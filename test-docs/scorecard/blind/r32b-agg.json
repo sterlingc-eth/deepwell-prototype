@@ -254,7 +254,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date ",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date < $1::date ",
     "params": [
      "@today"
     ]
@@ -268,7 +268,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > ($1::date + interval '365 days') ",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date >= $1::date ",
     "params": [
      "@today"
     ]
@@ -282,7 +282,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date ",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date < $1::date ",
     "params": [
      "@today"
     ]
@@ -296,7 +296,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > ($1::date + interval '365 days') ",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date >= $1::date ",
     "params": [
      "@today"
     ]
@@ -310,7 +310,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date ",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date < $1::date ",
     "params": [
      "@today"
     ]
@@ -324,7 +324,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > ($1::date + interval '365 days') ",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date >= $1::date ",
     "params": [
      "@today"
     ]
@@ -338,7 +338,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date ",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date < $1::date ",
     "params": [
      "@today"
     ]
@@ -352,7 +352,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > ($1::date + interval '365 days') ",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date >= $1::date ",
     "params": [
      "@today"
     ]
@@ -366,7 +366,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date AND data->>'manufacturer' ILIKE $2",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date < $1::date AND data->>'manufacturer' ILIKE $2",
     "params": [
      "@today",
      "York"
@@ -381,7 +381,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > $1::date AND data->>'manufacturer' ILIKE $2",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date >= $1::date AND data->>'manufacturer' ILIKE $2",
     "params": [
      "@today",
      "Daikin"
@@ -396,7 +396,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date AND data->>'manufacturer' ILIKE $2",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date < $1::date AND data->>'manufacturer' ILIKE $2",
     "params": [
      "@today",
      "Mitsubishi"
@@ -411,7 +411,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > $1::date AND data->>'manufacturer' ILIKE $2",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date >= $1::date AND data->>'manufacturer' ILIKE $2",
     "params": [
      "@today",
      "Rheem"
@@ -426,7 +426,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date AND data->>'manufacturer' ILIKE $2",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date < $1::date AND data->>'manufacturer' ILIKE $2",
     "params": [
      "@today",
      "York"
@@ -441,7 +441,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > $1::date AND data->>'manufacturer' ILIKE $2",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date >= $1::date AND data->>'manufacturer' ILIKE $2",
     "params": [
      "@today",
      "Trane"
@@ -456,7 +456,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date AND data->>'manufacturer' ILIKE $2",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date < $1::date AND data->>'manufacturer' ILIKE $2",
     "params": [
      "@today",
      "Goodman"
@@ -471,7 +471,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > $1::date AND data->>'manufacturer' ILIKE $2",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date >= $1::date AND data->>'manufacturer' ILIKE $2",
     "params": [
      "@today",
      "Goodman"
@@ -486,7 +486,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date AND data->>'manufacturer' ILIKE $2",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date < $1::date AND data->>'manufacturer' ILIKE $2",
     "params": [
      "@today",
      "Mitsubishi"
@@ -501,7 +501,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > $1::date AND data->>'manufacturer' ILIKE $2",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date >= $1::date AND data->>'manufacturer' ILIKE $2",
     "params": [
      "@today",
      "Trane"
@@ -516,7 +516,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date AND data->>'manufacturer' ILIKE $2",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date < $1::date AND data->>'manufacturer' ILIKE $2",
     "params": [
      "@today",
      "Lennox"
@@ -531,7 +531,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > $1::date AND data->>'manufacturer' ILIKE $2",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date >= $1::date AND data->>'manufacturer' ILIKE $2",
     "params": [
      "@today",
      "Trane"
@@ -546,7 +546,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date AND data->>'manufacturer' ILIKE $2",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date < $1::date AND data->>'manufacturer' ILIKE $2",
     "params": [
      "@today",
      "Carrier"
@@ -561,7 +561,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > $1::date AND data->>'manufacturer' ILIKE $2",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date >= $1::date AND data->>'manufacturer' ILIKE $2",
     "params": [
      "@today",
      "Daikin"
@@ -576,7 +576,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date AND data->>'manufacturer' ILIKE $2",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date < $1::date AND data->>'manufacturer' ILIKE $2",
     "params": [
      "@today",
      "Daikin"
@@ -591,7 +591,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > $1::date AND data->>'manufacturer' ILIKE $2",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date >= $1::date AND data->>'manufacturer' ILIKE $2",
     "params": [
      "@today",
      "Mitsubishi"
@@ -606,7 +606,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date AND data->>'manufacturer' ILIKE $2",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date < $1::date AND data->>'manufacturer' ILIKE $2",
     "params": [
      "@today",
      "Trane"
@@ -621,7 +621,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > $1::date AND data->>'manufacturer' ILIKE $2",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date >= $1::date AND data->>'manufacturer' ILIKE $2",
     "params": [
      "@today",
      "Trane"
@@ -636,7 +636,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date AND data->>'manufacturer' ILIKE $2",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date < $1::date AND data->>'manufacturer' ILIKE $2",
     "params": [
      "@today",
      "Mitsubishi"
@@ -651,7 +651,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > $1::date AND data->>'manufacturer' ILIKE $2",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date >= $1::date AND data->>'manufacturer' ILIKE $2",
     "params": [
      "@today",
      "Carrier"
@@ -666,7 +666,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date AND data->>'manufacturer' ILIKE $2",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date < $1::date AND data->>'manufacturer' ILIKE $2",
     "params": [
      "@today",
      "Rheem"
@@ -681,7 +681,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > $1::date AND data->>'manufacturer' ILIKE $2",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date >= $1::date AND data->>'manufacturer' ILIKE $2",
     "params": [
      "@today",
      "Rheem"
@@ -696,7 +696,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date AND data->>'manufacturer' ILIKE $2",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date < $1::date AND data->>'manufacturer' ILIKE $2",
     "params": [
      "@today",
      "Mitsubishi"
@@ -711,7 +711,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > $1::date AND data->>'manufacturer' ILIKE $2",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date >= $1::date AND data->>'manufacturer' ILIKE $2",
     "params": [
      "@today",
      "Trane"
@@ -726,7 +726,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date AND data->>'manufacturer' ILIKE $2",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date < $1::date AND data->>'manufacturer' ILIKE $2",
     "params": [
      "@today",
      "Daikin"
@@ -741,7 +741,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > $1::date AND data->>'manufacturer' ILIKE $2",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date >= $1::date AND data->>'manufacturer' ILIKE $2",
     "params": [
      "@today",
      "Trane"
@@ -756,7 +756,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date AND data->>'manufacturer' ILIKE $2",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date < $1::date AND data->>'manufacturer' ILIKE $2",
     "params": [
      "@today",
      "Goodman"
@@ -771,7 +771,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > $1::date AND data->>'manufacturer' ILIKE $2",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date >= $1::date AND data->>'manufacturer' ILIKE $2",
     "params": [
      "@today",
      "Goodman"
@@ -786,7 +786,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date AND data->>'manufacturer' ILIKE $2",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date < $1::date AND data->>'manufacturer' ILIKE $2",
     "params": [
      "@today",
      "Rheem"
@@ -801,7 +801,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > $1::date AND data->>'manufacturer' ILIKE $2",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date >= $1::date AND data->>'manufacturer' ILIKE $2",
     "params": [
      "@today",
      "York"
@@ -816,7 +816,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date <= $1::date AND data->>'manufacturer' ILIKE $2",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date < $1::date AND data->>'manufacturer' ILIKE $2",
     "params": [
      "@today",
      "Rheem"
@@ -831,7 +831,7 @@
    "shape": "blind_warranty_count",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date > $1::date AND data->>'manufacturer' ILIKE $2",
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' IS NOT NULL AND (data#>>'{warranty,expires}')::date >= $1::date AND data->>'manufacturer' ILIKE $2",
     "params": [
      "@today",
      "Mitsubishi"

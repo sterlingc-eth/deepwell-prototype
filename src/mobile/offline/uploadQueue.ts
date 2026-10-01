@@ -88,9 +88,25 @@ function isAuthError(err: unknown): boolean {
 
 /** R30 L4: a billing 402 will not clear in seconds - wait at least this long between tries. */
 export const BILLING_RETRY_MIN_MS = 10 * 60_000
+/** R35: never wait longer than this on a server Retry-After (a daily-cap 429 says "until UTC midnight"; the tech should
+ *  not come back to a scan that sat idle all night when the cap lifted at 5am local). */
+export const RETRY_AFTER_CAP_MS = 2 * 60 * 60_000
 export function retryDelayMs(err: unknown, attempts: number): number {
   const base = backoffDelayMs(attempts)
-  return err instanceof IngestHttpError && err.status === 402 ? Math.max(base, BILLING_RETRY_MIN_MS) : base
+  if (err instanceof IngestHttpError && err.status === 402) return Math.max(base, BILLING_RETRY_MIN_MS)
+  // R35: honor the server's Retry-After on a 429 (it was ignored here - the queue guessed its own backoff and every
+  // queued scan guessed the same moment, which is a thundering herd on the shared per-minute bucket).
+  if (err instanceof IngestHttpError && err.status === 429 && typeof err.retryAfterSeconds === 'number' && Number.isFinite(err.retryAfterSeconds) && err.retryAfterSeconds >= 0) {
+    return Math.min(Math.max(base, err.retryAfterSeconds * 1000 + Math.round(Math.random() * 2000)), RETRY_AFTER_CAP_MS)
+  }
+  return base
+}
+
+/** R35: a response that says "the SHOP is throttled/blocked right now", not "this scan is bad". When one arrives the
+ *  rest of the queue must stop sending: every further attempt is certain to fail the same way, burns that scan's retry
+ *  budget, and (rate limit) makes the shared per-minute bucket worse for the shop's other people. */
+export function isShopWidePause(err: unknown): boolean {
+  return err instanceof IngestHttpError && (err.status === 429 || err.status === 402)
 }
 
 function errorMessage(err: unknown): string {
@@ -139,6 +155,8 @@ export class OfflineUploadQueue {
    *  `retryAuthNow` (or a fresh drain() call after re-auth, e.g. next app
    *  open — the auth block itself is never persisted). */
   private authBlocked = new Set<string>()
+  /** R35: tenant -> epoch ms before which NOTHING is sent (set by a shop-wide 429/402, see isShopWidePause). */
+  private pausedUntil = new Map<string, number>()
   private backoffTimers = new Map<string, ReturnType<typeof setTimeout>>()
   /** The shop this phone is signed into RIGHT NOW. `undefined` = never told (tests, unguarded); `null` = nobody is
    *  signed in, so nothing may upload. A drain only ever runs for the active tenant; see setActiveTenant. */
@@ -184,6 +202,7 @@ export class OfflineUploadQueue {
     this.backoffTimers.clear()
     for (const ac of this.inflight.values()) ac.abort()
     this.authBlocked.clear()
+    this.pausedUntil.clear()
     await this.store.clearAll()
     for (const key of this.listeners.keys()) await this.notify(key)
   }
@@ -268,6 +287,15 @@ export class OfflineUploadQueue {
     if (!this.allowed(tenantKey)) return
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return
     if (this.authBlocked.has(tenantKey)) return
+    // R35: inside a shop-wide pause the online/visibility/sync triggers must not retry the next scan early.
+    const pausedUntil = this.pausedUntil.get(tenantKey) ?? 0
+    if (pausedUntil > Date.now()) {
+      if (!this.backoffTimers.has(tenantKey)) {
+        this.backoffTimers.set(tenantKey, setTimeout(() => void this.drain(tenantKey, opts), pausedUntil - Date.now()))
+      }
+      return
+    }
+    this.pausedUntil.delete(tenantKey)
     this.draining.add(tenantKey)
     const ac = new AbortController()
     this.inflight.set(tenantKey, ac)
@@ -321,6 +349,12 @@ export class OfflineUploadQueue {
           }
           await this.store.update(item.id, patch)
           opts.onError?.({ ...item, ...patch })
+          // R35: stop the drain at the first shop-wide refusal; the untouched scans keep their place and attempts.
+          if (isShopWidePause(err)) {
+            this.pausedUntil.set(tenantKey, patch.nextAttemptAt ?? Date.now() + retryDelayMs(err, attempts))
+            await this.notify(tenantKey)
+            break
+          }
         }
         await this.notify(tenantKey)
       }

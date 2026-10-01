@@ -119,6 +119,9 @@ export function parsePeriod(q, today) {
   if (/\blast year\b/.test(s)) return { label: String(Y - 1), from: iso(Y - 1, 1, 1), to: iso(Y - 1, 12, 31) };
   if (/\bthis year\b/.test(s)) return { label: String(Y), from: iso(Y, 1, 1), to: iso(Y, 12, 31) };
   if ((m = s.match(/\b(?:in|for|during)\s+(20\d\d)\b/))) return { label: m[1], from: iso(+m[1], 1, 1), to: iso(+m[1], 12, 31) };
+  // R35 adversarial pass: "the 2026 revenue" / "2025 invoices total" / "revenue 2026" named a year with no "in/for" and was answered with the
+  // all-time total. A year right next to a money noun is that calendar year.
+  if ((m = s.match(/\b((?:19|20)\d\d)\s+(?:revenue|sales|income|invoic\w*|billing|totals?|numbers)\b/) ?? s.match(/\b(?:revenue|sales|income|invoic\w*|billing|billed)\s+(?:of\s+)?((?:19|20)\d\d)\b/))) return { label: m[1], from: iso(+m[1], 1, 1), to: iso(+m[1], 12, 31) };
   void D;
   return null;
 }
@@ -717,7 +720,8 @@ async function receivables(db, intent, ctx, direction = 'receivable') {
   const noun = direction === 'receivable' ? 'invoice' : 'bill';
   const excl = exclusionText({ noTotal: a.n_open_no_amount, unknownStatus: direction === 'receivable' ? a.n_unknown : 0, noun });
   if (a.n_open === 0) {
-    return baseAnswer(`No open ${noun}s${who} that I can total${direction === 'receivable' ? ' - nothing is marked unpaid or partly paid' : ''}.${excl}`, [], { confidence: 1, ...zeroCite(`Searched every ${direction === 'receivable' ? 'customer invoice' : 'vendor bill'}${who}; none are marked unpaid or partly paid with an amount left.`) });
+    // R35 brevity: "No open invoices — none is marked unpaid. Note: 120 show no payment status, so they aren't counted."
+    return baseAnswer(`No open ${noun}s${who}${direction === 'receivable' ? ' — none is marked unpaid or partly paid' : ''}.${excl}`, [], { confidence: 1, ...zeroCite(`Searched every ${direction === 'receivable' ? 'customer invoice' : 'vendor bill'}${who}; none are marked unpaid or partly paid with an amount left.`) });
   }
   const rowFact = (r) => ({
     label: `${r.invoice_number ? `#${r.invoice_number}` : r.filename ?? 'Document'}${r.customer_name ? ` · ${r.customer_name}` : r.vendor_name ? ` · ${r.vendor_name}` : ''}`,

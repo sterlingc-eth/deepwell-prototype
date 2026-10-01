@@ -304,12 +304,9 @@ export function buildMaintenanceAnswer(res) {
   }
   const names = listed.slice(0, 6).map((e) => e.name);
   const nameList = names.length ? `: ${names.join(', ')}${listed.length > names.length ? `, and ${listed.length - names.length} more` : ''}` : '';
-  // Round 7: the decision is the flat 365-day rule every oracle in this exam uses, never an agreement's own
-  // cadence (see computeMaintenanceDue's own doc comment) — worded to match exactly what was computed.
-  const basis = res.mode === 'cadence'
-    ? ' Overdue = the last service visit on or before today is more than 12 months old, a flat cadence applied the same way regardless of any agreement’s own stated cadence. A customer with no qualifying visit on file at all is not counted here.'
-    : '';
-  const text = `${head}${nameList}.${basis}${futureNote(res.futureVisits, res.today)}`;
+  // Round 7 / R35: the flat 365-day rule is stated in the citation basis (citations/history.js maintenanceCitations), not in the answer text.
+  // R35 brevity: the rule sentence is the citation basis, not answer text (the answer leads with the count and names).
+  const text = `${head}${nameList}.${futureNote(res.futureVisits, res.today)}`;
   // TEAM C: one customer record per listed customer (same lists the counts come from), future visits mentioned only.
   return attachCitations(answerEnvelope({ text, facts, extra: { maintenanceDue: true } }), maintenanceCitations(res, listed));
 }

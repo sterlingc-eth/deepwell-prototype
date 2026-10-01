@@ -155,7 +155,8 @@ export function useRecordsBrowse() {
       const res = await recordsStore.browseDocuments({ ...f, cursor: cur, limit: 50 });
       if (id !== requestId.current) return; // a newer request landed first
       setRows((prev) => (append ? [...prev, ...res.rows] : res.rows));
-      setFacets(res.facets);
+      // R35: a "load more" page carries no facets (they describe the whole filtered set and were sent with page one).
+      if (!append || res.facets.length) setFacets(res.facets);
       setTotal(res.total);
       setCursor(res.nextCursor);
       setHasMore(res.hasMore);

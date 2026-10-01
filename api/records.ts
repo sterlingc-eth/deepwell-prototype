@@ -85,7 +85,10 @@ export function cleanCreateDocumentPayload(p: any): { ok: true; value: Record<st
   if (!filename) return { ok: false, error: 'original_filename is required' };
   if (typeof p?.sha256_hash !== 'string' || !/^[0-9a-f]{64}$/.test(p.sha256_hash)) return { ok: false, error: 'sha256_hash must be a 64-character hex digest' };
   const size = p?.file_size_bytes;
-  if (size != null && (!Number.isInteger(size) || size <= 0 || size > MAX_CREATE_BYTES)) return { ok: false, error: 'file_size_bytes must be a whole number of bytes between 1 and 100 MB' };
+  // R35 (owner decision): every upload states its size - this path included. The pending-pages estimate behind the monthly
+  // page cap reads file_size_bytes, and a row with none counted as a single page.
+  if (size == null) return { ok: false, error: 'file_size_bytes is required: send the original file\'s exact size in bytes' };
+  if (typeof size !== 'number' || !Number.isInteger(size) || size <= 0 || size > MAX_CREATE_BYTES) return { ok: false, error: 'file_size_bytes must be a whole number of bytes between 1 and 100 MB' };
   if (p?.content_type != null && typeof p.content_type !== 'string') return { ok: false, error: 'content_type must be a string' };
   if (p?.batch_id != null && (typeof p.batch_id !== 'string' || !UUID_SHAPE.test(p.batch_id))) return { ok: false, error: 'batch_id must be a uuid' };
   const dt = typeof p?.document_type === 'string' ? p.document_type.trim().toLowerCase().replace(/[\s_]+/g, '-') : null;
@@ -94,7 +97,7 @@ export function cleanCreateDocumentPayload(p: any): { ok: true; value: Record<st
     value: {
       original_filename: filename,
       sha256_hash: p.sha256_hash,
-      file_size_bytes: size ?? null,
+      file_size_bytes: size,
       content_type: normalizeContentType(p?.content_type),
       batch_id: p?.batch_id ?? null,
       // A type is kept only when it is a known id; anything else is left for classification to decide.

@@ -1,0 +1,1599 @@
+{
+ "version": "r35-blind-1",
+ "category": "blind-r35-warr",
+ "source": "scripts/gen-blind-r35.mjs (seeded, frozen before the R35 rules)",
+ "questions": [
+  {
+   "id": "bl-r35-warr-001",
+   "text": "hang on... how many units are still under warranty",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-002",
+   "text": "alright, how many units are under warranty thanks",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-003",
+   "text": "hang on... how many systems are still covered",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-004",
+   "text": "ok so number of units still under warranty",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-005",
+   "text": "how many units still have warranty",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-006",
+   "text": "quick one - how many units are in warranty right now real quick",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-007",
+   "text": "hey, count of units still under warranty thanks",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-008",
+   "text": "how many units have an active warranty please",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-009",
+   "text": "alright, how many units have warranty coverage right now please",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-010",
+   "text": "ok so how many pieces of equipment are still under warranty thanks",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-011",
+   "text": "alright, how many of our units are still under warranty",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-012",
+   "text": "sorry, one more - how many units are currently under warranty real quick",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-013",
+   "text": "alright, how many units are still covered by warranty",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-014",
+   "text": "ok so how many units are covered under warranty",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-015",
+   "text": "how many units have a valid warranty",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-016",
+   "text": "sorry, one more - how many systems are under warranty",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-017",
+   "text": "hang on... how many units do we have under warranty for me",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-018",
+   "text": "ok so how many units are still in warranty",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-019",
+   "text": "how many units still covered thanks",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-020",
+   "text": "quick one - how many units have current warranties please",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-021",
+   "text": "quick one - how many units are under a warranty thanks",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-022",
+   "text": "real quick: how many of the units are still under warranty please",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-023",
+   "text": "units still under warranty - how many",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-024",
+   "text": "total units still under warranty thanks",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-025",
+   "text": "how many units are not expired on warranty for me",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-026",
+   "text": "quick one - how many units have warranties that haven't expired please",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-027",
+   "text": "how many units have unexpired warranties thanks",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-028",
+   "text": "how many systems still have warranty coverage for me",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-029",
+   "text": "real quick: how many equipment records are still under warranty",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-030",
+   "text": "hey, how many units are under warranty today thanks",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-031",
+   "text": "alright, how many active warranties do we have",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-032",
+   "text": "how many warranties are still active",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-033",
+   "text": "hang on... how many warranties haven't expired yet",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-034",
+   "text": "how many warranties are still good thanks",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-035",
+   "text": "sorry, one more - how many warranties are still valid thanks",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-036",
+   "text": "how many active warranties are on file",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-037",
+   "text": "alright, how many warranties are still in effect for me",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-038",
+   "text": "hey, how many warranties have not run out yet",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-039",
+   "text": "sorry, one more - how many units have more than a year left on warranty real quick",
+   "category": "blind-r35-warr",
+   "shape": "warr_over_year",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date > ($1::date + 365)",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-040",
+   "text": "alright, how many units have over 12 months of warranty left thanks",
+   "category": "blind-r35-warr",
+   "shape": "warr_over_year",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date > ($1::date + 365)",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-041",
+   "text": "how many warranties have more than a year left",
+   "category": "blind-r35-warr",
+   "shape": "warr_over_year",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date > ($1::date + 365)",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-042",
+   "text": "how many units are under warranty for more than another year please",
+   "category": "blind-r35-warr",
+   "shape": "warr_over_year",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date > ($1::date + 365)",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-043",
+   "text": "hey, how many units have over a year of warranty remaining",
+   "category": "blind-r35-warr",
+   "shape": "warr_over_year",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date > ($1::date + 365)",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-044",
+   "text": "hang on... how many units have more than 12 months left on their warranty thanks",
+   "category": "blind-r35-warr",
+   "shape": "warr_over_year",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date > ($1::date + 365)",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-045",
+   "text": "sorry, one more - how many units have more than 365 days of warranty left",
+   "category": "blind-r35-warr",
+   "shape": "warr_over_year",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date > ($1::date + 365)",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-046",
+   "text": "quick one - how many units still have over a year of coverage for me",
+   "category": "blind-r35-warr",
+   "shape": "warr_over_year",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date > ($1::date + 365)",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-047",
+   "text": "hang on... number of units with more than a year of warranty left real quick",
+   "category": "blind-r35-warr",
+   "shape": "warr_over_year",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date > ($1::date + 365)",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-048",
+   "text": "how many units have warranties that run more than a year from now for me",
+   "category": "blind-r35-warr",
+   "shape": "warr_over_year",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date > ($1::date + 365)",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-049",
+   "text": "how many systems have more than a year left on warranty",
+   "category": "blind-r35-warr",
+   "shape": "warr_over_year",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date > ($1::date + 365)",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-050",
+   "text": "how many units are covered for more than a year yet thanks",
+   "category": "blind-r35-warr",
+   "shape": "warr_over_year",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date > ($1::date + 365)",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-051",
+   "text": "sorry, one more - how many warranties expire within a year please",
+   "category": "blind-r35-warr",
+   "shape": "warr_within_year",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date AND substr(data#>>'{warranty,expires}',1,10)::date <= ($1::date + 365)",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-052",
+   "text": "real quick: how many units have warranties expiring in the next 12 months for me",
+   "category": "blind-r35-warr",
+   "shape": "warr_within_year",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date AND substr(data#>>'{warranty,expires}',1,10)::date <= ($1::date + 365)",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-053",
+   "text": "alright, how many warranties run out in the next year thanks",
+   "category": "blind-r35-warr",
+   "shape": "warr_within_year",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date AND substr(data#>>'{warranty,expires}',1,10)::date <= ($1::date + 365)",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-054",
+   "text": "sorry, one more - how many unit warranties expire within the next year",
+   "category": "blind-r35-warr",
+   "shape": "warr_within_year",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date AND substr(data#>>'{warranty,expires}',1,10)::date <= ($1::date + 365)",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-055",
+   "text": "real quick: how many warranties are expiring within 12 months",
+   "category": "blind-r35-warr",
+   "shape": "warr_within_year",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date AND substr(data#>>'{warranty,expires}',1,10)::date <= ($1::date + 365)",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-056",
+   "text": "how many units come off warranty in the next year please",
+   "category": "blind-r35-warr",
+   "shape": "warr_within_year",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date AND substr(data#>>'{warranty,expires}',1,10)::date <= ($1::date + 365)",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-057",
+   "text": "how many Trane units are still under warranty for me",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND lower(data->>'manufacturer') = lower($2) AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today",
+     "Trane"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-058",
+   "text": "quick one - how many Trane units have an active warranty",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND lower(data->>'manufacturer') = lower($2) AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today",
+     "Trane"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-059",
+   "text": "number of carrier systems still covered",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND lower(data->>'manufacturer') = lower($2) AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today",
+     "Carrier"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-060",
+   "text": "hey, how many carrier units are under warranty right now",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND lower(data->>'manufacturer') = lower($2) AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today",
+     "Carrier"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-061",
+   "text": "hey, how many Goodman units have an active warranty thanks",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND lower(data->>'manufacturer') = lower($2) AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today",
+     "Goodman"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-062",
+   "text": "how many Goodman units are still under warranty thanks",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND lower(data->>'manufacturer') = lower($2) AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today",
+     "Goodman"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-063",
+   "text": "ok so how many lennox units are under warranty right now",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND lower(data->>'manufacturer') = lower($2) AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today",
+     "Lennox"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-064",
+   "text": "hang on... number of lennox systems still covered thanks",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND lower(data->>'manufacturer') = lower($2) AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today",
+     "Lennox"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-065",
+   "text": "quick one - how many Rheem units are still under warranty thanks",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND lower(data->>'manufacturer') = lower($2) AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today",
+     "Rheem"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-066",
+   "text": "how many Rheem units have an active warranty please",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND lower(data->>'manufacturer') = lower($2) AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today",
+     "Rheem"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-067",
+   "text": "number of york systems still covered",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND lower(data->>'manufacturer') = lower($2) AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today",
+     "York"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-068",
+   "text": "sorry, one more - how many york units are under warranty right now",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND lower(data->>'manufacturer') = lower($2) AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today",
+     "York"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-069",
+   "text": "how many Daikin units have an active warranty please",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND lower(data->>'manufacturer') = lower($2) AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today",
+     "Daikin"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-070",
+   "text": "quick one - how many Daikin units are still under warranty",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND lower(data->>'manufacturer') = lower($2) AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today",
+     "Daikin"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-071",
+   "text": "hey, how many mitsubishi units are under warranty right now please",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND lower(data->>'manufacturer') = lower($2) AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today",
+     "Mitsubishi"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-072",
+   "text": "ok so number of mitsubishi systems still covered real quick",
+   "category": "blind-r35-warr",
+   "shape": "warr_still_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND lower(data->>'manufacturer') = lower($2) AND substr(data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today",
+     "Mitsubishi"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-073",
+   "text": "hang on... how many Trane units are out of warranty",
+   "category": "blind-r35-warr",
+   "shape": "warr_expired_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND lower(data->>'manufacturer') = lower($2) AND substr(data#>>'{warranty,expires}',1,10)::date < $1::date",
+    "params": [
+     "@today",
+     "Trane"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-074",
+   "text": "how many carrier units are no longer under warranty",
+   "category": "blind-r35-warr",
+   "shape": "warr_expired_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND lower(data->>'manufacturer') = lower($2) AND substr(data#>>'{warranty,expires}',1,10)::date < $1::date",
+    "params": [
+     "@today",
+     "Carrier"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-075",
+   "text": "how many Goodman units are out of warranty",
+   "category": "blind-r35-warr",
+   "shape": "warr_expired_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND lower(data->>'manufacturer') = lower($2) AND substr(data#>>'{warranty,expires}',1,10)::date < $1::date",
+    "params": [
+     "@today",
+     "Goodman"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-076",
+   "text": "how many lennox units are no longer under warranty",
+   "category": "blind-r35-warr",
+   "shape": "warr_expired_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND lower(data->>'manufacturer') = lower($2) AND substr(data#>>'{warranty,expires}',1,10)::date < $1::date",
+    "params": [
+     "@today",
+     "Lennox"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-077",
+   "text": "how many Rheem units are out of warranty thanks",
+   "category": "blind-r35-warr",
+   "shape": "warr_expired_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND lower(data->>'manufacturer') = lower($2) AND substr(data#>>'{warranty,expires}',1,10)::date < $1::date",
+    "params": [
+     "@today",
+     "Rheem"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-078",
+   "text": "ok so how many york units are no longer under warranty",
+   "category": "blind-r35-warr",
+   "shape": "warr_expired_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND lower(data->>'manufacturer') = lower($2) AND substr(data#>>'{warranty,expires}',1,10)::date < $1::date",
+    "params": [
+     "@today",
+     "York"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-079",
+   "text": "how many Daikin units are out of warranty please",
+   "category": "blind-r35-warr",
+   "shape": "warr_expired_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND lower(data->>'manufacturer') = lower($2) AND substr(data#>>'{warranty,expires}',1,10)::date < $1::date",
+    "params": [
+     "@today",
+     "Daikin"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-080",
+   "text": "hang on... how many mitsubishi units are no longer under warranty for me",
+   "category": "blind-r35-warr",
+   "shape": "warr_expired_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND lower(data->>'manufacturer') = lower($2) AND substr(data#>>'{warranty,expires}',1,10)::date < $1::date",
+    "params": [
+     "@today",
+     "Mitsubishi"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-081",
+   "text": "sorry, one more - how many units are out of warranty real quick",
+   "category": "blind-r35-warr",
+   "shape": "warr_expired_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date < $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-082",
+   "text": "how many units are no longer under warranty",
+   "category": "blind-r35-warr",
+   "shape": "warr_expired_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date < $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-083",
+   "text": "how many units have an expired warranty thanks",
+   "category": "blind-r35-warr",
+   "shape": "warr_expired_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date < $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-084",
+   "text": "ok so how many units are not under warranty anymore",
+   "category": "blind-r35-warr",
+   "shape": "warr_expired_shopwide",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  AND substr(data#>>'{warranty,expires}',1,10)::date < $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-085",
+   "text": "hang on... is Laura Mercer's unit still under warranty",
+   "category": "blind-r35-warr",
+   "shape": "warr_customer",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1",
+    "params": [
+     "Laura Mercer",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "Laura Mercer"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-086",
+   "text": "is Cynthia Kowalski still covered",
+   "category": "blind-r35-warr",
+   "shape": "warr_customer",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1",
+    "params": [
+     "Cynthia Kowalski",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "Cynthia Kowalski"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-087",
+   "text": "hang on... does Linda Garrison still have warranty",
+   "category": "blind-r35-warr",
+   "shape": "warr_customer",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1",
+    "params": [
+     "Linda Garrison",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "Linda Garrison"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-088",
+   "text": "Patricia Esparza warranty still good?",
+   "category": "blind-r35-warr",
+   "shape": "warr_customer",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1",
+    "params": [
+     "Patricia Esparza",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "Patricia Esparza"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-089",
+   "text": "ok so is Richard Pruitt's unit still under warranty",
+   "category": "blind-r35-warr",
+   "shape": "warr_customer",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1",
+    "params": [
+     "Richard Pruitt",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "Richard Pruitt"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-090",
+   "text": "sorry, one more - is Susan Calloway still covered",
+   "category": "blind-r35-warr",
+   "shape": "warr_customer",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1",
+    "params": [
+     "Susan Calloway",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "Susan Calloway"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-091",
+   "text": "hang on... does William Quintana still have warranty real quick",
+   "category": "blind-r35-warr",
+   "shape": "warr_customer",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1",
+    "params": [
+     "William Quintana",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "William Quintana"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-092",
+   "text": "hey, Jessica Bennett warranty still good? for me",
+   "category": "blind-r35-warr",
+   "shape": "warr_customer",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1",
+    "params": [
+     "Jessica Bennett",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "Jessica Bennett"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-093",
+   "text": "is Stephanie Nakamura's unit still under warranty thanks",
+   "category": "blind-r35-warr",
+   "shape": "warr_customer",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1",
+    "params": [
+     "Stephanie Nakamura",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "Stephanie Nakamura"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-094",
+   "text": "hang on... is Donna Winslow still covered",
+   "category": "blind-r35-warr",
+   "shape": "warr_customer",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1",
+    "params": [
+     "Donna Winslow",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "Donna Winslow"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-095",
+   "text": "hang on... does Kenneth Gallardo still have warranty please",
+   "category": "blind-r35-warr",
+   "shape": "warr_customer",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1",
+    "params": [
+     "Kenneth Gallardo",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "Kenneth Gallardo"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-096",
+   "text": "Robert Salazar warranty still good?",
+   "category": "blind-r35-warr",
+   "shape": "warr_customer",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1",
+    "params": [
+     "Robert Salazar",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "Robert Salazar"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-097",
+   "text": "real quick: is Angela Hutchins's unit still under warranty thanks",
+   "category": "blind-r35-warr",
+   "shape": "warr_customer",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1",
+    "params": [
+     "Angela Hutchins",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "Angela Hutchins"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-098",
+   "text": "real quick: is Susan Dominguez still covered",
+   "category": "blind-r35-warr",
+   "shape": "warr_customer",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1",
+    "params": [
+     "Susan Dominguez",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "Susan Dominguez"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-099",
+   "text": "real quick: does James Tovar still have warranty real quick",
+   "category": "blind-r35-warr",
+   "shape": "warr_customer",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1",
+    "params": [
+     "James Tovar",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "James Tovar"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-100",
+   "text": "hey, Michelle Tovar warranty still good? thanks",
+   "category": "blind-r35-warr",
+   "shape": "warr_customer",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1",
+    "params": [
+     "Michelle Tovar",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "Michelle Tovar"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-101",
+   "text": "how many customers have a unit still under warranty",
+   "category": "blind-r35-warr",
+   "shape": "warr_customers",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(DISTINCT c.id) AS n FROM entities c JOIN entities e ON e.customer_id = c.id WHERE c.entity_type='customer' AND c.merged_into IS NULL AND e.entity_type='equipment' AND e.merged_into IS NULL AND e.data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND substr(e.data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-102",
+   "text": "quick one - how many customers are still under warranty please",
+   "category": "blind-r35-warr",
+   "shape": "warr_customers",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(DISTINCT c.id) AS n FROM entities c JOIN entities e ON e.customer_id = c.id WHERE c.entity_type='customer' AND c.merged_into IS NULL AND e.entity_type='equipment' AND e.merged_into IS NULL AND e.data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND substr(e.data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-103",
+   "text": "ok so how many customers have an active warranty",
+   "category": "blind-r35-warr",
+   "shape": "warr_customers",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(DISTINCT c.id) AS n FROM entities c JOIN entities e ON e.customer_id = c.id WHERE c.entity_type='customer' AND c.merged_into IS NULL AND e.entity_type='equipment' AND e.merged_into IS NULL AND e.data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND substr(e.data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-warr-104",
+   "text": "hang on... number of customers with equipment still under warranty",
+   "category": "blind-r35-warr",
+   "shape": "warr_customers",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(DISTINCT c.id) AS n FROM entities c JOIN entities e ON e.customer_id = c.id WHERE c.entity_type='customer' AND c.merged_into IS NULL AND e.entity_type='equipment' AND e.merged_into IS NULL AND e.data#>>'{warranty,expires}' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND substr(e.data#>>'{warranty,expires}',1,10)::date >= $1::date",
+    "params": [
+     "@today"
+    ]
+   },
+   "citationRequired": true
+  }
+ ]
+}

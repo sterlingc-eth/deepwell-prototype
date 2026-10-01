@@ -97,6 +97,11 @@ for (const c of [...(KNOWN_AZ_CITY_NAMES ?? []), ...(KNOWN_US_CITY_NAMES ?? [])]
 const STREET_WORDS = new Set(words("street st avenue ave road rd drive dr lane ln boulevard blvd court ct circle cir way place pl trail trl parkway pkwy highway hwy terrace suite apt unit north south east west"));
 
 /** True when `token` is a real English word, a common given name or surname, a brand/city/vocabulary word, or a street word. */
+/** R35: a common given name ("Amy", "Gary") — used to tell "<first name> <surname on file>" from other two-word phrases. */
+export function isGivenName(token) {
+  return GIVEN_NAMES.has(String(token ?? "").toLowerCase());
+}
+
 export function isRealWordOrName(token) {
   const t = String(token ?? "").toLowerCase().replace(/[^a-z]/g, "");
   if (!t) return true;

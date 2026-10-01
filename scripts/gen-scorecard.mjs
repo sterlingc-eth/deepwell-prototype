@@ -99,7 +99,8 @@ function equipPred(f, q, yearsAgo) {
   const op = OPS[f.op];
   switch (f.field) {
     case "brand": return f.op === "eq" ? `lower(e.data->>'manufacturer') = lower(${q.p(String(f.value))})` : null;
-    case "warrantyStatus": return f.op === "eq" ? `${wstatus("e", q)} = ${q.p(String(f.value))}` : null;
+    // R35: 'covered' = not expired (active OR expiring), owner decision 2026-10-01.
+    case "warrantyStatus": return f.op === "eq" ? (String(f.value) === "covered" ? `${wstatus("e", q)} IN ('active', 'expiring')` : `${wstatus("e", q)} = ${q.p(String(f.value))}`) : null;
     case "installYear": {
       if (!op || typeof f.value !== "number") return null;
       const rhs = yearsAgo != null ? `(EXTRACT(YEAR FROM ${q.today()})::int - ${Math.trunc(yearsAgo)})` : q.p(f.value);

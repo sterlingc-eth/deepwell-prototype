@@ -83,7 +83,7 @@ export function dropConflicting(rows, asked) {
 
 const ADDR_IN_TEXT_RE = new RegExp(
   `\\b(\\d{1,6}\\s+(?:(?:${DIR_ALT})\\b\\.?\\s+)?(?:[A-Za-z0-9.']+\\s+){0,3}?(?:${STREET_SUFFIX_ALTERNATION})\\b\\.?` +
-    `(?:\\s*,?\\s*(?:apt|apartment|suite|ste|unit|#)\\s*#?[A-Za-z0-9]+)?(?:\\s*,\\s*[A-Za-z][A-Za-z ]{2,19}?(?=\\s*(?:,|\\?|\\.|$|\\d)))?(?:\\s*,?\\s*[A-Za-z]{2}\\s+\\d{5})?)`,
+    `(?:\\s*,?\\s*(?:apt|apartment|suite|ste|unit|#)\\s*#?[A-Za-z0-9]+)?(?:\\s*,\\s*[A-Za-z][A-Za-z ]{2,19}?(?=\\s*(?:,|\\?|\\.|$|\\d)|\\s+(?:still|is|was|has|have|had|under|in|covered|warranty|for|and|please|thanks)\\b))?(?:\\s*,?\\s*[A-Za-z]{2}\\s+\\d{5})?)`,
   'gi'
 );
 
@@ -104,14 +104,35 @@ export function answerAddressConflict(question, data) {
   const askedList = addressesIn(question);
   if (askedList.length !== 1) return null;
   const asked = askedList[0];
+  // R35: an answer that echoes the TYPED address in its own wording ("the only unit on file for <typed address>") carries the
+  // stored one in `addressOnFile`, so a loosely typed city/zip still gets its visible note.
+  const echoed = new Set(addressesIn(question).map((a) => a.toLowerCase()));
   const stored = [
     ...(data.records ?? []).filter((r) => r && (r.type === 'customer' || r.type === 'unit')).map((r) => r.sublabel),
-    ...addressesIn(data.text),
+    ...(Array.isArray(data.addressOnFile) ? data.addressOnFile : [data.addressOnFile]),
+    // R35 fix: with `addressOnFile` set, the answer text only echoes the TYPED label (often without the city), so it is not a stored address.
+    ...(data.addressOnFile ? [] : addressesIn(data.text).filter((a) => !echoed.has(a.toLowerCase()))),
   ].filter((s) => typeof s === 'string' && /\d/.test(s));
   const sameHouse = stored.filter((s) => parseAddressQualifiers(s).house === parseAddressQualifiers(asked).house);
   if (!sameHouse.length) return null;
   const conflicting = sameHouse.filter((s) => addressConflict(asked, s, { soft: true }));
   if (conflicting.length !== sameHouse.length) return null;
   const c = addressConflict(asked, conflicting[0], { soft: true });
-  return { asked, closest: conflicting[0], kind: c?.kind, soft: c?.kind === 'city' || c?.kind === 'zip' };
+  return { asked, closest: conflicting[0], kind: c?.kind, soft: c?.kind === 'city' || c?.kind === 'zip', askedQualifier: c?.asked ?? null };
+}
+
+/** R35: the short visible note for a loosely typed city/zip: "(Note: on file in Phoenix, not Mesa.)" / "(Note: on file under zip 85001, not 85201.)". */
+export function softConflictNote(conflict) {
+  if (!conflict?.soft) return null;
+  const cap = (w) => String(w ?? '').replace(/\b[a-z]/g, (ch) => ch.toUpperCase());
+  const parts = String(conflict.closest ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+  const city = parts.length >= 2 && !/^\s*[A-Z]{2}\b/.test(parts[1]) && !/\d/.test(parts[1]) ? parts[1] : null;
+  if (conflict.kind === 'zip') {
+    const z = /\b(\d{5})\b/.exec(parts.slice(1).join(' '));
+    if (!z) return `(Note: on file as ${conflict.closest}.)`;
+    const askedCity = parseAddressQualifiers(conflict.asked).city;
+    if (askedCity && city && !new RegExp(`\\b${askedCity}\\b`, 'i').test(city)) return `(Note: on file in ${city} ${z[1]}, not ${cap(askedCity)} ${conflict.askedQualifier}.)`;
+    return `(Note: on file under zip ${z[1]}, not ${conflict.askedQualifier}.)`;
+  }
+  return city ? `(Note: on file in ${city}, not ${cap(conflict.askedQualifier)}.)` : `(Note: on file as ${conflict.closest}, not ${cap(conflict.askedQualifier)}.)`;
 }

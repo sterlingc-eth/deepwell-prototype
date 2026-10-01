@@ -103,7 +103,8 @@ export function parseCompose(question, pack) {
   // warranty status
   if (/\bexpired\s+warrant(?:y|ies)\b/i.test(q)) conditions.push({ type: 'warrantyStatus', status: 'expired' });
   else if (/\bwarrant(?:y|ies)\s+expiring\b|\bexpiring\s+warrant(?:y|ies)\b/i.test(q)) conditions.push({ type: 'warrantyStatus', status: 'expiring' });
-  else if (/\bactive\s+warrant(?:y|ies)\b/i.test(q)) conditions.push({ type: 'warrantyStatus', status: 'active' });
+  // R35 (owner decision 2026-10-01): an "active warranty" is one that has not expired (active OR expiring bucket).
+  else if (/\b(?:active|current|valid)\s+warrant(?:y|ies)\b|\bstill\s+under\s+warranty\b/i.test(q)) conditions.push({ type: 'warrantyStatus', status: 'covered' });
 
   // document type existence, from the tenant's own pack vocabulary
   for (const { id, phrase } of docTypePhrases(pack)) {
@@ -163,7 +164,8 @@ function conditionPhrase(cond) {
     case 'warrantyStatus':
       return cond.status === 'expired' ? 'have an expired warranty'
         : cond.status === 'expiring' ? 'have a warranty expiring within the next year'
-        : 'have an active warranty';
+        : cond.status === 'covered' ? 'have a unit still under warranty'
+        : 'have more than a year of warranty left';
     case 'hasDocType': return `have a ${cond.phrase} on file`;
     case 'lacksDocType': return `have no ${cond.phrase} on file`;
     case 'lacksRecentService': return `haven't had a service visit in the last ${cond.months} months`;
@@ -211,6 +213,7 @@ export function matchesCondition(c, cond, { today, thisYear }) {
         return e.installYear != null && e.installYear < thisYear - cond.years;
       });
     case 'warrantyStatus':
+      if (cond.status === 'covered') return c.equipment.some((e) => e.warrantyStatus === 'active' || e.warrantyStatus === 'expiring');
       return c.equipment.some((e) => e.warrantyStatus === cond.status);
     case 'hasDocType':
       return docTypeAliases(cond.id).some((alias) => c.docTypes.has(alias));

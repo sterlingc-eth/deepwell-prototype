@@ -205,7 +205,7 @@ const WARRANTY_EXPIRING_RE = /\bwarrant(?:y|ies)\s+expiring\b|\bexpiring\s+warra
 // as before this change, rather than newly claiming a shape nobody has verified this engine answers
 // correctly.
 function looseWarrantyNotExpired(q) {
-  return warrantyStatusFromQuestion(q) === 'active';
+  return warrantyStatusFromQuestion(q) === 'covered'; // R35: analytics now names the not-expired reading 'covered'
 }
 const NO_EMAIL_RE = /\b(?:no|missing|without)\s+(?:an?\s+)?email\b|\bemail\b.*\bmissing\b/i;
 // R14 (K4): the positive counterpart — "have email on file" / "with an email on file" — needed for a

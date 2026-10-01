@@ -251,3 +251,64 @@ The engine's already-adjudicated reading won in every case; the blind oracle was
 
 Every loop kept: exam wrong 0, no new wrong id vs the baseline run, `verify:golden` floors raised (correct >= 1570, answered >= 1590, needs-model <= 16), p95 unchanged (~55 ms).
 
+
+## R35 (Donovan) — owner decisions decided 2026-10-01, learning loops, blue-collar brevity
+
+### Owner decisions (decided by the owner on 2026-10-01; implemented deterministic, $0)
+
+- **"Still under warranty" means coverage is still active: warranty end date ON OR AFTER today** (shop-wide, per brand, per customer, per
+  unit; also "in warranty", "covered", "warrantied", "active / current / valid warranty", "haven't expired"). This SUPERSEDES the R32 / R32b notes
+  above (strict >365-day "active" bucket, 33). The answer gives the active count AND, in the same short line, how many of those run out within
+  12 months, so both readings are covered: `37 units are still under warranty — 4 of them run out in the next 12 months.` (followed by the
+  number with no end date on file when there are any). Explicit phrasings keep their own buckets: "more than a year left" = end date more than
+  365 days out (33); "expiring soon / about to expire / run out in the next 12 months" = within 12 months (4); "expired / out of warranty /
+  not warrantied / no longer covered" = end date passed (79); "no warranty on file / unknown / no end date" = no end date on file (16).
+  Oracle: `counts-warranty-0004` counts status IN ('active','expiring') (37); the brand-scoped ids (h050, g135, h091-h098) already counted
+  end date after today. The `number` comparator reads the first number, so the two-number answer form passes; no grader change was needed.
+  Per-unit / per-customer answers say `active, under warranty until May 9, 2027 (expiring within 12 months)` (the grader's 'expiring' token).
+  "Covered by a maintenance agreement / plan / contract" is a different coverage and is never answered as a warranty count.
+- **Nicknames resolve without asking when they name exactly ONE person** (`api/_lib/vocab/nicknames.js`, several hundred formal <-> nickname
+  pairs both directions incl. common Hispanic diminutives; same surname; customers and technicians counted together; a technician only in a
+  work question; word-like nicknames — will, bill, pat, rob ... — only where a name can stand; quoted = exactly as typed). Visible note
+  `Showing results for Thomas Mercer (you typed "Tom Mercer").` (same note + "Not who you meant?" chip as typo auto-resolve); two candidates ->
+  the one-tap "Did you mean" choices. Kill switch `DONOVAN_NICKNAMES=0`.
+- **Serial lookups are deterministic** (`api/_lib/lookups/serialLookup.js`): every phrasing (unit / model / brand / install / warranty /
+  location / customer / last service for serial X), case / space / dash-insensitive, O->0 and I->1 on both sides (a collision lists every unit,
+  never picks one), a serial printed only on a document is reported from it, near misses name the closest serial, a model number typed as a
+  serial is called out. **Partial serials** (>= 5 characters, at least one digit): answered when exactly ONE serial contains it, with the
+  visible note `Showing results for serial 2C100091 (you typed "100091").`; several -> listed, none picked; typed in quotes -> exactly as typed.
+- **A mistyped city / zip never blocks** the answer; the note is now short: `(Note: on file in Phoenix, not Mesa.)`, `(Note: on file under zip
+  85001, not 85201.)`, both -> `(Note: on file in Phoenix 85001, not Mesa 85201.)`. It now also fires when the typed city is followed by more
+  words ("... Ave, Mesa still under warranty") and on single-unit address answers that echo the typed address.
+- **Blue-collar brevity:** declines are one short line (off-domain, untracked field, no earlier question, unknown person, judgment); a list
+  sentence that repeats every fact row keeps its first 5 names + "and N more" (`api/_lib/router/brevity.js`; every name stays a fact row and a
+  cited record; kill switch `DONOVAN_BREVITY=0`); the maintenance-due rule sentence moved to the citation basis; open-invoice and document-number
+  answers lead with the figure. Measured on every deterministic exam answer (n ≈ 1685): average 95.4 -> 87.6 characters, answers over 300
+  characters 32 -> 13, average first sentence 77.7 -> 73.6.
+
+### R35 learning loops (fresh blind set per family written and frozen BEFORE the rule; `scripts/gen-blind-r35b.mjs`)
+
+| loop | family | rule(s) | blind before -> after (correct / q) |
+|---|---|---|---|
+| 1 | warranty wording ("covered", "warrantied", "expiring soon", "no warranty on file") | `aggregates.js` buckets + unknown state; detPlan never reads "covered by an agreement" as a warranty; a rewrite claimed only by analytics no longer overrides a deterministic claim (`classifyAll.js`) | 24 / 43, **11 wrong** -> 42 / 43, 0 wrong (1 needs-model: "covered by a maintenance agreement") |
+| 2 | document numbers (INV / WO / PO / permit; on file and not) — r34 G5 | `lookups/docNumberLookup.js` | 0 / 96 (96 needs-model) -> 96 / 96 |
+| 3 | judgment / advice / prediction / false premise / unknown person — r34 G3, G4, G5 | `safetyGate.js` judgment decline, `lookups/falsePremise.js`, unknown-name "who is X" shapes, address-miss work-history cues | 7 / 52 (29 needs-model, 1 wrong) -> 44 / 52 + 8 clarify chips, 0 needs-model, 0 wrong |
+| 4 | partial serials (unique / ambiguous) | `serialLookup.js` partial match | 6 / 38, **23 wrong** -> 38 / 38 |
+| 5 | texting shorthand ("4" = for, "@" = at, ph#, addy, wrnty, s/n 4 ...) | `router/rewrite.js` rewriteShorthand (+ invoice typos) | 12 / 47 (3 wrong) -> 47 / 47 |
+
+r34 battery would-be model calls 15 -> 0 (deferred 13 -> 0: G3 advice, G4 false premise, G5 not on file). Exam: 1594 answered / 1574 correct /
+0 wrong / 14 needs-model -> 1596 / 1576 / 0 / 12 (g091 shorthand, hvac-bookkeeper-0011-typo "invices"); no status changed for any other id.
+
+### Blind-oracle notes
+
+- `r35-warr2` "no warranty on file" oracle: the first generated SQL had an unused `$1` parameter (oracle-error, not a meaning change); fixed in
+  the generator and regenerated with the same seed (same questions).
+- `r35-advice`: a clarify reply ("Here is what I can look up for X: tap one") is $0 and honest but is counted as clarified, not correct.
+- Adversarial pass (self, no reviewer agent available): fixed "invoice 100 E Main St" read as invoice #100, "est 2026" read as an estimate
+  number, "not warrantied" read as under warranty, "covered by warranty but not registered" answered as the bare warranty count (analytics now
+  bails), "the 2026 revenue" / "2025 invoices total" answered with the all-time total (financials now reads a year next to a money noun),
+  "which brand has the most repairs" answered "120 customers." (an unfiltered customer list is never a superlative answer: detPlan bails),
+  "which brand fails the most" (reliability = opinion, judgment decline), "is invoice X paid" with no status printed (honest no-answer).
+- Nickname blind set (`r35-nick`): the 4 technician contact rows ("phone for Dan Ochoa", "address for Raymond Sutton") now get an honest
+  `Danny Ochoa is one of your technicians — no technician contact details are on file.` at $0 (161 -> 165 / 166; never fires when a customer
+  can be meant by the same name).

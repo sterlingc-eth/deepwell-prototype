@@ -1,0 +1,1341 @@
+{
+ "version": "r35b-blind-1",
+ "category": "blind-r35b-docnum",
+ "source": "scripts/gen-blind-r35b.mjs (seeded, frozen before the loop's rule)",
+ "questions": [
+  {
+   "id": "bl-r35b-docnum-001",
+   "text": "who is invoice INV-35007 for",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "INV-35007",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-002",
+   "text": "sorry, one more - whose invoice is INV-20040",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "INV-20040",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-003",
+   "text": "hang on... customer on invoice INV-20017",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "INV-20017",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-004",
+   "text": "real quick: invoice INV-20066 - who's that",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "INV-20066",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-005",
+   "text": "hey, who did we bill on INV-20073",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "INV-20073",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-006",
+   "text": "sorry, one more - what customer is INV-20080",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "INV-20080",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-007",
+   "text": "real quick: invoice # INV-20056 real quick",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "INV-20056",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-008",
+   "text": "alright, pull up invoice INV-20071 real quick",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "INV-20071",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-009",
+   "text": "hang on... look up INV-20086 thanks",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "INV-20086",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-010",
+   "text": "ok so INV-20039?",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "INV-20039",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-011",
+   "text": "sorry, one more - who is invoice INV-60007 for",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "INV-60007",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-012",
+   "text": "hey, whose invoice is INV-20055 please",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "INV-20055",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-013",
+   "text": "customer on invoice INV-20008",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "INV-20008",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-014",
+   "text": "alright, invoice INV-20083 - who's that please",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "INV-20083",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-015",
+   "text": "real quick: who did we bill on INV-20053 thanks",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "INV-20053",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-016",
+   "text": "hey, what customer is INV-20065 thanks",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "INV-20065",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-017",
+   "text": "invoice # INV-60001",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "INV-60001",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-018",
+   "text": "ok so pull up invoice INV-20074 real quick",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "INV-20074",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-019",
+   "text": "look up INV-20029 for me",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "INV-20029",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-020",
+   "text": "sorry, one more - INV-20021?",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "INV-20021",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-021",
+   "text": "ok so how much was invoice INV-35003",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT total::numeric AS n FROM document_financials WHERE invoice_number = $1 AND total IS NOT NULL LIMIT 1",
+    "params": [
+     "INV-35003"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-022",
+   "text": "total on invoice INV-20030 please",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT total::numeric AS n FROM document_financials WHERE invoice_number = $1 AND total IS NOT NULL LIMIT 1",
+    "params": [
+     "INV-20030"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-023",
+   "text": "sorry, one more - what did we charge on INV-20077 for me",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT total::numeric AS n FROM document_financials WHERE invoice_number = $1 AND total IS NOT NULL LIMIT 1",
+    "params": [
+     "INV-20077"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-024",
+   "text": "amount for invoice INV-20098",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT total::numeric AS n FROM document_financials WHERE invoice_number = $1 AND total IS NOT NULL LIMIT 1",
+    "params": [
+     "INV-20098"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-025",
+   "text": "how much was INV-20025",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT total::numeric AS n FROM document_financials WHERE invoice_number = $1 AND total IS NOT NULL LIMIT 1",
+    "params": [
+     "INV-20025"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-026",
+   "text": "real quick: what was the total for INV-20046",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT total::numeric AS n FROM document_financials WHERE invoice_number = $1 AND total IS NOT NULL LIMIT 1",
+    "params": [
+     "INV-20046"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-027",
+   "text": "real quick: how much was invoice INV-20012 for me",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT total::numeric AS n FROM document_financials WHERE invoice_number = $1 AND total IS NOT NULL LIMIT 1",
+    "params": [
+     "INV-20012"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-028",
+   "text": "real quick: total on invoice INV-20011",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT total::numeric AS n FROM document_financials WHERE invoice_number = $1 AND total IS NOT NULL LIMIT 1",
+    "params": [
+     "INV-20011"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-029",
+   "text": "what did we charge on INV-20043 for me",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT total::numeric AS n FROM document_financials WHERE invoice_number = $1 AND total IS NOT NULL LIMIT 1",
+    "params": [
+     "INV-20043"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-030",
+   "text": "hey, amount for invoice INV-20052",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT total::numeric AS n FROM document_financials WHERE invoice_number = $1 AND total IS NOT NULL LIMIT 1",
+    "params": [
+     "INV-20052"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-031",
+   "text": "hey, how much was INV-20095",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT total::numeric AS n FROM document_financials WHERE invoice_number = $1 AND total IS NOT NULL LIMIT 1",
+    "params": [
+     "INV-20095"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-032",
+   "text": "real quick: what was the total for INV-20101 thanks",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT total::numeric AS n FROM document_financials WHERE invoice_number = $1 AND total IS NOT NULL LIMIT 1",
+    "params": [
+     "INV-20101"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-033",
+   "text": "how much was invoice INV-35001 thanks",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT total::numeric AS n FROM document_financials WHERE invoice_number = $1 AND total IS NOT NULL LIMIT 1",
+    "params": [
+     "INV-35001"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-034",
+   "text": "total on invoice INV-20097",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT total::numeric AS n FROM document_financials WHERE invoice_number = $1 AND total IS NOT NULL LIMIT 1",
+    "params": [
+     "INV-20097"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-035",
+   "text": "ok so what did we charge on INV-20064",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT total::numeric AS n FROM document_financials WHERE invoice_number = $1 AND total IS NOT NULL LIMIT 1",
+    "params": [
+     "INV-20064"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-036",
+   "text": "hey, amount for invoice INV-60006",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT total::numeric AS n FROM document_financials WHERE invoice_number = $1 AND total IS NOT NULL LIMIT 1",
+    "params": [
+     "INV-60006"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-037",
+   "text": "how much was INV-20069",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT total::numeric AS n FROM document_financials WHERE invoice_number = $1 AND total IS NOT NULL LIMIT 1",
+    "params": [
+     "INV-20069"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-038",
+   "text": "real quick: what was the total for INV-20054",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT total::numeric AS n FROM document_financials WHERE invoice_number = $1 AND total IS NOT NULL LIMIT 1",
+    "params": [
+     "INV-20054"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-039",
+   "text": "invoice 20006",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_digits",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "INV-20006",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-040",
+   "text": "sorry, one more - who is invoice number 20079 for real quick",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_digits",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "INV-20079",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-041",
+   "text": "sorry, one more - invoice #20100 please",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_digits",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "INV-20100",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-042",
+   "text": "invoice 35000 thanks",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_digits",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "INV-35000",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-043",
+   "text": "hey, who is invoice number 20091 for for me",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_digits",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "INV-20091",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-044",
+   "text": "alright, invoice #60005",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_inv_digits",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "INV-60005",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-045",
+   "text": "work order WO-60007",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_wo",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "WO-60007",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-046",
+   "text": "who is work order WO-40094 for real quick",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_wo",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "WO-40094",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-047",
+   "text": "whose job is WO-40077 thanks",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_wo",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "WO-40077",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-048",
+   "text": "quick one - pull up WO 60001",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_wo",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "WO-60001",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-049",
+   "text": "hey, work order WO-60003 please",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_wo",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "WO-60003",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-050",
+   "text": "alright, who is work order WO-55002 for",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_wo",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "WO-55002",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-051",
+   "text": "whose job is WO-40000",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_wo",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "WO-40000",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-052",
+   "text": "real quick: pull up WO 60005 real quick",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_wo",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "WO-60005",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-053",
+   "text": "quick one - work order WO-40061",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_wo",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "WO-40061",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-054",
+   "text": "real quick: who is work order WO-40033 for",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_wo",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "WO-40033",
+     "invoice_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-055",
+   "text": "ok so purchase order PO-9021",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_po",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "PO-9021",
+     "po_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-056",
+   "text": "who is PO-9026 for thanks",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_po",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "PO-9026",
+     "po_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-057",
+   "text": "sorry, one more - what customer is on PO-9054",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_po",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "PO-9054",
+     "po_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-058",
+   "text": "po PO-9037",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_po",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "PO-9037",
+     "po_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-059",
+   "text": "purchase order PO-9048",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_po",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "PO-9048",
+     "po_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-060",
+   "text": "hey, who is PO-9081 for",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_po",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "PO-9081",
+     "po_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-061",
+   "text": "what customer is on PO-9059 real quick",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_po",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "PO-9059",
+     "po_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-062",
+   "text": "alright, po PO-9015 please",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_po",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "PO-9015",
+     "po_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-063",
+   "text": "purchase order PO-9087 real quick",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_po",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "PO-9087",
+     "po_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-064",
+   "text": "ok so who is PO-9032 for",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_po",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "PO-9032",
+     "po_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-065",
+   "text": "quick one - permit BP-2026-10051 for me",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_permit",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "BP-2026-10051",
+     "permit_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-066",
+   "text": "hang on... who is permit BP-2026-25004 for",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_permit",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "BP-2026-25004",
+     "permit_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-067",
+   "text": "whose permit is BP-2026-10029",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_permit",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "BP-2026-10029",
+     "permit_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-068",
+   "text": "hey, permit number BP-2026-10034 real quick",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_permit",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "BP-2026-10034",
+     "permit_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-069",
+   "text": "real quick: permit BP-2026-10023",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_permit",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "BP-2026-10023",
+     "permit_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-070",
+   "text": "hang on... who is permit BP-2026-10095 for",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_permit",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "BP-2026-10095",
+     "permit_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-071",
+   "text": "real quick: whose permit is BP-2026-10012 real quick",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_permit",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "BP-2026-10012",
+     "permit_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-072",
+   "text": "hang on... permit number BP-2026-25003 real quick",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_permit",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "BP-2026-25003",
+     "permit_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-073",
+   "text": "quick one - permit BP-2026-25001 real quick",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_permit",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "BP-2026-25001",
+     "permit_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-074",
+   "text": "who is permit BP-2026-10007 for",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_permit",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS v FROM extractions x JOIN document_entity_links l ON l.document_id = x.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL WHERE x.field_key = $2 AND x.value = $1",
+    "params": [
+     "BP-2026-10007",
+     "permit_number"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-docnum-075",
+   "text": "ok so invoice INV-96968",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_miss_inv",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-docnum-076",
+   "text": "quick one - how much was invoice INV-41428",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_miss_inv",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-docnum-077",
+   "text": "hey, who is invoice INV-81442 for",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_miss_inv",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-docnum-078",
+   "text": "real quick: pull up INV-62742 please",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_miss_inv",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-docnum-079",
+   "text": "real quick: what was INV-46211 for thanks",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_miss_inv",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-docnum-080",
+   "text": "invoice INV-67566",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_miss_inv",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-docnum-081",
+   "text": "alright, how much was invoice INV-83288",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_miss_inv",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-docnum-082",
+   "text": "who is invoice INV-73966 for for me",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_miss_inv",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-docnum-083",
+   "text": "ok so pull up INV-86040 please",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_miss_inv",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-docnum-084",
+   "text": "alright, what was INV-36812 for",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_miss_inv",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-docnum-085",
+   "text": "sorry, one more - work order WO-73819 real quick",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_miss_wo",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-docnum-086",
+   "text": "quick one - who is WO-82641 for for me",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_miss_wo",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-docnum-087",
+   "text": "work order WO-55330",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_miss_wo",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-docnum-088",
+   "text": "hang on... who is WO-80641 for for me",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_miss_wo",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-docnum-089",
+   "text": "hey, purchase order PO-9891 please",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_miss_po",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-docnum-090",
+   "text": "quick one - po PO-9979 real quick",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_miss_po",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-docnum-091",
+   "text": "purchase order PO-9707 real quick",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_miss_po",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-docnum-092",
+   "text": "hey, po PO-9963 please",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_miss_po",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-docnum-093",
+   "text": "alright, permit BP-2026-70553",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_miss_permit",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-docnum-094",
+   "text": "who is permit BP-2026-85524 for",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_miss_permit",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-docnum-095",
+   "text": "hang on... permit BP-2026-73567 real quick",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_miss_permit",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-docnum-096",
+   "text": "ok so who is permit BP-2026-54198 for",
+   "category": "blind-r35b-docnum",
+   "shape": "dn_miss_permit",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  }
+ ]
+}

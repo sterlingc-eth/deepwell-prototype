@@ -213,13 +213,60 @@ export function requireActiveBilling(tenantRow, now = new Date()) {
 }
 
 /**
+ * R35: extra pages a tenant may have ON TOP of its plan's monthly allowance (a Records Rescue customer, a negotiated
+ * backfile import). Stored as tenants.limits.extraPagesPerMonth, a plain number; migration 62 stops the billing webhook
+ * (which replaces `limits` wholesale on every subscription event) from wiping it. 0 / absent / garbage = no extra.
+ * @param {{limits?: object|null}|null|undefined} tenantRow
+ */
+export const EXTRA_PAGES_KEY = 'extraPagesPerMonth';
+export function extraPagesFor(tenantRow) {
+  const n = Number(tenantRow?.limits?.[EXTRA_PAGES_KEY]);
+  return Number.isFinite(n) && n > 0 ? Math.min(Math.trunc(n), 10_000_000) : 0;
+}
+
+/** The monthly page cap that actually applies (plan allowance + any extra), or null when uncapped / no plan. */
+export function pageCapFor(tenantRow) {
+  const base = PLAN_LIMITS[tenantRow?.plan]?.pagesPerMonth;
+  return base == null ? null : base + extraPagesFor(tenantRow);
+}
+
+/** The stored-documents cap for the tenant's plan, or null when uncapped (Fleet) / no plan. */
+export function documentCapFor(tenantRow) {
+  return PLAN_LIMITS[tenantRow?.plan]?.documentsStored ?? null;
+}
+
+/** "Oct 1" - when the monthly page count starts over (UTC calendar month; the same date the Billing screen shows). */
+export function monthResetLabel(now = new Date()) {
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  return `${d.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' })} ${d.getUTCDate()}`;
+}
+
+const fmtInt = (n) => Number(n).toLocaleString('en-US');
+
+/**
+ * Pure (R35): the pages one upload is expected to add, for gating only (nothing is billed from this). Photos 1; PDFs about
+ * 200 KB a page; text 6,000 characters a page (readDocument's PAGE_CHARS); never below 1, never above 200 for one file.
+ * Mirrors recordsStore.js estimatePendingPages' SQL, which is what counts the same file once it is stored.
+ */
+export function estimatePagesForUpload(contentType, sizeBytes) {
+  const size = Number(sizeBytes);
+  const bytes = Number.isFinite(size) && size > 0 ? size : 0;
+  const type = String(contentType ?? '').toLowerCase();
+  if (type.startsWith('image/')) return 1;
+  const per = type === 'application/pdf' ? 204_800 : 6_000;
+  return Math.max(1, Math.min(200, Math.ceil(bytes / per)));
+}
+
+/**
  * Gate for POST /api/upload-url (new ingestion).
  * @param {object} tenantRow
  * @param {{documentsStored: number, pagesThisMonth: number, pendingPages?: number}} usage
  *   `pendingPages` (R30 M6): estimated pages of documents uploaded but not yet read. document_pages rows only exist
  *   after the read step, so pipelining uploads faster than the reader used to slip past the monthly cap.
  * @param {Date} [now]
- * @returns {{allowed: true}|{allowed: false, status: 402, error: string, url: string}}
+ * @returns {{allowed: true, pagesRemaining: number|null, documentsRemaining: number|null}|{allowed: false, status: 402, error: string, url: string}}
+ *   On allow, `pagesRemaining` / `documentsRemaining` (R35) say how much headroom is left (null = uncapped), so a batch of
+ *   50 files stops at the cap instead of every file in it sailing past a check that only looked at the count before it.
  */
 export function gateUpload(tenantRow, usage, now = new Date()) {
   const state = planStateFor(tenantRow, now);
@@ -229,26 +276,56 @@ export function gateUpload(tenantRow, usage, now = new Date()) {
     if (freePreviewExhausted(usage)) {
       return requireActiveBilling(tenantRow, now);
     }
-    return { allowed: true };
+    return { allowed: true, pagesRemaining: null, documentsRemaining: null };
   }
   if (state === 'canceled') {
     return requireActiveBilling(tenantRow, now);
   }
   if (state === 'past_due' && isPastGrace(tenantRow, now)) {
-    return { allowed: false, status: 402, error: 'Subscription required', url: billingUrl };
+    // R35: not a bare "Subscription required" dead end - say why, what still works, and where to fix it.
+    return {
+      allowed: false, status: 402, url: billingUrl,
+      error: "Subscription required: your last payment didn't go through, so adding new documents is paused. Update your payment method in Billing to continue. Everything you've already added is safe and Donovan still answers.",
+    };
   }
-  // trialing, active, or past_due-within-grace: check the monthly page cap.
-  const plan = tenantRow?.plan;
-  const cap = PLAN_LIMITS[plan]?.pagesPerMonth ?? null;
+  // trialing, active, or past_due-within-grace: check the monthly page cap and the stored-document cap.
+  const cap = pageCapFor(tenantRow);
   const pagesRead = Number(usage?.pagesThisMonth) || 0;
   const pending = Math.max(0, Math.trunc(Number(usage?.pendingPages) || 0));
+  const topPlan = tenantRow?.plan === 'fleet';
+  const moreHelp = topPlan
+    ? 'Email support@deepwelltechnology.com to add pages for a big import.'
+    : 'Upgrade your plan for more.';
   if (cap != null && pagesRead + pending >= cap) {
+    const resets = `It resets on ${monthResetLabel(now)}.`;
     const error = pagesRead >= cap
-      ? `Monthly page limit reached (${cap}) — upgrade your plan for more.`
-      : `Monthly page limit reached (${cap}): ${pagesRead} pages are read and about ${pending} more are still being processed. Wait for them to finish, or upgrade your plan for more.`;
+      ? `Monthly page limit reached (${fmtInt(cap)}). ${resets} ${moreHelp}`
+      : `Monthly page limit reached (${fmtInt(cap)}): ${fmtInt(pagesRead)} pages are read and about ${fmtInt(pending)} more are still being processed. Wait for them to finish. ${resets} ${moreHelp}`;
     return { allowed: false, status: 402, error, url: billingUrl };
   }
-  return { allowed: true };
+  const docCap = documentCapFor(tenantRow);
+  const docs = Number(usage?.documentsStored);
+  if (docCap != null && Number.isFinite(docs) && docs >= docCap) {
+    return {
+      allowed: false, status: 402, url: billingUrl,
+      error: `Your plan stores up to ${fmtInt(docCap)} documents and you have ${fmtInt(docs)}. Delete documents you no longer need, or upgrade your plan for more room. You can still search and ask about everything you have.`,
+    };
+  }
+  return {
+    allowed: true,
+    pagesRemaining: cap == null ? null : Math.max(0, cap - pagesRead - pending),
+    documentsRemaining: docCap == null || !Number.isFinite(docs) ? null : Math.max(0, docCap - docs),
+  };
+}
+
+/** R35: the per-file 402 a batch reports for a file that did not fit under the monthly page cap / stored-document cap. */
+export function batchLimitMessage(kind, tenantRow, now = new Date()) {
+  if (kind === 'documents') {
+    return `Your plan's document limit was reached part-way through this batch. Delete documents you no longer need, or upgrade your plan, then add the rest again.`;
+  }
+  const cap = pageCapFor(tenantRow);
+  const more = tenantRow?.plan === 'fleet' ? 'Email support@deepwelltechnology.com to add pages.' : 'Upgrade your plan for more.';
+  return `Monthly page limit reached (${cap == null ? '' : fmtInt(cap)}) part-way through this batch, so this file was not added. The count resets on ${monthResetLabel(now)}. ${more}`;
 }
 
 /**

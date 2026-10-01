@@ -151,7 +151,8 @@ check("agg -: a named customer's warranty count is never the shop-wide out-of-wa
 a = await ask("how many units are not currently under warranty");
 check("agg +: units out of warranty (end date passed)", /^79 units are out of warranty/.test(a.text) && /no warranty end date/.test(a.text) && a.records.length > 0, a.text);
 a = await ask("how many units are still under warranty");
-check("agg -: the shop-wide 'still under warranty' keeps its established definition (status active)", /33/.test(a.text), a.text);
+// R35 (owner decision 2026-10-01, ADJUDICATION.md "R35"): shop-wide "still under warranty" = not expired (37), with the within-a-year share named.
+check("agg +: the shop-wide 'still under warranty' = not expired, with the next-12-months qualifier (owner wording)", /^37 units are still under warranty — 4 of them run out in the next 12 months/.test(a.text), a.text);
 a = await ask("which technicians have never logged a preventive maintenance visit");
 check("agg +: technicians who never did PM (set)", ["Danny Ochoa", "Denise Ford", "Ray Sutton", "Marisol Vega"].every((n) => a.text.includes(n)) && !/Kevin Pratt|Wyatt Coburn/.test(a.text.split("The other")[0] ?? a.text), a.text);
 a = await ask("which technicians never did a PM last year");

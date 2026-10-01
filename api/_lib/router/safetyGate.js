@@ -19,6 +19,7 @@
 import { attachCitations } from "../citations/records.js";
 import { buildUntrackedFieldAnswer } from "../contactLookup.js";
 import { findInvalidDate } from "../timeSpans.js";
+import { stripConversationalFrame } from "./frame.js";
 
 const INJECTION_RES = [
   /\b(?:ignore|disregard|forget|override|bypass)\b[^.?!]{0,30}\b(?:previous|prior|above|earlier|all|any|your|the)\b[^.?!]{0,25}\b(?:instructions?|rules?|prompts?|guidelines?|restrictions?|filters?|safeguards?)\b/i,
@@ -50,8 +51,36 @@ const PREDICT_RES = [
   /\bhow\s+(?:many|much)\b[^?]*\bwill\b[^?]*\b(?:next\s+(?:week|month|quarter|year|season)|this\s+coming|in\s+the\s+(?:coming|next)|by\s+(?:next|the\s+end\s+of\s+(?:next|the\s+year)))\b/i,
   /\bwhat\s+will\s+we\s+(?:invoice|bill|earn|make|sell|charge|collect|do)\b[^?]*\b(?:in|next|this\s+(?:coming|summer|winter|spring|fall|year)|tomorrow)\b/i,
   /\bwill\s+(?:we|you|i|the\s+shop)\s+be\s+(?:busier|slower|busy|booked|swamped|slammed|profitable)\b/i,
+  /\bhow\s+(?:busy|slow|busier|slower|booked)\s+will\s+(?:we|you|i|the\s+shop)\s+be\b/i, // R35
   /\b(?:estimate|guess|project|expect)\b[^?]{0,25}\b(?:our|my|the)\s+(?:revenue|sales|income|profit|call\s+volume|bookings)\b[^?]{0,30}\b(?:for|in|next|this\s+coming)\s+(?:20\d\d|next|the\s+(?:coming|rest))/i,
 ];
+// R35 loop 3: judgment / advice / opinion ("should we fire X", "what's the best AC brand", "what should I charge for a capacitor",
+// "is X a good customer"): not a recorded fact, so declined at $0 instead of reaching the model (or an analytics count that answers
+// a different question, e.g. "which brand should I recommend to customers" -> "120 customers"). A street address in the question
+// leaves it to the clarify chips ("Here is what I can look up for 100 E Main St"); a record cue (due, warranty, how many, did we, ...)
+// means it is a records question and is never declined here.
+const JUDGMENT_RES = [
+  /^\s*(?:so\s+|ok\s+|okay\s+|hey\s+|and\s+)?(?:should|shall)\s+(?:i|we)\s+(?:fire|hire|keep|let|lay|promote|demote|raise|lower|cut|buy|get|lease|sell|stock|carry|push|recommend|switch|drop|replace|repair|fix|give|pay|charge|offer|take|bid|quote|discount|stop|start|expand|open|add)\b/i,
+  /\bworth\s+(?:it|repairing|fixing|replacing|keeping|saving|the\s+money)\b/i,
+  /\b(?:best|most\s+reliable|least\s+reliable|worst|top|better|quietest|most\s+efficient)\s+(?:(?:ac|a\/c|hvac|furnace|heat\s+pump|condenser|air\s+conditioner|equipment|unit|system|mini[\s-]?split)\s+)?(?:brands?|manufacturers?|makes?)\b/i,
+  /\bwhat(?:'s|s|\s+is)\s+the\s+(?:best|most\s+reliable|best\s+value)\s+(?:ac|a\/c|hvac|furnace|heat\s+pump|condenser|air\s+conditioner|unit|system|brand|mini[\s-]?split)\b/i,
+  /^\s*(?:\w+\s+){0,3}?is\s+[a-z][a-z'-]+\s+(?:better|worse|more\s+reliable|cheaper\s+to\s+run)\s+than\s+[a-z][a-z'-]+\s*[?.!]*$/i,
+  /\bwhat\s+(?:should|do|would|can)\s+(?:i|we)\s+charge\b|\bhow\s+much\s+should\s+(?:i|we|a|an|the)\b|\b(?:a\s+)?(?:fair|reasonable|good|going)\s+(?:price|rate)\s+(?:for|on)\b/i,
+  /\bwhich\s+(?:brand|unit|system|model|manufacturer)s?\s+should\s+(?:i|we)\b|\bshould\s+(?:i|we)\s+(?:stock|recommend|push|carry|sell)\b/i,
+  /\bis\s+[a-z][a-z'. -]{1,40}\s+a\s+(?:good|bad|reliable|great|decent)\s+(?:customer|client|tech|technician|employee|worker|hire|guy)\b/i,
+  /\bwould\s+you\s+recommend\b|\bwhat\s+would\s+you\s+(?:do|recommend|suggest)\b|\bdo\s+you\s+(?:think|recommend)\b|\byour\s+(?:opinion|advice|recommendation)\b/i,
+  /\bis\s+[a-z][a-z'. -]{1,40}\s+worth\s+keeping\b/i,
+  // reliability is an opinion the records don't carry ("which brand fails the most" was answered "120 customers.")
+  /\b(?:which|what)\s+(?:brand|make|manufacturer|model)s?\s+(?:fails?|breaks?(?:\s+down)?|is\s+(?:the\s+)?(?:most|least)\s+reliable|has\s+the\s+most\s+(?:problems|issues|failures|breakdowns))\b/i,
+];
+const JUDGMENT_VETO_RE = /\b(?:due|overdue|schedul\w*|follow[\s-]?up|remind\w*|warrant\w*|register\w*|how\s+many|did\s+we|did\s+(?:he|she|they)|last\s+(?:time|visit|service|invoice)|history|on\s+file|invoiced|billed|charged|paid|owe[ds]?|maintenance\s+agreement)\b|\b\d{2,6}\s+(?:[nsew]\.?\s+)?[a-z]{2,}/i;
+export function isJudgmentQuestion(question) {
+  const raw = String(question ?? "");
+  let q = raw;
+  try { q = stripConversationalFrame(raw) ?? raw; } catch { q = raw; }
+  if (!q.trim() || q.length > 200 || JUDGMENT_VETO_RE.test(raw)) return false;
+  return JUDGMENT_RES.some((re) => re.test(q));
+}
 // "which warranties will expire next month", "who is due for service next week", "what's scheduled next month": record facts, never predictions.
 const PREDICT_VETO_RE = /\b(?:warrant\w*|expir\w*|renew\w*|due|schedul\w*|appointments?|lease|term|contract|agreement|permits?)\b/i;
 
@@ -72,7 +101,7 @@ export function normalizeInputText(text) {
 }
 
 /**
- * @returns {null | {kind: "injection"|"sensitive"|"prediction"|"invalid_date"|"junk", text: string}}
+ * @returns {null | {kind: "injection"|"sensitive"|"prediction"|"judgment"|"invalid_date"|"junk", text: string}}
  */
 export function classifySafety(question) {
   const q = String(question ?? "");
@@ -81,6 +110,7 @@ export function classifySafety(question) {
   for (const re of INJECTION_RES) if (re.test(q)) return { kind: "injection" };
   if (SENSITIVE_RE.test(q) && SENSITIVE_ASK_RE.test(q) && !SENSITIVE_VETO_RE.test(q)) return { kind: "sensitive" };
   if (!PREDICT_VETO_RE.test(q) && PREDICT_RES.some((re) => re.test(q))) return { kind: "prediction" };
+  if (process.env.DONOVAN_JUDGMENT_DECLINE !== "0" && isJudgmentQuestion(q)) return { kind: "judgment" };
   const bad = findInvalidDate(q);
   if (bad) return { kind: "invalid_date", text: bad.text };
   return null;
@@ -112,6 +142,11 @@ export function buildSafetyAnswer(hit) {
       return decline(
         "I can only report what's in your records. I can't forecast or predict future results, but I can show the history a forecast would start from, such as invoices or visits by month.",
         "A prediction is not a recorded fact, so nothing was searched."
+      );
+    case "judgment":
+      return decline(
+        "That's a judgment call — I only report what's on file, like age, warranty, visits, and invoices.",
+        "An opinion or advice is not a recorded fact, so nothing was searched."
       );
     case "invalid_date": {
       const t = String(hit.text ?? "that date").replace(/[^\w\s/,.-]/g, "");

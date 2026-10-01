@@ -15,6 +15,7 @@ import { attachCitations } from "../citations/records.js";
 import { stripConversationalFrame } from "../router/frame.js";
 import { isNonNameWord } from "./commonWords.js";
 import { damerauLevenshteinDistance } from "../integrity.js";
+import { isNicknamePair, formalsOf } from "../vocab/nicknames.js";
 
 export const unknownNameEnabled = () => process.env.DONOVAN_UNKNOWN_NAME_DECLINE !== "0";
 
@@ -36,7 +37,15 @@ const SHAPES = [
   new RegExp(String.raw`\b(?:last\s+time\s+we\s+(?:serviced|visited|saw|went\s+(?:to|out\s+to))|where\s+does)\s+(?:the\s+)?${NAME}(?:\s+live)?\s*$`, "i"),
   new RegExp(String.raw`\bwhat\s+(?:brand|make|model|size|tonnage|kind\s+of\s+(?:unit|system|furnace|ac))\s+(?:does|do)\s+(?:the\s+)?${NAME}\s+(?:have|use|own|run|got)\s*$`, "i"),
   new RegExp(String.raw`^${NAME}['’]s\s+(?:unit|system|account|phone(?:\s+number)?|e-?mail|address|warranty|serial|model|furnace|file)\s*$`, "i"),
+  // R35 loop 3: "who is X" / "tell me about X" / "is X a customer" (still only declined when X is nowhere in the records; see WHO_SHAPES)
+  new RegExp(String.raw`^(?:who\s+is|who['’]s|whos|who\s+was)\s+${NAME}\s*$`, "i"),
+  new RegExp(String.raw`^(?:tell\s+me\s+about|anything\s+on|any\s+info\s+on|info\s+on|what\s+about)\s+${NAME}\s*$`, "i"),
+  new RegExp(String.raw`^(?:is|was)\s+${NAME}\s+(?:a|one\s+of\s+our|our)\s+(?:customer|client|tech|technician|vendor)s?\s*$`, "i"),
 ];
+/** R35: the bare "who is X" shapes (the last three above) only take a phrase that reads as a person's name, never a role or a ranking
+ *  ("whos our busiest technician", "who is the owner", "who is our best customer" go on to their own routes). */
+const WHO_SHAPES = new Set(SHAPES.slice(-3));
+const NOT_A_PERSON_RE = /\b(?:our|the|my|your|their|this|that|best|worst|busiest|top|most|least|newest|oldest|last|first|next|new|biggest|largest|main|lead|head|tech|techs|technician|technicians|customer|customers|client|clients|guy|owner|manager|boss|vendor|vendors|supplier|dispatcher|office|admin|installer|crew|team|everyone|anyone|somebody|someone|nobody|busiest|biggest|largest|highest|lowest|latest|earliest|fastest|slowest|cheapest|newest|oldest)\b/i;
 const TAIL_WORDS = new Set(["unit", "units", "system", "systems", "furnace", "ac", "equipment", "account", "file", "place", "house", "site", "job", "jobs"]);
 const FILLER_TAIL = /\s+(?:for\s+me|please|pls|thanks|thx|real\s+quick|when\s+you\s+get\s+a\s+sec|asap|right\s+now|again|today|now)\s*[?.!]*$/i;
 const CUE_WORDS = ["serial", "number", "model", "brand", "tonnage", "warranty", "address", "phone", "email", "invoices", "invoice", "serviced", "service", "visit", "technician", "account", "refrigerant", "install", "installation", "manufacturer", "coverage", "contact", "paperwork", "history", "records", "estimate", "estimates", "quote", "quotes", "system", "furnace", "equipment", "customer", "unit", "documents", "when", "last", "what", "whats", "pull", "show", "file", "does", "under", "still", "covered", "have"];
@@ -60,6 +69,7 @@ export function extractNamePhrase(question) {
   for (const re of SHAPES) {
     const m = re.exec(q);
     if (!m) continue;
+    if (WHO_SHAPES.has(re) && NOT_A_PERSON_RE.test(m[1])) continue;
     const tokens = m[1].split(/\s+/).map((t) => t.replace(/['’]s?$/i, "")).filter((t) => t && !STOP.has(t.toLowerCase()) && !TAIL_WORDS.has(t.toLowerCase()));
     if (!tokens.length || tokens.length > 3) continue;
     return tokens.join(" ");
@@ -93,10 +103,38 @@ export function buildUnknownNameAnswer(phrase) {
   return attachCitations(
     {
       kind: "no-answer",
-      text: `I don't have anyone named "${phrase}" on file, and that name doesn't appear in any of your documents either — nothing to look up. Check the spelling, or ask by address.`,
+      text: `I don't have anyone named "${phrase}" on file or in any document — nothing to look up.`, // R35 brevity
       facts: [], sources: [], confidence: 0, verifiedCount: 0, unverifiedCount: 0, closest: [],
     },
     { records: [], total: 0, kind: "searched", basis: `Searched every customer and entity record and the full text of every document page for "${phrase}"; nothing matches.` }
+  );
+}
+
+/**
+ * R35: a contact-detail question (phone / email / address) about one of the shop's own TECHNICIANS ("phone for Danny Ochoa", "address for
+ * Raymond Sutton", "phone for Dan Ochoa") — the records carry customers' contact details, never a technician's. Honest decline at $0; the
+ * name only has to be the technician's (same surname, same or nickname-related first name). Never fires when a customer has that name.
+ */
+const CONTACT_FIELD_RE = /\b(?:phone|number|cell|e-?mail|address|contact|reach)\b/i;
+const related = (a, b) => a === b || isNicknamePair(a, b) || formalsOf(a).some((f) => f === b || isNicknamePair(f, b) || formalsOf(b).includes(f));
+async function technicianContactDecline(db, question, phrase) {
+  if (!CONTACT_FIELD_RE.test(question)) return null;
+  const toks = phrase.toLowerCase().split(/\s+/);
+  if (toks.length !== 2) return null;
+  // a customer the typed name can mean (same surname, same or nickname-related first name) keeps the customer paths
+  const { rows: cust } = await db.raw(`SELECT data->>'customer_name' AS n FROM entities WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT_SQL} AND lower(data->>'customer_name') LIKE $1 LIMIT 50`, [`% ${toks[1]}`]);
+  if (cust.some((c) => { const t = String(c.n ?? "").toLowerCase().split(/\s+/); return t.length === 2 && t[1] === toks[1] && related(toks[0], t[0]); })) return null;
+  const { rows } = await db.raw(
+    `SELECT DISTINCT COALESCE(NULLIF(corrected_value, ''), value) AS name FROM extractions
+      WHERE field_key = 'technician' AND ${TENANT_SQL} AND lower(COALESCE(NULLIF(corrected_value, ''), value)) LIKE $1 LIMIT 20`,
+    [`% ${toks[1]}`]
+  );
+  const hits = rows.map((r) => String(r.name ?? "").trim()).filter((n) => { const t = n.toLowerCase().split(/\s+/); return t.length === 2 && t[1] === toks[1] && related(toks[0], t[0]); });
+  const uniq = [...new Set(hits)];
+  if (uniq.length !== 1) return null;
+  return attachCitations(
+    { kind: "no-answer", text: `${uniq[0]} is one of your technicians — no technician contact details are on file.`, facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [] },
+    { records: [], total: 0, kind: "searched", basis: `Matched "${phrase}" to the technician ${uniq[0]} named on your documents; customer records carry contact details, technician records do not.` }
   );
 }
 
@@ -105,6 +143,8 @@ export async function buildUnknownNameDecline(db, question) {
   if (!unknownNameEnabled()) return null;
   const phrase = extractNamePhrase(question);
   if (!phrase) return null;
+  const tech = await technicianContactDecline(db, question, phrase);
+  if (tech) return tech;
   const tokens = candidateTokens(phrase);
   if (!tokens.length) return null;
   const { rows: custs } = await db.raw(`SELECT data->>'customer_name' AS n FROM entities WHERE entity_type = 'customer' AND ${TENANT_SQL}`, []);

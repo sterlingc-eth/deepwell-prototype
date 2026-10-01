@@ -42,9 +42,9 @@ const LEADING = [
   new RegExp(String.raw`^(?:the\s+)?customer(?:'?s|\s+is)\s+(?:on\s+the\s+(?:line|phone)|here|waiting|asking)\b${SEP}`, "i"),
 ];
 
-// Trailing noise, applied repeatedly.
+// Trailing noise, applied repeatedly. R35: a word boundary before the filler word — "Holbrook" ended in "ok" and lost it ("phone for Dan Holbro").
 const TRAILING = new RegExp(
-  String.raw`${SEP}(?:again|please|pls|thanks?|thx|for\s+me|right\s+now|real\s+quick|whoever\s+(?:that|it)\s+is|thx|cheers|lol|sir|buddy|mate|whenever|today|ok\??|okay\??|if\s+that'?s\s+ok|for\s+the\s+file|or\s+something|or\s+whatever|i\s+think|if\s+(?:you|we)\s+(?:can|have|got|know)(?:\s+(?:it|that|one|them))?|if\s+possible|if\s+you\s+don'?t\s+mind|when\s+you\s+can|when\s+you\s+get\s+a\s+(?:chance|sec|minute)|asap)${SEP}$`,
+  String.raw`${SEP}\b(?:again|please|pls|thanks?|thx|for\s+me|right\s+now|real\s+quick|whoever\s+(?:that|it)\s+is|thx|cheers|lol|sir|buddy|mate|whenever|today|ok\??|okay\??|if\s+that'?s\s+ok|for\s+the\s+file|or\s+something|or\s+whatever|i\s+think|if\s+(?:you|we)\s+(?:can|have|got|know)(?:\s+(?:it|that|one|them))?|if\s+possible|if\s+you\s+don'?t\s+mind|when\s+you\s+can|when\s+you\s+get\s+a\s+(?:chance|sec|minute)|asap)${SEP}$`,
   "i"
 );
 

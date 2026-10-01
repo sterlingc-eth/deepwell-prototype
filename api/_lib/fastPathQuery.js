@@ -864,14 +864,17 @@ async function buildSingleUnitAddressAnswer(db, { intent, unit, customer, addres
   const brandWord = narrowedByBrand && unit.manufacturer ? `${unit.manufacturer} ` : '';
   const labelOverride = `The only ${brandWord}unit on file for ${addressLabel}${who}`.replace(/\s+/g, ' ').trim();
 
+  // R35: the stored address rides along (never in the text) so a loosely typed city/zip gets ask.js's visible note.
+  const onFile = unit.service_address || customer?.data?.service_address || null;
+  const withOnFile = (a) => (a && typeof a === 'object' && onFile ? { ...a, addressOnFile: onFile } : a);
   if (WARRANTY_INTENTS.has(intent)) {
-    return runWarranty(db, equipmentResolution, intent, today, labelOverride, teamScoped);
+    return withOnFile(await runWarranty(db, equipmentResolution, intent, today, labelOverride, teamScoped));
   }
   const fieldKey = FIELD_BY_INTENT[intent];
   const rows = await fetchFieldRowsForResolution(db, equipmentResolution, fieldKey, teamScoped);
   const row = pickBestExtraction(rows);
   if (!row) return null;
-  return buildFieldAnswer({ intent, resolution: equipmentResolution, row, labelOverride });
+  return withOnFile(buildFieldAnswer({ intent, resolution: equipmentResolution, row, labelOverride }));
 }
 
 /** one customer, several units, nothing (or nothing NEW) disambiguating them — list every unit

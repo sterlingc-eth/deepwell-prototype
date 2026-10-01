@@ -179,23 +179,43 @@ export async function listIntakeQueue(db, { limit = 20, cursor = null } = {}) {
   // One row per DOCUMENT (its earliest-raised open question — the "ONE question" a card shows),
   // via DISTINCT ON; a document with more than one open question gets a `moreQuestions` count
   // below rather than a second card, so resolving the shown one is what surfaces the next.
+  //
+  // R35: the sort, the cursor and the total are all done IN SQL now. This used to pull EVERY open row (with its
+  // candidates JSON) into Node on EVERY page request and sort/filter there - O(open items) rows over the wire per
+  // page, 5,000 rows for a shop that has just imported its first 5,000 documents. Now a page is `limit + 1` rows.
+  // The cursor is (created_at to the millisecond, id) - ms because that is all a JS Date (the cursor we hand out) holds.
+  let cursorTs = null;
+  let cursorId = null;
+  if (cursor) {
+    const [ts, afterId] = String(cursor).split('|');
+    const okTs = ts && Number.isFinite(Date.parse(ts)) ? new Date(ts).toISOString() : null;
+    const okId = afterId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(afterId) ? afterId : null;
+    if (okTs && okId) { cursorTs = okTs; cursorId = okId; }
+  }
   const { rows: earliest } = await db.raw(
-    `SELECT DISTINCT ON (n.document_id) n.id, n.document_id, n.entity_id, n.field_key, n.question, n.candidates, n.created_at
-       FROM intake_needs_info n
-      WHERE n.${TENANT_SQL} AND n.status = 'open' ${snoozeClause}
-      ORDER BY n.document_id, n.created_at ASC, n.id ASC`,
-    []
+    `WITH first_open AS (
+       SELECT DISTINCT ON (n.document_id) n.id, n.document_id, n.entity_id, n.field_key, n.question, n.candidates, n.created_at
+         FROM intake_needs_info n
+        WHERE n.${TENANT_SQL} AND n.status = 'open' ${snoozeClause}
+        ORDER BY n.document_id, n.created_at ASC, n.id ASC
+     )
+     SELECT f.*, (SELECT count(*)::int FROM first_open) AS total_open
+       FROM first_open f
+      WHERE $1::timestamptz IS NULL
+         OR (date_trunc('milliseconds', f.created_at), f.id) > ($1::timestamptz, $2::uuid)
+      ORDER BY date_trunc('milliseconds', f.created_at) ASC, f.id ASC
+      LIMIT $3`,
+    [cursorTs, cursorId, boundedLimit + 1]
   );
 
-  const [ts, afterId] = cursor ? String(cursor).split('|') : [null, null];
-  let page = earliest.sort((a, b) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : String(a.id).localeCompare(String(b.id))));
-  if (ts) {
-    page = page.filter((r) => {
-      const t = new Date(r.created_at).toISOString();
-      return t > ts || (t === ts && String(r.id) > String(afterId));
-    });
+  let page = earliest;
+  // total_open rides on every row; with no rows left after the cursor the count is unknown here, so it is read once.
+  let openDocumentCount = page.length ? Number(page[0].total_open) : null;
+  if (openDocumentCount == null) {
+    const { rows } = await db.raw(
+      `SELECT count(DISTINCT n.document_id)::int AS n FROM intake_needs_info n WHERE n.${TENANT_SQL} AND n.status = 'open' ${snoozeClause}`, []);
+    openDocumentCount = rows[0]?.n ?? 0;
   }
-  const openDocumentCount = earliest.length;
   const hasMore = page.length > boundedLimit;
   page = page.slice(0, boundedLimit);
   if (!page.length) return { items: [], nextCursor: null, openDocumentCount, tracked: true };

@@ -373,7 +373,10 @@ async function classifyAllInner(question, ctx = {}) {
     if (rewritten) {
       const third = await classifyAllOnce(rewritten, ctx);
       const thirdName = third.winner?.name ?? null;
-      if (thirdName) return { ...third, effectiveQuestion: rewritten, frameStripped: Boolean(stripped), rewritten: true };
+      // R35: a rewrite only claimed by the (looser) analytics stage never overrides a deterministic claim on the text as typed
+      // ("units with no warranty end date on file" was respelled to "... warranty expires date ..." and lost its exact count).
+      const firstName = first.winner?.name ?? null;
+      if (thirdName && !(thirdName === "analytics" && firstName && firstName !== "analytics")) return { ...third, effectiveQuestion: rewritten, frameStripped: Boolean(stripped), rewritten: true };
     }
   }
   if (!stripped) return { ...first, effectiveQuestion: question };

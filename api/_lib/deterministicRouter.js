@@ -41,6 +41,9 @@ import {
 import { correctTriggerWordTypos, normalizeQuestion } from './nlNormalize.js';
 import { parseCompoundQuestion } from './lookups/compound.js';
 import { parseAggregate, runAggregate } from './lookups/aggregates.js';
+import { parseSerialQuestion, runSerialLookup } from './lookups/serialLookup.js';
+import { parseDocNumberQuestion, runDocNumberLookup } from './lookups/docNumberLookup.js';
+import { parseFalsePremise, runFalsePremise } from './lookups/falsePremise.js';
 
 // R32 (loop 3/4): "have we been out to <addr> in the last 90 days" / "any service calls at <addr> last year" / "did we do any work at <addr> this year".
 const WINDOW_VISIT_LEAD_RE = /^\s*(?:any\s+(?:service\s+(?:calls?|visits?)|visits?|calls?|work|jobs?|repairs?|maintenance)|(?:did|have)\s+we\s+(?:do\s+any|had\s+any|done\s+any|been\s+(?:out\s+)?(?:to|at)|gone\s+out\s+to|visited|serviced|worked\s+(?:on|at)|got\s+any)|has\s+anyone\s+been\s+out\s+to)\b/i;
@@ -111,6 +114,18 @@ function subjectFromPhrase(phrase) {
 export function classifyDeterministic(question, opts = {}) {
   const q = fixRouterWordTypos(normalizeQuestion(String(question ?? ''), { overlay: opts?.overlay }).normalized);
   if (!q) return null;
+
+  // R35 (owner decision 2026-10-01): any question ABOUT a serial the user typed is a deterministic serial lookup (lookups/serialLookup.js).
+  const serial = parseSerialQuestion(String(question ?? ''));
+  // R35 loop 2: a question about ONE numbered document ("invoice INV-20003", "who is PO-9004 for") — lookups/docNumberLookup.js.
+  // A typed "serial"/"s/n" wins; a bare token that is a document number is the document's.
+  const docNo = process.env.DONOVAN_DOCNUMBER === '0' || serial?.anchored ? null : parseDocNumberQuestion(String(question ?? ''));
+  if (docNo) return { route: 'docnumber', intent: docNo };
+  if (serial) return { route: 'serial', intent: serial };
+
+  // R35 loop 3: "why did X replace the compressor at <address>" with no such work on file -> honest "no compressor work on file".
+  const premise = parseFalsePremise(String(question ?? ''));
+  if (premise) return { route: 'premise', intent: premise };
 
   // R32b (loop C): closed-shape shop-wide aggregates (warranty extremes / out-of-warranty counts / technicians who never did X / date extremes ...).
   const agg = parseAggregate(String(question ?? '')) ?? parseAggregate(q); // raw first: the fuzzy normalizer can respell real words (older -> order, start -> star)
@@ -520,6 +535,9 @@ export function runDeterministic(db, intent, opts = {}) {
 
 async function runDeterministicCore(db, intent, { today } = {}) {
   const t = todayIso(today);
+  if (intent.route === 'serial') return runSerialLookup(db, intent.intent, { today: t });
+  if (intent.route === 'docnumber') return runDocNumberLookup(db, intent.intent);
+  if (intent.route === 'premise') return runFalsePremise(db, intent.intent);
   if (intent.route === 'aggregate') return runAggregate(db, intent.intent, { today: t });
   if (intent.route === 'comparison') return runComparison(db, intent.intent);
   // Team G (industry packs): db is already inside this tenant's transaction, so packForTenant is a plain read

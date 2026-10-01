@@ -6,8 +6,12 @@ import { createUploadUrl, respondUploadError, checkUploadGate } from "../../uplo
 
 /**
  * POST /api/v1-ingest
- * body: { filename, sha256, contentType?, sizeBytes? }
+ * body: { filename, sha256, sizeBytes, contentType? }   (sizeBytes is REQUIRED - R35 owner decision)
  * -> { documentId, uploadUrl, then: '/api/read-document' }
+ *
+ * `sizeBytes` is the file's exact size in bytes. It is signed into the upload URL as the Content-Length R2 will accept
+ * (a PUT of any other size is refused), so send the same number you PUT. A missing or invalid value is a 400 with a
+ * plain message, never a silently unsized upload.
  *
  * The clean public surface for ingestion — same idea as v1-equipment.js and
  * v1-warranty.js, but POST, because a file upload URL is not something a

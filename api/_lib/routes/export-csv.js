@@ -99,7 +99,7 @@ async function loadDocumentsCsv(db) {
 }
 
 async function loadCustomersCsv(db) {
-  const rows = await db.listCustomersSummary({ limit: MAX_ROWS });
+  const rows = await db.listCustomersSummary({ limit: MAX_ROWS, cap: MAX_ROWS });
   let out = csvRow(['customer_number', 'name', 'service_address', 'phone', 'email', 'document_count', 'equipment_count', 'last_activity']);
   for (const r of rows) {
     out += csvRow([

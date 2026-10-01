@@ -117,6 +117,11 @@ export class IngestError extends Error {
   }
 }
 
+/** R35: the message for a document whose presigned PUT never completed (closed tab, lost signal, killed app): the row
+ *  exists but the file never reached storage. Not a defect to alarm anyone about, and not worth a Sentry event. */
+export const ABANDONED_UPLOAD_MESSAGE =
+  "This upload never finished - the file did not reach storage (a closed tab or a lost connection). Please upload it again.";
+
 /**
  * Static system prompt for every transcription call (fast and strong pass
  * alike) — identical for every document, forever, which is exactly what a
@@ -454,6 +459,11 @@ export async function ingestDocument(ctx, documentId, { userId, force = false } 
     bytes = await getObject(doc.storage_key);
   } catch (err) {
     // R30 M5: an object over the read cap (PUT past its declared size) is the document's fault, not a blip.
+    if (err?.name === "R2Error" && err.status === 404) {
+      const abandoned = new IngestError(ABANDONED_UPLOAD_MESSAGE, 404);
+      abandoned.abandoned = true;
+      throw abandoned;
+    }
     if (err?.name === "R2Error" && err.status === 413) {
       // R34: ...and it is storage the tenant is billed for and nothing will ever read. Upload-url only signs the length when
       // the client declared one, so an object PUT past every limit is possible; do not keep it. Best effort, never blocks.
@@ -610,7 +620,8 @@ export async function ingestDocument(ctx, documentId, { userId, force = false } 
  * for the person who uploaded it. Never throws — it runs on the error path.
  */
 export async function recordIngestFailure(ctx, documentId, error) {
-  await captureException(error, { route: "ingestDocument", documentId, tenant: ctx?.tenantKey });
+  // R35: an abandoned upload is an expected, user-visible condition (see ABANDONED_UPLOAD_MESSAGE), not an incident.
+  if (!error?.abandoned) await captureException(error, { route: "ingestDocument", documentId, tenant: ctx?.tenantKey });
   await withTenant(ctx, (db) =>
     db.markExtracted(documentId, { error: (providerFailureMessage(error) ?? String(error?.message ?? error)).slice(0, 500) })
   ).catch(() => {});

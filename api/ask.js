@@ -71,6 +71,7 @@ import { packForTenant } from "./_lib/industry/index.js";
 // generic/pack vocabulary and grounds the analytics planner prompt in what THIS tenant's data contains.
 import { getTenantVocab, correctTenantNameTypos } from "./_lib/vocab/tenantVocab.js";
 import { decorateWithTypoNote, techNoteFromCorrection } from "./_lib/lookups/typoResolve.js";
+import { resolveNicknameInQuestion } from "./_lib/vocab/nicknames.js";
 // Miss loop (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md): every honest
 // fallback / no-answer / ambiguous-lookup / analytics-fallthrough gets a row
 // in ask_misses for the weekly review — see missStore.js's own doc comment
@@ -114,7 +115,8 @@ import { buildAddressMissAnswer } from "./_lib/lookups/addressMiss.js";
 import { buildUnknownNameDecline } from "./_lib/lookups/unknownName.js";
 import { parseCustomerCount, runCustomerCount } from "./_lib/lookups/namedCompare.js";
 import { buildClarifyAnswer, clarifyEnabled, ADDRESS_RE } from "./_lib/lookups/clarify.js";
-import { answerAddressConflict } from "./_lib/addressConflict.js";
+import { answerAddressConflict, softConflictNote } from "./_lib/addressConflict.js";
+import { capInlineNameList } from "./_lib/router/brevity.js";
 import { classifySafety, buildSafetyAnswer, unverifiedTypeNote, normalizeInputText, neutralizeMarkup } from "./_lib/router/safetyGate.js";
 import { classifyEarlyDecline, buildEarlyDeclineAnswer, earlyDeclineEnabled, triggerMatchesCustomerName } from "./_lib/router/earlyDecline.js";
 // Round 20 (J1): the general precision guard (THE #1 PROBLEM — false confidence, r19_blind3_clusters.json's
@@ -781,7 +783,9 @@ export default async function handler(req, res) {
         const conflict = answerAddressConflict(askedText, body.data);
         if (conflict?.soft) {
           // A loosely typed city/zip never blocks the answer (the exam relies on that), but it is never silently ignored either.
-          body.data.text = `${body.data.text} (Note: you said ${conflict.asked}; the address on file is ${conflict.closest}.)`;
+          // R35: short wording — "(Note: on file in Phoenix, not Mesa.)"
+          const note = softConflictNote(conflict);
+          if (note) body.data.text = `${body.data.text} ${note}`;
         } else if (conflict) {
           body = { ...body, data: attachCitations(
             { kind: "no-answer", text: `Nothing on file for ${conflict.asked}. The closest address on file is ${conflict.closest}, which is a different ${conflict.kind === "city" ? "city" : conflict.kind === "zip" ? "zip code" : conflict.kind === "unit" ? "unit" : conflict.kind === "suffix" ? "street type" : "side of the street"}.`, facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [], addressMiss: true },
@@ -791,6 +795,8 @@ export default async function handler(req, res) {
       } catch (err) { console.error("address conflict check failed, sending answer as computed:", err?.message); }
     }
     if (techTypoNote && body?.data && typeof body.data === "object" && body.data.kind === "answer") decorateWithTypoNote(body.data, techTypoNote);
+    // R35 brevity: a list sentence that repeats every fact row keeps only its first few names (router/brevity.js).
+    if (body?.data && typeof body.data === "object") { try { capInlineNameList(body.data); } catch { /* never block an answer on brevity */ } }
     if (helpHint && body?.data && typeof body.data === "object" && body.data.kind === "no-answer" && !body.data.help) body.data.helpHint = true;
     // TEAM C: last-resort guarantee that EVERY answer carries the citation contract (idempotent; mutates in place
     // so the answer cache stores it too). Producers attach richer records/basis earlier; this only fills gaps.
@@ -985,6 +991,16 @@ export default async function handler(req, res) {
         }
       } catch (err) {
         console.error("Tenant name-typo correction failed, using original question:", err?.message);
+      }
+    }
+    // R35 (owner decision 2026-10-01): a nickname ("Tom Mercer") resolves to the ONE person on file it can mean ("Thomas Mercer"),
+    // announced on the answer like a typo correction. Ambiguous / no match: the question goes on exactly as typed (vocab/nicknames.js).
+    if (!meta && tenantVocab && !techTypoNote) {
+      try {
+        const nick = resolveNicknameInQuestion(question, tenantVocab);
+        if (nick) { question = nick.question; techTypoNote = nick.note; }
+      } catch (err) {
+        console.error("Nickname resolution failed, using original question:", err?.message);
       }
     }
 

@@ -4,7 +4,7 @@ import { handleCors, handleError } from "./_lib/claude.js";
 import { requireAuthOrKey, assertScope } from "./_lib/apiKeyAuth.js";
 import { denyAuth } from "./_lib/auth.js";
 import { limit } from "./_lib/rateLimit.js";
-import { gateUpload, getCachedBillingRow } from "./_lib/plan.js";
+import { gateUpload, getCachedBillingRow, estimatePagesForUpload, batchLimitMessage } from "./_lib/plan.js";
 import { logStage } from "./_lib/perf.js";
 import { startTimer } from "./_lib/timing.js";
 
@@ -49,13 +49,15 @@ async function checkUploadGateInner(auth) {
       // R30 M6: pages of documents already accepted but not read yet (fails safe to 0 if the probe errors).
       typeof db.estimatePendingPages === "function" ? db.estimatePendingPages().catch(() => 0) : 0,
     ]);
-    return gateUpload(billingRow, { documentsStored, pagesThisMonth, pendingPages });
+    const gate = gateUpload(billingRow, { documentsStored, pagesThisMonth, pendingPages });
+    // R35: keep the plan row with the verdict so a 50-file batch can say, per file, which ones no longer fit.
+    return gate.allowed ? { ...gate, billingRow } : gate;
   });
 }
 
 /**
  * POST /api/upload-url
- * body: { filename, sha256, contentType?, sizeBytes? }
+ * body: { filename, sha256, sizeBytes, contentType? }   (sizeBytes REQUIRED, R35)
  * -> { documentId, storageKey, uploadUrl, alreadyUploaded }
  *
  * Step one of ingestion, and the point where the two stores meet: this creates
@@ -89,7 +91,7 @@ async function checkUploadGateInner(auth) {
  * upload for is not a wider capability grant.
  *
  * BATCH MODE (bulk import): body may instead be { files: [{filename, sha256,
- * contentType?, sizeBytes?}, ...] }, up to MAX_BATCH_FILES entries, and the
+ * sizeBytes, contentType?}, ...] }, up to MAX_BATCH_FILES entries, and the
  * response is { results: [...] } with one entry per input file IN THE SAME
  * ORDER (callers may zip by index; filenames are not assumed unique). This
  * exists because a bulk import of thousands of files at one presign-per-HTTP-
@@ -108,6 +110,11 @@ export const config = { api: { bodyParser: { sizeLimit: "64kb" } } };
 
 const MAX_BYTES = 100 * 1024 * 1024;
 const MAX_BATCH_FILES = 50;
+
+/** R35: the two 400s for the now-mandatory sizeBytes. Exported so the client tests and docs quote one wording. */
+export const SIZE_REQUIRED_MESSAGE =
+  "sizeBytes is required: send the file's exact size in bytes (a browser File's .size) so the upload can be checked and signed before it moves.";
+export const SIZE_INVALID_MESSAGE = "sizeBytes must be the file's exact size as a positive whole number of bytes";
 
 // What the reader will actually accept for a PDF or a photo. Checked HERE, not
 // only at read time: the old arrangement presigned anything up to 100 MB, the
@@ -156,7 +163,7 @@ export class UploadValidationError extends Error {
  * shape) so both the single-file and batch paths run the exact same checks.
  *
  * @param {{filename: unknown, sha256: unknown, contentType?: unknown, sizeBytes?: unknown}} body
- * @returns {{filename: string, sha256: string, contentType: string|null, sizeBytes: number|null}}
+ * @returns {{filename: string, sha256: string, contentType: string|null, sizeBytes: number}}
  * @throws {UploadValidationError}
  */
 function validateUploadBody(body) {
@@ -178,42 +185,38 @@ function validateUploadBody(body) {
   // R34: lower-cased with parameters removed, so "Application/PDF" and "application/pdf; charset=binary" are subject to the same
   // size limits as "application/pdf" (they used to slip past the 24 MB / 20 MB checks below and were uploaded in full first).
   const contentType = normalizeContentType(rawContentType);
-  // R30 M5: an integer, because it is signed into the upload URL as the exact Content-Length R2 will accept.
-  if (sizeBytes != null && sizeBytes === 0) {
+  // R35 (owner decision): an upload MUST state its size. It is signed into the upload URL as the exact Content-Length R2
+  // will accept, it feeds the pending-pages estimate that keeps the monthly page cap honest while files are still queued
+  // (a row with no size used to count as one page, so a 200-page scan slipped past the cap), and the 24 MB / 20 MB read
+  // limits below can only be applied before the bytes move if the size is known. Every client already knows file.size.
+  if (sizeBytes === undefined || sizeBytes === null) {
+    throw new UploadValidationError(SIZE_REQUIRED_MESSAGE);
+  }
+  if (sizeBytes === 0) {
     // R34: the old message ("sizeBytes must be a positive whole number of bytes") is what a person saw for an empty file.
     throw new UploadValidationError("This file is empty (0 bytes), so there is nothing to upload. Choose the file again, or scan it again.");
   }
-  if (sizeBytes != null && (!Number.isInteger(sizeBytes) || sizeBytes <= 0)) {
-    throw new UploadValidationError("sizeBytes must be a positive whole number of bytes");
+  if (typeof sizeBytes !== "number" || !Number.isSafeInteger(sizeBytes) || sizeBytes < 0) {
+    throw new UploadValidationError(SIZE_INVALID_MESSAGE);
   }
-  if (sizeBytes != null && sizeBytes > MAX_BYTES) {
+  if (sizeBytes > MAX_BYTES) {
     throw new UploadValidationError("File is larger than 100 MB", 413);
   }
-  if (
-    sizeBytes != null &&
-    sizeBytes > MAX_TEXT_BYTES &&
-    typeof contentType === "string" &&
-    TEXT_UPLOAD_TYPES.test(contentType)
-  ) {
+  if (sizeBytes > MAX_TEXT_BYTES && typeof contentType === "string" && TEXT_UPLOAD_TYPES.test(contentType)) {
     throw new UploadValidationError(
       "Text and spreadsheet files have to be under 20 MB. Split this into " +
         "smaller files and upload them separately.",
       413
     );
   }
-  if (
-    sizeBytes != null &&
-    sizeBytes > MAX_MODEL_BYTES &&
-    typeof contentType === "string" &&
-    MODEL_READ_TYPES.test(contentType)
-  ) {
+  if (sizeBytes > MAX_MODEL_BYTES && typeof contentType === "string" && MODEL_READ_TYPES.test(contentType)) {
     throw new UploadValidationError(
       "PDFs and photos have to be under 24 MB to be read. Split this into " +
         "smaller files, or scan at a lower resolution, and upload again.",
       413
     );
   }
-  return { filename, sha256, contentType, sizeBytes: sizeBytes ?? null };
+  return { filename, sha256, contentType, sizeBytes };
 }
 
 /**
@@ -244,8 +247,10 @@ async function createUploadUrlTx(db, validated, auth) {
   });
   // Was this row already here (same tenant, same bytes)? If the document
   // already has pages, the client can skip the upload entirely.
-  const pages = await db.listPages(doc.id);
-  const alreadyUploaded = pages.length > 0;
+  // R35: an EXISTS probe, not listPages() (every page's full text, once per file, just to read `.length`).
+  const alreadyUploaded = typeof db.hasPages === "function"
+    ? await db.hasPages(doc.id)
+    : (await db.listPages(doc.id)).length > 0;
 
   // presign() must run BEFORE this transaction commits, not after. It used
   // to be called outside withTenant, once the documents row above was
@@ -259,8 +264,9 @@ async function createUploadUrlTx(db, validated, auth) {
   let uploadUrl = null;
   if (!alreadyUploaded) {
     try {
-      // R30 M5: when the client declared a size, sign it (Content-Length) so R2 rejects a PUT of any other size -
-      // otherwise the "100 MB / 24 MB" limits above were only ever checked against what the client SAID.
+      // R30 M5 / R35: the declared size is ALWAYS signed (Content-Length), so R2 rejects a PUT of any other size -
+      // otherwise the "100 MB / 24 MB" limits above were only ever checked against what the client SAID. sizeBytes is
+      // mandatory now (validateUploadBody), so there is no unsigned URL any more.
       uploadUrl = presign("PUT", key, uploadExpirySeconds(sizeBytes), {}, new Date(), { contentLength: sizeBytes });
     } catch (err) {
       throw new StorageUnavailableError(err);
@@ -274,7 +280,8 @@ async function createUploadUrlTx(db, validated, auth) {
     clerk_user_id: auth.userId,
     changes: { filename, sizeBytes, viaKey: !!auth.viaKey },
   });
-  return { documentId: doc.id, storageKey: key, alreadyUploaded, uploadUrl };
+  // `created` = this call made the row (a brand-new document), as opposed to finding one that already existed.
+  return { documentId: doc.id, storageKey: key, alreadyUploaded, uploadUrl, created: doc.inserted === true };
 }
 
 /**
@@ -291,7 +298,10 @@ export async function createUploadUrl(auth, body) {
   const validated = validateUploadBody(body);
   return withTenant(
     { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId },
-    (db) => createUploadUrlTx(db, validated, auth)
+    async (db) => {
+      const { created: _created, ...publicShape } = await createUploadUrlTx(db, validated, auth);
+      return publicShape;
+    }
   );
 }
 
@@ -305,13 +315,20 @@ export async function createUploadUrl(auth, body) {
  * @returns {Promise<Array<{filename?: string, documentId?: string, storageKey?: string, alreadyUploaded?: boolean, uploadUrl?: string|null, error?: string, status?: number}>>}
  * @throws {UploadValidationError} only for a malformed batch itself (not an array, empty, or too long)
  */
-export async function createUploadUrls(auth, files) {
+export async function createUploadUrls(auth, files, allowance = null) {
   if (!Array.isArray(files) || files.length === 0) {
     throw new UploadValidationError("files must be a non-empty array");
   }
   if (files.length > MAX_BATCH_FILES) {
     throw new UploadValidationError(`A batch is limited to ${MAX_BATCH_FILES} files`, 413);
   }
+
+  // R35: `allowance` = what the plan gate said is left ({pagesRemaining, documentsRemaining, billingRow}; null = no
+  // limits known). The gate used to look only at the count BEFORE the batch, so 50 files each estimated at 100 pages all
+  // passed one check at 1,990 of 2,000. Now every NEW document spends from the headroom and a file that arrives once it
+  // is gone gets its own 402 (the rest of the batch, and everyone else's files, are unaffected).
+  let pagesLeft = allowance?.pagesRemaining ?? null;
+  let docsLeft = allowance?.documentsRemaining ?? null;
 
   return withTenant(
     { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId },
@@ -321,7 +338,21 @@ export async function createUploadUrls(auth, files) {
         const filename = typeof raw?.filename === "string" ? raw.filename : undefined;
         try {
           const validated = validateUploadBody(raw);
-          const single = await createUploadUrlTx(db, validated, auth);
+          if (pagesLeft != null && pagesLeft <= 0) {
+            results.push({ filename: validated.filename, error: batchLimitMessage("pages", allowance.billingRow), status: 402, url: "/app/?screen=billing" });
+            continue;
+          }
+          if (docsLeft != null && docsLeft <= 0) {
+            results.push({ filename: validated.filename, error: batchLimitMessage("documents", allowance.billingRow), status: 402, url: "/app/?screen=billing" });
+            continue;
+          }
+          const { created, ...single } = await createUploadUrlTx(db, validated, auth);
+          // Only a file that is not already stored (a duplicate costs nothing) and not already counted (a re-sent row that is
+          // still waiting is in the gate's pending estimate) spends from the headroom.
+          if (created && !single.alreadyUploaded) {
+            if (pagesLeft != null) pagesLeft -= estimatePagesForUpload(validated.contentType, validated.sizeBytes);
+            if (docsLeft != null) docsLeft -= 1;
+          }
           results.push({ filename: validated.filename, ...single });
         } catch (err) {
           // A bad or too-large file, or R2 being unconfigured, is this file's
@@ -481,7 +512,7 @@ export default async function handler(req, res) {
     // rate-limit charge and one usage_counters increment cover the whole
     // batch today — see the daily-cap note in HANDOFF-C.md for the tradeoff.
     if (req.body && Array.isArray(req.body.files)) {
-      const results = await timer.time("handler", () => createUploadUrls(auth, req.body.files));
+      const results = await timer.time("handler", () => createUploadUrls(auth, req.body.files, gate));
       statusSent = 200;
       return handleCors(res, req).status(200).json({ results });
     }

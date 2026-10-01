@@ -271,7 +271,7 @@ export function buildDanglingAnswer() {
   return attachCitations(
     {
       kind: "no-answer",
-      text: "I don't have an earlier question in this chat to go on. Tell me which customer, address, or job you mean and I'll look it up.",
+      text: "No earlier question to go on. Which customer, address, or job do you mean?", // R35 brevity
       facts: [], sources: [], confidence: 0, verifiedCount: 0, unverifiedCount: 0, closest: [],
     },
     { records: [], total: 0, kind: "searched", basis: "This refers back to an earlier question, but this chat has none — nothing to search." }

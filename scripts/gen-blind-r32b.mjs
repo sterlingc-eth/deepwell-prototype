@@ -156,9 +156,9 @@ FAMILIES.agg = () => {
   const outQ = [(b) => `how many ${b}units are not currently under warranty`, (b) => `how many ${b}units are out of warranty`, (b) => `how many ${b}units have an expired warranty`, (b) => `number of ${b}systems no longer covered by warranty`];
   const inQ = [(b) => `how many ${b}units are still under warranty`, (b) => `how many ${b}units are in warranty right now`, (b) => `number of ${b}systems still covered by warranty`, (b) => `how many ${b}units have active warranty coverage`];
   for (let i = 0; i < 40; i++) { const m = i < 8 ? "" : p.pick(MFRS); const b = m ? `${p.pick([m, m.toLowerCase()])} ` : ""; const mf = m ? `AND data->>'manufacturer' ILIKE $2` : ""; const prm = m ? ["@today", m] : ["@today"]; const isOut = i % 2 === 0;
-    // shop-wide "still under warranty" follows the owner's established definition (counts-warranty-0004: 'active' = more than 365 days left); brand-scoped follows h050/g135 (end date after today)
-    const unscopedActive = !isOut && !m;
-    add((isOut ? outQ : inQ)[(i >> 1) % 4](b), "blind_warranty_count", "number", `SELECT count(*) AS n FROM entities WHERE ${EQ} AND ${WEXP} IS NOT NULL AND (${WEXP})::date ${isOut ? "<=" : ">"} ${unscopedActive ? "($1::date + interval '365 days')" : "$1::date"} ${mf}`, prm); }
+    // R35 (owner decision 2026-10-01): "still under warranty" = not expired, shop-wide and per brand (end date on or after today; expired = before today).
+    // (R32b had frozen the shop-wide reading to the strict >365-day bucket; the 4 affected oracles were rewritten in place, ADJUDICATION.md "R35".)
+    add((isOut ? outQ : inQ)[(i >> 1) % 4](b), "blind_warranty_count", "number", `SELECT count(*) AS n FROM entities WHERE ${EQ} AND ${WEXP} IS NOT NULL AND (${WEXP})::date ${isOut ? "<" : ">="} $1::date ${mf}`, prm); }
   // C. technicians who never logged a visit of a service type - set
   const never = (st) => `SELECT DISTINCT value AS item FROM extractions WHERE field_key='technician' EXCEPT SELECT DISTINCT t.value FROM extractions t JOIN extractions s ON s.document_id=t.document_id AND s.field_key='service_type' AND s.value='${st}' WHERE t.field_key='technician'`;
   const nvPM = [`which technicians have never logged a preventive maintenance visit`, `which techs have never done a PM`, `who on the crew has never worked a preventive maintenance call`, `list the technicians with zero preventive maintenance visits`, `which technicians have no PM visits on file`, `any techs who've never done preventive maintenance, which ones`];

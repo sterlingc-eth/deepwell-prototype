@@ -127,6 +127,13 @@ export function getPool() {
       keepAlive: true,
       keepAliveInitialDelayMillis: 5_000,
     });
+    // R35: an IDLE pooled connection that the server drops (Neon suspending the compute, a pooler restart, a network
+    // blip) emits 'error' on the pool. With no listener, Node treats that as an uncaught exception and kills the warm
+    // instance - every request in flight on it fails with FUNCTION_INVOCATION_FAILED. The pool already discards the dead
+    // client; all that is needed is to say so, once, and carry on.
+    pool.on('error', (err) => {
+      console.error('recordsStore: idle Postgres connection error (the pool drops it and reconnects):', err?.code ?? '', err?.message);
+    });
   }
   return pool;
 }
@@ -926,6 +933,9 @@ export async function withTenant(ctx, fn) {
   const tenantId = (await getTenantContext(ctx.tenantKey, ctx.tenantName)).id;
 
   const client = serializeClient(await getPool().connect());
+  // R35: if even ROLLBACK fails the connection is broken; release(true) destroys it instead of handing a dead client
+  // to the next request on this warm instance (which then failed once, for someone else).
+  let destroy = false;
   try {
     await client.query('BEGIN');
     // `true` = SET LOCAL: reverts on COMMIT/ROLLBACK, never outlives the request.
@@ -935,10 +945,10 @@ export async function withTenant(ctx, fn) {
     await client.query('COMMIT');
     return result;
   } catch (err) {
-    await client.query('ROLLBACK').catch(() => {});
+    await client.query('ROLLBACK').catch(() => { destroy = true; });
     throw err;
   } finally {
-    client.release();
+    client.release(destroy ? true : undefined);
   }
 }
 
@@ -1445,7 +1455,7 @@ function makeStore(db, tenantId) {
            ON CONFLICT (tenant_id, sha256_hash) DO UPDATE
              SET storage_key = COALESCE(EXCLUDED.storage_key, documents.storage_key),
                  uploaded_by = COALESCE(documents.uploaded_by, EXCLUDED.uploaded_by)
-           RETURNING id`,
+           RETURNING id, (xmax = 0) AS inserted`,
           [tenantId, d.batch_id ?? null, d.original_filename, d.document_type ?? null,
            d.sha256_hash, d.file_size_bytes ?? null, d.stage,
            d.storage_key ?? null, d.content_type ?? null, d.uploaded_by ?? null]
@@ -1458,7 +1468,7 @@ function makeStore(db, tenantId) {
          VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7,'received'),$8,$9,NOW())
          ON CONFLICT (tenant_id, sha256_hash) DO UPDATE
            SET storage_key = COALESCE(EXCLUDED.storage_key, documents.storage_key)
-         RETURNING id`,
+         RETURNING id, (xmax = 0) AS inserted`,
         [tenantId, d.batch_id ?? null, d.original_filename, d.document_type ?? null,
          d.sha256_hash, d.file_size_bytes ?? null, d.stage,
          d.storage_key ?? null, d.content_type ?? null]
@@ -1549,12 +1559,17 @@ function makeStore(db, tenantId) {
         ['technician', 'technician_name AS value, technician_name AS label', 'technician_name IS NOT NULL', 20],
         ['brand', 'brand AS value, brand AS label', 'brand IS NOT NULL', 20],
       ];
-      const facetPromises = enumerated.map(([dim, cols, having, cap]) =>
+      // R35: facets describe the WHOLE filtered set, not the page, so they are identical for every "load more" of the same
+      // filters - but each one re-scans every document (10 statements). At 50,000 documents a second page cost the same
+      // ~1.9 s as the first. Only the first page (offset 0) computes them; a later page returns an empty list and the
+      // client keeps the ones it already has (useRecordsBrowse.ts).
+      const wantFacets = offset === 0;
+      const facetPromises = !wantFacets ? [] : enumerated.map(([dim, cols, having, cap]) =>
         runFiltered(without(dim), () => `SELECT ${cols}, count(*)::int AS n FROM base WHERE ${having} GROUP BY value, label ORDER BY n DESC, label ASC LIMIT ${cap}`)
           .then((r) => [dim, r.rows])
       );
       // Customer is the one enumerated facet with a real id separate from its label.
-      facetPromises.push(
+      if (wantFacets) facetPromises.push(
         runFiltered(
           without('customerId'),
           () => `SELECT customer_id AS value, customer_name AS label, count(*)::int AS n FROM base
@@ -1565,13 +1580,13 @@ function makeStore(db, tenantId) {
         ['hasMoney', hasFinancials ? '(has_money)' : 'FALSE'],
         ['openBalance', hasFinancials ? '(COALESCE(balance_due, 0) > 0)' : 'FALSE'],
       ];
-      for (const [dim, expr] of booleans) {
+      for (const [dim, expr] of wantFacets ? booleans : []) {
         facetPromises.push(
           runFiltered(without(dim), () => `SELECT count(*) FILTER (WHERE ${expr})::int AS n FROM base`)
             .then((r) => [dim, r.rows[0]?.n ?? 0])
         );
       }
-      if (currentUserId) {
+      if (currentUserId && wantFacets) {
         facetPromises.push(
           runFiltered(
             without('uploadedByMe'),
@@ -1651,11 +1666,18 @@ function makeStore(db, tenantId) {
     },
     // Pages ingested since `sinceIso` (a document's page rows land at ingest
     // time, so "this month's pages" = document_pages created since the 1st).
+    //
+    // R35: the count never reaches back before the 1st (UTC) of the CURRENT month. Callers pass "now minus 30 days", but
+    // the Billing screen, the 402 text and BILLING_RULES all promise the allowance resets on the 1st ("resets Oct 1"):
+    // a shop that scanned 2,000 pages on Sep 25 was told it reset Oct 1 and was refused until Oct 25.
     countPagesSince: async (sinceIso) => {
       const r = await one(
+        // No join to documents: document_pages carries its own tenant_id (RLS filters on it), and with
+        // M3-config/63-page-count-index.sql this is an index range count (240k pages: 421 ms -> 4 ms). It runs on every
+        // upload gate and every bootstrap, so it must not grow with the shop's whole history.
         `SELECT count(*)::int AS n FROM document_pages dp
-           JOIN documents d ON d.id = dp.document_id
-          WHERE ${TENANT.replace('tenant_id', 'd.tenant_id')} AND dp.created_at >= $1`,
+          WHERE ${TENANT.replace('tenant_id', 'dp.tenant_id')}
+            AND dp.created_at >= GREATEST($1::timestamptz, date_trunc('month', NOW() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')`,
         [sinceIso]
       );
       return r?.n ?? 0;
@@ -1931,6 +1953,17 @@ function makeStore(db, tenantId) {
         vals
       );
       return r.rowCount;
+    },
+
+    // R35: "does this document already have page text?" - what the upload dedupe actually needs. upload-url used to call
+    // listPages(), which returns EVERY page's full text, once per file: a batch of 50 already-uploaded multi-page
+    // documents pulled megabytes out of Postgres only to look at `.length > 0`.
+    hasPages: async (documentId) => {
+      const r = await one(
+        `SELECT EXISTS (SELECT 1 FROM document_pages WHERE document_id = $1 AND ${TENANT}) AS has`,
+        [documentId]
+      );
+      return r?.has === true;
     },
 
     listPages: (documentId) => many(
@@ -2866,8 +2899,11 @@ function makeStore(db, tenantId) {
      * so a customer whose only recent event is a new/edited piece of
      * equipment doesn't read as stale.
      */
-    listCustomersSummary: ({ like = null, sort = 'recent', limit = 200, offset = 0 } = {}) => {
-      const lim = Math.min(Math.max(Number(limit) || 200, 1), 200);
+    listCustomersSummary: ({ like = null, sort = 'recent', limit = 200, offset = 0, cap = 200 } = {}) => {
+      // R35: `cap` is the page ceiling (200 for every screen). The customers CSV export passes a bigger one: it asked for
+      // 10,000 rows and silently got 200, so a 10k-customer shop's "export everything" was missing 98% of its customers.
+      const ceiling = Math.min(Math.max(Math.trunc(Number(cap)) || 200, 1), 20000);
+      const lim = Math.min(Math.max(Number(limit) || 200, 1), ceiling);
       // `offset` (default 0 = the historical behaviour) backs the paging API: GET /api/v1/customers?limit=&cursor=.
       const off = Math.max(Math.trunc(Number(offset)) || 0, 0);
       const orderBy = sort === 'name' ? "c.data->>'customer_name' ASC NULLS LAST, c.id"
@@ -2913,20 +2949,24 @@ function makeStore(db, tenantId) {
          ),
          equip_agg AS (
            SELECT customer_id, COUNT(*) AS n, MAX(updated_at) AS last_equip_update FROM equip GROUP BY customer_id
+         ),
+         -- R35: this used to be a correlated subquery in the SELECT list ("SELECT jsonb_agg(...) FROM equip eq WHERE
+         -- eq.customer_id = c.id"), which scans EVERY unit once per customer row the sort has to look at: customers x
+         -- units. At 10,000 customers x 20,000 units the last page of the Customers list took ~19 s (page one ~0.6 s
+         -- only because LIMIT stopped it early). One grouped pass, joined, is the same answer in a single scan.
+         warranty_agg AS (
+           SELECT customer_id, jsonb_agg(jsonb_build_object('id', id) || warranty) AS warranties
+             FROM equip WHERE warranty IS NOT NULL GROUP BY customer_id
          )
          SELECT c.id, c.customer_number, c.data,
                 COALESCE(da.doc_count, 0)::int AS doc_count,
                 COALESCE(ea.n, 0)::int         AS equipment_count,
                 GREATEST(da.last_doc, sa.last_service::timestamptz, ea.last_equip_update) AS last_activity,
-                COALESCE(
-                  -- 'id' merged onto each warranty object (owner defect
-                  -- report 2026-09-22, item 2a) so a dismissal can be keyed
-                  -- per unit, not just per tier — see routes/customers.js's
-                  -- tallyWarrantyAlerts/dismissedAlertKey.
-                  (SELECT jsonb_agg(jsonb_build_object('id', eq.id) || eq.warranty) FROM equip eq WHERE eq.customer_id = c.id AND eq.warranty IS NOT NULL),
-                  '[]'::jsonb
-                ) AS warranties
+                -- 'id' merged onto each warranty object (owner defect report 2026-09-22, item 2a) so a dismissal can be
+                -- keyed per unit, not just per tier — see routes/customers.js's tallyWarrantyAlerts/dismissedAlertKey.
+                COALESCE(wa.warranties, '[]'::jsonb) AS warranties
            FROM c
+           LEFT JOIN warranty_agg wa ON wa.customer_id = c.id
            LEFT JOIN doc_agg da ON da.customer_id = c.id
            LEFT JOIN service_agg sa ON sa.customer_id = c.id
            LEFT JOIN equip_agg ea ON ea.customer_id = c.id

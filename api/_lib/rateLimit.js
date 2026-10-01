@@ -159,6 +159,11 @@ const PLAN_BY_PAGES = Object.freeze(
 );
 const PLAN_INGEST_MULTIPLIER = Object.freeze({ solo: 1, shop: 2.5, crew: 6, fleet: 12 });
 
+/** R35: per-MINUTE plan multipliers. ingest follows the daily multipliers (a Crew shop bulk-importing with several
+ *  people on phones must not starve behind a Solo-sized 60/min bucket that every user in the tenant shares); ask
+ *  scales more gently (a person asks ~1/min - the bucket is a burst guard, not an allowance). */
+const PLAN_ASK_MINUTE_MULTIPLIER = Object.freeze({ solo: 1, shop: 2, crew: 4, fleet: 6 });
+
 /** Pure: which plan tier a tenants.limits row describes, or null. */
 export function planTierFromLimits(tenantLimits) {
   if (tenantLimits?.plan && Object.prototype.hasOwnProperty.call(PLAN_LIMITS, tenantLimits.plan)) return tenantLimits.plan;
@@ -180,6 +185,16 @@ export function scaleDailyLimitForPlan(bucket, baseDaily, tenantLimits) {
   return Math.round(baseDaily * (PLAN_INGEST_MULTIPLIER[tier] ?? 1));
 }
 
+/** Pure (R35): the per-minute burst ceiling for a bucket given the tenant's plan. Only ingest and ask scale. */
+export function scaleMinuteLimitForPlan(bucket, basePerMinute, tenantLimits) {
+  if (!Number.isFinite(basePerMinute)) return basePerMinute;
+  const tier = planTierFromLimits(tenantLimits);
+  if (!tier) return basePerMinute;
+  if (bucket === 'ingest') return Math.round(basePerMinute * (PLAN_INGEST_MULTIPLIER[tier] ?? 1));
+  if (bucket === 'ask') return Math.round(basePerMinute * (PLAN_ASK_MINUTE_MULTIPLIER[tier] ?? 1));
+  return basePerMinute;
+}
+
 /**
  * Pure: given a tenant's already-fetched `limits` jsonb (get_tenant_limits()'s
  * shape — see M3-config/24), work out perMinute/perDay for `bucket`. Split out
@@ -195,10 +210,14 @@ export function limitsFromTenantContext(tenantLimits, bucket, overrides) {
   // Plan-sized INGEST daily ceilings (ask is flat — see scaleDailyLimitForPlan). An explicit
   // `limits.<bucket>.perDay` override on the tenant still wins.
   const scaled = scaleDailyLimitForPlan(bucket, base.perDay, tenantLimits);
+  // R35: an explicit RATE_LIMIT_<BUCKET>_PER_MINUTE env value is the operator's deployment-wide choice and is NOT
+  // multiplied by plan; only the built-in default scales.
+  const envPinned = parseLimitEnv(process.env[`RATE_LIMIT_${String(bucket).toUpperCase()}_PER_MINUTE`]) !== undefined;
+  const scaledMinute = envPinned ? base.perMinute : scaleMinuteLimitForPlan(bucket, base.perMinute, tenantLimits);
   return {
     perMinute: Number.isFinite(callerOverride.perMinute)
       ? callerOverride.perMinute
-      : Number.isFinite(tenantOverride.perMinute) ? tenantOverride.perMinute : base.perMinute,
+      : Number.isFinite(tenantOverride.perMinute) ? tenantOverride.perMinute : scaledMinute,
     perDay: Number.isFinite(callerOverride.perDay)
       ? callerOverride.perDay
       : Number.isFinite(tenantOverride.perDay) ? tenantOverride.perDay : scaled,
@@ -288,6 +307,23 @@ export function logOnce(table, err) {
   console.error(`rateLimit: could not update ${table} (failing open; repeated once per 10 min):`, err?.message);
 }
 
+/** R35: give back units a request was DENIED for. Before this, a denied call still stayed in the window total, so a
+ *  client retrying a 429 kept the whole shop's bucket pinned (and a 50-file batch denied once poisoned the minute for
+ *  every other user in the tenant). Needs M3-config/62-rate-limit-refund.sql; on the old function the negative units
+ *  clamp to 0 so this is a harmless no-op, never an error. Best-effort: never throws. */
+async function refund(tenantUuid, bucketKey, windowStartIso, units) {
+  try {
+    await getAuxPool().query("SELECT increment_rate_limit_window($1, $2, $3::timestamptz, $4)", [tenantUuid, bucketKey, windowStartIso, -units]);
+  } catch (err) {
+    logOnce("rate_limit_windows", err);
+  }
+}
+
+/** Pure (R35): one signed-in user's share of the tenant's ask burst bucket, so one runaway tab cannot eat everyone's. */
+export function perUserAskPerMinute(tenantPerMinute) {
+  return Math.max(6, Math.ceil(Number(tenantPerMinute) / 2));
+}
+
 export async function limit(req, res, auth, bucket, overrides, cost) {
   const tenantKey = auth?.tenantId;
   // Auth resolved but produced no tenant identity: there is nothing to meter
@@ -318,6 +354,7 @@ export async function limit(req, res, auth, bucket, overrides, cost) {
       );
       const unitsThisWindow = rows[0]?.units;
       if (unitsThisWindow != null && exceedsPerMinute(unitsThisWindow, limits.perMinute)) {
+        await refund(tenantUuid, bucket, new Date(windowStartMs).toISOString(), units);
         send429(res, secondsUntilNextWindow(now, windowStartMs), {
           details: `More than ${limits.perMinute} ${bucket} units in the last minute.`,
           scope: "per-minute",
@@ -328,6 +365,32 @@ export async function limit(req, res, auth, bucket, overrides, cost) {
       // Same principle as resolveLimits: a broken counter must not either
       // silently disable the cap or wrongly block every request. Log and let
       // the (still-enforced) daily cap below be the only gate this time.
+      logOnce("rate_limit_windows", err);
+    }
+  }
+
+  // ---- 1b. R35: per-user fairness for Donovan (ask) -----------------------------------------------------------
+  // The ask bucket is shared by every signed-in user of the tenant. Without this, one looping client could spend
+  // the whole shop's per-minute budget. Keyed by user id (never by API key - keys have no user). Fails open.
+  if (tenantUuid && bucket === "ask" && !auth?.viaKey && typeof auth?.userId === "string" && auth.userId) {
+    const windowStartMs = minuteWindowStart(now);
+    const userBucket = `ask_u:${auth.userId.slice(0, 48)}`;
+    try {
+      const { rows } = await getAuxPool().query(
+        "SELECT increment_rate_limit_window($1, $2, $3::timestamptz, $4) AS units",
+        [tenantUuid, userBucket, new Date(windowStartMs).toISOString(), units]
+      );
+      const perUser = perUserAskPerMinute(limits.perMinute);
+      if (rows[0]?.units != null && exceedsPerMinute(rows[0].units, perUser)) {
+        await refund(tenantUuid, userBucket, new Date(windowStartMs).toISOString(), units);
+        await refund(tenantUuid, bucket, new Date(windowStartMs).toISOString(), units);
+        send429(res, secondsUntilNextWindow(now, windowStartMs), {
+          details: `More than ${perUser} questions from one person in the last minute. Give it a moment.`,
+          scope: "per-user",
+        });
+        return false;
+      }
+    } catch (err) {
       logOnce("rate_limit_windows", err);
     }
   }
@@ -356,6 +419,12 @@ export async function limit(req, res, auth, bucket, overrides, cost) {
     if (reportRes.status === "rejected") logOnce("usage_counters", reportRes.reason);
 
     if (requestsToday != null && Number(requestsToday) > limits.perDay) {
+      // R35: the denied units come back out of both counters so the 429 itself does not eat tomorrow-bound budget
+      // or the minute window of the other people in the shop.
+      await Promise.all([
+        refund(tenantUuid, dailyBucketKey(bucket), utcDayStartIso(now), units),
+        refund(tenantUuid, bucket, new Date(minuteWindowStart(now)).toISOString(), units),
+      ]);
       // Donovan's daily ceiling is the hidden safety net, never a plan limit: polite, no "upgrade".
       send429(
         res,
@@ -385,7 +454,7 @@ export async function limit(req, res, auth, bucket, overrides, cost) {
  * number since a document with several flagged pages (see readDocument.js's
  * escalation) can cost more than one model call per page.
  */
-const DEFAULT_MAX_MODEL_CALLS_PER_DAY = 2000;
+export const DEFAULT_MAX_MODEL_CALLS_PER_DAY = 2000;
 
 /**
  * Read a tenant's daily model-call spend and its cap in ONE round trip.
@@ -428,7 +497,10 @@ export async function getDailyModelBudgetStatus(ctx) {
     );
     const row = rows[0];
     const override = row?.limits?.maxModelCallsPerDay;
-    const limitPerDay = Number.isFinite(override) && override > 0 ? Math.trunc(override) : DEFAULT_MAX_MODEL_CALLS_PER_DAY;
+    // R35: the default scales with the plan (Fleet imports 12x what Solo does); an explicit owner override still wins.
+    const limitPerDay = Number.isFinite(override) && override > 0
+      ? Math.trunc(override)
+      : scaleDailyLimitForPlan("ingest", DEFAULT_MAX_MODEL_CALLS_PER_DAY, row?.limits);
     const used = Number(row?.model_calls ?? 0);
     return { exceeded: used >= limitPerDay, used, limit: limitPerDay };
   } catch (err) {

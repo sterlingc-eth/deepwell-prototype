@@ -178,6 +178,7 @@ function buildSafetyNetFilters(question, entity) {
 // file's own caller bail on the WHOLE plan (never guess which of the other buckets was meant) instead of
 // mistaking "negated" for "no warranty condition here at all".
 const WARRANTY_STATUS_AMBIGUOUS = Symbol('warrantyStatusAmbiguous');
+const REGISTRATION_CONJUNCT_RE = /\b(?:but|and|that\s+are|that\s+is|which\s+are|yet)\s+(?:still\s+)?(?:not\s+|never\s+)?(?:un)?registered\b/i;
 
 // R21 M2 (Cluster 2, j047: "in the last 5 years, how many systems have we put in" — a plain
 // install-count question with no warranty mention at all): impliedWarrantyStatus's own "relaxed"
@@ -188,13 +189,20 @@ const WARRANTY_STATUS_AMBIGUOUS = Symbol('warrantyStatusAmbiguous');
 // question said. Guarded off whenever q's last real word is one of STRICT_ACTIVE_STATUS_RE's own
 // two preposition-led phrases' lead word ("in"/"under") with nothing warranty-related after it.
 const TRAILING_BARE_PREPOSITION_RE = /\b(?:in|under)\s*$/i;
+const OTHER_COVERAGE_RE = /\b(?:agreements?|plans?|contracts?|memberships?|insurance|polic(?:y|ies)|subscriptions?)\b/i;
 
 function impliedWarrantyStatus(q, entity) {
+  // R35 adversarial pass: "covered by warranty but not registered" carries a SECOND condition (registration) this plan has no filter for —
+  // never silently dropped (the whole plan bails instead of answering the bare warranty count).
+  if (REGISTRATION_CONJUNCT_RE.test(q)) return WARRANTY_STATUS_AMBIGUOUS;
   const direct = warrantyStatusFromQuestion(q);
   if (direct) return direct;
   if (hasAmbiguousWarrantyStatusNegation(q)) return WARRANTY_STATUS_AMBIGUOUS;
   if (entity !== 'equipment' && entity !== 'warranties') return null;
   if (TRAILING_BARE_PREPOSITION_RE.test(q.trim())) return null;
+  // R35: "covered by a maintenance agreement / service plan / contract" names a DIFFERENT kind of coverage — never a warranty status,
+  // and never silently dropped either (the whole deterministic plan bails, same as an ambiguous negation).
+  if (OTHER_COVERAGE_RE.test(q)) return /\b(?:covered|coverage|cover)\b/i.test(q) ? WARRANTY_STATUS_AMBIGUOUS : null;
   const relaxed = `${q} warranty`;
   const relaxedStatus = warrantyStatusFromQuestion(relaxed);
   if (relaxedStatus) return relaxedStatus;
@@ -1372,7 +1380,17 @@ export function questionNamesKnownCustomer(q, tenantVocab) {
   return false;
 }
 
+/** R35 adversarial pass: an unfiltered whole-table LIST is never the answer to a superlative / ranking question ("which brand has the most
+ *  repairs" was answered "120 customers.") — the ranking dimension was dropped, so the plan is refused and the question goes on. */
+const SUPERLATIVE_RE = /\b(?:most|least|fewest|highest|lowest|top|best|worst|biggest|smallest)\b/i;
 export function detectAnalyticsPlan(question, tenantVocab, today) {
+  const plan = detectAnalyticsPlanInner(question, tenantVocab, today);
+  const bare = plan && plan.op === 'list' && plan.entity === 'customers' && !(plan.filters ?? []).length && Object.keys(plan).every((k) => k === 'entity' || k === 'op' || k === 'filters');
+  if (bare && SUPERLATIVE_RE.test(String(question ?? ''))) return null;
+  return plan;
+}
+
+function detectAnalyticsPlanInner(question, tenantVocab, today) {
   try {
     const q = String(question ?? '').trim();
     if (!q) return null;
@@ -1383,6 +1401,9 @@ export function detectAnalyticsPlan(question, tenantVocab, today) {
     if (dup) return dup;
     if (SELF_DUPLICATE_RE.test(q)) return null;
     if (CONTENT_SEARCH_DENY_RE.test(q)) return null;
+    // R35 adversarial pass: a registration condition ANDed onto a warranty status ("covered by warranty but not registered") has no filter
+    // here; never answered as the bare warranty count.
+    if (REGISTRATION_CONJUNCT_RE.test(q)) return null;
     if (CONNECT_DENY_RE.test(q)) return null;
     if (ZERO_LINKED_EVENTS_RE.test(q)) return null;
     if (FOLLOW_UP_FRAGMENT_RE.test(q)) return null;

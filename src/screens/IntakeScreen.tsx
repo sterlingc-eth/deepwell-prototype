@@ -356,6 +356,10 @@ export function IntakeBody() {
             "Today's upload limit has been reached. Uploading has stopped — the files not yet started were not attempted. Try again after the limit resets (UTC midnight)."
           );
         },
+        // R35: a plan limit (monthly pages, stored documents, no active plan) ends the run with the server's own wording.
+        onPlanLimitReached: (message: string) => {
+          setBulkNotice(`${message} Uploading has stopped - the files not yet started were not attempted, and nothing already uploaded was lost.`);
+        },
       }
     );
     setBulkCancel(handle.cancel);

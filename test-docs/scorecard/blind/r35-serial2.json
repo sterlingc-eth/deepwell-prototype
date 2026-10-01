@@ -1,0 +1,515 @@
+{
+ "version": "r35b-blind-1",
+ "category": "blind-r35b-serial2",
+ "source": "scripts/gen-blind-r35b.mjs (seeded, frozen before the loop's rule)",
+ "questions": [
+  {
+   "id": "bl-r35b-serial2-001",
+   "text": "who has serial 100049 thanks",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_unique",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'serial_number' = $1",
+    "params": [
+     "M100049"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-serial2-002",
+   "text": "quick one - serial ending in 100125 real quick",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_unique",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'serial_number' = $1",
+    "params": [
+     "F100125"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-serial2-003",
+   "text": "alright, whose unit has serial 100040",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_unique",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'serial_number' = $1",
+    "params": [
+     "D100040"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-serial2-004",
+   "text": "real quick: sn 100006 - whose unit",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_unique",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'serial_number' = $1",
+    "params": [
+     "2R100006"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-serial2-005",
+   "text": "ok so customer for s/n 100004 please",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_unique",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'serial_number' = $1",
+    "params": [
+     "2G100004"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-serial2-006",
+   "text": "quick one - who has the unit with serial ending 100127 thanks",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_unique",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'serial_number' = $1",
+    "params": [
+     "2G100127"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-serial2-007",
+   "text": "serial 100098, whose is it thanks",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_unique",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'serial_number' = $1",
+    "params": [
+     "F100098"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-serial2-008",
+   "text": "real quick: which customer has serial 100133 please",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_unique",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'serial_number' = $1",
+    "params": [
+     "F100133"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-serial2-009",
+   "text": "quick one - who has serial 100054 thanks",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_unique",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'serial_number' = $1",
+    "params": [
+     "2R100054"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-serial2-010",
+   "text": "alright, serial ending in 100104 please",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_unique",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'serial_number' = $1",
+    "params": [
+     "D100104"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-serial2-011",
+   "text": "real quick: whose unit has serial 100102",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_unique",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'serial_number' = $1",
+    "params": [
+     "2R100102"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-serial2-012",
+   "text": "sn 100119 - whose unit",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_unique",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'serial_number' = $1",
+    "params": [
+     "Y100119"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-serial2-013",
+   "text": "customer for s/n 100099 real quick",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_unique",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'serial_number' = $1",
+    "params": [
+     "2C100099"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-serial2-014",
+   "text": "who has the unit with serial ending 100038",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_unique",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'serial_number' = $1",
+    "params": [
+     "2R100038"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-serial2-015",
+   "text": "serial 100002, whose is it",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_unique",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'serial_number' = $1",
+    "params": [
+     "F100002"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-serial2-016",
+   "text": "hey, which customer has serial 100132 please",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_unique",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'serial_number' = $1",
+    "params": [
+     "M100132"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-serial2-017",
+   "text": "sorry, one more - who has serial 100028 real quick",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_unique",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'serial_number' = $1",
+    "params": [
+     "2G100028"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-serial2-018",
+   "text": "serial ending in 100037 thanks",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_unique",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'serial_number' = $1",
+    "params": [
+     "LX100037"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-serial2-019",
+   "text": "whose unit has serial 100030",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_unique",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'serial_number' = $1",
+    "params": [
+     "2R100030"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-serial2-020",
+   "text": "hey, sn 100092 - whose unit",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_unique",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'serial_number' = $1",
+    "params": [
+     "2G100092"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-serial2-021",
+   "text": "hey, customer for s/n 100052",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_unique",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'serial_number' = $1",
+    "params": [
+     "2G100052"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-serial2-022",
+   "text": "who has the unit with serial ending 100010 thanks",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_unique",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'serial_number' = $1",
+    "params": [
+     "F100010"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-serial2-023",
+   "text": "alright, serial 100069, whose is it",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_unique",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'serial_number' = $1",
+    "params": [
+     "LX100069"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-serial2-024",
+   "text": "hang on... which customer has serial 100086",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_unique",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'serial_number' = $1",
+    "params": [
+     "2R100086"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-serial2-025",
+   "text": "who has serial 100063",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_unique",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'serial_number' = $1",
+    "params": [
+     "Y100063"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-serial2-026",
+   "text": "ok so serial ending in 100022",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_unique",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'serial_number' = $1",
+    "params": [
+     "2R100022"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-serial2-027",
+   "text": "whose unit has serial 100014",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_unique",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'serial_number' = $1",
+    "params": [
+     "2R100014"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-serial2-028",
+   "text": "hey, sn 100055 - whose unit",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_unique",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'serial_number' = $1",
+    "params": [
+     "Y100055"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-serial2-029",
+   "text": "quick one - customer for s/n 100084 real quick",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_unique",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'serial_number' = $1",
+    "params": [
+     "2G100084"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-serial2-030",
+   "text": "ok so who has the unit with serial ending 100091 for me",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_unique",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'serial_number' = $1",
+    "params": [
+     "2C100091"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35b-serial2-031",
+   "text": "ok so who has serial 10001 real quick",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_ambiguous",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-serial2-032",
+   "text": "real quick: serial ending in 10002 thanks",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_ambiguous",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-serial2-033",
+   "text": "hey, sn 10003 whose unit real quick",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_ambiguous",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-serial2-034",
+   "text": "customer for s/n 10010 please",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_ambiguous",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-serial2-035",
+   "text": "hang on... who has serial 10011 please",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_ambiguous",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-serial2-036",
+   "text": "hey, serial ending in 10012 please",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_ambiguous",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-serial2-037",
+   "text": "sorry, one more - sn 10005 whose unit for me",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_ambiguous",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-serial2-038",
+   "text": "customer for s/n 10009",
+   "category": "blind-r35b-serial2",
+   "shape": "s2_partial_ambiguous",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  }
+ ]
+}

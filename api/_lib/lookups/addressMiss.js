@@ -18,7 +18,7 @@ export function addressMissEnabled() {
   return process.env.DONOVAN_ADDRESS_MISS !== "0";
 }
 
-const CUE_RE = /\b(?:serial|model|brand|make|manufacturer|warranty|covered|unit|units|system|equipment|furnace|ac|a\/c|heat\s*pump|tonnage|install(?:ed|ation|er)?|tech|technician|serviced?|service|visit|maintenance|last|old|age|permit|invoice|customer|who|phone|contact|lives?|owner|account|file|documents?|paperwork|invoices?|permits?|nameplate|photo)\b/i;
+const CUE_RE = /\b(?:serial|model|brand|make|manufacturer|warranty|covered|unit|units|system|equipment|furnace|ac|a\/c|heat\s*pump|tonnage|install(?:ed|ation|er)?|tech|technician|serviced?|service|visit|maintenance|last|old|age|permit|invoice|customer|who|phone|contact|lives?|owner|account|file|documents?|paperwork|invoices?|permits?|nameplate|photo|done|work|history|happened|jobs?|repairs?|fixed|replaced|calls?|tickets?|do|did)\b/i; // R35: + work-history cues ("what was done at ...")
 const DIRECTION = new Set(["n", "s", "e", "w", "north", "south", "east", "west", "ne", "nw", "se", "sw"]);
 
 export function extractAddressPhrase(question) {

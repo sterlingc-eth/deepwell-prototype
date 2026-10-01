@@ -1,0 +1,3285 @@
+{
+ "version": "r35-blind-1",
+ "category": "blind-r35-serial",
+ "source": "scripts/gen-blind-r35.mjs (seeded, frozen before the R35 rules)",
+ "questions": [
+  {
+   "id": "bl-r35-serial-001",
+   "text": "what unit is serial Y 100103 for me",
+   "category": "blind-r35-serial",
+   "shape": "serial_unit",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "Y100103"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "Y100103"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-002",
+   "text": "quick one - model for serial LX100085",
+   "category": "blind-r35-serial",
+   "shape": "serial_model",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "LX100085"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "LX100085"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-003",
+   "text": "what model is s/n 2RI00II5 real quick",
+   "category": "blind-r35-serial",
+   "shape": "serial_model",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2R100115"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2R100115"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-004",
+   "text": "sorry, one more - who has serial F-100058",
+   "category": "blind-r35-serial",
+   "shape": "serial_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "F100058"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "F100058"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-005",
+   "text": "ok so whose is sn M100124 for me",
+   "category": "blind-r35-serial",
+   "shape": "serial_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "M100124"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "M100124"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-006",
+   "text": "hey, where's S/N LX1OOO29",
+   "category": "blind-r35-serial",
+   "shape": "serial_where",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'service_address' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "LX100029"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "LX100029"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-007",
+   "text": "quick one - where is serial number d100120 installed",
+   "category": "blind-r35-serial",
+   "shape": "serial_where",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'service_address' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "D100120"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "D100120"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-008",
+   "text": "what brand is serial y1ooo71 thanks",
+   "category": "blind-r35-serial",
+   "shape": "serial_brand",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'manufacturer' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "Y100071"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "Y100071"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-009",
+   "text": "serial# LX 100045 make?",
+   "category": "blind-r35-serial",
+   "shape": "serial_brand",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'manufacturer' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "LX100045"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "LX100045"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-010",
+   "text": "sn Y100015 thanks",
+   "category": "blind-r35-serial",
+   "shape": "serial_fragment",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "Y100015"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "Y100015"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-011",
+   "text": "real quick: serial 2CI00043? thanks",
+   "category": "blind-r35-serial",
+   "shape": "serial_fragment",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2C100043"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2C100043"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-012",
+   "text": "hey, look up serial 2G-100052",
+   "category": "blind-r35-serial",
+   "shape": "serial_unit",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2G100052"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2G100052"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-013",
+   "text": "when was serial F100066 installed",
+   "category": "blind-r35-serial",
+   "shape": "serial_install",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'installation_date' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "F100066"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "F100066"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-014",
+   "text": "install date on sn F1OOO1O thanks",
+   "category": "blind-r35-serial",
+   "shape": "serial_install",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'installation_date' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "F100010"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "F100010"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-015",
+   "text": "hey, ser no f100082 - whose unit for me",
+   "category": "blind-r35-serial",
+   "shape": "serial_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "F100082"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "F100082"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-016",
+   "text": "real quick: what's the address for serial d1ooo4o real quick",
+   "category": "blind-r35-serial",
+   "shape": "serial_where",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'service_address' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "D100040"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "D100040"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-017",
+   "text": "sorry, one more - customer for s/n 2G 100044",
+   "category": "blind-r35-serial",
+   "shape": "serial_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2G100044"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2G100044"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-018",
+   "text": "quick one - pull up serial number M100009 real quick",
+   "category": "blind-r35-serial",
+   "shape": "serial_unit",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "M100009"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "M100009"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-019",
+   "text": "hang on... what unit is serial LXI00III",
+   "category": "blind-r35-serial",
+   "shape": "serial_unit",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "LX100111"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "LX100111"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-020",
+   "text": "model for serial Y-100119",
+   "category": "blind-r35-serial",
+   "shape": "serial_model",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "Y100119"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "Y100119"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-021",
+   "text": "hang on... what model is s/n LX100005",
+   "category": "blind-r35-serial",
+   "shape": "serial_model",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "LX100005"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "LX100005"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-022",
+   "text": "ok so who has serial D1OOO56",
+   "category": "blind-r35-serial",
+   "shape": "serial_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "D100056"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "D100056"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-023",
+   "text": "hang on... whose is sn m100097 real quick",
+   "category": "blind-r35-serial",
+   "shape": "serial_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "M100097"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "M100097"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-024",
+   "text": "alright, where's S/N 2c1ooo35",
+   "category": "blind-r35-serial",
+   "shape": "serial_where",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'service_address' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2C100035"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2C100035"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-025",
+   "text": "where is serial number D 100064 installed real quick",
+   "category": "blind-r35-serial",
+   "shape": "serial_where",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'service_address' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "D100064"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "D100064"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-026",
+   "text": "what brand is serial F100125 for me",
+   "category": "blind-r35-serial",
+   "shape": "serial_brand",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'manufacturer' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "F100125"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "F100125"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-027",
+   "text": "quick one - serial# LXI000I3 make? please",
+   "category": "blind-r35-serial",
+   "shape": "serial_brand",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'manufacturer' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "LX100013"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "LX100013"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-028",
+   "text": "quick one - sn 2C-100099",
+   "category": "blind-r35-serial",
+   "shape": "serial_fragment",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2C100099"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2C100099"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-029",
+   "text": "sorry, one more - serial 2R100086?",
+   "category": "blind-r35-serial",
+   "shape": "serial_fragment",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2R100086"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2R100086"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-030",
+   "text": "hey, look up serial 2G1OO1O9 please",
+   "category": "blind-r35-serial",
+   "shape": "serial_unit",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2G100109"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2G100109"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-031",
+   "text": "hey, when was serial 2r100102 installed real quick",
+   "category": "blind-r35-serial",
+   "shape": "serial_install",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'installation_date' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2R100102"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2R100102"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-032",
+   "text": "install date on sn f1ooo42 please",
+   "category": "blind-r35-serial",
+   "shape": "serial_install",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'installation_date' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "F100042"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "F100042"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-033",
+   "text": "ok so ser no M 100121 - whose unit please",
+   "category": "blind-r35-serial",
+   "shape": "serial_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "M100121"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "M100121"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-034",
+   "text": "what's the address for serial Y100095 real quick",
+   "category": "blind-r35-serial",
+   "shape": "serial_where",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'service_address' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "Y100095"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "Y100095"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-035",
+   "text": "customer for s/n 2CI00I07",
+   "category": "blind-r35-serial",
+   "shape": "serial_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2C100107"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2C100107"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-036",
+   "text": "ok so pull up serial number 2C-100027 for me",
+   "category": "blind-r35-serial",
+   "shape": "serial_unit",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2C100027"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2C100027"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-037",
+   "text": "hey, what unit is serial 2G100084",
+   "category": "blind-r35-serial",
+   "shape": "serial_unit",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2G100084"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2G100084"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-038",
+   "text": "sorry, one more - model for serial M1OOO17 please",
+   "category": "blind-r35-serial",
+   "shape": "serial_model",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "M100017"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "M100017"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-039",
+   "text": "what model is s/n m100025 thanks",
+   "category": "blind-r35-serial",
+   "shape": "serial_model",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "M100025"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "M100025"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-040",
+   "text": "quick one - who has serial d1ooo88",
+   "category": "blind-r35-serial",
+   "shape": "serial_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "D100088"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "D100088"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-041",
+   "text": "alright, whose is sn LX 100037 real quick",
+   "category": "blind-r35-serial",
+   "shape": "serial_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "LX100037"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "LX100037"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-042",
+   "text": "where's S/N 2R100112 for me",
+   "category": "blind-r35-serial",
+   "shape": "serial_where",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'service_address' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2R100112"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2R100112"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-043",
+   "text": "hey, where is serial number DI00I3I installed real quick",
+   "category": "blind-r35-serial",
+   "shape": "serial_where",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'service_address' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "D100131"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "D100131"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-044",
+   "text": "quick one - what brand is serial 2R-100054",
+   "category": "blind-r35-serial",
+   "shape": "serial_brand",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'manufacturer' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2R100054"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2R100054"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-045",
+   "text": "hang on... serial# F100026 make? please",
+   "category": "blind-r35-serial",
+   "shape": "serial_brand",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'manufacturer' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "F100026"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "F100026"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-046",
+   "text": "sn 2R1OOO62",
+   "category": "blind-r35-serial",
+   "shape": "serial_fragment",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2R100062"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2R100062"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-047",
+   "text": "hey, serial 2g100110?",
+   "category": "blind-r35-serial",
+   "shape": "serial_fragment",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2G100110"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2G100110"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-048",
+   "text": "hang on... look up serial d1ooo24 thanks",
+   "category": "blind-r35-serial",
+   "shape": "serial_unit",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "D100024"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "D100024"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-049",
+   "text": "when was serial 2R 100114 installed",
+   "category": "blind-r35-serial",
+   "shape": "serial_install",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'installation_date' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2R100114"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2R100114"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-050",
+   "text": "hey, install date on sn LX100128",
+   "category": "blind-r35-serial",
+   "shape": "serial_install",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'installation_date' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "LX100128"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "LX100128"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-051",
+   "text": "real quick: ser no 2RI00022 - whose unit thanks",
+   "category": "blind-r35-serial",
+   "shape": "serial_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2R100022"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2R100022"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-052",
+   "text": "ok so what's the address for serial F-100133",
+   "category": "blind-r35-serial",
+   "shape": "serial_where",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'service_address' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "F100133"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "F100133"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-053",
+   "text": "quick one - customer for s/n 2C100059",
+   "category": "blind-r35-serial",
+   "shape": "serial_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2C100059"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2C100059"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-054",
+   "text": "real quick: pull up serial number 2G1OOO6O thanks",
+   "category": "blind-r35-serial",
+   "shape": "serial_unit",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2G100060"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2G100060"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-055",
+   "text": "what unit is serial m100081 for me",
+   "category": "blind-r35-serial",
+   "shape": "serial_unit",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "M100081"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "M100081"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-056",
+   "text": "ok so model for serial 2r1ooo3o",
+   "category": "blind-r35-serial",
+   "shape": "serial_model",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2R100030"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2R100030"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-057",
+   "text": "ok so what model is s/n 2G 100020",
+   "category": "blind-r35-serial",
+   "shape": "serial_model",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2G100020"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2G100020"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-058",
+   "text": "real quick: who has serial Y100007",
+   "category": "blind-r35-serial",
+   "shape": "serial_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "Y100007"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "Y100007"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-059",
+   "text": "whose is sn 2RI00006",
+   "category": "blind-r35-serial",
+   "shape": "serial_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2R100006"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2R100006"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-060",
+   "text": "real quick: where's S/N Y-100063",
+   "category": "blind-r35-serial",
+   "shape": "serial_where",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'service_address' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "Y100063"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "Y100063"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-061",
+   "text": "hey, where is serial number Y100055 installed real quick",
+   "category": "blind-r35-serial",
+   "shape": "serial_where",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'service_address' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "Y100055"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "Y100055"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-062",
+   "text": "hey, what brand is serial D1OOO72",
+   "category": "blind-r35-serial",
+   "shape": "serial_brand",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'manufacturer' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "D100072"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "D100072"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-063",
+   "text": "sorry, one more - serial# m100057 make?",
+   "category": "blind-r35-serial",
+   "shape": "serial_brand",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'manufacturer' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "M100057"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "M100057"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-064",
+   "text": "sn m1oo1o5 thanks",
+   "category": "blind-r35-serial",
+   "shape": "serial_fragment",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "M100105"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "M100105"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-065",
+   "text": "serial 2G 100127? real quick",
+   "category": "blind-r35-serial",
+   "shape": "serial_fragment",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2G100127"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2G100127"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-066",
+   "text": "ok so look up serial M100118",
+   "category": "blind-r35-serial",
+   "shape": "serial_unit",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "M100118"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "M100118"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-067",
+   "text": "when was serial 2CI00075 installed real quick",
+   "category": "blind-r35-serial",
+   "shape": "serial_install",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'installation_date' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2C100075"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2C100075"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-068",
+   "text": "install date on sn M-100123",
+   "category": "blind-r35-serial",
+   "shape": "serial_install",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'installation_date' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "M100123"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "M100123"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-069",
+   "text": "quick one - ser no Y100023 - whose unit",
+   "category": "blind-r35-serial",
+   "shape": "serial_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "Y100023"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "Y100023"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-070",
+   "text": "what's the address for serial 2R1OOO7O",
+   "category": "blind-r35-serial",
+   "shape": "serial_where",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'service_address' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2R100070"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2R100070"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-071",
+   "text": "customer for s/n 2g100068",
+   "category": "blind-r35-serial",
+   "shape": "serial_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2G100068"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2G100068"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-072",
+   "text": "pull up serial number lx1ooo93 thanks",
+   "category": "blind-r35-serial",
+   "shape": "serial_unit",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "LX100093"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "LX100093"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-073",
+   "text": "quick one - what unit is serial 2G 100036 thanks",
+   "category": "blind-r35-serial",
+   "shape": "serial_unit",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2G100036"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2G100036"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-074",
+   "text": "model for serial M100132",
+   "category": "blind-r35-serial",
+   "shape": "serial_model",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "M100132"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "M100132"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-075",
+   "text": "what model is s/n FI00050",
+   "category": "blind-r35-serial",
+   "shape": "serial_model",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "F100050"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "F100050"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-076",
+   "text": "quick one - who has serial Y-100079 thanks",
+   "category": "blind-r35-serial",
+   "shape": "serial_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "Y100079"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "Y100079"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-077",
+   "text": "whose is sn F100034 for me",
+   "category": "blind-r35-serial",
+   "shape": "serial_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "F100034"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "F100034"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-078",
+   "text": "alright, where's S/N 2C1OOOO3 real quick",
+   "category": "blind-r35-serial",
+   "shape": "serial_where",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'service_address' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2C100003"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2C100003"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-079",
+   "text": "where is serial number 2r100038 installed thanks",
+   "category": "blind-r35-serial",
+   "shape": "serial_where",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'service_address' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2R100038"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2R100038"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-080",
+   "text": "what brand is serial d1oooo8 real quick",
+   "category": "blind-r35-serial",
+   "shape": "serial_brand",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'manufacturer' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "D100008"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "D100008"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-081",
+   "text": "ok so serial# 2R 100129 make?",
+   "category": "blind-r35-serial",
+   "shape": "serial_brand",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'manufacturer' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2R100129"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2R100129"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-082",
+   "text": "quick one - sn LX100077",
+   "category": "blind-r35-serial",
+   "shape": "serial_fragment",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "LX100077"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "LX100077"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-083",
+   "text": "quick one - serial LXI00069? for me",
+   "category": "blind-r35-serial",
+   "shape": "serial_fragment",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "LX100069"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "LX100069"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-084",
+   "text": "quick one - look up serial 2R-100094",
+   "category": "blind-r35-serial",
+   "shape": "serial_unit",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2R100094"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2R100094"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-085",
+   "text": "when was serial M100033 installed real quick",
+   "category": "blind-r35-serial",
+   "shape": "serial_install",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'installation_date' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "M100033"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "M100033"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-086",
+   "text": "hey, install date on sn 2C1OO126",
+   "category": "blind-r35-serial",
+   "shape": "serial_install",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'installation_date' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2C100126"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2C100126"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-087",
+   "text": "real quick: ser no lx100113 - whose unit please",
+   "category": "blind-r35-serial",
+   "shape": "serial_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "LX100113"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "LX100113"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-088",
+   "text": "what's the address for serial 2g1oooo4",
+   "category": "blind-r35-serial",
+   "shape": "serial_where",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'service_address' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2G100004"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2G100004"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-089",
+   "text": "customer for s/n 2R 100078",
+   "category": "blind-r35-serial",
+   "shape": "serial_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2R100078"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2R100078"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-090",
+   "text": "quick one - pull up serial number 2C100083",
+   "category": "blind-r35-serial",
+   "shape": "serial_unit",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2C100083"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2C100083"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-091",
+   "text": "sorry, one more - what unit is serial 2RI00046",
+   "category": "blind-r35-serial",
+   "shape": "serial_unit",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2R100046"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2R100046"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-092",
+   "text": "model for serial 2R-100014",
+   "category": "blind-r35-serial",
+   "shape": "serial_model",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2R100014"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2R100014"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-093",
+   "text": "hang on... what model is s/n M100089 real quick",
+   "category": "blind-r35-serial",
+   "shape": "serial_model",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "M100089"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "M100089"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-094",
+   "text": "who has serial 2G1OOO92",
+   "category": "blind-r35-serial",
+   "shape": "serial_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2G100092"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2G100092"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-095",
+   "text": "whose is sn 2g100100 real quick",
+   "category": "blind-r35-serial",
+   "shape": "serial_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2G100100"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2G100100"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-096",
+   "text": "quick one - where's S/N d1ooo16",
+   "category": "blind-r35-serial",
+   "shape": "serial_where",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'service_address' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "D100016"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "D100016"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-097",
+   "text": "real quick: where is serial number F 100018 installed",
+   "category": "blind-r35-serial",
+   "shape": "serial_where",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'service_address' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "F100018"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "F100018"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-098",
+   "text": "real quick: what brand is serial LX100021",
+   "category": "blind-r35-serial",
+   "shape": "serial_brand",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'manufacturer' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "LX100021"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "LX100021"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-099",
+   "text": "hey, serial# MI00049 make?",
+   "category": "blind-r35-serial",
+   "shape": "serial_brand",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'manufacturer' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "M100049"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "M100049"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-100",
+   "text": "sn F-100106",
+   "category": "blind-r35-serial",
+   "shape": "serial_fragment",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "F100106"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "F100106"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-101",
+   "text": "serial M100041? for me",
+   "category": "blind-r35-serial",
+   "shape": "serial_fragment",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "M100041"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "M100041"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-102",
+   "text": "hang on... look up serial F1OOO74",
+   "category": "blind-r35-serial",
+   "shape": "serial_unit",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "F100074"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "F100074"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-103",
+   "text": "hang on... when was serial 2c100067 installed please",
+   "category": "blind-r35-serial",
+   "shape": "serial_install",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'installation_date' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2C100067"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2C100067"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-104",
+   "text": "ok so install date on sn y1oo116 for me",
+   "category": "blind-r35-serial",
+   "shape": "serial_install",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'installation_date' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "Y100116"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "Y100116"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-105",
+   "text": "ser no D 100117 - whose unit for me",
+   "category": "blind-r35-serial",
+   "shape": "serial_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "D100117"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "D100117"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-106",
+   "text": "hey, what's the address for serial 2C100091 thanks",
+   "category": "blind-r35-serial",
+   "shape": "serial_where",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'service_address' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2C100091"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2C100091"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-107",
+   "text": "sorry, one more - customer for s/n YI00087",
+   "category": "blind-r35-serial",
+   "shape": "serial_who",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "Y100087"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "Y100087"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-108",
+   "text": "real quick: pull up serial number D-100080 please",
+   "category": "blind-r35-serial",
+   "shape": "serial_unit",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "D100080"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "D100080"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-109",
+   "text": "hey, is serial 2G100052 still under warranty please",
+   "category": "blind-r35-serial",
+   "shape": "serial_warranty",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2G100052",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2G100052"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-110",
+   "text": "real quick: warranty status on sn D100122 real quick",
+   "category": "blind-r35-serial",
+   "shape": "serial_warranty",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "D100122",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "D100122"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-111",
+   "text": "is s/n F100058 covered",
+   "category": "blind-r35-serial",
+   "shape": "serial_warranty",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "F100058",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "F100058"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-112",
+   "text": "hang on... does serial 2C100035 have warranty left",
+   "category": "blind-r35-serial",
+   "shape": "serial_warranty",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2C100035",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2C100035"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-113",
+   "text": "is serial 2C100108 still under warranty thanks",
+   "category": "blind-r35-serial",
+   "shape": "serial_warranty",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2C100108",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2C100108"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-114",
+   "text": "ok so warranty status on sn 2G100109 for me",
+   "category": "blind-r35-serial",
+   "shape": "serial_warranty",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2G100109",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2G100109"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-115",
+   "text": "hey, is s/n F100066 covered",
+   "category": "blind-r35-serial",
+   "shape": "serial_warranty",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "F100066",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "F100066"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-116",
+   "text": "does serial LX100061 have warranty left for me",
+   "category": "blind-r35-serial",
+   "shape": "serial_warranty",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "LX100061",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "LX100061"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-117",
+   "text": "ok so is serial F100018 still under warranty please",
+   "category": "blind-r35-serial",
+   "shape": "serial_warranty",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "F100018",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "F100018"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-118",
+   "text": "sorry, one more - warranty status on sn M100033 real quick",
+   "category": "blind-r35-serial",
+   "shape": "serial_warranty",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "M100033",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "M100033"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-119",
+   "text": "is s/n D100088 covered",
+   "category": "blind-r35-serial",
+   "shape": "serial_warranty",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "D100088",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "D100088"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-120",
+   "text": "does serial 2G100036 have warranty left",
+   "category": "blind-r35-serial",
+   "shape": "serial_warranty",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2G100036",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2G100036"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-121",
+   "text": "hey, is serial D100056 still under warranty please",
+   "category": "blind-r35-serial",
+   "shape": "serial_warranty",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "D100056",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "D100056"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-122",
+   "text": "real quick: warranty status on sn D100016 real quick",
+   "category": "blind-r35-serial",
+   "shape": "serial_warranty",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "D100016",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "D100016"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-123",
+   "text": "is s/n 2C100075 covered",
+   "category": "blind-r35-serial",
+   "shape": "serial_warranty",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2C100075",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2C100075"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-124",
+   "text": "real quick: does serial D100120 have warranty left",
+   "category": "blind-r35-serial",
+   "shape": "serial_warranty",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "D100120",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "D100120"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-125",
+   "text": "quick one - is serial Y100031 still under warranty",
+   "category": "blind-r35-serial",
+   "shape": "serial_warranty",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "Y100031",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "Y100031"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-126",
+   "text": "warranty status on sn Y100079",
+   "category": "blind-r35-serial",
+   "shape": "serial_warranty",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "Y100079",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "Y100079"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-127",
+   "text": "is s/n Y100103 covered",
+   "category": "blind-r35-serial",
+   "shape": "serial_warranty",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "Y100103",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "Y100103"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-128",
+   "text": "does serial Y100130 have warranty left",
+   "category": "blind-r35-serial",
+   "shape": "serial_warranty",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (CASE WHEN (e.data#>>'{warranty,expires}') IS NULL OR (e.data#>>'{warranty,expires}') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date < $2::date THEN 'expired' WHEN substr(e.data#>>'{warranty,expires}',1,10)::date - $2::date <= 365 THEN 'expiring' ELSE 'active' END) AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "Y100130",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "Y100130"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-129",
+   "text": "when was serial D100056 last serviced for me",
+   "category": "blind-r35-serial",
+   "shape": "serial_last_service",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (SELECT max(substr(x.value,1,10)) FROM extractions x JOIN documents d ON d.id = x.document_id WHERE x.field_key='service_date' AND x.value ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND substr(x.value,1,10) <= $2 AND lower(replace(d.document_type,'_','-')) NOT IN ('maintenance-agreement','maintenance-plan','warranty-registration','warranty','proposal-quote','proposal','quote','purchase-order','permit','nameplate-photo','nameplate','correspondence','internal') AND x.document_id IN (SELECT document_id FROM extractions WHERE entity_id = e.id UNION SELECT document_id FROM document_entity_links WHERE entity_id = e.id)) AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "D100056",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "D100056"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-130",
+   "text": "hang on... last service on sn M100123",
+   "category": "blind-r35-serial",
+   "shape": "serial_last_service",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (SELECT max(substr(x.value,1,10)) FROM extractions x JOIN documents d ON d.id = x.document_id WHERE x.field_key='service_date' AND x.value ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND substr(x.value,1,10) <= $2 AND lower(replace(d.document_type,'_','-')) NOT IN ('maintenance-agreement','maintenance-plan','warranty-registration','warranty','proposal-quote','proposal','quote','purchase-order','permit','nameplate-photo','nameplate','correspondence','internal') AND x.document_id IN (SELECT document_id FROM extractions WHERE entity_id = e.id UNION SELECT document_id FROM document_entity_links WHERE entity_id = e.id)) AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "M100123",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "M100123"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-131",
+   "text": "hey, last time we worked on s/n 2R100102",
+   "category": "blind-r35-serial",
+   "shape": "serial_last_service",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (SELECT max(substr(x.value,1,10)) FROM extractions x JOIN documents d ON d.id = x.document_id WHERE x.field_key='service_date' AND x.value ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND substr(x.value,1,10) <= $2 AND lower(replace(d.document_type,'_','-')) NOT IN ('maintenance-agreement','maintenance-plan','warranty-registration','warranty','proposal-quote','proposal','quote','purchase-order','permit','nameplate-photo','nameplate','correspondence','internal') AND x.document_id IN (SELECT document_id FROM extractions WHERE entity_id = e.id UNION SELECT document_id FROM document_entity_links WHERE entity_id = e.id)) AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2R100102",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2R100102"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-132",
+   "text": "when was serial 2G100044 last serviced thanks",
+   "category": "blind-r35-serial",
+   "shape": "serial_last_service",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (SELECT max(substr(x.value,1,10)) FROM extractions x JOIN documents d ON d.id = x.document_id WHERE x.field_key='service_date' AND x.value ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND substr(x.value,1,10) <= $2 AND lower(replace(d.document_type,'_','-')) NOT IN ('maintenance-agreement','maintenance-plan','warranty-registration','warranty','proposal-quote','proposal','quote','purchase-order','permit','nameplate-photo','nameplate','correspondence','internal') AND x.document_id IN (SELECT document_id FROM extractions WHERE entity_id = e.id UNION SELECT document_id FROM document_entity_links WHERE entity_id = e.id)) AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2G100044",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2G100044"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-133",
+   "text": "last service on sn M100081 thanks",
+   "category": "blind-r35-serial",
+   "shape": "serial_last_service",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (SELECT max(substr(x.value,1,10)) FROM extractions x JOIN documents d ON d.id = x.document_id WHERE x.field_key='service_date' AND x.value ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND substr(x.value,1,10) <= $2 AND lower(replace(d.document_type,'_','-')) NOT IN ('maintenance-agreement','maintenance-plan','warranty-registration','warranty','proposal-quote','proposal','quote','purchase-order','permit','nameplate-photo','nameplate','correspondence','internal') AND x.document_id IN (SELECT document_id FROM extractions WHERE entity_id = e.id UNION SELECT document_id FROM document_entity_links WHERE entity_id = e.id)) AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "M100081",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "M100081"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-134",
+   "text": "hey, last time we worked on s/n D100131 thanks",
+   "category": "blind-r35-serial",
+   "shape": "serial_last_service",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (SELECT max(substr(x.value,1,10)) FROM extractions x JOIN documents d ON d.id = x.document_id WHERE x.field_key='service_date' AND x.value ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND substr(x.value,1,10) <= $2 AND lower(replace(d.document_type,'_','-')) NOT IN ('maintenance-agreement','maintenance-plan','warranty-registration','warranty','proposal-quote','proposal','quote','purchase-order','permit','nameplate-photo','nameplate','correspondence','internal') AND x.document_id IN (SELECT document_id FROM extractions WHERE entity_id = e.id UNION SELECT document_id FROM document_entity_links WHERE entity_id = e.id)) AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "D100131",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "D100131"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-135",
+   "text": "when was serial Y100095 last serviced please",
+   "category": "blind-r35-serial",
+   "shape": "serial_last_service",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (SELECT max(substr(x.value,1,10)) FROM extractions x JOIN documents d ON d.id = x.document_id WHERE x.field_key='service_date' AND x.value ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND substr(x.value,1,10) <= $2 AND lower(replace(d.document_type,'_','-')) NOT IN ('maintenance-agreement','maintenance-plan','warranty-registration','warranty','proposal-quote','proposal','quote','purchase-order','permit','nameplate-photo','nameplate','correspondence','internal') AND x.document_id IN (SELECT document_id FROM extractions WHERE entity_id = e.id UNION SELECT document_id FROM document_entity_links WHERE entity_id = e.id)) AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "Y100095",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "Y100095"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-136",
+   "text": "alright, last service on sn M100017 thanks",
+   "category": "blind-r35-serial",
+   "shape": "serial_last_service",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (SELECT max(substr(x.value,1,10)) FROM extractions x JOIN documents d ON d.id = x.document_id WHERE x.field_key='service_date' AND x.value ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND substr(x.value,1,10) <= $2 AND lower(replace(d.document_type,'_','-')) NOT IN ('maintenance-agreement','maintenance-plan','warranty-registration','warranty','proposal-quote','proposal','quote','purchase-order','permit','nameplate-photo','nameplate','correspondence','internal') AND x.document_id IN (SELECT document_id FROM extractions WHERE entity_id = e.id UNION SELECT document_id FROM document_entity_links WHERE entity_id = e.id)) AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "M100017",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "M100017"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-137",
+   "text": "last time we worked on s/n 2G100036 for me",
+   "category": "blind-r35-serial",
+   "shape": "serial_last_service",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (SELECT max(substr(x.value,1,10)) FROM extractions x JOIN documents d ON d.id = x.document_id WHERE x.field_key='service_date' AND x.value ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND substr(x.value,1,10) <= $2 AND lower(replace(d.document_type,'_','-')) NOT IN ('maintenance-agreement','maintenance-plan','warranty-registration','warranty','proposal-quote','proposal','quote','purchase-order','permit','nameplate-photo','nameplate','correspondence','internal') AND x.document_id IN (SELECT document_id FROM extractions WHERE entity_id = e.id UNION SELECT document_id FROM document_entity_links WHERE entity_id = e.id)) AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2G100036",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2G100036"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-138",
+   "text": "quick one - when was serial LX100093 last serviced",
+   "category": "blind-r35-serial",
+   "shape": "serial_last_service",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (SELECT max(substr(x.value,1,10)) FROM extractions x JOIN documents d ON d.id = x.document_id WHERE x.field_key='service_date' AND x.value ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND substr(x.value,1,10) <= $2 AND lower(replace(d.document_type,'_','-')) NOT IN ('maintenance-agreement','maintenance-plan','warranty-registration','warranty','proposal-quote','proposal','quote','purchase-order','permit','nameplate-photo','nameplate','correspondence','internal') AND x.document_id IN (SELECT document_id FROM extractions WHERE entity_id = e.id UNION SELECT document_id FROM document_entity_links WHERE entity_id = e.id)) AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "LX100093",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "LX100093"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-139",
+   "text": "quick one - last service on sn D100040 thanks",
+   "category": "blind-r35-serial",
+   "shape": "serial_last_service",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (SELECT max(substr(x.value,1,10)) FROM extractions x JOIN documents d ON d.id = x.document_id WHERE x.field_key='service_date' AND x.value ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND substr(x.value,1,10) <= $2 AND lower(replace(d.document_type,'_','-')) NOT IN ('maintenance-agreement','maintenance-plan','warranty-registration','warranty','proposal-quote','proposal','quote','purchase-order','permit','nameplate-photo','nameplate','correspondence','internal') AND x.document_id IN (SELECT document_id FROM extractions WHERE entity_id = e.id UNION SELECT document_id FROM document_entity_links WHERE entity_id = e.id)) AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "D100040",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "D100040"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-140",
+   "text": "last time we worked on s/n 2R100038",
+   "category": "blind-r35-serial",
+   "shape": "serial_last_service",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT (SELECT max(substr(x.value,1,10)) FROM extractions x JOIN documents d ON d.id = x.document_id WHERE x.field_key='service_date' AND x.value ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' AND substr(x.value,1,10) <= $2 AND lower(replace(d.document_type,'_','-')) NOT IN ('maintenance-agreement','maintenance-plan','warranty-registration','warranty','proposal-quote','proposal','quote','purchase-order','permit','nameplate-photo','nameplate','correspondence','internal') AND x.document_id IN (SELECT document_id FROM extractions WHERE entity_id = e.id UNION SELECT document_id FROM document_entity_links WHERE entity_id = e.id)) AS v FROM entities e LEFT JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND upper(e.data->>'serial_number') = upper($1)",
+    "params": [
+     "2R100038",
+     "@today"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(data->>'serial_number') = upper($1)",
+     "params": [
+      "2R100038"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-141",
+   "text": "quick one - what unit is serial 4N2119-08772",
+   "category": "blind-r35-serial",
+   "shape": "serial_not_on_file",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(regexp_replace(data->>'serial_number','[^A-Za-z0-9]','','g')) = upper(regexp_replace($1,'[^A-Za-z0-9]','','g'))",
+    "params": [
+     "4N2119-08772"
+    ]
+   }
+  },
+  {
+   "id": "bl-r35-serial-142",
+   "text": "who has serial ZZ9900123",
+   "category": "blind-r35-serial",
+   "shape": "serial_not_on_file",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(regexp_replace(data->>'serial_number','[^A-Za-z0-9]','','g')) = upper(regexp_replace($1,'[^A-Za-z0-9]','','g'))",
+    "params": [
+     "ZZ9900123"
+    ]
+   }
+  },
+  {
+   "id": "bl-r35-serial-143",
+   "text": "quick one - sn K7731-55210",
+   "category": "blind-r35-serial",
+   "shape": "serial_not_on_file",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(regexp_replace(data->>'serial_number','[^A-Za-z0-9]','','g')) = upper(regexp_replace($1,'[^A-Za-z0-9]','','g'))",
+    "params": [
+     "K7731-55210"
+    ]
+   }
+  },
+  {
+   "id": "bl-r35-serial-144",
+   "text": "hey, model for serial QX100555 please",
+   "category": "blind-r35-serial",
+   "shape": "serial_not_on_file",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(regexp_replace(data->>'serial_number','[^A-Za-z0-9]','','g')) = upper(regexp_replace($1,'[^A-Za-z0-9]','','g'))",
+    "params": [
+     "QX100555"
+    ]
+   }
+  },
+  {
+   "id": "bl-r35-serial-145",
+   "text": "alright, where's s/n B2299-0071",
+   "category": "blind-r35-serial",
+   "shape": "serial_not_on_file",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(regexp_replace(data->>'serial_number','[^A-Za-z0-9]','','g')) = upper(regexp_replace($1,'[^A-Za-z0-9]','','g'))",
+    "params": [
+     "B2299-0071"
+    ]
+   }
+  },
+  {
+   "id": "bl-r35-serial-146",
+   "text": "ok so what unit is serial WX-4471902",
+   "category": "blind-r35-serial",
+   "shape": "serial_not_on_file",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(regexp_replace(data->>'serial_number','[^A-Za-z0-9]','','g')) = upper(regexp_replace($1,'[^A-Za-z0-9]','','g'))",
+    "params": [
+     "WX-4471902"
+    ]
+   }
+  },
+  {
+   "id": "bl-r35-serial-147",
+   "text": "hang on... who has serial 7H330-221A9 please",
+   "category": "blind-r35-serial",
+   "shape": "serial_not_on_file",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(regexp_replace(data->>'serial_number','[^A-Za-z0-9]','','g')) = upper(regexp_replace($1,'[^A-Za-z0-9]','','g'))",
+    "params": [
+     "7H330-221A9"
+    ]
+   }
+  },
+  {
+   "id": "bl-r35-serial-148",
+   "text": "sn TT100999 please",
+   "category": "blind-r35-serial",
+   "shape": "serial_not_on_file",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(regexp_replace(data->>'serial_number','[^A-Za-z0-9]','','g')) = upper(regexp_replace($1,'[^A-Za-z0-9]','','g'))",
+    "params": [
+     "TT100999"
+    ]
+   }
+  },
+  {
+   "id": "bl-r35-serial-149",
+   "text": "real quick: model for serial AB12345678",
+   "category": "blind-r35-serial",
+   "shape": "serial_not_on_file",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(regexp_replace(data->>'serial_number','[^A-Za-z0-9]','','g')) = upper(regexp_replace($1,'[^A-Za-z0-9]','','g'))",
+    "params": [
+     "AB12345678"
+    ]
+   }
+  },
+  {
+   "id": "bl-r35-serial-150",
+   "text": "quick one - where's s/n R9-00213-77 for me",
+   "category": "blind-r35-serial",
+   "shape": "serial_not_on_file",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(regexp_replace(data->>'serial_number','[^A-Za-z0-9]','','g')) = upper(regexp_replace($1,'[^A-Za-z0-9]','','g'))",
+    "params": [
+     "R9-00213-77"
+    ]
+   }
+  },
+  {
+   "id": "bl-r35-serial-151",
+   "text": "hey, what unit is serial M100044",
+   "category": "blind-r35-serial",
+   "shape": "serial_near_miss",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(regexp_replace(data->>'serial_number','[^A-Za-z0-9]','','g')) = upper(regexp_replace($1,'[^A-Za-z0-9]','','g'))",
+    "params": [
+     "M100044"
+    ]
+   }
+  },
+  {
+   "id": "bl-r35-serial-152",
+   "text": "real quick: who has serial M100128",
+   "category": "blind-r35-serial",
+   "shape": "serial_near_miss",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(regexp_replace(data->>'serial_number','[^A-Za-z0-9]','','g')) = upper(regexp_replace($1,'[^A-Za-z0-9]','','g'))",
+    "params": [
+     "M100128"
+    ]
+   }
+  },
+  {
+   "id": "bl-r35-serial-153",
+   "text": "quick one - sn Y100114 thanks",
+   "category": "blind-r35-serial",
+   "shape": "serial_near_miss",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(regexp_replace(data->>'serial_number','[^A-Za-z0-9]','','g')) = upper(regexp_replace($1,'[^A-Za-z0-9]','','g'))",
+    "params": [
+     "Y100114"
+    ]
+   }
+  },
+  {
+   "id": "bl-r35-serial-154",
+   "text": "model for serial LX100058 thanks",
+   "category": "blind-r35-serial",
+   "shape": "serial_near_miss",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(regexp_replace(data->>'serial_number','[^A-Za-z0-9]','','g')) = upper(regexp_replace($1,'[^A-Za-z0-9]','','g'))",
+    "params": [
+     "LX100058"
+    ]
+   }
+  },
+  {
+   "id": "bl-r35-serial-155",
+   "text": "where's s/n LX100080 real quick",
+   "category": "blind-r35-serial",
+   "shape": "serial_near_miss",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(regexp_replace(data->>'serial_number','[^A-Za-z0-9]','','g')) = upper(regexp_replace($1,'[^A-Za-z0-9]','','g'))",
+    "params": [
+     "LX100080"
+    ]
+   }
+  },
+  {
+   "id": "bl-r35-serial-156",
+   "text": "what unit is serial LX100000",
+   "category": "blind-r35-serial",
+   "shape": "serial_near_miss",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(regexp_replace(data->>'serial_number','[^A-Za-z0-9]','','g')) = upper(regexp_replace($1,'[^A-Za-z0-9]','','g'))",
+    "params": [
+     "LX100000"
+    ]
+   }
+  },
+  {
+   "id": "bl-r35-serial-157",
+   "text": "hey, who has serial 2G100104",
+   "category": "blind-r35-serial",
+   "shape": "serial_near_miss",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(regexp_replace(data->>'serial_number','[^A-Za-z0-9]','','g')) = upper(regexp_replace($1,'[^A-Za-z0-9]','','g'))",
+    "params": [
+     "2G100104"
+    ]
+   }
+  },
+  {
+   "id": "bl-r35-serial-158",
+   "text": "alright, sn Y100108 for me",
+   "category": "blind-r35-serial",
+   "shape": "serial_near_miss",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(regexp_replace(data->>'serial_number','[^A-Za-z0-9]','','g')) = upper(regexp_replace($1,'[^A-Za-z0-9]','','g'))",
+    "params": [
+     "Y100108"
+    ]
+   }
+  },
+  {
+   "id": "bl-r35-serial-159",
+   "text": "what unit is serial 4TTR4003L1000AA for me",
+   "category": "blind-r35-serial",
+   "shape": "serial_is_model",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(regexp_replace(data->>'serial_number','[^A-Za-z0-9]','','g')) = upper(regexp_replace($1,'[^A-Za-z0-9]','','g'))",
+    "params": [
+     "4TTR4003L1000AA"
+    ]
+   }
+  },
+  {
+   "id": "bl-r35-serial-160",
+   "text": "ok so who has serial 24ACC634A003 thanks",
+   "category": "blind-r35-serial",
+   "shape": "serial_is_model",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(regexp_replace(data->>'serial_number','[^A-Za-z0-9]','','g')) = upper(regexp_replace($1,'[^A-Za-z0-9]','','g'))",
+    "params": [
+     "24ACC634A003"
+    ]
+   }
+  },
+  {
+   "id": "bl-r35-serial-161",
+   "text": "sn DZ16SA0361",
+   "category": "blind-r35-serial",
+   "shape": "serial_is_model",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(regexp_replace(data->>'serial_number','[^A-Za-z0-9]','','g')) = upper(regexp_replace($1,'[^A-Za-z0-9]','','g'))",
+    "params": [
+     "DZ16SA0361"
+    ]
+   }
+  },
+  {
+   "id": "bl-r35-serial-162",
+   "text": "model for serial YXV026BF31TAA",
+   "category": "blind-r35-serial",
+   "shape": "serial_is_model",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND upper(regexp_replace(data->>'serial_number','[^A-Za-z0-9]','','g')) = upper(regexp_replace($1,'[^A-Za-z0-9]','','g'))",
+    "params": [
+     "YXV026BF31TAA"
+    ]
+   }
+  },
+  {
+   "id": "bl-r35-serial-163",
+   "text": "serial number for Donna Sorensen please",
+   "category": "blind-r35-serial",
+   "shape": "serial_forward_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'serial_number' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.entity_type='customer' AND c.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1",
+    "params": [
+     "Donna Sorensen"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "Donna Sorensen"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-164",
+   "text": "what's the serial on Timothy Ulloa's unit real quick",
+   "category": "blind-r35-serial",
+   "shape": "serial_forward_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'serial_number' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.entity_type='customer' AND c.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1",
+    "params": [
+     "Timothy Ulloa"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "Timothy Ulloa"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-165",
+   "text": "serial number for Sandra Wyckoff for me",
+   "category": "blind-r35-serial",
+   "shape": "serial_forward_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'serial_number' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.entity_type='customer' AND c.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1",
+    "params": [
+     "Sandra Wyckoff"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "Sandra Wyckoff"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-166",
+   "text": "quick one - what's the serial on Michael Sandoval's unit",
+   "category": "blind-r35-serial",
+   "shape": "serial_forward_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'serial_number' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.entity_type='customer' AND c.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1",
+    "params": [
+     "Michael Sandoval"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "Michael Sandoval"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-167",
+   "text": "serial number for Kenneth Fenwick",
+   "category": "blind-r35-serial",
+   "shape": "serial_forward_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'serial_number' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.entity_type='customer' AND c.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1",
+    "params": [
+     "Kenneth Fenwick"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "Kenneth Fenwick"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-168",
+   "text": "sorry, one more - what's the serial on Betty Zimmerman's unit real quick",
+   "category": "blind-r35-serial",
+   "shape": "serial_forward_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'serial_number' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.entity_type='customer' AND c.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1",
+    "params": [
+     "Betty Zimmerman"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "Betty Zimmerman"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-169",
+   "text": "sorry, one more - serial number for Kathleen Keller thanks",
+   "category": "blind-r35-serial",
+   "shape": "serial_forward_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'serial_number' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.entity_type='customer' AND c.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1",
+    "params": [
+     "Kathleen Keller"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "Kathleen Keller"
+     ]
+    }
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "bl-r35-serial-170",
+   "text": "what's the serial on Barbara Ellison's unit",
+   "category": "blind-r35-serial",
+   "shape": "serial_forward_control",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'serial_number' AS v FROM entities e JOIN entities c ON c.id = e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.entity_type='customer' AND c.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1",
+    "params": [
+     "Barbara Ellison"
+    ],
+    "requires": {
+     "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+     "params": [
+      "Barbara Ellison"
+     ]
+    }
+   },
+   "citationRequired": true
+  }
+ ]
+}

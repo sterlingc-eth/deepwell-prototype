@@ -270,6 +270,17 @@ export function isDailyCapError(err: unknown): boolean {
   return err.status === 429 && body?.scope === 'per-day';
 }
 
+/** R35: a whole-batch 402 - "choose a plan", the monthly page limit, or the stored-document limit. Like the daily cap,
+ *  every further request in this run is guaranteed to get the same answer, so the run stops instead of falling back to
+ *  one presign per file (thousands of failing calls). */
+export function isPlanLimitError(err: unknown): boolean {
+  return err instanceof IngestHttpError && err.status === 402;
+}
+
+function message402(err: unknown): string {
+  return err instanceof Error && err.message ? err.message : 'Plan limit reached';
+}
+
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   if (ms <= 0) return Promise.resolve();
   return new Promise((resolve) => {
@@ -398,6 +409,8 @@ export interface BulkImportCallbacks {
   onState?: (states: BulkFileState[]) => void;
   /** Fired once, the moment the server's daily cap stops the whole run. `remaining` is always 0 — the cap is already spent. */
   onDailyCapReached?: (remaining: number) => void;
+  /** R35: fired once when a plan/billing limit (HTTP 402) stops the whole run; `message` is the server's own plain-English text. */
+  onPlanLimitReached?: (message: string) => void;
 }
 
 export interface BulkImportOptions {
@@ -429,7 +442,7 @@ async function presignGroup(
       signal
     );
   } catch (err) {
-    if (isDailyCapError(err)) throw err;
+    if (isDailyCapError(err) || isPlanLimitError(err)) throw err;
     return null;
   }
 }
@@ -457,7 +470,7 @@ export function startBulkImport(
   const states: BulkFileState[] = sources.map((s) => ({ path: s.path, name: s.name, sizeBytes: s.sizeBytes, status: 'pending', attempt: 0 }));
   const emit = () => callbacks.onState?.(states.slice());
   const gate = new RateGate(signal);
-  const dailyCap = { hit: false };
+  const dailyCap = { hit: false, message: 'Daily upload limit reached' };
 
   const result = (async (): Promise<BulkFileState[]> => {
     const workIndexes: number[] = [];
@@ -501,11 +514,16 @@ export function startBulkImport(
       try {
         presignResults = await presignGroup(prepared, signal);
       } catch (err) {
-        if (isDailyCapError(err)) {
+        if (isDailyCapError(err) || isPlanLimitError(err)) {
           dailyCap.hit = true;
-          callbacks.onDailyCapReached?.(0);
+          if (isPlanLimitError(err)) {
+            dailyCap.message = (err as Error).message || 'Plan limit reached';
+            callbacks.onPlanLimitReached?.(dailyCap.message);
+          } else {
+            callbacks.onDailyCapReached?.(0);
+          }
           group.forEach((i) => {
-            states[i] = { ...(states[i] as BulkFileState), status: 'failed', error: 'Daily upload limit reached' };
+            states[i] = { ...(states[i] as BulkFileState), status: 'failed', error: dailyCap.message };
           });
           emit();
           break;
@@ -540,7 +558,7 @@ export function startBulkImport(
     } else if (dailyCap.hit) {
       states.forEach((s, i) => {
         if (s.status !== 'done' && s.status !== 'queued' && s.status !== 'skipped' && s.status !== 'failed') {
-          states[i] = { ...s, status: 'failed', error: 'Daily upload limit reached — not attempted' };
+          states[i] = { ...s, status: 'failed', error: `${dailyCap.message} — not attempted` };
         }
       });
     }
@@ -566,7 +584,7 @@ async function uploadPresigned(
   emit: () => void,
   gate: RateGate,
   signal: AbortSignal,
-  dailyCap: { hit: boolean }
+  dailyCap: { hit: boolean; message: string }
 ): Promise<void> {
   const set = (patch: Partial<BulkFileState>) => {
     states[index] = { ...(states[index] as BulkFileState), ...patch };
@@ -579,7 +597,7 @@ async function uploadPresigned(
       return;
     }
     if (dailyCap.hit) {
-      set({ status: 'failed', error: 'Daily upload limit reached' });
+      set({ status: 'failed', error: dailyCap.message });
       return;
     }
     await gate.wait();
@@ -609,6 +627,13 @@ async function uploadPresigned(
       if (isDailyCapError(err)) {
         dailyCap.hit = true;
         set({ status: 'failed', error: 'Daily upload limit reached' });
+        return;
+      }
+      // R35: a per-file 402 (the batch allowance ran out part-way, or a lone presign hit the cap) also ends the run.
+      if (isPlanLimitError(err) || (err instanceof IngestHttpError && err.status === 402)) {
+        dailyCap.hit = true;
+        dailyCap.message = message402(err);
+        set({ status: 'failed', error: dailyCap.message });
         return;
       }
       const status = err instanceof IngestHttpError ? err.status : undefined;

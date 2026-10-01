@@ -319,12 +319,12 @@ family = 'records/create';
   const c = RC.cleanCreateDocumentPayload;
   const ok = c({ original_filename: 'a\u0000.pdf', sha256_hash: rnd(), file_size_bytes: 10, content_type: 'Application/PDF; x=1', batch_id: null, document_type: 'Service Ticket' });
   check('createDocument: valid payload is cleaned (name, type, document_type)', ok.ok && ok.value.original_filename === 'a.pdf' && ok.value.content_type === 'application/pdf' && ok.value.document_type === 'service-ticket', JSON.stringify(ok));
-  check('createDocument: unknown document_type is dropped for classification to decide', c({ original_filename: 'a.pdf', sha256_hash: rnd(), document_type: '<script>' }).value?.document_type === null);
+  check('createDocument: unknown document_type is dropped for classification to decide', c({ original_filename: 'a.pdf', sha256_hash: rnd(), file_size_bytes: 10, document_type: '<script>' }).value?.document_type === null);
   check('createDocument: bad sha rejected', c({ original_filename: 'a.pdf', sha256_hash: 'zz' }).ok === false);
   check('createDocument: missing / junk-only filename rejected', c({ sha256_hash: rnd() }).ok === false && c({ original_filename: '\u0000', sha256_hash: rnd() }).ok === false);
   check('createDocument: zero / negative / huge / fractional size rejected', [0, -1, 5.5, 10 ** 12].every((n) => c({ original_filename: 'a.pdf', sha256_hash: rnd(), file_size_bytes: n }).ok === false));
-  check('createDocument: object content_type rejected', c({ original_filename: 'a.pdf', sha256_hash: rnd(), content_type: { a: 1 } }).ok === false);
-  check('createDocument: non-uuid batch_id rejected', c({ original_filename: 'a.pdf', sha256_hash: rnd(), batch_id: 'x; drop table' }).ok === false);
+  check('createDocument: object content_type rejected', c({ original_filename: 'a.pdf', sha256_hash: rnd(), file_size_bytes: 10, content_type: { a: 1 } }).ok === false);
+  check('createDocument: non-uuid batch_id rejected', c({ original_filename: 'a.pdf', sha256_hash: rnd(), file_size_bytes: 10, batch_id: 'x; drop table' }).ok === false);
   check('createDocument: client cannot smuggle storage_key / stage / tenant_id through the cleaned payload', !('storage_key' in (ok.value ?? {})) && !('stage' in (ok.value ?? {})) && !('tenant_id' in (ok.value ?? {})));
 }
 

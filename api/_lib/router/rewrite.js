@@ -32,7 +32,8 @@ const RULES = [
   [/\b(?:the\s+)?warranty\s+(?:finish|finishes|ends?|runs?\s+until(?:\s+when)?)\b/gi, "warranty expires"],
   [/\bstop(?:s|ped)?\s+being\s+covered\b/gi, "warranty expires"],
   [/\bcoverage\s+(?:run|runs|running)\s+out\b/gi, "warranty expires"],
-  [/\b(?:the\s+)?coverage\b(?!\s+(?:area|zone))/gi, "warranty"],
+  // R35: "warranty coverage" already names the warranty; rewriting it to "warranty warranty" lost the "still covered" meaning.
+  [/(?<!\bwarranty\s)\b(?:the\s+)?coverage\b(?!\s+(?:area|zone))/gi, "warranty"],
   [/\bwarranty\s+(?:lapse|lapses|run\s+out|runs\s+out|is\s+up|is\s+over|over|up)\b/gi, "warranty expires"],
   [/\bwarranty\s+end\s+date\b|\bwarranty\s+expiry\b|\bwarranty\s+expiration\b/gi, "warranty expires"],
   // size -> tonnage (only next to a unit noun, never "filter size"/"breaker size")
@@ -131,10 +132,38 @@ function rewriteWindowShapes(q) {
   return s;
 }
 
+/**
+ * R35 loop 5: texting shorthand -> words ("ph# 4 Sandra Alvarez" -> "phone number for Sandra Alvarez", "warranty info 4 the unit @ 322 n
+ * greenfield" -> "warranty info for the unit at 322 n greenfield"). Spelling only: "4" becomes "for" only between a word and a name /
+ * article / record noun, never next to a count noun ("4 ton", "4 units", "top 4", "last 4 visits") or another digit.
+ */
+const COUNT_NOUN = String.raw`(?:tons?|units|systems|years?|yrs?|months?|weeks?|days?|hours?|times|visits|calls|jobs|invoices|customers|techs?|technicians|pieces|digits|chars|characters|of|or|and|to|-|x|\d)`;
+export function rewriteShorthand(question) {
+  let q = String(question ?? "");
+  q = q.replace(/(^|\s)@\s*(?=\d)/g, "$1at ");
+  q = q.replace(new RegExp(String.raw`(?<=[A-Za-z#'])(?<!\b(?:at|is|on|in|to|from|near|by|of|number|no|apt|suite|unit|ste|top|last|first|past|next|over|under|about|than|only|just|all)) +4 +(?!${COUNT_NOUN}\b|(?:[nsew]|ne|nw|se|sw|north|south|east|west)\b|[A-Za-z]+\s+(?:st|street|ave|avenue|rd|road|dr|drive|ln|lane|blvd|way|ct|court|pl|cir|pkwy|hwy)\b)(?=(?:the|a|an|my|our|unit|system|[A-Za-z]))`, "gi"), " for ");
+  q = q.replace(/\b(?:ph(?:one)?\s*#|ph\.?\s*no\.?|phone\s+no\.?)(?=\s|$)/gi, "phone number");
+  q = q.replace(/\bph\b(?=\s+(?:for|of|on)\b)/gi, "phone number");
+  q = q.replace(/\bserial\s*#(?=\s|$)/gi, "serial number");
+  q = q.replace(/(?<=\b(?:the|'s|s'))\s+#(?=\s|$|[?.!])/gi, " number");
+  q = q.replace(/\b(?:addy|addr)\b/gi, "address");
+  q = q.replace(/\b(?:wrnty|wrnt|wrranty|warrenty|waranty|warrantee|warr)\b/gi, "warranty");
+  q = q.replace(/\bgimme\b/gi, "give me");
+  q = q.replace(/\b(?:invices|invoces|invoics|invioces|invoies|invocies|invoicse)\b/gi, "invoices").replace(/\b(?:invice|invoce|invioce|invocie)\b/gi, "invoice");
+  q = q.replace(/\b(?:pls|plz)\b/gi, " ");
+  q = q.replace(/\s+@\s*[?.!]*$/, "");
+  q = q.replace(/\bsn\s+(?=(?:on|for|of)\b)/gi, "serial number ");
+  // "warranty info for / warranty on the unit at X" -> the "warranty status for the unit at X" shape
+  q = q.replace(/^(?:i\s+)?(?:need|want|get\s+me|give\s+me)\s+(?:the\s+)?(?=warranty\s)/i, "");
+  q = q.replace(/\bwarranty\s+(?:info(?:rmation)?|details?|situation|deal)\s+(?:for|on|of)\s+(?=(?:the\s+)?(?:unit|system|equipment|ac|furnace)\b)/gi, "warranty status for ");
+  q = q.replace(/^warranty\s+on\s+(?=(?:the\s+)?(?:unit|system|equipment|ac|furnace)\b)/i, "warranty status for ");
+  return q.replace(/\s{2,}/g, " ").trim();
+}
+
 export function rewriteQuestion(question) {
   const src = String(question ?? "");
   if (!src.trim() || src.length > 300) return null;
-  let q = src;
+  let q = rewriteShorthand(src);
   q = q.replace(DIGIT_SEQ_RE, (m) => m.toLowerCase().split(/\s+/).map((w) => DIGITS[w] ?? w).join(""));
   for (const [re, rep] of RULES) q = q.replace(re, rep);
   q = rewriteWindowShapes(q);

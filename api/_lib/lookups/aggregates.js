@@ -3,7 +3,9 @@
  *
  *   warranty-extreme   "what's the earliest warranty expiration we have on file" / "latest Carrier warranty expiry"
  *   warranty-count     "how many units are not currently under warranty" / "how many York units have an expired warranty"
- *                      (units out of warranty = warranty end date has passed; brand-scoped "still under warranty" = end date not yet passed)
+ *                      (out of warranty = end date before today; "still under warranty" = end date on or after today, shop-wide or per
+ *                      brand — R35 owner decision 2026-10-01; "more than a year left" / "expire within a year" are their own buckets;
+ *                      "how many customers ..." counts customers with at least one such unit)
  *   tech-never         "which technicians have never logged a preventive maintenance visit" (set difference over the visit documents)
  *   no-text-docs       "how many documents have no readable text extracted"
  *   history-skew       "has most of our service history happened before last year" (yes/no over dated service visits)
@@ -18,7 +20,7 @@
  */
 import { unframe } from "./unframe.js";
 import { serviceType, resolveTechnician } from "./namedCompare.js";
-import { attachCitations, documentRecord, unitRecord } from "../citations/records.js";
+import { attachCitations, documentRecord, unitRecord, customerRecord } from "../citations/records.js";
 import { answerEnvelope, TENANT_SQL, todayIso } from "../scope.js";
 import { formatDateHumanWithIso } from "../fastPath.js";
 import { resolveAnyTimeRange } from "../analytics.js";
@@ -83,14 +85,33 @@ function parseAggregateCore(question) {
     }
   }
 
-  // --- warranty count: units out of / under warranty
-  if (/\b(?:how many|number of|count of)\b/.test(q) && /\b(?:units?|systems?|equipment|furnaces?|condensers?|heaters?|acs?|pieces?)\b/.test(q) && /\b(?:warrant(?:y|ies)|covered|coverage)\b/.test(q)) {
-    const expired = /\bnot\s+(?:currently\s+|still\s+|presently\s+)?(?:under|in|covered\s+by|within)\s+(?:a\s+)?warranty\b|\bout\s+of\s+warranty\b|\b(?:have|has|with)\s+(?:an?\s+)?expired\s+warranty\b|\bwarranty\s+(?:has\s+|have\s+)?expired\b|\bno\s+longer\s+(?:covered|under|in)\b|\bexpired\s+warranty\b|\bwarranty\s+is\s+(?:over|up|done)\b|\bnot\s+covered\b|\buncovered\b/.test(q);
-    const active = !expired && /\b(?:still|currently|presently)?\s*(?:under|in|covered\s+by|within)\s+(?:a\s+)?warranty\b|\bstill\s+covered\b|\bactive\s+warranty\b|\bwarranty\s+(?:coverage|is\s+active|still\s+(?:active|good|valid))\b|\bhave\s+(?:an?\s+)?(?:active|valid)\s+warranty\b/.test(q);
-    if (expired || active) {
-      const vocab = setOf(V.unit, V.warranty, V.negwar, ["expired", "expire", "expires", "still", "good", "valid", "active", "within", "covered", "by", "have", "has", "with", "is", "over", "up", "done", "currently", "of", "how", "many"]);
-      const unknown = words(q).filter((w) => !(GLUE.has(w) || vocab.has(w) || /^\d+$/.test(w)));
-      if (unknown.length <= 2) return { kind: "warranty-count", state: expired ? "expired" : "active", unknown };
+  // --- warranty count: units out of / under warranty.
+  // R35 (owner decision 2026-10-01): "still under warranty" (and active / current / valid / covered / in warranty) = NOT EXPIRED
+  // (end date on or after today), shop-wide too; "more than a year left" is its own strict bucket; "expire within a year" its own.
+  // "how many customers ..." counts customers with at least one such unit.
+  // R35 loop 1: + "warrantied" / "in-warranty" / "expiring soon" / "no warranty on file" (unknown bucket); "covered by an agreement/plan" is not a warranty.
+  if (/\b(?:how many|number of|count of|total)\b/.test(q) && /\b(?:units?|systems?|equipment|furnaces?|condensers?|heaters?|acs?|pieces?|warranties|customers?|clients?|accounts?)\b/.test(q) && /\b(?:warrant(?:y|ies|ied)|covered|coverage|in-warranty)\b/.test(q)
+    && !/\b(?:agreements?|plans?|contracts?|memberships?|insurance|polic(?:y|ies)|subscriptions?|registrations?|registered|unregistered|claims?)\b/.test(q)) {
+    const customers = /\b(?:customers?|clients?|accounts?)\b/.test(q);
+    const overYear = /\b(?:more than|over|at least|longer than)\s+(?:a|one|another|1|12|twelve|365)\s*(?:full\s+)?(?:year|years|yr|yrs|months?|days?)\b|\bfor more than (?:another |a )?year\b|\bmore than a year from now\b/.test(q);
+    const withinYear = !overYear && (/\b(?:expir\w*|run(?:s|ning)? out|end(?:s|ing)?|come off(?: warranty)?|lapse|lapsing)\b[^?]{0,40}\b(?:within|in|over)\s+(?:the\s+)?(?:next\s+)?(?:a|one|1|12|twelve|365)?\s*(?:year|yr|months?|days?)\b/.test(q)
+      || /\b(?:expir(?:ing|es?)|run(?:s|ning)?\s+out|end(?:s|ing)?|lapsing|coming\s+off(?:\s+warranty)?)\s+soon\b|\babout\s+to\s+(?:expire|run\s+out|end|lapse|come\s+off)\b|\b(?:expir(?:ing|es?)|run(?:s|ning)?\s+out)\s+(?:in\s+)?the\s+next\s+(?:12|twelve)\s+months\b/.test(q));
+    // "no warranty on file" / "unknown warranty" / "no warranty end date" — the units with no end date on file
+    const unknownState = !overYear && !withinYear && /\b(?:no|without|missing|unknown|blank)\s+(?:a\s+)?(?:warranty\s+)?(?:warranty|end\s+date|expiration|expiry)(?:\s+(?:end\s+)?(?:date|info|information|status|on\s+file|listed|recorded))?\b|\b(?:don'?t|doesn'?t|do\s+not|does\s+not)\s+have\s+(?:a\s+)?warranty\s+(?:end\s+)?(?:date|info|information|on\s+file)\b|\bwarranty\s+(?:status\s+)?(?:is\s+)?unknown\b/.test(q)
+      && /\b(?:on\s+file|end\s+date|date|info|information|unknown|missing|status|recorded|listed)\b/.test(q);
+    const expired = !overYear && !withinYear && !unknownState && (/\bnot\s+(?:currently\s+|still\s+)?(?:warrantied|in-warranty|covered)\b|\bunwarrantied\b/.test(q) || /\bnot\s+(?:currently\s+|still\s+|presently\s+)?(?:under|in|covered\s+by|within)\s+(?:a\s+)?warranty\b|\bout\s+of\s+warranty\b|\b(?:have|has|with)\s+(?:an?\s+)?expired\s+warrant(?:y|ies)\b|\bwarrant(?:y|ies)\s+(?:has\s+|have\s+)?expired\b|\bno\s+longer\s+(?:covered|under|in)\b|\bexpired\s+warrant(?:y|ies)\b|\bwarranty\s+is\s+(?:over|up|done)\b|\bnot\s+covered\b|\buncovered\b/.test(q) || /\bnot\s+under\s+warranty\s+anymore\b/.test(q));
+    const notExpiredWords = /\b(?:haven'?t|have\s+not|hasn'?t|has\s+not|not\s+yet|not)\s+(?:yet\s+)?(?:expired|run\s+out|lapsed|ended)\b|\bunexpired\b|\bnot\s+expired\b/.test(q);
+    const active = !overYear && !withinYear && !unknownState && (notExpiredWords || (!expired && (/\b(?:are|is)\s+(?:currently\s+|still\s+)?(?:covered|warrantied|in-warranty)\b|\bwarrantied\b|\bin-warranty\b|\bin\s+coverage\b/.test(q) || /\b(?:still|currently|presently)?\s*(?:under|in|covered\s+by|covered\s+under|within)\s+(?:a\s+)?warranty\b|\bstill\s+(?:covered|have\s+(?:a\s+)?warranty|in\s+effect|good|valid|active)\b|\b(?:active|current|valid|open)\s+warrant(?:y|ies)\b|\bwarrant(?:y|ies)\s+(?:coverage|is\s+active|still\s+(?:active|good|valid|in\s+effect))\b|\bwarrant(?:y|ies)\s+(?:are|is)\s+still\s+(?:active|good|valid|in\s+effect)\b|\bhave\s+(?:an?\s+)?(?:active|valid)\s+warranty\b|\bwarranty\s+coverage\b|\bstill\s+covered\b/.test(q))));
+    if (expired || active || overYear || withinYear || unknownState) {
+      const vocab = setOf(V.unit, V.warranty, V.negwar, ["soon", "about", "to", "coming", "without", "missing", "unknown", "blank", "date", "info", "information", "status", "recorded", "listed",
+        "expiration", "expiry", "don't", "dont", "doesn't", "doesnt", "do", "does", "in-warranty", "coverage", "right", "units'", "unit's", "system's", "systems'", "warranties'", "expired", "expire", "expires", "expiring", "still", "good", "valid", "active", "within", "covered", "by", "have", "has", "with", "is", "over", "up", "done", "currently", "of", "how", "many",
+        "more", "than", "year", "years", "yr", "months", "month", "days", "left", "remaining", "another", "least", "longer", "twelve", "one", "next", "come", "off", "run", "runs", "out", "from", "now", "lapse", "lapsing",
+        "haven't", "havent", "have", "not", "yet", "unexpired", "current", "open", "effect", "anymore", "today", "total", "customers", "customer", "clients", "client", "accounts", "account", "their", "a", "full", "under", "ends", "end", "ending", "under", "count"]);
+      const unknown = words(q).filter((w) => /[a-z0-9]/.test(w) && !(GLUE.has(w) || vocab.has(w) || /^\d+$/.test(w)));
+      const state = overYear ? "over-year" : withinYear ? "within-year" : unknownState ? "unknown" : expired ? "expired" : "active";
+      // a time window ("expired so far this year", "in 2025", "last month") is a different question (when it expired), not this count
+      const windowed = (state === "expired" || state === "active") && /\b(?:years?|months?|weeks?|days?|quarters?|ytd|since|during|before|after|\d{4})\b/.test(q);
+      if (unknown.length <= 2 && !windowed) return { kind: "warranty-count", state, customers, unknown };
     }
   }
 
@@ -231,24 +252,53 @@ async function warrantyCount(db, intent, today) {
        FROM entities WHERE ${EQUIP} ${sc.brand ? "AND lower(data->>'manufacturer') = lower($1)" : ""}`, params);
   const total = rows.length;
   if (!total) return null;
-  // Shop-wide "still under warranty" keeps its established definition (owner exam counts-warranty-0004: status 'active' = more than a year left); only the unambiguous expired count and brand-scoped counts are answered here.
-  if (intent.state === "active" && !sc.brand) return null;
   const dated = rows.filter((r) => r.expires);
   const noDate = total - dated.length;
-  const expired = dated.filter((r) => r.expires <= today);
-  const live = dated.filter((r) => r.expires > today);
+  const daysLeft = (r) => (Date.parse(r.expires) - Date.parse(today)) / 86400000;
+  // R35 (owner decision 2026-10-01): a warranty is still in force through its end date (end date >= today); expired = end date before today.
+  const expired = dated.filter((r) => r.expires < today);
+  const live = dated.filter((r) => r.expires >= today);
+  const soonList = live.filter((r) => daysLeft(r) <= 365);
+  const overList = live.filter((r) => daysLeft(r) > 365);
   const scope = sc.brand ? `${sc.brand} ` : "";
   const unitsWord = (n) => `${scope}unit${n === 1 ? "" : "s"}`;
-  const dateNote = noDate ? ` ${noDate} ${unitsWord(noDate)} ha${noDate === 1 ? "s" : "ve"} no warranty end date on file, so ${noDate === 1 ? "it is" : "they are"} not counted either way.` : "";
-  if (intent.state === "expired") {
-    const text = `${expired.length} ${unitsWord(expired.length)} ${expired.length === 1 ? "is" : "are"} out of warranty — the warranty end date has already passed (of ${total} ${unitsWord(total)} on file).${dateNote}`;
-    return attachCitations(answerEnvelope({ text, facts: [{ label: `${scope}units out of warranty`, value: String(expired.length), sources: [] }], extra: { fastIntent: "warranty_count" } }),
-      { records: unitCite(expired), total: expired.length, claimedCount: expired.length, kind: "searched", basis: `Counted the ${scope}units whose warranty end date is on or before ${today}; every counted unit is listed.` });
+  const isAre = (n) => (n === 1 ? "is" : "are");
+  const dateNote = noDate ? ` ${noDate} ${noDate === 1 ? "has" : "have"} no warranty end date on file.` : "";
+  const noDateList = rows.filter((r) => !r.expires);
+  const pick = { expired, active: live, "over-year": overList, "within-year": soonList, unknown: noDateList }[intent.state] ?? live;
+  if (intent.customers) {
+    const ids = [...new Set(pick.map((r) => r.customer_id).filter(Boolean))];
+    const { rows: cust } = ids.length
+      ? await db.raw(`SELECT id, data->>'customer_name' AS customer_name FROM entities WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT_SQL} AND id = ANY($1::uuid[])`, [ids])
+      : { rows: [] };
+    const n = cust.length;
+    const what = { expired: "unit out of warranty", active: "unit still under warranty", "over-year": "unit with more than a year of warranty left", "within-year": "unit whose warranty runs out in the next 12 months", unknown: "unit with no warranty end date on file" }[intent.state];
+    const text = `${n} customer${n === 1 ? "" : "s"} ${n === 1 ? "has" : "have"} a ${scope}${what}.`;
+    return attachCitations(answerEnvelope({ text, facts: [{ label: "Customers", value: String(n), sources: [] }], extra: { fastIntent: "warranty_count" } }),
+      { records: cust.map((c) => customerRecord({ id: c.id, customer_name: c.customer_name })).slice(0, 150), total: n, claimedCount: n, kind: "searched", basis: `Counted customers with at least one ${scope}unit whose warranty end date ${intent.state === "unknown" ? "is not on file" : intent.state === "expired" ? `is before ${today}` : `is on or after ${today}`}${intent.state === "over-year" ? " by more than a year" : intent.state === "within-year" ? " and within a year" : ""}.` });
   }
-  const soon = live.filter((r) => { const d = (Date.parse(r.expires) - Date.parse(today)) / 86400000; return d <= 365; }).length;
-  const text = `${live.length} ${unitsWord(live.length)} ${live.length === 1 ? "is" : "are"} still under warranty — the warranty end date has not passed yet${soon ? ` (${soon} of them expire within the next year)` : ""}.${dateNote}`;
-  return attachCitations(answerEnvelope({ text, facts: [{ label: `${scope}units still under warranty`, value: String(live.length), sources: [] }], extra: { fastIntent: "warranty_count" } }),
-    { records: unitCite(live), total: live.length, claimedCount: live.length, kind: "searched", basis: `Counted the ${scope}units whose warranty end date is after ${today}; every counted unit is listed.` });
+  let text;
+  if (intent.state === "expired") {
+    text = `${expired.length} ${unitsWord(expired.length)} ${isAre(expired.length)} out of warranty (end date passed), of ${total} on file.${dateNote}`;
+  } else if (intent.state === "over-year") {
+    text = `${overList.length} ${unitsWord(overList.length)} ${overList.length === 1 ? "has" : "have"} more than a year of warranty left (${live.length} still under warranty in all).`;
+  } else if (intent.state === "unknown") {
+    text = `${noDateList.length} ${unitsWord(noDateList.length)} ${noDateList.length === 1 ? "has" : "have"} no warranty end date on file (of ${total}).`;
+  } else if (intent.state === "within-year") {
+    text = `${soonList.length} ${unitsWord(soonList.length)} ${soonList.length === 1 ? "has a warranty" : "have warranties"} running out in the next 12 months.`;
+  } else {
+    text = `${live.length} ${unitsWord(live.length)} ${isAre(live.length)} still under warranty${soonList.length ? ` — ${soonList.length} of them run${soonList.length === 1 ? "s" : ""} out in the next 12 months` : ""}.${dateNote}`;
+  }
+  const label = { expired: "units out of warranty", active: "units still under warranty", "over-year": "units with more than a year left", "within-year": "warranties running out in the next 12 months", unknown: "units with no warranty end date" }[intent.state];
+  const basis = {
+    expired: `Counted the ${scope}units whose warranty end date is before ${today}; every counted unit is listed.`,
+    active: `Counted the ${scope}units whose warranty end date is on or after ${today} (not expired); every counted unit is listed.`,
+    "over-year": `Counted the ${scope}units whose warranty end date is more than 365 days after ${today}; every counted unit is listed.`,
+    "within-year": `Counted the ${scope}units whose warranty end date falls between ${today} and 365 days later; every counted unit is listed.`,
+    unknown: `Counted the ${scope}units with no warranty end date on file; every counted unit is listed.`,
+  }[intent.state];
+  return attachCitations(answerEnvelope({ text, facts: [{ label: `${scope}${label}`, value: String(pick.length), sources: [] }], extra: { fastIntent: "warranty_count" } }),
+    { records: unitCite(pick), total: pick.length, claimedCount: pick.length, kind: "searched", basis });
 }
 
 async function techNever(db, intent, today) {

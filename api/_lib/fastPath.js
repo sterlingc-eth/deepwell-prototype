@@ -1506,16 +1506,24 @@ export function buildAddressFieldDecline({ intent, subject, resolution }) {
  * missing (caller should already have checked this; kept here too since this
  * function is the contract boundary).
  */
+// R35 ("less is better"): a match-basis label ("The only unit on file for 100 E Main St (Linda Fitzgerald)", R16 owner policy)
+// reads badly as a possessive subject ("...(Linda Fitzgerald)'s warranty expired ..."). The fact goes first and the match basis
+// trails it: "Serial number: 2C100003 — the only unit on file for ...".
+const isMatchBasisLabel = (label) => /^The only\b/.test(String(label ?? ''));
+const basisTail = (label) => ` — ${String(label).replace(/^The /, 'the ')}`;
+
 export function buildFieldAnswer({ intent, resolution, row, labelOverride }) {
   if (!row || row.value == null || String(row.value).trim() === '') return null;
   const label = labelOverride ?? subjectLabel(resolution);
   const value = String(row.value);
   const intro = FIELD_INTRO[intent];
-  const text = intro ? intro(label, value) : `${label}: ${value}.`;
   const displayValue =
     intent === 'invoice_total' || intent === 'agreement_cost' ? formatMoney(value)
     : intent === 'install_date' || intent === 'last_service_date' ? formatDateHuman(value)
     : value;
+  const text = isMatchBasisLabel(label) && FACT_LABEL[intent]
+    ? `${FACT_LABEL[intent]}: ${displayValue}${basisTail(label)}.`
+    : intro ? intro(label, value) : `${label}: ${value}.`;
 
   const fact = {
     label: FACT_LABEL[intent] ?? intent,
@@ -1678,7 +1686,16 @@ export function buildWarrantyAnswer({ intent, resolution, stable, today, citatio
   const computedNote = basis === 'computed' ? ' (computed)' : '';
 
   let text;
-  if (intent === 'warranty_status') {
+  if (isMatchBasisLabel(label)) {
+    // R35: fact first, match basis trailing (see isMatchBasisLabel).
+    const daysNote = described.daysToExpiry != null && tier !== 'ok' && tier !== 'expired' ? `, expiring in ${described.daysToExpiry} day(s)` : '';
+    const expiredText = `warranty expired ${dateHuman}${computedNote}`;
+    const liveText = `still under warranty${daysNote}, valid through ${dateHuman}${computedNote}`;
+    if (intent === 'warranty_status') text = tier === 'expired' ? `No — ${expiredText}` : `Yes — ${liveText}`;
+    else if (intent === 'warranty_out') text = tier === 'expired' ? `Yes — ${expiredText}` : `No — ${liveText}`;
+    else text = tier === 'expired' ? `Warranty expired ${dateHuman}${computedNote}` : `Warranty expires ${dateHuman}${computedNote}`;
+    text = `${text}${basisTail(label)}.`;
+  } else if (intent === 'warranty_status') {
     if (tier === 'expired') {
       text = `No — ${label}'s warranty expired ${dateHuman}${computedNote}.`;
     } else {
@@ -1746,7 +1763,9 @@ export function buildWarrantyUnknownAnswer({ intent, resolution, labelOverride }
   const equipment = resolution?.equipment;
   if (!equipment) return null;
   const label = labelOverride ?? subjectLabel(resolution);
-  const text = `${label}'s warranty status is unknown — the brand's terms haven't been verified, so no expiration date has been computed yet.`;
+  const text = isMatchBasisLabel(label)
+    ? `Warranty status unknown (brand terms not verified yet, so no end date is computed)${basisTail(label)}.`
+    : `${label}'s warranty status is unknown — the brand's terms haven't been verified, so no expiration date has been computed yet.`;
   const fact = { label: 'Warranty', value: 'Unknown', status: 'muted', basis: 'computed' };
   return attachCitations({
     kind: 'answer',
@@ -1775,7 +1794,9 @@ export function buildWarrantyNoExpiryDecline({ intent, resolution, labelOverride
   const label = labelOverride ?? subjectLabel(resolution);
   return {
     kind: 'no-answer',
-    text: `I don't have a computed warranty expiration on file for ${label} — the brand's terms haven't been verified yet.`,
+    text: isMatchBasisLabel(label)
+      ? `No warranty end date on file (brand terms not verified yet)${basisTail(label)}.`
+      : `I don't have a computed warranty expiration on file for ${label} — the brand's terms haven't been verified yet.`,
     facts: [], sources: [], confidence: 0,
     verifiedCount: 0, unverifiedCount: 0, closest: [], fastIntent: intent,
   };

@@ -266,7 +266,11 @@ export const DATA_QUALITY_FIELD_ENTITY = {
 };
 export const DATA_QUALITY_BOOLEAN_FIELDS = Object.keys(DATA_QUALITY_FIELD_ENTITY);
 export const FILTER_OPS = ['eq', 'neq', 'contains', 'gt', 'gte', 'lt', 'lte', 'in'];
-export const WARRANTY_STATUSES = ['active', 'expiring', 'expired', 'unknown'];
+// R35 (owner decision 2026-10-01): 'covered' = NOT EXPIRED (end date on or after today) = active OR expiring — the plain meaning of
+// "still under warranty" / "active" / "current" / "valid" / "covered". It is a filter value only (never a row's own status, never a
+// groupBy bucket); matchesFilter expands it. 'active' alone stays the strict "more than a year left" bucket.
+export const WARRANTY_STATUSES = ['active', 'expiring', 'expired', 'unknown', 'covered'];
+export const WARRANTY_COVERED_STATUSES = new Set(['active', 'expiring']);
 export const MAX_LIMIT = 500;
 export const DEFAULT_LIMIT = 500;
 /** "who's our biggest customer" (round 4, item 1) — customers RANKED by a
@@ -1591,7 +1595,7 @@ export function hasAmbiguousWarrantyStatusNegation(question) {
   const REGEXES = [
     /\be[xp]{2}ir(?:ing|es? soon)\b|\babout to expire\b|\brunning out\b/,
     /\bexpired\b|\bout of warranty\b|\bno longer\b|\blapsed\b/,
-    /\bactive\b|\bcurrent\b|\bvalid\b|\bstill\b|\bunder warranty\b|\bin warranty\b|\bcovered\b/,
+    /\bactive\b|\bcurrent\b|\bvalid\b|\bstill\b|\bunder warranty\b|\bin warranty\b|\bcovered\b|\bwarrantied\b|\bin-warranty\b/,
     PAST_WARRANTY_RE,
   ];
   // R34: phrasings that ARE the negation (not a status word preceded by one) and do not say whether the warranty lapsed or was never on
@@ -1608,6 +1612,8 @@ export function hasAmbiguousWarrantyStatusNegation(question) {
 }
 
 /**
+ * R35 (owner decision 2026-10-01) SUPERSEDES the note below: these phrases now return 'covered' (not expired), and
+ * counts-warranty-0004-canonical's oracle was rewritten to that reading (ADJUDICATION.md "R35").
  * R18 P4 (C2/C3, blind generalization round 18 part 2): tried folding "still"/"under
  * warranty"/"in warranty"/"covered" into a coarser 'not_expired' bucket (active OR
  * expiring) instead of the strict >365-day 'active' bucket, to fix g135/h050 ("how many
@@ -1618,7 +1624,9 @@ export function hasAmbiguousWarrantyStatusNegation(question) {
  * give both answers, and the frozen id wins. "still"/"under warranty"/"in warranty"/
  * "covered" fold back into the same strict 'active' bucket as "active"/"current"/"valid".
  */
-const STRICT_ACTIVE_STATUS_RE = /\bactive\b|\bcurrent\b|\bvalid\b|\bstill\b|\bunder warranty\b|\bin warranty\b|\bcovered\b/;
+const STRICT_ACTIVE_STATUS_RE = /\bactive\b|\bcurrent\b|\bvalid\b|\bstill\b|\bunder warranty\b|\bin warranty\b|\bcovered\b|\bwarrantied\b|\bin-warranty\b/; // R35: + warrantied / in-warranty
+// R35: "more than a year left" / "over 12 months of warranty" — the strict bucket, asked for explicitly.
+const MORE_THAN_A_YEAR_LEFT_RE = /\b(?:more than|over|at least|longer than)\s+(?:a|one|another|1|12|twelve|365)\s*(?:full\s+)?(?:year|years|yr|yrs|months?|days?)\b(?:[^?.!]{0,30}\b(?:left|remaining|of (?:warranty|coverage)|from now))?/;
 
 const UNKNOWN_WARRANTY_RE =
   /\b(?:no|without|missing|lack(?:s|ing)?)\s+(?:a\s+|any\s+|the\s+)?warrant(?:y|ies)\s+(?:on\s+file|info(?:rmation)?|dates?|end\s+dates?|expir\w*(?:\s+dates?)?|recorded|listed|data)\b|\bwarrant(?:y|ies)\s+(?:is\s+|are\s+)?(?:not\s+on\s+file|missing|not\s+listed|not\s+recorded)\b/;
@@ -1643,8 +1651,9 @@ export function warrantyStatusFromQuestion(question) {
   // "units that don't have a warranty anymore" is 'expired' - both used to match nothing here and answered with every unit.
   if (UNKNOWN_WARRANTY_RE.test(q)) return 'unknown';
   if (NO_WARRANTY_ANYMORE_RE.test(q)) return 'expired';
+  if (MORE_THAN_A_YEAR_LEFT_RE.test(q)) return 'active';
   m = STRICT_ACTIVE_STATUS_RE.exec(q);
-  if (m) return statusNegatedAt(q, m.index) ? null : 'active';
+  if (m) return statusNegatedAt(q, m.index) ? null : 'covered';
   return null;
 }
 
@@ -1989,7 +1998,8 @@ export const ANALYTICS_TOOL = {
                 'state: 2-letter code ("AZ") — "Arizona"/"arizona" both mean AZ. county: bare name, ' +
                 'no the word "County" ("Maricopa", not "Maricopa County"). warrantyStatus: one of ' +
                 `${WARRANTY_STATUSES.join('|')} ("out of warranty"/"expired" -> expired; "still under ` +
-                'warranty"/"active" -> active; "expiring soon" -> expiring). installYear: the calendar ' +
+                'warranty"/"active"/"current"/"covered" -> covered (not expired yet); "more than a year left" -> active; ' +
+                '"expiring soon" -> expiring). installYear: the calendar ' +
                 'year installed, for "older/newer than N years" compute the year and use op gt/lt. ' +
                 'hasEmail (customers only, boolean value, op "eq"): "have/has an email on file" -> true; ' +
                 '"missing/without/no email" -> false. hasPhone (customers only, boolean value, op "eq"): ' +
@@ -3333,6 +3343,11 @@ const DATE_STRING_FIELDS = new Set(['warrantyExpires', 'installDate']);
 
 export function matchesFilter(row, filter) {
   const { field, op, value } = filter;
+  // R35: 'covered' (not expired) is active OR expiring.
+  if (field === 'warrantyStatus' && (op === 'eq' || op === 'neq') && String(value).toLowerCase() === 'covered') {
+    const hit = WARRANTY_COVERED_STATUSES.has(String(row.warrantyStatus ?? ''));
+    return op === 'eq' ? hit : !hit;
+  }
   if (field in HAS_FIELD_ROW_KEY) {
     const raw = row[HAS_FIELD_ROW_KEY[field]];
     const has = raw != null && String(raw).trim() !== '';

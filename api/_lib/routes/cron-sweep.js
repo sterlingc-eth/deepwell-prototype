@@ -1,6 +1,9 @@
 import { ingestDocument, recordIngestFailure } from "../readDocument.js";
+import { extractDocumentFields } from "../extractDocument.js";
+import { withTenant } from "../recordsStore.js";
 import { listStuckDocuments, listBudgetDeferredDocuments, listTenantKeysWithSource } from "../opsStore.js";
-import { DAILY_BUDGET_EXCEEDED_MESSAGE } from "../queue.js";
+import { DAILY_BUDGET_EXCEEDED_MESSAGE, isQueueEnabled, enqueueDocument } from "../queue.js";
+import { getDailyModelBudgetStatus } from "../rateLimit.js";
 import { assertActiveBilling } from "../plan.js";
 import { captureMessage, captureException, recordInfo } from "../telemetry.js";
 import { runWarrantyNotificationSweep } from "../notify.js";
@@ -64,6 +67,41 @@ const STUCK_MINUTES = 60;
 // the next 60-second platform timeout waiting to happen, on the one route
 // that exists specifically to clean up after platform timeouts.
 const MAX_DOCS_PER_TENANT = 25;
+// R35: with the Inngest queue on, the sweep only ENQUEUES (a few ms each); the queue's own concurrency/throttle does the
+// model work. So the per-tenant cap is about how fast a backlog drains per night, not how long this function runs.
+// 25/night made a 1,500-document first import take 60 nights; 400/night x 5 sweeps/day clears it in a day.
+export const MAX_ENQUEUE_PER_TENANT = 400;
+// Documents the read step finished that never got extracted (lost event, extract billing-gated, process killed).
+const UNEXTRACTED_MINUTES = 60;
+// R35: with the queue on, a document can legitimately wait hours behind a big import (e.g. 5,000 documents at the default
+// 3 reads at a time is most of a day). Re-sending one that is merely waiting would run it twice (the sweep's event id differs
+// from the upload's, so Inngest does not dedupe them, and a second extraction pass would re-bill the model). So in queue mode
+// "stuck" means quiet for 12 h (read) / 6 h (extract), not 60 minutes. Without the queue nothing waits, so 60 minutes stands.
+export const QUEUE_STUCK_MINUTES = 12 * 60;
+export const QUEUE_UNEXTRACTED_MINUTES = 6 * 60;
+
+/** Pure: the sweep's own Inngest event nonce. Fixed per UTC day so a re-run of the same sweep collapses into the
+ *  same event ids (no double model spend), while tomorrow's sweep is allowed to re-queue what is still stuck. */
+export function sweepNonce(now = Date.now()) {
+  return `sweep-${new Date(now).toISOString().slice(0, 10).replace(/-/g, "")}`;
+}
+
+/** Documents read (page text stored) but never extracted: stage 'read', no error, quiet for an hour. */
+export async function listUnextractedDocuments(ctx, olderThanMinutes = UNEXTRACTED_MINUTES, limit = MAX_ENQUEUE_PER_TENANT) {
+  return withTenant(ctx, async (db) => {
+    const { rows } = await db.raw(
+      `SELECT id, original_filename, created_at
+         FROM documents
+        WHERE stage = 'read' AND extract_error IS NULL AND page_count > 0
+          AND COALESCE(extracted_at, updated_at, created_at) < NOW() - ($1 || ' minutes')::interval
+          AND tenant_id = (current_setting('app.tenant_id', true))::uuid
+        ORDER BY created_at ASC
+        LIMIT $2`,
+      [olderThanMinutes, limit]
+    );
+    return rows;
+  });
+}
 
 /** Pure, exported for scripts/verify-ops.mjs. A misconfigured (empty/unset)
  * CRON_SECRET fails closed — it authorizes nothing, ever. */
@@ -87,6 +125,10 @@ export default async function handler(req, res) {
   // below still take. Only the notification step is deadline-aware today
   // (REVIEW FIX 2026-09-20) — it receives this and stops before crossing it,
   // logging + reporting how many tenants it had to leave for next run.
+  // R35: `?mode=docs` is the LIGHT sweep - document recovery only (stuck, budget-deferred, read-but-unextracted),
+  // none of the integrity / recheck / notification / outreach / learning work. Cheap enough to run every 15-30 minutes
+  // during a first big import so documents do not wait for the nightly run. Same auth, same summary shape.
+  const docsOnly = req.query?.mode === "docs" || (() => { try { return new URL(req.url ?? "", "http://x").searchParams.get("mode") === "docs"; } catch { return false; } })();
   const deadlineAt = Date.now() + 45_000;
   // Stuck-document re-reads (model calls) get their own, longer budget: api/account.js runs this on a 300s
   // ceiling, so 200s leaves ~100s for the integrity/notification/outreach steps and the response.
@@ -151,6 +193,11 @@ export default async function handler(req, res) {
     recheckLeftForNextRun: 0,
     recheckSkippedTenants: 0,
     billingGatedTenants: 0,
+    // R35: documents handed to the queue by this sweep, abandoned uploads (PUT never happened), read-but-never-extracted
+    // documents found, and tenants whose model budget was still spent today.
+    queuedForRecovery: 0,
+    abandonedUploads: 0,
+    unextractedFound: 0,
     // TEAM T2 (2026-09-25): dossier catch-up (per tenant, below) + async full-report jobs (one per tenant, below).
     dossiersBuilt: 0,
     dossiersUnchanged: 0,
@@ -194,6 +241,32 @@ export default async function handler(req, res) {
       return { recovered: 0, stillFailing: 0, billingGated: true };
     }
 
+    // R35: queue on -> hand the backlog to the queue (it has the concurrency, throttle, retries and budget guard).
+    // Skipped entirely while today's model budget is still spent: enqueueing 400 documents into a spent budget
+    // would only re-stamp them "deferred" and burn their retries.
+    if (isQueueEnabled()) {
+      const budget = await getDailyModelBudgetStatus(ctx);
+      if (budget.exceeded) {
+        summary.budgetStillSpentTenants = (summary.budgetStillSpentTenants ?? 0) + 1;
+        return { recovered: 0, stillFailing: 0, billingGated: false, queued: 0 };
+      }
+      let queued = 0;
+      const nonce = sweepNonce();
+      for (const doc of docs.slice(0, MAX_ENQUEUE_PER_TENANT)) {
+        if (Date.now() >= docRetryDeadlineAt) break;
+        try {
+          await enqueueDocument({ documentId: doc.id, tenantKey: ctx.tenantKey, tenantName: ctx.tenantName, autoExtract: true, requeueNonce: nonce });
+          queued += 1;
+        } catch (err) {
+          summary.errors.push({ tenant: ctx.tenantKey, phase: "enqueue", message: err?.message });
+          break; // the queue is down for everyone; do not hammer it once per document
+        }
+      }
+      summary.queuedForRecovery += queued;
+      summary.docsLeftForNextRun = (summary.docsLeftForNextRun ?? 0) + Math.max(0, docs.length - queued);
+      return { recovered: 0, stillFailing: 0, billingGated: false, queued };
+    }
+
     let recovered = 0;
     let stillFailing = 0;
     for (const doc of docs.slice(0, MAX_DOCS_PER_TENANT)) {
@@ -206,12 +279,22 @@ export default async function handler(req, res) {
       }
       try {
         await ingestDocument(ctx, doc.id);
+        // R35: this used to stop after the READ, so a recovered document sat at stage 'read' with no fields forever
+        // (no extraction was ever requested). Extraction is best-effort here: a failure is recorded on the row.
+        await extractDocumentFields(ctx, doc.id, { modelAttempts: 1 });
         recovered += 1;
       } catch (err) {
+        if (err?.abandoned) {
+          // The file never reached storage - recorded quietly (no Sentry) with its own counter, not "still failing".
+          summary.abandonedUploads += 1;
+          await recordIngestFailure(ctx, doc.id, err);
+          continue;
+        }
         stillFailing += 1;
         await recordIngestFailure(ctx, doc.id, new Error(failMessage(err)));
       }
     }
+    summary.docsLeftForNextRun = (summary.docsLeftForNextRun ?? 0) + Math.max(0, docs.length - MAX_DOCS_PER_TENANT);
     return { recovered, stillFailing, billingGated: false };
   }
 
@@ -220,7 +303,7 @@ export default async function handler(req, res) {
 
     let stuck;
     try {
-      stuck = await listStuckDocuments(ctx, STUCK_MINUTES);
+      stuck = await listStuckDocuments(ctx, isQueueEnabled() ? QUEUE_STUCK_MINUTES : STUCK_MINUTES);
     } catch (err) {
       summary.errors.push({ tenant: t.tenant_key, phase: "list", message: err?.message });
       await captureException(err, { route: "/api/cron-sweep", tenant: t.tenant_key, stage: "list" });
@@ -259,6 +342,23 @@ export default async function handler(req, res) {
     );
     summary.budgetDeferredRecovered += deferredResult.recovered;
     summary.budgetDeferredStillFailing += deferredResult.stillFailing;
+
+    // R35: read but never extracted (stage 'read', no error). listStuckDocuments only sees stage 'received', so a
+    // document whose extract event was lost - or gated while billing lapsed - was never found by anything.
+    try {
+      const unextracted = await listUnextractedDocuments(ctx, isQueueEnabled() ? QUEUE_UNEXTRACTED_MINUTES : UNEXTRACTED_MINUTES);
+      summary.unextractedFound += unextracted.length;
+      const r = await retryOnce(
+        ctx, unextracted,
+        (err) => `This document was read but its details were never extracted, and the recovery pass also failed (${err?.message ?? "unknown error"}).`
+      );
+      summary.recovered += r.recovered;
+      summary.stillFailing += r.stillFailing;
+    } catch (err) {
+      summary.errors.push({ tenant: t.tenant_key, phase: "list-unextracted", message: err?.message });
+    }
+
+    if (docsOnly) continue;
 
     // Data integrity (handoffs/DATA_INTEGRITY_2026-09-20.md, section D):
     // deterministic, no model calls. Only score >= 0.95 duplicate-customer
@@ -354,6 +454,12 @@ export default async function handler(req, res) {
         await captureException(err, { route: "/api/cron-sweep", tenant: t.tenant_key, stage: "knowledge-report" });
       }
     }
+  }
+
+  if (docsOnly) {
+    summary.mode = "docs";
+    summary.billingGatedTenants = billingGatedTenantKeys.size;
+    return res.status(200).json(summary);
   }
 
   // Warranty-expiration notifications (handoffs/NOTIFICATIONS.md). Its own
@@ -460,6 +566,7 @@ export default async function handler(req, res) {
       `${summary.integrityNamesRelinkable} mismatched name link(s) relinkable (dry-run, needs an admin), ` +
       `${summary.integritySkippedTenants} tenant(s) skipped (deadline); ` +
       `recheck: ${summary.recheckScanned} document(s) re-checked, ${summary.recheckFilledFields} field(s) restored on ${summary.recheckFilledDocuments} document(s), ${summary.recheckVerified} verified, ${summary.recheckLeftForNextRun} left for next run; ` +
+      `${summary.queuedForRecovery} queued for recovery, ${summary.abandonedUploads} abandoned upload(s), ${summary.unextractedFound} read-but-unextracted found; ` +
       `${summary.billingGatedTenants} tenant(s) billing-gated (no active subscription, retries skipped); ` +
       `miss-digest: ${summary.missDigest?.skipped ?? summary.missDigest?.ranAt ?? summary.missDigest?.error ?? "n/a"}; ` +
       `learning: ${summary.learning?.skipped ?? summary.learning?.error ?? `${summary.learning?.totalMissGroups ?? 0} group(s), ${summary.learning?.modelCallsMade ?? 0} model call(s)`}; ` +

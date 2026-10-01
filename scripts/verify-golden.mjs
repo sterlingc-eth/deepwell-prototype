@@ -402,13 +402,16 @@ if (examExport) {
     // R31 (Team A): conversational frame + entity-first slot filling + technician job counts + future-year / off-topic /
     // near-miss honesty + the breadth-content-019/semantic oracle-regex fix. Measured 1524/1496 (incl. live-status declines), wrong 12 -> 8 (zero new wrong
     // ids, zero lost-correct) → floor RAISED to 1515/1488 (a little below measured, same margin convention as above).
-    check(`no-model coverage floor: correct ≥ 1570 (got ${overall.correct})`, overall.correct >= 1570, JSON.stringify(overall));
-    check(`no-model coverage floor: answeredWithoutModel ≥ 1590 (got ${overall.answeredWithoutModel})`, overall.answeredWithoutModel >= 1590, JSON.stringify(overall));
+    // R35 (owner decisions 2026-10-01 + learning loops: nicknames, serial lookups, "still under warranty" = not expired, document numbers,
+    // judgment / false-premise declines, texting shorthand): measured 1596 answered / 1576 correct / 0 wrong / 12 needs-model / 45 clarified
+    // (from 1594/1574/0/14) -> floors RAISED to 1594/1574 and needs-model LOWERED to <= 13.
+    check(`no-model coverage floor: correct ≥ 1574 (got ${overall.correct})`, overall.correct >= 1574, JSON.stringify(overall));
+    check(`no-model coverage floor: answeredWithoutModel ≥ 1594 (got ${overall.answeredWithoutModel})`, overall.answeredWithoutModel >= 1594, JSON.stringify(overall));
     // R32 floors: measured 1572 answered / 1552 correct / 0 wrong / 33 needs-model / 49 clarified (a clarify reply is never counted as correct).
     // R32b (Team A3, loops A-E: page attributes + unknown names + off-domain, per-customer/vendor counts + named comparisons, warranty/date aggregates +
     // tech-never sets, technician pair comparisons, dangling/trivia declines): measured 1594 answered / 1574 correct / 0 wrong / 14 needs-model / 45 clarified
     // (was 1572/1552/0/33 -> 35 in this repo) -> floors RAISED to 1590/1570 and needs-model LOWERED to <= 16.
-    check(`R32: needs-model has not risen above 16 (got ${overall.needsModel})`, overall.needsModel <= 16, JSON.stringify(overall));
+    check(`R35: needs-model has not risen above 13 (got ${overall.needsModel})`, overall.needsModel <= 13, JSON.stringify(overall));
     check(`R32: wrong stays 0 (got ${overall.wrong})`, overall.wrong === 0, JSON.stringify(overall));
     check(`fast: full ${exam.questions.length}-question exam finished in under 3 minutes (took ${Math.round(durationMs / 1000)}s)`, durationMs < 180_000, `${durationMs}ms`);
 

@@ -249,14 +249,17 @@ for (const [brand, n] of brands) {
 }
 
 /* ---- 3. counts: warranty status ---------------------------------------- */
-for (const [status, n] of Object.entries(key.warrantyStatusCounts)) {
+for (const [status, n0] of Object.entries(key.warrantyStatusCounts)) {
   const phrase = warrantyLabel[status] ?? status;
+  // R35 (owner decision 2026-10-01): "still under warranty" = not expired (active OR expiring) -> filter value 'covered'.
+  const value = status === 'active' ? 'covered' : status;
+  const n = status === 'active' ? n0 + (key.warrantyStatusCounts.expiring ?? 0) : n0;
   add('counts-warranty', `How many units are ${phrase}?`, {
-    route: 'analytics', entity: 'warranties', filters: [{ field: 'warrantyStatus', op: 'eq', value: status }],
+    route: 'analytics', entity: 'warranties', filters: [{ field: 'warrantyStatus', op: 'eq', value }],
     answerValue: n,
   });
   add('counts-warranty', `How many units have ${phrase}?`, {
-    route: 'analytics', entity: 'warranties', filters: [{ field: 'warrantyStatus', op: 'eq', value: status }],
+    route: 'analytics', entity: 'warranties', filters: [{ field: 'warrantyStatus', op: 'eq', value }],
     answerValue: n,
   });
 }

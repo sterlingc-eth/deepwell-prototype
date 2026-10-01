@@ -264,7 +264,12 @@ export async function syncTenantAfterBilling(pool, tenantId, opts = {}) {
   }
 }
 
-export const SEAT_LIMIT_MESSAGE = (plan, cap) =>
+export const SEAT_LIMIT_MESSAGE = (plan, cap, used = null) =>
+  // R35: after a downgrade (or an invite accepted just before one) an org can be OVER its cap. Say so plainly: current
+  // members keep their access, only NEW invites are blocked, and removing people or upgrading is the way back.
+  (Number.isFinite(used) && used > cap
+    ? `Your team has ${used} logins (including pending invites) but your ${String(plan).charAt(0).toUpperCase()}${String(plan).slice(1)} plan includes up to ${cap}. Everyone already on the team keeps their access; to invite someone new, remove ${used - cap} login${used - cap === 1 ? '' : 's'} or upgrade your plan.`
+    : null) ??
   `Your ${String(plan).charAt(0).toUpperCase()}${String(plan).slice(1)} plan includes up to ${cap} login${cap === 1 ? '' : 's'} (the owner account isn't counted). Upgrade your plan to invite more people.`;
 
 /**
@@ -342,7 +347,7 @@ async function guardedInviteUnlocked({ orgId, plan, email, role = 'member', invi
   }
   const { org: _org, ...view } = seats;
   if (cap != null && seats.used >= cap) {
-    return { ok: false, status: 402, error: SEAT_LIMIT_MESSAGE(plan, cap), seats: view, url: '/app/?screen=billing' };
+    return { ok: false, status: 402, error: SEAT_LIMIT_MESSAGE(plan, cap, seats.used), seats: view, url: '/app/?screen=billing' };
   }
   try {
     const invitation = await client.organizations.createOrganizationInvitation({
@@ -369,7 +374,7 @@ async function guardedInviteUnlocked({ orgId, plan, email, role = 'member', invi
     const d = describeClerkError(err);
     const quota = /member.*(limit|quota)|quota|exceed|maximum/i.test(`${d.code} ${d.message}`);
     if (quota) {
-      return { ok: false, status: 402, error: cap != null ? SEAT_LIMIT_MESSAGE(plan, cap) : 'Your team has reached its member limit. Contact support@deepwelltechnology.com.', seats: view, url: '/app/?screen=billing' };
+      return { ok: false, status: 402, error: cap != null ? SEAT_LIMIT_MESSAGE(plan, cap, seats?.used) : 'Your team has reached its member limit. Contact support@deepwelltechnology.com.', seats: view, url: '/app/?screen=billing' };
     }
     const status = d.status === 422 || d.status === 400 ? 400 : d.status === 409 ? 409 : 502;
     return { ok: false, status, error: status === 502 ? 'Could not send that invite. Try again in a moment.' : d.message };

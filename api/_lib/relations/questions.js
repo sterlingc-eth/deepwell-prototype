@@ -1214,17 +1214,16 @@ const HANDLERS = {
         WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.${TENANT_SQL}
           AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.${TENANT_SQL}
                         AND e.customer_id = c.id AND lower(e.data->>'manufacturer') = ANY($1::text[])
-                        AND (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown'
-                                  WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $2::date THEN 'expired'
-                                  WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $2::date <= 365 THEN 'expiring'
-                                  ELSE 'active' END) = 'active')`,
+                        -- R35 (owner decision 2026-10-01): an active warranty = not expired (end date on or after today)
+                        AND (e.data->'warranty'->>'expires') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+                        AND substr((e.data->'warranty'->>'expires'), 1, 10)::date >= $2::date)`,
       [brands.map((b) => b.toLowerCase()), t]);
     const named = rows.filter((r) => r.name);
     const n = named.length;
     const label = brands.length > 1 ? `${brands.join(' or ')}` : brands[0];
     return finish(`${n} customer${n === 1 ? '' : 's'} with a ${label} unit have an active warranty.`, [{ label: 'Customers', value: String(n) }],
       { records: named.map((r) => customerRecord({ id: r.id, customer_name: r.name })), total: n, claimedCount: n,
-        basis: `Counted customers with a ${label} unit whose warranty status is currently active.` });
+        basis: `Counted customers with a ${label} unit whose warranty has not expired (end date on or after ${t}).` });
   },
 
   async ageNoVisitSet(db, { years }, today) {

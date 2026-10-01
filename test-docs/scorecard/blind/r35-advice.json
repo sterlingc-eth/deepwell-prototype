@@ -1,0 +1,579 @@
+{
+ "version": "r35b-blind-1",
+ "category": "blind-r35b-advice",
+ "source": "scripts/gen-blind-r35b.mjs (seeded, frozen before the loop's rule)",
+ "questions": [
+  {
+   "id": "bl-r35b-advice-001",
+   "text": "should I replace the unit at 3282 W Camelback Rd",
+   "category": "blind-r35b-advice",
+   "shape": "adv_named",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-002",
+   "text": "is it worth repairing Matthew Whitfield's unit",
+   "category": "blind-r35b-advice",
+   "shape": "adv_named",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-003",
+   "text": "hey, should we fix or replace the system at 1543 S Higley Rd",
+   "category": "blind-r35b-advice",
+   "shape": "adv_named",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-004",
+   "text": "alright, is Stephanie Osborn a good customer",
+   "category": "blind-r35b-advice",
+   "shape": "adv_named",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-005",
+   "text": "should we keep Sandra Yarborough as a customer",
+   "category": "blind-r35b-advice",
+   "shape": "adv_named",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-006",
+   "text": "sorry, one more - would you recommend a new unit for Kathleen Jennings",
+   "category": "blind-r35b-advice",
+   "shape": "adv_named",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-007",
+   "text": "sorry, one more - should I replace the unit at 951 E Main St for me",
+   "category": "blind-r35b-advice",
+   "shape": "adv_named",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-008",
+   "text": "is it worth repairing Maria Holbrook's unit",
+   "category": "blind-r35b-advice",
+   "shape": "adv_named",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-009",
+   "text": "should we fix or replace the system at 618 N Power Rd for me",
+   "category": "blind-r35b-advice",
+   "shape": "adv_named",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-010",
+   "text": "is Gary Wyckoff a good customer",
+   "category": "blind-r35b-advice",
+   "shape": "adv_named",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-011",
+   "text": "should we keep Barbara Ellison as a customer",
+   "category": "blind-r35b-advice",
+   "shape": "adv_named",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-012",
+   "text": "alright, would you recommend a new unit for Anthony Alvarez please",
+   "category": "blind-r35b-advice",
+   "shape": "adv_named",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-013",
+   "text": "hey, what is the best AC brand please",
+   "category": "blind-r35b-advice",
+   "shape": "adv_general",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-014",
+   "text": "sorry, one more - which brand should we stock",
+   "category": "blind-r35b-advice",
+   "shape": "adv_general",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-015",
+   "text": "hang on... what's the most reliable furnace brand",
+   "category": "blind-r35b-advice",
+   "shape": "adv_general",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-016",
+   "text": "quick one - should I raise my prices real quick",
+   "category": "blind-r35b-advice",
+   "shape": "adv_general",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-017",
+   "text": "alright, what should I charge for a capacitor for me",
+   "category": "blind-r35b-advice",
+   "shape": "adv_general",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-018",
+   "text": "quick one - what should I charge for a compressor swap real quick",
+   "category": "blind-r35b-advice",
+   "shape": "adv_general",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-019",
+   "text": "sorry, one more - how much should a tune-up cost",
+   "category": "blind-r35b-advice",
+   "shape": "adv_general",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-020",
+   "text": "sorry, one more - is Trane better than Carrier",
+   "category": "blind-r35b-advice",
+   "shape": "adv_general",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-021",
+   "text": "hey, should we buy another van real quick",
+   "category": "blind-r35b-advice",
+   "shape": "adv_general",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-022",
+   "text": "should I hire another tech",
+   "category": "blind-r35b-advice",
+   "shape": "adv_general",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-023",
+   "text": "real quick: what's a fair price for a service call for me",
+   "category": "blind-r35b-advice",
+   "shape": "adv_general",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-024",
+   "text": "which brand should I recommend to customers thanks",
+   "category": "blind-r35b-advice",
+   "shape": "adv_general",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-025",
+   "text": "quick one - should we fire Danny Ochoa",
+   "category": "blind-r35b-advice",
+   "shape": "adv_tech",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-026",
+   "text": "hang on... is Kevin Pratt a good tech thanks",
+   "category": "blind-r35b-advice",
+   "shape": "adv_tech",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-027",
+   "text": "hang on... should I give Marisol Vega a raise thanks",
+   "category": "blind-r35b-advice",
+   "shape": "adv_tech",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-028",
+   "text": "ok so is Denise Ford worth keeping real quick",
+   "category": "blind-r35b-advice",
+   "shape": "adv_tech",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-029",
+   "text": "ok so how many service calls will we have next month real quick",
+   "category": "blind-r35b-advice",
+   "shape": "adv_predict",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-030",
+   "text": "what will we invoice next quarter",
+   "category": "blind-r35b-advice",
+   "shape": "adv_predict",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-031",
+   "text": "predict our revenue for next year",
+   "category": "blind-r35b-advice",
+   "shape": "adv_predict",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-032",
+   "text": "ok so which unit will fail next",
+   "category": "blind-r35b-advice",
+   "shape": "adv_predict",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-033",
+   "text": "ok so how busy will we be next summer",
+   "category": "blind-r35b-advice",
+   "shape": "adv_predict",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-034",
+   "text": "quick one - forecast our sales for 2027 thanks",
+   "category": "blind-r35b-advice",
+   "shape": "adv_predict",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-035",
+   "text": "hang on... why did Danny Ochoa replace the compressor at 3282 W Camelback Rd for me",
+   "category": "blind-r35b-advice",
+   "shape": "adv_false_premise",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-036",
+   "text": "quick one - when did we replace the compressor for Matthew Whitfield for me",
+   "category": "blind-r35b-advice",
+   "shape": "adv_false_premise",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-037",
+   "text": "quick one - why did Marisol Vega swap the compressor at 1543 S Higley Rd please",
+   "category": "blind-r35b-advice",
+   "shape": "adv_false_premise",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-038",
+   "text": "hey, how much did the compressor replacement for Stephanie Osborn cost please",
+   "category": "blind-r35b-advice",
+   "shape": "adv_false_premise",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-039",
+   "text": "why did Ray Sutton replace the compressor at 2172 E Chandler Blvd",
+   "category": "blind-r35b-advice",
+   "shape": "adv_false_premise",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-040",
+   "text": "when did we replace the compressor for Kathleen Jennings",
+   "category": "blind-r35b-advice",
+   "shape": "adv_false_premise",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-041",
+   "text": "hang on... why did Danny Ochoa swap the compressor at 951 E Main St for me",
+   "category": "blind-r35b-advice",
+   "shape": "adv_false_premise",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-042",
+   "text": "hey, how much did the compressor replacement for Maria Holbrook cost real quick",
+   "category": "blind-r35b-advice",
+   "shape": "adv_false_premise",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-043",
+   "text": "hang on... who is Zaphod Beeblebrox thanks",
+   "category": "blind-r35b-advice",
+   "shape": "adv_unknown_person",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-044",
+   "text": "ok so tell me about Jebediah Pendergast real quick",
+   "category": "blind-r35b-advice",
+   "shape": "adv_unknown_person",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-045",
+   "text": "hey, who's Quentin Ravensworth",
+   "category": "blind-r35b-advice",
+   "shape": "adv_unknown_person",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-046",
+   "text": "ok so what do we have on Ophelia Featherstone",
+   "category": "blind-r35b-advice",
+   "shape": "adv_unknown_person",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-047",
+   "text": "is Bartholomew Huxley a customer real quick",
+   "category": "blind-r35b-advice",
+   "shape": "adv_unknown_person",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-048",
+   "text": "hey, who is Thaddeus Quackenbush for me",
+   "category": "blind-r35b-advice",
+   "shape": "adv_unknown_person",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-049",
+   "text": "real quick: tell me about Philippa Wolcott please",
+   "category": "blind-r35b-advice",
+   "shape": "adv_unknown_person",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-050",
+   "text": "quick one - who's Ignatius Abernethy-Smythe for me",
+   "category": "blind-r35b-advice",
+   "shape": "adv_unknown_person",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-051",
+   "text": "what do we have on Zaphod Beeblebrox",
+   "category": "blind-r35b-advice",
+   "shape": "adv_unknown_person",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  },
+  {
+   "id": "bl-r35b-advice-052",
+   "text": "hey, is Jebediah Pendergast a customer",
+   "category": "blind-r35b-advice",
+   "shape": "adv_unknown_person",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   }
+  }
+ ]
+}

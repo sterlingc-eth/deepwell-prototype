@@ -52,6 +52,8 @@ import { citeNotes } from "./citations/history.js"; // TEAM C
 // TEAM E (2026-09-24): full-name (not just surname) typo tolerance — see tokenFuzzyMatches below.
 import { damerauLevenshteinDistance } from "./integrity.js";
 import { typoAutoResolveEnabled, decideTypoResolution, isQuotedAsTyped, recordTypoResolution, withTypoNote } from "./lookups/typoResolve.js";
+import { nicknameCandidateRows, nicknamesEnabled, isKnownFirstName } from "./vocab/nicknames.js";
+import { isGivenName } from "./lookups/commonWords.js";
 // R31 (Team A): entity-first slot filling — the parser's last resort, see lookups/slotFill.js.
 import { stripConversationalFrame } from "./router/frame.js";
 import { parseSlotFill, runSlotFill } from "./lookups/slotFill.js";
@@ -385,6 +387,9 @@ const WHEN_LAST_AT_RE =
   /^when\s+(?:were\s+we|was\s+(?:the\s+)?(?:tech|crew|team))\s+last\s+(?:at|out\s+to)\s+([A-Za-z0-9][A-Za-z0-9'.-]*(?:\s+[A-Za-z0-9][A-Za-z0-9'.-]*){0,3})\s*\??$/i;
 const WHEN_LAST_SERVICE_RE =
   /^when\s+did\s+we\s+last\s+service\s+([A-Za-z][A-Za-z'.-]*(?:\s+[A-Za-z][A-Za-z'.-]*){0,2})\s*\??$/i;
+// R35: "when was <name> last serviced / seen / out" — the same last-visit question, passive word order (was a clarify).
+const WHEN_WAS_NAME_LAST_SERVICED_RE =
+  /^when\s+was\s+([A-Za-z][A-Za-z'.-]*(?:\s+[A-Za-z][A-Za-z'.-]*){0,2}?)\s+last\s+(?:serviced|seen|visited|worked\s+on)\s*\??$/i;
 const LAST_TIME_AT_RE =
   /^last\s+time\s+we\s+were\s+(?:at|out\s+to|out\s+at)\s+([A-Za-z0-9][A-Za-z0-9'.-]*(?:\s+[A-Za-z0-9][A-Za-z0-9'.-]*){0,4})\s*\??$/i;
 const HOW_MANY_TIMES_RE =
@@ -590,6 +595,16 @@ const GENERIC_PRONOUN_RE = /^(?:anyone|someone|everyone|everybody|anybody|somebo
 const IS_NAME_WARRANTY_STATUS_RE = new RegExp(
   "^is\\s+([A-Za-z][A-Za-z'.-]*(?:\\s+[A-Za-z'.-]+){0,2}?)(?:'s\\s+unit)?\\s+(?:still\\s+)?" +
     "(?:under warranty|covered|in warranty|out of warranty)(?:\\s+yet)?\\s*\\??$",
+  "i"
+);
+// R35: "does <name> still have warranty (left)" / "<name> warranty still good?" / "<name>'s unit still covered?" — the same named-unit
+// warranty question, two more word orders field staff use.
+const DOES_NAME_STILL_HAVE_WARRANTY_RE = new RegExp(
+  "^does\\s+([A-Za-z][A-Za-z'.-]*(?:\\s+[A-Za-z'.-]+){0,2}?)(?:'s\\s+(?:unit|system))?\\s+still\\s+have\\s+(?:a\\s+|any\\s+)?warranty(?:\\s+(?:left|coverage))?\\s*\\??$",
+  "i"
+);
+const NAME_WARRANTY_STILL_GOOD_RE = new RegExp(
+  "^([A-Za-z][A-Za-z'.-]*(?:\\s+[A-Za-z'.-]+){0,2}?)(?:'s)?\\s+(?:(?:unit|system)\\s+)?(?:warranty\\s+still\\s+(?:good|valid|active|in\\s+effect)|still\\s+(?:under\\s+warranty|covered))\\s*\\??$",
   "i"
 );
 const WARRANTY_STATUS_FOR_NAME_RE = new RegExp(
@@ -831,7 +846,7 @@ export function buildUntrackedFieldAnswer() {
   return attachCitations(
     {
       kind: "no-answer",
-      text: "That's not a field this system tracks for any unit or job — nothing on file could answer it, for any address.",
+      text: "That isn't tracked for any unit or job, so nothing on file answers it.", // R35 brevity
       facts: [], sources: [], confidence: 0, verifiedCount: 0, unverifiedCount: 0, closest: [],
     },
     { records: [], total: 0, kind: "searched", basis: "This asks for an equipment/job attribute this schema has no field for at all — never printed on any document on file." }
@@ -847,8 +862,8 @@ export function buildOutOfDomainAnswer() {
     {
       kind: "no-answer",
       text:
-        `That's not something your business records can answer. I can help with things like ` +
-        `"${OUT_OF_DOMAIN_EXAMPLES[0]}" or "${OUT_OF_DOMAIN_EXAMPLES[1]}".`,
+        // R35 brevity: one short line, no worked examples (the suggestion chips carry those).
+        `That's not in your business records. Ask about a customer, address, unit, job, or invoice.`,
       facts: [], sources: [], confidence: 0, verifiedCount: 0, unverifiedCount: 0, closest: [],
     },
     { records: [], total: 0, kind: "searched", basis: "This question has no HVAC/business-record content — nothing here would be worth searching for." }
@@ -1108,7 +1123,7 @@ function parseContactLookupQuestionCore(question, opts = {}) {
   // to let "unit ... under warranty" match too) — stripped back off the same way
   // stripPossessive/POSSESSIVE_UNIT_ATTR_RE already handle "Prentiss's unit" elsewhere in this
   // file, so "thomas osborn's unit still under warranty" still resolves to "thomas osborn".
-  for (const re of [IS_NAME_WARRANTY_STATUS_RE, WARRANTY_STATUS_FOR_NAME_RE]) {
+  for (const re of [IS_NAME_WARRANTY_STATUS_RE, WARRANTY_STATUS_FOR_NAME_RE, DOES_NAME_STILL_HAVE_WARRANTY_RE, NAME_WARRANTY_STILL_GOOD_RE]) {
     const m = q.match(re);
     if (m) {
       const namePhrase = stripPossessive(m[1].trim().replace(/\s+(?:unit|system|equipment|ac)$/i, ""));
@@ -1149,6 +1164,7 @@ function parseContactLookupQuestionCore(question, opts = {}) {
     for (const [re, field] of [
       [WHEN_LAST_AT_RE, "lastVisit"],
       [WHEN_LAST_SERVICE_RE, "lastVisit"],
+      [WHEN_WAS_NAME_LAST_SERVICED_RE, "lastVisit"],
       [LAST_TIME_AT_RE, "lastVisit"],
       [LAST_TIME_SERVICED_RE, "lastVisit"],
       [WHEN_LAST_GO_OUT_RE, "lastVisit"],
@@ -1421,15 +1437,17 @@ export function buildContactAnswer(field, row) {
     };
   }
 
-  const facts = contactFacts(row);
-  const summary = [row.phone, row.email, row.service_address].filter(Boolean).join(" · ");
+  // R35 (owner decision 2026-10-01, "less is better"): the field asked for, in one short sentence — not the whole contact card.
+  // ("pull up X" / "contact info for X" is field 'full' above and still shows every field.)
+  const facts = contactFacts(row).filter((f) => f.label === FACT_LABEL_FOR_FIELD[field]);
   return {
     kind: "answer",
-    text: `${name} — ${summary}`,
+    text: `${name}'s ${FIELD_WORD[field] === "service address" ? "address" : FIELD_WORD[field]} is ${requestedValue}.`,
     facts, sources: [], confidence: 1,
     verifiedCount: facts.length, unverifiedCount: 0, closest: [],
   };
 }
+const FACT_LABEL_FOR_FIELD = { phone: "Phone", email: "Email", address: "Address", serial: "Serial" };
 
 /** Pure: more than one customer matched the searched name — name them and
  *  ask which, rather than guessing one (same rule fastPath.js's own
@@ -1680,11 +1698,19 @@ export async function resolveContactCandidatesDetailed(db, namePhrase) {
       tier = 'fuzzy';
     }
   }
-  return { rows, tier, universe: tier === 'fuzzy' ? all : undefined };
+  return { rows, tier, universe: tier === 'fuzzy' ? all : undefined, allRows: all };
 }
 
 export async function resolveContactCandidates(db, namePhrase) {
   return (await resolveContactCandidatesDetailed(db, namePhrase)).rows;
+}
+
+/** R35: "<known first name> <surname on file>" that matched nobody: the customers sharing that exact surname (names only, max 3). */
+function sameSurnameKnownFirst(namePhrase, allRows) {
+  const toks = String(namePhrase ?? "").trim().replace(/['’]s$/i, "").split(/\s+/);
+  if (toks.length !== 2 || !(isKnownFirstName(toks[0]) || isGivenName(toks[0]))) return [];
+  const last = toks[1].toLowerCase();
+  return (allRows ?? []).filter((r) => String(r.customer_name ?? "").trim().split(/\s+/).length === 2 && String(r.customer_name).trim().split(/\s+/)[1].toLowerCase() === last);
 }
 
 /** Up to 3 candidate names only — never a phone/email/address/serial, and never a citation record
@@ -1769,7 +1795,24 @@ export function corroboratesCandidate(question, row) {
  * 'exact'/'contains'/'fuzzy-surname' tiers — this guard only ever narrows the 'fuzzy' tier).
  */
 export async function resolveNamedCustomers(db, question, namePhrase) {
-  const { rows, tier, universe } = await resolveContactCandidatesDetailed(db, namePhrase);
+  const { rows, tier, universe, allRows } = await resolveContactCandidatesDetailed(db, namePhrase);
+  // R35 (owner decision 2026-10-01): a nickname ("Tom Mercer") that ask.js could not resolve to ONE person (vocab/nicknames.js) —
+  // several customers fit ("Chris Lee" -> Christopher Lee, Christina Lee): the one-tap "Did you mean", never a guess. One fit (a
+  // caller that bypassed ask.js's rewrite): resolved with the same visible note. A known first name whose surname is on file but
+  // with no first name that fits ("Bob Mercer" when only Thomas and Laura Mercer exist): an honest decline naming the Mercers.
+  if ((tier === "none" || tier === "fuzzy") && nicknamesEnabled() && !isQuotedAsTyped(question, namePhrase)) {
+    const nick = nicknameCandidateRows(namePhrase, allRows);
+    if (nick.length > 1) return { candidates: [], declined: buildNearMissDeclineAnswer(namePhrase, nick) };
+    if (nick.length === 1 && typoAutoResolveEnabled()) {
+      const at = String(question ?? "").toLowerCase().indexOf(String(namePhrase).toLowerCase());
+      recordTypoResolution(at >= 0 ? String(question).slice(at, at + String(namePhrase).length) : namePhrase, nick[0].customer_name);
+      return { candidates: nick, declined: null, typoResolved: true };
+    }
+    if (tier === "none") {
+      const sameSurname = sameSurnameKnownFirst(namePhrase, allRows);
+      if (sameSurname.length) return { candidates: [], declined: buildNearMissDeclineAnswer(namePhrase, sameSurname) };
+    }
+  }
   if (tier !== "fuzzy" || !rows.length) return { candidates: rows, declined: null };
   if (rows.length === 1 && corroboratesCandidate(question, rows[0])) return { candidates: rows, declined: null };
   // R32 (CEO decision 2026-09-30): an UNAMBIGUOUS typo'd full name resolves, with a visible note on the answer (see
@@ -2258,7 +2301,10 @@ export function unitWarrantyPhrase(u, today) {
   // R21 (M1, L4 rubric g151/g155): the literal word "active" (not just the date) is required by
   // this round's keyFacts for a not-yet-expired warranty — "under warranty until <date>" alone
   // read as ambiguous to that grader, so state the status word explicitly, same as "expired" already is.
-  return tier === "expired" ? `warranty expired ${dateHuman}` : `active, under warranty until ${dateHuman}`;
+  if (tier === "expired") return `warranty expired ${dateHuman}`;
+  // R35 (owner decision 2026-10-01): still under warranty = not expired; when it runs out within a year, say so (short qualifier).
+  const days = (Date.parse(String(w.expires).slice(0, 10)) - Date.parse(String(today ?? "").slice(0, 10))) / 86400000;
+  return `active, under warranty until ${dateHuman}${Number.isFinite(days) && days >= 0 && days <= 365 ? " (expiring within 12 months)" : ""}`;
 }
 
 /** Pure: one unit's value for one named-unit attribute, always a sentence

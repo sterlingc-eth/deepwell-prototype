@@ -1346,10 +1346,9 @@
    "text": "How many units have still under warranty?",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $1::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $1::date <= 365 THEN 'expiring' ELSE 'active' END) = $2",
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $1::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $1::date <= 365 THEN 'expiring' ELSE 'active' END) IN ('active', 'expiring')",
     "params": [
-     "@today",
-     "active"
+     "@today"
     ]
    }
   },
@@ -10600,7 +10599,7 @@
    "text": "How many customers with a Trane or Carrier unit have an active warranty?",
    "cmp": "number",
    "oracle": {
-    "sql": "SELECT count(*) AS n FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND lower(e.data->>'manufacturer') IN ('trane','carrier') AND (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $1::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $1::date <= 365 THEN 'expiring' ELSE 'active' END) = 'active')",
+    "sql": "SELECT count(*) AS n FROM entities c WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.customer_id = c.id AND lower(e.data->>'manufacturer') IN ('trane','carrier') AND (CASE WHEN (e.data->'warranty'->>'expires') IS NULL OR (e.data->'warranty'->>'expires') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN 'unknown' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date < $1::date THEN 'expired' WHEN substr((e.data->'warranty'->>'expires'), 1, 10)::date - $1::date <= 365 THEN 'expiring' ELSE 'active' END) IN ('active', 'expiring'))",
     "params": [
      "@today"
     ]
