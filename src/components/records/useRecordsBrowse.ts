@@ -152,14 +152,26 @@ export function useRecordsBrowse() {
     (append ? setLoadingMore : setLoading)(true);
     setError(null);
     try {
-      const res = await recordsStore.browseDocuments({ ...f, cursor: cur, limit: 50 });
+      // R36: the page comes back on its own (no filter-chip counts); the counts are a separate, cached server pass that
+      // fills in behind it. At 50,000 documents the page is tens of milliseconds and the counts a second or so.
+      const res = await recordsStore.browseDocuments({ ...f, cursor: cur, limit: 50 }, { facets: false });
       if (id !== requestId.current) return; // a newer request landed first
       setRows((prev) => (append ? [...prev, ...res.rows] : res.rows));
-      // R35: a "load more" page carries no facets (they describe the whole filtered set and were sent with page one).
-      if (!append || res.facets.length) setFacets(res.facets);
       setTotal(res.total);
       setCursor(res.nextCursor);
       setHasMore(res.hasMore);
+      if (!append) {
+        // Facets describe the whole filtered set: ask once per filter change, never for "load more". A server that still
+        // sends them with the page (an older deploy) is used as it is; otherwise they are fetched behind the page. A failure
+        // here only leaves the chips as they were (the list is the thing the person came for).
+        if (Array.isArray(res.facets) && res.facets.length) {
+          setFacets(res.facets);
+        } else {
+          recordsStore.browseFacets({ ...f, cursor: null, limit: 50 }).then((fr) => {
+            if (id === requestId.current && Array.isArray(fr?.facets)) setFacets(fr.facets);
+          }).catch(() => {});
+        }
+      }
     } catch (e) {
       if (id !== requestId.current) return;
       setError(e instanceof Error ? e.message : 'Could not load records.');

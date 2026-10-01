@@ -300,7 +300,7 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
       </main>
 
       <footer className="border-t border-line">
-        <div className="max-w-content mx-auto px-4 sm:px-6 pt-4 pb-20 lg:pb-4 flex flex-wrap items-center justify-between gap-2 text-caption text-ink-3">
+        <div className="max-w-content mx-auto px-4 sm:px-6 pt-4 pb-20 lg:pb-4 lg:pr-20 min-[1400px]:pr-6 flex flex-wrap items-center justify-between gap-2 text-caption text-ink-3">
           <span>DeepWell Technology · Knowledge Builds Business.</span>
           <span className="flex items-center gap-4">
             <span>Every answer shows its source.</span>

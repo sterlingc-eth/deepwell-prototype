@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent } 
 import { localYmd } from '../core/localDate';
 import { Plus, Upload, AlertTriangle, ChevronRight, X, FolderArchive, FileUp } from 'lucide-react';
 import { StagePill, STAGE_LABEL } from '../components/StagePill';
-import { docCountsByStage, useGraph } from '../core/entityGraph';
+import { docCountsByStage, documentTotalFor, useGraph } from '../core/entityGraph';
 import { INTAKE_SOURCES, PIPELINE_STAGES, type Batch, type Doc, type IntakeSource, type PipelineStage } from '../core/types';
 import { classifyByFilename, fileTypeOf, SAMPLE_UPLOADS } from '../domains/hvac/intake';
 import { useAppStore } from '../store/appStore';
@@ -140,8 +140,9 @@ export function IntakeBody() {
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
   const selected = batches.find((b) => b.id === selectedBatchId) ?? batches[0];
   const [showNew, setShowNew] = useState(false);
+  // R36: whole-shop totals from the server (the graph holds only the newest 500 documents plus older needs-review ones).
   const counts = docCountsByStage(graph);
-  const total = Object.values(graph.docs).length;
+  const total = documentTotalFor(graph);
 
   const batchDocs = (b: Batch) => b.documentIds.map((id) => graph.docs[id]).filter((d): d is Doc => !!d);
   const stageCounts = (b: Batch): Record<PipelineStage, number> => {

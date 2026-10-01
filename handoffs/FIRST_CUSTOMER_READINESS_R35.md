@@ -7,7 +7,7 @@ Postgres (PGlite) with mocked storage, model, Stripe and network. Nothing real w
 grows with shop size (the thing that breaks first) and for before/after comparisons. They are not a prediction of Neon latency, which is
 typically several times faster on the same plan. Where a number matters to the decision it is labelled "PGlite".
 
-Regression gate: `npm run verify:r35-limits` (133 checks, part of `verify:all`). Measurement tool: `npx tsx scripts/r35-measure.mjs`
+Regression gates: `npm run verify:r35-limits` (133 checks) and `npm run verify:r36-scale` (138 checks), both part of `verify:all`. Measurement tool: `npx tsx scripts/r35-measure.mjs`
 (seeds 50,000 documents / 10,000 customers / 20,000 units / 5,000 open Inbox questions in about two minutes).
 
 ## Owner decision applied
@@ -17,7 +17,7 @@ validation), and the Records `createDocument` action. Missing, zero, negative, f
 message "sizeBytes is required...". The signed PUT URL always carries `content-length`, so a client cannot send more than it declared.
 Every in-repo client already sends it (`ingestClient`, `bulkImport`, `uploadQueue`, the queued item). Read-time caps stay as the second
 line of defence. One unsized presign remains: platform expense receipts (`api/_lib/routes/expenses.js`, owner-only, not part of the
-customer pipeline). Flagged, not changed.
+customer pipeline). Flagged, not changed. (R36: now sized, required and capped the same way.)
 
 ## Measured limits (what a customer will actually hit)
 
@@ -145,30 +145,122 @@ keep access, and how many to remove. Existing test strings kept. Check: `gate`, 
 Also changed: `scripts/verify-r34-breakit-uploads.mjs` (three payloads now carry the required size so they still test what they say) and
 `scripts/verify-r33-dates.mjs` (its "no new SQL" check now allows R35's two migrations).
 
-## Remaining risks (not fixed)
+## R36 update: the five open risks, closed (scale engineer pass)
 
-1. **Records first page and Records search at 50,000 documents: ~2 s and ~7 s in PGlite.** Ten facet scans each re-scan every document.
+Gate: `npm run verify:r36-scale` (138 checks, part of `verify:all`). Same harness and the same 50,000-document / 10,000-customer / 20,000-unit
+tenant as above. **Every timing is PGlite on a slow, shared 2-core machine (load average 3 to 5 while measuring), so read them as
+before / after on identical data, not as Neon latency.** The before column is the R35 code run on this machine today.
+
+**1. Records search and first page**
+
+| PGlite, 50,000 documents | R35 code | R36, SQL 64 not pasted | R36, SQL 64 pasted |
+|---|---|---|---|
+| Records first page (the page itself) | 4,700 to 6,300 ms (page + facets) | 80 ms | 60 to 120 ms |
+| "Load more" (page 2) | 6,083 ms | 87 ms | 89 ms |
+| Filter chips (facets), now fetched behind the page and cached 60 s | inside every first page | ~1,200 ms | ~970 ms |
+| Search "Customer 777" (a customer name) | 14,155 ms | 522 ms | **86 ms** |
+| Search "scan-4123" (a file name) | 14,400 ms | 481 ms | **61 ms** |
+| Search with no match ("zzzqx") | 14,880 ms | 320 ms | **81 ms** |
+| Search + a type filter | 6,150 ms | 271 ms | **42 ms** |
+| Search "Carrier" (a unit manufacturer, 20,000 matching units) | 16,258 ms | 424 ms | 236 ms |
+| Search "capacitor" (a word on EVERY page of every document: the worst case) | 16,621 ms | 729 ms | 597 ms |
+
+What changed: the search is no longer an OR of ILIKEs over per-document aggregates. It is a candidate set of document ids from four arms
+(file / display name, a linked customer's name / address / unit manufacturer, the technician, page text through the existing tsvector GIN),
+and only the page's rows are then joined. Newest-first (the default) walks `documents` in index order and stops at the page; "load more"
+resumes from a keyset `(created_at, id)` cursor that carries the total, so it never recounts (an old OFFSET cursor still works). A common
+word is answered by testing the newest 1,000 documents one by one (a page fills at once); a rare one by the candidate set. Facets are one
+pass instead of ten, are returned by their own action (`browseFacets`) and the Records screen paints the page first. Results stay newest
+first; there is no relevance ranking (it would defeat stopping at the first page).
+
+**An important finding behind SQL 64: the app role is subject to row-level security, and Postgres will not use an index for `ILIKE` or
+`tsvector @@` under a policy (those operators are not "leakproof").** With the trigram indexes in place and nothing else, the same
+queries still ran as sequential scans (about 300 ms at 50,000 documents against 14 ms as the table owner). SQL 64 therefore also installs
+`records_search_candidates(like, text)`, a `SECURITY DEFINER` function (the pattern 59 and 60 already use) that runs the four arms with an
+explicit tenant predicate on every table; it reads the shop from `app.tenant_id`, returns nothing without one, returns ids only, and the
+page query that calls it is still the RLS role. The code checks the function exists AND is executable by the app role, and falls back to
+the inline arms otherwise, so pasting order is free. **The Donovan passage search (`searchPassages`, 1.1 to 1.2 s) has the same
+sequential-scan problem; it is a Donovan file, so not changed here: give it the same function pattern if it ever shows up.**
+
+**2. The 500-document client graph**
+
+The Inbox, Review and Dashboard were counting from the newest 500 documents. Now: `reviewSummary` (exact shop-wide stage counts) is
+fetched on every sync and kept as `serverCounts` in the graph store; `docCountsByStage` and a new `documentTotalFor` add what the graph
+does not hold, so the Dashboard, the Data Health strip, the Intake screen and the Records delete confirmation say the real number. Older
+needs-review documents are paged in behind the first paint (`listUnverifiedDocuments`, 200 a page, keyset, exact total, up to
+`HYDRATE_CAP` = 3,000 on the desktop app; the phone app takes the counts only), together with the customers and units they point at
+(`listEntitiesByIds`). The Inbox / Review lists therefore include them without those screens changing. A tenant switch abandons a
+hydration in flight. If a shop ever has more than 3,000 older needs-review documents, the remainder is reported in
+`serverCounts.needsReviewNotLoaded` (never silently dropped); Records still reaches every document.
+
+**3. Records Rescue credit**
+
+A paid Records Rescue checkout now adds its pages by itself (it used to be a hand-run SQL). The docs only say "one-time", so the pages do
+not expire: a one-time balance, usable in any month, drawn only after the plan's own allowance plus `extraPagesPerMonth` is spent, until
+all are read. The webhook records the order in its own ledger row (`billing_events`: pages + Stripe session id; the event id is the
+once-only guard), so a retried delivery adds nothing and a plan change or the R35 owner-override preservation cannot wipe it. No new table
+and no migration. A paid order that arrives while the ledger is unavailable is refused so Stripe retries it. Details and the manual
+grant / revoke SQL are in `handoffs/BILLING_RULES.md`. `GET /api/billing` returns `usage.rescuePagesRemaining` / `rescuePagesPurchased`.
+
+**4. Canceled customers and export**
+
+Findings: the server never gated exports on billing (`tenant-export`, `export-csv`, `upload-url` mode `get` have no billing check), and
+Team (the Settings card with the full JSON export: documents + `manifest.originals`) is one of the two screens a canceled shop is shown.
+The three CSVs were only reachable from Records and Customers, which a canceled shop cannot open. Fix: `DataExportButtons` (documents,
+customers, units as CSV) is now on the Team screen. Everything else is still refused (upload 402, ask / read / extract fail closed).
+Verified end to end for a canceled tenant: the export is complete and valid, lists all 120 originals in the manifest, and holds no storage keys.
+
+**5. Expense receipt uploads**
+
+`sizeBytes` is now required (400 when missing, zero or invalid; 413 over the 24 MB the receipt reader accepts) and signed into the PUT
+URL as `content-length`, exactly like the customer upload paths. `ExpensesScreen` and `expensesClient` send `file.size`.
+
+**One more fix found on the way:** `checkUploadGate` ran the billing-row lookup beside its own transaction. With the rescue credit that
+lookup now needs a second connection on a cache miss, and a pool of 3 could deadlock three concurrent uploads. It now runs before the
+transaction opens (`api/upload-url.js`, three lines).
+
+## Remaining risks (R36 status first; the R35 list follows)
+
+R36 closes R35 risks 1, 2, 4, 5 and 8 below. Still open:
+
+- **Inbox / Review / Dashboard do not display `serverCounts.needsReviewNotLoaded`** (those screens are outside this pass); it only
+  matters past 3,000 older needs-review documents.
+- **Billing does not display the rescue balance** (the API returns it; the Billing screen is outside this pass).
+- **Rescue consumption is approximated with today's plan allowance** for past months (a plan change shifts what earlier overflow counts
+  as); the credit is never lost or double-granted.
+- **`billing_events` rows with `rescuePages` are the credit: never purge them.**
+- **Register `checkout.session.async_payment_succeeded` in the Stripe webhook** if delayed payment methods are ever enabled for Rescue
+  (the code reads it; the dashboard setting is the owner's). Card payments arrive as `checkout.session.completed` as before.
+- **Facet counts can be up to 60 s old** (a document uploaded a moment ago appears in the list at once but in the chips a minute later).
+- **A very common search word is the slowest case** (~600 ms here, 50,000 documents all containing it): the total still needs an exact
+  count. Expect a fraction of that on Neon.
+- **Donovan `searchPassages` is still ~1.1 s** at this size for the RLS reason above.
+- Numbers are PGlite. Neon should be faster; paste 64 before the import and re-time one search on the real database.
+
+## R35 remaining risks (as written at the time; see the R36 status above)
+
+1. **(R36: fixed, see above.) Records first page and Records search at 50,000 documents: ~2 s and ~7 s in PGlite.** Ten facet scans each re-scan every document.
    Page one is the only page that runs them now. Expect roughly a third to a fifth of that on Neon; search is the one to watch. Fix when
    it bites: materialise the "linked" rows once per request, or cache facets per filter set for 60 s. Not done: it is the Records contract
    and a large change.
-2. **The app loads at most the newest 500 documents and 500 entities into the client graph** (`usePostgresSync`, not owned). Inbox "Needs
+2. **(R36: fixed for counts and the needs-review lists, see above.) The app loads at most the newest 500 documents and 500 entities into the client graph** (`usePostgresSync`, not owned). Inbox "Needs
    you" counts and some derived views are computed from those 500, so a needs-review document older than the newest 500 is invisible
    there until the Inbox queue endpoint is used for it. Documented earlier; unchanged.
 3. **Import speed is the per-shop queue concurrency (3).** See limits. A 5,000-document first import is an overnight job until the env
    vars are raised.
-4. **Records Rescue is not fulfilled in code.** The checkout is a one-time payment with no code that adds pages. The owner sets
+4. **(R36: fixed, see above.) Records Rescue is not fulfilled in code.** The checkout is a one-time payment with no code that adds pages. The owner sets
    `extraPagesPerMonth` by hand (SQL below). It survives renewals only after migration 62.
-5. **Canceled customers see only Billing** (`src/App.tsx`, not owned) and Donovan is blocked. Their data is retained. Confirm they can
+5. **(R36: fixed, see above.) Canceled customers see only Billing** (`src/App.tsx`, not owned) and Donovan is blocked. Their data is retained. Confirm they can
    still reach the export from Billing or support before the first cancellation.
 6. **Each file costs 2 upload units** (presign and read). Intentional and now documented; it halves the files-per-day figure above.
 7. **Inbox page = ~2.4 SQL statements per card** (one set of lookups per card, 49 for a page of 20; 320 ms PGlite). Fine at 20 per page.
-8. **Expense receipt uploads are unsized** (owner-only).
+8. **(R36: fixed.) Expense receipt uploads are unsized** (owner-only).
 9. **Not measured:** full-tenant export streaming at 50,000 documents (it pages and resumes by design, no cap), and real latency to
    Neon, R2, Inngest or Anthropic.
 
 ## Owner onboarding-day checklist
 
-1. Paste migrations 62 and 63 (SQL below). Run 63 before the import, not during.
+1. Paste migrations 62, 63 and 64 (SQL below), in that order. Run 63 and 64 before the import, not during.
 2. Confirm `NEON_CONNECTION_STRING` is the pooled one (host contains `-pooler`). The deploy logs a warning at boot if not.
 3. Confirm the Inngest keys are set, then raise the import speed: `INGEST_CONCURRENCY_GLOBAL`, `INGEST_CONCURRENCY_TENANT`,
    `INGEST_THROTTLE_PER_MIN` (see limits; needs the paid Inngest plan and an Anthropic tier to match). Check the Anthropic rate limit first.
@@ -184,7 +276,8 @@ Also changed: `scripts/verify-r34-breakit-uploads.mjs` (three payloads now carry
 
 1. `M3-config/62-rate-limit-refund-and-owner-overrides.sql` (idempotent; safe to re-run).
 2. `M3-config/63-page-count-index.sql` (idempotent).
-3. Per customer, for the import (replace the org id; numbers are an example for 20,000 pages on a Shop plan):
+3. `M3-config/64-records-search-indexes.sql` (R36; idempotent; run it BEFORE the import, not during: plain `CREATE INDEX` blocks writes while it builds, seconds at today's size; the file explains the one-at-a-time `CONCURRENTLY` form for a busy table). It creates three trigram indexes on `entities`, one ordered index on `documents`, and the `records_search_candidates()` function. The last query in it is a proof (four valid indexes, `prosecdef = true`); also run the owner check it prints (the function owner must bypass RLS, as for 59 and 60).
+4. Per customer, for the import (replace the org id; numbers are an example for 20,000 pages on a Shop plan):
 
 ```sql
 UPDATE tenants
@@ -216,3 +309,20 @@ New: `M3-config/62-rate-limit-refund-and-owner-overrides.sql`, `M3-config/63-pag
 Tests adjusted: `scripts/verify-r34-breakit-uploads.mjs`, `scripts/verify-r33-dates.mjs`.
 `api/` still has exactly 12 top-level files. No `.env` created, no dependency installed, no Donovan engine, router, support-bot or
 telemetry file touched.
+
+### R36 files
+
+Code: `api/_lib/recordsStore.js`, `api/records.ts`, `api/_lib/billing.js`, `api/_lib/plan.js`, `api/billing.js`, `api/_lib/routes/expenses.js`,
+`api/upload-url.js` (the gate ordering fix, 3 lines, not on the owned list), `src/core/entityGraph.ts`, `src/hooks/usePostgresSync.ts`,
+`src/services/recordsStoreClient.ts`, `src/services/billingClient.ts`, `src/services/expensesClient.ts`,
+`src/components/records/useRecordsBrowse.ts`, `src/screens/IntakeScreen.tsx`, `src/screens/BrowseScreen.tsx`,
+`src/screens/TeamScreen.tsx` (mounts the CSV buttons; 2 lines, not on the owned list), `src/screens/ExpensesScreen.tsx` (passes `file.size`; 2 call sites, not on the owned list).
+New: `M3-config/64-records-search-indexes.sql`, `src/components/records/DataExportButtons.tsx`, `scripts/verify-r36-scale.mjs`.
+Tools: `scripts/r35-measure.mjs` (seeds in 5,000-document chunks; `R35_SEED_DIR` keeps the 50,000-document database on disk so it is
+seeded once, the old single-statement seed and snapshot dump were OOM-killed at ~4 GB; `R36_SQL=file,file` applies migrations onto a
+reused database; new rows for the page alone, facets, load more and six searches), `scripts/lib/r35Harness.mjs` (`dataDir`).
+Tests adjusted: `scripts/verify-r35-limits.mjs` (two Records checks that counted the old per-page query numbers and the old hook
+wording; the invariants they protect - page two runs no facet scans, the client keeps page-one facets - are unchanged). `package.json`:
+`verify:r36-scale`, appended to `verify:all`. Also: `handoffs/BILLING_RULES.md` (rescue credit semantics).
+No `.env` created, no dependency installed, no git, `api/` still exactly 12 top-level files, no Donovan engine, router, support-bot,
+telemetry or `src/mobile` file touched.

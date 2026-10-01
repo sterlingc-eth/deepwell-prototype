@@ -1,4 +1,4 @@
-import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
+import { forwardRef, memo, startTransition, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { ArrowUp, RotateCcw, X } from 'lucide-react'
 import { ask, AskApiError } from '../services/answerService'
 import { friendlyErrorMessage } from '../services/httpError'
@@ -104,10 +104,19 @@ const Composer = memo(
       },
     }))
 
-    // Grow with the text up to ~4 lines, then scroll inside.
+    // Grow with the text up to ~4 lines, then scroll inside. Measure-then-mutate: while text is only being added
+    // the box can only need to GROW, so read scrollHeight once and write only when it actually changes; the
+    // reset-to-auto (a forced layout per keystroke) is kept for deletions/replacements, where it may need to shrink.
+    const prevLen = useRef(0)
     useEffect(() => {
       const ta = taRef.current
       if (!ta) return
+      const appended = input.length > prevLen.current
+      prevLen.current = input.length
+      if (appended && ta.clientHeight > 0) {
+        if (ta.scrollHeight > ta.clientHeight && ta.clientHeight < 128) ta.style.height = `${Math.min(ta.scrollHeight, 128)}px`
+        return
+      }
       ta.style.height = 'auto'
       ta.style.height = `${Math.min(ta.scrollHeight, 128)}px`
     }, [input])
@@ -246,7 +255,7 @@ const TurnView = memo(function TurnView({
 
 // ---------------------------------------------------------------------------
 
-export function AskTab({
+export const AskTab = memo(function AskTab({
   onOpenDoc,
   onOpenCustomer,
   tenantKey = null,
@@ -329,7 +338,9 @@ export function AskTab({
     const priorTurns = contextTurns
     try {
       const answer = await ask(question, { signal: controller.signal, conversationContext: { turns: priorTurns } })
-      update(id, { answer })
+      // The answer card (headline, citations, trust row, hero, chips) mounts as a transition: its render is time-sliced
+      // instead of one long task when the response lands.
+      startTransition(() => update(id, { answer }))
       setContextTurns((t) => [...t, turnFrom(question, answer)].slice(-MAX_CONTEXT_TURNS))
     } catch (err) {
       const aborted = controller.signal.aborted
@@ -416,4 +427,4 @@ export function AskTab({
       <Composer ref={composerRef} busy={busy} onSubmit={send} />
     </div>
   )
-}
+})

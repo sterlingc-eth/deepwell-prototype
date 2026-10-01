@@ -16,9 +16,19 @@ import type {
 } from '../services/postgresRecordsStore';
 
 import { authHeader } from './authToken';
-import type { BrowseFilters, BrowseResponse } from '../components/records/types';
+import type { BrowseFacet, BrowseFilters, BrowseResponse } from '../components/records/types';
 
 const API_URL = '/api/records';
+
+/** R36: what POST /api/records { action: 'reviewSummary' } returns. */
+export interface ReviewSummary {
+  total: number;
+  /** Raw `documents.stage` counts: received -> read -> mapped -> linked -> verified. */
+  byStage: { received: number; read: number; mapped: number; linked: number; verified: number };
+  /** Every document that is not verified. */
+  needsReview: number;
+  verified: number;
+}
 
 export class RecordsStoreClient implements RecordsStore {
   /** Kept for the RecordsStore interface; the server derives the real tenant
@@ -74,6 +84,16 @@ export class RecordsStoreClient implements RecordsStore {
     return this.call('listDocuments', { filters });
   }
 
+  /** R36: shop-wide document counts (the client graph only holds the newest 500, so it cannot know these). */
+  async reviewSummary(): Promise<ReviewSummary> {
+    return this.call('reviewSummary', {});
+  }
+
+  /** R36: the needs-review list (every document that is not verified), newest first, paged by an opaque cursor. */
+  async listUnverifiedDocuments(opts: { cursor?: string | null; limit?: number } = {}): Promise<{ rows: Document[]; total: number; nextCursor: string | null }> {
+    return this.call('listUnverifiedDocuments', opts);
+  }
+
   async updateDocument(id: string, updates: Partial<Document>): Promise<void> {
     await this.call('updateDocument', { id, updates });
   }
@@ -83,8 +103,14 @@ export class RecordsStoreClient implements RecordsStore {
    *  browseDocuments for the server side. Never capped at 500: pass the
    *  previous response's `nextCursor` back in `filters.cursor` for the next
    *  page. */
-  async browseDocuments(filters: BrowseFilters): Promise<BrowseResponse> {
-    return this.call('browseDocuments', { filters });
+  async browseDocuments(filters: BrowseFilters, opts: { facets?: boolean } = {}): Promise<BrowseResponse> {
+    // R36: `facets: false` asks for the page only (no filter-chip counts); fetch those with browseFacets().
+    return this.call('browseDocuments', opts.facets === false ? { filters, facets: false } : { filters });
+  }
+
+  /** R36: just the facet counts for a filter set (one server pass, cached 60 s). Pairs with browseDocuments(…, {facets:false}). */
+  async browseFacets(filters: BrowseFilters): Promise<{ facets: BrowseFacet[]; cached: boolean }> {
+    return this.call('browseFacets', { filters });
   }
 
   // Facets
@@ -144,6 +170,11 @@ export class RecordsStoreClient implements RecordsStore {
 
   async listEntities(type?: string): Promise<Entity[]> {
     return this.call('listEntities', { type });
+  }
+
+  /** R36: entities by id (at most 500 per call), for documents the newest-500 window did not bring their customers / units with. */
+  async listEntitiesByIds(ids: string[]): Promise<Entity[]> {
+    return this.call('listEntitiesByIds', { ids });
   }
 
   async updateEntity(id: string, updates: Partial<Entity>): Promise<void> {

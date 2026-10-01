@@ -16,7 +16,7 @@
  *   update    { id, ...same fields as add } -> { ok }
  *   delete    { id }                        -> { ok }
  *   totals    { range?, from?, to? }        -> { range, grandTotalCents, byCategory, byMonth }
- *   receiptUploadUrl { filename, contentType } -> { receiptKey, uploadUrl }
+ *   receiptUploadUrl { filename, contentType, sizeBytes (required, R36) } -> { receiptKey, uploadUrl }
  *   receiptExtract   { receiptKey, contentType } -> { draft: {vendor, occurredOn, amountCents, category} }
  *   receiptViewUrl   { id }                -> { url, filename, expiresIn } (short-lived presigned GET; 404 if the row has no receipt)
  *   monthly   { year? }                     -> { year, yearTotalCents, yearCount, months:[{month,totalCents,count,topCategories,items}] } newest first
@@ -36,7 +36,7 @@ import { handleCors, handleError, getApiKey, MODEL_TIMEOUT_MS, withBackoff } fro
 import { limit as rateLimit } from '../rateLimit.js';
 import { TTLCache } from '../perf.js';
 import { isPlatformOperator } from '../missDigest.js';
-import { presign, getObject } from '../r2.js';
+import { presign, getObject, uploadExpirySeconds } from '../r2.js';
 import {
   EXPENSE_CATEGORIES,
   isValidExpenseCategory,
@@ -139,15 +139,35 @@ export function validateExpenseFields(body) {
 const RECEIPT_TYPES = /^(application\/pdf|image\/(jpeg|png|gif|webp))$/;
 const MAX_RECEIPT_BYTES = 24 * 1024 * 1024; // matches upload-url.js's MODEL_READ_TYPES ceiling
 
-async function handleReceiptUploadUrl(body) {
+// R36: same rule as every customer upload path (R35): the size is declared up front, validated, and signed into the URL so
+// storage refuses a body of any other length. The wording matches api/upload-url.js's SIZE_REQUIRED_MESSAGE.
+export const RECEIPT_SIZE_REQUIRED_MESSAGE =
+  "sizeBytes is required: send the file's exact size in bytes (a browser File's .size) so the upload can be checked and signed before it moves.";
+export const RECEIPT_SIZE_INVALID_MESSAGE = "sizeBytes must be the file's exact size as a positive whole number of bytes";
+
+/**
+ * Pure: the validated size of a receipt about to be uploaded. Throws ExpensesValidationError (400, or 413 when over the
+ * 24 MB ceiling the receipt reader enforces anyway - refused here, before any bytes move over a phone connection).
+ * @param {unknown} sizeBytes
+ */
+export function validateReceiptSize(sizeBytes) {
+  if (sizeBytes === undefined || sizeBytes === null) throw new ExpensesValidationError(RECEIPT_SIZE_REQUIRED_MESSAGE);
+  if (sizeBytes === 0) throw new ExpensesValidationError('This file is empty (0 bytes), so there is nothing to upload.');
+  if (typeof sizeBytes !== 'number' || !Number.isSafeInteger(sizeBytes) || sizeBytes < 0) throw new ExpensesValidationError(RECEIPT_SIZE_INVALID_MESSAGE);
+  if (sizeBytes > MAX_RECEIPT_BYTES) throw new ExpensesValidationError('Receipt is too large to read (24 MB limit)', 413);
+  return sizeBytes;
+}
+
+export async function handleReceiptUploadUrl(body) {
   const contentType = body?.contentType;
   if (typeof contentType !== 'string' || !RECEIPT_TYPES.test(contentType)) {
     throw new ExpensesValidationError('contentType must be a PDF or a photo (jpeg/png/gif/webp)');
   }
+  const sizeBytes = validateReceiptSize(body?.sizeBytes);
   const key = `platform/expenses/${crypto.randomUUID()}`;
   let uploadUrl;
   try {
-    uploadUrl = presign('PUT', key, 900);
+    uploadUrl = presign('PUT', key, uploadExpirySeconds(sizeBytes), {}, new Date(), { contentLength: sizeBytes });
   } catch (err) {
     const e = new ExpensesValidationError('File storage is not configured for this environment.', 503);
     e.cause = err;

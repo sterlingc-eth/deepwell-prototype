@@ -5,7 +5,7 @@ import { downloadExportCsv } from '../services/exportClient';
 import { AppShell } from '../components/AppShell';
 import { DocumentPreview } from '../components/DocumentPreview';
 import { KnowledgeGraph } from '../components/KnowledgeGraph';
-import { useGraph } from '../core/entityGraph';
+import { documentTotalFor, useGraph } from '../core/entityGraph';
 import { deleteDocuments } from '../services/documentClient';
 import { CustomersScreen } from './CustomersScreen';
 import { useAppStore } from '../store/appStore';
@@ -94,7 +94,9 @@ function DocumentsTab() {
     }
   };
 
-  const totalCount = Object.keys(docs).length;
+  // R36: the real number of documents in the shop (this confirmation says what a delete will remove, so it must not say "500").
+  const serverCounts = useGraph((s) => s.serverCounts);
+  const totalCount = documentTotalFor({ docs, serverCounts } as Parameters<typeof documentTotalFor>[0]);
 
   return (
     <div className="space-y-4">

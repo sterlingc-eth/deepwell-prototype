@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-export async function bootHarness({ migrations = true, loadFrom = null } = {}) {
+export async function bootHarness({ migrations = true, loadFrom = null, dataDir = null } = {}) {
   for (const k of ['STRIPE_SECRET_KEY', 'CLERK_SECRET_KEY', 'RESEND_API_KEY', 'ANTHROPIC_API_KEY', 'INNGEST_EVENT_KEY', 'INNGEST_SIGNING_KEY']) delete process.env[k];
   process.env.NEON_CONNECTION_STRING = 'postgres://fixture_user:fixture_pw@db.fixture.invalid:5432/fixture?sslmode=require&channel_binding=require';
   Object.assign(process.env, { R2_ACCOUNT_ID: 'acct123', R2_ACCESS_KEY_ID: 'AKIAFIXTURE', R2_SECRET_ACCESS_KEY: 'secretfixture', R2_BUCKET_NAME: 'fixture-bucket' });
@@ -23,8 +23,14 @@ export async function bootHarness({ migrations = true, loadFrom = null } = {}) {
   const contrib = {};
   for (const key of ['uuid_ossp', 'pgcrypto', 'pg_trgm', 'btree_gin']) contrib[key] = (await import(`@electric-sql/pglite/contrib/${key}`))[key];
   const loaded = loadFrom && fs.existsSync(loadFrom);
-  if (loaded) migrations = false;
-  const lite = new PGlite({ extensions: contrib, ...(loaded ? { loadDataDir: new Blob([fs.readFileSync(loadFrom)]) } : {}) });
+  // R36: `dataDir` keeps the database on disk (PGlite's Node filesystem), so a 50,000-document tenant is seeded once and
+  // re-opened by later runs. The old `loadFrom` snapshot had to hold the whole dump in memory several times over and was
+  // OOM-killed on a small machine. An existing directory is reused as it is (no migrations re-applied).
+  const persisted = Boolean(dataDir) && fs.existsSync(path.join(dataDir, 'PG_VERSION'));
+  if (loaded || persisted) migrations = false;
+  const lite = dataDir
+    ? new PGlite(dataDir, { extensions: contrib })
+    : new PGlite({ extensions: contrib, ...(loaded ? { loadDataDir: new Blob([fs.readFileSync(loadFrom)]) } : {}) });
   const cfgDir = path.join(ROOT, 'M3-config');
   const applied = [];
   const skipped = [];

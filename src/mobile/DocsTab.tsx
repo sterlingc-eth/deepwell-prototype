@@ -1,10 +1,15 @@
-import { memo, useEffect, useRef, useState } from 'react'
+import { memo, startTransition, useEffect, useRef, useState } from 'react'
 import { Loader2, RefreshCw, Search, SlidersHorizontal, X } from 'lucide-react'
 import type { SyncStatus } from '../hooks/usePostgresSync'
 import { useRecordsBrowse } from '../components/records/useRecordsBrowse'
 import { STAGE_BUCKET_LABEL, WARRANTY_BUCKET_LABEL, type BrowseFilters, type BrowseRow } from '../components/records/types'
 import { formatYmd } from '../core/answer'
 import { Sheet } from './Sheet'
+import { whenIdle } from './idle'
+
+/** Rows mounted when the tab opens (about one screen); the rest follow REVEAL_STEP rows per idle slot. */
+const FIRST_PAINT_ROWS = 8
+const REVEAL_STEP = 16
 
 /** documentName()'s priority (server display_name -> derived -> filename) —
  *  the row itself already carries `displayName` from the server, so this is
@@ -37,11 +42,14 @@ const DocRow = memo(function DocRow({ row: r, onOpen }: { row: BrowseRow; onOpen
  * client-side 500-doc cap: this reads straight from the server, page by
  * page, same as desktop.
  */
-export function DocsTab({
+export const DocsTab = memo(function DocsTab({
   syncStatus,
   onOpenDoc,
   onRefresh,
+  active = true,
 }: {
+  /** True while this is the visible tab. The rest of a long list only mounts once it is (see FIRST_PAINT_ROWS). */
+  active?: boolean
   syncStatus: SyncStatus
   onOpenDoc: (id: string) => void
   onRefresh: () => Promise<void>
@@ -52,6 +60,15 @@ export function DocsTab({
   const [draft, setDraft] = useState<BrowseFilters>(b.filters)
   const [refreshing, setRefreshing] = useState(false)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
+  // Un-hiding the tab styles and lays out every mounted row inside the tap, so a long list is mounted in steps:
+  // the first screen now, then REVEAL_STEP more per idle slot (never while the tab is hidden, where it'd just wait).
+  const [revealed, setRevealed] = useState(FIRST_PAINT_ROWS)
+  const rowCount = b.rows.length
+  const showAll = revealed >= rowCount
+  useEffect(() => {
+    if (!active || showAll) return
+    return whenIdle(() => setRevealed((n) => n + REVEAL_STEP), 500)
+  }, [active, showAll, revealed])
 
   useEffect(() => {
     const t = window.setTimeout(() => {
@@ -68,9 +85,10 @@ export function DocsTab({
     const io = new IntersectionObserver((entries) => { if (entries[0]?.isIntersecting) loadMore() }, { rootMargin: '600px' })
     io.observe(el)
     return () => io.disconnect()
-  }, [loadMore])
+  }, [loadMore, showAll])
 
-  const openSheet = () => { setDraft(b.filters); setSheetOpen(true) }
+  // A transition: the sheet's render is time-sliced instead of landing in the tap's own task.
+  const openSheet = () => startTransition(() => { setDraft(b.filters); setSheetOpen(true) })
   const applySheet = () => { b.patchFilters(draft); setSheetOpen(false) }
 
   const refresh = async () => {
@@ -87,17 +105,18 @@ export function DocsTab({
   // Group by customer (owner brief: "large rows showing name + customer +
   // date + status" — grouping keeps a multi-visit customer's documents
   // together without hiding the fields each row already shows).
+  const shownRows = showAll ? b.rows : b.rows.slice(0, revealed)
   const groups: { key: string; label: string; rows: BrowseRow[] }[] = []
   if (b.groupBy === 'customer') {
     const byKey = new Map<string, { key: string; label: string; rows: BrowseRow[] }>()
-    for (const r of b.rows) {
+    for (const r of shownRows) {
       const key = r.customerId ?? 'none'
       if (!byKey.has(key)) byKey.set(key, { key, label: r.customerName || 'No customer linked', rows: [] })
       byKey.get(key)!.rows.push(r)
     }
     groups.push(...byKey.values())
   } else {
-    groups.push({ key: 'all', label: '', rows: b.rows })
+    groups.push({ key: 'all', label: '', rows: shownRows })
   }
 
   return (
@@ -177,11 +196,11 @@ export function DocsTab({
                   </ul>
                 </div>
               ))}
-              <div ref={sentinelRef} />
+              {showAll && <div ref={sentinelRef} />}
               {b.loadingMore && (
                 <div className="flex justify-center py-3"><Loader2 className="w-5 h-5 animate-spin text-ink-3" /></div>
               )}
-              {!b.loadingMore && b.hasMore && (
+              {showAll && !b.loadingMore && b.hasMore && (
                 <button type="button" onClick={b.loadMore} className="mt-2 w-full min-h-touch rounded-xl bg-surface text-ink-2 font-semibold">
                   Show more
                 </button>
@@ -234,7 +253,7 @@ export function DocsTab({
       )}
     </div>
   )
-}
+})
 
 function Chip({ label, onClear }: { label: string; onClear: () => void }) {
   return (

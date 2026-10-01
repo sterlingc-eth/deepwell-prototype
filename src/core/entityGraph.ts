@@ -72,10 +72,44 @@ export interface GraphSnapshot {
    *  still out. Set synchronously before the first `await`, so there is no
    *  gap for a second call to slip through. */
   aiVerifying: Record<DocumentId, boolean>;
+  /**
+   * R36: shop-wide counts from the server. The graph itself only ever holds the newest 500 documents (plus the older
+   * needs-review ones usePostgresSync hydrates in the background, up to a cap), so any TOTAL a screen shows must come from
+   * here, never from `Object.keys(docs).length`. null until the first server answer (and in demo mode): callers fall back to
+   * counting the graph, which is exact for a small shop.
+   */
+  serverCounts?: ServerCounts | null;
+}
+
+/** R36: see GraphStore.serverCounts. */
+export interface ServerCounts {
+  /** Every document the shop has. */
+  documents: number;
+  verified: number;
+  /** Every document that is not verified (the server cannot see client-derived issues, so this is a superset of "Needs a person"). */
+  needsReview: number;
+  /** Raw database stage counts: received -> read -> mapped -> linked -> verified. */
+  byStage: { received: number; read: number; mapped: number; linked: number; verified: number };
+  /** Not-verified documents the graph does not hold (older than the loaded window, past the background load cap). 0 = all loaded. */
+  needsReviewNotLoaded: number;
+}
+
+/** R36: how many documents the shop has - the server's number when known, else what the graph holds. */
+export function documentTotalFor(g: GraphSnapshot & { serverCounts?: ServerCounts | null }): number {
+  const server = g.serverCounts?.documents;
+  return Math.max(typeof server === 'number' && Number.isFinite(server) ? server : 0, Object.keys(g.docs).length);
 }
 
 interface GraphActions {
   seed: (schema: DomainSchema, entities: Entity[], docs: Doc[], batches: Batch[], conflicts: Conflict[]) => void;
+  /** R36: record the server's shop-wide counts (see GraphStore.serverCounts). */
+  setServerCounts: (counts: ServerCounts | null) => void;
+  /**
+   * R36: add documents (and the entities they point at) to the graph in ONE update, leaving everything already there as it
+   * is (an already-loaded document is never replaced by an older copy). The bulk twin of upsertDoc, for hydrating the older
+   * needs-review documents the initial 500-document window missed.
+   */
+  mergeSynced: (docs: Doc[], entities: Entity[]) => void;
   /** Dismiss the banner shown for `lastError`. */
   clearLastError: () => void;
 
@@ -242,6 +276,42 @@ export const useGraph = create<GraphStore>((set, get) => ({
   conflicts: {},
   lastError: null,
   aiVerifying: {},
+  serverCounts: null,
+
+  setServerCounts: (counts) => set({ serverCounts: counts }),
+
+  mergeSynced: (docs, entities) =>
+    set((s) => {
+      const nextDocs = { ...s.docs };
+      const nextEntities = { ...s.entities };
+      const batches = { ...s.batches };
+      const batchIds = new Map<string, Set<string>>();
+      for (const e of entities) if (!nextEntities[e.id]) nextEntities[e.id] = e;
+      for (const doc of docs) {
+        if (nextDocs[doc.id]) continue;
+        nextDocs[doc.id] = recomputeIssues(doc, s.schema);
+        const existing = batches[doc.batchId];
+        if (!existing) {
+          batches[doc.batchId] = {
+            id: doc.batchId,
+            name: doc.batchId === 'synced' ? 'Ingested documents' : `Batch ${doc.batchId.slice(0, 8)}`,
+            source: doc.source,
+            dateRange: { from: doc.receivedAt, to: doc.receivedAt },
+            createdAt: doc.receivedAt,
+            createdBy: 'system',
+            documentIds: [],
+          };
+        }
+        let ids = batchIds.get(doc.batchId);
+        if (!ids) { ids = new Set(batches[doc.batchId]!.documentIds); batchIds.set(doc.batchId, ids); }
+        ids.add(doc.id);
+      }
+      for (const [bid, ids] of batchIds) {
+        const b = batches[bid]!;
+        batches[bid] = { ...b, documentIds: [...ids] };
+      }
+      return { docs: nextDocs, entities: nextEntities, batches };
+    }),
 
   seed: (schema, entities, docs, batches, conflicts) =>
     set({
@@ -591,6 +661,18 @@ export function docsLinkedTo(g: GraphSnapshot, entityId: EntityId): Doc[] {
 export function docCountsByStage(g: GraphSnapshot): Record<PipelineStage, number> {
   const counts: Record<PipelineStage, number> = { received: 0, classified: 0, extracted: 0, linked: 0, verified: 0 };
   for (const d of Object.values(g.docs)) counts[d.stage] += 1;
+  // R36: the graph holds the newest 500 documents (plus older needs-review ones). When the server's shop-wide counts are known,
+  // the documents the graph does NOT hold are added: older verified ones as verified, and (only if a shop has more older
+  // needs-review documents than the background load takes) the rest as 'classified', i.e. in progress. For a shop whose
+  // documents are all held this is exactly the old count. Counts never go below what the graph itself holds.
+  const sc = g.serverCounts;
+  if (sc && Number.isFinite(sc.documents) && Number.isFinite(sc.verified)) {
+    const held = Object.keys(g.docs).length;
+    const unheldVerified = Math.max(0, sc.verified - counts.verified);
+    const unheldOther = Math.max(0, sc.documents - held - unheldVerified);
+    counts.verified += unheldVerified;
+    counts.classified += unheldOther;
+  }
   return counts;
 }
 

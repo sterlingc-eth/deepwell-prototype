@@ -249,6 +249,7 @@ export function BillingScreen() {
               </>
             )}
 
+            {canAdmin && (
             <div className="flex flex-wrap gap-2 pt-1">
               {trialEligible && (
                 <button
@@ -267,9 +268,14 @@ export function BillingScreen() {
                 Manage billing
               </button>
             </div>
+            )}
           </section>
         )}
 
+        {/* R36: a member can't start, change or buy anything here (the server refuses it too), so they get the
+            plan + usage summary and the note above — not a wall of greyed-out Choose plan / Buy buttons. */}
+        {canAdmin && (
+        <>
         <section aria-labelledby="plans-heading" className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 id="plans-heading" className="text-h3">
@@ -316,7 +322,7 @@ export function BillingScreen() {
                   </ul>
                   <button
                     type="button"
-                    className={isCurrent ? 'dw-btn-secondary' : 'dw-btn-primary'}
+                    className={`${isCurrent ? 'dw-btn-secondary' : 'dw-btn-primary'} !px-2 whitespace-nowrap`}
                     disabled={busy !== null || isCurrent || !canAdmin}
                     title={adminTitle}
                     onClick={() => void runCheckout(`checkout:${planId}`, () => billingClient.checkout(planId, interval))}
@@ -330,8 +336,6 @@ export function BillingScreen() {
             })}
           </div>
         </section>
-
-        {!gated && <p className="text-caption text-ink-3">The owner account doesn&apos;t count toward logins.</p>}
 
         {!gated && <ApiAccessCard plan={status?.plan ?? null} onUpgrade={() => document.getElementById('plans-heading')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />}
 
@@ -372,6 +376,8 @@ export function BillingScreen() {
             Buy Records Rescue
           </button>
         </section>
+        </>
+        )}
       </div>
     </AppShell>
   );

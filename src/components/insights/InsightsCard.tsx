@@ -40,7 +40,10 @@ export function InsightsCard({ onAsk, onOpenInbox }: { onAsk: (question: string)
     void (async () => {
       try {
         const res = await fetchInsights(8);
-        if (!cancelled) setState({ status: 'ready', items: res.items });
+        if (cancelled) return;
+        setState({ status: 'ready', items: res.items });
+        // R36: open the top (highest-priority) insight so its items and action are one click away, not two.
+        setOpenId(res.items?.[0]?.id ?? null);
       } catch {
         if (!cancelled) setState({ status: 'error', items: [] });
       }

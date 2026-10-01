@@ -80,7 +80,7 @@ interface EditableFieldProps {
   value: string | null;
   placeholder: string;
   onSave: (value: string) => Promise<void>;
-  /** When set and there is a value, a small "Call"/"Email" link sits beside the click-to-edit text. */
+  /** When set and there is a value, a full-size "Call"/"Email" button (R36: was a 12px underlined link) sits beside the click-to-edit text. */
   actionHref?: (value: string) => string;
   actionLabel?: string;
 }
@@ -127,7 +127,7 @@ function EditableField({ label, value, placeholder, onSave, actionHref, actionLa
     return (
       <span className="inline-flex items-center gap-2">
         {edit}
-        <a href={actionHref(value)} className="text-caption font-medium underline underline-offset-2 text-ink-2 hover:text-ink" aria-label={`${actionLabel} ${value}`}>
+        <a href={actionHref(value)} className="dw-btn-secondary !min-h-[44px] !py-1 !px-3 text-body" aria-label={`${actionLabel} ${value}`}>
           {actionLabel}
         </a>
       </span>

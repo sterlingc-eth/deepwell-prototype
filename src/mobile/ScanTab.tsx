@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import { AlertTriangle, Camera, CheckCircle2, CloudOff, FileUp, Loader2, LogIn, Trash2 } from 'lucide-react'
 import { sha256Hex, waitForIngest, type IngestProgress, type IngestResult } from '../services/ingestClient'
 import { fetchDocumentIntakeSummaries, type DocumentIntakeSummary } from '../services/intakeClient'
@@ -69,7 +69,7 @@ function isImage(f: File) {
   return f.type.startsWith('image/') || /\.(jpe?g|png|heic|heif|webp|gif)$/i.test(f.name)
 }
 
-export function ScanTab({
+export const ScanTab = memo(function ScanTab({
   onUploaded,
   onOpenDocs,
   onOpenDoc,
@@ -615,4 +615,4 @@ export function ScanTab({
       )}
     </div>
   )
-}
+})

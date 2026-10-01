@@ -10,24 +10,7 @@ import { installPath, onInstallAvailabilityChange, promptInstall, type InstallPa
  * open even if it was dismissed before.
  */
 
-const DISMISS_KEY = 'deepwell.m.installGuide'
-const APP_URL = 'https://deepwelltechnology.com/m/'
-
-function forcedOpen(): boolean {
-  try {
-    return new URLSearchParams(window.location.search).get('install') === '1'
-  } catch {
-    return false
-  }
-}
-
-function wasDismissed(): boolean {
-  try {
-    return localStorage.getItem(DISMISS_KEY) === 'off'
-  } catch {
-    return false
-  }
-}
+import { APP_URL, DISMISS_KEY, forcedOpen, wasDismissed } from './installGuideState'
 
 function Step({ n, children }: { n: number; children: ReactNode }) {
   return (

@@ -14,7 +14,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { recordsStore } from '../services/recordsStoreClient';
+import { recordsStore, type ReviewSummary } from '../services/recordsStoreClient';
 import { reviewClient, isIntegrityFixDebounced, type DocumentLink, type Correction } from '../services/reviewClient';
 import { authHeader } from '../services/authToken';
 import { maxStageFor, recomputeIssues, useGraph } from '../core/entityGraph';
@@ -24,6 +24,7 @@ import { hvacSchema } from '../domains/hvac/schema';
 import { normalizeDocumentType } from '../domains/hvac/documentTypes';
 import type { Batch, Doc, DocCompleteness, Entity, FieldValue, FileType, PipelineStage } from '../core/types';
 import type { Entity as ApiEntity } from '../services/postgresRecordsStore';
+import type { ServerCounts } from '../core/entityGraph';
 
 export type SyncStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -443,7 +444,108 @@ let fullSyncCompleted = false;
 export function resetGraphForTenantSwitch(): void {
   fullSyncCompleted = false;
   linkSweepRanForTenant = null;
-  useGraph.setState({ entities: {}, docs: {}, batches: {}, conflicts: {} });
+  hydrateEpoch++; // abandon a background hydration that belongs to the tenant we just left
+  useGraph.setState({ entities: {}, docs: {}, batches: {}, conflicts: {}, serverCounts: null });
+}
+
+/**
+ * R36: the graph holds the newest 500 documents, so anything older that still needs a person was invisible in the Inbox
+ * badge and lists, and every total a screen derived from the graph said "500". Two fixes, both driven by the server:
+ *   1. shop-wide counts (`reviewSummary`: total, per stage, not-verified) are fetched on every sync and kept in the graph
+ *      store as `serverCounts`; docCountsByStage and documentTotalFor in entityGraph.ts add them to the graph counts, so every screen that shows a total picks them up.
+ *   2. every older not-verified document is paged in behind the first paint (`listUnverifiedDocuments`, 200 a page, exact
+ *      total) through the same row -> graph-document path as the first 500, up to HYDRATE_CAP, so the existing Inbox / Review /
+ *      Dashboard counts and lists include them without each screen changing. The 500 newest stay the "recent, interactive"
+ *      set; this adds only what needs attention. If a shop has more than HYDRATE_CAP older not-verified documents the rest are
+ *      reported in `serverCounts.needsReviewNotLoaded` (never silently dropped), and Records / Browse reaches any document.
+ */
+const HYDRATE_PAGE = 200;
+export const HYDRATE_CAP = 3000;
+let hydrateEpoch = 0;
+
+function serverCountsFrom(summary: ReviewSummary, notLoaded: number): ServerCounts {
+  return { documents: summary.total, verified: summary.verified, needsReview: summary.needsReview, byStage: summary.byStage, needsReviewNotLoaded: Math.max(0, notLoaded) };
+}
+
+/** Not-verified documents the graph holds right now ('verified' is only ever set from the database, never inferred). */
+function unverifiedHeld(): number {
+  let n = 0;
+  for (const d of Object.values(useGraph.getState().docs)) if (d.stage !== 'verified') n++;
+  return n;
+}
+
+/** Turns one page of document rows into graph documents (extractions, links, corrections, the entities they point at) and merges them in. */
+async function hydrateRows(rows: DocumentRow[]): Promise<void> {
+  const ids = rows.map((r) => r.id);
+  const byDoc = new Map<string, ExtractionRow[]>();
+  try {
+    for (const x of (await recordsStore.listExtractionsByDocuments(ids)) as unknown as ExtractionRow[]) {
+      const list = byDoc.get(x.document_id);
+      if (list) list.push(x); else byDoc.set(x.document_id, [x]);
+    }
+  } catch { /* fields are an enhancement, not a precondition */ }
+  const linksByDoc = new Map<string, DocumentLink[]>();
+  try {
+    for (const l of (await reviewClient.listLinks(ids)).links) {
+      const list = linksByDoc.get(l.document_id);
+      if (list) list.push(l); else linksByDoc.set(l.document_id, [l]);
+    }
+  } catch { /* manual links are an enhancement, not a precondition */ }
+  const correctionsByDoc = new Map<string, Correction[]>();
+  try {
+    for (const c of (await reviewClient.listCorrections(ids)).corrections) {
+      const list = correctionsByDoc.get(c.document_id);
+      if (list) list.push(c); else correctionsByDoc.set(c.document_id, [c]);
+    }
+  } catch { /* corrections are an enhancement, not a precondition */ }
+  const docs = rows.map((r) => toDoc(r, byDoc.get(r.id) ?? [], linksByDoc.get(r.id) ?? [], correctionsByDoc.get(r.id) ?? []));
+
+  // The customers / units these documents point at may be older than the newest 500 entities the sync loaded.
+  const have = useGraph.getState().entities;
+  const missing = [...new Set(docs.flatMap((d) => d.linkedEntityIds))].filter((id) => !have[id]);
+  const entities: Entity[] = [];
+  try {
+    for (let i = 0; i < missing.length; i += 500) entities.push(...(await recordsStore.listEntitiesByIds(missing.slice(i, i + 500))).map(toEntity));
+  } catch { /* a document with an entity we could not fetch still shows, just without that name */ }
+  useGraph.getState().mergeSynced(docs, entities);
+}
+
+/** Fetches the shop-wide counts, then pages in the older not-verified documents. Best-effort and abandoned if a newer sync / tenant switch starts. */
+async function syncServerCountsAndOlderNeedsReview(epoch: number, hydrate: boolean): Promise<void> {
+  let summary: ReviewSummary;
+  try {
+    summary = await recordsStore.reviewSummary();
+  } catch {
+    return; // the totals stay as the graph counts them (exact for a small shop)
+  }
+  if (epoch !== hydrateEpoch) return;
+  // A server (or a test double) that answers with anything but real counts must not put NaN on a screen.
+  const nums = [summary?.total, summary?.verified, summary?.needsReview, ...Object.values(summary?.byStage ?? {})];
+  if (!summary || !summary.byStage || nums.length < 3 || !nums.every((n) => typeof n === 'number' && Number.isFinite(n) && n >= 0)) return;
+  const publish = () => useGraph.getState().setServerCounts(serverCountsFrom(summary, summary.needsReview - unverifiedHeld()));
+  publish();
+  if (!hydrate) return; // the phone app takes the counts only (see usePostgresSync's linkSweep option)
+  let cursor: string | null = null;
+  let added = 0;
+  try {
+    while (summary.needsReview - unverifiedHeld() > 0 && added < HYDRATE_CAP) {
+      const page = await recordsStore.listUnverifiedDocuments({ cursor, limit: HYDRATE_PAGE });
+      if (epoch !== hydrateEpoch) return;
+      const held = useGraph.getState().docs;
+      const fresh = (page.rows as unknown as DocumentRow[]).filter((r) => !held[r.id]);
+      if (fresh.length) {
+        await hydrateRows(fresh);
+        if (epoch !== hydrateEpoch) return;
+        added += fresh.length;
+        publish();
+      }
+      cursor = page.nextCursor;
+      if (!cursor) break;
+    }
+  } catch {
+    /* best-effort: what loaded stays, and needsReviewNotLoaded says how many did not */
+  }
+  if (epoch === hydrateEpoch) publish();
 }
 
 /**
@@ -469,7 +571,7 @@ export function seedDocsPartial(rows: DocumentRow[]): void {
   }
 }
 
-export async function loadGraphFromServer(tenantKey = ''): Promise<{ isEmpty: boolean }> {
+export async function loadGraphFromServer(tenantKey = '', opts: { hydrateOlder?: boolean } = {}): Promise<{ isEmpty: boolean }> {
   await recordsStore.connect(tenantKey);
   const [docRows, entityRows] = await Promise.all([
     recordsStore.listDocuments() as unknown as Promise<DocumentRow[]>,
@@ -548,6 +650,9 @@ export async function loadGraphFromServer(tenantKey = ''): Promise<{ isEmpty: bo
   addAmbiguousNameLinkIssues(docs, entityRows, linksByDoc);
   useGraph.getState().seed(hvacSchema, entities, docs, buildBatches(docs), []);
   fullSyncCompleted = true;
+  // R36: shop-wide counts + the older not-verified documents, behind the first paint (see syncServerCountsAndOlderNeedsReview).
+  const epoch = ++hydrateEpoch;
+  void syncServerCountsAndOlderNeedsReview(epoch, opts.hydrateOlder !== false);
 
   return { isEmpty: docs.length === 0 && entities.length === 0 };
 }
@@ -625,7 +730,7 @@ export function usePostgresSync(enabled: boolean, tenantKey: string | null, opts
     const run = async () => {
       setState((s) => ({ status: 'loading', error: null, isEmpty: false, refresh: s.refresh }));
       try {
-        const { isEmpty } = await loadGraphFromServer(tenantKey ?? '');
+        const { isEmpty } = await loadGraphFromServer(tenantKey ?? '', { hydrateOlder: linkSweep });
         if (cancelled || requestId.current !== id) return;
         setState({ status: 'ready', error: null, isEmpty, refresh: run });
         if (!isEmpty && linkSweep) void runInboxLinkSweep(tenantKey ?? '');

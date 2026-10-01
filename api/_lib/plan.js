@@ -10,7 +10,7 @@
  * rules this file implements are written out in handoffs/BILLING_RULES.md;
  * keep the two in sync.
  */
-import { getTenantContext } from './recordsStore.js';
+import { getTenantContext, withTenant } from './recordsStore.js';
 import { TTLCache, memoAsync, logStage, registerTenantCache } from './perf.js';
 
 /** Per-plan entitlements, written to tenants.limits by billing_apply() on every
@@ -224,10 +224,63 @@ export function extraPagesFor(tenantRow) {
   return Number.isFinite(n) && n > 0 ? Math.min(Math.trunc(n), 10_000_000) : 0;
 }
 
-/** The monthly page cap that actually applies (plan allowance + any extra), or null when uncapped / no plan. */
+/**
+ * R36: pages bought through Records Rescue that have not been read yet. Carried on the billing row as
+ * `rescuePagesRemaining` (a number; loadRescueCredit computes it from the webhook ledger). 0 / absent / garbage = none.
+ */
+export function rescuePagesFor(tenantRow) {
+  const n = Number(tenantRow?.rescuePagesRemaining);
+  return Number.isFinite(n) && n > 0 ? Math.min(Math.trunc(n), 10_000_000) : 0;
+}
+
+/** The monthly page cap that actually applies (plan allowance + any owner extra + unused Records Rescue pages), or null when uncapped / no plan. */
 export function pageCapFor(tenantRow) {
   const base = PLAN_LIMITS[tenantRow?.plan]?.pagesPerMonth;
-  return base == null ? null : base + extraPagesFor(tenantRow);
+  return base == null ? null : base + extraPagesFor(tenantRow) + rescuePagesFor(tenantRow);
+}
+
+/**
+ * R36: the Records Rescue page credit of the CURRENT tenant (call inside withTenant / a store with `.raw`).
+ *
+ * Granted = sum of `rescuePages` over the tenant's webhook-ledger rows (api/_lib/billing.js recordAndApplyEvent writes one
+ * per paid checkout, keyed by the Stripe event id, so a replay cannot add twice). Used = the pages a past month read
+ * ABOVE that month's plan + extra allowance (the allowance is spent first; only the overflow draws on the credit), summed
+ * from the month of the first purchase up to, not including, this month. This month's overflow is simply headroom the
+ * credit provides: remaining = granted - used in earlier months, and the monthly cap is plan + extra + remaining.
+ * Past months use TODAY's plan allowance (a plan change shifts what earlier overflow counts as; documented, not tracked).
+ * Fails safe: any error means "no credit" (the plain plan cap applies) and is logged.
+ * @returns {Promise<{granted: number, used: number, remaining: number}>}
+ */
+export async function loadRescueCredit(db, tenantRow, now = new Date()) {
+  const none = { granted: 0, used: 0, remaining: 0 };
+  try {
+    const T = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
+    const g = await db.raw(
+      `SELECT COALESCE(SUM((payload->>'rescuePages')::bigint), 0)::bigint AS granted, MIN(received_at) AS first_at
+         FROM billing_events
+        WHERE ${T} AND payload ? 'rescuePages'`,
+      []
+    );
+    const granted = Number(g.rows[0]?.granted) || 0;
+    if (granted <= 0) return none;
+    const firstAt = g.rows[0]?.first_at ? new Date(g.rows[0].first_at) : now;
+    const firstMonth = new Date(Date.UTC(firstAt.getUTCFullYear(), firstAt.getUTCMonth(), 1)).toISOString();
+    const thisMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+    const monthlyAllowance = (PLAN_LIMITS[tenantRow?.plan]?.pagesPerMonth ?? 0) + extraPagesFor(tenantRow);
+    const u = await db.raw(
+      `SELECT COALESCE(SUM(GREATEST(n - $3::bigint, 0)), 0)::bigint AS used FROM (
+         SELECT count(*) AS n FROM document_pages
+          WHERE ${T} AND created_at >= $1::timestamptz AND created_at < $2::timestamptz
+          GROUP BY date_trunc('month', created_at AT TIME ZONE 'UTC')
+       ) m`,
+      [firstMonth, thisMonth, monthlyAllowance]
+    );
+    const used = Math.min(granted, Number(u.rows[0]?.used) || 0);
+    return { granted, used, remaining: Math.max(0, granted - used) };
+  } catch (err) {
+    console.error('rescue credit lookup failed (plain plan cap applies):', err?.message);
+    return none;
+  }
 }
 
 /** The stored-documents cap for the tenant's plan, or null when uncapped (Fleet) / no plan. */
@@ -378,7 +431,17 @@ registerTenantCache(billingRowCache);
 
 async function fetchBillingRow(ctx) {
   const t = await getTenantContext(ctx.tenantKey, ctx.tenantName ?? ctx.tenantKey);
-  return { plan: t.plan, billing_status: t.billingStatus, trial_ends_at: t.trialEndsAt, current_period_end: t.currentPeriodEnd, limits: t.limits ?? {} };
+  const row = { plan: t.plan, billing_status: t.billingStatus, trial_ends_at: t.trialEndsAt, current_period_end: t.currentPeriodEnd, limits: t.limits ?? {} };
+  // R36: unused Records Rescue pages raise this tenant's monthly cap. Only a tenant on a capped plan can use them, and the
+  // lookup is cached with the row (2 min), so this is one small query per tenant per cache window, not per upload.
+  if (PLAN_LIMITS[row.plan]) {
+    try {
+      row.rescuePagesRemaining = (await withTenant(ctx, (db) => loadRescueCredit(db, row))).remaining;
+    } catch (err) {
+      console.error('billing gate: rescue credit unavailable (plain plan cap applies):', err?.message);
+    }
+  }
+  return row;
 }
 
 /**

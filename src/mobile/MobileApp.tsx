@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { lazy, memo, startTransition, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { SignIn, useAuth, useOrganization, useUser } from '@clerk/clerk-react'
 import { FileText, Loader2, MessageCircle, Moon, ScanLine, Sun } from 'lucide-react'
 import { setAuthTokenProvider } from '../services/authToken'
@@ -10,10 +10,10 @@ import { Wordmark } from '../components/Wordmark'
 import { AskTab } from './AskTab'
 import { ScanTab } from './ScanTab'
 import { DocsTab } from './DocsTab'
-import { DocSheet } from './DocSheet'
-import { CustomerSheet } from './CustomerSheet'
+import { LazyCustomerSheet, LazyDocSheet, LazyInstallGuide } from './lazySheets'
+import { openSheet, schedulePrefetch } from './sheetLoader'
+import { whenIdle } from './idle'
 import { useKeyboardOpen } from './useKeyboardOpen'
-import { InstallGuide } from './InstallGuide'
 import { Sheet } from './Sheet'
 import { AccountMenu } from './AccountMenu'
 import { offlineQueue } from './offline/uploadQueue'
@@ -21,6 +21,13 @@ import { reconcileDeviceOwner } from './offline/deviceIsolation'
 import { SupportLauncherButton, SupportLoading } from '../components/support/SupportWidget'
 import { useLauncherPulse } from '../components/support/useLauncherPulse'
 import { SupportLogo } from '../components/support/SupportLogo'
+
+/** The Help launcher owns the pulse timers, so their on/off re-renders stay inside this button instead of the whole app (tabs included). */
+const HelpLauncher = memo(function HelpLauncher({ open, onOpen }: { open: boolean; onOpen: () => void }) {
+  const ref = useRef<HTMLButtonElement>(null)
+  const pulsing = useLauncherPulse(open, 8_000)
+  return <SupportLauncherButton buttonRef={ref} size={44} pulsing={pulsing} onClick={onOpen} className="shrink-0" />
+})
 
 // Loaded on first open of the Help sheet, so the phone's startup bundle doesn't carry the chat.
 const SupportAssistant = lazy(() => import('../components/support/SupportAssistant').then((m) => ({ default: m.SupportAssistant })))
@@ -100,27 +107,31 @@ export function MobileApp() {
   const setFieldMode = useAppStore((s) => s.setFieldMode)
 
   const [tab, setTabState] = useState<MobileTab>(initialTab)
-  const setTab = (t: MobileTab) => {
-    setTabState(t)
-    const url = new URL(window.location.href)
-    url.searchParams.set('tab', t)
-    window.history.replaceState(null, '', url)
-    try {
-      window.localStorage.setItem(LAST_TAB_KEY, t)
-    } catch {
-      /* best-effort only */
-    }
-  }
+  // Stable identity: the tabs are memoized, so a new function here would re-render all three on every shell state change.
+  const setTab = useCallback((t: MobileTab) => {
+    // A transition: the newly shown tab renders in its own (time-sliced) task, not on top of the tap's event handling.
+    startTransition(() => setTabState(t))
+    // Bookkeeping (URL + remembered tab) runs after the new tab has painted, not inside the tap's own task.
+    whenIdle(() => {
+      try {
+        const url = new URL(window.location.href)
+        url.searchParams.set('tab', t)
+        window.history.replaceState(null, '', url)
+        window.localStorage.setItem(LAST_TAB_KEY, t)
+      } catch {
+        /* best-effort only */
+      }
+    }, 400)
+  }, [])
   const [sheet, setSheet] = useState<{ kind: 'doc'; id: string; page?: number; quote?: string } | { kind: 'customer'; ref: string } | null>(null)
-  const openDoc = useCallback((id: string, page?: number, quote?: string) => setSheet({ kind: 'doc', id, page, quote }), [])
-  const openCustomer = useCallback((ref: string) => setSheet({ kind: 'customer', ref }), [])
+  const openDoc = useCallback((id: string, page?: number, quote?: string) => openSheet('doc', () => setSheet({ kind: 'doc', id, page, quote })), [])
+  const openCustomer = useCallback((ref: string) => openSheet('customer', () => setSheet({ kind: 'customer', ref })), [])
   const closeSheet = useCallback(() => setSheet(null), [])
   const keyboardOpen = useKeyboardOpen()
   // DeepWell Help: a header button (never a 4th tab, never over the tab bar or Scan) opening the chat in a Sheet.
   const [helpOpen, setHelpOpen] = useState(false)
   const [askPrefill, setAskPrefill] = useState<{ text: string; n: number } | null>(null)
-  const helpBtnRef = useRef<HTMLButtonElement>(null)
-  const helpPulse = useLauncherPulse(helpOpen, 8_000)
+  const openHelp = useCallback(() => setHelpOpen(true), [])
   const closeHelp = useCallback(() => setHelpOpen(false), [])
   // The Ask tab's "Open DeepWell Help" button (a how-to answer from the Help guide) opens this same sheet.
   useEffect(() => {
@@ -137,15 +148,10 @@ export function MobileApp() {
   const [graphWanted, setGraphWanted] = useState(false)
   useEffect(() => {
     if (!ready || graphWanted) return
-    const start = () => setGraphWanted(true)
-    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (h: number) => void }
-    if (w.requestIdleCallback) {
-      const h = w.requestIdleCallback(start, { timeout: 2500 })
-      return () => w.cancelIdleCallback?.(h)
-    }
-    const t = window.setTimeout(start, 1200)
-    return () => window.clearTimeout(t)
+    return whenIdle(() => setGraphWanted(true), 2500)
   }, [ready, graphWanted])
+  // Sheet code (document / customer / account) is fetched during idle time after the graph starts, never on the tap.
+  useEffect(() => (ready ? schedulePrefetch() : undefined), [ready])
   // Once wanted, stays wanted (graphWanted latches via the idle timer; the
   // tab/sheet triggers only ever add to it while visible, and the latch below
   // keeps the sync enabled after they leave).
@@ -153,6 +159,16 @@ export function MobileApp() {
   const [graphLatched, setGraphLatched] = useState(false)
   if (needGraphNow && !graphLatched) setGraphLatched(true)
   const sync = usePostgresSync(ready && (graphWanted || graphLatched), orgId ?? userId ?? null, { linkSweep: false })
+
+  // The sync object changes identity on every status flip; the tabs only need "refresh", so hand them a stable wrapper.
+  const syncRef = useRef(sync)
+  useEffect(() => {
+    syncRef.current = sync
+  })
+  const refreshSync = useCallback(() => syncRef.current.refresh(), [])
+  const onUploaded = useCallback(() => void syncRef.current.refresh(), [])
+  const openScan = useCallback(() => setTab('scan'), [setTab])
+  const openDocsTab = useCallback(() => setTab('docs'), [setTab])
 
   const [billing, setBilling] = useState<BillingStatus | null>(null)
   const [billingLoaded, setBillingLoaded] = useState(false)
@@ -181,7 +197,7 @@ export function MobileApp() {
     return (
       <div className="dw-m dw-safe-top min-h-screen bg-gradient-to-br from-[#163C2C] to-[#0F2818] flex flex-col items-center justify-center gap-6 p-4">
         <Wordmark size="lg" animated />
-        <InstallGuide />
+        <LazyInstallGuide />
         <div className="w-full max-w-md rounded-lg p-4 flex justify-center" style={{ background: '#F6F8F6' }}>
           <SignIn
             routing="hash"
@@ -237,7 +253,7 @@ export function MobileApp() {
             {organization?.name && (
               <span className="hidden min-[480px]:inline short:hidden text-caption text-ink-3 truncate max-w-[30vw] md:max-w-xs">{organization.name}</span>
             )}
-            <SupportLauncherButton buttonRef={helpBtnRef} size={44} pulsing={helpPulse} onClick={() => setHelpOpen(true)} className="shrink-0" />
+            <HelpLauncher open={helpOpen} onOpen={openHelp} />
             {/* Round 17 audit fix #1: reachable, 1-tap, persisted (same
                 setFieldMode/localStorage the desktop toggle uses) — the only
                 thing missing before was a button that calls it from here. */}
@@ -272,18 +288,18 @@ export function MobileApp() {
         {/* All three stay mounted so an upload keeps going and the Ask
             thread survives while the tech flips between tabs. */}
         <div className={tab === 'ask' ? 'h-full' : 'hidden'}>
-          <AskTab prefill={askPrefill} onOpenDoc={openDoc} onOpenCustomer={openCustomer} tenantKey={orgId ?? userId ?? null} emptyShop={sync.status === 'ready' && sync.isEmpty} onOpenScan={() => setTab('scan')} />
+          <AskTab prefill={askPrefill} onOpenDoc={openDoc} onOpenCustomer={openCustomer} tenantKey={orgId ?? userId ?? null} emptyShop={sync.status === 'ready' && sync.isEmpty} onOpenScan={openScan} />
         </div>
         <div className={tab === 'scan' ? 'h-full' : 'hidden'}>
           <ScanTab
             tenantKey={queueTenantKey}
-            onUploaded={() => void sync.refresh()}
-            onOpenDocs={() => setTab('docs')}
+            onUploaded={onUploaded}
+            onOpenDocs={openDocsTab}
             onOpenDoc={openDoc}
           />
         </div>
         <div className={tab === 'docs' ? 'h-full' : 'hidden'}>
-          <DocsTab syncStatus={sync.status} onOpenDoc={openDoc} onRefresh={() => sync.refresh()} />
+          <DocsTab active={tab === 'docs'} syncStatus={sync.status} onOpenDoc={openDoc} onRefresh={refreshSync} />
         </div>
       </main>
 
@@ -328,9 +344,9 @@ export function MobileApp() {
       )}
 
       {sheet?.kind === 'doc' && (
-        <DocSheet key={sheet.id} documentId={sheet.id} page={sheet.page} quote={sheet.quote} graphLoading={sync.status !== 'ready' && sync.status !== 'error'} onOpenCustomer={openCustomer} onClose={closeSheet} />
+        <LazyDocSheet key={sheet.id} documentId={sheet.id} page={sheet.page} quote={sheet.quote} graphLoading={sync.status !== 'ready' && sync.status !== 'error'} onOpenCustomer={openCustomer} onClose={closeSheet} />
       )}
-      {sheet?.kind === 'customer' && <CustomerSheet key={sheet.ref} customerRef={sheet.ref} onOpenDoc={openDoc} onClose={closeSheet} />}
+      {sheet?.kind === 'customer' && <LazyCustomerSheet key={sheet.ref} customerRef={sheet.ref} onOpenDoc={openDoc} onClose={closeSheet} />}
     </div>
   )
 }

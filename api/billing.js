@@ -14,7 +14,7 @@ import {
   needsBillingReconcile,
   reconcileTenantBilling,
 } from "./_lib/billing.js";
-import { clientLimits, planStateFor, loginCapForPlan } from "./_lib/plan.js";
+import { clientLimits, planStateFor, loginCapForPlan, loadRescueCredit, extraPagesFor } from "./_lib/plan.js";
 import { getSeatState, syncOrgMemberLimit, syncTenantAfterBilling, guardedInvite } from "./_lib/seats.js";
 import { getUsage, estimateCostUsd, getAsksThisMonth, resetsOnIso } from "./_lib/usage.js";
 import { limit as rateLimit } from "./_lib/rateLimit.js";
@@ -174,6 +174,9 @@ async function computeStatus(auth) {
     // Monthly ask count — feeds only the hidden Donovan safety ceiling (plan.js DONOVAN_SAFETY); there is no
     // per-plan allowance any more. See usage.js's getAsksThisMonth for why this reads rate_limit_windows.
     const asksThisMonth = await getAsksThisMonth(store);
+    // R36: pages bought through Records Rescue that are still unread (granted by the Stripe webhook, see plan.js
+    // loadRescueCredit), and the owner-set monthly extra, so the Billing screen can show the real allowance.
+    const rescue = tenantRow?.plan ? await loadRescueCredit(store, tenantRow) : { granted: 0, used: 0, remaining: 0 };
 
     // Owner ask (2026-09-20): "make sure we're not wasting money asking
     // questions" — a per-tenant monthly AI-cost estimate on the Billing
@@ -208,7 +211,7 @@ async function computeStatus(auth) {
       // aiCostEstimateUsd: last-30-days estimate, NOT a bill — see
       // usage.js's estimateCostUsd doc comment for what it blends and why.
       // resetsOn: ISO date of next month's 1st UTC (page-allowance reset).
-      usage: { documentsStored, pagesThisMonth, asksThisMonth, aiCostEstimateUsd, resetsOn: resetsOnIso() },
+      usage: { documentsStored, pagesThisMonth, asksThisMonth, aiCostEstimateUsd, resetsOn: resetsOnIso(), rescuePagesRemaining: rescue.remaining, rescuePagesPurchased: rescue.granted, extraPagesPerMonth: extraPagesFor(tenantRow) },
     };
   });
   return { result, row: billingRow };

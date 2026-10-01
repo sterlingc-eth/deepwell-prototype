@@ -40,10 +40,12 @@ async function checkUploadGateInner(auth) {
   // — which must be fresh on every call, never cached, since the whole point
   // of the gate is catching the moment a tenant crosses its cap — still need
   // a real per-request round trip.
-  const billingRowPromise = getCachedBillingRow(ctx);
+  // R36: awaited BEFORE the transaction opens (it used to run beside it). A cache miss now also reads the tenant's Records
+  // Rescue credit through its own connection; with the pool at 3 connections, holding one here while waiting for another could
+  // deadlock three concurrent uploads on a cold cache. On a cache hit (almost always) this costs nothing.
+  const billingRow = await getCachedBillingRow(ctx);
   return withTenant(ctx, async (db) => {
-    const [billingRow, documentsStored, pagesThisMonth, pendingPages] = await Promise.all([
-      billingRowPromise,
+    const [documentsStored, pagesThisMonth, pendingPages] = await Promise.all([
       db.countDocuments(),
       db.countPagesSince(new Date(Date.now() - MS_PER_MONTH).toISOString()),
       // R30 M6: pages of documents already accepted but not read yet (fails safe to 0 if the probe errors).

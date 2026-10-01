@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ArrowRight, Check, ChevronDown, ChevronRight, ClipboardList, Copy, FileText, Loader2, Mail, ShieldCheck, Upload, User, X } from 'lucide-react';
+import { ArrowRight, Check, ChevronDown, ChevronRight, ClipboardList, Copy, Loader2, Mail, Upload, User, X } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { DataHealthStrip } from '../components/DataHealthStrip';
 import { FinancialsCard } from '../components/FinancialsCard';
 import { InsightsCard } from '../components/insights/InsightsCard';
 import { WarrantyStatusBadge, warrantyStatus, type AlertTier } from '../components/WarrantyStatusBadge';
-import { docCountsByStage, entitiesOfType, useGraph } from '../core/entityGraph';
+import { entitiesOfType, useGraph } from '../core/entityGraph';
 import { dateOf, formatYmd, normalize, str } from '../core/answer';
 import type { Entity } from '../core/types';
 import { deepLinkFor } from '../hooks/useDeepLink';
@@ -167,7 +167,6 @@ export function DashboardScreen() {
   const [noWarrantyCollapsed, toggleNoWarranty] = useCollapsed('no-warranty', false);
 
   const now = new Date();
-  const counts = docCountsByStage(graph);
   const total = Object.values(graph.docs).length;
 
   const units = useMemo(() => entitiesOfType(graph, 'equipment'), [graph]);
@@ -332,10 +331,6 @@ export function DashboardScreen() {
     if (!db) return -1;
     return da.getTime() - db.getTime();
   });
-  const upcoming = byExpiry.filter((e) => {
-    const d = dateOf(e, 'warrantyExpiry');
-    return !!d && d >= now;
-  });
   const atRisk = units
     .map((e) => {
       const info = warrantyStatus(dateOf(e, 'warrantyExpiry'), now);
@@ -423,10 +418,10 @@ export function DashboardScreen() {
           </button>
         </header>
 
-        <DataHealthStrip />
-        {/* Kept near the top, always expanded — the one section the owner
-            asked to never bury (R17 UX audit fix #12). */}
+        {/* Kept at the top, always expanded — the one section the owner asked to never bury (R17 UX audit
+            fix #12). R36: it used to sit under ~550px of Data health tiles, i.e. below the fold at 1280x800. */}
         {!DEMO_MODE && <InsightsCard onAsk={askQuestion} onOpenInbox={() => { setCurrentScreen('ingest'); setInboxTab('needs-person'); }} />}
+        <DataHealthStrip />
         {!DEMO_MODE && (
           <section aria-labelledby="financials-heading" className="space-y-3">
             <SectionHeader id="financials" title="Financials" collapsed={financialsCollapsed} onToggle={toggleFinancials} />
@@ -675,22 +670,6 @@ export function DashboardScreen() {
             )}
           </section>
         )}
-
-        <section aria-label="Overview" className="grid grid-cols-2 gap-3">
-          {[
-            { label: 'Documents', value: total, sub: `${counts.verified} checked`, Icon: FileText, onClick: () => setCurrentScreen('browse') },
-            { label: 'Units on record', value: units.length, sub: `${upcoming.length} under warranty`, Icon: ShieldCheck, onClick: () => askQuestion('Which units are out of warranty?') },
-          ].map(({ label, value, sub, Icon, onClick }) => (
-            <button key={label} type="button" onClick={onClick} className="dw-card p-4 text-left hover:shadow-lift transition-shadow duration-quick">
-              <div className="flex items-start justify-between">
-                <p className="text-caption text-ink-3">{label}</p>
-                <Icon className="w-4 h-4 text-ink-3" aria-hidden="true" />
-              </div>
-              <p className="font-display text-h1 mt-1">{value}</p>
-              <p className="text-body text-ink-3">{sub}</p>
-            </button>
-          ))}
-        </section>
 
         <section aria-labelledby="expiry-heading" className="space-y-3">
           <SectionHeader

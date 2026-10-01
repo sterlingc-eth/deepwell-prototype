@@ -10,6 +10,7 @@ import { deleteShopData, downloadTenantExportJson } from '../services/exportClie
 import { memberDisplayName } from '../core/memberNames';
 import { FollowupsCard } from '../components/FollowupsCard';
 import { PhoneAppCard } from '../components/PhoneAppCard';
+import { DataExportButtons } from '../components/records/DataExportButtons';
 import { reviewClient, type StaffAccessLogEntry, type SupportAccessGrant } from '../services/reviewClient';
 
 /**
@@ -202,6 +203,8 @@ function AccountSettingsCard({ tenantId, shopName }: { tenantId: string | null; 
               {exporting ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Download className="w-4 h-4" aria-hidden="true" />} Download data export (JSON)
             </button>
             {exportError && <p role="alert" className="text-body text-warn-ink dark:text-brass-200">{exportError}</p>}
+            <p className="text-caption text-ink-3">Or as spreadsheets:</p>
+            <DataExportButtons />
           </div>
 
           {/* R25: self-serve deletion (promised on /security). Typed confirmation here; the server
@@ -442,7 +445,7 @@ export function SupportAccessCard() {
  * Round 26: the seat-guarded invite form. Disabled at/over the plan's login cap with an upgrade message; the
  * server (api/_lib/seats.js guardedInvite) re-checks live, so a stale count here can never over-invite.
  */
-function InviteForm({ seats, onInvited, onUpgrade }: { seats: SeatStatus; onInvited: () => void; onUpgrade: () => void }) {
+function InviteForm({ seats, onInvited }: { seats: SeatStatus; onInvited: () => void }) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<'member' | 'admin'>('member');
   const [busy, setBusy] = useState(false);
@@ -480,7 +483,7 @@ function InviteForm({ seats, onInvited, onUpgrade }: { seats: SeatStatus; onInvi
             value={email}
             disabled={blocked}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="tech@yourshop.com"
+            placeholder="name@company.com"
           />
         </label>
         <label className="block">
@@ -495,12 +498,6 @@ function InviteForm({ seats, onInvited, onUpgrade }: { seats: SeatStatus; onInvi
           Send invite
         </button>
       </div>
-      {blocked && (
-        <p className="text-caption text-warn-ink dark:text-brass-200">
-          Your plan&apos;s login limit is reached — upgrade to invite more people.{' '}
-          <button type="button" onClick={onUpgrade} className="underline font-medium">Go to Billing</button>
-        </p>
-      )}
       {message && (
         <p role={message.ok ? 'status' : 'alert'} className={message.ok ? 'text-caption text-ink-2' : 'text-caption text-bad-ink'}>
           {message.text}
@@ -569,25 +566,6 @@ export function TeamScreen() {
           </span>
         </div>
 
-        <PhoneAppCard />
-
-        {admin && <FollowupsCard />}
-
-        {/* Round 17 (U2 top fix #3): Team used to carry 7 stacked cards —
-            Donovan misses/learning and Search by meaning moved to their own
-            "Donovan" destination (account row, admin-only — see
-            AppShell.tsx/DonovanScreen.tsx: answer quality isn't a people/seats
-            concern), and Possible duplicate customers folded into the
-            Customers tab (CustomersScreen.tsx: it already had a related,
-            tighter duplicate check right there). Team now keeps only what is
-            actually about the team: the phone-app install card, follow-ups,
-            and — below — invites/seats/roles. Settings (notifications +
-            data export) stays here too, in its own separated, collapsed
-            section, until it has a Billing/Settings home this pass doesn't
-            own (see AccountSettingsCard's file comment). */}
-        {admin && <AccountSettingsCard tenantId={organization?.name ? (orgId ?? null) : null} shopName={organization?.name ?? ''} />}
-        {admin && <SupportAccessCard />}
-
         {admin && seats.atCap && (
           <div role="alert" className="dw-card border-warn/40 px-4 py-3 text-warn-ink dark:text-brass-200 flex items-center justify-between gap-3 flex-wrap">
             <span>
@@ -603,20 +581,40 @@ export function TeamScreen() {
 
         {admin ? (
           <>
+            {/* R36: inviting is the one job of this screen for an admin, so the form leads (it used to sit below the
+                phone-app card and three collapsed sections). The seat-limit notice above it says everything the old
+                in-form hint and the "Your plan includes…" sentence repeated. */}
+            <InviteForm seats={seats} onInvited={() => { refreshSeats(); void organization?.reload(); }} />
             <p className="text-caption text-ink-3">
               Invites are sent by email: anyone who accepts lands in this shop with the role you pick. To change a role,
               remove someone or cancel an invitation, use the <strong className="text-ink-2">Members</strong> and{' '}
-              <strong className="text-ink-2">Invitations</strong> tabs of the panel below the form. Your plan includes{' '}
-              {seats.cap == null ? '11 or more' : `up to ${seats.cap}`} logins (the owner doesn&apos;t count; extra admins
-              and pending invites do).
+              <strong className="text-ink-2">Invitations</strong> tabs of the panel at the bottom of this page.
             </p>
-            <InviteForm seats={seats} onInvited={() => { refreshSeats(); void organization?.reload(); }} onUpgrade={() => setCurrentScreen('billing')} />
+            <PhoneAppCard />
+            <FollowupsCard />
+        {/* Round 17 (U2 top fix #3): Team used to carry 7 stacked cards —
+            Donovan misses/learning and Search by meaning moved to their own
+            "Donovan" destination (account row, admin-only — see
+            AppShell.tsx/DonovanScreen.tsx: answer quality isn't a people/seats
+            concern), and Possible duplicate customers folded into the
+            Customers tab (CustomersScreen.tsx: it already had a related,
+            tighter duplicate check right there). Team now keeps only what is
+            actually about the team: the phone-app install card, follow-ups,
+            and — below — invites/seats/roles. Settings (notifications +
+            data export) stays here too, in its own separated, collapsed
+            section, until it has a Billing/Settings home this pass doesn't
+            own (see AccountSettingsCard's file comment). */}
+        <AccountSettingsCard tenantId={organization?.name ? (orgId ?? null) : null} shopName={organization?.name ?? ''} />
+        <SupportAccessCard />
+
             <div className="dw-card p-1 sm:p-3 overflow-hidden" data-testid="team-clerk-panel">
               <OrganizationProfile appearance={clerkAppearance} />
             </div>
           </>
         ) : (
-          <div className="dw-card p-4">
+          <>
+            <PhoneAppCard />
+            <div className="dw-card p-4">
             <p className="text-body text-ink-2 mb-1">Members of {organization?.name ?? 'this shop'}:</p>
             <p className="text-caption text-ink-3 mb-3" data-testid="team-member-help">
               Only a shop admin can invite people, change roles or remove someone. Ask an admin.
@@ -630,7 +628,8 @@ export function TeamScreen() {
               ))}
             </ul>
             {!memberships?.data?.length && <p className="text-caption text-ink-3">No members yet.</p>}
-          </div>
+            </div>
+          </>
         )}
       </div>
     </AppShell>

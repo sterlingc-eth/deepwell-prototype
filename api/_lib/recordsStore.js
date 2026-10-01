@@ -471,13 +471,42 @@ export function decodeBrowseCursor(cursor, filtersKey) {
 }
 
 /**
+ * R36: keyset cursor for the default (newest-first) sort. Offset paging made page N cost N rows; this resumes from
+ * (created_at, id) of the last row served. `k` is [created_at as full-precision text, id], `t` the total counted when the
+ * browse started (so a "load more" never recounts). Falls back to "no keyset" (null) on anything malformed or minted for a
+ * different filters/sort combination, exactly like decodeBrowseCursor.
+ */
+export function encodeBrowseKeysetCursor(createdAtText, id, filtersKey, total) {
+  return Buffer.from(JSON.stringify({ k: [createdAtText, id], f: filtersKey, t: total }), 'utf8').toString('base64url');
+}
+const KEYSET_TS_RE = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(\.\d{1,6})?([+-]\d{2}(:?\d{2})?|Z)?$/;
+const KEYSET_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export function decodeBrowseKeysetCursor(cursor, filtersKey) {
+  if (typeof cursor !== 'string' || !cursor) return null;
+  try {
+    const obj = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8'));
+    if (obj?.f !== filtersKey || !Array.isArray(obj.k) || obj.k.length !== 2) return null;
+    const [ts, id] = obj.k;
+    if (typeof ts !== 'string' || !KEYSET_TS_RE.test(ts) || typeof id !== 'string' || !KEYSET_ID_RE.test(id)) return null;
+    const t = Number.isInteger(obj.t) && obj.t >= 0 ? obj.t : null;
+    return { ts, id, total: t };
+  } catch {
+    return null;
+  }
+}
+
+/** Filter dimensions that read only `documents` columns (so a page and its total can be answered from `documents` alone,
+ *  with no per-document joins). Everything else needs the linked customer / extracted fields / financials. */
+const BROWSE_DOC_LOCAL_DIMS = new Set(['documentType', 'stageBucket', 'uploadedByMe', 'uploadDateFrom', 'uploadDateTo', 'q']);
+
+/**
  * One WHERE fragment, keyed by the filter dimension it came from so a facet
  * count for that SAME dimension can be computed with every filter EXCEPT it
  * (so picking "Invoice" never makes "Invoice" disappear from the Type
  * facet's own options). `template` uses `??` placeholders, filled in order
  * from `values` — see renderBrowseFragments.
  */
-function buildBrowseFragments(f, hasDisplayName, hasFinancials, hasAudienceColumn) {
+function buildBrowseFragments(f, hasDisplayName, hasFinancials, hasAudienceColumn, searchFn = false) {
   const frags = [];
   const add = (dim, template, ...values) => frags.push({ dim, template, values });
 
@@ -502,18 +531,49 @@ function buildBrowseFragments(f, hasDisplayName, hasFinancials, hasAudienceColum
   if (f.uploadDateFrom) add('uploadDateFrom', 'd.created_at::date >= ??::date', f.uploadDateFrom);
   if (f.uploadDateTo) add('uploadDateTo', 'd.created_at::date <= ??::date', f.uploadDateTo);
   if (f.q) {
+    // R36: search is a CANDIDATE set (document ids) built from index-friendly arms and then joined, instead of an OR of
+    // ILIKEs over the per-document aggregates (which forced every document's customer / fields to be computed before a
+    // single row could be tested: 7.5 s at 50,000 documents). Arms, each tenant-scoped:
+    //   1. the file name / display name (trigram indexes, M3-config/41 + 42)
+    //   2. a linked customer's name or address, a linked unit's address or manufacturer (trigram expression indexes,
+    //      M3-config/64 - the query is correct without them, only slower)
+    //   3. the technician an extraction read off the document (extractions_tenant_value_trgm_idx, M3-config/17)
+    //   4. words in the page text (document_pages_tenant_tsv_idx, M3-config/17)
+    // A document linked to two customers now matches on either (the old test only looked at one of them).
     const like = `%${f.q}%`;
-    // d.display_name only when M3-config/41 has been pasted (see hasDisplayName) —
-    // referencing a column that doesn't exist yet would 42703 the whole query,
-    // not just quietly skip it.
-    add(
-      'q',
-      `(d.original_filename ILIKE ?? ${hasDisplayName ? 'OR d.display_name ILIKE ??' : ''} OR linked.customer_name ILIKE ??
-         OR linked.site_address ILIKE ?? OR fields.technician_name ILIKE ?? OR linked.brand ILIKE ??
-         OR EXISTS (SELECT 1 FROM document_pages dp WHERE dp.document_id = d.id AND ${TENANT.replace('tenant_id', 'dp.tenant_id')}
-                      AND dp.tsv @@ websearch_to_tsquery('english', ??)))`,
-      like, ...(hasDisplayName ? [like] : []), like, like, like, like, f.q
-    );
+    const T = (alias) => TENANT.replace('tenant_id', `${alias}.tenant_id`);
+    const arms = [];
+    const vals = [];
+    arms.push(`SELECT x.id FROM documents x WHERE ${T('x')} AND (x.original_filename ILIKE ??${hasDisplayName ? ' OR x.display_name ILIKE ??' : ''})`);
+    vals.push(like, ...(hasDisplayName ? [like] : []));
+    arms.push(`SELECT del.document_id AS id FROM entities e JOIN document_entity_links del ON del.entity_id = e.id AND ${T('del')}
+        WHERE ${T('e')} AND e.merged_into IS NULL
+          AND (e.data->>'customer_name' ILIKE ?? OR e.data->>'service_address' ILIKE ?? OR e.data->>'manufacturer' ILIKE ??)`);
+    vals.push(like, like, like);
+    arms.push(`SELECT x.document_id AS id FROM extractions x WHERE ${T('x')} AND x.field_key = 'technician' AND x.value ILIKE ??`);
+    vals.push(like);
+    arms.push(`SELECT x.document_id AS id FROM document_pages x WHERE ${T('x')} AND x.tsv @@ websearch_to_tsquery('english', ??)`);
+    vals.push(f.q);
+    // R36 (RLS): the app's database role is subject to row-level security, and Postgres will not push an operator that is
+    // not "leakproof" (ILIKE, tsvector @@) into an index scan under a row-security policy: the same arms ran as sequential
+    // scans of documents / entities / document_pages. M3-config/64 therefore also installs records_search_candidates(), a
+    // SECURITY DEFINER function that runs these four arms with an explicit tenant predicate (so the indexes are usable).
+    // Used when it exists; the inline arms above are the fallback, and the "walk" form below needs neither.
+    const T2 = (alias) => TENANT.replace('tenant_id', `${alias}.tenant_id`);
+    const walk = {
+      template: `(d.original_filename ILIKE ??${hasDisplayName ? ' OR d.display_name ILIKE ??' : ''}
+        OR EXISTS (SELECT 1 FROM document_entity_links wl JOIN entities we ON we.id = wl.entity_id AND ${T2('we')} AND we.merged_into IS NULL
+                    WHERE wl.document_id = d.id AND ${T2('wl')}
+                      AND (we.data->>'customer_name' ILIKE ?? OR we.data->>'service_address' ILIKE ?? OR we.data->>'manufacturer' ILIKE ??))
+        OR EXISTS (SELECT 1 FROM extractions wx WHERE wx.document_id = d.id AND ${T2('wx')} AND wx.field_key = 'technician' AND wx.value ILIKE ??)
+        OR EXISTS (SELECT 1 FROM document_pages wp WHERE wp.document_id = d.id AND ${T2('wp')} AND wp.tsv @@ websearch_to_tsquery('english', ??)))`,
+      values: [like, ...(hasDisplayName ? [like] : []), like, like, like, like, f.q],
+    };
+    if (searchFn && hasDisplayName) {
+      frags.push({ dim: 'q', template: 'SELECT c.id FROM records_search_candidates(??, ??) AS c(id)', values: [like, f.q], candidate: true, walk });
+    } else {
+      frags.push({ dim: 'q', template: arms.join('\n        UNION\n        '), values: vals, candidate: true, walk });
+    }
   }
   return frags;
 }
@@ -522,26 +582,86 @@ function buildBrowseFragments(f, hasDisplayName, hasFinancials, hasAudienceColum
  *  count is being computed for) into one WHERE-safe SQL string plus its OWN
  *  freshly-numbered params array — `baseParams` (today/today+90d, always)
  *  come first so $1/$2 stay stable across every query variant. */
-function renderBrowseFragments(fragments, baseParams) {
+function renderBrowseFragments(fragments, baseParams, { walk = false } = {}) {
   const params = [...baseParams];
+  let candidateSql = null;
   const clauses = fragments.map((f) => {
     let i = 0;
-    return f.template.replace(/\?\?/g, () => {
-      params.push(f.values[i++]);
+    const useWalk = walk && f.candidate && f.walk;
+    const vals = useWalk ? f.walk.values : f.values;
+    const rendered = (useWalk ? f.walk.template : f.template).replace(/\?\?/g, () => {
+      params.push(vals[i++]);
       return `$${params.length}`;
     });
+    if (useWalk) return rendered; // the search as a per-document test (no candidate set): see browsePageSelect's `window`
+    if (!f.candidate) return rendered;
+    // R36: the search candidate set is its own MATERIALIZED CTE (`cand`) so the other CTEs can be restricted to it.
+    candidateSql = rendered;
+    return 'd.id IN (SELECT id FROM cand)';
   });
-  return { sql: clauses.length ? clauses.join(' AND ') : 'TRUE', params };
+  return { sql: clauses.length ? clauses.join(' AND ') : 'TRUE', params, clauses, candidateSql };
+}
+
+/** The columns of one browse row (the `base` of every browse query). Shared by the CTE form (sharedBrowseCtes) and the
+ *  per-page form (browsePageSelect) so the two can never drift apart. */
+function browseBaseColumns(hasDisplayName, hasFinancials, hasAudienceColumn) {
+  return `d.id, d.original_filename,
+             ${hasDisplayName ? 'd.display_name' : 'NULL::text AS display_name'},
+             d.document_type, d.stage, d.created_at, d.created_at::text AS created_at_raw, d.verified_by, d.uploaded_by,
+             linked.customer_id, linked.customer_name, linked.site_address, linked.brand, linked.warranty_expiry,
+             fields.service_date, fields.technician_name,
+             (${AUDIENCE_EXPR(hasAudienceColumn)}) AS audience,
+             ${hasFinancials
+               ? "df.total AS amount, df.balance_due, df.status AS money_status, (df.id IS NOT NULL) AS has_money,"
+               : 'NULL::numeric AS amount, NULL::numeric AS balance_due, NULL::text AS money_status, FALSE AS has_money,'}
+             (${STAGE_BUCKET_CASE}) AS stage_bucket,
+             (${WARRANTY_BUCKET_CASE}) AS warranty_bucket`;
+}
+
+/** The two per-document sub-selects, correlated on `d` (LATERAL) - the per-page form computes them only for the rows
+ *  of the page it is about to return. Same output columns as the grouped `linked` / `fields` CTEs. */
+function browseLateralJoins(hasAudienceColumn) {
+  return `LEFT JOIN LATERAL (
+        SELECT MAX(CASE WHEN e.entity_type = 'customer' THEN e.id::text END) AS customer_id,
+               MAX(CASE WHEN e.entity_type = 'customer' THEN e.data->>'customer_name' END) AS customer_name,
+               COALESCE(
+                 MAX(CASE WHEN e.entity_type = 'customer' THEN e.data->>'service_address' END),
+                 MAX(CASE WHEN e.entity_type = 'equipment' THEN e.data->>'service_address' END)
+               ) AS site_address,
+               MAX(CASE WHEN e.entity_type = 'equipment' THEN e.data->>'manufacturer' END) AS brand,
+               MAX(CASE WHEN e.entity_type = 'equipment' THEN e.data->'warranty'->>'expires' END) AS warranty_expiry
+          FROM document_entity_links del
+          JOIN entities e ON e.id = del.entity_id AND ${TENANT.replace('tenant_id', 'e.tenant_id')} AND e.merged_into IS NULL
+         WHERE del.document_id = d.id AND ${TENANT.replace('tenant_id', 'del.tenant_id')}
+      ) linked ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT MAX(value) FILTER (WHERE field_key = 'service_date') AS service_date,
+               MAX(value) FILTER (WHERE field_key = 'technician') AS technician_name,
+               ${hasAudienceColumn
+                 ? 'NULL::text AS audience_fallback'
+                 : `MAX(value) FILTER (WHERE field_key = '${AUDIENCE_FALLBACK_FIELD_KEY}') AS audience_fallback`}
+          FROM (
+            SELECT DISTINCT ON (field_key) field_key, value
+              FROM extractions
+             WHERE ${TENANT} AND document_id = d.id AND field_key IN ('service_date', 'technician'${hasAudienceColumn ? '' : `, '${AUDIENCE_FALLBACK_FIELD_KEY}'`})
+             ORDER BY field_key, confidence DESC NULLS LAST, id
+          ) best
+      ) fields ON TRUE`;
 }
 
 /** The shared CTEs every browse query (list + every facet) is built on top
  *  of. `hasDisplayName`: M3-config/41 (owned by G3) may not be pasted yet —
  *  same "detect once" contract as documentsHaveUpdatedAt. `wherePart` is the
  *  already-rendered fragment SQL (see renderBrowseFragments) for THIS
- *  particular query (full set for the list, N-1 for a facet count). */
-function sharedBrowseCtes(hasDisplayName, hasFinancials, wherePart, hasAudienceColumn) {
+ *  particular query (full set for the list, N-1 for a facet count).
+ *  R36: `candidateSql` (a search) becomes the first CTE, and the two grouped CTEs are restricted to it, so a search no
+ *  longer aggregates every document in the shop before filtering. `materialize` forces `base` to be computed once when
+ *  several statements below read it (facets). */
+function sharedBrowseCtes(hasDisplayName, hasFinancials, wherePart, hasAudienceColumn, { candidateSql = null, extraColumns = '', materialize = false } = {}) {
+  const inCand = (col) => (candidateSql ? `AND ${col} IN (SELECT id FROM cand)` : '');
   return `
-    WITH linked AS (
+    WITH ${candidateSql ? `cand AS MATERIALIZED (${candidateSql}),` : ''}
+    linked AS (
       SELECT del.document_id,
              MAX(CASE WHEN e.entity_type = 'customer' THEN e.id::text END) AS customer_id,
              MAX(CASE WHEN e.entity_type = 'customer' THEN e.data->>'customer_name' END) AS customer_name,
@@ -553,7 +673,7 @@ function sharedBrowseCtes(hasDisplayName, hasFinancials, wherePart, hasAudienceC
              MAX(CASE WHEN e.entity_type = 'equipment' THEN e.data->'warranty'->>'expires' END) AS warranty_expiry
         FROM document_entity_links del
         JOIN entities e ON e.id = del.entity_id AND ${TENANT.replace('tenant_id', 'e.tenant_id')} AND e.merged_into IS NULL
-       WHERE ${TENANT.replace('tenant_id', 'del.tenant_id')}
+       WHERE ${TENANT.replace('tenant_id', 'del.tenant_id')} ${inCand('del.document_id')}
        GROUP BY del.document_id
     ),
     fields AS (
@@ -566,29 +686,219 @@ function sharedBrowseCtes(hasDisplayName, hasFinancials, wherePart, hasAudienceC
         FROM (
           SELECT DISTINCT ON (document_id, field_key) document_id, field_key, value
             FROM extractions
-           WHERE ${TENANT} AND field_key IN ('service_date', 'technician'${hasAudienceColumn ? '' : `, '${AUDIENCE_FALLBACK_FIELD_KEY}'`})
+           WHERE ${TENANT} AND field_key IN ('service_date', 'technician'${hasAudienceColumn ? '' : `, '${AUDIENCE_FALLBACK_FIELD_KEY}'`}) ${inCand('document_id')}
            ORDER BY document_id, field_key, confidence DESC NULLS LAST, id
         ) best
        GROUP BY document_id
     ),
-    base AS (
-      SELECT d.id, d.original_filename,
-             ${hasDisplayName ? 'd.display_name' : 'NULL::text AS display_name'},
-             d.document_type, d.stage, d.created_at, d.verified_by, d.uploaded_by,
-             linked.customer_id, linked.customer_name, linked.site_address, linked.brand, linked.warranty_expiry,
-             fields.service_date, fields.technician_name,
-             (${AUDIENCE_EXPR(hasAudienceColumn)}) AS audience,
-             ${hasFinancials
-               ? "df.total AS amount, df.balance_due, df.status AS money_status, (df.id IS NOT NULL) AS has_money,"
-               : 'NULL::numeric AS amount, NULL::numeric AS balance_due, NULL::text AS money_status, FALSE AS has_money,'}
-             (${STAGE_BUCKET_CASE}) AS stage_bucket,
-             (${WARRANTY_BUCKET_CASE}) AS warranty_bucket
+    base AS ${materialize ? 'MATERIALIZED ' : ''}(
+      SELECT ${browseBaseColumns(hasDisplayName, hasFinancials, hasAudienceColumn)}${extraColumns}
         FROM documents d
         LEFT JOIN linked ON linked.document_id = d.id
         LEFT JOIN fields ON fields.document_id = d.id
         ${hasFinancials ? `LEFT JOIN document_financials df ON df.document_id = d.id AND ${TENANT.replace('tenant_id', 'df.tenant_id')}` : ''}
        WHERE ${TENANT.replace('tenant_id', 'd.tenant_id')} AND ${wherePart}
     )`;
+}
+
+/** R36: the per-page form of a browse list for the newest-first sort. Walks `documents` in (created_at, id) order and
+ *  computes the customer / field sub-selects only for rows it actually tests, stopping at `limit`. Fragments are the same
+ *  ones the CTE form uses (they reference d.*, linked.*, fields.*, df.*). */
+function browsePageSelect(hasDisplayName, hasFinancials, wherePart, hasAudienceColumn, { candidateSql = null, keysetSql = '', windowSize = 0, windowKeysetSql = '', limit, offset = 0 }) {
+  return `
+    WITH ${candidateSql ? `cand AS MATERIALIZED (${candidateSql})` : 'noop AS (SELECT 1)'}
+    SELECT ${browseBaseColumns(hasDisplayName, hasFinancials, hasAudienceColumn)}
+      FROM ${windowSize
+        ? `(SELECT * FROM documents dw WHERE ${TENANT.replace('tenant_id', 'dw.tenant_id')} ${windowKeysetSql} ORDER BY dw.created_at DESC, dw.id DESC LIMIT ${windowSize}) d`
+        : 'documents d'}
+      ${browseLateralJoins(hasAudienceColumn)}
+      ${hasFinancials ? `LEFT JOIN document_financials df ON df.document_id = d.id AND ${TENANT.replace('tenant_id', 'df.tenant_id')}` : ''}
+     WHERE ${TENANT.replace('tenant_id', 'd.tenant_id')} AND ${wherePart} ${windowSize ? '' : keysetSql}
+     ORDER BY d.created_at DESC, d.id DESC
+     OFFSET ${offset} LIMIT ${limit}`;
+}
+
+
+/* ----------------------------------------------------------------------------------------------------------------------
+ * R36: browse helpers (module level so browseDocuments and browseFacets share one context builder).
+ * -------------------------------------------------------------------------------------------------------------------- */
+
+/** Facet cache: tenant uuid + filters key + caller -> facets, 60 s. Only browseFacets (the dedicated action) reads it. */
+const browseFacetCache = new TTLCache(60_000, 400);
+export function _resetBrowseFacetCache() { browseFacetCache.map.clear(); }
+
+/** Is M3-config/64's records_search_candidates() installed AND callable by this role (a missing grant must not break search)? A yes is remembered; a no is re-checked each minute, so pasting the SQL takes effect without a restart. */
+let searchFnState = { ok: false, at: 0 };
+export function _resetSearchFnProbe() { searchFnState = { ok: false, at: 0 }; }
+async function searchFunctionExists(db) {
+  if (searchFnState.ok) return true;
+  if (Date.now() - searchFnState.at < 60_000) return false;
+  try {
+    const r = await db.query(`SELECT (to_regprocedure('records_search_candidates(text,text)') IS NOT NULL AND has_function_privilege('records_search_candidates(text,text)', 'EXECUTE')) AS ok`);
+    searchFnState = { ok: Boolean(r.rows[0]?.ok), at: Date.now() };
+  } catch {
+    searchFnState = { ok: false, at: Date.now() };
+  }
+  return searchFnState.ok;
+}
+
+/** Newest documents the dense-search probe tests before falling back to the candidate set. */
+const SEARCH_WALK_WINDOW = 1000;
+
+/** Normalises the caller's filters and runs the once-per-process schema probes every browse query needs. */
+async function browseContext(db, rawFilters, currentUserId) {
+  const f = normalizeBrowseFilters(rawFilters);
+  f.currentUserId = f.uploadedByMe ? currentUserId : null;
+  const hasDisplayName = await documentsHaveDisplayName(db);
+  // financialsTableExists expects a store-shaped object with `.raw` (that is how api/_lib/financials/store.js's own callers
+  // use it, via makeStore) - this function receives the low-level driver, which only has `.query`, so adapt it.
+  const hasFinancials = await financialsTableExists({ raw: (sql, params) => db.query(sql, params) });
+  // Round 18, part 2 (owner ask (a)): same "detect once" contract, for the audience chip.
+  const hasAudienceColumn = await documentsHaveAudience({ query: (sql, params) => db.query(sql, params) });
+  const today = new Date().toISOString().slice(0, 10);
+  const baseParams = [today, isoPlusDays(today, 90)];
+  const filtersKey = browseFiltersKey(f);
+  const searchFn = f.q ? await searchFunctionExists(db) : false;
+  const allFrags = buildBrowseFragments(f, hasDisplayName, hasFinancials, hasAudienceColumn, searchFn);
+  return { f, hasDisplayName, hasFinancials, hasAudienceColumn, baseParams, filtersKey, allFrags };
+}
+
+/** How many documents match the fragments. Only `documents` is touched when every active filter is a documents column
+ *  (or the search); otherwise the joined form is needed to evaluate the customer / field / money filters. */
+async function countBrowseMatches(db, ctxB, frags) {
+  const { hasDisplayName, hasFinancials, hasAudienceColumn, baseParams } = ctxB;
+  const docLocal = (x) => BROWSE_DOC_LOCAL_DIMS.has(x.dim) || (x.dim === 'audience' && hasAudienceColumn);
+  const { sql: wherePart, params, candidateSql } = renderBrowseFragments(frags, baseParams);
+  if (frags.every(docLocal)) {
+    const r = await db.query(
+      `${candidateSql ? `WITH cand AS MATERIALIZED (${candidateSql})` : ''}
+       SELECT count(*)::int AS n FROM documents d WHERE ${TENANT.replace('tenant_id', 'd.tenant_id')} AND ${wherePart}
+          AND $1::text IS NOT NULL AND $2::text IS NOT NULL`, // $1/$2 (today, +90d) are always bound; this just gives them a type
+
+      params
+    );
+    return r.rows[0]?.n ?? 0;
+  }
+  const r = await db.query(
+    `${sharedBrowseCtes(hasDisplayName, hasFinancials, wherePart, hasAudienceColumn, { candidateSql })} SELECT count(*)::int AS n FROM base`,
+    params
+  );
+  return r.rows[0]?.n ?? 0;
+}
+
+const FACET_ENUMERATED = [
+  ['documentType', 'document_type', 'document_type', 'document_type IS NOT NULL', 30],
+  ['stageBucket', 'stage_bucket', 'stage_bucket', 'TRUE', 10],
+  ['warrantyBucket', 'warranty_bucket', 'warranty_bucket', 'TRUE', 10],
+  ['audience', 'audience', 'audience', 'TRUE', 2],
+  ['site', 'site_address', 'site_address', 'site_address IS NOT NULL', 20],
+  ['technician', 'technician_name', 'technician_name', 'technician_name IS NOT NULL', 20],
+  ['brand', 'brand', 'brand', 'brand IS NOT NULL', 20],
+];
+
+/**
+ * Every facet in ONE pass. `base` is computed once (MATERIALIZED) for the set the search restricts to, each active filter
+ * becomes a boolean column, and each facet then counts the rows where every OTHER filter's flag holds (so picking an
+ * option never removes its siblings - the same rule as before). Before: ten statements, each re-building `base`.
+ * Returns the same `[{key, options}] / [{key, trueCount}]` list, in the same order, as the old per-facet code.
+ */
+async function runBrowseFacets(db, ctxB, currentUserId) {
+  const { hasDisplayName, hasFinancials, hasAudienceColumn, baseParams, allFrags } = ctxB;
+  const { params, clauses, candidateSql } = renderBrowseFragments(allFrags, baseParams);
+  // The search restricts `base` itself (cand), so its clause is never a per-facet flag.
+  const flagged = allFrags
+    .map((frag, i) => ({ dim: frag.dim, clause: clauses[i] }))
+    .filter((x) => x.dim !== 'q');
+  const flagCols = flagged.map((x, i) => `(${x.clause}) AS ok_${i}`).join(', ');
+  const okExcept = (dim) => {
+    const parts = flagged.map((x, i) => (x.dim === dim ? null : `ok_${i}`)).filter(Boolean);
+    return parts.length ? parts.join(' AND ') : 'TRUE';
+  };
+  const wantMine = Boolean(currentUserId);
+  const mineIdx = params.length + 1;
+  const arms = [];
+  for (const [dim, valueCol, labelCol, having, cap] of FACET_ENUMERATED) {
+    arms.push(`(SELECT '${dim}'::text AS dim, ${valueCol}::text AS value, ${labelCol}::text AS label, count(*)::int AS n FROM base
+       WHERE ${okExcept(dim)} AND ${having} GROUP BY ${valueCol}, ${labelCol} ORDER BY n DESC, label ASC LIMIT ${cap})`);
+  }
+  arms.push(`(SELECT 'customerId'::text, customer_id::text, customer_name::text, count(*)::int AS n FROM base
+       WHERE ${okExcept('customerId')} AND customer_id IS NOT NULL GROUP BY customer_id, customer_name ORDER BY n DESC, customer_name ASC LIMIT 20)`);
+  arms.push(`(SELECT 'hasMoney'::text, NULL::text, NULL::text, count(*) FILTER (WHERE ${hasFinancials ? 'has_money' : 'FALSE'})::int FROM base WHERE ${okExcept('hasMoney')})`);
+  arms.push(`(SELECT 'openBalance'::text, NULL::text, NULL::text, count(*) FILTER (WHERE ${hasFinancials ? '(COALESCE(balance_due, 0) > 0)' : 'FALSE'})::int FROM base WHERE ${okExcept('openBalance')})`);
+  if (wantMine) {
+    arms.push(`(SELECT 'uploadedByMe'::text, NULL::text, NULL::text, count(*) FILTER (WHERE uploaded_by = $${mineIdx})::int FROM base WHERE ${okExcept('uploadedByMe')})`);
+    params.push(currentUserId);
+  }
+  // `base` carries no per-filter WHERE here (the flags do that job per facet); only the search restricts it.
+  const sql = `${sharedBrowseCtes(hasDisplayName, hasFinancials, candidateSql ? 'd.id IN (SELECT id FROM cand)' : 'TRUE', hasAudienceColumn, {
+    candidateSql,
+    extraColumns: flagCols ? `, ${flagCols}` : '',
+    materialize: true,
+  })}
+    ${arms.join('\n    UNION ALL\n    ')}`;
+  const { rows } = await db.query(sql, params);
+  const byDim = new Map();
+  for (const r of rows) {
+    const list = byDim.get(r.dim);
+    if (list) list.push(r); else byDim.set(r.dim, [r]);
+  }
+  const out = [];
+  for (const [dim] of FACET_ENUMERATED) {
+    out.push({
+      key: dim,
+      options: (byDim.get(dim) ?? [])
+        .filter((r) => r.value !== null && r.value !== '')
+        .map((r) => ({ value: String(r.value), label: r.label != null ? String(r.label) : String(r.value), count: Number(r.n) })),
+    });
+  }
+  out.push({
+    key: 'customerId',
+    options: (byDim.get('customerId') ?? [])
+      .filter((r) => r.value !== null && r.value !== '')
+      .map((r) => ({ value: String(r.value), label: r.label != null ? String(r.label) : String(r.value), count: Number(r.n) })),
+  });
+  out.push({ key: 'hasMoney', trueCount: Number(byDim.get('hasMoney')?.[0]?.n ?? 0) });
+  out.push({ key: 'openBalance', trueCount: Number(byDim.get('openBalance')?.[0]?.n ?? 0) });
+  if (wantMine) out.push({ key: 'uploadedByMe', trueCount: Number(byDim.get('uploadedByMe')?.[0]?.n ?? 0) });
+  return out;
+}
+
+/** Shapes a browse page (rows straight from SQL) into the wire response. */
+function browseResult(rows, { total, hasMore, nextCursor, facets, sort, limit }) {
+  return {
+    rows: rows.map((r) => ({
+      id: r.id,
+      filename: r.original_filename,
+      displayName: r.display_name ?? null,
+      documentType: r.document_type,
+      stage: r.stage,
+      stageBucket: r.stage_bucket,
+      verifiedBy: r.verified_by,
+      uploadedBy: r.uploaded_by,
+      createdAt: r.created_at ? new Date(r.created_at).toISOString() : null,
+      serviceDate: r.service_date ?? null,
+      customerId: r.customer_id,
+      customerName: r.customer_name,
+      siteAddress: r.site_address,
+      technician: r.technician_name,
+      brand: r.brand,
+      warrantyExpiry: r.warranty_expiry,
+      warrantyBucket: r.warranty_bucket,
+      amount: r.amount != null ? Number(r.amount) : null,
+      balanceDue: r.balance_due != null ? Number(r.balance_due) : null,
+      moneyStatus: r.money_status,
+      hasMoney: r.has_money,
+      // Round 18, part 2 (owner ask (a)): drives the "Team only" badge (src/components/records/RecordsBrowser.tsx) -
+      // always 'customer' or 'internal', never null (AUDIENCE_EXPR's own COALESCE).
+      audience: r.audience === 'internal' ? 'internal' : 'customer',
+    })),
+    total,
+    hasMore,
+    nextCursor,
+    facets,
+    sort,
+    limit,
+  };
 }
 
 /**
@@ -1492,6 +1802,59 @@ function makeStore(db, tenantId) {
     },
 
     /**
+     * R36: accurate totals for the whole shop, not for the newest-500 window the client graph loads. One pass over
+     * `documents` (index-only on (tenant_id, stage) once M3-config/40 is pasted): the headline counts the Inbox badge,
+     * the Intake pipeline strip and the "delete everything" confirmation need. `needsReview` is every document that is not
+     * verified (the superset of the client's "Needs a person"; the client narrows it with the issues it can compute from
+     * extractions, which is why those documents are also fetched, below).
+     * @returns {Promise<{total: number, byStage: Record<string, number>, needsReview: number, verified: number}>}
+     */
+    reviewSummary: async () => {
+      const r = await one(
+        `SELECT count(*)::int AS total,
+                count(*) FILTER (WHERE stage = 'received')::int AS received,
+                count(*) FILTER (WHERE stage = 'read')::int AS read,
+                count(*) FILTER (WHERE stage = 'mapped')::int AS mapped,
+                count(*) FILTER (WHERE stage = 'linked')::int AS linked,
+                count(*) FILTER (WHERE stage = 'verified')::int AS verified
+           FROM documents WHERE ${TENANT}`,
+        []
+      );
+      const byStage = { received: r?.received ?? 0, read: r?.read ?? 0, mapped: r?.mapped ?? 0, linked: r?.linked ?? 0, verified: r?.verified ?? 0 };
+      const total = r?.total ?? 0;
+      return { total, byStage, needsReview: total - byStage.verified, verified: byStage.verified };
+    },
+
+    /**
+     * R36: the needs-review list, paged. Every document that is not verified, newest first, `limit` (max 200) per page,
+     * resumed by an opaque keyset cursor (created_at, id), with the exact `total` (counted on the first page, carried in the
+     * cursor after that). Rows are the plain `documents` rows listDocuments returns, so the client turns them into graph
+     * documents exactly as it does for the newest 500. The "newest 500" cap is why a needs-review document older than that
+     * was invisible; this has no cap.
+     * @param {{cursor?: string|null, limit?: number}} [opts]
+     */
+    listUnverifiedDocuments: async ({ cursor = null, limit = 200 } = {}) => {
+      const n = Number.isFinite(Number(limit)) && Number(limit) >= 1 ? Math.min(Math.trunc(Number(limit)), 200) : 200;
+      const key = decodeBrowseKeysetCursor(cursor, 'unverified');
+      const vals = [];
+      let keysetSql = '';
+      if (key) { vals.push(key.ts, key.id); keysetSql = 'AND (created_at, id) < ($1::timestamptz, $2::uuid)'; }
+      const rows = await many(
+        `SELECT *, created_at::text AS _created_at_raw FROM documents
+          WHERE ${TENANT} AND stage <> 'verified' ${keysetSql}
+          ORDER BY created_at DESC, id DESC LIMIT ${n + 1}`,
+        vals
+      );
+      const more = rows.length > n;
+      const page = more ? rows.slice(0, n) : rows;
+      let total = key?.total ?? null;
+      if (total == null) total = (await one(`SELECT count(*)::int AS n FROM documents WHERE ${TENANT} AND stage <> 'verified'`, []))?.n ?? 0;
+      const last = page[page.length - 1];
+      const nextCursor = more && last ? encodeBrowseKeysetCursor(last._created_at_raw, last.id, 'unverified', total) : null;
+      return { rows: page.map(({ _created_at_raw, ...row }) => row), total, nextCursor };
+    },
+
+    /**
      * Records Browse (round 12 contract) — the paginated, filtered, faceted,
      * sortable, searchable replacement for the records screen's old "every
      * doc, capped at 500" list. See the big doc comment above TENANT (search
@@ -1507,154 +1870,113 @@ function makeStore(db, tenantId) {
      * counted with every OTHER active filter applied but never its own, so
      * picking a facet option never removes it (or its siblings) from view.
      */
-    /** @param {Record<string, unknown>} [rawFilters] @param {{currentUserId?: string|null}} [opts] */
-    browseDocuments: async (rawFilters = {}, { currentUserId = null } = {}) => {
-      const f = normalizeBrowseFilters(rawFilters);
-      f.currentUserId = f.uploadedByMe ? currentUserId : null;
-      const hasDisplayName = await documentsHaveDisplayName(db);
-      // financialsTableExists expects a store-shaped object with `.raw`
-      // (that's how api/_lib/financials/store.js's own callers use it, via
-      // the makeStore() return value below) — this function receives the
-      // low-level driver instead, which only has `.query`, so adapt it.
-      const hasFinancials = await financialsTableExists({ raw: (sql, params) => db.query(sql, params) });
-      // Round 18, part 2 (owner ask (a)): same "detect once" contract, for the audience chip.
-      const hasAudienceColumn = await documentsHaveAudience({ query: (sql, params) => db.query(sql, params) });
-
-      const today = new Date().toISOString().slice(0, 10);
-      const baseParams = [today, isoPlusDays(today, 90)];
-      const filtersKey = browseFiltersKey(f);
-      const offset = decodeBrowseCursor(f.cursor, filtersKey);
-      const allFrags = buildBrowseFragments(f, hasDisplayName, hasFinancials, hasAudienceColumn);
-
-      // `buildSelect(nextIndex)` returns the SELECT SQL text; `nextIndex` is
-      // where ITS OWN extra params (if any) start — after baseParams and every
-      // rendered fragment's own bound values — so nothing here ever falls
-      // back to string-interpolating a value into SQL text (the exact thing
-      // scripts/verify-records-browse.mjs's injection checks are for).
-      const runFiltered = (fragsSubset, buildSelect, extraParams = []) => {
-        const { sql: wherePart, params } = renderBrowseFragments(fragsSubset, baseParams);
-        const selectSql = buildSelect(params.length + 1);
-        return db.query(`${sharedBrowseCtes(hasDisplayName, hasFinancials, wherePart, hasAudienceColumn)}\n${selectSql}`, [...params, ...extraParams]);
-      };
-
-      const sortDef = BROWSE_SORTS[f.sort] ?? BROWSE_SORTS[DEFAULT_BROWSE_SORT];
+    /** @param {Record<string, unknown>} [rawFilters] @param {{currentUserId?: string|null, facets?: 'inline'|'none'}} [opts] */
+    browseDocuments: async (rawFilters = {}, { currentUserId = null, facets: facetMode = 'inline' } = {}) => {
+      const ctxB = await browseContext(db, rawFilters, currentUserId);
+      const { f, hasDisplayName, hasFinancials, hasAudienceColumn, baseParams, filtersKey, allFrags } = ctxB;
       const limit = f.limit;
-      const listPromise = runFiltered(
-        allFrags,
-        () => `SELECT *, count(*) OVER() AS total_matching FROM base
+      const sortDef = BROWSE_SORTS[f.sort] ?? BROWSE_SORTS[DEFAULT_BROWSE_SORT];
+      const wantFacets = facetMode === 'inline';
+      const facetsPromiseFor = (offset) => (wantFacets && offset === 0 ? runBrowseFacets(db, ctxB, currentUserId) : Promise.resolve([]));
+
+      // ---- R36 fast path: newest-first, answered page by page from `documents` -----------------------------------------
+      // The default sort needs no per-document aggregates to ORDER, so the page is taken from documents in index order
+      // and only those rows get their customer / fields looked up (a 50,000-document shop: first page ~2 s -> tens of ms).
+      // A "load more" resumes from a keyset (created_at, id) instead of OFFSET, and carries the total it already counted.
+      if (f.sort === 'upload-date') {
+        const keyset = decodeBrowseKeysetCursor(f.cursor, filtersKey);
+        const offset = keyset ? 0 : decodeBrowseCursor(f.cursor, filtersKey);
+        const { sql: wherePart, params, candidateSql } = renderBrowseFragments(allFrags, baseParams);
+        let keysetSql = '';
+        let windowKeysetSql = '';
+        const pageParams = [...params];
+        if (keyset) {
+          pageParams.push(keyset.ts, keyset.id);
+          keysetSql = `AND (d.created_at, d.id) < ($${pageParams.length - 1}::timestamptz, $${pageParams.length}::uuid)`;
+        }
+        // A search that matches a lot (a common word) is best answered by walking the newest documents and testing each,
+        // which stops after one page; a rare one by the indexed candidate set. Probe the newest SEARCH_WALK_WINDOW documents
+        // with the per-document test: if they fill the page the term is dense and that IS the answer, otherwise use the set.
+        let pageResult = null;
+        if (f.q && !offset) {
+          const w = renderBrowseFragments(allFrags, baseParams, { walk: true });
+          const walkParams = [...w.params];
+          if (keyset) {
+            walkParams.push(keyset.ts, keyset.id);
+            windowKeysetSql = `AND (dw.created_at, dw.id) < ($${walkParams.length - 1}::timestamptz, $${walkParams.length}::uuid)`;
+          }
+          const probe = await db.query(
+            browsePageSelect(hasDisplayName, hasFinancials, w.sql, hasAudienceColumn, { windowSize: SEARCH_WALK_WINDOW, windowKeysetSql, limit: limit + 1 }),
+            walkParams
+          );
+          if (probe.rows.length > limit) pageResult = probe;
+        }
+        // +1 row tells us whether another page exists without counting.
+        if (!pageResult) {
+          pageResult = await db.query(
+            browsePageSelect(hasDisplayName, hasFinancials, wherePart, hasAudienceColumn, { candidateSql, keysetSql, limit: limit + 1, offset }),
+            pageParams
+          );
+        }
+        const hasMoreRows = pageResult.rows.length > limit;
+        const rows = hasMoreRows ? pageResult.rows.slice(0, limit) : pageResult.rows;
+
+        let total;
+        if (keyset && keyset.total != null) total = keyset.total;
+        else if (!hasMoreRows && offset === 0 && !keyset) total = rows.length; // the whole answer fit on one page
+        else total = await countBrowseMatches(db, ctxB, allFrags);
+
+        const facets = await facetsPromiseFor(keyset ? 1 : offset);
+        const last = rows[rows.length - 1];
+        return browseResult(rows, {
+          total: Math.max(total, (keyset ? 0 : offset) + rows.length),
+          hasMore: hasMoreRows,
+          nextCursor: hasMoreRows && last ? encodeBrowseKeysetCursor(last.created_at_raw, last.id, filtersKey, total) : null,
+          facets, sort: f.sort, limit,
+        });
+      }
+
+      // ---- other sorts: ORDER BY needs the joined values, so the whole filtered set is built (as before) ----------------
+      const offset = decodeBrowseCursor(f.cursor, filtersKey);
+      const { sql: wherePart, params, candidateSql } = renderBrowseFragments(allFrags, baseParams);
+      const listResult = await db.query(
+        `${sharedBrowseCtes(hasDisplayName, hasFinancials, wherePart, hasAudienceColumn, { candidateSql })}
+          SELECT *, count(*) OVER() AS total_matching FROM base
           ORDER BY ${sortDef.expr} ${sortDef.dir} NULLS LAST, id ${sortDef.dir}
-          OFFSET ${offset} LIMIT ${limit}`
+          OFFSET ${offset} LIMIT ${limit}`,
+        params
       );
-
-      // Facet dimensions: enumerated ones (grouped, top N by count) and
-      // boolean ones (a single "how many are true" count) — each rendered
-      // with every fragment EXCEPT the one for its own dimension.
-      const without = (dim) => allFrags.filter((x) => x.dim !== dim);
-      const enumerated = [
-        ['documentType', 'document_type AS value, document_type AS label', 'document_type IS NOT NULL', 30],
-        ['stageBucket', 'stage_bucket AS value, stage_bucket AS label', 'TRUE', 10],
-        ['warrantyBucket', 'warranty_bucket AS value, warranty_bucket AS label', 'TRUE', 10],
-        ['audience', 'audience AS value, audience AS label', 'TRUE', 2],
-        ['site', 'site_address AS value, site_address AS label', 'site_address IS NOT NULL', 20],
-        ['technician', 'technician_name AS value, technician_name AS label', 'technician_name IS NOT NULL', 20],
-        ['brand', 'brand AS value, brand AS label', 'brand IS NOT NULL', 20],
-      ];
-      // R35: facets describe the WHOLE filtered set, not the page, so they are identical for every "load more" of the same
-      // filters - but each one re-scans every document (10 statements). At 50,000 documents a second page cost the same
-      // ~1.9 s as the first. Only the first page (offset 0) computes them; a later page returns an empty list and the
-      // client keeps the ones it already has (useRecordsBrowse.ts).
-      const wantFacets = offset === 0;
-      const facetPromises = !wantFacets ? [] : enumerated.map(([dim, cols, having, cap]) =>
-        runFiltered(without(dim), () => `SELECT ${cols}, count(*)::int AS n FROM base WHERE ${having} GROUP BY value, label ORDER BY n DESC, label ASC LIMIT ${cap}`)
-          .then((r) => [dim, r.rows])
-      );
-      // Customer is the one enumerated facet with a real id separate from its label.
-      if (wantFacets) facetPromises.push(
-        runFiltered(
-          without('customerId'),
-          () => `SELECT customer_id AS value, customer_name AS label, count(*)::int AS n FROM base
-            WHERE customer_id IS NOT NULL GROUP BY customer_id, customer_name ORDER BY n DESC, label ASC LIMIT 20`
-        ).then((r) => ['customerId', r.rows])
-      );
-      const booleans = [
-        ['hasMoney', hasFinancials ? '(has_money)' : 'FALSE'],
-        ['openBalance', hasFinancials ? '(COALESCE(balance_due, 0) > 0)' : 'FALSE'],
-      ];
-      for (const [dim, expr] of wantFacets ? booleans : []) {
-        facetPromises.push(
-          runFiltered(without(dim), () => `SELECT count(*) FILTER (WHERE ${expr})::int AS n FROM base`)
-            .then((r) => [dim, r.rows[0]?.n ?? 0])
-        );
-      }
-      if (currentUserId && wantFacets) {
-        facetPromises.push(
-          runFiltered(
-            without('uploadedByMe'),
-            (i) => `SELECT count(*) FILTER (WHERE uploaded_by = $${i})::int AS n FROM base`,
-            [currentUserId]
-          ).then((r) => ['uploadedByMe', r.rows[0]?.n ?? 0])
-        );
-      }
-
-      const [listResult, ...facetResults] = await Promise.all([listPromise, ...facetPromises]);
+      const facets = await facetsPromiseFor(offset);
       const rows = listResult.rows;
       const total = rows[0]?.total_matching != null ? Number(rows[0].total_matching) : 0;
-      // Zero rows on this page doesn't mean zero total (a cursor past the end,
-      // or filters just changed) — the window count above is only present on
-      // an actual row, so re-ask cheaply when the page itself came back empty.
-      const trueTotal = rows.length
-        ? total
-        : (await runFiltered(allFrags, () => 'SELECT count(*)::int AS n FROM base')).rows[0]?.n ?? 0;
-
-      const facets = [];
-      for (const [dim, data] of facetResults) {
-        if (dim === 'hasMoney' || dim === 'openBalance' || dim === 'uploadedByMe') {
-          facets.push({ key: dim, trueCount: data });
-        } else {
-          facets.push({
-            key: dim,
-            options: data
-              .filter((r) => r.value !== null && r.value !== '')
-              .map((r) => ({ value: String(r.value), label: r.label != null ? String(r.label) : String(r.value), count: Number(r.n) })),
-          });
-        }
-      }
-
-      return {
-        rows: rows.map((r) => ({
-          id: r.id,
-          filename: r.original_filename,
-          displayName: r.display_name ?? null,
-          documentType: r.document_type,
-          stage: r.stage,
-          stageBucket: r.stage_bucket,
-          verifiedBy: r.verified_by,
-          uploadedBy: r.uploaded_by,
-          createdAt: r.created_at ? new Date(r.created_at).toISOString() : null,
-          serviceDate: r.service_date ?? null,
-          customerId: r.customer_id,
-          customerName: r.customer_name,
-          siteAddress: r.site_address,
-          technician: r.technician_name,
-          brand: r.brand,
-          warrantyExpiry: r.warranty_expiry,
-          warrantyBucket: r.warranty_bucket,
-          amount: r.amount != null ? Number(r.amount) : null,
-          balanceDue: r.balance_due != null ? Number(r.balance_due) : null,
-          moneyStatus: r.money_status,
-          hasMoney: r.has_money,
-          // Round 18, part 2 (owner ask (a)): drives the "Team only" badge (src/components/
-          // records/RecordsBrowser.tsx) — always 'customer' or 'internal', never null (AUDIENCE_EXPR's
-          // own COALESCE).
-          audience: r.audience === 'internal' ? 'internal' : 'customer',
-        })),
+      // Zero rows on this page doesn't mean zero total (a cursor past the end, or filters just changed) - the window
+      // count above is only present on an actual row, so re-ask cheaply when the page itself came back empty.
+      const trueTotal = rows.length ? total : await countBrowseMatches(db, ctxB, allFrags);
+      return browseResult(rows, {
         total: trueTotal,
         hasMore: offset + rows.length < trueTotal,
         nextCursor: offset + rows.length < trueTotal ? encodeBrowseCursor(offset + rows.length, filtersKey) : null,
-        facets,
-        sort: f.sort,
-        limit,
-      };
+        facets, sort: f.sort, limit,
+      });
+    },
+
+    /**
+     * R36: the facets on their own (the same counts browseDocuments(…, {facets: 'inline'}) returns), so the Records screen
+     * can paint the first page the moment it is ready and fill the filter chips in behind it. One pass over the filtered
+     * set instead of ten, and a 60 s per-tenant cache for the same filters (they describe the whole set, change only when
+     * documents arrive, and nobody needs them to the second).
+     */
+    /** @param {Record<string, unknown>} [rawFilters] @param {{currentUserId?: string|null, cache?: boolean}} [opts] */
+    browseFacets: async (rawFilters = {}, { currentUserId = null, cache = true } = {}) => {
+      const ctxB = await browseContext(db, rawFilters, currentUserId);
+      const key = `${tenantId}|${ctxB.filtersKey}|${currentUserId ?? ''}`;
+      if (cache) {
+        const hit = browseFacetCache.get(key);
+        if (hit !== undefined) return { facets: hit, cached: true };
+      }
+      const facets = await runBrowseFacets(db, ctxB, currentUserId);
+      if (cache) browseFacetCache.set(key, facets);
+      return { facets, cached: false };
     },
 
     // ---- billing read helpers (api/_lib/billing.js, api/_lib/plan.js) -------
@@ -1873,6 +2195,12 @@ function makeStore(db, tenantId) {
       [tenantId, e.entity_type, e.data ?? {}]
     ),
     getEntity: (id) => one(`SELECT * FROM entities WHERE id = $1 AND ${TENANT}`, [id]),
+    // R36: entities by id (the customers / units a needs-review document older than the newest 500 points at).
+    listEntitiesByIds: async (ids) => {
+      const list = [...new Set((ids ?? []).filter((x) => typeof x === 'string' && KEYSET_ID_RE.test(x)))].slice(0, 500);
+      if (!list.length) return [];
+      return many(`SELECT * FROM entities WHERE id = ANY($1::uuid[]) AND ${TENANT}`, [list]);
+    },
     listEntities: (type) => type
       ? many(`SELECT * FROM entities WHERE entity_type = $1 AND ${TENANT} ORDER BY updated_at DESC LIMIT 500`, [type])
       : many(`SELECT * FROM entities WHERE ${TENANT} ORDER BY updated_at DESC LIMIT 500`, []),

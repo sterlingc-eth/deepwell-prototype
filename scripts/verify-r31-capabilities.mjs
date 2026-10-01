@@ -42,7 +42,7 @@ const P = await import("../src/core/passage.ts");
   const dp = read("src/components/DocumentPreview.tsx"), ds = read("src/mobile/DocSheet.tsx"), ma = read("src/mobile/MobileApp.tsx"), mm = read("src/mobile/MobileAnswer.tsx"), ac = read("src/components/AnswerCard.tsx"), as = read("src/screens/AskScreen.tsx"), cp = read("src/components/answer/CitationPopover.tsx");
   check("wiring 3a: popover passes the server quote up; AnswerCard turns it into SourceRef.excerpt; AskScreen hands it to the viewer", /citation\.quote\)/.test(cp) && /excerpt: quote/.test(ac) && /excerpt=\{preview\.excerpt\}/.test(as));
   check("wiring 3a: desktop viewer marks + scrolls + opens PDFs at the cited page", /findPassage/.test(dp) && /scrollIntoView/.test(dp) && /withPdfPage\(original\.url, location\?\.page\)/.test(dp));
-  check("wiring 3a: phone: page+quote travel MobileAnswer -> MobileApp -> DocSheet, original opens at #page", /onOpenDoc\(documentId, page, quote\)/.test(mm) && /page: number \| undefined|page\?: number, quote\?: string\) => setSheet/.test(ma) && /quote=\{sheet\.quote\}/.test(ma) && /withPdfPage\(original\.url, page\)/.test(ds));
+  check("wiring 3a: phone: page+quote travel MobileAnswer -> MobileApp -> DocSheet, original opens at #page", /onOpenDoc\(documentId, page, quote\)/.test(mm) && /page: number \| undefined|page\?: number, quote\?: string\) => (?:openSheet\('doc', \(\) => )?setSheet/.test(ma) && /quote=\{sheet\.quote\}/.test(ma) && /withPdfPage\(original\.url, page\)/.test(ds));
 }
 
 /* ---------------------------------------------------------------- 3d why / superseded (pure) + 3c role */

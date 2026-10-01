@@ -2,17 +2,21 @@
 // hooks, useGraph.seed, the fetch stub) — oxlint's react-refresh rule wants a
 // component's own file to only export components (same reason
 // scripts/answer-harness/Fixtures.tsx exists).
-import { useCallback, useState } from 'react'
+import { startTransition, useCallback, useEffect, useState } from 'react'
 import { FileText, MessageCircle, Moon, ScanLine, Sun } from 'lucide-react'
 import { useAppStore } from '../../src/store/appStore'
 import type { Answer } from '../../src/core/types'
 import { AskTab } from '../../src/mobile/AskTab'
 import { ScanTab } from '../../src/mobile/ScanTab'
 import { DocsTab } from '../../src/mobile/DocsTab'
-import { DocSheet } from '../../src/mobile/DocSheet'
-import { CustomerSheet } from '../../src/mobile/CustomerSheet'
+import { LazyCustomerSheet, LazyDocSheet } from '../../src/mobile/lazySheets'
+import { openSheet, schedulePrefetch } from '../../src/mobile/sheetLoader'
+import { whenIdle } from '../../src/mobile/idle'
 import { MobileAnswer } from '../../src/mobile/MobileAnswer'
 import { DOC_ID, note } from './fixtures-data'
+
+const noop = () => {}
+const noopAsync = async () => {}
 
 type MobileTab = 'ask' | 'scan' | 'docs'
 const LAST_TAB_KEY = 'deepwell.mobile.lastTab'
@@ -45,17 +49,29 @@ export function Shell() {
   // M1 fluidity walk) — this fixture would then be measuring its own
   // re-render churn instead of the real app's.
   const setTab = useCallback((t: MobileTab) => {
-    setTabState(t)
-    try {
-      window.localStorage.setItem(LAST_TAB_KEY, t)
-    } catch {
-      /* ignore */
-    }
+    startTransition(() => setTabState(t))
+    // Same as MobileApp.tsx: persistence runs after the tab has painted.
+    whenIdle(() => {
+      try {
+        window.localStorage.setItem(LAST_TAB_KEY, t)
+      } catch {
+        /* ignore */
+      }
+    }, 400)
   }, [])
   const [sheet, setSheet] = useState<{ kind: 'doc'; id: string } | { kind: 'customer'; ref: string } | null>(null)
-  const openDoc = useCallback((id: string) => setSheet({ kind: 'doc', id }), [])
-  const openCustomer = useCallback((ref: string) => setSheet({ kind: 'customer', ref }), [])
+  const openDoc = useCallback((id: string) => openSheet('doc', () => setSheet({ kind: 'doc', id })), [])
+  const openCustomer = useCallback((ref: string) => openSheet('customer', () => setSheet({ kind: 'customer', ref })), [])
   const closeSheet = useCallback(() => setSheet(null), [])
+  const openDocs = useCallback(() => setTab('docs'), [setTab])
+  // Same idle-time prefetch MobileApp.tsx runs once signed in (sheet chunks never load on the tap).
+  useEffect(
+    () =>
+      schedulePrefetch(() => {
+        ;(window as unknown as { __dwPrefetchDone?: boolean }).__dwPrefetchDone = true
+      }),
+    []
+  )
 
   const tabs: { id: MobileTab; label: string; Icon: typeof MessageCircle }[] = [
     { id: 'ask', label: 'Ask', Icon: MessageCircle },
@@ -87,10 +103,10 @@ export function Shell() {
           <AskTab onOpenDoc={openDoc} onOpenCustomer={openCustomer} billing={null} />
         </div>
         <div className={tab === 'scan' ? 'h-full' : 'hidden'}>
-          <ScanTab tenantKey="harness-tenant" onUploaded={() => {}} onOpenDocs={() => setTab('docs')} onOpenDoc={openDoc} />
+          <ScanTab tenantKey="harness-tenant" onUploaded={noop} onOpenDocs={openDocs} onOpenDoc={openDoc} />
         </div>
         <div className={tab === 'docs' ? 'h-full' : 'hidden'}>
-          <DocsTab syncStatus="ready" onOpenDoc={openDoc} onRefresh={async () => {}} />
+          <DocsTab active={tab === 'docs'} syncStatus="ready" onOpenDoc={openDoc} onRefresh={noopAsync} />
         </div>
       </main>
 
@@ -111,8 +127,8 @@ export function Shell() {
         </div>
       </nav>
 
-      {sheet?.kind === 'doc' && <DocSheet key={sheet.id} documentId={sheet.id} graphLoading={false} onOpenCustomer={openCustomer} onClose={closeSheet} />}
-      {sheet?.kind === 'customer' && <CustomerSheet key={sheet.ref} customerRef={sheet.ref} onOpenDoc={openDoc} onClose={closeSheet} />}
+      {sheet?.kind === 'doc' && <LazyDocSheet key={sheet.id} documentId={sheet.id} graphLoading={false} onOpenCustomer={openCustomer} onClose={closeSheet} />}
+      {sheet?.kind === 'customer' && <LazyCustomerSheet key={sheet.ref} customerRef={sheet.ref} onOpenDoc={openDoc} onClose={closeSheet} />}
     </div>
   )
 }

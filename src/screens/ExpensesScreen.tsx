@@ -306,7 +306,7 @@ export function ExpensesScreen() {
         try {
           patchQueue(id, { status: 'uploading' });
           const type = file.type;
-          const { receiptKey, uploadUrl } = await requestReceiptUploadUrl(file.name, type);
+          const { receiptKey, uploadUrl } = await requestReceiptUploadUrl(file.name, type, file.size);
           await uploadReceiptBytes(uploadUrl, file);
           const base = { receiptKey, receiptFilename: file.name, source: 'receipt' as const };
           if (removedRef.current.has(id)) continue;
@@ -381,7 +381,7 @@ export function ExpensesScreen() {
     setAttachingId(row.id);
     setError(null);
     try {
-      const { receiptKey, uploadUrl } = await requestReceiptUploadUrl(file.name, file.type);
+      const { receiptKey, uploadUrl } = await requestReceiptUploadUrl(file.name, file.type, file.size);
       await uploadReceiptBytes(uploadUrl, file);
       await updateExpense(row.id, { ...rowToFields(row), receiptKey, receiptFilename: file.name });
       load();

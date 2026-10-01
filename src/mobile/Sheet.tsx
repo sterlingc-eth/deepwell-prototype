@@ -35,7 +35,13 @@ export function Sheet({
   })
   useEffect(() => {
     const restore = document.activeElement as HTMLElement | null
-    closeRef.current?.focus({ preventScroll: true })
+    // Focus moves in once the sheet has painted (a rAF, then a macrotask), not inside the tap's own commit: focus()
+    // forces a synchronous style + layout pass, which used to stack onto the render in one long task.
+    let raf = 0
+    let focusTimer = 0
+    raf = requestAnimationFrame(() => {
+      focusTimer = window.setTimeout(() => closeRef.current?.focus({ preventScroll: true }), 0)
+    })
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') return onCloseRef.current()
       // Keep Tab inside the dialog (aria-modal) instead of wandering behind the backdrop.
@@ -54,6 +60,8 @@ export function Sheet({
     }
     window.addEventListener('keydown', onKey)
     return () => {
+      cancelAnimationFrame(raf)
+      window.clearTimeout(focusTimer)
       window.removeEventListener('keydown', onKey)
       restore?.focus?.({ preventScroll: true })
     }

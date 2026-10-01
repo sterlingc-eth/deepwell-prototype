@@ -175,8 +175,9 @@ export function fetchExpenseTotals(range: { range?: ExpenseRangeKind; from?: str
   return call({ op: 'totals', ...range });
 }
 
-export function requestReceiptUploadUrl(filename: string, contentType: string): Promise<{ receiptKey: string; uploadUrl: string }> {
-  return call({ op: 'receiptUploadUrl', filename, contentType });
+/** `sizeBytes` is the file's exact size (a browser File's `.size`): required since R36, signed into the upload URL. */
+export function requestReceiptUploadUrl(filename: string, contentType: string, sizeBytes: number): Promise<{ receiptKey: string; uploadUrl: string }> {
+  return call({ op: 'receiptUploadUrl', filename, contentType, sizeBytes });
 }
 
 /** PUTs the file's bytes straight to the presigned R2 URL — same idiom as

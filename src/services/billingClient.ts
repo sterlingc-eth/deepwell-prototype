@@ -88,7 +88,17 @@ export interface BillingStatus {
   limits: Partial<PlanLimits> & { outreachAuto?: boolean };
   // resetsOn: ISO date of next month's 1st UTC — mirrors api/billing.js's
   // usage.resetsOn (api/_lib/usage.js's resetsOnIso).
-  usage: { documentsStored: number; pagesThisMonth: number; asksThisMonth?: number; resetsOn?: string };
+  usage: {
+    documentsStored: number;
+    pagesThisMonth: number;
+    asksThisMonth?: number;
+    resetsOn?: string;
+    /** R36: Records Rescue pages bought and not yet read (they raise this month's cap until used up). */
+    rescuePagesRemaining?: number;
+    rescuePagesPurchased?: number;
+    /** R36: pages per month the owner added on top of the plan (a negotiated import), 0 when none. */
+    extraPagesPerMonth?: number;
+  };
   // Donovan is unlimited on every plan (Round 26): asksThisMonth is informational only — nothing renders a meter from it.
 }
 

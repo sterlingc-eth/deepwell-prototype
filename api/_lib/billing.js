@@ -77,6 +77,33 @@ export function resolveRecordsRescueQuantity(requested) {
   return Math.max(RECORDS_RESCUE.minUnits, n);
 }
 
+/**
+ * R36 (pure): the page credit a PAID Records Rescue checkout grants, or null when the event is not one.
+ *
+ * Semantics (docs/help/05-add-ons.md says only "billed separately, one-time"; nothing says the pages expire, so they do not):
+ * the purchased pages are a one-time balance, usable on any month once the plan's own monthly allowance is spent, until
+ * they are all read (plan.js loadRescueCredit). Granted once per Stripe event id (the webhook ledger's primary key), so
+ * a retried or replayed delivery adds nothing. The count is the `pages` metadata the checkout wrote; for a session made
+ * before that existed it is derived from the undiscounted subtotal at the unit price (only when that divides evenly).
+ * Never granted for an unpaid session (payment_status other than "paid"), a subscription checkout, or another plan.
+ * @param {object} event a parsed Stripe event
+ * @returns {{pages: number, sessionId: string|null}|null}
+ */
+export function rescueGrantForEvent(event) {
+  if (event?.type !== 'checkout.session.completed' && event?.type !== 'checkout.session.async_payment_succeeded') return null;
+  const obj = event?.data?.object;
+  if (!obj || obj.mode !== 'payment' || obj.payment_status !== 'paid') return null;
+  if (obj?.metadata?.plan !== 'records_rescue') return null;
+  let pages = Number(obj?.metadata?.pages);
+  if (!(Number.isInteger(pages) && pages > 0)) {
+    const sub = Number(obj.amount_subtotal);
+    pages = Number.isInteger(sub) && sub > 0 && sub % RECORDS_RESCUE.unitPriceCents === 0 ? sub / RECORDS_RESCUE.unitPriceCents : 0;
+  }
+  // Below the minimum order the checkout could not have been created; above ~1M pages is a typo, not an order.
+  if (!Number.isInteger(pages) || pages < RECORDS_RESCUE.minUnits || pages > 1_000_000) return null;
+  return { pages, sessionId: typeof obj.id === 'string' ? obj.id : null };
+}
+
 /** Solo, monthly or annual, only for a tenant that has never trialed. */
 export function isTrialEligible(plan, tenantRow) {
   return plan === 'solo' && PLAN_CATALOG.solo.trialEligible && tenantRow?.trial_used !== true;
@@ -121,7 +148,8 @@ export async function createCheckoutSession(stripe, args) {
       cancel_url: cancelUrl,
       allow_promotion_codes: true,
       automatic_tax: { enabled: false },
-      metadata: { tenantId, plan },
+      // R36: the page count rides on the session so the webhook can credit exactly what was bought (rescueGrantForEvent).
+      metadata: { tenantId, plan, pages: String(resolveRecordsRescueQuantity(quantity)) },
     });
   }
 
@@ -308,6 +336,7 @@ export function patchForEvent(event) {
   if (!obj) return null;
 
   switch (event.type) {
+    case 'checkout.session.async_payment_succeeded':
     case 'checkout.session.completed': {
       const customerId = obj.customer;
       if (!customerId) return null;
@@ -505,18 +534,26 @@ export async function recordAndApplyEvent(pool, event, tenantId, patch) {
   try {
     await client.query("BEGIN");
     let fresh = true;
+    // R36: a paid Records Rescue order is recorded IN the ledger row (rescuePages, sessionId): that row is both the
+    // once-per-event idempotency guard and the credit itself (plan.js loadRescueCredit sums them), so there is no second
+    // table to keep in step and nothing for billing_apply()'s wholesale limits replacement to wipe.
+    const grant = rescueGrantForEvent(event);
     await client.query("SAVEPOINT billing_ledger");
     try {
       const { rows } = await client.query("SELECT billing_record_event($1, $2, $3, $4::jsonb) AS fresh", [
         event.id,
         event.type,
         tenantId,
-        JSON.stringify({ type: event.type }), // never the full payload — see billing_events comment; no PII, no card data
+        // never the full payload — see billing_events comment; no PII, no card data
+        JSON.stringify(grant ? { type: event.type, rescuePages: grant.pages, sessionId: grant.sessionId } : { type: event.type }),
       ]);
       fresh = rows[0]?.fresh !== false;
       await client.query("RELEASE SAVEPOINT billing_ledger");
     } catch (ledgerErr) {
       await client.query("ROLLBACK TO SAVEPOINT billing_ledger");
+      // Without the ledger a paid rescue order has nowhere to be recorded: fail the delivery so Stripe retries it (for days)
+      // rather than acknowledge a payment whose pages were never credited. Everything else keeps the old "apply anyway".
+      if (grant) throw ledgerErr;
       console.error("billing webhook: idempotency ledger unavailable, applying without it:", ledgerErr?.message);
       fresh = true;
     }

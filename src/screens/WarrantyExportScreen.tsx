@@ -56,6 +56,11 @@ export function WarrantyExportScreen() {
     return { e, info, missing, missingInstaller, verifiedDocs, ready };
   });
   const allReady = readiness.length > 0 && readiness.every((r) => r.ready);
+  // R36: "Download PDF" stays off until every unit is claim-ready, and Dashboard's "select all" includes expired
+  // units — so the common path used to dead-end on a greyed button (7 expired units = 7 Remove clicks). Say why,
+  // and offer the one-click fix.
+  const notReady = readiness.filter((r) => !r.ready);
+  const removeNotReady = () => { for (const r of notReady) toggle(r.e.id); };
 
   const generate = async () => {
     if (!pdfRef.current || !units.length) return;
@@ -97,6 +102,18 @@ export function WarrantyExportScreen() {
             <Download className="w-4 h-4" aria-hidden="true" /> {busy ? 'Preparing…' : 'Download PDF'}
           </button>
         </header>
+
+        {units.length > 0 && !allReady && (
+          <div role="status" data-testid="export-not-ready" className="dw-card p-4 flex flex-wrap items-center justify-between gap-3 border-warn/40">
+            <p className="text-body text-ink-2 min-w-0">
+              <AlertTriangle className="w-4 h-4 text-warn inline mr-1.5 -mt-0.5" aria-hidden="true" />
+              {notReady.length} of {units.length} unit{units.length === 1 ? ' is' : 's are'} not ready for a claim (expired warranty, missing details or no verified document). Download turns on once every unit in the packet is ready.
+            </p>
+            <button type="button" className="dw-btn-secondary !min-h-[40px] !py-1.5 shrink-0" onClick={removeNotReady}>
+              <X className="w-4 h-4" aria-hidden="true" /> Remove {notReady.length} not ready
+            </button>
+          </div>
+        )}
 
         <section aria-labelledby="units-heading" className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">

@@ -25,8 +25,8 @@ const MAX_CONTEXT_TURNS = 4;
 // real to suggest. Clearly labelled "e.g." — never presented as though they
 // are this tenant's own records — and paired with one action: go add some.
 const EXAMPLE_QUESTIONS = [
-  'Is the furnace at 2847 N 24th St still under warranty?',
-  'What serial number is on that outdoor unit?',
+  'Is the unit at 2847 N 24th St still under warranty?',
+  'What serial number is on the unit at 2847 N 24th St?',
   'Which warranties expire in the next 12 months?',
 ];
 

@@ -335,7 +335,7 @@ export function OutreachScreen() {
                   type="text"
                   disabled={!admin}
                   value={shopName}
-                  placeholder={organization?.name || "Your shop's name"}
+                  placeholder={organization?.name || "Your company name"}
                   onChange={(e) => setSettingsDraft((d) => ({ ...d, shopName: e.target.value }))}
                   className="dw-input mt-1 w-full"
                 />
@@ -371,7 +371,7 @@ export function OutreachScreen() {
                   type="text"
                   disabled={!admin}
                   value={signature}
-                  placeholder="e.g. Dana, Acme HVAC"
+                  placeholder="e.g. Dana, Acme Co."
                   onChange={(e) => setSettingsDraft((d) => ({ ...d, signature: e.target.value }))}
                   className="dw-input mt-1 w-full"
                 />
@@ -383,7 +383,7 @@ export function OutreachScreen() {
                   type="email"
                   disabled={!admin}
                   value={replyTo}
-                  placeholder="service@yourshop.com"
+                  placeholder="service@yourcompany.com"
                   onChange={(e) => setSettingsDraft((d) => ({ ...d, replyTo: e.target.value }))}
                   className="dw-input mt-1 w-full"
                 />

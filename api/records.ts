@@ -46,7 +46,8 @@ const MONTH_MS = 30 * 24 * 60 * 60 * 1000;
  * rate-limited exactly like /api/upload-url, and never accepts a client storage_key (see the case below).
  */
 export const RECORDS_READ_ACTIONS: ReadonlySet<string> = new Set([
-  'getDocument', 'listDocuments', 'browseDocuments',
+  'getDocument', 'listDocuments', 'browseDocuments', 'browseFacets',
+  'reviewSummary', 'listUnverifiedDocuments', 'listEntitiesByIds',
   'getFacet', 'listFacetsByDocument',
   'getExtraction', 'listExtractionsByDocument', 'listExtractionsByDocuments', 'listExtractionsByEntity',
   'getEntity', 'listEntities',
@@ -260,7 +261,13 @@ export async function processRecords(req: VercelRequest, res: VercelResponse, au
           // normalized and validated inside browseDocuments itself — nothing
           // here is trusted directly. `currentUserId` comes from the verified
           // token (never the payload) so "My uploads" can't be spoofed.
-          case 'browseDocuments': return await db.browseDocuments(payload.filters, { currentUserId: auth.userId });
+          case 'browseDocuments': return await db.browseDocuments(payload.filters, { currentUserId: auth.userId, facets: payload.facets === false ? 'none' : 'inline' });
+          // R36: the filter-chip counts on their own (one pass, 60 s cache), so the first page need not wait for them.
+          case 'browseFacets': return await db.browseFacets(payload.filters, { currentUserId: auth.userId });
+          // R36: shop-wide counts and the uncapped needs-review list (the client graph only holds the newest 500).
+          case 'reviewSummary': return await db.reviewSummary();
+          case 'listUnverifiedDocuments': return await db.listUnverifiedDocuments({ cursor: payload.cursor ?? null, limit: payload.limit });
+          case 'listEntitiesByIds': return await db.listEntitiesByIds(payload.ids);
           case 'updateDocument':
             await db.updateDocument(payload.id, payload.updates); return { success: true };
 

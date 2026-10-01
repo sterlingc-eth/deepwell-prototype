@@ -486,9 +486,9 @@ family = 'scale';
   const p2 = await withDb('org_r35_scale', (db) => db.browseDocuments({ limit: 50, cursor: p1.nextCursor }, {}));
   const q2 = stats.capture.length; stats.capture = null;
   check('records: page one carries the facets', p1.facets.length >= 8 && p1.facets.find((f) => f.key === 'documentType')?.options?.length >= 1);
-  check('records: "load more" (page two) returns rows but runs the facet scans zero times', p2.rows.length === 50 && p2.facets.length === 0 && q2 < q1 - 8, `queries p1=${q1} p2=${q2}`);
+  check('records: "load more" (page two) returns rows but runs the facet scans zero times (R36: page one is now 8 queries, page two 4)', p2.rows.length === 50 && p2.facets.length === 0 && q2 < q1 && q2 <= 6, `queries p1=${q1} p2=${q2}`);
   eq('records: paging still walks the whole set (50 + 50 + 20)', [p1.rows.length, p2.rows.length, (await withDb('org_r35_scale', (db) => db.browseDocuments({ limit: 50, cursor: p2.nextCursor }, {}))).rows.length], [50, 50, 20]);
-  check('records: the client keeps page-one facets when a load-more page has none', /!append \|\| res\.facets\.length/.test(read('src/components/records/useRecordsBrowse.ts')));
+  check('records: the client keeps page-one facets when a load-more page has none', /if \(!append\)/.test(read('src/components/records/useRecordsBrowse.ts')) && /browseFacets\(/.test(read('src/components/records/useRecordsBrowse.ts')));
 }
 
 /* ============================================================ STRUCTURE */

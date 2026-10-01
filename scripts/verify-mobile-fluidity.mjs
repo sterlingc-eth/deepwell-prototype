@@ -8,19 +8,22 @@
  * down/up, 400 ms RTT) — on three device emulations (iPhone 13, iPhone SE,
  * Pixel 7) and asserts:
  *
- *   1. No single long task > 100 ms during any key interaction (tab switch,
+ *   1. No single long task > 80 ms during any key interaction (tab switch,
  *      sheet open/close, typing, ask submit + answer render, filter sheet).
- *      100 ms (not the usual 50 ms) because this budget is measured WHILE
- *      4x-throttled — an unthrottled "no task > 50ms" turns into "no task
- *      > ~12.5ms real work", which is what actually keeps INP low once the
- *      throttle comes off; 100ms throttled catches genuine offenders without
- *      flagging React/dev-mode noise as failures.
+ *      80 ms (tightened from 100 in R36; the usual 50 ms is unreachable here)
+ *      because this budget is measured WHILE 4x-throttled — an unthrottled
+ *      "no task > 50ms" turns into "no task > ~12.5ms real work", which is
+ *      what actually keeps INP low once the throttle comes off; 80ms
+ *      throttled catches genuine offenders without flagging React/dev-mode
+ *      noise as failures. Each interaction prints its worst task ("[lt]")
+ *      whether or not it passes, so a regression shows up as a creeping number.
  *   2. CLS < 0.05 specifically on answer render and on every sheet open
  *      (DocSheet, CustomerSheet, the Filters sheet) — measured as the delta
  *      logged during that one interaction, not the whole session, so an
  *      unrelated shift earlier in the walk can't mask (or fail) one later.
  *   3. The mobile entry chunk (dist/assets/mobile-*.js, gzip) stays under
- *      MOBILE_ENTRY_BUDGET_GZIP — this is the mobile-SPECIFIC bundle (the
+ *      MOBILE_ENTRY_BUDGET_GZIP (23 KB since R36; the sheets, account menu
+ *      and install guide are lazy chunks prefetched at idle) — this is the mobile-SPECIFIC bundle (the
  *      shared Clerk/Wordmark/jsx-runtime chunks it modulepreloads are common
  *      to every DeepWell surface, including desktop, and aren't this budget's
  *      job to police).
@@ -49,10 +52,10 @@ const CUSTOMER_ID = '33333333-3333-4333-8333-000000000001';
 const DOC_ID = '44444444-4444-4444-8444-000000000001';
 
 /** Throttled-budget: see the file comment above for why this isn't 50ms. */
-const LONG_TASK_BUDGET_MS = 100;
+const LONG_TASK_BUDGET_MS = 80;
 const CLS_BUDGET = 0.05;
-/** The mobile entry chunk alone, gzip. Current (R23 baseline): ~22.5 KB. */
-const MOBILE_ENTRY_BUDGET_GZIP = 100 * 1024;
+/** The mobile entry chunk alone, gzip. R23 baseline ~22.5 KB; R36: 21.2 KB after moving the sheets out. */
+const MOBILE_ENTRY_BUDGET_GZIP = 23 * 1024;
 
 /** "Slow 4G" (Chrome DevTools' own preset: ~400 Kbps, 400ms RTT) applied as
  *  a per-response delay on every mocked API call below, rather than as a
@@ -225,6 +228,7 @@ async function measure(page, label, clsBudget, fn) {
   await page.waitForTimeout(250); // let layout-shift/longtask entries land
   const { longTasks, cls } = await readPerf(page);
   const worst = longTasks.reduce((m, t) => Math.max(m, t.dur), 0);
+  console.log(`  [lt] ${label}: worst=${worst.toFixed(0)}ms n=${longTasks.length}${cls ? ` cls=${cls.toFixed(4)}` : ''}`);
   check(`${label}: no long task > ${LONG_TASK_BUDGET_MS}ms (4x CPU)`, worst <= LONG_TASK_BUDGET_MS, `worst=${worst.toFixed(1)}ms, count=${longTasks.length}`);
   if (clsBudget != null) {
     check(`${label}: CLS < ${clsBudget}`, cls < clsBudget, `cls=${cls.toFixed(4)}`);
@@ -292,6 +296,11 @@ try {
     await page.waitForSelector('[data-testid="mobile-shell"]', { timeout: 20000 });
     const coldStartMs = Date.now() - t0;
     console.log(`  ${name}: cold start to shell visible (unthrottled dev server) = ${coldStartMs}ms`);
+    // The idle-time sheet-chunk prefetch (MobileApp.tsx does the same once signed in) settles in the seconds between
+    // launching the app and the first tap on a real phone; wait for it here so a dev-server module compile of the
+    // lazy sheets can't land inside a measured interaction. (Bounded: a prefetch that never finishes is itself a failure.)
+    const prefetched = await page.waitForFunction(() => window.__dwPrefetchDone === true, null, { timeout: 15000 }).then(() => true, () => false);
+    check(`${name}: sheet chunks prefetched during idle after launch`, prefetched);
     await page.waitForTimeout(300);
     await page.screenshot({ path: `${SHOT_DIR}/fluidity-${name}-1-launch.png` });
 
