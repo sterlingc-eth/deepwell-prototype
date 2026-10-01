@@ -18,8 +18,8 @@ Yes. I can send your question to the team from this chat. Choose **Send to a per
 !handoff:asked-human
 
 ### How fast will support respond?
-~ response time, how fast, how quickly do you respond, support hours, support sla, turnaround time, when will someone reply, how long for support, urgent support, 24/7 support, phone support, chat support, support level, business hours, how quickly does support reply, support reply, how fast does support reply, how long until support replies, reply time, does support reply fast
-Response targets depend on the plan: Solo, email with a next-business-day response. Shop, email and chat, same business day. Crew, email, chat and phone, 2 hours for urgent issues. Fleet, a named contact, 1 hour for urgent issues, 24/7. I can't make promises beyond those listed targets. Phone support is listed for Crew and Fleet, so email support@ to get set up.
+~ response time, shop plan support, team plan support, how fast, how quickly do you respond, support hours, support sla, turnaround time, when will someone reply, how long for support, urgent support, 24/7 support, phone support, chat support, support level, business hours, how quickly does support reply, support reply, how fast does support reply, how long until support replies, reply time, does support reply fast
+Response targets depend on the plan: Solo, email with a next-business-day response. Team, email and chat, same business day. Crew, email, chat and phone, 2 hours for urgent issues. Fleet, a named contact, 1 hour for urgent issues, 24/7. I can't make promises beyond those listed targets. Phone support is listed for Crew and Fleet, so email support@ to get set up.
 
 ### How do I talk to sales or get a demo?
 ~ sales, talk to sales, book a demo, schedule a demo, request a demo, get a quote, enterprise quote, custom quote, sales team, contact sales, speak to sales, meeting, schedule a call, book a call, demo call, can i get a demo, get a demo, want a demo, see a demo, demo please

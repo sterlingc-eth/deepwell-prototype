@@ -30,7 +30,7 @@ export interface SeatStatus {
 }
 
 /**
- * Round 26: logins are really capped (Solo 2 / Shop 5 / Crew 10 / Fleet 11+). `count` is the number of
+ * Round 26: logins are really capped (Solo 2 / Team 5 / Crew 10 / Fleet 11+). `count` is the number of
  * logins USED — every member except the ONE owner account, plus pending invitations (the server computes
  * it: api/_lib/seats.js). `cap` is the plan's login cap — `null` on Fleet (no DeepWell cap) or before
  * billing status has loaded, in which case nothing is ever "at cap". Label mirrors api/_lib/seats.js's

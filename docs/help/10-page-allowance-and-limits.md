@@ -9,12 +9,12 @@ updated: 2026-09-29
 Each plan has a monthly allowance of new pages, a documents-stored limit and a login limit. Donovan questions are not limited.
 
 ### How many pages can I scan per month?
-~ pages per month, page allowance, monthly pages, page limit, how many pages, how many documents, scan limit, scan allowance, scan volume, how much can i upload, upload limit, monthly upload limit, monthly scan, new pages
-Solo: {{solo.pages}} new pages a month. Shop: {{shop.pages}}. Crew: {{crew.pages}}. Fleet: {{fleet.pages}}. A page is one page of a document. Signed in, ask me and I'll check your usage.
+~ pages per month, shop plan pages, team plan pages, page allowance, monthly pages, page limit, how many pages, how many documents, scan limit, scan allowance, scan volume, how much can i upload, upload limit, monthly upload limit, monthly scan, new pages
+Solo: {{solo.pages}} new pages a month. Team: {{shop.pages}}. Crew: {{crew.pages}}. Fleet: {{fleet.pages}}. A page is one page of a document. Signed in, ask me and I'll check your usage.
 
 ### How many documents can I store?
-~ documents stored, storage limit, storage, how many files can i store, max documents, document limit, how much storage, storage cap, unlimited storage, how many documents
-Solo stores up to {{solo.docs}} documents, Shop {{shop.docs}}, Crew {{crew.docs}}, and Fleet is {{fleet.docs}}.
+~ documents stored, shop plan storage, team plan storage, storage limit, storage, how many files can i store, max documents, document limit, how much storage, storage cap, unlimited storage, how many documents
+Solo stores up to {{solo.docs}} documents, Team {{shop.docs}}, Crew {{crew.docs}}, and Fleet is {{fleet.docs}}.
 
 ### What happens when I reach my page limit?
 ~ reach my limit, hit the limit, monthly page limit reached, over the page limit, out of pages, exceeded allowance, limit reached, out of scans, ran out of pages, more pages, need more pages, upgrade for more pages, page cap

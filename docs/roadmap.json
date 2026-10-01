@@ -1,0 +1,24 @@
+{
+  "_note": "Single source of truth for the website roadmap section (index.html, between the roadmap markers) and the 'What features are coming soon?' help answer (docs/help/18). Edit here, then run: npm run build:roadmap && npm run build:support-kb. No dates, ever. 'match' lists lowercase phrases used by verify:roadmap to tie each 'Coming soon' pill on the site to an item here.",
+  "live": [
+    { "id": "ask-donovan", "title": "Ask Donovan", "text": "Ask a plain-English question and get an answer with the original page attached as the source." },
+    { "id": "phone-scanning", "title": "Phone app scanning", "text": "Scan paperwork on your phone, even with no signal; pages upload when it returns." },
+    { "id": "warranty", "title": "Warranty tracking and export", "text": "See which coverage is expiring across every unit and export warranty records any time." },
+    { "id": "records-search", "title": "Records search", "text": "Find a customer, address, serial number or date across every document you have sent in." },
+    { "id": "help-chat", "title": "Help chat", "text": "Ask the help chat how DeepWell works, any time, with answers drawn from our public help articles." }
+  ],
+  "next": [
+    { "id": "email-folder-upload", "title": "Email and folder upload", "text": "Forward a vendor invoice or drop files in a folder and they file themselves.", "match": ["email", "folder upload"] },
+    { "id": "google-drive-sync", "title": "Google Drive sync", "text": "Connect a Drive folder so new files come in on their own.", "match": ["drive sync"] },
+    { "id": "branch-scoping", "title": "Branch scoping", "text": "Limit each person to the records of their own branch or location.", "match": ["branch scoping"] },
+    { "id": "callback-analytics", "title": "Callback analytics", "text": "See which technicians and equipment brands generate the most repeat visits.", "match": ["callback analytics"] },
+    { "id": "backups-restore", "title": "Backups and per-company restore", "text": "Scheduled off-site backups, with the option to restore a single company.", "match": ["backup", "per-company restore"] },
+    { "id": "status-page-sla", "title": "Public status page and uptime SLA", "text": "A public status page and an uptime commitment with service credits.", "match": ["status page", "uptime sla"] }
+  ],
+  "later": [
+    { "id": "electrical", "title": "Electrical", "text": "Panel schedules, permits and inspections for electrical contractors.", "match": ["electrical"] },
+    { "id": "plumbing", "title": "Plumbing", "text": "Backflow testing, water heater warranties and permits for plumbing contractors.", "match": ["plumbing"] },
+    { "id": "property-management", "title": "Property management", "text": "Leases, unit turns, vendor compliance and appliance warranties for property managers.", "match": ["property management"] },
+    { "id": "fleet-equipment-rental", "title": "Fleet and equipment rental", "text": "Service history and paperwork for rented equipment and vehicle fleets.", "match": ["fleet and equipment rental", "equipment rental"] }
+  ]
+}

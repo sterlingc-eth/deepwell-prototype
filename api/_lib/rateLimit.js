@@ -46,7 +46,7 @@ import { logStage } from "./perf.js";
  * (see `cost` on `limit()` below) — a batch presign of 50 files now costs 50,
  * not 1 — so the same counter that used to mean "ingest HTTP calls today" now
  * means "ingest units (roughly: files/pages) today". 2000/day is this
- * build's Shop-plan-sized default for that meaning, not a tweak of the old
+ * build's Team-plan-sized default for that meaning, not a tweak of the old
  * one; a tenant that needs a different number gets it via tenants.limits.
  * ingest.perDay, the same override mechanism every bucket already had.
  */
@@ -448,7 +448,7 @@ export async function limit(req, res, auth, bucket, overrides, cost) {
  * cap enforced before a document is even uploaded; this is a whole-tenant cap
  * on `usage_counters.model_calls` — the number Anthropic actually billed for
  * today, whichever route produced it (ask, ingest, or extract all share this
- * counter — see usage.js's recordModelCall). Sized for a Shop plan by
+ * counter — see usage.js's recordModelCall). Sized for a Team plan by
  * default, same order of magnitude as DEFAULT_LIMITS.ingest.perDay for the
  * same reason (roughly one model call per page), but checked as its own
  * number since a document with several flagged pages (see readDocument.js's

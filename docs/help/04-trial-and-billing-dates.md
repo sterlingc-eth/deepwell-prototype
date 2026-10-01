@@ -10,7 +10,7 @@ The free trial is on Solo only. Billing has four states: trialing, active, past 
 
 ### Is there a free trial?
 ~ free trial, trial, try for free, try it free, 30 day trial, trial period, how long is the trial, can i try deepwell, test drive, try before buying, is there a free plan, free version, free tier, is it free
-Yes. Solo has a **30-day free trial**. A card is required, you won't be charged until the trial ends, and you can cancel anytime. Shop, Crew and Fleet do not have a trial. If you want to see DeepWell on your own records first, ask about the free sample box.
+Yes. Solo has a **30-day free trial**. A card is required, you won't be charged until the trial ends, and you can cancel anytime. Team, Crew and Fleet do not have a trial. If you want to see DeepWell on your own records first, ask about the free sample box.
 
 ### Do I need a credit card for the trial?
 ~ card required, credit card for trial, need a card, card needed, payment method trial, charged during trial, when will i be charged, will i be charged, trial card, when will i be charged after the trial ends, charged after the trial, charged when the trial ends, billed after trial, when am i charged, charged right away, charged when i sign up, charged immediately, charged today, charged at signup, billed right away, billed when i sign up, will i get charged right away

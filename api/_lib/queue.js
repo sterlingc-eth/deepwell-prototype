@@ -361,7 +361,7 @@ function buildFunctions(inngest, NonRetriableError) {
       }
 
       // Cost guard: a customer's daily model-spend cap (tenants.limits.
-      // maxModelCallsPerDay, default sized for a Shop plan — see
+      // maxModelCallsPerDay, default sized for a Team plan — see
       // rateLimit.js) is checked BEFORE this run pays for another Anthropic
       // call. Wrapped in step.run so a retried run doesn't re-spend this
       // check pointlessly, though NonRetriableError below ends the run

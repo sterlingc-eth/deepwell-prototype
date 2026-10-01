@@ -20,7 +20,7 @@ import { TTLCache, memoAsync, logStage, registerTenantCache } from './perf.js';
  *
  * ROUND 26 (owner decisions, 2026-09-28) — plan tiers:
  *  - `logins` (was `technicians`): how many people besides the ONE owner
- *    account can sign in. Solo 2, Shop 5, Crew 10, Fleet 11+ (null = no
+ *    account can sign in. Solo 2, Team 5, Crew 10, Fleet 11+ (null = no
  *    DeepWell cap). Enforced for real — see api/_lib/seats.js (server-side
  *    invite guard + Clerk maxAllowedMemberships) and TeamScreen.tsx.
  *  - Donovan (asks) is UNLIMITED on every plan. There is deliberately no

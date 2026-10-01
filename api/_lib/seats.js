@@ -1,7 +1,7 @@
 /**
  * Login ("seat") entitlements — Round 26 plan tiers.
  *
- * Solo 2, Shop 5, Crew 10 logins, Fleet 11+ (no DeepWell cap) — see plan.js
+ * Solo 2, Team 5, Crew 10 logins, Fleet 11+ (no DeepWell cap) — see plan.js
  * PLAN_LIMITS.logins. "Logins" are people who can sign in to the shop, NOT
  * counting the ONE owner account.
  *
@@ -264,13 +264,19 @@ export async function syncTenantAfterBilling(pool, tenantId, opts = {}) {
   }
 }
 
+/** Display name for a plan id (the 'shop' id is shown to people as "Team"; ids themselves never change). */
+const planDisplayName = (plan) => {
+  const id = String(plan);
+  return id === 'shop' ? 'Team' : id.charAt(0).toUpperCase() + id.slice(1);
+};
+
 export const SEAT_LIMIT_MESSAGE = (plan, cap, used = null) =>
   // R35: after a downgrade (or an invite accepted just before one) an org can be OVER its cap. Say so plainly: current
   // members keep their access, only NEW invites are blocked, and removing people or upgrading is the way back.
   (Number.isFinite(used) && used > cap
-    ? `Your team has ${used} logins (including pending invites) but your ${String(plan).charAt(0).toUpperCase()}${String(plan).slice(1)} plan includes up to ${cap}. Everyone already on the team keeps their access; to invite someone new, remove ${used - cap} login${used - cap === 1 ? '' : 's'} or upgrade your plan.`
+    ? `Your team has ${used} logins (including pending invites) but your ${planDisplayName(plan)} plan includes up to ${cap}. Everyone already on the team keeps their access; to invite someone new, remove ${used - cap} login${used - cap === 1 ? '' : 's'} or upgrade your plan.`
     : null) ??
-  `Your ${String(plan).charAt(0).toUpperCase()}${String(plan).slice(1)} plan includes up to ${cap} login${cap === 1 ? '' : 's'} (the owner account isn't counted). Upgrade your plan to invite more people.`;
+  `Your ${planDisplayName(plan)} plan includes up to ${cap} login${cap === 1 ? '' : 's'} (the owner account isn't counted). Upgrade your plan to invite more people.`;
 
 /**
  * The server-side invite guard. Counts live (members + pending invites, owner

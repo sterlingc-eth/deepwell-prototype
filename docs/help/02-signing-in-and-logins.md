@@ -9,8 +9,8 @@ updated: 2026-09-29
 People sign in with their own DeepWell account. A company is one account, and the owner invites everyone else from the Team screen.
 
 ### How many logins does my plan include?
-~ how many users, how many seats, how many people, how many technicians, how many techs, number of logins, user limit, seat limit, login limit, how many employees, users per plan, seats per plan, login cap, how many users can i add, users can i add, how many people can i add, how many people can use it, how many team members
-Solo includes up to {{solo.logins}} logins, Shop up to {{shop.logins}}, Crew up to {{crew.logins}}, and Fleet {{fleet.logins}}. The owner account is not counted. So a Shop can have the owner plus five more people.
+~ how many users, shop plan logins, team plan logins, how many seats, how many people, how many technicians, how many techs, number of logins, user limit, seat limit, login limit, how many employees, users per plan, seats per plan, login cap, how many users can i add, users can i add, how many people can i add, how many people can use it, how many team members
+Solo includes up to {{solo.logins}} logins, Team up to {{shop.logins}}, Crew up to {{crew.logins}}, and Fleet {{fleet.logins}}. The owner account is not counted. So a Team plan can have the owner plus five more people.
 
 ### Is the owner counted as a login?
 ~ owner counted, does the owner count, owner account, does the owner use a seat, main account, admin count

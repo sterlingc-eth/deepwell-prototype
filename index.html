@@ -258,6 +258,25 @@ section{padding-block:clamp(36px,5vw,64px);border-top:1px solid var(--line)}
 .plan .math{min-height:5.2em}
 .trial-badge{white-space:nowrap;padding:3px 10px;border-radius:999px;background:var(--well);color:#fff;font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.08em;text-transform:uppercase}
 .pill-soon{display:inline-flex;align-items:center;padding:2px 9px;border-radius:999px;border:1px dashed var(--line-strong);color:var(--faint);background:transparent;font-family:"IBM Plex Mono",monospace;font-size:.64rem;letter-spacing:.07em;text-transform:uppercase;white-space:nowrap}
+/* roadmap section (generated markup: scripts/build-roadmap.mjs from docs/roadmap.json) */
+#roadmap{padding-block:clamp(28px,4vw,48px)}
+#roadmap .sec-head{align-items:center;margin-bottom:12px}
+.rm-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.rm-col{border:1px solid var(--line);background:var(--surface);padding:12px 14px 6px;min-width:0}
+.rm-col h3{font-size:1rem;margin:0 0 6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rm-live{border-top:3px solid var(--well)}
+.rm-next{border-top:3px solid var(--brass)}
+.rm-later{border-top:3px dashed var(--line-strong)}
+.rm-col ul{list-style:none;margin:0;padding:0}
+.rm-col li{display:flex;flex-direction:column;gap:1px;padding:6px 0;border-top:1px solid var(--line);font-size:.84rem;line-height:1.35}
+.rm-col li:first-child{border-top:0}
+.rm-col li b{font-weight:600;color:var(--text)}
+.rm-col li span{color:var(--muted)}
+.rm-ask{margin:10px 0 0;font-size:.9rem;color:var(--muted)}
+.rm-ask a{display:inline-flex;align-items:center;min-height:44px;padding-inline:4px;color:var(--well);font-weight:600;text-decoration:underline;text-underline-offset:3px}
+:root[data-theme="dark"] .rm-ask a{color:#9DC4B2}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .rm-ask a{color:#9DC4B2}}
+@media (max-width:860px){.rm-grid{grid-template-columns:1fr}}
 @media (max-width:1100px){.plans-4{grid-template-columns:repeat(2,1fr)}}
 @media (max-width:860px){.plans,.plans-4{grid-template-columns:1fr}}
 /* cost-of-missing-this: interactive calculator + tightened registration note */
@@ -789,6 +808,7 @@ section{padding-block:clamp(12px,1.3vw,18px)}
           <a role="menuitem" href="/industries/property-management.html">Property management <span class="tag soon">Coming</span></a>
         </div>
       </div>
+      <a href="#roadmap">Roadmap</a>
       <a href="#plans">Pricing</a>
       <a href="#team">Founders</a>
     </div>
@@ -1633,6 +1653,53 @@ section{padding-block:clamp(12px,1.3vw,18px)}
   </div>
 </section>
 
+<!-- roadmap:start -->
+<section id="roadmap" aria-labelledby="roadmap-h">
+  <div class="wrap">
+    <div class="sec-head dw-observe dw-once">
+      <div>
+        <div class="eyebrow">Roadmap</div>
+        <h2 id="roadmap-h">What we're building</h2>
+      </div>
+      <p class="lede">What works today, what we're building next, and what comes later. We don't give dates, because we'd rather ship it than promise it.</p>
+    </div>
+    <div class="rm-grid">
+      <div class="rm-col rm-live">
+        <h3>Live now</h3>
+        <ul>
+          <li><b>Ask Donovan</b><span>Ask a plain-English question and get an answer with the original page attached as the source.</span></li>
+          <li><b>Phone app scanning</b><span>Scan paperwork on your phone, even with no signal; pages upload when it returns.</span></li>
+          <li><b>Warranty tracking and export</b><span>See which coverage is expiring across every unit and export warranty records any time.</span></li>
+          <li><b>Records search</b><span>Find a customer, address, serial number or date across every document you have sent in.</span></li>
+          <li><b>Help chat</b><span>Ask the help chat how DeepWell works, any time, with answers drawn from our public help articles.</span></li>
+        </ul>
+      </div>
+      <div class="rm-col rm-next">
+        <h3>Building next <span class="pill-soon">Coming soon</span></h3>
+        <ul>
+          <li><b>Email and folder upload</b><span>Forward a vendor invoice or drop files in a folder and they file themselves.</span></li>
+          <li><b>Google Drive sync</b><span>Connect a Drive folder so new files come in on their own.</span></li>
+          <li><b>Branch scoping</b><span>Limit each person to the records of their own branch or location.</span></li>
+          <li><b>Callback analytics</b><span>See which technicians and equipment brands generate the most repeat visits.</span></li>
+          <li><b>Backups and per-company restore</b><span>Scheduled off-site backups, with the option to restore a single company.</span></li>
+          <li><b>Public status page and uptime SLA</b><span>A public status page and an uptime commitment with service credits.</span></li>
+        </ul>
+      </div>
+      <div class="rm-col rm-later">
+        <h3>Later <span class="pill-soon">Planned</span></h3>
+        <ul>
+          <li><b>Electrical</b><span>Panel schedules, permits and inspections for electrical contractors.</span></li>
+          <li><b>Plumbing</b><span>Backflow testing, water heater warranties and permits for plumbing contractors.</span></li>
+          <li><b>Property management</b><span>Leases, unit turns, vendor compliance and appliance warranties for property managers.</span></li>
+          <li><b>Fleet and equipment rental</b><span>Service history and paperwork for rented equipment and vehicle fleets.</span></li>
+        </ul>
+      </div>
+    </div>
+    <p class="rm-ask">Need something that isn't here? <a href="mailto:support@deepwelltechnology.com?subject=Feature%20request">Ask us</a></p>
+  </div>
+</section>
+<!-- roadmap:end -->
+
 <section id="plans">
   <div class="wrap">
     <div class="sec-head dw-observe dw-once">
@@ -1682,7 +1749,7 @@ section{padding-block:clamp(12px,1.3vw,18px)}
         <a class="btn btn-ghost" href="/app/?plan=solo&interval=month">Start free trial</a>
       </div>
       <div class="plan featured dw-observe dw-once">
-        <div class="plan-top"><div class="tier">Shop</div><span class="badge-pop">Most popular</span></div>
+        <div class="plan-top"><div class="tier">Team</div><span class="badge-pop">Most popular</span></div>
         <div class="plan-price"><h3>$199<span class="per">/mo</span></h3><p class="for">Small team</p></div>
 
         <div class="grp"><h4>Team</h4>
@@ -1706,7 +1773,7 @@ section{padding-block:clamp(12px,1.3vw,18px)}
             <li>Email intake <span class="pill-soon">Coming soon</span></li>
           </ul></div>
         <p class="math">Service companies: one avoided $300&ndash;600 repeat visit a month is $3,600&ndash;7,200 a year. You pay $199/mo.</p>
-        <a class="btn btn-primary" href="/app/?plan=shop&interval=month">Choose Shop</a>
+        <a class="btn btn-primary" href="/app/?plan=shop&interval=month">Choose Team</a>
       </div>
       <div class="plan dw-observe dw-once">
         <div class="plan-top"><div class="tier">Crew</div></div>
@@ -1728,7 +1795,7 @@ section{padding-block:clamp(12px,1.3vw,18px)}
             <li><span>Support</span><b>Email, chat, phone</b></li>
             <li><span>Response</span><b>2 hrs, urgent issues</b></li>
           </ul></div>
-        <div class="grp plus"><h4>Everything in Shop, plus</h4>
+        <div class="grp plus"><h4>Everything in Team, plus</h4>
           <ul>
             <li>Scheduled onboarding call</li>
             <li>Daily off-site backups, 30-day restore <span class="pill-soon">Coming soon</span></li>
@@ -1931,7 +1998,7 @@ section{padding-block:clamp(12px,1.3vw,18px)}
           <div class="lbl">Estimated annual cost, combined</div>
           <p class="cost-final" aria-live="polite" aria-atomic="true"><b id="cc-out-total">$26,800</b><span>/yr</span></p>
         </div>
-        <p class="cost-compare" id="cc-compare">That's about <b>11.2×</b> the Shop plan's <b>$2,388/yr</b> (<b>$199/mo</b>) cost — at this scale one plan pays for itself many times over.</p>
+        <p class="cost-compare" id="cc-compare">That's about <b>11.2×</b> the Team plan's <b>$2,388/yr</b> (<b>$199/mo</b>) cost — at this scale one plan pays for itself many times over.</p>
         <button type="button" class="cost-reset" id="cc-reset">Reset to defaults</button>
       </div>
     </div>
@@ -2435,14 +2502,14 @@ sync(true);if(mq.addEventListener)mq.addEventListener('change',function(){sync(f
    deliberately separate from the numbered micro-animation IIFEs above and
    from the Industries-dropdown script. Vanilla JS, no dependencies, no
    localStorage. Plan price is read from the #plans section of this same
-   page (Shop, $199/mo) rather than invented. Fully self-guarding: if any
+   page (Team, $199/mo) rather than invented. Fully self-guarding: if any
    expected element is missing, it quietly does nothing. */
 (function () {
   var calc = document.getElementById('cost-calc');
   if (!calc) return;
 
-  var PLAN_NAME = 'Shop';
-  var PLAN_PRICE = 199; // matches the "Shop" tier price in #plans
+  var PLAN_NAME = 'Team';
+  var PLAN_PRICE = 199; // matches the "Team" tier price in #plans
 
   var money0 = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 

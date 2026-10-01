@@ -105,12 +105,12 @@ export interface BillingStatus {
 /** Monthly USD price per plan — mirrors api/_lib/billing.js's PLAN_CATALOG. */
 export const PLAN_CATALOG: Record<BillingPlanId, { name: string; monthly: number; trialEligible: boolean }> = {
   solo: { name: 'DeepWell Solo', monthly: 99, trialEligible: true },
-  shop: { name: 'DeepWell Shop', monthly: 199, trialEligible: false },
+  shop: { name: 'DeepWell Team', monthly: 199, trialEligible: false },
   crew: { name: 'DeepWell Crew', monthly: 399, trialEligible: false },
   fleet: { name: 'DeepWell Fleet', monthly: 899, trialEligible: false },
 };
 
-/** Mirrors api/_lib/plan.js's PLAN_LIMITS — display only. Round 26: Solo 2 / Shop 5 / Crew 10 logins (owner not counted), Fleet 11+. */
+/** Mirrors api/_lib/plan.js's PLAN_LIMITS — display only. Round 26: Solo 2 / Team 5 / Crew 10 logins (owner not counted), Fleet 11+. */
 export const PLAN_LIMITS: Record<BillingPlanId, PlanLimits> = {
   solo: { logins: 2, documentsStored: 25_000, pagesPerMonth: 750 },
   shop: { logins: 5, documentsStored: 100_000, pagesPerMonth: 2_000 },

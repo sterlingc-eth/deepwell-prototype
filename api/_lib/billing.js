@@ -21,7 +21,7 @@ import { PLAN_LIMITS } from './plan.js';
 /** Monthly USD price per plan. Annual = 11x monthly (one month free). */
 export const PLAN_CATALOG = Object.freeze({
   solo:  Object.freeze({ id: 'solo',  name: 'DeepWell Solo',  monthly: 99,  trialEligible: true }),
-  shop:  Object.freeze({ id: 'shop',  name: 'DeepWell Shop',  monthly: 199, trialEligible: false }),
+  shop:  Object.freeze({ id: 'shop',  name: 'DeepWell Team',  monthly: 199, trialEligible: false }),
   crew:  Object.freeze({ id: 'crew',  name: 'DeepWell Crew',  monthly: 399, trialEligible: false }),
   fleet: Object.freeze({ id: 'fleet', name: 'DeepWell Fleet', monthly: 899, trialEligible: false }),
 });
