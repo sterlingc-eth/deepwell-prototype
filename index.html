@@ -259,24 +259,48 @@ section{padding-block:clamp(36px,5vw,64px);border-top:1px solid var(--line)}
 .trial-badge{white-space:nowrap;padding:3px 10px;border-radius:999px;background:var(--well);color:#fff;font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.08em;text-transform:uppercase}
 .pill-soon{display:inline-flex;align-items:center;padding:2px 9px;border-radius:999px;border:1px dashed var(--line-strong);color:var(--faint);background:transparent;font-family:"IBM Plex Mono",monospace;font-size:.64rem;letter-spacing:.07em;text-transform:uppercase;white-space:nowrap}
 /* roadmap section (generated markup: scripts/build-roadmap.mjs from docs/roadmap.json) */
-#roadmap{padding-block:clamp(28px,4vw,48px)}
-#roadmap .sec-head{align-items:center;margin-bottom:12px}
-.rm-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
-.rm-col{border:1px solid var(--line);background:var(--surface);padding:12px 14px 6px;min-width:0}
-.rm-col h3{font-size:1rem;margin:0 0 6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.rm-live{border-top:3px solid var(--well)}
-.rm-next{border-top:3px solid var(--brass)}
-.rm-later{border-top:3px dashed var(--line-strong)}
-.rm-col ul{list-style:none;margin:0;padding:0}
-.rm-col li{display:flex;flex-direction:column;gap:1px;padding:6px 0;border-top:1px solid var(--line);font-size:.84rem;line-height:1.35}
-.rm-col li:first-child{border-top:0}
-.rm-col li b{font-weight:600;color:var(--text)}
-.rm-col li span{color:var(--muted)}
-.rm-ask{margin:10px 0 0;font-size:.9rem;color:var(--muted)}
-.rm-ask a{display:inline-flex;align-items:center;min-height:44px;padding-inline:4px;color:var(--well);font-weight:600;text-decoration:underline;text-underline-offset:3px}
-:root[data-theme="dark"] .rm-ask a{color:#9DC4B2}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .rm-ask a{color:#9DC4B2}}
-@media (max-width:860px){.rm-grid{grid-template-columns:1fr}}
+#roadmap{padding-block:clamp(36px,5vw,64px);--rm-gap:clamp(18px,2.6vw,36px);--rm-node:34px}
+#roadmap .sec-head{align-items:end;margin-bottom:clamp(20px,3vw,32px)}
+.rm-stages{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--rm-gap)}
+.rm-stage{position:relative;min-width:0;display:flex;flex-direction:column}
+.rm-stage:not(:last-child)::before{content:"";position:absolute;top:calc(var(--rm-node)/2 - 1px);left:calc(var(--rm-node) + 10px);right:calc(-1*var(--rm-gap) + 10px);height:2px;background:var(--well);opacity:.55}
+.rm-next::before{background:repeating-linear-gradient(90deg,var(--brass) 0 8px,transparent 8px 14px)!important;opacity:.8!important}
+.rm-top{display:flex;flex-direction:column;align-items:flex-start;gap:12px;margin-bottom:16px}
+.rm-node{position:relative;flex:none;width:var(--rm-node);height:var(--rm-node);border-radius:50%;display:grid;place-items:center}
+.rm-live .rm-node{background:var(--well);color:#fff}
+.rm-next .rm-node{border:2px solid var(--brass);background:var(--ground)}
+.rm-next .rm-node::before{content:"";width:12px;height:12px;border-radius:50%;background:var(--brass)}
+.rm-next .rm-node::after{content:"";position:absolute;inset:-2px;border-radius:50%;border:2px solid var(--brass);animation:rmPulse 2.4s ease-out infinite}
+.rm-later .rm-node{border:2px dashed var(--line-strong);background:var(--ground)}
+@keyframes rmPulse{0%{transform:scale(1);opacity:.7}100%{transform:scale(1.9);opacity:0}}
+@media (prefers-reduced-motion:reduce){.rm-next .rm-node::after{animation:none;opacity:0}}
+.rm-top h3{margin:0;font-size:1.15rem;line-height:1.2}
+.rm-top small{display:block;font:500 .7rem/1.3 var(--mono,ui-monospace,monospace);letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-top:3px}
+.rm-next .rm-top small{color:var(--brass-text)}
+.rm-items{list-style:none;margin:0;padding:16px 18px;display:grid;align-content:start;gap:14px;flex:1;background:var(--surface);border:1px solid var(--line);border-radius:8px}
+.rm-next .rm-items{border-color:rgba(185,138,78,.55);box-shadow:0 18px 40px -30px rgba(185,138,78,.9)}
+.rm-later .rm-items{background:transparent;border-style:dashed}
+.rm-items li{position:relative;padding-left:22px;font-size:.86rem;line-height:1.4;color:var(--muted)}
+.rm-items li b{display:block;font-size:.95rem;font-weight:600;color:var(--text);margin-bottom:1px}
+.rm-items li span{display:block}
+.rm-items li::before{content:"";position:absolute;left:0;top:.38em;width:9px;height:9px;border-radius:50%}
+.rm-live .rm-items li::before{width:12px;height:7px;border-radius:0;border-left:2px solid var(--well);border-bottom:2px solid var(--well);transform:rotate(-45deg);top:.3em;left:1px}
+.rm-next .rm-items li::before{background:var(--brass)}
+.rm-later .rm-items li::before{border:1.5px solid var(--line-strong)}
+.rm-ask{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px 14px;margin:clamp(20px,3vw,32px) 0 0;font-size:.95rem;color:var(--muted);text-align:center}
+.rm-ask a{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:10px 18px;border:1px solid var(--line-strong);border-radius:4px;color:var(--text);font-weight:600;text-decoration:none;transition:background .2s ease,transform .2s ease}
+.rm-ask a:hover{background:var(--surface);transform:translateY(-1px)}
+:root[data-theme="dark"] .rm-live .rm-items li::before{border-color:#9DC4B2}
+:root[data-theme="dark"] .rm-live .rm-node{background:#2F6B52}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .rm-live .rm-items li::before{border-color:#9DC4B2}:root:not([data-theme="light"]) .rm-live .rm-node{background:#2F6B52}}
+@media (max-width:860px){
+  .rm-stages{grid-template-columns:1fr;gap:28px}
+  .rm-stage{padding-left:calc(var(--rm-node) + 14px)}
+  .rm-top{flex-direction:row;align-items:center;margin-left:calc(-1*(var(--rm-node) + 14px));margin-bottom:12px}
+  .rm-stage:not(:last-child)::before{top:calc(var(--rm-node) + 8px);bottom:-20px;left:calc(var(--rm-node)/2 - 1px);right:auto;width:2px;height:auto}
+  .rm-next::before{background:repeating-linear-gradient(180deg,var(--brass) 0 8px,transparent 8px 14px)!important}
+}
+@media (max-width:600px){.rm-items{gap:10px;padding:14px 16px}.rm-items li span{display:none}.rm-items li b{margin:0}}
 @media (max-width:1100px){.plans-4{grid-template-columns:repeat(2,1fr)}}
 @media (max-width:860px){.plans,.plans-4{grid-template-columns:1fr}}
 /* cost-of-missing-this: interactive calculator + tightened registration note */
@@ -1661,22 +1685,22 @@ section{padding-block:clamp(12px,1.3vw,18px)}
         <div class="eyebrow">Roadmap</div>
         <h2 id="roadmap-h">What we're building</h2>
       </div>
-      <p class="lede">What works today, what we're building next, and what comes later. We don't give dates, because we'd rather ship it than promise it.</p>
+      <p class="lede">What works today, what's being built now, and what comes after. No dates. We'd rather ship it than promise it.</p>
     </div>
-    <div class="rm-grid">
-      <div class="rm-col rm-live">
-        <h3>Live now</h3>
-        <ul>
+    <ol class="rm-stages">
+      <li class="rm-stage rm-live dw-observe dw-once">
+        <div class="rm-top"><span class="rm-node" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div><h3>Live now</h3><small>Working today</small></div></div>
+        <ul class="rm-items">
           <li><b>Ask Donovan</b><span>Ask a plain-English question and get an answer with the original page attached as the source.</span></li>
           <li><b>Phone app scanning</b><span>Scan paperwork on your phone, even with no signal; pages upload when it returns.</span></li>
           <li><b>Warranty tracking and export</b><span>See which coverage is expiring across every unit and export warranty records any time.</span></li>
           <li><b>Records search</b><span>Find a customer, address, serial number or date across every document you have sent in.</span></li>
           <li><b>Help chat</b><span>Ask the help chat how DeepWell works, any time, with answers drawn from our public help articles.</span></li>
         </ul>
-      </div>
-      <div class="rm-col rm-next">
-        <h3>Building next <span class="pill-soon">Coming soon</span></h3>
-        <ul>
+      </li>
+      <li class="rm-stage rm-next dw-observe dw-once">
+        <div class="rm-top"><span class="rm-node" aria-hidden="true"></span><div><h3>Building next</h3><small>Coming soon</small></div></div>
+        <ul class="rm-items">
           <li><b>Email and folder upload</b><span>Forward a vendor invoice or drop files in a folder and they file themselves.</span></li>
           <li><b>Google Drive sync</b><span>Connect a Drive folder so new files come in on their own.</span></li>
           <li><b>Branch scoping</b><span>Limit each person to the records of their own branch or location.</span></li>
@@ -1684,18 +1708,18 @@ section{padding-block:clamp(12px,1.3vw,18px)}
           <li><b>Backups and per-company restore</b><span>Scheduled off-site backups, with the option to restore a single company.</span></li>
           <li><b>Public status page and uptime SLA</b><span>A public status page and an uptime commitment with service credits.</span></li>
         </ul>
-      </div>
-      <div class="rm-col rm-later">
-        <h3>Later <span class="pill-soon">Planned</span></h3>
-        <ul>
+      </li>
+      <li class="rm-stage rm-later dw-observe dw-once">
+        <div class="rm-top"><span class="rm-node" aria-hidden="true"></span><div><h3>Later</h3><small>Planned</small></div></div>
+        <ul class="rm-items">
           <li><b>Electrical</b><span>Panel schedules, permits and inspections for electrical contractors.</span></li>
           <li><b>Plumbing</b><span>Backflow testing, water heater warranties and permits for plumbing contractors.</span></li>
           <li><b>Property management</b><span>Leases, unit turns, vendor compliance and appliance warranties for property managers.</span></li>
           <li><b>Fleet and equipment rental</b><span>Service history and paperwork for rented equipment and vehicle fleets.</span></li>
         </ul>
-      </div>
-    </div>
-    <p class="rm-ask">Need something that isn't here? <a href="mailto:support@deepwelltechnology.com?subject=Feature%20request">Ask us</a></p>
+      </li>
+    </ol>
+    <p class="rm-ask">Need something that isn't here? <a href="mailto:support@deepwelltechnology.com?subject=Feature%20request">Tell us what to build <span aria-hidden="true">→</span></a></p>
   </div>
 </section>
 <!-- roadmap:end -->

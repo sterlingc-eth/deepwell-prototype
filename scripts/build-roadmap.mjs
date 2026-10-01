@@ -38,14 +38,15 @@ for (const g of GROUPS) {
 if (problems.length) { console.error(problems.map((p) => `build-roadmap: ${p}`).join('\n')); process.exit(1); }
 
 /* ------------------------------------------------------------ (a) website section */
-function column(cls, heading, pill, items) {
+const CHECK_SVG = '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+function stage(cls, heading, sub, items) {
   const lis = items.map((it) => `<li><b>${esc(it.title)}</b><span>${esc(it.text)}</span></li>`).join('\n          ');
-  return `      <div class="rm-col ${cls}">
-        <h3>${esc(heading)}${pill ? ` <span class="pill-soon">${esc(pill)}</span>` : ''}</h3>
-        <ul>
+  return `      <li class="rm-stage ${cls} dw-observe dw-once">
+        <div class="rm-top"><span class="rm-node" aria-hidden="true">${cls === 'rm-live' ? CHECK_SVG : ''}</span><div><h3>${esc(heading)}</h3><small>${esc(sub)}</small></div></div>
+        <ul class="rm-items">
           ${lis}
         </ul>
-      </div>`;
+      </li>`;
 }
 const sectionHtml = `${START}
 <section id="roadmap" aria-labelledby="roadmap-h">
@@ -55,14 +56,14 @@ const sectionHtml = `${START}
         <div class="eyebrow">Roadmap</div>
         <h2 id="roadmap-h">What we're building</h2>
       </div>
-      <p class="lede">What works today, what we're building next, and what comes later. We don't give dates, because we'd rather ship it than promise it.</p>
+      <p class="lede">What works today, what's being built now, and what comes after. No dates. We'd rather ship it than promise it.</p>
     </div>
-    <div class="rm-grid">
-${column('rm-live', 'Live now', '', road.live)}
-${column('rm-next', 'Building next', 'Coming soon', road.next)}
-${column('rm-later', 'Later', 'Planned', road.later)}
-    </div>
-    <p class="rm-ask">Need something that isn't here? <a href="mailto:${SUPPORT_MAIL}?subject=Feature%20request">Ask us</a></p>
+    <ol class="rm-stages">
+${stage('rm-live', 'Live now', 'Working today', road.live)}
+${stage('rm-next', 'Building next', 'Coming soon', road.next)}
+${stage('rm-later', 'Later', 'Planned', road.later)}
+    </ol>
+    <p class="rm-ask">Need something that isn't here? <a href="mailto:${SUPPORT_MAIL}?subject=Feature%20request">Tell us what to build <span aria-hidden="true">→</span></a></p>
   </div>
 </section>
 ${END}`;
