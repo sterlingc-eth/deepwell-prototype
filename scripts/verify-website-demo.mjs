@@ -31,7 +31,8 @@ const SCENARIOS = [
   { name: 'click during typing (mid-way)', steps: [['c',0,250],['c',1,0]], expect: 1 },
   { name: 'click during answer reveal', steps: [['c',3,'done'],['c',1,120],['c',2,0]], expect: 2 },
   { name: 'click same chip after finished (retypes)', steps: [['c',0,'done'],['c',0,0]], expect: 0 },
-  { name: '20 clicks in ~300ms', steps: Array.from({length:20},(_,k)=>['c',k%4,15]), expect: 3 },
+  { name: '20 clicks in ~300ms', steps: Array.from({length:20},(_,k)=>['c',k%5,15]), expect: 4 },
+  { name: 'last (equipment) chip after others', steps: [['c',0,40],['c',4,40]], expect: 4 },
   { name: 'keyboard (focus + Enter/Space) rapid', kb: true, steps: [['c',0,30],['c',2,30],['c',1,30]], expect: 1 },
 ];
 
@@ -81,10 +82,10 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
     await page.locator('#demo').scrollIntoViewIfNeeded();
     await page.locator('#q1').dispatchEvent('click');
     await sleep(200);
-    await page.locator('#ask-input').fill('carrier expire 90');
+    await page.locator('#ask-input').fill('contract expire 90');
     await sleep(1500);
     let v = await page.inputValue('#ask-input');
-    ok(v === 'carrier expire 90', `user typing during animation: input "${v}"`);
+    ok(v === 'contract expire 90', `user typing during animation: input "${v}"`);
     // submit mid-animation: input frozen at submit time, answer matches submitted text
     await page.reload({ waitUntil: 'load' });
     await page.locator('#demo').scrollIntoViewIfNeeded();
@@ -103,6 +104,21 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
     await page.locator('#ask-input').press('Enter');
     await sleep(700);
     ok((await page.textContent('#demo-main .answer')) === info.demo[3].a, 'submit after chip finished shows chip answer');
+    // every chip's own question, typed and submitted, returns that chip's answer (sourced), and each answer cites sources
+    for (let k = 0; k < info.demo.length; k++) {
+      await page.locator('#ask-input').fill(info.demo[k].q);
+      await page.locator('#ask-input').press('Enter');
+      await sleep(150);
+      ok((await page.textContent('#demo-main .answer')) === info.demo[k].a, `typed chip ${k} question returns its own answer`);
+      ok((await page.locator('#demo-main .src').count()) >= 2, `chip ${k} answer shows 2+ sources`);
+    }
+    // a question the sample records don't hold must not get another chip's answer
+    await page.locator('#ask-input').fill('When does the Okafor agreement end?');
+    await page.locator('#ask-input').press('Enter');
+    await sleep(150);
+    ok(/Nothing in the sample records/.test(await page.textContent('#demo-main .answer')), 'unmatched question gets the not-in-sample message');
+    // the demo no longer leads with equipment
+    ok(!/furnace|Carrier|serial/i.test(info.demo.slice(0, 4).map(d => d.q).join(' ')), 'first four chips are not equipment questions');
     console.log(`  ${errs.length ? 'FAIL' : 'ok  '} console/page errors: ${errs.length}`);
     errs.forEach(e => console.log('    ' + e));
     ok(errs.length === 0, 'console errors');
