@@ -337,7 +337,7 @@ export function BillingScreen() {
           </div>
         </section>
 
-        {!gated && <ApiAccessCard plan={status?.plan ?? null} onUpgrade={() => document.getElementById('plans-heading')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />}
+        {!gated && <ApiAccessCard plan={status?.plan ?? null} staffImportUntil={status?.staffImport?.until ?? null} onUpgrade={() => document.getElementById('plans-heading')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />}
 
         <section className="dw-card p-5 space-y-3" aria-labelledby="rescue-heading">
           <h2 id="rescue-heading" className="text-h3">

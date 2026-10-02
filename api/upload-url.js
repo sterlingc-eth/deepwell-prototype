@@ -4,7 +4,7 @@ import { handleCors, handleError } from "./_lib/claude.js";
 import { requireAuthOrKey, assertScope } from "./_lib/apiKeyAuth.js";
 import { denyAuth } from "./_lib/auth.js";
 import { limit } from "./_lib/rateLimit.js";
-import { gateUpload, getCachedBillingRow, estimatePagesForUpload, batchLimitMessage } from "./_lib/plan.js";
+import { gateUpload, getCachedBillingRow, estimatePagesForUpload, batchLimitMessage, staffImportFor, IMPORT_ALLOWANCE_CODE } from "./_lib/plan.js";
 import { logStage } from "./_lib/perf.js";
 import { startTimer } from "./_lib/timing.js";
 
@@ -27,6 +27,12 @@ export async function checkUploadGate(auth) {
   try {
     return await checkUploadGateInner(auth);
   } catch (err) {
+    // R43: ...EXCEPT while a staff import is active. Its page budget is the spend ceiling of a bulk load, so a broken count
+    // must not mean "no ceiling": refuse this request (503 is retried by the import tool with a back-off) instead.
+    if (err?.staffImportActive) {
+      console.error("billing gate failed CLOSED during a staff import (checkUploadGate):", err?.message);
+      return { allowed: false, status: 503, error: "The import allowance could not be checked just now. Try again in a minute." };
+    }
     console.error("billing gate failed open (checkUploadGate):", err?.message);
     return { allowed: true };
   }
@@ -44,16 +50,24 @@ async function checkUploadGateInner(auth) {
   // Rescue credit through its own connection; with the pool at 3 connections, holding one here while waiting for another could
   // deadlock three concurrent uploads on a cold cache. On a cache hit (almost always) this costs nothing.
   const billingRow = await getCachedBillingRow(ctx);
+  // R43: a staff import (tenants.limits.staffImport, see plan.js) keeps its pages out of the monthly count and, while
+  // active, is gated on its own page budget; the import pages are only counted when one is active.
+  const imp = staffImportFor(billingRow);
+  const importWindow = imp ? { from: imp.from.toISOString(), to: imp.end.toISOString() } : null;
   return withTenant(ctx, async (db) => {
-    const [documentsStored, pagesThisMonth, pendingPages] = await Promise.all([
+    const [documentsStored, pagesThisMonth, pendingPages, importPagesUsed] = await Promise.all([
       db.countDocuments(),
-      db.countPagesSince(new Date(Date.now() - MS_PER_MONTH).toISOString()),
+      db.countPagesSince(new Date(Date.now() - MS_PER_MONTH).toISOString(), importWindow),
       // R30 M6: pages of documents already accepted but not read yet (fails safe to 0 if the probe errors).
       typeof db.estimatePendingPages === "function" ? db.estimatePendingPages().catch(() => 0) : 0,
+      imp?.active && typeof db.countPagesBetween === "function" ? db.countPagesBetween(importWindow.from, importWindow.to) : 0,
     ]);
-    const gate = gateUpload(billingRow, { documentsStored, pagesThisMonth, pendingPages });
+    const gate = gateUpload(billingRow, { documentsStored, pagesThisMonth, pendingPages, importPagesUsed });
     // R35: keep the plan row with the verdict so a 50-file batch can say, per file, which ones no longer fit.
     return gate.allowed ? { ...gate, billingRow } : gate;
+  }).catch((err) => {
+    if (imp?.active && err && typeof err === "object") err.staffImportActive = true;
+    throw err;
   });
 }
 
@@ -341,7 +355,7 @@ export async function createUploadUrls(auth, files, allowance = null) {
         try {
           const validated = validateUploadBody(raw);
           if (pagesLeft != null && pagesLeft <= 0) {
-            results.push({ filename: validated.filename, error: batchLimitMessage("pages", allowance.billingRow), status: 402, url: "/app/?screen=billing" });
+            results.push({ filename: validated.filename, error: batchLimitMessage("pages", allowance.billingRow), status: 402, url: "/app/?screen=billing", ...(allowance.importMode ? { code: IMPORT_ALLOWANCE_CODE } : {}) });
             continue;
           }
           if (docsLeft != null && docsLeft <= 0) {
@@ -507,7 +521,7 @@ export default async function handler(req, res) {
     const gate = await timer.time("gate", () => checkUploadGate(auth));
     if (!gate.allowed) {
       statusSent = gate.status;
-      return handleCors(res, req).status(gate.status).json({ error: gate.error, url: gate.url });
+      return handleCors(res, req).status(gate.status).json({ error: gate.error, url: gate.url, ...(gate.code ? { code: gate.code } : {}) });
     }
 
     // Batch shape: { files: [...] } -> { results: [...] }. One request, one

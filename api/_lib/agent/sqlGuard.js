@@ -63,6 +63,9 @@ export const REAL_TABLES = Object.freeze([
   // M3-config/61-support-assistant.sql (R28): the support assistant's rate-limit windows. No app-role grants, so
   // this is defence in depth only (R30 L5: verify-agent's "every CREATE TABLE is in REAL_TABLES" check failed).
   "support_public_windows",
+  // M3-config/65-scale-donovan-and-customers.sql (R41): the Customers-list summary and its to-do list. Derived data only
+  // (last activity, document counts); Donovan reads customers through the `customers` view, never these.
+  "customer_activity", "customer_activity_dirty",
 ]);
 
 const DENY_TOKENS = new Set([

@@ -9,8 +9,9 @@ import { AskAdminNote } from './AskAdminNote';
  * API access (Round 26): Fleet-only. Every other plan sees an upgrade prompt; Fleet gets a small key manager
  * (list / create / revoke) backed by /api/keys. The server enforces the same rule — this card is presentation.
  */
-export function ApiAccessCard({ plan, onUpgrade }: { plan: BillingPlanId | null; onUpgrade: () => void }) {
-  const allowed = hasApiAccess(plan);
+export function ApiAccessCard({ plan, onUpgrade, staffImportUntil = null }: { plan: BillingPlanId | null; onUpgrade: () => void; staffImportUntil?: string | null }) {
+  // R43: DeepWell staff can open a data import for a company on any plan; the keys card is then available until it ends.
+  const allowed = hasApiAccess(plan) || Boolean(staffImportUntil);
   const canAdmin = useCanAdmin();
   return (
     <section className="dw-card p-5 space-y-3" aria-labelledby="api-access-heading">
@@ -23,7 +24,14 @@ export function ApiAccessCard({ plan, onUpgrade }: { plan: BillingPlanId | null;
           API keys are managed by a company admin. <AskAdminNote />
         </p>
       ) : allowed ? (
-        <KeyManager />
+        <>
+          {staffImportUntil && !hasApiAccess(plan) && (
+            <p className="text-caption text-ink-2">
+              DeepWell support has opened a data import for your company until {new Date(staffImportUntil).toLocaleDateString()}. Create the key they ask for here; it stops working when the import ends.
+            </p>
+          )}
+          <KeyManager />
+        </>
       ) : (
         <>
           <p className="text-ink-2">API access is included on the Fleet plan. Upgrade to connect your own systems to DeepWell with API keys.</p>

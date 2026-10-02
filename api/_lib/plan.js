@@ -12,6 +12,8 @@
  */
 import { getTenantContext, withTenant } from './recordsStore.js';
 import { TTLCache, memoAsync, logStage, registerTenantCache } from './perf.js';
+import { STAFF_IMPORT_KEY, STAFF_IMPORT_MAX_DAYS, STAFF_IMPORT_CEILINGS, staffImportFor, staffImportWindowFor, staffImportNow, noteDatabaseClock } from './staffImport.js';
+export { STAFF_IMPORT_KEY, STAFF_IMPORT_MAX_DAYS, STAFF_IMPORT_CEILINGS, staffImportFor, staffImportWindowFor, staffImportNow, noteDatabaseClock };
 
 /** Per-plan entitlements, written to tenants.limits by billing_apply() on every
  * subscription create/update webhook. Exported so api/_lib/billing.js's
@@ -65,6 +67,14 @@ export const API_ACCESS_MESSAGE = 'API access is included on the Fleet plan';
 export function hasApiAccess(plan) {
   return plan === 'fleet';
 }
+
+/** API access: Fleet, or any plan while a staff import is active (R43). */
+export function hasApiAccessFor(tenantRow, now) {
+  return hasApiAccess(tenantRow?.plan) || staffImportFor(tenantRow, now)?.active === true;
+}
+
+/** Stable machine-readable codes the staff import tool reads off a 402 (the browser ignores them). */
+export const IMPORT_ALLOWANCE_CODE = 'import-allowance-exhausted';
 
 /**
  * Hidden Donovan safety ceiling (Round 26): Donovan is "Unlimited" to
@@ -267,13 +277,16 @@ export async function loadRescueCredit(db, tenantRow, now = new Date()) {
     const firstMonth = new Date(Date.UTC(firstAt.getUTCFullYear(), firstAt.getUTCMonth(), 1)).toISOString();
     const thisMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
     const monthlyAllowance = (PLAN_LIMITS[tenantRow?.plan]?.pagesPerMonth ?? 0) + extraPagesFor(tenantRow);
+    // R43: pages read inside a staff import window never draw on the monthly allowance, so they do not draw on the credit.
+    const win = staffImportWindowFor(tenantRow);
     const u = await db.raw(
       `SELECT COALESCE(SUM(GREATEST(n - $3::bigint, 0)), 0)::bigint AS used FROM (
          SELECT count(*) AS n FROM document_pages
           WHERE ${T} AND created_at >= $1::timestamptz AND created_at < $2::timestamptz
+            AND ($4::timestamptz IS NULL OR created_at < $4::timestamptz OR created_at >= $5::timestamptz)
           GROUP BY date_trunc('month', created_at AT TIME ZONE 'UTC')
        ) m`,
-      [firstMonth, thisMonth, monthlyAllowance]
+      [firstMonth, thisMonth, monthlyAllowance, win?.from ?? null, win?.to ?? null]
     );
     const used = Math.min(granted, Number(u.rows[0]?.used) || 0);
     return { granted, used, remaining: Math.max(0, granted - used) };
@@ -321,7 +334,7 @@ export function estimatePagesForUpload(contentType, sizeBytes) {
  *   On allow, `pagesRemaining` / `documentsRemaining` (R35) say how much headroom is left (null = uncapped), so a batch of
  *   50 files stops at the cap instead of every file in it sailing past a check that only looked at the count before it.
  */
-export function gateUpload(tenantRow, usage, now = new Date()) {
+export function gateUpload(tenantRow, usage, now) {
   const state = planStateFor(tenantRow, now);
   const billingUrl = '/app/?screen=billing';
 
@@ -342,9 +355,31 @@ export function gateUpload(tenantRow, usage, now = new Date()) {
     };
   }
   // trialing, active, or past_due-within-grace: check the monthly page cap and the stored-document cap.
-  const cap = pageCapFor(tenantRow);
   const pagesRead = Number(usage?.pagesThisMonth) || 0;
   const pending = Math.max(0, Math.trunc(Number(usage?.pendingPages) || 0));
+  // R43: while a staff import is active, a dedicated import page budget replaces the monthly cap (and the stored-document
+  // cap is raised by `documents`); the pages it reads are kept out of the monthly count (recordsStore.js countPagesSince).
+  const imp = staffImportFor(tenantRow, now);
+  if (imp?.active) {
+    const importUsed = Math.max(0, Math.trunc(Number(usage?.importPagesUsed) || 0));
+    if (importUsed + pending >= imp.pages) {
+      return { allowed: false, status: 402, url: billingUrl, code: IMPORT_ALLOWANCE_CODE, error: importAllowanceMessage(imp.pages) };
+    }
+    const docCapI = documentCapFor(tenantRow);
+    const docsI = Number(usage?.documentsStored);
+    if (docCapI != null && Number.isFinite(docsI) && docsI >= docCapI + imp.documents) {
+      return {
+        allowed: false, status: 402, url: billingUrl, code: 'import-documents-exhausted',
+        error: `Your plan stores up to ${fmtInt(docCapI)} documents${imp.documents ? ` (${fmtInt(imp.documents)} more are allowed while the DeepWell import is open)` : ''} and you have ${fmtInt(docsI)}. DeepWell staff can raise the import's document allowance, or move you to a larger plan.`,
+      };
+    }
+    return {
+      allowed: true, importMode: true,
+      pagesRemaining: Math.max(0, imp.pages - importUsed - pending),
+      documentsRemaining: docCapI == null || !Number.isFinite(docsI) ? null : Math.max(0, docCapI + imp.documents - docsI),
+    };
+  }
+  const cap = pageCapFor(tenantRow);
   const topPlan = tenantRow?.plan === 'fleet';
   const moreHelp = topPlan
     ? 'Email support@deepwelltechnology.com to add pages for a big import.'
@@ -371,8 +406,15 @@ export function gateUpload(tenantRow, usage, now = new Date()) {
   };
 }
 
+/** R43: the 402 text when the staff import's page budget is used up. */
+export function importAllowanceMessage(pages) {
+  return `The temporary page allowance for DeepWell's data import on this account (${fmtInt(pages)} pages) is used up, so nothing more can be added right now. Everything already uploaded is safe. DeepWell staff can raise the allowance; then run the import again and it carries on where it stopped.`;
+}
+
 /** R35: the per-file 402 a batch reports for a file that did not fit under the monthly page cap / stored-document cap. */
-export function batchLimitMessage(kind, tenantRow, now = new Date()) {
+export function batchLimitMessage(kind, tenantRow, now) {
+  const imp = staffImportFor(tenantRow, now);
+  if (imp?.active && kind === 'pages') return importAllowanceMessage(imp.pages);
   if (kind === 'documents') {
     return `Your plan's document limit was reached part-way through this batch. Delete documents you no longer need, or upgrade your plan, then add the rest again.`;
   }

@@ -22,6 +22,7 @@
 import { serializeClient, assertTenantUuid, isNonBlankId, explicitPgSsl } from './util/pgClient.js';
 import pg from 'pg';
 import { keyBelongsToTenant } from './r2.js';
+import { staffImportWindowFor, noteDatabaseClock } from './staffImport.js';
 import {
   customerMatchScore, CUSTOMER_MATCH_THRESHOLD, normalizeSurname, normalizeAddressKey, normalizeUnitKey,
   addressOnlyCustomerName, isAddressOnlyCustomer, isLikelyShopAddress, houseNumberOf,
@@ -188,9 +189,11 @@ let requestContextFnExists = null;
 async function fetchRequestContextRow(tenantKey, tenantName) {
   if (requestContextFnExists !== false) {
     try {
-      const { rows } = await getPool().query('SELECT * FROM get_request_context($1, $2)', [tenantKey, tenantName]);
+      // R43: now() rides along so every staff-import decision uses the DATABASE's clock (staffImport.js noteDatabaseClock).
+      const { rows } = await getPool().query('SELECT *, now() AS db_now FROM get_request_context($1, $2)', [tenantKey, tenantName]);
       requestContextFnExists = true;
       const row = rows[0];
+      if (row) noteDatabaseClock(row.db_now);
       // Empty/absent id (function returned no row, or a blank id): never hand
       // it to a caller that will feed it to SQL as a uuid — take the
       // multi-query path below, which validates the id itself.
@@ -234,11 +237,12 @@ async function fetchRequestContextRow(tenantKey, tenantName) {
     await client.query('BEGIN');
     await client.query("SELECT set_config('app.tenant_id', $1, true)", [assertTenantUuid(id)]);
     const { rows: tRows } = await client.query(
-      'SELECT plan, billing_status, trial_ends_at, current_period_end FROM tenants WHERE id = $1',
+      'SELECT plan, billing_status, trial_ends_at, current_period_end, now() AS db_now FROM tenants WHERE id = $1',
       [id]
     );
     await client.query('COMMIT');
     t = tRows[0] ?? {};
+    noteDatabaseClock(t.db_now);
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
     throw err;
@@ -2035,15 +2039,35 @@ function makeStore(db, tenantId) {
     // R35: the count never reaches back before the 1st (UTC) of the CURRENT month. Callers pass "now minus 30 days", but
     // the Billing screen, the 402 text and BILLING_RULES all promise the allowance resets on the 1st ("resets Oct 1"):
     // a shop that scanned 2,000 pages on Sep 25 was told it reset Oct 1 and was refused until Oct 25.
-    countPagesSince: async (sinceIso) => {
+    // R43: the pages a staff import read (tenants.limits.staffImport, see staffImport.js) are left out of the count, so a
+    // backfill never uses up (or is blocked by) the customer's monthly allowance. `excludeWindow` ({from, to} ISO strings)
+    // may be passed when the caller already holds the tenant row (the upload gate does, so it costs nothing extra there);
+    // `undefined` = look the company's own window up here (one primary-key read); null = exclude nothing. Still one index
+    // range count for the pages themselves.
+    countPagesSince: async (sinceIso, excludeWindow = undefined) => {
+      if (excludeWindow === undefined) {
+        const t = await one(`SELECT limits -> 'staffImport' AS si FROM tenants WHERE id = (current_setting('app.tenant_id', true))::uuid`, []);
+        excludeWindow = staffImportWindowFor({ limits: { staffImport: t?.si } });
+      }
       const r = await one(
         // No join to documents: document_pages carries its own tenant_id (RLS filters on it), and with
         // M3-config/63-page-count-index.sql this is an index range count (240k pages: 421 ms -> 4 ms). It runs on every
         // upload gate and every bootstrap, so it must not grow with the shop's whole history.
         `SELECT count(*)::int AS n FROM document_pages dp
           WHERE ${TENANT.replace('tenant_id', 'dp.tenant_id')}
-            AND dp.created_at >= GREATEST($1::timestamptz, date_trunc('month', NOW() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')`,
-        [sinceIso]
+            AND dp.created_at >= GREATEST($1::timestamptz, date_trunc('month', NOW() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')
+            AND ($2::timestamptz IS NULL OR dp.created_at < $2::timestamptz OR dp.created_at >= $3::timestamptz)`,
+        [sinceIso, excludeWindow?.from ?? null, excludeWindow?.to ?? null]
+      );
+      return r?.n ?? 0;
+    },
+    // R43: pages read between two instants (the staff import window), for the import page budget. Index range count.
+    countPagesBetween: async (fromIso, toIso) => {
+      const r = await one(
+        `SELECT count(*)::int AS n FROM document_pages dp
+          WHERE ${TENANT.replace('tenant_id', 'dp.tenant_id')}
+            AND dp.created_at >= $1::timestamptz AND dp.created_at < $2::timestamptz`,
+        [fromIso, toIso]
       );
       return r?.n ?? 0;
     },

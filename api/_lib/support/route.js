@@ -5,6 +5,8 @@
  *   GET  /api/support?starter=1&surface=public|app|mobile   -> {greeting, suggestions}   static, $0, no auth
  *   POST /api/support {message, history?, surface, page?, turn?} -> {reply, sources, mode, redirectTo?, handoff?, suggestions?}
  *   POST /api/support {action:'handoff', email, name?, message, transcript?, surface, kind?:'problem', diagnostics?} -> {ok:true}
+ *   POST /api/support {action:'inquiry', name, company, email, phone?, size?, where?, message, website, elapsedMs} -> {ok:true}
+ *     (website "Send my question" form, round 44: public, rate limited tighter than chat, emails the team + a receipt; see inquiry.js)
  *   POST /api/support {action:'client-error', surface:'app'|'mobile', kind, message, where?, page?, device?, build?} -> {ok:true}
  *     (browser crash report from src/services/errorReporter.ts: signed-in only, capped per user/day, logged as one line, not stored)
  *
@@ -23,6 +25,7 @@ import { respond, starter } from './engine.js';
 import { createLimiter } from './limits.js';
 import { callSupportModel, supportModelEnabled, supportModelId } from './client.js';
 import { validateHandoff, deliverHandoff } from './handoff.js';
+import { runInquiry } from './inquiry.js';
 import { validateClientError, clientErrorLogLine } from './clientError.js';
 import { captureMessage } from '../telemetry.js';
 import * as tools from './tools.js';
@@ -73,6 +76,20 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return bad(res, 405, 'Method not allowed');
 
   const body = parseBody(req);
+
+  /* ------------------------------------------------------------ website inquiry form (public, no account, email is the record) */
+  if (body.action === 'inquiry') {
+    let out;
+    try {
+      out = await runInquiry(body, { req, limiter: getLimiter(), send: sendEmail });
+    } catch {
+      console.error('support inquiry failed');
+      return bad(res, 502, 'We could not send that just now. Please email us at hello@deepwelltechnology.com and we will reply within one business day.');
+    }
+    if (out.status === 429) res.setHeader('Retry-After', String(out.body.retryAfterSec ?? 3600));
+    return res.status(out.status).json(out.body);
+  }
+
   if (body.surface !== undefined && !SURFACES.includes(body.surface)) return bad(res, 400, 'Invalid surface');
   const surface = surfaceOf(body.surface);
 

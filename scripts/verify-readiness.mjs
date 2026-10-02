@@ -120,6 +120,16 @@ for (const [child, parents] of Object.entries({
     check(`DELETE_ORDER: ${child} before ${parent}`, DELETE_ORDER.indexOf(child) !== -1 && DELETE_ORDER.indexOf(child) < DELETE_ORDER.indexOf(parent));
   }
 }
+// R43 loose end: customer_activity / customer_activity_dirty (M3-config/65). Their triggers re-add customers to the to-do list
+// whenever links / extractions / entities / documents are deleted, so they must be wiped AFTER every one of those (the
+// opposite of the child-before-parent rule above), or a deletion leaves fresh rows behind.
+for (const t of ['customer_activity', 'customer_activity_dirty']) {
+  check(`DELETE_ORDER: ${t} is listed`, DELETE_ORDER.includes(t));
+  for (const trig of ['document_entity_links', 'extractions', 'entities', 'documents']) {
+    check(`DELETE_ORDER: ${t} after ${trig} (its triggers refill the to-do list)`, DELETE_ORDER.indexOf(t) > DELETE_ORDER.indexOf(trig));
+  }
+}
+check('DELETE_ORDER: customer_activity_dirty is the last of the two', DELETE_ORDER.indexOf('customer_activity_dirty') > DELETE_ORDER.indexOf('customer_activity'));
 const sweepSrc = fs.readFileSync(rel('api/_lib/routes/cron-sweep.js'), 'utf8');
 check('cron-sweep uses the definer-backed listing and reports tenantSource', sweepSrc.includes('listTenantKeysWithSource') && sweepSrc.includes('tenantSource'));
 
@@ -635,6 +645,35 @@ const expCtx = { tenantKey: EXP, tenantName: 'Export Shop' };
   eq('no matches: empty page, total 0, no cursor', [empty.body.customers.length, empty.body.total, empty.body.nextCursor], [0, 0, null]);
   const exact = await call({ limit: '7' });
   eq('exactly one full page: nextCursor null', exact.body.nextCursor, null);
+}
+
+/* ------------------------------------------------------------ 5. tenant merge x customer_activity (M3-config/65) */
+{
+  // merge_tenant() (07) moves a solo tenant's rows into a shop and deletes the solo tenant. customer_activity /
+  // customer_activity_dirty (65) carry the solo tenant id on the moved customers: they must not survive under the dead tenant,
+  // must not linger as orphans, and the shop's Customers summary must pick the moved customers up on its next refresh.
+  const SHOP = 'org_ready_mg_shop'; const SOLO = 'user_ready_mg_solo';
+  await RS.getTenantContext(SHOP, 'Merge Shop'); await RS.getTenantContext(SOLO, 'Solo Tech');
+  const shopId = await idOf(SHOP); const soloId = await idOf(SOLO);
+  const mkCust = async (tid, name) => (await lite.query(`INSERT INTO entities (tenant_id, entity_type, data) VALUES ($1,'customer',$2) RETURNING id`, [tid, JSON.stringify({ customer_name: name })])).rows[0].id;
+  const mkDoc = async (tid, tag) => (await lite.query(`INSERT INTO documents (tenant_id, original_filename, sha256_hash) VALUES ($1,$2,$3) RETURNING id`, [tid, `${tag}.pdf`, `mg-${tag}-${tid}`])).rows[0].id;
+  const shopCust = await mkCust(shopId, 'Shop Customer');
+  const soloCust = await mkCust(soloId, 'Solo Customer');
+  const soloDoc = await mkDoc(soloId, 'solo');
+  await lite.query(`INSERT INTO document_entity_links (tenant_id, document_id, entity_id) VALUES ($1,$2,$3)`, [soloId, soloDoc, soloCust]);
+  // both tenants have their summary computed first (the state in production), as the app does it.
+  const refreshFor = async (tid) => { await lite.query(`SELECT set_config('app.tenant_id', $1, false)`, [tid]); await lite.query('SELECT customer_activity_refresh()'); await lite.query(`SELECT set_config('app.tenant_id', '', false)`); };
+  for (const t of [shopId, soloId]) await refreshFor(t);
+  eq('before the merge each tenant has its own summary row', [await countRows('customer_activity', shopId), await countRows('customer_activity', soloId)], [1, 1]);
+  await lite.query(`SELECT * FROM merge_tenant($1, $2)`, [SOLO, SHOP]);
+  eq('merge: the solo tenant is gone', Number((await lite.query(`SELECT count(*)::int n FROM tenants WHERE id = $1`, [soloId])).rows[0].n), 0);
+  eq('merge: no customer_activity / customer_activity_dirty row is left under the dead solo tenant id',
+    [await countRows('customer_activity', soloId), await countRows('customer_activity_dirty', soloId)], [0, 0]);
+  await refreshFor(shopId);
+  const after = (await lite.query(`SELECT customer_id, doc_count FROM customer_activity WHERE tenant_id = $1 ORDER BY customer_id`, [shopId])).rows;
+  eq('merge: after the shop\'s next refresh both customers (its own and the moved one) have a summary row, the moved one with its document',
+    after.map((r) => [r.customer_id, r.doc_count]).sort(), [[shopCust, 0], [soloCust, 1]].sort());
+  eq('merge: nothing is left on the to-do list after the refresh', await countRows('customer_activity_dirty', shopId), 0);
 }
 
 if (failures) { console.log(`\n${failures} check(s) FAILED, ${passes} passed.`); process.exit(1); }

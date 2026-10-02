@@ -199,7 +199,8 @@ endpoint is what runs. In this order:
    `ask_misses`, `ask_answer_cache`, `ask_semantic_cache`, `embedding_usage`, `rate_limit_windows`,
    `donovan_gap_promotions`, `donovan_learned_tenant`, `donovan_promoted_tests`,
    `donovan_scorecard_results`, `donovan_scorecard_runs`, `staff_access_log`, `support_access_grants`,
-   `proposals`, `schema_versions`, `entities`, `audit_log`, `users`, `api_keys`, `usage_counters`.
+   `proposals`, `schema_versions`, `entities`, `customer_activity`, `customer_activity_dirty`, `audit_log`,
+   `users`, `api_keys`, `usage_counters`.
    The shop's stored settings (the known-shop-contacts list, follow-up and digest settings) are cleared.
    The delete also sweeps any other table that carries a `tenant_id` column but is not on that list, so a
    table added by a later migration cannot be missed at runtime; and `scripts/verify-readiness.mjs` fails

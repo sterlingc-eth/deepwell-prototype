@@ -86,6 +86,8 @@ export interface BillingStatus {
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
   limits: Partial<PlanLimits> & { outreachAuto?: boolean };
+  /** R43: set only while DeepWell staff have a data import open for this company (API keys work on any plan until then). */
+  staffImport?: { until: string } | null;
   // resetsOn: ISO date of next month's 1st UTC — mirrors api/billing.js's
   // usage.resetsOn (api/_lib/usage.js's resetsOnIso).
   usage: {

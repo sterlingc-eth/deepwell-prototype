@@ -25,6 +25,10 @@ Response targets depend on the plan: Solo, email with a next-business-day respon
 ~ sales, talk to sales, book a demo, schedule a demo, request a demo, get a quote, enterprise quote, custom quote, sales team, contact sales, speak to sales, meeting, schedule a call, book a call, demo call, can i get a demo, get a demo, want a demo, see a demo, demo please
 Email hello@deepwelltechnology.com. The best first step is to send a sample box, and on the first call you ask real questions about your own business. Fleet pricing beyond the base is quoted by email.
 
+### Can I ask a question before I sign up?
+~ ask a question, ask before signing up, question before buying, pre-sales question, inquiry, inquiry form, contact form, website form, send a question, send my question, ask the founders, ask sterling, ask hilton, questions before trial, not sure if deepwell fits
+Yes. On the DeepWell website, the **Talk to us** section at the bottom of the home page has a short form: add your name, company and work email, say roughly how many documents you have and where they are, and type your question. Sterling and Hilton read every one and reply by email within one business day. You can also just email hello@deepwelltechnology.com.
+
 ### Who will I work with during setup?
 ~ who will i work with, onboarding contact, account manager, named contact, my contact, who helps me, implementation contact, who sets it up, sterling, hilton
 Sterling Chapman works with you from your first sample through go-live. Hilton Chapman leads customer relationships. Fleet customers get a named contact. Crew includes a scheduled onboarding call.

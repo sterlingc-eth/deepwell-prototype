@@ -14,7 +14,7 @@ import {
   needsBillingReconcile,
   reconcileTenantBilling,
 } from "./_lib/billing.js";
-import { clientLimits, planStateFor, loginCapForPlan, loadRescueCredit, extraPagesFor } from "./_lib/plan.js";
+import { clientLimits, planStateFor, loginCapForPlan, loadRescueCredit, extraPagesFor, staffImportFor } from "./_lib/plan.js";
 import { getSeatState, syncOrgMemberLimit, syncTenantAfterBilling, guardedInvite } from "./_lib/seats.js";
 import { getUsage, estimateCostUsd, getAsksThisMonth, resetsOnIso } from "./_lib/usage.js";
 import { limit as rateLimit } from "./_lib/rateLimit.js";
@@ -199,12 +199,15 @@ async function computeStatus(auth) {
       console.error("billing status: AI cost estimate failed (non-fatal):", err?.message);
     }
 
+    const staffImport = staffImportFor(tenantRow);
     return {
       plan: tenantRow?.plan ?? null,
       status: planStateFor(tenantRow ?? {}),
       trialEndsAt: tenantRow?.trial_ends_at ?? null,
       currentPeriodEnd: tenantRow?.current_period_end ?? null,
       cancelAtPeriodEnd: !!tenantRow?.cancel_at_period_end,
+      // R43: set only while DeepWell staff have an import open for this company (shows the API-keys card on any plan).
+      staffImport: staffImport?.active ? { until: staffImport.end.toISOString() } : null,
       // Round 26: limits always come from the live plan table (logins, documents, pages) — never from the
       // tenants.limits snapshot, which may predate a plan-table change. Donovan has no per-plan allowance.
       limits: clientLimits(tenantRow),

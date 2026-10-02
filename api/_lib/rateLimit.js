@@ -34,7 +34,7 @@
  * lowest-priority layer added underneath.
  */
 import { getAuxPool } from "./apiKeyAuth.js";
-import { PLAN_LIMITS, DONOVAN_SAFETY, DONOVAN_SAFETY_MESSAGE } from "./plan.js";
+import { PLAN_LIMITS, DONOVAN_SAFETY, DONOVAN_SAFETY_MESSAGE, staffImportFor, noteDatabaseClock } from "./plan.js";
 import { getTenantContext } from "./recordsStore.js";
 import { logStage } from "./perf.js";
 
@@ -214,13 +214,18 @@ export function limitsFromTenantContext(tenantLimits, bucket, overrides) {
   // multiplied by plan; only the built-in default scales.
   const envPinned = parseLimitEnv(process.env[`RATE_LIMIT_${String(bucket).toUpperCase()}_PER_MINUTE`]) !== undefined;
   const scaledMinute = envPinned ? base.perMinute : scaleMinuteLimitForPlan(bucket, base.perMinute, tenantLimits);
+  // R43: an ACTIVE staff import (tenants.limits.staffImport) may name bigger ingest ceilings; an explicit
+  // limits.ingest override still wins, and once the import expires or is ended the plan's own numbers apply again.
+  const imp = bucket === "ingest" ? staffImportFor({ limits: tenantLimits }) : null;
+  const importMinute = imp?.active ? imp.ingestPerMinute : null;
+  const importDay = imp?.active ? imp.ingestPerDay : null;
   return {
     perMinute: Number.isFinite(callerOverride.perMinute)
       ? callerOverride.perMinute
-      : Number.isFinite(tenantOverride.perMinute) ? tenantOverride.perMinute : scaledMinute,
+      : Number.isFinite(tenantOverride.perMinute) ? tenantOverride.perMinute : (importMinute ?? scaledMinute),
     perDay: Number.isFinite(callerOverride.perDay)
       ? callerOverride.perDay
-      : Number.isFinite(tenantOverride.perDay) ? tenantOverride.perDay : scaled,
+      : Number.isFinite(tenantOverride.perDay) ? tenantOverride.perDay : (importDay ?? scaled),
   };
 }
 
@@ -487,7 +492,7 @@ export async function getDailyModelBudgetStatus(ctx) {
   try {
     const { rows } = await getAuxPool().query(
       `WITH t AS (SELECT resolve_tenant($1, $2) AS id)
-       SELECT get_tenant_limits(t.id) AS limits,
+       SELECT t.id AS tenant_id, now() AS db_now, get_tenant_limits(t.id) AS limits,
               COALESCE(
                 (SELECT u.model_calls FROM get_usage_counters(t.id, 1) u WHERE u.day = $3::date),
                 0
@@ -496,13 +501,36 @@ export async function getDailyModelBudgetStatus(ctx) {
       [tenantKey, ctx.tenantName ?? tenantKey, today]
     );
     const row = rows[0];
+    noteDatabaseClock(row?.db_now);
     const override = row?.limits?.maxModelCallsPerDay;
     // R35: the default scales with the plan (Fleet imports 12x what Solo does); an explicit owner override still wins.
+    // R43: an ACTIVE staff import may name a bigger daily model-call ceiling (an explicit override above still wins).
+    const imp = staffImportFor({ limits: row?.limits });
+    const importCalls = imp?.active ? imp.maxModelCallsPerDay : null;
     const limitPerDay = Number.isFinite(override) && override > 0
       ? Math.trunc(override)
-      : scaleDailyLimitForPlan("ingest", DEFAULT_MAX_MODEL_CALLS_PER_DAY, row?.limits);
+      : importCalls ?? scaleDailyLimitForPlan("ingest", DEFAULT_MAX_MODEL_CALLS_PER_DAY, row?.limits);
     const used = Number(row?.model_calls ?? 0);
-    return { exceeded: used >= limitPerDay, used, limit: limitPerDay };
+    if (used >= limitPerDay) return { exceeded: true, used, limit: limitPerDay };
+    // R43: a staff import also has a WHOLE-IMPORT ceiling on model calls (retries that read no page never move the page
+    // budget, so the page budget alone is not a spend cap). Only looked up while an import is active. Unlike the daily
+    // check this one FAILS CLOSED: the import is the one place a broken check must not mean "no cap".
+    if (imp?.active) {
+      try {
+        const win = await getAuxPool().query(
+          `SELECT COALESCE(SUM(u.model_calls), 0)::bigint AS n FROM get_usage_counters($1::uuid, 62) u WHERE u.day >= $2::date`,
+          [row.tenant_id, imp.from.toISOString().slice(0, 10)]
+        );
+        const windowCalls = Number(win.rows[0]?.n ?? 0);
+        if (windowCalls >= imp.maxModelCalls) {
+          return { exceeded: true, used: windowCalls, limit: imp.maxModelCalls, scope: "import-total", message: IMPORT_MODEL_CALLS_MESSAGE };
+        }
+      } catch (err) {
+        console.error("rateLimit: could not read the staff import's model-call total, refusing (fails closed):", err?.message);
+        return { exceeded: true, used: 0, limit: imp.maxModelCalls, scope: "import-total", message: IMPORT_MODEL_CALLS_MESSAGE };
+      }
+    }
+    return { exceeded: false, used, limit: limitPerDay };
   } catch (err) {
     console.error("rateLimit: could not read daily model budget, allowing ingestion:", err?.message);
     return { exceeded: false, used: 0, limit: DEFAULT_MAX_MODEL_CALLS_PER_DAY };
@@ -515,6 +543,8 @@ export async function getDailyModelBudgetStatus(ctx) {
  * wording whether they hit it uploading, asking, or extracting.
  */
 export const DAILY_MODEL_BUDGET_MESSAGE = "Daily AI budget reached — resumes tomorrow";
+/** R43: the whole-import ceiling on model calls (staffImport.js maxModelCalls) was reached. */
+export const IMPORT_MODEL_CALLS_MESSAGE = "The AI-reading allowance set for this data import is used up. DeepWell staff can raise it.";
 
 /**
  * Thrown by assertModelBudget() below. `.status` is 429 (same family as the
@@ -558,7 +588,7 @@ export class ModelBudgetExceededError extends Error {
 export async function assertModelBudget(ctx) {
   const status = await getDailyModelBudgetStatus(ctx);
   if (status.exceeded) {
-    throw new ModelBudgetExceededError();
+    throw new ModelBudgetExceededError(status.message ?? DAILY_MODEL_BUDGET_MESSAGE);
   }
   return status;
 }

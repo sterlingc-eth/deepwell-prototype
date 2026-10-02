@@ -25,12 +25,15 @@ import { RATE, SPEND } from './policy.js';
 
 const MIN = 60_000;
 const DAY = 86_400_000;
+const HOUR = 3_600_000;
 const microOf = (usd) => Math.max(0, Math.min(2_000_000_000, Math.round((Number(usd) || 0) * 1_000_000)));
 
 export const minuteStart = (now) => Math.floor(now / MIN) * MIN;
 export const dayStart = (now) => Math.floor(now / DAY) * DAY;
+export const hourStart = (now) => Math.floor(now / HOUR) * HOUR;
 export const monthStart = (now) => { const d = new Date(now); return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1); };
 const secondsToNextMinute = (now) => Math.max(1, Math.ceil((minuteStart(now) + MIN - now) / 1000));
+const secondsToNextHour = (now) => Math.max(1, Math.ceil((hourStart(now) + HOUR - now) / 1000));
 const secondsToNextDay = (now) => Math.max(1, Math.ceil((dayStart(now) + DAY - now) / 1000));
 
 const num = (v) => { const n = Number(v); return Number.isFinite(n) && n >= 0 ? n : null; };
@@ -46,6 +49,9 @@ export function resolveConfig(env = process.env) {
     handoffPublicPerDay: posInt(env?.SUPPORT_HANDOFF_PUBLIC_PER_DAY) ?? RATE.handoffPublicPerDay,
     handoffAppPerDay: posInt(env?.SUPPORT_HANDOFF_APP_PER_DAY) ?? RATE.handoffAppPerDay,
     clientErrorPerDay: posInt(env?.SUPPORT_CLIENT_ERROR_PER_DAY) ?? RATE.clientErrorPerDay,
+    inquiryPerIpPerHour: posInt(env?.SUPPORT_INQUIRY_PER_IP_HOUR) ?? RATE.inquiryPerIpPerHour,
+    inquiryGlobalPerDay: posInt(env?.SUPPORT_INQUIRY_GLOBAL_PER_DAY) ?? RATE.inquiryGlobalPerDay,
+    inquiryPerAddressPerDay: posInt(env?.SUPPORT_INQUIRY_PER_ADDRESS_PER_DAY) ?? RATE.inquiryPerAddressPerDay,
     tenantDailyUsd: num(env?.SUPPORT_DAILY_USD) ?? SPEND.tenantDailyUsd,
     tenantMonthlyUsd: num(env?.SUPPORT_MONTHLY_USD) ?? SPEND.tenantMonthlyUsd,
     platformDailyUsd: num(env?.SUPPORT_PLATFORM_DAILY_USD) ?? SPEND.platformDailyUsd,
@@ -201,6 +207,24 @@ export function createLimiter(deps = {}) {
       }
       const n = await tenant.bumpWindow(auth, `support_h_${hashUser(auth.userId)}`, dayStart(now), 1);
       return n != null && n > c.handoffAppPerDay ? { ok: false, scope: 'day', retryAfterSec: secondsToNextDay(now) } : { ok: true };
+    },
+
+    /**
+     * Count one website inquiry (public, no account). Three independent caps, all in the shared window store:
+     * per IP hash per hour, all visitors per day, and per visitor address per day (that last one bounds the receipt email).
+     */
+    async checkInquiry({ req, email }) {
+      const now = nowFn();
+      const c = cfg();
+      const h = hashIp(clientIp(req), now, env);
+      const ip = (await shared(`inq:ip:${h}:h`, hourStart(now), 1)).units;
+      if (ip > c.inquiryPerIpPerHour) return { ok: false, scope: 'ip-hour', retryAfterSec: secondsToNextHour(now) };
+      const eh = crypto.createHash('sha256').update(`inq|${String(email ?? '').toLowerCase()}`).digest('hex').slice(0, 24);
+      const em = (await shared(`inq:em:${eh}:d`, dayStart(now), 1)).units;
+      if (em > c.inquiryPerAddressPerDay) return { ok: false, scope: 'address-day', retryAfterSec: secondsToNextDay(now) };
+      const g = (await shared('inq:g:d', dayStart(now), 1)).units;
+      if (g > c.inquiryGlobalPerDay) return { ok: false, scope: 'global-day', retryAfterSec: secondsToNextDay(now) };
+      return { ok: true };
     },
 
     /** Count one browser error report (signed-in only) against the user's daily cap so a crash loop cannot flood the logs. */

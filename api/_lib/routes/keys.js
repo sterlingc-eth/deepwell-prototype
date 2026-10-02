@@ -2,7 +2,7 @@ import { serializeClient, assertTenantUuid } from '../util/pgClient.js';
 import { requireAuth, denyAuth, hasShop, requireRole } from "../auth.js";
 import { handleCors, handleError } from "../claude.js";
 import { getAuxPool, generateKey, SCOPES } from "../apiKeyAuth.js";
-import { hasApiAccess, API_ACCESS_MESSAGE } from "../plan.js";
+import { hasApiAccessFor, noteDatabaseClock, API_ACCESS_MESSAGE } from "../plan.js";
 
 /**
  * POST /api/keys
@@ -93,8 +93,10 @@ export async function createApiKey(ctx, auth, body) {
 
   const result = await withTenantTx(ctx, async (client, tenantId) => {
     // Round 26: API access is Fleet-only. Checked inside the same tenant transaction, before anything is written.
-    const { rows: planRows } = await client.query("SELECT plan FROM tenants WHERE id = $1", [tenantId]);
-    if (!hasApiAccess(planRows[0]?.plan)) return null;
+    const { rows: planRows } = await client.query("SELECT plan, limits, now() AS db_now FROM tenants WHERE id = $1", [tenantId]);
+    // R43: Fleet, or any plan while DeepWell staff have a staff import open for this company (judged on the DATABASE's clock).
+    noteDatabaseClock(planRows[0]?.db_now);
+    if (!hasApiAccessFor(planRows[0], new Date(planRows[0]?.db_now))) return null;
     const { rows } = await client.query(
       `INSERT INTO api_keys (tenant_id, name, key_prefix, key_hash, scopes, created_by, created_at)
        VALUES ($1,$2,$3,$4,$5,$6,NOW())

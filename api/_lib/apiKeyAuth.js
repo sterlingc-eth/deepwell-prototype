@@ -81,7 +81,7 @@ import crypto from "node:crypto";
 import { getPool } from "./recordsStore.js";
 import { requireAuth, AuthError } from "./auth.js";
 import { logStage } from "./perf.js";
-import { getCachedBillingRow, hasApiAccess, API_ACCESS_MESSAGE } from "./plan.js";
+import { getCachedBillingRow, hasApiAccess, hasApiAccessFor, staffImportFor, noteDatabaseClock, API_ACCESS_MESSAGE } from "./plan.js";
 
 export const KEY_PREFIX = "dw_live_";
 const HEX64 = /^[0-9a-f]{64}$/;
@@ -182,7 +182,24 @@ export async function verifyApiKey(rawKey) {
     console.error("API key plan lookup failed (failing closed):", err?.message);
     throw new AuthError("Billing check unavailable, try again", 503);
   }
-  if (!hasApiAccess(billingRow?.plan)) throw new AuthError(API_ACCESS_MESSAGE, 403);
+  // R43: ...or while DeepWell staff have a staff import open for this company (tenants.limits.staffImport, plan.js).
+  if (!hasApiAccessFor(billingRow)) throw new AuthError(API_ACCESS_MESSAGE, 403);
+  // R43: on a plan WITHOUT API access the only thing letting this key in is the import window, and that window can be closed
+  // by hand (I2) at any moment. The cached row above can be minutes old, so confirm against the database right now, with the
+  // database's own clock: a key must stop working the moment the import is closed or expires, not a cache TTL later.
+  // (Fleet keys are unaffected and pay nothing extra.) FAILS CLOSED.
+  if (!hasApiAccess(billingRow?.plan)) {
+    let live;
+    try {
+      const { rows: lr } = await getAuxPool().query("SELECT get_tenant_limits($1::uuid) AS limits, now() AS db_now", [row.tenant_id]);
+      live = lr[0];
+      noteDatabaseClock(live?.db_now);
+    } catch (err) {
+      console.error("API key import-window check failed (failing closed):", err?.message);
+      throw new AuthError("Billing check unavailable, try again", 503);
+    }
+    if (staffImportFor({ limits: live?.limits }, new Date(live?.db_now))?.active !== true) throw new AuthError(API_ACCESS_MESSAGE, 403);
+  }
 
   return {
     userId: `key:${row.id}`,

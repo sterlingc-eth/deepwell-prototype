@@ -512,6 +512,12 @@ export const DELETE_ORDER = Object.freeze([
   'proposals',
   'schema_versions',
   'entities',
+  // R41 (M3-config/65): the Customers-list summary. These two go AFTER documents / links / extractions / entities on purpose:
+  // deleting those fires the statement triggers that put customers on customer_activity_dirty's to-do list, so wiping
+  // the list any earlier would leave fresh rows behind. customer_activity rows cascade from entities anyway; both are
+  // listed so the delete is explicit, counted, and covered by verify-readiness.
+  'customer_activity',
+  'customer_activity_dirty',
   'audit_log',
   // members, API keys and counters: no incoming FKs that matter, but their PRESENCE is what makes "delete all my data"
   // true (the tenants row is kept, so ON DELETE CASCADE from tenants never fires).
