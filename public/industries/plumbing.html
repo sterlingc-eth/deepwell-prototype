@@ -110,6 +110,13 @@ a{color:inherit}
   letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:20px}
 .nav-dropdown-menu .tag.live{color:#0D3827;background:color-mix(in srgb,#0D3827 16%,transparent)}
 .nav-dropdown-menu .tag.soon{color:#7A5326;background:color-mix(in srgb,var(--brass) 18%,transparent)}
+.nav-dropdown-menu{width:max-content;max-width:min(340px,calc(100vw - 32px))}
+.navlinks .nav-dropdown-menu a,.nav.menu-open .navlinks .nav-dropdown-menu a{flex-direction:column;align-items:flex-start;justify-content:center;gap:1px;white-space:normal;text-align:left}
+.nav.menu-open .nav-dropdown-menu{max-width:none}
+.nav-dropdown-menu .dd-t{font-size:.9rem;font-weight:600;line-height:1.3;color:var(--text)}
+.nav-dropdown-menu .dd-d{font-size:.8rem;font-weight:400;line-height:1.35;color:var(--muted)}
+.nav-dropdown-menu .dd-group{font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:8px 12px 4px}
+.nav-dropdown-menu .dd-group:not(:first-child){margin-top:6px;padding-top:12px;border-top:1px solid var(--line)}
 
 main{padding-block:clamp(36px,7vw,64px)}
 .hero-block{display:flex;flex-direction:column;gap:18px;padding-bottom:36px;border-bottom:1px solid var(--line);margin-bottom:36px}
@@ -155,11 +162,15 @@ footer a:hover{color:var(--text)}
           <svg class="nav-dropdown-caret" width="10" height="6" viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
         <div class="nav-dropdown-menu" id="industriesMenu" role="menu" aria-label="Who it's for">
-          <a role="menuitem" href="/#what">Any business with paperwork <span class="tag live">Live</span></a>
-          <a role="menuitem" href="/industries/hvac.html">HVAC <span class="tag live">Live</span></a>
-          <a role="menuitem" href="/industries/electrical.html">Electrical <span class="tag soon">Coming</span></a>
-          <a role="menuitem" href="/industries/plumbing.html" aria-current="page">Plumbing <span class="tag soon">Coming</span></a>
-          <a role="menuitem" href="/industries/property-management.html">Property management <span class="tag soon">Coming</span></a>
+          <div class="dd-group" role="presentation">By role</div>
+          <a role="menuitem" href="/who.html#office"><span class="dd-t">Office staff</span><span class="dd-d">Answer a caller with the original page in hand.</span></a>
+          <a role="menuitem" href="/who.html#field"><span class="dd-t">People in the field</span><span class="dd-d">Look things up and scan paperwork from a phone.</span></a>
+          <a role="menuitem" href="/who.html#owners"><span class="dd-t">Owners</span><span class="dd-d">See which warranties and agreements are expiring.</span></a>
+          <div class="dd-group" role="presentation">By industry</div>
+          <a role="menuitem" href="/who.html#industries"><span class="dd-t">Every industry, one app</span><span class="dd-d">See how Donovan fits your kind of business.</span></a>
+          <a role="menuitem" href="/who.html#hvac"><span class="dd-t">HVAC</span><span class="dd-d">Warranties, serial numbers and service tickets.</span></a>
+          <a role="menuitem" href="/who.html#electrical"><span class="dd-t">Electrical and plumbing</span><span class="dd-d">Permits, inspections and equipment paperwork.</span></a>
+          <a role="menuitem" href="/who.html#property"><span class="dd-t">Property management</span><span class="dd-d">Work orders, vendor contracts and invoices.</span></a>
         </div>
       </div>
       <a href="/#plans">Pricing</a>
