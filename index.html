@@ -523,6 +523,13 @@ footer a{color:var(--muted);text-decoration:none}
 .nav-dropdown-menu a{display:flex;align-items:center;justify-content:space-between;gap:14px;
   padding:9px 12px;border-radius:6px;font-size:.88rem;font-weight:500;color:var(--text);text-decoration:none}
 .nav-dropdown-menu a:hover,.nav-dropdown-menu a:focus-visible{background:var(--surface-2)}
+.nav-dropdown-menu{width:max-content;max-width:min(340px,calc(100vw - 32px))}
+.navlinks .nav-dropdown-menu a,.nav.menu-open .navlinks .nav-dropdown-menu a{flex-direction:column;align-items:flex-start;justify-content:center;gap:1px;white-space:normal;text-align:left}
+.nav.menu-open .nav-dropdown-menu{max-width:none}
+.nav-dropdown-menu .dd-t{font-size:.9rem;font-weight:600;line-height:1.3;color:var(--text)}
+.nav-dropdown-menu .dd-d{font-size:.8rem;font-weight:400;line-height:1.35;color:var(--muted)}
+.nav-dropdown-menu .dd-group{font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:8px 12px 4px}
+.nav-dropdown-menu .dd-group:not(:first-child){margin-top:6px;padding-top:12px;border-top:1px solid var(--line)}
 .nav-dropdown-menu .tag{flex:none;font-family:"IBM Plex Mono",monospace;font-size:.64rem;
   letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:20px}
 .nav-dropdown-menu .tag.live{color:var(--well);background:color-mix(in srgb,var(--well) 16%,transparent)}
@@ -1191,6 +1198,18 @@ footer{padding-block:10px}
 .cta-card .cta-pitch{display:flex;flex-direction:column;align-items:flex-start;min-width:0}
 .cta-card .cta-pitch .cta-side{flex-direction:row;align-items:center;gap:16px;margin-top:12px}
 .closing-grid .cta-card .cta-who{margin-top:8px}
+/* talk-to-us polish: pitch top-aligned with numbered steps, no logo tile, roomier card */
+.cta-steps{list-style:none;margin:16px 0 4px;padding:0;display:grid;gap:10px;counter-reset:cta}
+.cta-card .cta-steps li{counter-increment:cta;display:grid;grid-template-columns:28px minmax(0,1fr);gap:12px;align-items:center;color:rgba(255,255,255,.9);font-size:.95rem;line-height:1.4}
+.cta-steps li::before{content:counter(cta);display:grid;place-items:center;width:28px;height:28px;border:1px solid var(--brass);border-radius:50%;color:var(--brass);font-size:.85rem;font-weight:600}
+@media (min-width:901px){
+  .closing-grid .cta-card .cta-pitch{padding-top:14px}
+  .closing-grid .cta-card h3{font-size:clamp(1.6rem,2.4vw,2rem)}
+  .closing-grid .cta-card .cta-pitch{align-self:stretch}
+  .closing-grid .cta-card .cta-pitch .cta-side{margin-top:18px;flex:1 1 auto;flex-direction:column;align-items:flex-start;gap:20px;align-self:stretch}
+  .closing-grid .cta-card .cta-pitch .logo-card{margin-top:auto;padding:14px 18px}
+  .closing-grid .cta-card .cta-pitch .logo-card img{width:190px}
+}
 .inq{--inq-err:#A4261C;background:var(--surface);color:var(--text);border:1px solid var(--line);padding:14px 16px;min-width:0}
 :root[data-theme="dark"] .inq{--inq-err:#F58C8C}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .inq{--inq-err:#F58C8C}}
@@ -1229,7 +1248,7 @@ footer{padding-block:10px}
 .cta-card .inq .inq-done p{color:var(--text);font-size:1rem;line-height:1.5;margin:0 0 12px;max-width:none}
 .inq-done .btn-ghost{color:var(--text)}
 @media (min-width:901px){
-  .closing-grid .cta-card{grid-template-columns:minmax(0,.78fr) minmax(0,1.22fr);align-items:center;gap:16px 32px;padding:18px}
+  .closing-grid .cta-card{grid-template-columns:minmax(0,.78fr) minmax(0,1.22fr);align-items:start;gap:16px clamp(24px,3vw,44px);padding:clamp(20px,2.4vw,32px)}
 }
 @media (max-width:900px){.cta-card .cta-pitch .cta-side{margin-top:8px}}
 @media (max-width:560px){
@@ -1297,11 +1316,14 @@ footer{padding-block:10px}
           <svg class="nav-dropdown-caret" width="10" height="6" viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
         <div class="nav-dropdown-menu" id="industriesMenu" role="menu" aria-label="Who it's for">
-          <a role="menuitem" href="/#what">Any business with paperwork <span class="tag live">Live</span></a>
-          <a role="menuitem" href="/industries/hvac.html">HVAC <span class="tag live">Live</span></a>
-          <a role="menuitem" href="/industries/electrical.html">Electrical <span class="tag soon">Coming</span></a>
-          <a role="menuitem" href="/industries/plumbing.html">Plumbing <span class="tag soon">Coming</span></a>
-          <a role="menuitem" href="/industries/property-management.html">Property management <span class="tag soon">Coming</span></a>
+          <div class="dd-group" role="presentation">By role</div>
+          <a role="menuitem" href="/#what"><span class="dd-t">Office staff</span><span class="dd-d">Answer a caller with the original page in hand.</span></a>
+          <a role="menuitem" href="/get"><span class="dd-t">People in the field</span><span class="dd-d">Look things up and scan paperwork from a phone.</span></a>
+          <a role="menuitem" href="/#cost"><span class="dd-t">Owners</span><span class="dd-d">See which warranties and agreements are expiring.</span></a>
+          <div class="dd-group" role="presentation">By industry</div>
+          <a role="menuitem" href="/#demo"><span class="dd-t">Any business with paperwork</span><span class="dd-d">Invoices, contracts, permits and forms.</span></a>
+          <a role="menuitem" href="/industries/hvac.html"><span class="dd-t">HVAC</span><span class="dd-d">Warranties, serial numbers and service tickets.</span></a>
+          <a role="menuitem" href="/#roadmap"><span class="dd-t">More industries</span><span class="dd-d">Electrical, plumbing and property management, on the roadmap.</span></a>
         </div>
       </div>
       <a href="#roadmap">Roadmap</a>
@@ -2371,7 +2393,12 @@ footer{padding-block:10px}
       <div class="cta-pitch">
         <div class="eyebrow">Talk to us</div>
         <h3>Start with one box of records.</h3>
-        <p>Send a sample — a drawer, a folder, a month of paperwork — and we'll set up your account with it. On the first call you ask it real questions about your own business. If it doesn't earn its keep, you've lost thirty minutes.</p>
+        <p>See DeepWell working on your own paperwork before you commit. If it doesn't earn its keep, you've lost thirty minutes.</p>
+        <ol class="cta-steps">
+          <li>Send a sample: a drawer, a folder, a month of paperwork.</li>
+          <li>We set up your account with it.</li>
+          <li>On the first call, you ask it real questions about your own business.</li>
+        </ol>
         <p class="cta-who">Questions first? Ask Sterling or Hilton in the form. We read every one.</p>
         <div class="cta-side">
           <a class="btn btn-primary" href="mailto:hello@deepwelltechnology.com?subject=Records%20Rescue%20demo%20sample">Send a sample box (free)</a>
