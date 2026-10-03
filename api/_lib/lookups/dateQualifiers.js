@@ -41,7 +41,7 @@ function day(y, m, d, numeric) { return okDay(y, m, d) ? { from: `${y}-${pad(m)}
 function month(y, m, numeric) { return okDay(y, m, 1) ? { from: `${y}-${pad(m)}-01`, to: `${y}-${pad(m)}-${pad(lastDay(y, m))}`, label: `${monthName(m)} ${y}`, numeric } : null; }
 
 /** Pull every date point out of the text (left to right); returns {points, rest} or null when a point is invalid/ambiguous. */
-function extractPoints(text) {
+export function extractPoints(text) {
   const found = [];
   let rest = text;
   for (const [re, fn] of POINT_RES) {

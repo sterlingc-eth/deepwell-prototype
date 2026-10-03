@@ -52,6 +52,7 @@ import { parseCountQualifier, runCountQualifier } from './lookups/countQualifier
 import { parseTonnageCount, runTonnageCount } from './lookups/tonnageCount.js';
 import { parseFieldQuestion, runFieldMatch } from './lookups/fieldMatch.js';
 import { parseDateQualifier, runDateQualifier } from './lookups/dateQualifiers.js';
+import { parseDocWindow, runDocWindow } from './lookups/dateDocWindow.js';
 import { parseFalsePremise, runFalsePremise } from './lookups/falsePremise.js';
 
 // R32 (loop 3/4): "have we been out to <addr> in the last 90 days" / "any service calls at <addr> last year" / "did we do any work at <addr> this year".
@@ -149,6 +150,9 @@ export function classifyDeterministic(question, opts = {}) {
   // Date / month / range qualifiers on service-visit, install and invoice counts (2026.09.21, 9/2026, Jan 2020 to Dec 2021) - lookups/dateQualifiers.js.
   const dateQ = parseDateQualifier(String(question ?? ''));
   if (dateQ) return { route: 'datequal', intent: dateQ };
+  // Document-type counts with date lists / months / open windows / undated types / ambiguous dates (tickets on A and B, work orders in 2026-09) - lookups/dateDocWindow.js.
+  const dateDocQ = parseDocWindow(String(question ?? ''));
+  if (dateDocQ) return { route: 'datedocs', intent: dateDocQ };
   // Field asked = field returned (who installed X -> installer; invoice number vs phone) - lookups/fieldMatch.js.
   const fieldQ = opts?.skipFieldMatch ? null : parseFieldQuestion(String(question ?? ''));
   if (fieldQ) return { route: 'fieldmatch', intent: fieldQ };
@@ -592,6 +596,7 @@ async function runDeterministicCore(db, intent, { today } = {}) {
     return again && again.route !== 'fieldmatch' ? runDeterministicCore(db, again, { today }) : null;
   }
   if (intent.route === 'datequal') return runDateQualifier(db, intent.intent);
+  if (intent.route === 'datedocs') return runDocWindow(db, intent.intent);
   if (intent.route === 'countqual') return runCountQualifier(db, intent.intent);
   if (intent.route === 'tonnage') return runTonnageCount(db, intent.intent);
   if (intent.route === 'premise') return runFalsePremise(db, intent.intent);

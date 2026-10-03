@@ -52,6 +52,7 @@
     "verify:r3-bulk": "tsx scripts/verify-r3-invoice-total-type-bulk.mjs",
     "verify:r3-dates": "tsx scripts/verify-r3-date-qualifiers.mjs",
     "verify:r3-dategap": "tsx scripts/verify-r3-dategap.mjs",
+    "verify:r3-datedocs": "tsx scripts/verify-r3-datedocs.mjs",
     "verify:r33-dates": "tsx scripts/verify-r33-dates.mjs",
     "verify:transcribe": "node scripts/verify-transcribe.mjs",
     "verify:caching": "node scripts/verify-caching.mjs",
