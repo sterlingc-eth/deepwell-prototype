@@ -42,6 +42,26 @@ const SENSITIVE_RE = /\b(?:ssn|social\s+security(?:\s+(?:number|no\.?|#))?|(?:cr
 const SENSITIVE_ASK_RE = /\b(?:what(?:'s|s|\s+is|\s+are)?|whats|give\s+me|tell\s+me|show\s+me|get\s+me|find|pull\s+up|look\s*up|lookup|need|got|have\s+on\s+file)\b/i;
 const SENSITIVE_VETO_RE = /\b(?:wi-?fi|wifi|router|network|how\s+many|which|list|count|paid\s+(?:by|with|via)|pay(?:s|ing)?\s+(?:by|with|via)|(?:by|with|via)\s+(?:a\s+)?(?:credit|debit)|accept|payment\s+method|mention|reset|forgot|login|log\s+in|sign\s+in|app|account\s+settings|my\s+(?:own\s+)?password)\b/i;
 
+// R3 scope: a request for the identifier with no ask-verb ("David Prentiss ssn", "bank account number for X", "social security numbers of all
+// customers"). A filter/payment-process question (paid by credit card, how many, accept cards, card fee) is a record question and is vetoed.
+const SENSITIVE_STRONG_RE = /\b(?:ssns?|social\s+security(?:\s+(?:numbers?|nos?\.?|#))?|(?:credit|debit)\s+cards?(?:\s+(?:numbers?|info(?:rmation)?|details|on\s+file))?|card\s+numbers?|bank\s+account(?:\s+numbers?)?|routing\s+numbers?|driver'?s?\s+licen[cs]es?|date\s+of\s+birth|dob|passwords?)\b|\bcard\b[^?]{0,40}\bnumber\b/i;
+const SENSITIVE_HARD_VETO_RE = /\b(?:wi-?fi|wifi|router|network|how\s+many|count|total|percent\w*|paid\s+(?:by|with|via)|pay(?:s|ing|ment|ments)?\b|(?:by|with|via)\s+(?:a\s+)?(?:credit|debit)|accept\w*|processing|fees?|surcharge|reader|machine|mention\w*|reset|forgot|login|log\s+in|sign\s+in|app|account\s+settings|my\s+(?:own\s+)?password|who\s+(?:use|uses|have|has)|my|how\s+(?:do|can|to|would)|change|update|set\s*up|invoices?|permits?|documents?|notes?)\b/i;
+const SENSITIVE_TARGET_RE = /'s\b|\b(?:for|of|on|did)\s+[A-Za-z]|\b(?:all|every|each|everyone|everybody|customers?)\b|\b[A-Z][a-z]+(?:\s+[A-Z][a-z'-]+)+/;
+// R3 scope: competitors / rivals are another business; only the company's own records are in scope. A record cue (notes, a quote or invoice
+// that mentions one, a customer lost to one) means a records question and is never declined here.
+const COMPETITOR_RE = /\b(?:competitors?|competition|competing\s+(?:compan\w+|business\w*|contractors?|shops?)|rivals?)\b/i;
+const COMPETITOR_VETO_RE = /\b(?:notes?|memos?|mention\w*|says?|said|documents?|uploaded|invoices?\s+from|quotes?\s+from|bids?\s+from|lost\s+to|switched|replac\w+|on\s+file|dispatch|wrote|written)\b/i;
+
+// R3 loop: a request to dump every customer's e-mail / phone in one answer. One customer's contact is a lookup; counts and "who has no email"
+// are record questions and are vetoed. Kill switch: DONOVAN_BULK_CONTACT_DECLINE=0.
+const CONTACT_SRC = String.raw`(?:e-?mails?(?:\s+addresse?s?)?|phone\s+numbers?|phones|contact\s+(?:info(?:rmation)?|details))`;
+const BULK_CONTACT_RES = [
+  new RegExp(String.raw`\b(?:all|every|each)\s+(?:of\s+)?(?:the\s+|our\s+|my\s+)?(?:customers?|clients?)['’]?s?\s+${CONTACT_SRC}`, "i"),
+  new RegExp(String.raw`\b${CONTACT_SRC}\s+(?:of|for|from)\s+(?:all|every|each)\s+(?:of\s+)?(?:the\s+|our\s+|my\s+)?(?:customers?|clients?)\b`, "i"),
+  new RegExp(String.raw`^\W*(?:list|dump|export|show|give|send|print|pull)\s+(?:me\s+)?(?:the\s+|our\s+|my\s+)?(?:customers?|clients?)['’]?s?\s+${CONTACT_SRC}\s*[?.!]*$`, "i"),
+];
+const BULK_CONTACT_VETO_RE = /\b(?:how\s+many|count|number\s+of|which|who|missing|without|no\s+e-?mail|named|called|bounced|duplicate\w*|invalid|have\s+an?|has\s+an?|with\s+an?)\b/i;
+
 const PREDICT_RES = [
   /\b(?:predict|forecast|projection|projected|prognos\w+)\b/i,
   /\bwhat\s+will\s+(?:our|my|the)\s+(?:revenue|sales|income|profit|earnings|expenses|costs?|invoices?|customers?|bookings?)\b[^?]*\b(?:be|look\s+like|come\s+to)\b/i,
@@ -101,7 +121,7 @@ export function normalizeInputText(text) {
 }
 
 /**
- * @returns {null | {kind: "injection"|"sensitive"|"prediction"|"judgment"|"invalid_date"|"junk", text: string}}
+ * @returns {null | {kind: "injection"|"sensitive"|"outside"|"prediction"|"judgment"|"invalid_date"|"junk", text: string}}
  */
 export function classifySafety(question) {
   const q = String(question ?? "");
@@ -109,6 +129,11 @@ export function classifySafety(question) {
   if (JUNK_LITERAL_RE.test(q) || JUNK_SYNTAX_RE.test(q) || (NON_LATIN_SCRIPT_RE.test(q) && !LATIN_LETTER_RE.test(q))) return { kind: "junk" };
   for (const re of INJECTION_RES) if (re.test(q)) return { kind: "injection" };
   if (SENSITIVE_RE.test(q) && SENSITIVE_ASK_RE.test(q) && !SENSITIVE_VETO_RE.test(q)) return { kind: "sensitive" };
+  if (process.env.DONOVAN_OFFTOPIC_DECLINE !== "0") {
+    if (SENSITIVE_STRONG_RE.test(q) && !SENSITIVE_HARD_VETO_RE.test(q) && (SENSITIVE_TARGET_RE.test(q) || q.trim().split(/\s+/).length <= 8)) return { kind: "sensitive" };
+    if (COMPETITOR_RE.test(q) && !COMPETITOR_VETO_RE.test(q)) return { kind: "outside" };
+  }
+  if (process.env.DONOVAN_BULK_CONTACT_DECLINE !== "0" && !BULK_CONTACT_VETO_RE.test(q) && BULK_CONTACT_RES.some((re) => re.test(q))) return { kind: "bulk_contact" };
   if (!PREDICT_VETO_RE.test(q) && PREDICT_RES.some((re) => re.test(q))) return { kind: "prediction" };
   if (process.env.DONOVAN_JUDGMENT_DECLINE !== "0" && isJudgmentQuestion(q)) return { kind: "judgment" };
   const bad = findInvalidDate(q);
@@ -132,7 +157,15 @@ export function buildSafetyAnswer(hit) {
         "This isn't a question about your records, so nothing was searched."
       );
     case "sensitive":
-      return buildUntrackedFieldAnswer();
+      return decline(
+        "DeepWell doesn't keep social security numbers, card or bank numbers, birth dates or passwords, so there is nothing on file to look up.",
+        "This asks for personal ID or payment details, which are not stored anywhere in your records, so nothing was searched."
+      );
+    case "outside":
+      return decline(
+        "I only have your own company's records, so I can't tell you about competitors, their customers, or their prices.",
+        "This asks about another business; only your own records are in scope, so nothing was searched."
+      );
     case "junk":
       return decline(
         "I couldn't read that as a question about your records. Try something like \"who is at 100 Main St\" or \"how many units are under warranty\" (I read English).",
@@ -142,6 +175,11 @@ export function buildSafetyAnswer(hit) {
       return decline(
         "I can only report what's in your records. I can't forecast or predict future results, but I can show the history a forecast would start from, such as invoices or visits by month.",
         "A prediction is not a recorded fact, so nothing was searched."
+      );
+    case "bulk_contact":
+      return decline(
+        "I won't list every customer's contact details in one answer. Ask about a specific customer, like \"what's Thomas Mercer's email\", or use your Customers list.",
+        "A bulk dump of customer contact details was requested, so nothing was searched."
       );
     case "judgment":
       return decline(
@@ -165,13 +203,17 @@ export function buildSafetyAnswer(hit) {
 // "when did we install the geothermal system for X" / "how much did we charge X for the heat pump": the records carry a unit's
 // brand, model, serial and dates but NO equipment type, so the type the question names can neither be confirmed nor refuted. The
 // answer is about whatever unit/invoice is on file - say so instead of letting it read as confirmation of the premise.
-const EQUIP_TYPE_RE = /\b(geothermal|heat\s+pumps?|furnaces?|boilers?|mini[\s-]?splits?|water\s+heaters?|rooftop\s+units?|package\s+units?|chillers?|swamp\s+coolers?|evaporative\s+coolers?|air\s+handlers?|air\s+conditioners?)\b/i;
+const EQUIP_TYPE_RE = /\b(geothermal|rtus?|split\s+systems?|heat\s+pumps?|furnaces?|boilers?|mini[\s-]?splits?|water\s+heaters?|rooftop\s+units?|package\s+units?|chillers?|swamp\s+coolers?|evaporative\s+coolers?|air\s+handlers?|air\s+conditioners?)\b/i;
 const AGGREGATE_LEAD_RE = /^\s*(?:how\s+many|which\s+\w+s\b|list|show|what\s+(?:brands?|types?|kinds?)|do\s+we\s+(?:have|service|work)|any)\b/i;
 /** @returns {string|null} the note to append to an answer's text, or null. */
 export function unverifiedTypeNote(question, data) {
   if (!data || data.kind !== "answer") return null;
   const q = String(question ?? "");
   const m = EQUIP_TYPE_RE.exec(q);
+  // R3 loop: "how many RTU units" is answered with the all-equipment count; say so (kill switch DONOVAN_TYPE_COUNT_NOTE=0).
+  if (m && process.env.DONOVAN_TYPE_COUNT_NOTE !== "0" && /^\s*(?:how\s+many|number\s+of|count\s+of)\b/i.test(q) && /\bpieces of equipment\b/i.test(data.text ?? "") && !/isn'?t recorded|not recorded/i.test(data.text ?? "")) {
+    return `(Note: equipment type isn't recorded in these records, so I can't count ${m[1].toLowerCase()} on their own; that is every piece of equipment on file.)`;
+  }
   if (!m || AGGREGATE_LEAD_RE.test(q)) return null;
   const hay = `${data.text ?? ""} ${(data.facts ?? []).map((f) => `${f.label} ${f.value}`).join(" ")} ${(data.records ?? []).map((r) => `${r.label} ${r.sublabel}`).join(" ")}`;
   if (new RegExp(m[1].replace(/\s+/g, "\\s+"), "i").test(hay) || /isn'?t recorded|not recorded/i.test(data.text ?? "")) return null;

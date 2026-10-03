@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-03T01:34:25.923Z",
-  "count": 752,
+  "generatedAt": "2026-10-03T11:46:34.824Z",
+  "count": 769,
   "questions": [
     {
       "id": "hvac-owner-0069-canonical",
@@ -540,6 +540,17 @@
       "claimants": [
         "deterministic",
         "fastPath"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "live-misses-2026-09-21-0013-canonical",
+      "category": "live-misses-2026-09-21",
+      "text": "Are we owed any money?",
+      "claimants": [
+        "deterministic",
+        "money"
       ],
       "winner": "deterministic",
       "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
@@ -1557,6 +1568,17 @@
       "reason": "ask.js: `!meta && !docLookupIntent && !contentCountIntent && (isMoneyQuestion(...) || isFinancialQuestion(...))`, where docLookupIntent/contentCountIntent are the ALREADY-GATED computed values, not raw claims. Expanded algebraically over raw claims this is: money is excluded only when docLookup or contentCount would ACTUALLY have fired (which itself requires contactLookup to be raw-unclaimed) — money's gate never checks contactLookup or fastPath directly at all. That is exactly why money+relations (relations wins, 0.35 < 0.65 — benign, relations answers with a real document count/comparison, never a fabricated $ figure — see handoffs/MONEY_SAFETY_EXCEPTIONS_2026-09-26.md) and fastPath+money (fastPath wins, 0.5 < 0.65) conflicts both occur silently: money's own 'no fabricated $ figures' guard can be bypassed by any earlier-tried classifier whose shape detector also matches, without money's gate ever being consulted."
     },
     {
+      "id": "breadth-financials-013",
+      "category": "financials",
+      "text": "Are we owed any money? How much?",
+      "claimants": [
+        "deterministic",
+        "money"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
       "id": "breadth-financials-019",
       "category": "financials",
       "text": "How much have we invoiced in total?",
@@ -1599,6 +1621,17 @@
       ],
       "winner": "money",
       "reason": "ask.js: `!meta && !docLookupIntent && !contentCountIntent && (isMoneyQuestion(...) || isFinancialQuestion(...))`, where docLookupIntent/contentCountIntent are the ALREADY-GATED computed values, not raw claims. Expanded algebraically over raw claims this is: money is excluded only when docLookup or contentCount would ACTUALLY have fired (which itself requires contactLookup to be raw-unclaimed) — money's gate never checks contactLookup or fastPath directly at all. That is exactly why money+relations (relations wins, 0.35 < 0.65 — benign, relations answers with a real document count/comparison, never a fabricated $ figure — see handoffs/MONEY_SAFETY_EXCEPTIONS_2026-09-26.md) and fastPath+money (fastPath wins, 0.5 < 0.65) conflicts both occur silently: money's own 'no fabricated $ figures' guard can be bypassed by any earlier-tried classifier whose shape detector also matches, without money's gate ever being consulted."
+    },
+    {
+      "id": "breadth-financials-034",
+      "category": "financials",
+      "text": "How much money have customers paid us so far?",
+      "claimants": [
+        "deterministic",
+        "money"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
     },
     {
       "id": "breadth-financials-035",
@@ -1833,6 +1866,94 @@
       ],
       "winner": "money",
       "reason": "ask.js: `!meta && !docLookupIntent && !contentCountIntent && (isMoneyQuestion(...) || isFinancialQuestion(...))`, where docLookupIntent/contentCountIntent are the ALREADY-GATED computed values, not raw claims. Expanded algebraically over raw claims this is: money is excluded only when docLookup or contentCount would ACTUALLY have fired (which itself requires contactLookup to be raw-unclaimed) — money's gate never checks contactLookup or fastPath directly at all. That is exactly why money+relations (relations wins, 0.35 < 0.65 — benign, relations answers with a real document count/comparison, never a fabricated $ figure — see handoffs/MONEY_SAFETY_EXCEPTIONS_2026-09-26.md) and fastPath+money (fastPath wins, 0.5 < 0.65) conflicts both occur silently: money's own 'no fabricated $ figures' guard can be bypassed by any earlier-tried classifier whose shape detector also matches, without money's gate ever being consulted."
+    },
+    {
+      "id": "breadth-financials-059",
+      "category": "financials",
+      "text": "How much does Mercer owe us?",
+      "claimants": [
+        "deterministic",
+        "money"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "breadth-financials-060",
+      "category": "financials",
+      "text": "How much does Salazar owe us?",
+      "claimants": [
+        "deterministic",
+        "money"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "breadth-financials-061",
+      "category": "financials",
+      "text": "How much does Delgado owe us?",
+      "claimants": [
+        "deterministic",
+        "money"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "breadth-financials-062",
+      "category": "financials",
+      "text": "How much does Rios owe us?",
+      "claimants": [
+        "deterministic",
+        "money"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "breadth-financials-063",
+      "category": "financials",
+      "text": "How much does Holbrook owe us?",
+      "claimants": [
+        "deterministic",
+        "money"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "breadth-financials-064",
+      "category": "financials",
+      "text": "How much does Thornton owe us?",
+      "claimants": [
+        "deterministic",
+        "money"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "breadth-financials-065",
+      "category": "financials",
+      "text": "How much does Prentiss owe us?",
+      "claimants": [
+        "deterministic",
+        "money"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "breadth-financials-066",
+      "category": "financials",
+      "text": "How much does Abernathy owe us?",
+      "claimants": [
+        "deterministic",
+        "money"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
     },
     {
       "id": "breadth-financials-067",
@@ -4969,6 +5090,17 @@
       "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
     },
     {
+      "id": "h081",
+      "category": "field-phrasing-2",
+      "text": "whats still owed on the norwood account",
+      "claimants": [
+        "deterministic",
+        "money"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
       "id": "h082",
       "category": "field-phrasing-2",
       "text": "any invoices from last quarter thats still open",
@@ -6637,7 +6769,8 @@
       "text": "what's the total on purchase order PO-9026, the one for Rebecca Montoya",
       "claimants": [
         "deterministic",
-        "fastPath"
+        "fastPath",
+        "money"
       ],
       "winner": "deterministic",
       "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
@@ -6648,7 +6781,8 @@
       "text": "what's the total on purchase order PO-9015, the one for Daniel Keller",
       "claimants": [
         "deterministic",
-        "fastPath"
+        "fastPath",
+        "money"
       ],
       "winner": "deterministic",
       "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
@@ -6659,7 +6793,8 @@
       "text": "what's the total on purchase order PO-9087, the one for Richard Pruitt",
       "claimants": [
         "deterministic",
-        "fastPath"
+        "fastPath",
+        "money"
       ],
       "winner": "deterministic",
       "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
@@ -6670,7 +6805,8 @@
       "text": "what's the total on purchase order PO-9059, the one for Robert Thornton",
       "claimants": [
         "deterministic",
-        "fastPath"
+        "fastPath",
+        "money"
       ],
       "winner": "deterministic",
       "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
@@ -6681,7 +6817,8 @@
       "text": "what's the total on purchase order PO-9054, the one for Amy Jarvis",
       "claimants": [
         "deterministic",
-        "fastPath"
+        "fastPath",
+        "money"
       ],
       "winner": "deterministic",
       "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
@@ -6692,7 +6829,8 @@
       "text": "what's the total on purchase order PO-9098, the one for Amanda Redwine",
       "claimants": [
         "deterministic",
-        "fastPath"
+        "fastPath",
+        "money"
       ],
       "winner": "deterministic",
       "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
@@ -6703,7 +6841,8 @@
       "text": "what's the total on purchase order PO-9010, the one for Karen Abernathy",
       "claimants": [
         "deterministic",
-        "fastPath"
+        "fastPath",
+        "money"
       ],
       "winner": "deterministic",
       "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
@@ -6714,7 +6853,8 @@
       "text": "what's the total on purchase order PO-9043, the one for George Garrison",
       "claimants": [
         "deterministic",
-        "fastPath"
+        "fastPath",
+        "money"
       ],
       "winner": "deterministic",
       "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
@@ -7574,6 +7714,17 @@
       "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
     },
     {
+      "id": "k128",
+      "category": "field-phrasing-5",
+      "text": "who financed the equipment purchase for Amy Isaacson's install",
+      "claimants": [
+        "deterministic",
+        "contactLookup"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
       "id": "k138",
       "category": "field-phrasing-5",
       "text": "has Kevin Pratt logged more jobs than Marisol Vega",
@@ -8092,6 +8243,17 @@
       "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
     },
     {
+      "id": "g058",
+      "category": "field-phrasing",
+      "text": "whats owed on Ibarra's account",
+      "claimants": [
+        "deterministic",
+        "money"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
       "id": "g059",
       "category": "field-phrasing",
       "text": "last invoice total for 1506 E McKellips Rd",
@@ -8103,6 +8265,17 @@
       "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
     },
     {
+      "id": "g061",
+      "category": "field-phrasing",
+      "text": "whats owed on Yarborough's account",
+      "claimants": [
+        "deterministic",
+        "money"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
       "id": "g062",
       "category": "field-phrasing",
       "text": "last invoice total for 2505 E Pecos Rd",
@@ -8112,6 +8285,17 @@
       ],
       "winner": "fastPath",
       "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "g064",
+      "category": "field-phrasing",
+      "text": "whats owed on Montoya's account",
+      "claimants": [
+        "deterministic",
+        "money"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
     },
     {
       "id": "g065",
@@ -8200,6 +8384,17 @@
       ],
       "winner": "fastPath",
       "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "g098",
+      "category": "field-phrasing",
+      "text": "who installed the app on this phone",
+      "claimants": [
+        "deterministic",
+        "contactLookup"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
     },
     {
       "id": "g105",

@@ -44,6 +44,12 @@ import { parseAggregate, runAggregate } from './lookups/aggregates.js';
 import { parseSerialQuestion, runSerialLookup } from './lookups/serialLookup.js';
 import { parseDocNumberQuestion, runDocNumberLookup } from './lookups/docNumberLookup.js';
 import { parseAgreementEndQuestion, runAgreementEnd } from './lookups/agreementEnd.js';
+import { parseQuoteQuestion, runQuoteLookup } from './lookups/quoteLookup.js';
+import { parsePaidQuestion, runPaidLookup } from './lookups/paidLookup.js';
+import { parseCountQualifier, runCountQualifier } from './lookups/countQualifiers.js';
+import { parseTonnageCount, runTonnageCount } from './lookups/tonnageCount.js';
+import { parseFieldQuestion, runFieldMatch } from './lookups/fieldMatch.js';
+import { parseDateQualifier, runDateQualifier } from './lookups/dateQualifiers.js';
 import { parseFalsePremise, runFalsePremise } from './lookups/falsePremise.js';
 
 // R32 (loop 3/4): "have we been out to <addr> in the last 90 days" / "any service calls at <addr> last year" / "did we do any work at <addr> this year".
@@ -126,6 +132,24 @@ export function classifyDeterministic(question, opts = {}) {
   // Agreement end dates are a document field ("expire in 2026", "run through 2027") - lookups/agreementEnd.js.
   const agEnd = parseAgreementEndQuestion(String(question ?? ''));
   if (agEnd) return { route: 'agreementend', intent: agEnd };
+  // Count questions with a qualifier the old path dropped (invoices over <words>, out-of-state customers, commercial/residential permits) - lookups/countQualifiers.js.
+  const cntQ = parseCountQualifier(String(question ?? ''));
+  if (cntQ) return { route: 'countqual', intent: cntQ };
+  // "How many 5 ton units": unit field + tonnage stated in linked documents, with the no-tonnage count - lookups/tonnageCount.js.
+  const tonQ = parseTonnageCount(String(question ?? ''));
+  if (tonQ) return { route: 'tonnage', intent: tonQ };
+  // Date / month / range qualifiers on service-visit, install and invoice counts (2026.09.21, 9/2026, Jan 2020 to Dec 2021) - lookups/dateQualifiers.js.
+  const dateQ = parseDateQualifier(String(question ?? ''));
+  if (dateQ) return { route: 'datequal', intent: dateQ };
+  // Field asked = field returned (who installed X -> installer; invoice number vs phone) - lookups/fieldMatch.js.
+  const fieldQ = opts?.skipFieldMatch ? null : parseFieldQuestion(String(question ?? ''));
+  if (fieldQ) return { route: 'fieldmatch', intent: fieldQ };
+  // Quote / estimate / proposal questions are answered only from quote documents, never an invoice total - lookups/quoteLookup.js.
+  const quoteQ = parseQuoteQuestion(String(question ?? ''));
+  if (quoteQ) return { route: 'quote', intent: quoteQ };
+  // "What did X pay / owe": X's invoiced total, paid status not recorded; unknown name = not on file - lookups/paidLookup.js.
+  const paidQ = opts?.skipPaid ? null : parsePaidQuestion(String(question ?? ''));
+  if (paidQ) return { route: 'paid', intent: paidQ };
 
   // R35 loop 3: "why did X replace the compressor at <address>" with no such work on file -> honest "no compressor work on file".
   const premise = parseFalsePremise(String(question ?? ''));
@@ -542,6 +566,24 @@ async function runDeterministicCore(db, intent, { today } = {}) {
   if (intent.route === 'serial') return runSerialLookup(db, intent.intent, { today: t });
   if (intent.route === 'docnumber') return runDocNumberLookup(db, intent.intent);
   if (intent.route === 'agreementend') return runAgreementEnd(db, intent.intent);
+  if (intent.route === 'quote') return runQuoteLookup(db, intent.intent);
+  if (intent.route === 'paid') {
+    const pd = await runPaidLookup(db, intent.intent);
+    if (pd) return pd;
+    // Not ours (near-miss / partial / several names / amounts recorded): behave as if this lookup did not exist.
+    const again = classifyDeterministic(intent.intent.question, { skipPaid: true });
+    return again && again.route !== 'paid' ? runDeterministicCore(db, again, { today }) : null;
+  }
+  if (intent.route === 'fieldmatch') {
+    const fm = await runFieldMatch(db, intent.intent);
+    if (fm) return fm;
+    // No single named customer / no data: behave exactly as if this lookup did not exist (re-classify without it).
+    const again = classifyDeterministic(intent.intent.question, { skipFieldMatch: true });
+    return again && again.route !== 'fieldmatch' ? runDeterministicCore(db, again, { today }) : null;
+  }
+  if (intent.route === 'datequal') return runDateQualifier(db, intent.intent);
+  if (intent.route === 'countqual') return runCountQualifier(db, intent.intent);
+  if (intent.route === 'tonnage') return runTonnageCount(db, intent.intent);
   if (intent.route === 'premise') return runFalsePremise(db, intent.intent);
   if (intent.route === 'aggregate') return runAggregate(db, intent.intent, { today: t });
   if (intent.route === 'comparison') return runComparison(db, intent.intent);

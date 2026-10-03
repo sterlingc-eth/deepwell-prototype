@@ -337,9 +337,19 @@ export function buildBattery(exp, today, { seed = 34 } = {}) {
 
   /* ---- D. units: tonnage / brand / install year / warranty windows (oracle counts) ---- */
   const total = O.units.length;
+  // R3: tonnage = the unit's own field, else the single tonnage its linked documents state (matches lookups/tonnageCount.js).
+  const pgText = {}; for (const p of exp.pages) (pgText[p.document_id] ??= []).push(p.text);
+  const linkDocs = {}; for (const l of exp.document_entity_links) (linkDocs[l.entity_id] ??= []).push(l.document_id);
+  const tonOf = (u) => {
+    const own = /(\d+(?:\.\d+)?)/.exec(String(u.data?.tonnage ?? ""));
+    if (own) return Number(own[1]);
+    const set = new Set();
+    for (const d of linkDocs[u.id] ?? []) for (const m of (pgText[d] ?? []).join("\n").matchAll(/(?:^|[^\w.])(\d{1,2}(?:\.\d)?)\s*-?\s*tons?\b/gi)) set.add(Number(m[1]));
+    return set.size === 1 ? [...set][0] : null;
+  };
   const tonWords = { 2: "two", 3: "three", 4: "four", 5: "five" };
   for (const t of [2, 3, 4, 5]) {
-    const n = O.unitsWhere((u) => u.data.tonnage === `${t} ton`);
+    const n = O.unitsWhere((u) => tonOf(u) === t);
     for (const q of [`how many ${t} ton units do we have`, `how many ${tonWords[t]} ton units`, `how many ${t}-ton units`, `how many units are ${t} tons`]) {
       add("D1-tonnage", q, countJudge(n, { total }));
     }

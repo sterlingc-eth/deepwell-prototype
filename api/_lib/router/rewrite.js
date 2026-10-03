@@ -160,6 +160,20 @@ export function rewriteShorthand(question) {
   return q.replace(/\s{2,}/g, " ").trim();
 }
 
+// R3 loop: whole-question phrasings of two shapes the engine already answers. Kill switch: DONOVAN_PHRASE_REWRITE_R3=0.
+const EQUIP_TYPE_SRC = String.raw`(?:rtus?(?:\s+units?)?|rooftop\s+units?|package(?:d)?\s+units?|split\s+systems?|furnaces|heat\s+pumps|mini[\s-]?splits|boilers|chillers|air\s+handlers|water\s+heaters)`;
+function rewriteLoopR3(q) {
+  if (process.env.DONOVAN_PHRASE_REWRITE_R3 === "0") return q;
+  const T = String.raw`^\s*(?:so\s+|ok\s+|hey\s+)?`;
+  // dollars across every invoice ("total of all invoices", "add up all the invoices", "tally up all invoices", "total invoiced")
+  if (new RegExp(T + String.raw`(?:what(?:'s|s|\s+is)\s+|whats\s+|give\s+me\s+|show\s+me\s+)?(?:the\s+)?(?:(?:grand\s+)?total|sum|tally)(?:\s+(?:of|on|for|value\s+of))?\s+(?:(?:all|every)\s+(?:of\s+)?)?(?:the\s+|our\s+|my\s+)?(?:invoices?|invoiced)(?:\s+(?:we\s+(?:have|got)|on\s+file|total|altogether|combined))?\s*[?.!]*\s*$`, "i").test(q)
+    || new RegExp(T + String.raw`(?:add|tally|sum)\s+up\s+(?:(?:all|every)\s+(?:of\s+)?)?(?:the\s+|our\s+|my\s+)?invoices?(?:\s+(?:we\s+(?:have|got)|on\s+file))?\s*[?.!]*\s*$`, "i").test(q)) return "total invoices amount";
+  // "rtu count" / "number of rtu units" -> "how many ..." (the type-count path)
+  const m = new RegExp(T + String.raw`(?:(?:the\s+)?(?:number|count|total)\s+of\s+(${EQUIP_TYPE_SRC})|(${EQUIP_TYPE_SRC})\s+count)\s*[?.!]*\s*$`, "i").exec(q);
+  if (m) return `how many ${m[1] ?? m[2]}`;
+  return q;
+}
+
 export function rewriteQuestion(question) {
   const src = String(question ?? "");
   if (!src.trim() || src.length > 300) return null;
@@ -167,5 +181,6 @@ export function rewriteQuestion(question) {
   q = q.replace(DIGIT_SEQ_RE, (m) => m.toLowerCase().split(/\s+/).map((w) => DIGITS[w] ?? w).join(""));
   for (const [re, rep] of RULES) q = q.replace(re, rep);
   q = rewriteWindowShapes(q);
+  q = rewriteLoopR3(q);
   return q !== src ? q : null;
 }
