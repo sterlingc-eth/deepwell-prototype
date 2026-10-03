@@ -209,7 +209,7 @@ const AGGREGATE_LEAD_RE = /^\s*(?:how\s+many|which\s+\w+s\b|list|show|what\s+(?:
 export function unverifiedTypeNote(question, data) {
   if (!data || data.kind !== "answer") return null;
   const q = String(question ?? "");
-  const m = EQUIP_TYPE_RE.exec(q);
+  const m = EQUIP_TYPE_RE.exec(q) ?? (process.env.DONOVAN_EQUIP_TYPE_SYNONYMS === "0" ? null : /\b(ductless)\b/i.exec(q));
   // R3 loop: "how many RTU units" is answered with the all-equipment count; say so (kill switch DONOVAN_TYPE_COUNT_NOTE=0).
   if (m && process.env.DONOVAN_TYPE_COUNT_NOTE !== "0" && /^\s*(?:how\s+many|number\s+of|count\s+of)\b/i.test(q) && /\bpieces of equipment\b/i.test(data.text ?? "") && !/isn'?t recorded|not recorded/i.test(data.text ?? "")) {
     return `(Note: equipment type isn't recorded in these records, so I can't count ${m[1].toLowerCase()} on their own; that is every piece of equipment on file.)`;

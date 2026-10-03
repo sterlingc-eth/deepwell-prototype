@@ -174,6 +174,27 @@ function rewriteLoopR3(q) {
   return q;
 }
 
+// R4 loop: shorthand for two shapes the engine already answers -- the quoted dollar total ("total of all quotes", "sum quotes", "how much
+// in quotes") and plain document / equipment counts ("num of invoices", "# of quotes", "invoice count", bare "rtu units?"). Whole-question
+// matches only. Kill switch: DONOVAN_PHRASE_REWRITE_R4=0.
+const QUOTE_N_SRC = String.raw`(?:quotes?|proposals?|estimates?)`;
+const COUNT_DOC_SRC = String.raw`(invoices?|quotes?|proposals?|estimates?|purchase\s+orders?|pos|techs?|technicians|customers?)`;
+const pluralize = (w) => { const x = w.toLowerCase().replace(/\s+/g, " "); return /s$/.test(x) ? x : `${x}s`; };
+function rewriteLoopR4(q) {
+  if (process.env.DONOVAN_PHRASE_REWRITE_R4 === "0") return q;
+  const T = String.raw`^\s*(?:so\s+|ok\s+|hey\s+)?`;
+  const E = String.raw`\s*[?.!]*\s*$`;
+  if (new RegExp(T + String.raw`(?:what(?:'s|s|\s+is)\s+|whats\s+|give\s+me\s+|show\s+me\s+)?(?:the\s+)?(?:(?:grand\s+)?total|sum|tally(?:\s+up)?|add\s+up)(?:\s+(?:of|on|for|value\s+of))?\s+(?:(?:all|every)\s+(?:of\s+)?)?(?:the\s+|our\s+|my\s+)?${QUOTE_N_SRC}(?:\s+(?:amount|value|dollars))?(?:\s+(?:we\s+(?:sent|have|got|made|gave)|on\s+file|altogether|combined|total))?` + E, "i").test(q)
+    || new RegExp(T + String.raw`(?:all\s+)?(?:the\s+|our\s+)?${QUOTE_N_SRC}\s+(?:total|value|sum)` + E, "i").test(q)
+    || new RegExp(T + String.raw`how\s+much\s+(?:in\s+|are\s+all\s+(?:the\s+|our\s+)?|are\s+(?:the\s+|our\s+)?|is\s+in\s+)(?:all\s+)?(?:the\s+|our\s+)?${QUOTE_N_SRC}(?:\s+(?:worth|total|combined|altogether))?` + E, "i").test(q)) return "total value of our quotes";
+  let m = new RegExp(T + String.raw`(?:num(?:ber)?|no\.?|#|count)\s*(?:of\s+)?(?:all\s+)?(?:the\s+)?${COUNT_DOC_SRC}` + E, "i").exec(q)
+    ?? new RegExp(T + String.raw`${COUNT_DOC_SRC}\s+count` + E, "i").exec(q);
+  if (m) return `how many ${pluralize(m[1])}`;
+  m = new RegExp(T + String.raw`(${EQUIP_TYPE_SRC})` + E, "i").exec(q);
+  if (m) return `how many ${m[1]}`;
+  return q;
+}
+
 export function rewriteQuestion(question) {
   const src = String(question ?? "");
   if (!src.trim() || src.length > 300) return null;
@@ -182,5 +203,6 @@ export function rewriteQuestion(question) {
   for (const [re, rep] of RULES) q = q.replace(re, rep);
   q = rewriteWindowShapes(q);
   q = rewriteLoopR3(q);
+  q = rewriteLoopR4(q);
   return q !== src ? q : null;
 }

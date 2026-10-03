@@ -336,6 +336,11 @@ export const ENTITY_SYNONYMS = {
     'equipment', 'unit', 'units', 'system', 'systems', 'ac', 'acs', 'air conditioner', 'air conditioners',
     'furnace', 'furnaces', 'heat pump', 'heat pumps', 'condenser', 'condensers', 'rtu', 'rtus',
     'rooftop unit', 'rooftop units', 'piece of equipment', 'pieces of equipment',
+    // R4 loop: more field names for the same equipment count (kill switch DONOVAN_EQUIP_TYPE_SYNONYMS=0).
+    ...(process.env.DONOVAN_EQUIP_TYPE_SYNONYMS === '0' ? [] : [
+      'mini split', 'mini splits', 'mini-split', 'mini-splits', 'minisplit', 'minisplits', 'ductless', 'air handler', 'air handlers',
+      'package unit', 'package units', 'packaged unit', 'packaged units', 'boiler', 'boilers',
+    ]),
     // HVAC persona bank (2026-09-21, hvac-personas.mjs): "how many Trane
     // installs have we done since 2020" — "install"/"installs" is a plain,
     // common owner synonym for "installed unit", same shape as "unit"/

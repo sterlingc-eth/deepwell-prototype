@@ -294,6 +294,9 @@ const KNOWN_CITY_NAMES = new Set(
 const NAME_STOPWORD_RE =
   /^(?:the|a|an|this|that|these|those|our|their|his|her|my|your|its|which|who|what|how|why|when|does|do|did|is|are|was|were|list|show|has|have|had|in|on|at|of|for|with|without|any|anyone|anybody|everyone|everybody|someone|somebody|some|all|last|next|first|second|third|most|many|few|several|pull|need|get)$/i;
 
+const NAME_DESCRIPTOR_RE =
+  /^(?:biggest|largest|smallest|oldest|newest|highest|lowest|overdue|accepted|declined|expired|pending|unpaid|average|avg|total|totals|sum|tally|tot|num|number|count|whats|can|grand|grande)$/i;
+
 const AGGREGATE_WORD_RE = new RegExp(
   `\\b(${[...new Set([
     ...ENTITY_SYNONYMS.customers,
@@ -346,6 +349,8 @@ function isRealNameOrAddressPhrase(phrase, { trailingJob = false } = {}) {
   // this file's own tests) is still caught.
   const firstWord = p.split(/\s+/)[0].toLowerCase().replace(/'s$/, "");
   if (NAME_STOPWORD_RE.test(firstWord)) return false;
+  // R4 loop: a superlative / status / shorthand word is never the start of a customer name ("biggest invoice", "overdue invoices", "num of invoices").
+  if (process.env.DONOVAN_NAME_DESCRIPTOR_GUARD !== "0" && NAME_DESCRIPTOR_RE.test(firstWord)) return false;
   if (MONTH_NAMES.has(firstWord) && p.split(/\s+/).length <= 2) return false; // "for august", "for august 2024"
   if (TIME_WORDS.has(firstWord)) return false;
   if (AGGREGATE_WORD_RE.test(p)) return false;

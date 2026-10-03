@@ -46,6 +46,7 @@ import { parseDocNumberQuestion, runDocNumberLookup } from './lookups/docNumberL
 import { parseAgreementEndQuestion, runAgreementEnd } from './lookups/agreementEnd.js';
 import { parseQuoteQuestion, runQuoteLookup } from './lookups/quoteLookup.js';
 import { parsePaidQuestion, runPaidLookup } from './lookups/paidLookup.js';
+import { parseDocExtreme, runDocExtreme } from './lookups/docExtremes.js';
 import { parseCountQualifier, runCountQualifier } from './lookups/countQualifiers.js';
 import { parseTonnageCount, runTonnageCount } from './lookups/tonnageCount.js';
 import { parseFieldQuestion, runFieldMatch } from './lookups/fieldMatch.js';
@@ -138,6 +139,9 @@ export function classifyDeterministic(question, opts = {}) {
   // "How many 5 ton units": unit field + tonnage stated in linked documents, with the no-tonnage count - lookups/tonnageCount.js.
   const tonQ = parseTonnageCount(String(question ?? ''));
   if (tonQ) return { route: 'tonnage', intent: tonQ };
+  // Whole-shop extremes on one document type (oldest/newest invoice, cheapest invoice, biggest/oldest quote) - lookups/docExtremes.js.
+  const extQ = parseDocExtreme(String(question ?? ''));
+  if (extQ) return { route: 'docextreme', intent: extQ };
   // Date / month / range qualifiers on service-visit, install and invoice counts (2026.09.21, 9/2026, Jan 2020 to Dec 2021) - lookups/dateQualifiers.js.
   const dateQ = parseDateQualifier(String(question ?? ''));
   if (dateQ) return { route: 'datequal', intent: dateQ };
@@ -567,6 +571,7 @@ async function runDeterministicCore(db, intent, { today } = {}) {
   if (intent.route === 'docnumber') return runDocNumberLookup(db, intent.intent);
   if (intent.route === 'agreementend') return runAgreementEnd(db, intent.intent);
   if (intent.route === 'quote') return runQuoteLookup(db, intent.intent);
+  if (intent.route === 'docextreme') return runDocExtreme(db, intent.intent);
   if (intent.route === 'paid') {
     const pd = await runPaidLookup(db, intent.intent);
     if (pd) return pd;
