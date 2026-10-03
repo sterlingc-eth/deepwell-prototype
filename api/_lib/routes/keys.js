@@ -180,6 +180,7 @@ export default async function handler(req, res) {
     if (body.action === "revoke") {
       const id = typeof body.id === "string" ? body.id : null;
       if (!id) return res.status(400).json({ error: "id is required" });
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return res.status(404).json({ error: "Key not found" });
 
       const revoked = await withTenantTx(ctx, async (client, tenantId) => {
         const { rows } = await client.query(

@@ -214,7 +214,7 @@ export async function requireSupportAccess(ctxArg, { staffUserId, action, record
   const grant = isFounderTenant ? null : await getActiveGrant(ctxArg);
   const decision = decideAccess({ grant, isFounderTenant, emergencyReason });
   if (decision.allowed && decision.mode !== "exempt-founder-tenant") {
-    await appendAccessLog(ctxArg, {
+    const logged = await appendAccessLog(ctxArg, {
       staffUserId,
       action,
       recordCount,
@@ -222,6 +222,9 @@ export async function requireSupportAccess(ctxArg, { staffUserId, action, record
       emergencyReason: decision.mode === "emergency" ? decision.emergencyReason : null,
       grantId: grant?.id ?? null,
     });
+    // TESTER B (limit test): "every access is logged" - an access whose log row could not be written is refused
+    // (fail closed) instead of going through unlogged. The caller's message already tells staff to retry.
+    if (!logged) return { allowed: false, mode: "denied", reason: "access-log-unavailable" };
   }
   return decision;
 }

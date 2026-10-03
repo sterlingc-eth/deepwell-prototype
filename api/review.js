@@ -145,6 +145,9 @@ async function gateSupportAccess(auth, ctx, action, payload, recordCount) {
     recordCount,
     emergencyReason: payload?.emergencyReason,
   });
+  if (!decision.allowed && decision.reason === 'access-log-unavailable') {
+    throw new reviewStore.ReviewError('The support-access log could not be written, so this access was refused. Try again in a moment.', 503);
+  }
   if (!decision.allowed) {
     throw new reviewStore.ReviewError(
       'This tenant has not granted DeepWell staff support access. Ask the tenant\'s admin to grant time-boxed access in Settings, or resubmit with an emergencyReason for a logged break-glass access.',

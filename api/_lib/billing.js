@@ -297,15 +297,16 @@ function planFromSubscriptionItem(sub) {
   // metadata still resolves a plan instead of silently applying none.
   for (const item of sub?.items?.data ?? []) {
     const fromMeta = item?.price?.metadata?.plan;
-    if (fromMeta && PLAN_CATALOG[fromMeta]) return fromMeta;
+    if (fromMeta && Object.hasOwn(PLAN_CATALOG, fromMeta)) return fromMeta;
   }
   for (const item of sub?.items?.data ?? []) {
     const key = String(item?.price?.lookup_key ?? '');
     const prefix = key.split('_')[0];
-    if (!isOutreachAutoAddOnKey(key) && PLAN_CATALOG[prefix]) return prefix;
+    if (!isOutreachAutoAddOnKey(key) && Object.hasOwn(PLAN_CATALOG, prefix)) return prefix;
   }
   const first = sub?.items?.data?.[0]?.price?.metadata?.plan;
-  return first ?? null;
+  // An inherited Object name ('constructor', '__proto__', ...) is never a plan.
+  return typeof first === 'string' && !(first in Object.prototype) ? first : null;
 }
 
 function isoOrNull(unixSeconds) {

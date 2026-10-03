@@ -47,7 +47,7 @@ export function normalizePacks(raw) {
   if (!Array.isArray(raw)) return [...LEGACY_PACKS];
   const want = new Set();
   const add = (id) => {
-    if (!PACK_MANIFESTS[id] || want.has(id)) return;
+    if (typeof id !== 'string' || !Object.hasOwn(PACK_MANIFESTS, id) || want.has(id)) return;
     want.add(id);
     PACK_MANIFESTS[id].requires.forEach(add);
   };
@@ -68,7 +68,7 @@ export function isGeneral(packIds) { return !packIds || packIds.length === 0; }
 /** Pure: sorted unique feature list for a pack id list. */
 export function featuresFor(packIds) {
   const out = new Set();
-  for (const id of packIds || []) (PACK_MANIFESTS[id]?.features || []).forEach((f) => out.add(f));
+  for (const id of packIds || []) (Object.hasOwn(PACK_MANIFESTS, id) ? PACK_MANIFESTS[id].features : []).forEach((f) => out.add(f));
   return [...out].sort();
 }
 

@@ -452,6 +452,13 @@ export function handleError(res, error, req, extra = {}) {
   const msg = (error && error.message) || "";
   const status = error && error.status;
 
+  // TESTER B (limit test): OUR OWN AuthError (a member refused by requireRole, status 403 / 401) is not an AI-provider
+  // failure. classifyProviderError below reads any 401/403 as "provider key invalid", so a member's refused admin
+  // request came back as a 503 "AI features are temporarily unavailable" and flipped the process-wide outage flag.
+  if (error?.name === "AuthError" && (error.status === 401 || error.status === 403)) {
+    return handleCors(res, req).status(error.status).json({ error: error.message });
+  }
+
   // Before the 401 check, because a missing server key is not an auth failure
   // and must never be reported as one.
   if (error?.name === "ConfigError") {

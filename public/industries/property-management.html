@@ -143,6 +143,10 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
 footer .wrap>div:last-child{display:flex;flex-wrap:wrap;gap:8px 18px;min-width:0}
 footer a{color:var(--muted);text-decoration:none}
 footer a:hover{color:var(--text)}
+.nav .wrap{max-width:1080px}
+/* limit-test 2026-10-03: header never wraps; phone menu reachable */
+.navlinks a,.nav-dropdown-toggle,.navcta .btn{white-space:nowrap}
+@media (max-width:760px){.navlinks{display:flex;gap:0}.navlinks>a{display:none}.navlinks .nav-dropdown-menu{position:fixed;left:16px;right:16px;top:76px;width:auto;max-width:none;min-width:0;transform:none!important}.nav-dropdown-toggle,.navcta .btn{min-height:44px}}
 </style>
 <link rel="stylesheet" href="/support/widget.css">
 </head>

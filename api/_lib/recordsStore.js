@@ -1763,6 +1763,8 @@ async function findOrCreateCustomerByAddress(db, tenantId, address, facts, shopC
 
 function makeStore(db, tenantId) {
   const one = async (sql, params) => (await db.query(sql, params)).rows[0] ?? null;
+  const ownedBy = (table, param) => `EXISTS (SELECT 1 FROM ${table} WHERE id = ${param} AND ${TENANT})`;
+  const notFound = (msg) => Object.assign(new Error(msg), { status: 404, statusCode: 404, code: 'NOT_FOUND' });
   const many = async (sql, params) => (await db.query(sql, params)).rows;
 
   /** Build "SET a=$2, b=$3" from an allowlist. Never interpolates caller keys. */
@@ -2189,13 +2191,21 @@ function makeStore(db, tenantId) {
     },
 
     // ---- facets ----
-    createFacet: (f) => one(
-      `INSERT INTO facets (tenant_id, document_id, page_no, segment_id, label_raw, value_raw,
-                           value_type_guess, confidence, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW()) RETURNING id`,
-      [tenantId, f.document_id, f.page_no ?? null, f.segment_id ?? null,
-       f.label_raw, f.value_raw, f.value_type_guess ?? null, f.confidence ?? null]
-    ),
+    // Parent ids are ownership-checked in the same statement: FK checks bypass RLS,
+    // so without this a company could attach rows to another company's document.
+    createFacet: async (f) => {
+      const row = await one(
+        `INSERT INTO facets (tenant_id, document_id, page_no, segment_id, label_raw, value_raw,
+                             value_type_guess, confidence, created_at)
+         SELECT $1,$2::uuid,$3,$4,$5,$6,$7,$8,NOW()
+          WHERE ${ownedBy('documents', '$2::uuid')}
+         RETURNING id`,
+        [tenantId, f.document_id, f.page_no ?? null, f.segment_id ?? null,
+         f.label_raw, f.value_raw, f.value_type_guess ?? null, f.confidence ?? null]
+      );
+      if (!row) throw notFound('document not found');
+      return row;
+    },
     getFacet: (id) => one(`SELECT * FROM facets WHERE id = $1 AND ${TENANT}`, [id]),
     listFacetsByDocument: (documentId) =>
       many(`SELECT * FROM facets WHERE document_id = $1 AND ${TENANT} ORDER BY page_no, id`, [documentId]),
@@ -2204,21 +2214,31 @@ function makeStore(db, tenantId) {
     // ---- extractions ----
     createExtraction: async (e) => {
       if (await extractionsHaveUnitIndex(db)) {
-        return one(
+        const row = await one(
           `INSERT INTO extractions (tenant_id, document_id, entity_id, field_key, value,
                                     confidence, source_facet_id, unit_index, created_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW()) RETURNING id`,
+           SELECT $1,$2::uuid,$3::uuid,$4,$5,$6,$7::uuid,$8,NOW()
+            WHERE ${ownedBy('documents', '$2::uuid')} AND ($3::uuid IS NULL OR ${ownedBy('entities', '$3::uuid')})
+              AND ($7::uuid IS NULL OR ${ownedBy('facets', '$7::uuid')})
+           RETURNING id`,
           [tenantId, e.document_id, e.entity_id ?? null, e.field_key, e.value ?? null,
            e.confidence ?? null, e.source_facet_id ?? null, e.unit_index ?? null]
         );
+        if (!row) throw notFound('document, entity or facet not found');
+        return row;
       }
-      return one(
+      const row = await one(
         `INSERT INTO extractions (tenant_id, document_id, entity_id, field_key, value,
                                   confidence, source_facet_id, created_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,NOW()) RETURNING id`,
+         SELECT $1,$2::uuid,$3::uuid,$4,$5,$6,$7::uuid,NOW()
+          WHERE ${ownedBy('documents', '$2::uuid')} AND ($3::uuid IS NULL OR ${ownedBy('entities', '$3::uuid')})
+              AND ($7::uuid IS NULL OR ${ownedBy('facets', '$7::uuid')})
+         RETURNING id`,
         [tenantId, e.document_id, e.entity_id ?? null, e.field_key, e.value ?? null,
          e.confidence ?? null, e.source_facet_id ?? null]
       );
+      if (!row) throw notFound('document, entity or facet not found');
+      return row;
     },
     getExtraction: (id) => one(`SELECT * FROM extractions WHERE id = $1 AND ${TENANT}`, [id]),
     listExtractionsByDocument: (documentId) =>
@@ -2253,7 +2273,13 @@ function makeStore(db, tenantId) {
         [ids]
       );
     },
-    updateExtraction: updater('extractions', ['value', 'confidence', 'entity_id']),
+    updateExtraction: async (id, updates) => {
+      if (updates && updates.entity_id != null) {
+        const ok = await one(`SELECT 1 AS ok FROM entities WHERE id = $1::uuid AND ${TENANT}`, [updates.entity_id]);
+        if (!ok) throw notFound('entity not found');
+      }
+      return updater('extractions', ['value', 'confidence', 'entity_id'])(id, updates);
+    },
 
     // ---- entities ----
     createEntity: (e) => one(

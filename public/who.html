@@ -177,6 +177,11 @@ footer a:hover{color:var(--text)}
 .who-link:hover{text-decoration:underline}
 @media (max-width:860px){.who-grid{grid-template-columns:minmax(0,1fr)}.who-roles{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:480px){.web-node{font-size:.74rem;padding:6px 8px;min-height:36px;max-width:7.2em}}
+/* limit-test 2026-10-03: header never wraps; phone menu reachable */
+.navlinks a,.nav-dropdown-toggle,.navcta .btn{white-space:nowrap}
+@media (max-width:760px){.navlinks{display:flex;gap:0}.navlinks>a{display:none}.navlinks .nav-dropdown-menu{position:fixed;left:16px;right:16px;top:76px;width:auto;max-width:none;min-width:0;transform:none!important}.nav-dropdown-toggle,.navcta .btn{min-height:44px}}
+.who-link{display:inline-flex;align-items:center;min-height:44px}
+@media (max-width:480px){.web-node{min-height:44px}}
 </style>
 <link rel="stylesheet" href="/support/widget.css">
 </head>

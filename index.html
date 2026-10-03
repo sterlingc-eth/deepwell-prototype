@@ -2456,7 +2456,7 @@ footer{padding-block:10px}
               <label for="inq-message">Your question</label>
               <textarea id="inq-message" name="message" rows="3" maxlength="2000" autocomplete="off" required aria-describedby="inq-e-message inq-count"></textarea>
               <p class="inq-e" id="inq-e-message" hidden></p>
-              <p class="inq-count" id="inq-count" hidden></p>
+              <p class="inq-count" id="inq-count" aria-live="polite" hidden></p>
             </div>
           </div>
           <div class="inq-hp" aria-hidden="true"><label for="inq-website">Leave this field empty</label><input id="inq-website" name="website" type="text" tabindex="-1" autocomplete="off"></div>
@@ -3101,11 +3101,18 @@ sync(true);if(mq.addEventListener)mq.addEventListener('change',function(){sync(f
     var w=[].slice.call(form.querySelectorAll('input[name="where"]:checked')).map(function(c){return c.value;});
     return {name:f.name.value.trim(),company:f.company.value.trim(),email:f.email.value.trim(),phone:f.phone.value.trim(),size:f.size.value,where:w,message:f.message.value.trim()};
   }
+  /* same rule as the server (api/_lib/support/handoff.js isValidEmail) so the visitor sees the error at once */
+  function okEmail(x){
+    if(!x||x.length>254||/[\p{C}\p{Z}\s]/u.test(x)||!/^[^\s@<>()[\]",;:\\]+@[^\s@<>()[\]",;:\\]+\.[^\s@<>()[\]",;:\\]{2,}$/.test(x))return false;
+    var at=x.indexOf('@'),lo=x.slice(0,at),labels=x.slice(at+1).split('.');
+    if(lo.length>64||lo.charAt(0)==='.'||lo.slice(-1)==='.'||lo.indexOf('..')>=0)return false;
+    return labels.length>=2&&labels.every(function(l){return l.length>=1&&l.length<=63&&l.charAt(0)!=='-'&&l.slice(-1)!=='-';})&&/^[\p{L}\p{N}-]{2,24}$/u.test(labels[labels.length-1]);
+  }
   function check(v){
     var e={};
     if(!v.name)e.name=MSG.name;
     if(!v.company)e.company=MSG.company;
-    if(!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]{2,}$/.test(v.email))e.email=MSG.email;
+    if(!okEmail(v.email))e.email=MSG.email;
     if(v.phone){var d=v.phone.replace(/\D/g,'');if(!/^[0-9+().\-\sxX#]+$/.test(v.phone)||d.length<7||d.length>15)e.phone=MSG.phone;}
     if(!v.message)e.message=MSG.message;else if(v.message.length<5)e.message=MSG.messageShort;
     return e;
@@ -3117,7 +3124,7 @@ sync(true);if(mq.addEventListener)mq.addEventListener('change',function(){sync(f
     return !!first;
   }
   function succeed(v){
-    var first=(v.name.split(/\s+/)[0]||'').trim();
+    var first=(v.name.split(/\s+/)[0]||'').trim();if(!/^[\p{L}\p{M}'\u2019-]{1,40}$/u.test(first))first='';
     $('inq-done-title').textContent=first?'Thanks, '+first+'.':'Thanks.';
     $('inq-done-body').textContent='Your question is with Sterling and Hilton. We reply within one business day, to '+v.email+'.';
     form.hidden=true;done.hidden=false;done.focus({preventScroll:true});
