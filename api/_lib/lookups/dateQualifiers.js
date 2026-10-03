@@ -5,6 +5,7 @@
  * Closed shapes only. A count question (how many / number of) whose ONLY content is <subject> + <date or date range>:
  *   subject: service visits|calls (every document with a service date)  |  units/systems/equipment installed (install date)  |  invoices (invoice date)
  *   claimed when the window is a range of two dates, or a single date written numerically (2026-09-21, 2026.09.21, 9.21.2026, 9/2026, 2026/09).
+ *   Open-ended: since/after/before/until + ONE numeric date (DONOVAN_DATE_OPEN=0 disables just this).
  *   Ambiguous day/month ("3.4.2026"), invalid dates, "before/after/since", names, amounts or any other word -> null (falls through, unchanged).
  * Kill switch: DONOVAN_DATE_QUALIFIERS=0.      pure: parseDateQualifier     db: runDateQualifier
  */
@@ -59,13 +60,13 @@ function extractPoints(text) {
   // order by position in the ORIGINAL text
   found.forEach((f) => { f.at = text.toLowerCase().indexOf(f.key.toLowerCase()); });
   found.sort((a, b) => a.at - b.at);
-  return { points: found.map((f) => f.p), rest };
+  return { points: found.map((f) => f.p), keys: found.map((f) => f.key), rest };
 }
 
 const SERVICE_RE = /\bservice\s+(?:visits?|calls?)\b/;
 const INSTALL_RE = /\b(?:(?:units?|systems?|equipment|pieces?\s+of\s+equipment|ac\s+units?|hvac\s+units?|furnaces?|heat\s+pumps?)\b.*\binstall(?:ed|s)?|install(?:ed|s)?\b.*\b(?:units?|systems?|equipment|pieces?\s+of\s+equipment))\b/;
 const INVOICE_RE = /\binvoices?\b/;
-const FILLER = new Set("how many number of count the our all we do did have has are is were was there on in during between and from to through thru until till dated date of a an got done performed completed total file made issued written for within each service visit visits call calls unit units system systems equipment piece pieces installed install installs invoice invoices ac hvac furnace furnaces heat pump pumps".split(" "));
+const FILLER = new Set("how many number of count the our all we do did have has are is were was there on in during between and from to through thru until till since after before dated date of a an got done performed completed total file made issued written for within each service visit visits call calls unit units system systems equipment piece pieces installed install installs invoice invoices ac hvac furnace furnaces heat pump pumps".split(" "));
 
 /** Pure. @returns {kind:'service'|'install'|'invoice', from, to, label, range} or null. */
 export function parseDateQualifier(question) {
@@ -82,6 +83,18 @@ export function parseDateQualifier(question) {
   if (words.some((w) => !FILLER.has(w) && !/^\d+$/.test(w) && false)) return null;
   if (words.some((w) => !FILLER.has(w))) return null;
   const [a, b] = ex.points;
+  const open = /\b(since|after|before|until|till)\b/.exec(q);
+  if (open) {
+    // Open-ended window (DONOVAN_DATE_OPEN=0 disables): exactly one numeric date straight after the keyword, nothing else.
+    if (process.env.DONOVAN_DATE_OPEN === "0" || b || !a.numeric || (q.match(/\b(?:since|after|before|until|till)\b/g) ?? []).length !== 1) return null;
+    const esc = ex.keys[0].replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    if (!new RegExp(`\\b${open[1]}\\s+(?:on\\s+)?${esc}`).test(q) || /\b(?:between|from|to|through|thru)\b/.test(q)) return null;
+    const next = (d) => { const t = new Date(`${d}T00:00:00Z`); t.setUTCDate(t.getUTCDate() + 1); return t.toISOString().slice(0, 10); };
+    const prev = (d) => { const t = new Date(`${d}T00:00:00Z`); t.setUTCDate(t.getUTCDate() - 1); return t.toISOString().slice(0, 10); };
+    const w = open[1] === "till" ? "until" : open[1];
+    const [f, t] = w === "since" ? [a.from, "9999-12-31"] : w === "after" ? [next(a.to), "9999-12-31"] : w === "before" ? ["0001-01-01", prev(a.from)] : ["0001-01-01", a.to];
+    return { kind, from: f, to: t, label: `${w} ${a.label}`, range: false, open: true };
+  }
   if (b) {
     if (!/\b(?:between\b.*\band\b|from\b.*\b(?:to|through|thru|until|till)\b|\b(?:to|through|thru)\b)/.test(q)) return null;
     if (b.from < a.from) return null;
@@ -95,7 +108,7 @@ const VAL = (a) => `COALESCE(NULLIF(${a}.corrected_value, ''), ${a}.value)`;
 const iso = (s) => { const m = /(\d{4})-(\d{2})-(\d{2})/.exec(String(s ?? "")) ?? null; if (m) return `${m[1]}-${m[2]}-${m[3]}`; const u = /(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(String(s ?? "")); return u ? `${u[3]}-${pad(+u[1])}-${pad(+u[2])}` : null; };
 const TYPE_LABEL = { "service-ticket": ["service ticket", "service tickets"], invoice: ["invoice", "invoices"], "work-order": ["work order", "work orders"], "startup-sheet": ["startup sheet", "startup sheets"], "inspection-report": ["inspection report", "inspection reports"] };
 const when = (i) => (i.range ? `from ${i.label.replace(" through ", " through ")}` : `on ${i.label}`);
-const whenIn = (i) => (i.range ? `from ${i.label}` : /^[A-Z][a-z]+ \d{4}$/.test(i.label) ? `in ${i.label}` : `on ${i.label}`);
+const whenIn = (i) => (i.open ? i.label : i.range ? `from ${i.label}` : /^[A-Z][a-z]+ \d{4}$/.test(i.label) ? `in ${i.label}` : `on ${i.label}`);
 
 export async function runDateQualifier(db, intent) {
   const inRange = (d) => d && d >= intent.from && d <= intent.to;

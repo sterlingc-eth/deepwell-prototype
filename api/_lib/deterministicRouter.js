@@ -47,6 +47,7 @@ import { parseAgreementEndQuestion, runAgreementEnd } from './lookups/agreementE
 import { parseQuoteQuestion, runQuoteLookup } from './lookups/quoteLookup.js';
 import { parsePaidQuestion, runPaidLookup } from './lookups/paidLookup.js';
 import { parseDocExtreme, runDocExtreme } from './lookups/docExtremes.js';
+import { parseCustomerDocRank, runCustomerDocRank } from './lookups/customerDocRank.js';
 import { parseCountQualifier, runCountQualifier } from './lookups/countQualifiers.js';
 import { parseTonnageCount, runTonnageCount } from './lookups/tonnageCount.js';
 import { parseFieldQuestion, runFieldMatch } from './lookups/fieldMatch.js';
@@ -139,6 +140,9 @@ export function classifyDeterministic(question, opts = {}) {
   // "How many 5 ton units": unit field + tonnage stated in linked documents, with the no-tonnage count - lookups/tonnageCount.js.
   const tonQ = parseTonnageCount(String(question ?? ''));
   if (tonQ) return { route: 'tonnage', intent: tonQ };
+  // Customer x document-type rank / none / have and quote-status counts (customer with most invoices, customers with no quotes, open quotes) - lookups/customerDocRank.js.
+  const cdrQ = parseCustomerDocRank(String(question ?? ''));
+  if (cdrQ) return { route: 'custdocrank', intent: cdrQ };
   // Whole-shop extremes on one document type (oldest/newest invoice, cheapest invoice, biggest/oldest quote) - lookups/docExtremes.js.
   const extQ = parseDocExtreme(String(question ?? ''));
   if (extQ) return { route: 'docextreme', intent: extQ };
@@ -571,7 +575,8 @@ async function runDeterministicCore(db, intent, { today } = {}) {
   if (intent.route === 'docnumber') return runDocNumberLookup(db, intent.intent);
   if (intent.route === 'agreementend') return runAgreementEnd(db, intent.intent);
   if (intent.route === 'quote') return runQuoteLookup(db, intent.intent);
-  if (intent.route === 'docextreme') return runDocExtreme(db, intent.intent);
+  if (intent.route === 'custdocrank') return runCustomerDocRank(db, intent.intent);
+  if (intent.route === 'docextreme') return runDocExtreme(db, intent.intent, { today: t });
   if (intent.route === 'paid') {
     const pd = await runPaidLookup(db, intent.intent);
     if (pd) return pd;

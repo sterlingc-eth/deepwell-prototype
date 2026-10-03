@@ -195,6 +195,30 @@ function rewriteLoopR4(q) {
   return q;
 }
 
+// R5 loop: customer-revenue ranking phrasings ("biggest/best/top customer", "top 5 clients", "who spent the most"), "customer with the biggest
+// invoice" and "median invoice" -> shapes the engine already answers (customers by revenue / biggest invoice / median). Whole-question matches
+// only. Kill switch: DONOVAN_PHRASE_REWRITE_R5=0.
+const RANK_ADJ_SRC = String.raw`(?:biggest|largest|best|top|highest[\s-]paying|most\s+valuable|number\s+(?:one|1)|#1|top[\s-]?spending)`;
+function rewriteLoopR5(q) {
+  if (process.env.DONOVAN_PHRASE_REWRITE_R5 === "0") return q;
+  const T = String.raw`^\s*(?:so\s+|ok\s+|hey\s+)?`;
+  const E = String.raw`\s*[?.!]*\s*$`;
+  const OWN = String.raw`(?:(?:our|the|my)\s+)?`;
+  let m = new RegExp(T + String.raw`(?:who(?:'s|s|\s+is)\s+|which\s+is\s+|what(?:'s|\s+is)\s+|whos\s+)?${OWN}${RANK_ADJ_SRC}\s+(?:customer|client)` + E, "i").exec(q);
+  if (m) return "customers by revenue";
+  if (new RegExp(T + String.raw`(?:(?:which|what)\s+)?(?:customer|client)\s+(?:who\s+|that\s+|has\s+)?(?:has\s+)?(?:spent|spend|spends)\s+the\s+most` + E, "i").test(q)
+    || new RegExp(T + String.raw`who\s+(?:has\s+|have\s+)?(?:spent|spend|spends)\s+the\s+most(?:\s+with\s+us|\s+money)?` + E, "i").test(q)
+    || new RegExp(T + String.raw`who(?:'s|s|\s+is)\s+our\s+(?:top|biggest|largest)\s+(?:spender|buyer)` + E, "i").test(q)) return "customers by revenue";
+  m = new RegExp(T + String.raw`(?:who\s+are\s+|what\s+are\s+|list\s+|show\s+me\s+|give\s+me\s+|list\s+out\s+)?${OWN}(?:top\s+(\d{1,2})|${RANK_ADJ_SRC})\s+(?:customers|clients)` + E, "i").exec(q);
+  if (m) return `top ${m[1] ?? 5} customers by revenue`;
+  m = new RegExp(T + String.raw`(?:(?:the|which)\s+)?(?:customer|client)\s+(?:with|has|having)\s+(?:the\s+)?(biggest|largest|highest|smallest|lowest|cheapest)\s+(invoice|quote)` + E, "i").exec(q)
+    ?? new RegExp(T + String.raw`who\s+(?:has|got|had)\s+(?:the\s+)?(biggest|largest|highest|smallest|lowest|cheapest)\s+(invoice|quote)` + E, "i").exec(q);
+  if (m) return `${m[1].toLowerCase()} ${m[2].toLowerCase()}`;
+  m = new RegExp(T + String.raw`(?:what(?:'s|s|\s+is)\s+|whats\s+|give\s+me\s+|show\s+me\s+)?(?:the\s+)?median\s+(invoice|quote|estimate|proposal)(?:\s+(?:amount|size|total|value))?` + E, "i").exec(q);
+  if (m) return `median ${m[1].toLowerCase()} amount`;
+  return q;
+}
+
 export function rewriteQuestion(question) {
   const src = String(question ?? "");
   if (!src.trim() || src.length > 300) return null;
@@ -204,5 +228,6 @@ export function rewriteQuestion(question) {
   q = rewriteWindowShapes(q);
   q = rewriteLoopR3(q);
   q = rewriteLoopR4(q);
+  q = rewriteLoopR5(q);
   return q !== src ? q : null;
 }

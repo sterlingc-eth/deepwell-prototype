@@ -228,7 +228,7 @@ const RE = {
   open: /\b(?:open|unpaid|outstanding|owe us|owes us|owed to us|owing|receivables?|haven'?t paid|hasn'?t paid|not paid|still owe|who owes|money owed|balance due)\b|\bare owed\b|\bowed\b/i,
   byMonth: /\b(?:by month|monthly|per month|each month|month by month|month over month|by the month)\b/i,
   topCustomers: /\b(?:biggest|largest|top|best|highest)\b[^?]*\bcustomers?\b|\bcustomers?\b[^?]*\bby (?:revenue|sales|billing|spend)\b|\bwho(?:'s| is) our (?:biggest|best|top)\b/i,
-  avg: /\baverage\s+(?:ticket|invoice|job|sale|bill|repair|quote|estimate|proposal)\b|\bavg\s+(?:ticket|invoice)\b/i,
+  avg: /\baverage\s+(?:ticket|invoice|job|sale|bill|repair|quote|estimate|proposal)\b|\bavg\s+(?:ticket|invoice)\b|\bmedian\s+(?:invoice|quote|estimate|proposal)\b/i,
   last: /\b(?:last|latest|most recent|newest|previous)\s+(?:invoice|bill|job|ticket|charge|one|visit|service|repair|install(?:ation)?)\b/i,
   totalInvoiced: /\b(?:how much|total|revenue|sales|invoiced|billed|billing|income|earn(?:ed)?|brought in|made)\b/i,
   po: /\bpurchase orders?\b|\bpos?\b/i,
@@ -416,7 +416,7 @@ export function parseMoneyIntent(question, { today }) {
     const topM = q.match(/\btop\s+(\d{1,2})\b/);
     return mk('top_customers', { subject: null, topN: topM ? Number(topM[1]) : null });
   }
-  if (RE.avg.test(q)) return mk('avg_invoice', { subject, docKind: /\b(?:quote|estimate|proposal)\b/.test(q) ? 'estimate' : 'invoice' });
+  if (RE.avg.test(q)) return mk('avg_invoice', { subject, median: process.env.DONOVAN_PHRASE_REWRITE_R5 !== '0' && /\bmedian\b/.test(q), docKind: /\b(?:quote|estimate|proposal)\b/.test(q) ? 'estimate' : 'invoice' });
   if (RE.last.test(q)) return mk('last_invoice', { subject });
   // R7: "how much have we spent on purchase orders" matches RE.spend ("how much have we spent")
   // just as readily as it matches po_total below, and RE.spend was checked first - every such
@@ -962,14 +962,14 @@ async function avgInvoice(db, intent, ctx) {
   const docKindSql = isQuote ? 'estimate' : 'invoice';
   const inRange = `(($2::date IS NULL AND $3::date IS NULL) OR (f.doc_date >= COALESCE($2::date, '0001-01-01') AND f.doc_date <= COALESCE($3::date, '9999-12-31')))`;
   const [a] = await q(db,
-    `SELECT count(*)::int AS n, round(avg(f.total), 2) AS avg_total, sum(f.total) AS sum_total,
+    `SELECT count(*)::int AS n, round(avg(f.total), 2) AS avg_total, round((percentile_cont(0.5) WITHIN GROUP (ORDER BY f.total))::numeric, 2) AS med_total, sum(f.total) AS sum_total,
             (array_agg(jsonb_build_object('id', f.document_id, 'no', f.invoice_number, 'cust', f.customer_name, 'total', f.total, 'page', f.total_page, 'date', f.doc_date) ORDER BY f.doc_date DESC NULLS LAST))[1:200] AS docs,
             (SELECT count(*)::int FROM financials x WHERE x.direction = 'receivable' AND x.doc_kind = $5 AND x.total IS NULL) AS n_no_total
        FROM financials f WHERE f.direction = 'receivable' AND f.doc_kind = $5 AND f.currency = 'USD' AND f.total IS NOT NULL AND ${inRange}
         AND ($4::uuid[] IS NULL OR f.customer_id = ANY($4::uuid[]))`, [p?.from ?? null, p?.to ?? null, g?.ids ?? null, docKindSql], ctx.hu);
   if (!a || a.n === 0) return baseAnswer(`No ${noun}s with printed totals match that, so there is no average to give.`, [], { confidence: 1, ...zeroCite(`Searched every customer ${noun}; none with a printed total match.`) });
-  const text = `The average ${noun}${g ? ` for ${g.name}` : ''}${p ? ` in ${p.label}` : ''} is ${fmt(a.avg_total)} across ${plural(a.n, noun)} (${fmt(a.sum_total)} total).${exclusionText({ noTotal: a.n_no_total, noun })}`;
-  return baseAnswer(text, [{ label: `Average ${noun}`, value: fmt(a.avg_total), status: 'ok', sources: [] }, { label: `${noun[0].toUpperCase()}${noun.slice(1)}s averaged`, value: String(a.n), status: 'info', sources: [] }], {
+  const text = intent.median ? `The median ${noun}${g ? ` for ${g.name}` : ''}${p ? ` in ${p.label}` : ''} is ${fmt(a.med_total)} across ${plural(a.n, noun)} (the middle printed total; the average is ${fmt(a.avg_total)}).${exclusionText({ noTotal: a.n_no_total, noun })}` : `The average ${noun}${g ? ` for ${g.name}` : ''}${p ? ` in ${p.label}` : ''} is ${fmt(a.avg_total)} across ${plural(a.n, noun)} (${fmt(a.sum_total)} total).${exclusionText({ noTotal: a.n_no_total, noun })}`;
+  return baseAnswer(text, [{ label: intent.median ? `Median ${noun}` : `Average ${noun}`, value: fmt(intent.median ? a.med_total : a.avg_total), status: 'ok', sources: [] }, { label: `${noun[0].toUpperCase()}${noun.slice(1)}s averaged`, value: String(a.n), status: 'info', sources: [] }], {
     interpretation: `average ${noun}`,
     cite: { records: (Array.isArray(a.docs) ? a.docs : []).map((d) => aggregatedDocRecord(d)), total: a.n, claimedCount: a.n, basis: `Averaged the printed totals of ${plural(a.n, `customer ${noun}`)}${g ? ` for ${g.name}` : ''}${p ? ` dated ${p.label}` : ''} (the sum divided by the count).` },
   });

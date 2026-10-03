@@ -33,7 +33,7 @@ const CASES = [
   ["biggest quote", "quote", "total", -1], ["largest quote", "quote", "total", -1], ["what's our highest quote", "quote", "total", -1], ["smallest quote", "quote", "total", 1], ["cheapest estimate", "quote", "total", 1],
   ["oldest quote", "quote", "date", 1], ["newest quote", "quote", "date", -1], ["latest quote", "quote", "date", -1], ["most recent estimate", "quote", "date", -1], ["earliest proposal", "quote", "date", 1],
 ];
-const NEG = ["how many invoices", "oldest invoice for Kenneth Gallardo", "latest invoice from august", "biggest customer", "what is the weather", "newest equipment", "oldest unit", "latest invoice over 5000", "quote for Kenneth Gallardo"];
+const NEG = ["how many invoices", "oldest invoice for Kenneth Gallardo", "biggest customer", "what is the weather", "newest equipment", "oldest unit", "latest invoice over 5000", "quote for Kenneth Gallardo"];
 const offline = await import(path.join(ROOT, "scripts/offline-exam.mjs"));
 const { installPgHarness, installModelBlock, createPGlite, setActiveDatabase, loadExportIntoNewTenant } = offline;
 console.log = () => {};
