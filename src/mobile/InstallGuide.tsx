@@ -153,7 +153,7 @@ export function InstallGuide() {
           <img src="/get/qr.svg" alt="QR code that opens DeepWell Mobile" width={96} height={96} className="w-24 h-24 rounded-md bg-white p-1 shrink-0" />
           <p>
             Point your phone's camera at the code. On this computer, use the{' '}
-            <a href="/app/" className="underline font-semibold text-white">
+            <a href="/app/" className="underline font-semibold text-white inline-block py-3">
               full DeepWell app
             </a>
             .

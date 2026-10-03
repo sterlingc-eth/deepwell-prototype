@@ -318,7 +318,7 @@ const exportData = JSON.parse(fs.readFileSync(path.join(ROOT, "scripts/golden/go
 // field-phrasing-3.json, the blind-3 set r19_blind3_clusters.json's F1/F6 clusters came from) is resolved
 // against the export's OWN tenantKey before the data is loaded into this run's fresh PGlite tenant.
 const exam = await loadFullExam(exportData.tenantKey ?? null);
-const today = process.env.EXAM_TODAY && /^\d{4}-\d{2}-\d{2}$/.test(process.env.EXAM_TODAY) ? process.env.EXAM_TODAY : new Date().toISOString().slice(0, 10); // R32b: honor the same pinned date every other exam script uses (the oracle fixtures are dated against it)
+const today = process.env.EXAM_TODAY && /^\d{4}-\d{2}-\d{2}$/.test(process.env.EXAM_TODAY) ? process.env.EXAM_TODAY : '2026-09-25'; // the oracle fixtures are dated against 2026-09-25 (same pin as the offline exam: TZ=America/Phoenix EXAM_TODAY=2026-09-25); an unpinned run drifts as the real clock moves. R32b: honor the same pinned date every other exam script uses (the oracle fixtures are dated against it)
 const { ctx } = await loadExportIntoNewTenant(lite, exportData, { tenantKey: "offline-precision-guard", tenantName: "Precision Guard Verify" });
 
 const { overall, perQuestion } = await runOfflineExam({ ctx, questions: exam.questions, today, modelCounter });

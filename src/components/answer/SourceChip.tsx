@@ -26,7 +26,7 @@ export function SourceChip({ source, onOpen, compact = false }: { source: Source
         // min-w-0 lets this shrink (and its truncated label actually truncate) inside a flex row that
         // does not itself have room to spare — without it a flex child's default min-width:auto keeps
         // it at its full content width and the ROW overflows the viewport instead.
-        'inline-flex items-center gap-1.5 min-h-[32px] min-w-0 max-w-full rounded-full border border-brass-300/70 dark:border-brass-300/40',
+        'inline-flex items-center gap-1.5 min-h-[32px] [@media(pointer:coarse)]:min-h-11 min-w-0 max-w-full rounded-full border border-brass-300/70 dark:border-brass-300/40',
         'bg-brass-50 dark:bg-forest-800 text-ink-2 hover:text-ink hover:border-brass-500 dark:hover:border-brass-200',
         'transition-colors duration-quick text-caption',
         compact ? 'pl-2 pr-2.5' : 'pl-2.5 pr-3',

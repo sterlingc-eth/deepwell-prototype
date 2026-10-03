@@ -1,0 +1,2663 @@
+{
+ "version": "lt-donovan-2026-10-03",
+ "questions": [
+  {
+   "id": "lt-cn-001",
+   "section": "cn",
+   "text": "whats the phone number for Amy Isaacson",
+   "expect": {
+    "digits": [
+     "4805550114"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-cn-002",
+   "section": "cn",
+   "text": "email address for Deborah Ortega",
+   "expect": {
+    "all": [
+     [
+      "deborah.ortega2@hotmail.com"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-cn-003",
+   "section": "cn",
+   "text": "need to call Kevin Zimmerman back, what's his number",
+   "expect": {
+    "digits": [
+     "4805550127"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-cn-004",
+   "section": "cn",
+   "text": "David Prentiss phone",
+   "expect": {
+    "notOnFile": true,
+    "none": []
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-cn-005",
+   "section": "cn",
+   "text": "what's David Prentiss's address",
+   "expect": {
+    "all": [
+     [
+      "285 E Elliot Rd"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-cn-006",
+   "section": "cn",
+   "text": "address for Holy Trinity Church",
+   "expect": {
+    "all": [
+     [
+      "859 E Chandler Blvd"
+     ],
+     [
+      "Suite 115"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-cn-007",
+   "section": "cn",
+   "text": "who's the contact at Copper Sky Dental",
+   "expect": {
+    "all": [
+     [
+      "Linda Ibarra"
+     ]
+    ]
+   },
+   "baseline": "fail"
+  },
+  {
+   "id": "lt-cn-008",
+   "section": "cn",
+   "text": "phone for Sunrise Valley Elementary",
+   "expect": {
+    "digits": [
+     "4805550186"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-cn-009",
+   "section": "cn",
+   "text": "contact person at Sunrise Valley Elementary School",
+   "expect": {
+    "all": [
+     [
+      "Amy Kowalski"
+     ]
+    ]
+   },
+   "baseline": "clarified"
+  },
+  {
+   "id": "lt-cn-010",
+   "section": "cn",
+   "text": "Grace Community Church phone number",
+   "expect": {
+    "notOnFile": true,
+    "none": []
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-cn-011",
+   "section": "cn",
+   "text": "whose number is 480-555-0127",
+   "expect": {
+    "all": [
+     [
+      "Kevin Zimmerman"
+     ],
+     [
+      "Thomas Quintana"
+     ]
+    ]
+   },
+   "note": "two customers share this number",
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-cn-012",
+   "section": "cn",
+   "text": "who has the phone number (480) 555-0110",
+   "expect": {
+    "all": [
+     [
+      "Linda Fitzgerald"
+     ],
+     [
+      "Ashley Whitfield"
+     ]
+    ]
+   },
+   "note": "two customers share this number",
+   "baseline": "needs-model"
+  },
+  {
+   "id": "lt-cn-013",
+   "section": "cn",
+   "text": "email for Copper Sky Dental",
+   "expect": {
+    "all": [
+     [
+      "linda.ibarra0@outlook.com"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-cn-014",
+   "section": "cn",
+   "text": "what city is Betty Winslow in",
+   "expect": {
+    "all": [
+     [
+      "Chandler"
+     ]
+    ]
+   },
+   "baseline": "clarified"
+  },
+  {
+   "id": "lt-cn-015",
+   "section": "cn",
+   "text": "who is at 3300 S Alma School Rd Apt 104",
+   "expect": {
+    "all": [
+     [
+      "Amy Larkin"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-cn-016",
+   "section": "cn",
+   "text": "who's the customer in apt 107 at 3300 S Alma School",
+   "expect": {
+    "all": [
+     [
+      "Steven Hutchins"
+     ]
+    ]
+   },
+   "baseline": "needs-model"
+  },
+  {
+   "id": "lt-cn-017",
+   "section": "cn",
+   "text": "who lives at 951 E Main St in Chandler",
+   "expect": {
+    "all": [
+     [
+      "William Quintana"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-cn-018",
+   "section": "cn",
+   "text": "how many customers do we have at 3300 S Alma School Rd",
+   "expect": {
+    "all": [
+     [
+      "8",
+      "eight"
+     ]
+    ]
+   },
+   "baseline": "clarified"
+  },
+  {
+   "id": "lt-cn-019",
+   "section": "cn",
+   "text": "list everybody at 3300 S Alma School Rd",
+   "expect": {
+    "all": [
+     [
+      "Thomas Quintana"
+     ],
+     [
+      "Donna Winslow"
+     ],
+     [
+      "Ronald Fenwick"
+     ],
+     [
+      "Amy Larkin"
+     ],
+     [
+      "David Sandoval"
+     ],
+     [
+      "Sandra Alvarez"
+     ],
+     [
+      "Steven Hutchins"
+     ],
+     [
+      "Laura Nakamura"
+     ]
+    ]
+   },
+   "baseline": "clarified"
+  },
+  {
+   "id": "lt-cn-020",
+   "section": "cn",
+   "text": "what email do we have for Steven Ellison",
+   "expect": {
+    "notOnFile": true,
+    "none": []
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-dc-021",
+   "section": "dc",
+   "text": "what documents do we have on file for Linda Fitzgerald",
+   "expect": {
+    "all": [
+     [
+      "invoice"
+     ],
+     [
+      "warranty"
+     ],
+     [
+      "service"
+     ],
+     [
+      "work order"
+     ],
+     [
+      "startup"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-dc-022",
+   "section": "dc",
+   "text": "how many documents are on file for Ronald Bracken",
+   "expect": {
+    "all": [
+     [
+      "5",
+      "five"
+     ]
+    ]
+   },
+   "baseline": "clarified"
+  },
+  {
+   "id": "lt-dc-023",
+   "section": "dc",
+   "text": "how many documents do we have for Copper Sky Dental",
+   "expect": {
+    "all": [
+     [
+      "7",
+      "seven"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-dc-024",
+   "section": "dc",
+   "text": "does Thomas Mercer have a permit on file",
+   "expect": {
+    "all": [
+     [
+      "BP-2026-10001"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-dc-025",
+   "section": "dc",
+   "text": "does Linda Fitzgerald have a permit on file",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "BP-2026"
+    ]
+   },
+   "baseline": "clarified"
+  },
+  {
+   "id": "lt-dc-026",
+   "section": "dc",
+   "text": "is there a maintenance agreement for Ronald Bracken",
+   "expect": {
+    "all": [
+     [
+      "12/31/2026",
+      "December 31, 2026",
+      "2026-12-31"
+     ]
+    ]
+   },
+   "baseline": "fail"
+  },
+  {
+   "id": "lt-dc-027",
+   "section": "dc",
+   "text": "is there a maintenance agreement for Linda Fitzgerald",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "Agreement Period"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-dc-028",
+   "section": "dc",
+   "text": "pull up the nameplate for Matthew Winslow",
+   "expect": {
+    "all": [
+     [
+      "2C100083"
+     ],
+     [
+      "Carrier"
+     ]
+    ]
+   },
+   "baseline": "clarified"
+  },
+  {
+   "id": "lt-dc-029",
+   "section": "dc",
+   "text": "what's on the data plate for Amy Isaacson's unit",
+   "expect": {
+    "all": [
+     [
+      "RA1456AJ1NA"
+     ],
+     [
+      "2R100006"
+     ]
+    ]
+   },
+   "baseline": "clarified"
+  },
+  {
+   "id": "lt-dc-030",
+   "section": "dc",
+   "text": "any correspondence with Ronald Bracken",
+   "expect": {
+    "all": [
+     [
+      "correspondence",
+      "letter"
+     ]
+    ]
+   },
+   "baseline": "clarified"
+  },
+  {
+   "id": "lt-dc-031",
+   "section": "dc",
+   "text": "what does the internal memo about Karen Abernathy say",
+   "expect": {
+    "all": [
+     [
+      "filter size"
+     ]
+    ]
+   },
+   "baseline": "fail"
+  },
+  {
+   "id": "lt-dc-032",
+   "section": "dc",
+   "text": "how many internal memos do we have",
+   "expect": {
+    "all": [
+     [
+      "20"
+     ]
+    ]
+   },
+   "baseline": "fail"
+  },
+  {
+   "id": "lt-dc-033",
+   "section": "dc",
+   "text": "how many dispatch notes are on file",
+   "expect": {
+    "all": [
+     [
+      "25"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-dc-034",
+   "section": "dc",
+   "text": "how many permits do we have",
+   "expect": {
+    "all": [
+     [
+      "27"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-dc-035",
+   "section": "dc",
+   "text": "how many maintenance agreements are there",
+   "expect": {
+    "all": [
+     [
+      "27"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-dc-036",
+   "section": "dc",
+   "text": "how many purchase orders",
+   "expect": {
+    "all": [
+     [
+      "19"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-dc-037",
+   "section": "dc",
+   "text": "how many proposals do we have on file",
+   "expect": {
+    "all": [
+     [
+      "60"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-dc-038",
+   "section": "dc",
+   "text": "how many inspection reports",
+   "expect": {
+    "all": [
+     [
+      "19"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-dc-039",
+   "section": "dc",
+   "text": "what did the dispatch note for Donna Winslow say",
+   "expect": {
+    "all": [
+     [
+      "no cold air"
+     ]
+    ]
+   },
+   "baseline": "clarified"
+  },
+  {
+   "id": "lt-dc-040",
+   "section": "dc",
+   "text": "dispatch note for Deborah Ortega",
+   "expect": {
+    "all": [
+     [
+      "weak airflow"
+     ],
+     [
+      "Danny Ochoa"
+     ]
+    ]
+   },
+   "baseline": "fail"
+  },
+  {
+   "id": "lt-mn-041",
+   "section": "mn",
+   "text": "how much was invoice INV-20003",
+   "expect": {
+    "all": [
+     [
+      "$3,211.00",
+      "$3,211",
+      "3,211",
+      "3211"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-mn-042",
+   "section": "mn",
+   "text": "what's the total on INV-20023",
+   "expect": {
+    "all": [
+     [
+      "$5,951.00",
+      "$5,951",
+      "5,951",
+      "5951"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-mn-043",
+   "section": "mn",
+   "text": "who was invoice INV-20012 for",
+   "expect": {
+    "all": [
+     [
+      "Deborah Ortega"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-mn-044",
+   "section": "mn",
+   "text": "how much did we charge Linda Fitzgerald for the install",
+   "expect": {
+    "all": [
+     [
+      "$2,800.00",
+      "$2,800",
+      "2,800",
+      "2800"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-mn-045",
+   "section": "mn",
+   "text": "what did William Quintana pay for his new system",
+   "expect": {
+    "all": [
+     [
+      "$5,951.00",
+      "$5,951",
+      "5,951",
+      "5951"
+     ]
+    ]
+   },
+   "baseline": "fail"
+  },
+  {
+   "id": "lt-mn-046",
+   "section": "mn",
+   "text": "invoice number for Amy Isaacson",
+   "expect": {
+    "all": [
+     [
+      "INV-20004"
+     ]
+    ]
+   },
+   "baseline": "fail"
+  },
+  {
+   "id": "lt-mn-047",
+   "section": "mn",
+   "text": "when did we invoice Karen Abernathy",
+   "expect": {
+    "all": [
+     [
+      "March 7, 2025",
+      "Mar 7, 2025",
+      "03/07/2025",
+      "3/7/2025",
+      "2025-03-07"
+     ]
+    ]
+   },
+   "baseline": "clarified"
+  },
+  {
+   "id": "lt-mn-048",
+   "section": "mn",
+   "text": "what's the invoice total for Copper Sky Dental",
+   "expect": {
+    "all": [
+     [
+      "$840.00",
+      "$840",
+      "840",
+      "840"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-mn-049",
+   "section": "mn",
+   "text": "how much is the Sunrise Valley Elementary invoice",
+   "expect": {
+    "all": [
+     [
+      "$1,080.00",
+      "$1,080",
+      "1,080",
+      "1080"
+     ]
+    ]
+   },
+   "baseline": "fail"
+  },
+  {
+   "id": "lt-mn-050",
+   "section": "mn",
+   "text": "which tech installed David Prentiss's system",
+   "expect": {
+    "all": [
+     [
+      "Wyatt Coburn"
+     ]
+    ]
+   },
+   "baseline": "fail"
+  },
+  {
+   "id": "lt-mn-051",
+   "section": "mn",
+   "text": "who did the startup for Linda Fitzgerald",
+   "expect": {
+    "all": [
+     [
+      "Danny Ochoa"
+     ]
+    ]
+   },
+   "baseline": "clarified"
+  },
+  {
+   "id": "lt-mn-052",
+   "section": "mn",
+   "text": "total on PO-9004",
+   "expect": {
+    "all": [
+     [
+      "$92.00",
+      "$92",
+      "92",
+      "92"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-mn-053",
+   "section": "mn",
+   "text": "which vendor was PO-9081 from",
+   "expect": {
+    "all": [
+     [
+      "Watsco"
+     ]
+    ]
+   },
+   "baseline": "fail"
+  },
+  {
+   "id": "lt-mn-054",
+   "section": "mn",
+   "text": "what parts were on PO-9010",
+   "expect": {
+    "all": [
+     [
+      "capacitor"
+     ],
+     [
+      "filter drier"
+     ]
+    ]
+   },
+   "baseline": "fail"
+  },
+  {
+   "id": "lt-mn-055",
+   "section": "mn",
+   "text": "how much have we spent with Baker Distributing on purchase orders",
+   "expect": {
+    "all": [
+     [
+      "$920.00",
+      "$920",
+      "920",
+      "920"
+     ]
+    ]
+   },
+   "note": "truth 920 over 10 POs",
+   "baseline": "fail"
+  },
+  {
+   "id": "lt-mn-056",
+   "section": "mn",
+   "text": "how much was the quote for Thomas Mercer",
+   "expect": {
+    "all": [
+     [
+      "$305.00",
+      "$305",
+      "305",
+      "305"
+     ]
+    ]
+   },
+   "baseline": "fail"
+  },
+  {
+   "id": "lt-mn-057",
+   "section": "mn",
+   "text": "what was the proposal amount for Copper Sky Dental",
+   "expect": {
+    "all": [
+     [
+      "$8,300.00",
+      "$8,300",
+      "8,300",
+      "8300"
+     ]
+    ]
+   },
+   "baseline": "clarified"
+  },
+  {
+   "id": "lt-mn-058",
+   "section": "mn",
+   "text": "annual cost of Ronald Bracken's maintenance agreement",
+   "expect": {
+    "all": [
+     [
+      "$360.00",
+      "$360",
+      "360",
+      "360"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-mn-059",
+   "section": "mn",
+   "text": "what does the Sunrise Valley Elementary School agreement cost per year",
+   "expect": {
+    "all": [
+     [
+      "$2,200.00",
+      "$2,200",
+      "2,200",
+      "2200"
+     ]
+    ]
+   },
+   "baseline": "needs-model"
+  },
+  {
+   "id": "lt-mn-060",
+   "section": "mn",
+   "text": "what's the biggest invoice we have",
+   "expect": {
+    "all": [
+     [
+      "INV-20075"
+     ],
+     [
+      "$7,875.00",
+      "$7,875",
+      "7,875",
+      "7875"
+     ]
+    ]
+   },
+   "note": "max {\"no\":\"INV-20075\",\"date\":\"2012-04-04\",\"total\":7875,\"who\":\"Kenneth Gallardo\"}",
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-mn-061",
+   "section": "mn",
+   "text": "smallest invoice on file",
+   "expect": {
+    "all": [
+     [
+      "INV-35000"
+     ],
+     [
+      "$840.00",
+      "$840",
+      "840",
+      "840"
+     ]
+    ]
+   },
+   "note": "min {\"no\":\"INV-35000\",\"date\":\"2018-06-09\",\"total\":840,\"who\":\"Copper Sky Dental\"}",
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-mn-062",
+   "section": "mn",
+   "text": "how many invoices are over $5,000",
+   "expect": {
+    "all": [
+     [
+      "54"
+     ]
+    ]
+   },
+   "note": "truth 54",
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-mn-063",
+   "section": "mn",
+   "text": "total invoiced in 2021",
+   "expect": {
+    "all": [
+     [
+      "$37,034.00",
+      "$37,034",
+      "37,034",
+      "37034"
+     ]
+    ]
+   },
+   "note": "8 invoices",
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-mn-064",
+   "section": "mn",
+   "text": "how many invoices were issued in 2019",
+   "expect": {
+    "all": [
+     [
+      "6"
+     ]
+    ]
+   },
+   "note": "truth 6",
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-mn-065",
+   "section": "mn",
+   "text": "add up all the invoices for our Mesa customers",
+   "expect": {
+    "all": [
+     [
+      "$60,788.00",
+      "$60,788",
+      "60,788",
+      "60788"
+     ]
+    ]
+   },
+   "note": "truth 60788",
+   "baseline": "needs-model"
+  },
+  {
+   "id": "lt-mn-066",
+   "section": "mn",
+   "text": "how much was Karen Abernathy's purchase order",
+   "expect": {
+    "all": [
+     [
+      "$60.00",
+      "$60",
+      "60",
+      "60"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-mn-067",
+   "section": "mn",
+   "text": "has Linda Fitzgerald paid her invoice",
+   "expect": {
+    "review": true,
+    "none": [
+     "paid in full",
+     "yes, she paid",
+     "has been paid"
+    ],
+    "note": "amount_paid is null in the records; Donovan must not assert payment"
+   },
+   "baseline": "review"
+  },
+  {
+   "id": "lt-mn-068",
+   "section": "mn",
+   "text": "invoice number and total for Betty Winslow",
+   "expect": {
+    "all": [
+     [
+      "INV-20024"
+     ],
+     [
+      "$6,088.00",
+      "$6,088",
+      "6,088",
+      "6088"
+     ]
+    ]
+   },
+   "baseline": "fail"
+  },
+  {
+   "id": "lt-mn-069",
+   "section": "mn",
+   "text": "what's the invoice for INV-99999",
+   "expect": {
+    "notOnFile": true,
+    "none": []
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-mn-070",
+   "section": "mn",
+   "text": "how much was PO-9999",
+   "expect": {
+    "notOnFile": true,
+    "none": []
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-mn-071",
+   "section": "mn",
+   "text": "who owes us money right now",
+   "expect": {
+    "review": true,
+    "none": [],
+    "note": "no paid/balance data on file; must not invent debtors or amounts"
+   },
+   "baseline": "review"
+  },
+  {
+   "id": "lt-pm-072",
+   "section": "pm",
+   "text": "permit number for Thomas Mercer",
+   "expect": {
+    "all": [
+     [
+      "BP-2026-10001"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-pm-073",
+   "section": "pm",
+   "text": "which city issued Deborah Ortega's permit",
+   "expect": {
+    "all": [
+     [
+      "Mesa"
+     ]
+    ]
+   },
+   "baseline": "fail"
+  },
+  {
+   "id": "lt-pm-074",
+   "section": "pm",
+   "text": "what's the scope of work on permit BP-2026-10023",
+   "expect": {
+    "all": [
+     [
+      "change-out"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-pm-075",
+   "section": "pm",
+   "text": "whose permit is BP-2026-25004",
+   "expect": {
+    "all": [
+     [
+      "Sunrise Valley"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-pm-076",
+   "section": "pm",
+   "text": "what address is permit BP-2026-10012 for",
+   "expect": {
+    "all": [
+     [
+      "544 E Ray Rd"
+     ]
+    ]
+   },
+   "baseline": "fail"
+  },
+  {
+   "id": "lt-pm-077",
+   "section": "pm",
+   "text": "what's the status on permit BP-2026-10023",
+   "expect": {
+    "all": [
+     [
+      "issued"
+     ]
+    ]
+   },
+   "baseline": "fail"
+  },
+  {
+   "id": "lt-pm-078",
+   "section": "pm",
+   "text": "how many commercial permits do we have",
+   "expect": {
+    "all": [
+     [
+      "8"
+     ]
+    ]
+   },
+   "note": "truth 8",
+   "baseline": "fail"
+  },
+  {
+   "id": "lt-pm-079",
+   "section": "pm",
+   "text": "agreement period for Ronald Bracken",
+   "expect": {
+    "all": [
+     [
+      "January 1, 2025",
+      "Jan 1, 2025",
+      "01/01/2025",
+      "1/1/2025",
+      "2025-01-01"
+     ]
+    ]
+   },
+   "also": [
+    "December 31, 2026",
+    "Dec 31, 2026",
+    "12/31/2026",
+    "12/31/2026",
+    "2026-12-31"
+   ],
+   "baseline": "clarified"
+  },
+  {
+   "id": "lt-pm-080",
+   "section": "pm",
+   "text": "when does Copper Sky Dental's maintenance agreement end",
+   "expect": {
+    "all": [
+     [
+      "December 31, 2027",
+      "Dec 31, 2027",
+      "12/31/2027",
+      "12/31/2027",
+      "2027-12-31"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-pm-081",
+   "section": "pm",
+   "text": "which maintenance agreements expire in 2026",
+   "expect": {
+    "all": [
+     [
+      "Ronald Bracken"
+     ],
+     [
+      "Laura Lombardi"
+     ],
+     [
+      "Barbara Delgado"
+     ],
+     [
+      "Joseph Norwood"
+     ],
+     [
+      "Kenneth Fenwick"
+     ],
+     [
+      "Melissa Pruitt"
+     ],
+     [
+      "Angela Hutchins"
+     ],
+     [
+      "Michael Redwine"
+     ],
+     [
+      "Paul Jarvis"
+     ],
+     [
+      "Donna Ulloa"
+     ],
+     [
+      "Laura Mercer"
+     ],
+     [
+      "Gary Wyckoff"
+     ],
+     [
+      "Joseph Ortega"
+     ],
+     [
+      "Betty Zimmerman"
+     ],
+     [
+      "Melissa Quintana"
+     ],
+     [
+      "Anthony Bennett"
+     ],
+     [
+      "Michael Sandoval"
+     ],
+     [
+      "Susan Dominguez"
+     ],
+     [
+      "Donna Vance"
+     ]
+    ]
+   },
+   "note": "truth 19 agreements",
+   "baseline": "fail"
+  },
+  {
+   "id": "lt-pm-082",
+   "section": "pm",
+   "text": "how many maintenance agreements run through 2027",
+   "expect": {
+    "all": [
+     [
+      "8"
+     ]
+    ]
+   },
+   "note": "truth 8",
+   "baseline": "fail"
+  },
+  {
+   "id": "lt-pm-083",
+   "section": "pm",
+   "text": "what units are covered under the Holy Trinity Church agreement",
+   "expect": {
+    "all": [
+     [
+      "LX100111"
+     ],
+     [
+      "2R100112"
+     ],
+     [
+      "2G100110"
+     ]
+    ]
+   },
+   "baseline": "needs-model"
+  },
+  {
+   "id": "lt-pm-084",
+   "section": "pm",
+   "text": "how many units does the Sunrise Valley Elementary School agreement cover",
+   "expect": {
+    "all": [
+     [
+      "4",
+      "four"
+     ]
+    ]
+   },
+   "baseline": "needs-model"
+  },
+  {
+   "id": "lt-pm-085",
+   "section": "pm",
+   "text": "what's included in Ronald Bracken's agreement",
+   "expect": {
+    "all": [
+     [
+      "2 preventive maintenance visits",
+      "two preventive maintenance visits",
+      "2 preventive"
+     ],
+     [
+      "priority"
+     ]
+    ]
+   },
+   "baseline": "clarified"
+  },
+  {
+   "id": "lt-pm-086",
+   "section": "pm",
+   "text": "is Linda Fitzgerald on a maintenance agreement",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "Agreement Period"
+    ]
+   },
+   "baseline": "clarified"
+  },
+  {
+   "id": "lt-pm-087",
+   "section": "pm",
+   "text": "what's our total annual maintenance agreement revenue",
+   "expect": {
+    "all": [
+     [
+      "$21,440.00",
+      "$21,440",
+      "21,440",
+      "21440"
+     ]
+    ]
+   },
+   "note": "truth 21440",
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-pm-088",
+   "section": "pm",
+   "text": "which maintenance agreement costs the most",
+   "expect": {
+    "all": [
+     [
+      "Sunrise Valley Elementary School"
+     ],
+     [
+      "$2,200.00",
+      "$2,200",
+      "2,200",
+      "2200"
+     ]
+    ]
+   },
+   "note": "{\"who\":\"Sunrise Valley Elementary School\",\"c\":2200}",
+   "baseline": "fail"
+  },
+  {
+   "id": "lt-pm-089",
+   "section": "pm",
+   "text": "permit for Linda Fitzgerald",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "BP-2026"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-wr-090",
+   "section": "wr",
+   "text": "when was the warranty registered for Amy Isaacson's unit",
+   "expect": {
+    "all": [
+     [
+      "September 28, 2019",
+      "Sep 28, 2019",
+      "09/28/2019",
+      "9/28/2019",
+      "2019-09-28"
+     ]
+    ]
+   },
+   "baseline": "fail"
+  },
+  {
+   "id": "lt-wr-091",
+   "section": "wr",
+   "text": "was Laura Lombardi's warranty registered",
+   "expect": {
+    "all": [
+     [
+      "June 9, 2011",
+      "Jun 9, 2011",
+      "06/09/2011",
+      "6/9/2011",
+      "2011-06-09"
+     ]
+    ]
+   },
+   "baseline": "clarified"
+  },
+  {
+   "id": "lt-wr-092",
+   "section": "wr",
+   "text": "has Thomas Mercer registered his warranty",
+   "expect": {
+    "review": true,
+    "none": [
+     "registered on"
+    ],
+    "note": "Thomas Mercer has no warranty registration document"
+   },
+   "baseline": "clarified"
+  },
+  {
+   "id": "lt-wr-093",
+   "section": "wr",
+   "text": "what is the warranty term on Deborah Ortega's Rheem",
+   "expect": {
+    "all": [
+     [
+      "5-10",
+      "5 to 10",
+      "5–10"
+     ]
+    ]
+   },
+   "baseline": "clarified"
+  },
+  {
+   "id": "lt-wr-094",
+   "section": "wr",
+   "text": "what brand is Karen Abernathy's unit",
+   "expect": {
+    "all": [
+     [
+      "Goodman"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-wr-095",
+   "section": "wr",
+   "text": "when was Karen Abernathy's system installed",
+   "expect": {
+    "all": [
+     [
+      "March 7, 2025",
+      "Mar 7, 2025",
+      "03/07/2025",
+      "3/7/2025",
+      "2025-03-07"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-wr-096",
+   "section": "wr",
+   "text": "how many warranty registrations do we have",
+   "expect": {
+    "all": [
+     [
+      "52"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-wr-097",
+   "section": "wr",
+   "text": "when does the warranty run out on Linda Fitzgerald's Trane",
+   "expect": {
+    "review": true,
+    "note": "doc says 'per manufacturer terms'; any date must be labelled computed, not stated"
+   },
+   "baseline": "clarified"
+  },
+  {
+   "id": "lt-wr-098",
+   "section": "wr",
+   "text": "is Ashley Whitfield's Trane still under warranty",
+   "expect": {
+    "review": true,
+    "note": "registered 2013-10-02; 5-10 yr parts; must not assert coverage without basis"
+   },
+   "baseline": "review"
+  },
+  {
+   "id": "lt-wr-099",
+   "section": "wr",
+   "text": "is David Prentiss's York still under warranty",
+   "expect": {
+    "review": true,
+    "note": "installed 2026-02-18, no registration doc"
+   },
+   "baseline": "review"
+  },
+  {
+   "id": "lt-sr-100",
+   "section": "sr",
+   "text": "whose serial is F100002",
+   "expect": {
+    "all": [
+     [
+      "Linda Fitzgerald"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-sr-101",
+   "section": "sr",
+   "text": "serial number on Donna Sorensen's condenser",
+   "expect": {
+    "all": [
+     [
+      "2G100004"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-sr-102",
+   "section": "sr",
+   "text": "what is the serial for Gary Villegas's unit",
+   "expect": {
+    "all": [
+     [
+      "Y100015"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-sr-103",
+   "section": "sr",
+   "text": "model number for serial LX100005",
+   "expect": {
+    "all": [
+     [
+      "ML14XC1-046-230"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-sr-104",
+   "section": "sr",
+   "text": "what brand is serial D100008",
+   "expect": {
+    "all": [
+     [
+      "Daikin"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-sr-105",
+   "section": "sr",
+   "text": "who owns unit 2R100054",
+   "expect": {
+    "all": [
+     [
+      "Donna Ulloa"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-sr-106",
+   "section": "sr",
+   "text": "what tonnage is serial 2C100019",
+   "expect": {
+    "all": [
+     [
+      "3 ton",
+      "3-ton",
+      "3 Ton"
+     ]
+    ]
+   },
+   "note": "from text: 3",
+   "baseline": "fail"
+  },
+  {
+   "id": "lt-sr-107",
+   "section": "sr",
+   "text": "what refrigerant is in the unit at 470 E Chandler Blvd",
+   "expect": {
+    "all": [
+     [
+      "R-454B"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-sr-108",
+   "section": "sr",
+   "text": "what serials are at Holy Trinity Church",
+   "expect": {
+    "all": [
+     [
+      "2G100110"
+     ],
+     [
+      "LX100111"
+     ],
+     [
+      "2R100112"
+     ]
+    ]
+   },
+   "baseline": "clarified"
+  },
+  {
+   "id": "lt-sr-109",
+   "section": "sr",
+   "text": "what units does Sunrise Valley Elementary have",
+   "expect": {
+    "all": [
+     [
+      "2R100115"
+     ],
+     [
+      "Y100116"
+     ],
+     [
+      "D100117"
+     ],
+     [
+      "M100118"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-sr-110",
+   "section": "sr",
+   "text": "how many units does Copper Sky Dental have",
+   "expect": {
+    "all": [
+     [
+      "2",
+      "two"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-sr-111",
+   "section": "sr",
+   "text": "serial ZZ999999",
+   "expect": {
+    "notOnFile": true,
+    "none": []
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-sr-112",
+   "section": "sr",
+   "text": "who has serial 2c100003",
+   "expect": {
+    "all": [
+     [
+      "Thomas Mercer"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-sr-113",
+   "section": "sr",
+   "text": "serial F100106 which RTU is that",
+   "expect": {
+    "all": [
+     [
+      "RTU-1"
+     ],
+     [
+      "Copper Sky"
+     ]
+    ]
+   },
+   "baseline": "fail"
+  },
+  {
+   "id": "lt-sr-114",
+   "section": "sr",
+   "text": "model of the Mitsubishi at 951 E Main St Chandler",
+   "expect": {
+    "all": [
+     [
+      "MUZ-FS40NA"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-sr-115",
+   "section": "sr",
+   "text": "what year was the Lennox at Ronald Bracken's installed",
+   "expect": {
+    "all": [
+     [
+      "2012"
+     ]
+    ]
+   },
+   "baseline": "clarified"
+  },
+  {
+   "id": "lt-sr-116",
+   "section": "sr",
+   "text": "serial of the Trane at 3356 E Pecos Rd",
+   "expect": {
+    "all": [
+     [
+      "F100090"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-sr-117",
+   "section": "sr",
+   "text": "what's the model on the unit at 100 E Main St",
+   "expect": {
+    "all": [
+     [
+      "4TTR4002L1000AA"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-dt-118",
+   "section": "dt",
+   "text": "when was the last service visit for Deborah Ortega",
+   "expect": {
+    "all": [
+     [
+      "November 12, 2022",
+      "Nov 12, 2022",
+      "11/12/2022",
+      "11/12/2022",
+      "2022-11-12"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-dt-119",
+   "section": "dt",
+   "text": "when was the first service visit for Thomas Mercer",
+   "expect": {
+    "all": [
+     [
+      "November 5, 2017",
+      "Nov 5, 2017",
+      "11/05/2017",
+      "11/5/2017",
+      "2017-11-05"
+     ]
+    ]
+   },
+   "baseline": "clarified"
+  },
+  {
+   "id": "lt-dt-120",
+   "section": "dt",
+   "text": "what date was Deborah Ortega's unit installed",
+   "expect": {
+    "all": [
+     [
+      "January 25, 2021",
+      "Jan 25, 2021",
+      "01/25/2021",
+      "1/25/2021",
+      "2021-01-25"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-dt-121",
+   "section": "dt",
+   "text": "which customers had service on 09/21/2026",
+   "expect": {
+    "all": [
+     [
+      "David Prentiss"
+     ],
+     [
+      "Karen Abernathy"
+     ],
+     [
+      "William Quintana"
+     ],
+     [
+      "Jessica Bennett"
+     ],
+     [
+      "Charles Whitford"
+     ],
+     [
+      "Michael Redwine"
+     ]
+    ]
+   },
+   "note": "truth 22 customers; first 6 required",
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-dt-122",
+   "section": "dt",
+   "text": "how many service visits happened in 2013",
+   "expect": {
+    "all": [
+     [
+      "6"
+     ]
+    ]
+   },
+   "note": "service tickets, truth 6",
+   "baseline": "fail"
+  },
+  {
+   "id": "lt-dt-123",
+   "section": "dt",
+   "text": "how many service visits between 2010 and 2012",
+   "expect": {
+    "all": [
+     [
+      "7"
+     ]
+    ]
+   },
+   "note": "truth 7",
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-dt-124",
+   "section": "dt",
+   "text": "how many service tickets in March 2021",
+   "expect": {
+    "all": [
+     [
+      "2"
+     ]
+    ]
+   },
+   "note": "truth 2",
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-dt-125",
+   "section": "dt",
+   "text": "which units were installed in 2026",
+   "expect": {
+    "all": [
+     [
+      "Y100007"
+     ],
+     [
+      "M100025"
+     ],
+     [
+      "2C100043"
+     ],
+     [
+      "LX100061"
+     ],
+     [
+      "Y100079"
+     ],
+     [
+      "M100097"
+     ]
+    ]
+   },
+   "note": "truth 6",
+   "baseline": "fail"
+  },
+  {
+   "id": "lt-dt-126",
+   "section": "dt",
+   "text": "how many units were installed before 2012",
+   "expect": {
+    "all": [
+     [
+      "24"
+     ]
+    ]
+   },
+   "note": "truth 24",
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-dt-127",
+   "section": "dt",
+   "text": "how many units were installed between January 2020 and December 2021",
+   "expect": {
+    "all": [
+     [
+      "14"
+     ]
+    ]
+   },
+   "note": "truth 14",
+   "baseline": "fail"
+  },
+  {
+   "id": "lt-dt-128",
+   "section": "dt",
+   "text": "when was the proposal sent to David Prentiss",
+   "expect": {
+    "all": [
+     [
+      "September 21, 2026",
+      "Sep 21, 2026",
+      "09/21/2026",
+      "9/21/2026",
+      "2026-09-21"
+     ]
+    ]
+   },
+   "baseline": "clarified"
+  },
+  {
+   "id": "lt-dt-129",
+   "section": "dt",
+   "text": "who got a quote in the last 30 days",
+   "expect": {
+    "all": [
+     [
+      "David Prentiss"
+     ],
+     [
+      "William Quintana"
+     ],
+     [
+      "Michael Redwine"
+     ],
+     [
+      "Robert Thornton"
+     ],
+     [
+      "James Underhill"
+     ],
+     [
+      "Timothy Vance"
+     ]
+    ]
+   },
+   "note": "truth 7: David Prentiss, William Quintana, Michael Redwine, Robert Thornton, James Underhill, Timothy Vance, Sonoran Grill Restaurant",
+   "baseline": "needs-model"
+  },
+  {
+   "id": "lt-dt-130",
+   "section": "dt",
+   "text": "how many service visits in the last 6 months",
+   "expect": {
+    "all": [
+     [
+      "26"
+     ]
+    ]
+   },
+   "note": "truth 26",
+   "baseline": "fail"
+  },
+  {
+   "id": "lt-dt-131",
+   "section": "dt",
+   "text": "how old is the system at 285 E Elliot Rd",
+   "expect": {
+    "review": true,
+    "note": "installed 2026-02-18; today pinned 2026-09-25 -> 7 months"
+   },
+   "baseline": "review"
+  },
+  {
+   "id": "lt-dt-132",
+   "section": "dt",
+   "text": "what's on the schedule for next week",
+   "expect": {
+    "notOnFile": true,
+    "none": []
+   },
+   "baseline": "fail"
+  },
+  {
+   "id": "lt-dt-133",
+   "section": "dt",
+   "text": "when is Linda Fitzgerald's next appointment",
+   "expect": {
+    "notOnFile": true,
+    "none": []
+   },
+   "baseline": "clarified"
+  },
+  {
+   "id": "lt-dt-134",
+   "section": "dt",
+   "text": "how many service visits in 2031",
+   "expect": {
+    "zeroOrFuture": true
+   },
+   "note": "future year",
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-ct-135",
+   "section": "ct",
+   "text": "how many customers do we have",
+   "expect": {
+    "all": [
+     [
+      "120"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-ct-136",
+   "section": "ct",
+   "text": "how many customers are in Mesa",
+   "expect": {
+    "all": [
+     [
+      "16"
+     ]
+    ]
+   },
+   "note": "truth 16",
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-ct-137",
+   "section": "ct",
+   "text": "how many customers in Tucson",
+   "expect": {
+    "all": [
+     [
+      "12"
+     ]
+    ]
+   },
+   "note": "truth 12",
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-ct-138",
+   "section": "ct",
+   "text": "how many Trane units do we have",
+   "expect": {
+    "all": [
+     [
+      "16"
+     ]
+    ]
+   },
+   "note": "truth 16",
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-ct-139",
+   "section": "ct",
+   "text": "how many Carrier units",
+   "expect": {
+    "all": [
+     [
+      "16"
+     ]
+    ]
+   },
+   "note": "truth 16",
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-ct-140",
+   "section": "ct",
+   "text": "how many units total do we have on file",
+   "expect": {
+    "all": [
+     [
+      "132"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-ct-141",
+   "section": "ct",
+   "text": "how many customers don't have a phone number on file",
+   "expect": {
+    "all": [
+     [
+      "23"
+     ]
+    ]
+   },
+   "note": "truth 23",
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-ct-142",
+   "section": "ct",
+   "text": "how many customers have no email on file",
+   "expect": {
+    "all": [
+     [
+      "60"
+     ]
+    ]
+   },
+   "note": "truth 60",
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-ct-143",
+   "section": "ct",
+   "text": "which brand do we have the most units of",
+   "expect": {
+    "all": [
+     [
+      "Mitsubishi"
+     ]
+    ]
+   },
+   "note": "[[\"Mitsubishi\",18],[\"Rheem\",17],[\"Daikin\",17],[\"Trane\",16],[\"Carrier\",16],[\"Goodman\",16],[\"Lennox\",16],[\"York\",16]]",
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-ct-144",
+   "section": "ct",
+   "text": "how many 5 ton units",
+   "expect": {
+    "all": [
+     [
+      "24"
+     ]
+    ]
+   },
+   "note": "truth from text 24",
+   "baseline": "fail"
+  },
+  {
+   "id": "lt-ct-145",
+   "section": "ct",
+   "text": "how many R-454B units do we have",
+   "expect": {
+    "all": [
+     [
+      "12"
+     ]
+    ]
+   },
+   "note": "truth from text 12",
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-ct-146",
+   "section": "ct",
+   "text": "how many customers are out of state",
+   "expect": {
+    "all": [
+     [
+      "4"
+     ]
+    ]
+   },
+   "note": "truth 4",
+   "baseline": "fail"
+  },
+  {
+   "id": "lt-ct-147",
+   "section": "ct",
+   "text": "how many customers in Nevada",
+   "expect": {
+    "all": [
+     [
+      "2"
+     ]
+    ]
+   },
+   "note": "truth 2",
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-ct-148",
+   "section": "ct",
+   "text": "which technician has done the most service visits",
+   "expect": {
+    "all": [
+     [
+      "Kevin Pratt"
+     ]
+    ]
+   },
+   "note": "[[\"Kevin Pratt\",22],[\"Denise Ford\",21],[\"Marisol Vega\",20],[\"Ray Sutton\",19],[\"Wyatt Coburn\",19],[\"Danny Ochoa\",19]]",
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-ct-149",
+   "section": "ct",
+   "text": "how many service visits did Danny Ochoa do",
+   "expect": {
+    "all": [
+     [
+      "19"
+     ]
+    ]
+   },
+   "note": "truth 19",
+   "baseline": "fail"
+  },
+  {
+   "id": "lt-cp-150",
+   "section": "cp",
+   "text": "who has the bigger invoice, Linda Fitzgerald or Thomas Mercer",
+   "expect": {
+    "all": [
+     [
+      "Thomas Mercer"
+     ]
+    ]
+   },
+   "none": [],
+   "baseline": "needs-model"
+  },
+  {
+   "id": "lt-cp-151",
+   "section": "cp",
+   "text": "is Karen Abernathy's unit older than Donna Sorensen's",
+   "expect": {
+    "all": [
+     [
+      "Donna Sorensen"
+     ]
+    ]
+   },
+   "note": "Donna 2023-11-19 older than Karen 2025-03-07: answer no",
+   "baseline": "needs-model"
+  },
+  {
+   "id": "lt-cp-152",
+   "section": "cp",
+   "text": "which was installed first, Ronald Bracken's unit or Amy Isaacson's",
+   "expect": {
+    "all": [
+     [
+      "Ronald Bracken"
+     ]
+    ]
+   },
+   "baseline": "needs-model"
+  },
+  {
+   "id": "lt-cp-153",
+   "section": "cp",
+   "text": "compare the invoices for Deborah Ortega and William Quintana",
+   "expect": {
+    "all": [
+     [
+      "$4,444.00",
+      "$4,444",
+      "4,444",
+      "4444"
+     ],
+     [
+      "$5,951.00",
+      "$5,951",
+      "5,951",
+      "5951"
+     ]
+    ]
+   },
+   "baseline": "needs-model"
+  },
+  {
+   "id": "lt-cp-154",
+   "section": "cp",
+   "text": "who has more units, Holy Trinity Church or Cactus Rose Restaurant",
+   "expect": {
+    "all": [
+     [
+      "Holy Trinity"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-cp-155",
+   "section": "cp",
+   "text": "who pays more for their maintenance agreement, Copper Sky Dental or Sunrise Valley Elementary",
+   "expect": {
+    "all": [
+     [
+      "Sunrise Valley"
+     ],
+     [
+      "$2,200.00",
+      "$2,200",
+      "2,200",
+      "2200"
+     ]
+    ]
+   },
+   "baseline": "clarified"
+  },
+  {
+   "id": "lt-fu-156",
+   "section": "fu",
+   "text": "and her email",
+   "expect": {
+    "all": [
+     [
+      "linda.fitzgerald0@gmail.com"
+     ]
+    ]
+   },
+   "thread": [
+    "whats Linda Fitzgerald's phone number"
+   ],
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fu-157",
+   "section": "fu",
+   "text": "what's her address",
+   "expect": {
+    "all": [
+     [
+      "100 E Main St"
+     ]
+    ]
+   },
+   "thread": [
+    "who owns serial F100002"
+   ],
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fu-158",
+   "section": "fu",
+   "text": "how about Amy Isaacson",
+   "expect": {
+    "all": [
+     [
+      "INV-20004"
+     ],
+     [
+      "$3,348.00",
+      "$3,348",
+      "3,348",
+      "3348"
+     ]
+    ]
+   },
+   "thread": [
+    "invoice for Ronald Bracken"
+   ],
+   "baseline": "needs-model"
+  },
+  {
+   "id": "lt-fu-159",
+   "section": "fu",
+   "text": "what about his warranty",
+   "expect": {
+    "review": true,
+    "none": [
+     "registered on"
+    ],
+    "note": "Thomas Mercer has no warranty registration doc"
+   },
+   "thread": [
+    "permit for Thomas Mercer"
+   ],
+   "baseline": "needs-model"
+  },
+  {
+   "id": "lt-fu-160",
+   "section": "fu",
+   "text": "and Gilbert",
+   "expect": {
+    "all": [
+     [
+      "8"
+     ]
+    ]
+   },
+   "thread": [
+    "how many customers are in Mesa"
+   ],
+   "note": "truth 8",
+   "baseline": "needs-model"
+  },
+  {
+   "id": "lt-fu-161",
+   "section": "fu",
+   "text": "how many Trane units do we have",
+   "expect": {
+    "all": [
+     [
+      "16"
+     ]
+    ]
+   },
+   "thread": [
+    "phone for Deborah Ortega"
+   ],
+   "note": "subject change",
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fu-162",
+   "section": "fu",
+   "text": "never mind, serial F100090 who's that",
+   "expect": {
+    "all": [
+     [
+      "Ashley Whitfield"
+     ]
+    ]
+   },
+   "thread": [
+    "address for Kevin Zimmerman"
+   ],
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fu-163",
+   "section": "fu",
+   "text": "and who did the work",
+   "expect": {
+    "all": [
+     [
+      "Denise Ford"
+     ]
+    ]
+   },
+   "thread": [
+    "total on INV-20003"
+   ],
+   "baseline": "needs-model"
+  },
+  {
+   "id": "lt-fu-164",
+   "section": "fu",
+   "text": "when was it installed",
+   "expect": {
+    "all": [
+     [
+      "November 19, 2023",
+      "Nov 19, 2023",
+      "11/19/2023",
+      "11/19/2023",
+      "2023-11-19"
+     ]
+    ]
+   },
+   "thread": [
+    "whose unit is 2G100004"
+   ],
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-nf-165",
+   "section": "nf",
+   "text": "phone number for Jessica Sandoval",
+   "expect": {
+    "notOnFile": true,
+    "none": []
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-nf-166",
+   "section": "nf",
+   "text": "address for Mr. Henderson",
+   "expect": {
+    "notOnFile": true,
+    "none": []
+   },
+   "baseline": "needs-model"
+  },
+  {
+   "id": "lt-nf-167",
+   "section": "nf",
+   "text": "invoice for Zachary Pemberton",
+   "expect": {
+    "notOnFile": true,
+    "none": []
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-nf-168",
+   "section": "nf",
+   "text": "what did we charge for the Lennox at 100 E Main St",
+   "expect": {
+    "review": true,
+    "none": [
+     "Lennox ML14",
+     "$2,800"
+    ],
+    "note": "customer at that address has a Trane, not a Lennox: must not assert a Lennox price"
+   },
+   "baseline": "clarified"
+  },
+  {
+   "id": "lt-nf-169",
+   "section": "nf",
+   "text": "what's Danny Ochoa's cell number",
+   "expect": {
+    "notOnFile": true,
+    "none": []
+   },
+   "baseline": "needs-model"
+  },
+  {
+   "id": "lt-nf-170",
+   "section": "nf",
+   "text": "what's the credit card on file for Thomas Mercer",
+   "expect": {
+    "notOnFile": true,
+    "none": []
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-nf-171",
+   "section": "nf",
+   "text": "Linda Fitzgerald's social security number",
+   "expect": {
+    "notOnFile": true,
+    "none": []
+   },
+   "baseline": "fail"
+  },
+  {
+   "id": "lt-nf-172",
+   "section": "nf",
+   "text": "how much profit did we make in 2021",
+   "expect": {
+    "review": true,
+    "note": "no cost data; must not invent a profit figure"
+   },
+   "baseline": "review"
+  },
+  {
+   "id": "lt-nf-173",
+   "section": "nf",
+   "text": "total revenue for 2031",
+   "expect": {
+    "review": true,
+    "note": "future year; must not invent"
+   },
+   "baseline": "review"
+  },
+  {
+   "id": "lt-nf-174",
+   "section": "nf",
+   "text": "what's the weather in Mesa today",
+   "expect": {
+    "notOnFile": true,
+    "none": []
+   },
+   "baseline": "fail"
+  },
+  {
+   "id": "lt-nf-175",
+   "section": "nf",
+   "text": "warranty on serial Q555555",
+   "expect": {
+    "notOnFile": true,
+    "none": []
+   },
+   "baseline": "needs-model"
+  },
+  {
+   "id": "lt-nf-176",
+   "section": "nf",
+   "text": "what's the filter size at David Prentiss's place",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "16x25",
+     "20x25",
+     "16x20"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-nf-177",
+   "section": "nf",
+   "text": "did Donna Sorensen sign the maintenance agreement",
+   "expect": {
+    "notOnFile": true,
+    "none": []
+   },
+   "baseline": "clarified"
+  },
+  {
+   "id": "lt-nf-178",
+   "section": "nf",
+   "text": "what was Thomas Mercer's invoice in 2025",
+   "expect": {
+    "notOnFile": true,
+    "none": []
+   },
+   "baseline": "clarified"
+  },
+  {
+   "id": "lt-nf-179",
+   "section": "nf",
+   "text": "who lives at 3300 S Alma School Rd Apt 110",
+   "expect": {
+    "notOnFile": true,
+    "none": []
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-nf-180",
+   "section": "nf",
+   "text": "how many tickets were closed at 3300 S Alma School Rd Apt 109",
+   "expect": {
+    "notOnFile": true,
+    "none": []
+   },
+   "baseline": "clarified"
+  }
+ ],
+ "baselineNote": "Frozen 2026-10-03 against main dacf468. baseline 'pass' = Donovan answered correctly (no model); anything else is a logged defect/gap, not asserted. Truth derived from raw page text, never from Donovan."
+}

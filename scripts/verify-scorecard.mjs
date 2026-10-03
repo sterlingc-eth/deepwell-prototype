@@ -852,7 +852,13 @@ const graderModel = (pass) => async () => ({ content: [tu('grade', { pass, reaso
   check('nightly step: DONOVAN_SCORECARD_NIGHTLY=0 disables it', off.skipped === 'disabled');
   const late = await routes.runScorecardSweepStep({ deadlineAt: Date.now() + 5_000, handler: h, env, claim: false });
   check('nightly step: never starts with less than 20 s left on the sweep\'s deadline (customer-facing steps come first)', late.skipped === 'no-time');
-  const ran = await routes.runScorecardSweepStep({ deadlineAt: Date.now() + 240_000, handler: h, env, claim: false });
+  // The nightly slice rotates with the real calendar day (nightlySlice(exam, todayUtc())), and this fixture tenant can only answer part of the exam,
+  // so on most days the 40-question slice answered nothing and this check failed. Pin `new Date()` (not Date.now) to TODAY for this one call so the
+  // slice is the same one the fixtures were written against.
+  const RealDate = Date;
+  globalThis.Date = class extends RealDate { constructor(...a) { if (a.length === 0) super(`${TODAY}T12:00:00Z`); else super(...a); } };
+  let ran;
+  try { ran = await routes.runScorecardSweepStep({ deadlineAt: Date.now() + 240_000, handler: h, env, claim: false }); } finally { globalThis.Date = RealDate; }
   check('nightly step: runs a 40-question rotating slice as source "nightly"', ran.slice === 40 && ran.answered > 0 && !ran.error, JSON.stringify(ran));
   const stored = await store.getRun(ctxA, ran.runId);
   eq('nightly step: the run is recorded with source nightly', stored?.run.source, 'nightly');

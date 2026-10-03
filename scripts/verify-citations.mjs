@@ -279,7 +279,14 @@ const contractOk = (d) => d && Array.isArray(d.records) && Number.isFinite(d.rec
 
 /* ================================================================== 5. honest-zero retrieval + generic no-answer */
 {
+  // R32: with a customer recognised, the default is now 2-3 tap-able reformulations (clarify chips) instead of the retrieval honest-zero.
+  // The honest-zero path is still the engine underneath, so pin it with the documented kill switch (DONOVAN_CLARIFY_CHIPS=0) and check
+  // the clarify variant separately (still a no-answer with an honest "nothing matched" basis, never a guess).
+  const clarifyQ = (await ask('do we have anything about a compressor replacement for Donna Thornton')).data;
+  check('honest zero (clarify variant, R32): no-answer with an honest "nothing matched" basis and zero records', clarifyQ.kind === 'no-answer' && /nothing matched/.test(clarifyQ.basis ?? '') && (clarifyQ.records?.length ?? 0) === 0, JSON.stringify({ t: clarifyQ.text, b: clarifyQ.basis }));
+  process.env.DONOVAN_CLARIFY_CHIPS = '0';
   const hz = (await ask('do we have anything about a compressor replacement for Donna Thornton')).data;
+  delete process.env.DONOVAN_CLARIFY_CHIPS;
   check('honest zero (single record): "Searched N documents ... none mention ..." with the searched documents listed', hz.kind === 'no-answer' && hz.recordsKind === 'searched' && /^Searched \d+ documents? on file for Donna Thornton — none mention compressor replacement\./.test(hz.basis) && hz.records.length === hz.recordsTotal && hz.records.every((x) => x.type === 'document' || x.type === 'invoice'), JSON.stringify({ t: hz.text, b: hz.basis, n: hz.records.length }));
   const gz = (await ask('what is the airspeed velocity of a laden swallow')).data;
   check(`generic no-answer: states the whole library was searched (${nDocsA} documents)`, gz.kind === 'no-answer' && gz.recordsKind === 'searched' && new RegExp(`all ${nDocsA} documents`).test(gz.basis), gz.basis);

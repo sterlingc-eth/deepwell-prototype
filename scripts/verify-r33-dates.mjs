@@ -487,7 +487,7 @@ if (PGlite) {
   eq('api/ still has exactly 12 top-level function files', apiTop.length, 12);
   const pkg = JSON.parse(fs.readFileSync(rel('package.json'), 'utf8'));
   check('package.json: verify:r33-dates exists and is part of verify:all', !!pkg.scripts['verify:r33-dates'] && /verify:r33-dates/.test(pkg.scripts['verify:all']));
-  const newSql = fs.readdirSync(rel('M3-config')).filter((f) => /^6[2-9]-/.test(f) && !['62-rate-limit-refund-and-owner-overrides.sql', '63-page-count-index.sql'].includes(f)); // R35's own migration is not R33's
+  const newSql = fs.readdirSync(rel('M3-config')).filter((f) => /^6[2-9]-/.test(f) && !['62-rate-limit-refund-and-owner-overrides.sql', '63-page-count-index.sql', '64-records-search-indexes.sql', '65-scale-donovan-and-customers.sql', '66-staff-import-override.sql'].includes(f)); // R35's and later rounds' own migrations (64-66) are not R33's
   eq('no SQL schema change was needed (provenance rides on facets.segment_id)', newSql, []);
 }
 

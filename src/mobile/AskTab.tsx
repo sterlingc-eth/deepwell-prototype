@@ -1,5 +1,5 @@
 import { forwardRef, memo, startTransition, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
-import { ArrowUp, RotateCcw, X } from 'lucide-react'
+import { ArrowUp, LogIn, RotateCcw, X } from 'lucide-react'
 import { ask, AskApiError } from '../services/answerService'
 import { friendlyErrorMessage } from '../services/httpError'
 import { authHeader } from '../services/authToken'
@@ -23,6 +23,8 @@ interface Turn {
   answer?: Answer
   error?: string
   billingUrl?: string
+  /** 401: the session ran out — offer a reload (Clerk refreshes it) instead of the raw server text. */
+  signIn?: boolean
   slow?: boolean
 }
 
@@ -233,9 +235,13 @@ const TurnView = memo(function TurnView({
         <div role="alert" className="rounded-2xl bg-bad-bg text-bad-ink p-4 text-body grid gap-2">
           <span>{turn.error}</span>
           {turn.billingUrl ? (
-            <a href={turn.billingUrl} className="font-semibold underline">
+            <a href={turn.billingUrl} className="justify-self-start min-h-11 inline-flex items-center font-semibold underline">
               See plans
             </a>
+          ) : turn.signIn ? (
+            <button type="button" onClick={() => window.location.reload()} className="justify-self-start min-h-11 inline-flex items-center gap-2 font-semibold underline">
+              <LogIn className="w-4 h-4" /> Sign in again
+            </button>
           ) : (
             <button type="button" onClick={() => onRetry(turn.question)} className="justify-self-start min-h-11 inline-flex items-center gap-2 font-semibold underline">
               <RotateCcw className="w-4 h-4" /> Try again
@@ -350,7 +356,8 @@ export const AskTab = memo(function AskTab({
           ? "Couldn't reach DeepWell. Check your connection and try again."
           : friendlyErrorMessage(err, 'Something went wrong.')
       const billingUrl = err instanceof AskApiError && err.status === 402 ? (err.url ?? '/app/?screen=billing') : undefined
-      update(id, { error: message, billingUrl })
+      const expired = err instanceof AskApiError && err.status === 401
+      update(id, { error: expired ? 'Your session expired. Sign in again.' : message, billingUrl, signIn: expired })
     } finally {
       window.clearTimeout(slowTimer)
       window.clearTimeout(killTimer)

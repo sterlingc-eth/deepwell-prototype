@@ -1,8 +1,9 @@
 import { memo, useEffect, useRef, useState } from 'react'
 import { AlertTriangle, Camera, CheckCircle2, CloudOff, FileUp, Loader2, LogIn, Trash2 } from 'lucide-react'
-import { sha256Hex, waitForIngest, type IngestProgress, type IngestResult } from '../services/ingestClient'
+import { IngestHttpError, sha256Hex, waitForIngest, type IngestProgress, type IngestResult } from '../services/ingestClient'
 import { fetchDocumentIntakeSummaries, type DocumentIntakeSummary } from '../services/intakeClient'
-import { combineToPdf, preparePhoto, scanFilename, type PreparedPage } from './imagePrep'
+import { whenIdle } from './idle'
+import { combineToPdf, prefetchPdfLib, preparePhoto, scanFilename, type PreparedPage } from './imagePrep'
 import {
   attemptUploadOnce,
   offlineQueue,
@@ -24,7 +25,7 @@ type Phase = 'pick' | 'working' | 'done'
 /** A result that landed in the offline queue instead of uploading right
  *  away — `documentId` isn't known yet, so it's not shown as uploaded or
  *  read; see the separate "Waiting to upload" strip for its live status. */
-type ScanResult = IngestResult & { queuedOffline?: boolean }
+type ScanResult = IngestResult & { queuedOffline?: boolean; queuedNote?: string }
 
 /** Adds the one state a scan can be in this run that ingestClient's own
  *  status enum has no reason to know about: no signal, saved for later. */
@@ -60,7 +61,8 @@ function queueItemStatusText(item: QueuedUpload): string {
   if (item.status === 'error') {
     if (item.errorClass === 'too-large') return item.error ?? 'File is too large'
     if (item.errorClass === 'permanent') return item.error ?? "Couldn't upload"
-    return `${item.error ?? 'Waiting for a signal'} — will retry`
+    if (!item.error || /failed to fetch|load failed|networkerror/i.test(item.error)) return 'No signal. Will retry.'
+    return `${item.error} — will retry`
   }
   return 'Waiting for a signal…'
 }
@@ -99,6 +101,13 @@ export const ScanTab = memo(function ScanTab({
   // even leaving the tab), so it's tracked separately from the per-run
   // progress/results above and rendered as its own persistent strip.
   const [queueItems, setQueueItems] = useState<QueuedUpload[]>([])
+  // A waiting scan that WILL still upload is the only copy of the photo: first tap arms, second tap deletes.
+  const [armedId, setArmedId] = useState<string | null>(null)
+  useEffect(() => {
+    if (!armedId) return
+    const t = window.setTimeout(() => setArmedId(null), 4000)
+    return () => window.clearTimeout(t)
+  }, [armedId])
   // Live post-upload status (Round 13, H2, research #7): once a document is uploaded, straight-
   // through autofill keeps working in the background — this is a best-effort, short-lived poll of
   // that progress, not a persistent tracker (a field tech scanning paperwork typically moves on
@@ -107,6 +116,13 @@ export const ScanTab = memo(function ScanTab({
   const cameraRef = useRef<HTMLInputElement>(null)
   const filesRef = useRef<HTMLInputElement>(null)
   const nextId = useRef(1)
+
+  // Warm the jsPDF chunk while idle and online so combining pages still works after signal is lost.
+  useEffect(() => {
+    return whenIdle(() => {
+      if (navigator.onLine !== false) prefetchPdfLib().catch(() => {})
+    }, 4000)
+  }, [])
 
   // Free the thumbnails' object URLs when they leave the list.
   const previews = useRef(new Set<string>())
@@ -203,9 +219,13 @@ export const ScanTab = memo(function ScanTab({
       const files: File[] = []
       const ready = prepared.filter((x): x is { page: PreparedPage; original: File } => x.page !== null)
       const undecodable = prepared.filter((x) => x.page === null).map((x) => x.original)
+      let pdf: Blob | null = null
       if (willCombine && ready.length > 1) {
         setPrepMessage(`Combining ${ready.length} pages into one document…`)
-        const pdf = await combineToPdf(ready.map((x) => x.page))
+        // If the PDF library can't load (no signal, chunk never cached) keep the pages as separate documents.
+        pdf = await combineToPdf(ready.map((x) => x.page)).catch(() => null)
+      }
+      if (pdf) {
         files.push(new File([pdf], scanFilename('pdf'), { type: 'application/pdf' }))
       } else {
         ready.forEach((x, i) =>
@@ -287,6 +307,13 @@ export const ScanTab = memo(function ScanTab({
             onError: patchQueuedError,
           })
           report(file.name, 'queued-offline')
+          if (liveErr instanceof IngestHttpError && (liveErr.status === 402 || liveErr.status >= 500)) {
+            if (liveErr.status === 402) {
+              const url = (liveErr.body as { url?: string } | null)?.url
+              return { filename: file.name, queuedOffline: true, queuedNote: `${liveErr.message} Saved on your phone.`, billingUrl: url ?? '/app/?screen=billing' }
+            }
+            return { filename: file.name, queuedOffline: true, queuedNote: 'Server problem — saved on your phone, will retry' }
+          }
           return { filename: file.name, queuedOffline: true }
         } catch (err) {
           const message =
@@ -399,7 +426,7 @@ export const ScanTab = memo(function ScanTab({
                 <button
                   type="button"
                   onClick={() => tenantKey && offlineQueue.retryAuthNow(tenantKey)}
-                  className="min-h-8 px-2 rounded-lg bg-accent/20 text-accent-ink text-caption font-semibold inline-flex items-center gap-1"
+                  className="min-h-touch px-3 rounded-lg bg-accent/20 text-accent-ink text-caption font-semibold inline-flex items-center gap-1"
                 >
                   <LogIn className="w-3.5 h-3.5" aria-hidden="true" />
                   Sign in again
@@ -422,11 +449,17 @@ export const ScanTab = memo(function ScanTab({
                   </span>
                   <button
                     type="button"
-                    onClick={() => tenantKey && void offlineQueue.remove(tenantKey, item.id)}
-                    aria-label={`Remove ${item.filename} from the upload queue`}
-                    className="w-11 h-11 flex items-center justify-center shrink-0"
+                    onClick={() => {
+                      if (!tenantKey) return
+                      const willStillUpload = !(item.status === 'error' && item.errorClass && item.errorClass !== 'transient')
+                      if (willStillUpload && armedId !== item.id) return setArmedId(item.id)
+                      setArmedId(null)
+                      void offlineQueue.remove(tenantKey, item.id)
+                    }}
+                    aria-label={armedId === item.id ? `Tap again to delete ${item.filename} for good` : `Remove ${item.filename} from the upload queue`}
+                    className={armedId === item.id ? 'min-w-11 h-11 px-2 flex items-center justify-center shrink-0 text-caption font-semibold text-bad-ink bg-bad-bg rounded-lg' : 'w-11 h-11 flex items-center justify-center shrink-0'}
                   >
-                    <Trash2 className="w-4 h-4 text-ink-3" aria-hidden="true" />
+                    {armedId === item.id ? 'Delete?' : <Trash2 className="w-4 h-4 text-ink-3" aria-hidden="true" />}
                   </button>
                 </li>
               ))}
@@ -542,7 +575,7 @@ export const ScanTab = memo(function ScanTab({
                           <span className="block text-caption text-ink-3">
                             {r.error ??
                               (r.queuedOffline
-                                ? 'No signal — saved on your phone, will upload automatically'
+                                ? (r.queuedNote ?? 'No signal — saved on your phone, will upload automatically')
                                 : r.duplicate
                                   ? 'Already in DeepWell — nothing new to add'
                                   : r.queued
@@ -554,7 +587,7 @@ export const ScanTab = memo(function ScanTab({
                               <button
                                 type="button"
                                 onClick={() => (r.documentId && onOpenDoc ? onOpenDoc(r.documentId) : onOpenDocs())}
-                                className="block text-caption text-accent-ink font-semibold underline mt-0.5 text-left"
+                                className="block min-h-touch py-2 text-caption text-accent-ink font-semibold underline text-left"
                               >
                                 {status}
                               </button>
@@ -568,7 +601,7 @@ export const ScanTab = memo(function ScanTab({
                   })}
               </ul>
               {billingUrl && (
-                <a href={billingUrl} className="text-body font-semibold underline text-accent-ink">
+                <a href={billingUrl} className="min-h-touch inline-flex items-center text-body font-semibold underline text-accent-ink">
                   See plans
                 </a>
               )}

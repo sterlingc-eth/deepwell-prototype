@@ -949,7 +949,7 @@ eq(
 eq(
   'reconcileTimeRange: model year does NOT match the question -> deterministic override wins',
   reconcileTimeRange({ from: '2021-08', to: '2021-08' }, 'how many jobs did we do in August 2019', '2026-09-21'),
-  { from: '2019-08', to: '2019-08' }
+  { from: '2019-08-01', to: '2019-08-31' } // resolveAnyTimeRange returns day-grain bounds for a month named with its year
 );
 eq(
   'reconcileTimeRange: question names no year at all -> deterministic override wins even if model guessed one',
@@ -1193,8 +1193,11 @@ check('detectedConditions: no relevant words -> empty set', detectedConditions('
   );
 
   const row = { id: 'c1', customer_number: 'C-00001', customer_name: 'Donna Thornton', phone: '(480) 555-0112', email: 'donna.thornton2@outlook.com', service_address: '123 X St, Mesa, AZ' };
-  const found = buildContactAnswer('phone', row);
+  // R35 (owner decision 2026-10-01, "less is better"): a single-field ask answers that field only; the whole card is field 'full'.
+  const found = buildContactAnswer('full', row);
   check('contact-lookup: full-record answer names the customer and every field on file', found.text.includes('Donna Thornton') && found.text.includes('555-0112') && found.text.includes('outlook.com'));
+  const phoneOnly = buildContactAnswer('phone', row);
+  check('contact-lookup: single-field ask answers just that field (R35)', phoneOnly.text === "Donna Thornton's phone is (480) 555-0112." && !phoneOnly.text.includes('outlook.com'));
   eq('contact-lookup: facts link back to the customer entity', found.facts[0].entityId, 'c1');
 
   const missingRow = { id: 'c2', customer_number: 'C-00002', customer_name: 'No Phone Customer', phone: null, email: 'x@y.com', service_address: '1 Main St' };
@@ -1946,7 +1949,7 @@ for (const [f, v] of [['hasDocType', 'not-a-real-type'], ['lacksDocType', 'invoi
 }
 
 // Live miss 2026-09-22: warranty status must be a code-decided condition.
-for (const [q, status] of [['how many active warranties do we have','active'],['how many units are still under warranty','active'],['which units are out of warranty','expired'],['how many warranties expire soon','expiring'],['units with unknown warranty status','unknown']]) {
+for (const [q, status] of [['how many active warranties do we have','covered'],['how many units are still under warranty','covered'],['which units are out of warranty','expired'],['how many warranties expire soon','expiring'],['units with unknown warranty status','unknown']]) {
   check(`warranty condition :: "${q}" -> ${status}`, detectedConditions(q).has('warranty') && buildConditionOverrideFilter('warranty', q)?.value === status);
 }
 for (const q of ['how many active customers do we have', 'how many current customers in mesa', 'which units are covered by a maintenance agreement']) {
@@ -2147,10 +2150,10 @@ for (const q of [
   // must fold back to the exact same strict 'active' bucket as the literal word "active", never a
   // distinct value, so a frozen oracle for this bare phrasing (counts-warranty-0004-canonical)
   // never regresses.
-  eq('warrantyStatusFromQuestion: "still under warranty" is the strict active bucket (not a coarser value)', warrantyStatusFromQuestion('how many units are still under warranty'), 'active');
-  eq('warrantyStatusFromQuestion: "under warranty" (no "still") is also the strict active bucket', warrantyStatusFromQuestion('is this unit under warranty'), 'active');
-  eq('warrantyStatusFromQuestion: "covered" is also the strict active bucket', warrantyStatusFromQuestion('is the warranty covered on this unit'), 'active');
-  eq('warrantyStatusFromQuestion: literal "active" is unchanged', warrantyStatusFromQuestion('how many warranties are active'), 'active');
+  eq('warrantyStatusFromQuestion: "still under warranty" is the covered (not-expired) bucket per the R35 owner decision 2026-10-01', warrantyStatusFromQuestion('how many units are still under warranty'), 'covered');
+  eq('warrantyStatusFromQuestion: "under warranty" (no "still") is also the covered bucket (R35)', warrantyStatusFromQuestion('is this unit under warranty'), 'covered');
+  eq('warrantyStatusFromQuestion: "covered" is also the covered bucket (R35)', warrantyStatusFromQuestion('is the warranty covered on this unit'), 'covered');
+  eq('warrantyStatusFromQuestion: literal "active" maps to the same R35 covered bucket', warrantyStatusFromQuestion('how many warranties are active'), 'covered');
 }
 
 {
@@ -2365,9 +2368,10 @@ for (const q of [
     'how many units did we install in 2027',
     'how many invoices do we have from 2030',
     'how many service visits happened in 2099',
-    'what warranties expire in 2028',
     'how many customers signed up in 2040',
   ];
+  // R34: a forward-looking record field (warranty end, renewal, due) legitimately names a future year - answerable, not declined.
+  check('j192/j195: "what warranties expire in 2028" is a forward-looking field -> mentionsFutureYear false (R34)', mentionsFutureYear('what warranties expire in 2028', '2026-09-25') === false);
   for (const q of futureYearPositives) {
     check(`j192/j195 (own paraphrase): "${q}" names a future year -> mentionsFutureYear true`, mentionsFutureYear(q, '2026-09-25') === true);
   }

@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-01T02:49:49.909Z",
-  "count": 730,
+  "generatedAt": "2026-10-03T01:34:25.923Z",
+  "count": 752,
   "questions": [
     {
       "id": "hvac-owner-0069-canonical",
@@ -279,6 +279,17 @@
       ],
       "winner": "relations",
       "reason": "ask.js: `!meta ? classifyRelationsQuestion(question) : null` — gated on meta alone."
+    },
+    {
+      "id": "counts-warranty-0005-canonical",
+      "category": "counts-warranty",
+      "text": "How many units are an unknown warranty status?",
+      "claimants": [
+        "deterministic",
+        "analytics"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
     },
     {
       "id": "counts-warranty-0001-canonical",
@@ -3149,6 +3160,17 @@
       "reason": "ask.js: `!meta ? classifyRelationsQuestion(question) : null` — gated on meta alone."
     },
     {
+      "id": "breadth-data-quality-014",
+      "category": "data-quality",
+      "text": "How many units have no warranty information at all?",
+      "claimants": [
+        "deterministic",
+        "analytics"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
       "id": "breadth-data-quality-021",
       "category": "data-quality",
       "text": "How many documents have no readable text extracted?",
@@ -3378,6 +3400,7 @@
       "text": "How many units have a warranty expiring in the next year?",
       "claimants": [
         "relations",
+        "deterministic",
         "analytics"
       ],
       "winner": "relations",
@@ -4647,6 +4670,94 @@
       "reason": "ask.js: `!meta ? classifyRelationsQuestion(question) : null` — gated on meta alone."
     },
     {
+      "id": "h001",
+      "category": "field-phrasing-2",
+      "text": "whose unit has serial Y100007",
+      "claimants": [
+        "deterministic",
+        "fastPath"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "h002",
+      "category": "field-phrasing-2",
+      "text": "got a serial LX100005 here, who's that for",
+      "claimants": [
+        "deterministic",
+        "fastPath"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "h003",
+      "category": "field-phrasing-2",
+      "text": "who's serial number 2R100006 belong to",
+      "claimants": [
+        "deterministic",
+        "fastPath"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "h004",
+      "category": "field-phrasing-2",
+      "text": "customer for serial M100009",
+      "claimants": [
+        "deterministic",
+        "fastPath"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "h005",
+      "category": "field-phrasing-2",
+      "text": "serial 2C100011 - whose account is this",
+      "claimants": [
+        "deterministic",
+        "fastPath"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "h006",
+      "category": "field-phrasing-2",
+      "text": "trying to id serial 2G100004, whose job is it",
+      "claimants": [
+        "deterministic",
+        "fastPath"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "h007",
+      "category": "field-phrasing-2",
+      "text": "who owns the unit serial F100018",
+      "claimants": [
+        "deterministic",
+        "fastPath"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "h008",
+      "category": "field-phrasing-2",
+      "text": "serial D100016, who's the customer",
+      "claimants": [
+        "deterministic",
+        "fastPath"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
       "id": "h014",
       "category": "field-phrasing-2",
       "text": "customer with phone 480 555 0124",
@@ -4764,17 +4875,6 @@
       "claimants": [
         "deterministic",
         "decompose",
-        "analytics"
-      ],
-      "winner": "deterministic",
-      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
-    },
-    {
-      "id": "h051",
-      "category": "field-phrasing-2",
-      "text": "how many units warranty has expired so far this year",
-      "claimants": [
-        "deterministic",
         "analytics"
       ],
       "winner": "deterministic",
@@ -5674,6 +5774,61 @@
       "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
     },
     {
+      "id": "i078",
+      "category": "field-phrasing-3",
+      "text": "got serial F100002 on the truck radio, whose job is this",
+      "claimants": [
+        "deterministic",
+        "fastPath"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "i079",
+      "category": "field-phrasing-3",
+      "text": "serial 2C100027 - who's the customer",
+      "claimants": [
+        "deterministic",
+        "fastPath"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "i080",
+      "category": "field-phrasing-3",
+      "text": "dispatch says serial M100033, whose account is that",
+      "claimants": [
+        "deterministic",
+        "fastPath"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "i081",
+      "category": "field-phrasing-3",
+      "text": "whose unit is serial D100032",
+      "claimants": [
+        "deterministic",
+        "fastPath"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "i082",
+      "category": "field-phrasing-3",
+      "text": "trying to match serial 2R100030 to an account",
+      "claimants": [
+        "deterministic",
+        "fastPath"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
       "id": "i088",
       "category": "field-phrasing-3",
       "text": "who's the last one we sent to 1284 S Alma School Rd",
@@ -6475,6 +6630,94 @@
       ],
       "winner": "fastPath",
       "reason": "ask.js: `!meta && isFastPathEnabled() ? classifyFastPath(question) : null` — gated ONLY on meta + the ASK_FAST_PATH flag. THE HEADLINE GAP (r16_d1_pipeline.json D1): fastPath is never gated against contactLookup/docLookup/contentCount/decompose at computation time, yet TRIES (0.5) before contactLookup (0.6) and docLookup (0.62) — so on any double-claim with either, fastPath wins by trial-order accident, regardless of which classifier's own doc comment claims priority for that shape (contactLookup.js/docLookup.js both say their family 'takes priority')."
+    },
+    {
+      "id": "j106",
+      "category": "field-phrasing-4",
+      "text": "what's the total on purchase order PO-9026, the one for Rebecca Montoya",
+      "claimants": [
+        "deterministic",
+        "fastPath"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "j107",
+      "category": "field-phrasing-4",
+      "text": "what's the total on purchase order PO-9015, the one for Daniel Keller",
+      "claimants": [
+        "deterministic",
+        "fastPath"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "j108",
+      "category": "field-phrasing-4",
+      "text": "what's the total on purchase order PO-9087, the one for Richard Pruitt",
+      "claimants": [
+        "deterministic",
+        "fastPath"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "j109",
+      "category": "field-phrasing-4",
+      "text": "what's the total on purchase order PO-9059, the one for Robert Thornton",
+      "claimants": [
+        "deterministic",
+        "fastPath"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "j110",
+      "category": "field-phrasing-4",
+      "text": "what's the total on purchase order PO-9054, the one for Amy Jarvis",
+      "claimants": [
+        "deterministic",
+        "fastPath"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "j111",
+      "category": "field-phrasing-4",
+      "text": "what's the total on purchase order PO-9098, the one for Amanda Redwine",
+      "claimants": [
+        "deterministic",
+        "fastPath"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "j112",
+      "category": "field-phrasing-4",
+      "text": "what's the total on purchase order PO-9010, the one for Karen Abernathy",
+      "claimants": [
+        "deterministic",
+        "fastPath"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "j113",
+      "category": "field-phrasing-4",
+      "text": "what's the total on purchase order PO-9043, the one for George Garrison",
+      "claimants": [
+        "deterministic",
+        "fastPath"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
     },
     {
       "id": "j125",

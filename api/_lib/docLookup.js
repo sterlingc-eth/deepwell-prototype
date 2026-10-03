@@ -20,6 +20,7 @@
  * parseDocLookupQuestion's own doc comment for the "must not hijack an
  * analytics/retrieval question" guards this shares with contactLookup.js.
  */
+import { localYmdIn } from "./util/localDate.js";
 import { correctTriggerWordTypos, normalizeQuestion } from "./nlNormalize.js";
 import { ENTITY_SYNONYMS, STREET_ADDRESS_RE, KNOWN_AZ_CITY_NAMES, KNOWN_US_CITY_NAMES } from "./analytics.js";
 import { docTypeFromWord, docTypeSynonymAlternation, documentTypeLabel, DOCTYPE_TRIGGER_WORDS } from "./documentTypes.js";
@@ -474,7 +475,8 @@ export async function customerDocumentIds(db, row) {
 }
 
 function formatDateLabel(rawDate) {
-  const s = String(rawDate ?? "").trim();
+  // The pg driver returns timestamptz columns (created_at) as Date objects; String(Date) printed "Mon Aug 31 2026 17:00:00 GMT-0700 (...)" in answers.
+  const s = rawDate instanceof Date && !Number.isNaN(rawDate.getTime()) ? localYmdIn(rawDate) : String(rawDate ?? "").trim();
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
   if (!m) return s || "an unknown date";
   const MONTH_LABELS = [

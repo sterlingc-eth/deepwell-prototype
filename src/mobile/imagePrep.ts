@@ -74,9 +74,12 @@ export async function preparePhoto(file: Blob): Promise<PreparedPage | null> {
   return blob ? { blob, width, height } : null
 }
 
+/** Warm the jsPDF chunk (idle, online) so a multi-page scan taken later with no signal can still combine. */
+export const prefetchPdfLib = () => import('jspdf')
+
 /** Several prepared photos -> one PDF, one page per photo, each page sized to its photo. */
 export async function combineToPdf(pages: PreparedPage[]): Promise<Blob> {
-  const { jsPDF } = await import('jspdf')
+  const { jsPDF } = await prefetchPdfLib()
   // Points at 150 dpi-equivalent keeps the page dimensions sane for any viewer.
   const toPt = (px: number) => (px * 72) / 150
   const first = pages[0]

@@ -78,7 +78,7 @@ const overflow = (page) => page.evaluate(() => document.documentElement.scrollWi
   ok((await opacityOf(page, '[data-n=c2]')) > 0.9, 't=3.6: all three notification cards in');
   await seek(page, 5.5);
   const typed = await page.evaluate(() => document.querySelector('#how-it-works [data-n=txt]').textContent);
-  ok(typed.length > 3 && 'smith warranty'.startsWith(typed), `t=5.5: question typing itself ("${typed}")`);
+  ok(typed.length > 3 && 'smith contract'.startsWith(typed), `t=5.5: question typing itself ("${typed}")`);
   await seek(page, 8.0);
   ok((await opacityOf(page, '.hiw-ans')) > 0.95 && (await opacityOf(page, '[data-n=chip]')) > 0.95, 't=8.0: cited answer card + source chip visible');
   await seek(page, 10.4);

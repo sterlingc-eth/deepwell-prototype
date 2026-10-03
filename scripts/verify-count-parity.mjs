@@ -239,7 +239,8 @@ const dbCall = (fn) => withTenant(ctx, fn);
   const mAnswer = await dbCall((db) => runDeterministic(db, mIntent, { today: TODAY }));
   check('maintenance due :: Dan Delta (last PM 2024-06-01, default 12-month cadence) is overdue', /dan delta/i.test(mAnswer?.text ?? ''), mAnswer?.text);
   check('maintenance due :: Ann Alpha (serviced recently, well within cadence) is NOT listed as overdue', !/ann alpha/i.test(mAnswer?.text ?? ''), mAnswer?.text);
-  check('maintenance due :: states the cadence rule in the answer, not agreement coverage text', /cadence/i.test(mAnswer?.text ?? ''), mAnswer?.text);
+  // R35 brevity (owner decision 2026-10-01): the rule sentence moved to the citation basis; the answer leads with the count and names.
+  check('maintenance due :: answer leads with the count and names (rule lives in the citation basis, R35)', /^\d+ of \d+ customers with a service visit on file are overdue/i.test(mAnswer?.text ?? '') && !/agreement coverage/i.test(mAnswer?.text ?? ''), mAnswer?.text);
 }
 
 /* ================================================================== item 7: a single property answers directly */

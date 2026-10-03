@@ -68,6 +68,15 @@ export function resetPackForTenantCacheForTests() {
   tenantIndustryCache.clear();
 }
 
+/** Drops one tenant's cached industry (both call shapes) so a settings change
+ *  is seen immediately instead of after the 10-minute TTL. Additive; unused by
+ *  existing callers. */
+export function invalidateTenantIndustryCache(tenantId) {
+  if (tenantId == null) return;
+  tenantIndustryCache.delete(`db:${tenantId}`);
+  tenantIndustryCache.delete(`ctx:${tenantId}`);
+}
+
 /** True for anything that already looks like an open, tenant-scoped store
  *  (recordsStore.js's makeStore() result, or a bare {raw|query} client) —
  *  i.e. something packForTenant can query directly, with no transaction of

@@ -70,7 +70,8 @@ await setActiveDatabase(lite);
 
 const exportData = JSON.parse(fs.readFileSync(path.join(ROOT, "scripts/golden/golden-export.json"), "utf8"));
 const exam = await loadFullExam(exportData.tenantKey ?? null);
-const today = new Date().toISOString().slice(0, 10);
+// Pinned like every other exam script: the frozen oracles are dated against 2026-09-25 (override with EXAM_TODAY); the real clock made this drift.
+const today = process.env.EXAM_TODAY && /^\d{4}-\d{2}-\d{2}$/.test(process.env.EXAM_TODAY) ? process.env.EXAM_TODAY : "2026-09-25";
 const { ctx } = await loadExportIntoNewTenant(lite, exportData, { tenantKey: "offline-coverage-r24", tenantName: "Coverage R24 Verify" });
 
 const { overall, perQuestion } = await runOfflineExam({ ctx, questions: exam.questions, today, modelCounter });

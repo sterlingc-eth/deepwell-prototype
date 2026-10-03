@@ -89,7 +89,7 @@ export const DocsTab = memo(function DocsTab({
 
   // A transition: the sheet's render is time-sliced instead of landing in the tap's own task.
   const openSheet = () => startTransition(() => { setDraft(b.filters); setSheetOpen(true) })
-  const applySheet = () => { b.patchFilters(draft); setSheetOpen(false) }
+  const applySheet = () => { b.setFilters(draft); setSheetOpen(false) }
 
   const refresh = async () => {
     setRefreshing(true)

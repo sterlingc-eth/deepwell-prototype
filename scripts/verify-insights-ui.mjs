@@ -69,13 +69,15 @@ try {
     check(`${label}: card mounted`, (await page.locator('#insights-heading').count()) > 0);
 
     if (state !== 'empty') {
-      const rows = page.locator('#insights-heading + div ul > li');
+      const rows = page.locator('#insights-heading + div > ul > li');
       const rowCount = await rows.count();
       check(`${label}: shows at most 5 rows (7 fixtures supplied)`, rowCount === 5, `got ${rowCount}`);
 
       // Expand the first row and confirm its items + source-count chip render, and both action
       // kinds ('ask:' and the literal 'inbox' token) actually fire their callback.
-      await rows.first().locator('button').first().click();
+      // R36: the top insight now opens by itself; only click it when it is not already expanded (a click would close it).
+      const firstBtn = rows.first().locator('button').first();
+      if ((await firstBtn.getAttribute('aria-expanded')) !== 'true') await firstBtn.click();
       await page.waitForTimeout(150);
       check(`${label}: expanding a row reveals its action button`, (await page.getByRole('button', { name: /Ask about registration deadlines/ }).count()) > 0);
       await page.getByRole('button', { name: /Ask about registration deadlines/ }).click();

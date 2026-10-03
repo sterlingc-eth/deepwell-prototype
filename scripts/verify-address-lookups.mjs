@@ -119,7 +119,9 @@ function mockEntityDb(rows) {
   // never a guess at a different apartment's data.
   const rows = [101, 102].map((n) => ({ id: `eq-${n}`, entity_type: 'equipment', service_address: `3300 S Alma School Rd, Apt ${n}, Mesa, AZ 85201` }));
   const resolution = await resolveFastPathSubject(mockEntityDb(rows), { address: '3300 S Alma School Rd, Apt 999, Mesa, AZ 85201' });
-  eq('resolveFastPathSubject :: unnamed unit on file -> no-unit (never falls back to another unit)', resolution.kind, 'no-unit');
+  // R34 (addressConflict.js): a typed unit that contradicts every stored address drops those rows, so the honest result is 'no-address' (nothing on file
+  // at that address); the invariant is unchanged - it never falls back to another unit.
+  check('resolveFastPathSubject :: unnamed unit on file -> no-unit / no-address (never falls back to another unit)', ['no-unit', 'no-address'].includes(resolution.kind) && !resolution.equipment && !resolution.customer, JSON.stringify(resolution));
 }
 {
   // Multiple units, question does NOT name a specific one -> ambiguous, never

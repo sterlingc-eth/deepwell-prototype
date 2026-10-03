@@ -373,7 +373,9 @@ check(`namingBackfillStatus: reports enabled + remaining=${STUCK_REMAINING} (its
 
 /* ================================================================== 7. WITHOUT migration 41 */
 {
-  const withoutMigrations = allMigrations.filter((f) => !f.startsWith('41-'));
+  // 64-records-search-indexes.sql declares in its own header that it needs 41 (documents.display_name) - it cannot run without 41 by design, so the
+  // control instance skips both; every OTHER migration must still apply cleanly without 41.
+  const withoutMigrations = allMigrations.filter((f) => !f.startsWith('41-') && !f.startsWith('64-'));
   const { lite: lite2, notes: notes2 } = await buildLite(withoutMigrations);
   // `notes` (the harness's own pre-existing quirks — pgvector unavailable in PGlite, etc., same
   // ones the full run above already tolerated) may reappear here; what matters is that skipping
