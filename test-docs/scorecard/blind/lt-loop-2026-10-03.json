@@ -1,0 +1,630 @@
+{
+ "version": "lt-loop-2026-10-03",
+ "questions": [
+  {
+   "id": "ltl-partial-001",
+   "section": "partial",
+   "text": "how much is the Sunrise Valley Elementary invoice",
+   "expect": {
+    "digits": [
+     "108000"
+    ],
+    "none": [
+     "572,212"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-partial-002",
+   "section": "partial",
+   "text": "Sunrise Valley invoice amount",
+   "expect": {
+    "digits": [
+     "108000"
+    ],
+    "none": [
+     "572,212"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-partial-003",
+   "section": "partial",
+   "text": "what's the Copper Sky bill",
+   "expect": {
+    "digits": [
+     "84000"
+    ],
+    "none": [
+     "572,212"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-partial-004",
+   "section": "partial",
+   "text": "Holy Trinity invoice amount",
+   "expect": {
+    "digits": [
+     "96000"
+    ],
+    "none": [
+     "572,212"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-partial-005",
+   "section": "partial",
+   "text": "what is the invoice total for Holy Trinity",
+   "expect": {
+    "digits": [
+     "96000"
+    ],
+    "none": [
+     "572,212"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-partial-006",
+   "section": "partial",
+   "text": "how much did we invoice Cactus Rose",
+   "expect": {
+    "digits": [
+     "84000"
+    ],
+    "none": [
+     "572,212"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-partial-007",
+   "section": "partial",
+   "text": "what is the invoice total for Grace Community",
+   "expect": {
+    "digits": [
+     "96000"
+    ],
+    "none": [
+     "572,212"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-partial-008",
+   "section": "partial",
+   "text": "what's the Grace Community bill",
+   "expect": {
+    "digits": [
+     "96000"
+    ],
+    "none": [
+     "572,212"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-partial-009",
+   "section": "partial",
+   "text": "how much is the Canyon View invoice",
+   "expect": {
+    "digits": [
+     "84000"
+    ],
+    "none": [
+     "572,212"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-partial-010",
+   "section": "partial",
+   "text": "what's the Mesquite Table bill",
+   "expect": {
+    "digits": [
+     "84000"
+    ],
+    "none": [
+     "572,212"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-partial-011",
+   "section": "partial",
+   "text": "how much did we invoice Mesquite Table",
+   "expect": {
+    "digits": [
+     "84000"
+    ],
+    "none": [
+     "572,212"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-partial-012",
+   "section": "partial",
+   "text": "Sonoran Grill invoice amount",
+   "expect": {
+    "digits": [
+     "84000"
+    ],
+    "none": [
+     "572,212"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-modifier-013",
+   "section": "modifier",
+   "text": "how much is the Copper Sky Dental invoice",
+   "expect": {
+    "digits": [
+     "84000"
+    ],
+    "none": [
+     "572,212"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-modifier-014",
+   "section": "modifier",
+   "text": "Holy Trinity Church invoice total",
+   "expect": {
+    "digits": [
+     "96000"
+    ],
+    "none": [
+     "572,212"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-modifier-015",
+   "section": "modifier",
+   "text": "how much is the David Prentiss invoice",
+   "expect": {
+    "digits": [
+     "348500"
+    ],
+    "none": [
+     "572,212"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-modifier-016",
+   "section": "modifier",
+   "text": "Sandra Wyckoff invoice amount",
+   "expect": {
+    "digits": [
+     "362200"
+    ],
+    "none": [
+     "572,212"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-modifier-017",
+   "section": "modifier",
+   "text": "what's the Steven Ellison bill",
+   "expect": {
+    "digits": [
+     "375900"
+    ],
+    "none": [
+     "572,212"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-modifier-018",
+   "section": "modifier",
+   "text": "how much is the Laura Lombardi invoice total",
+   "expect": {
+    "digits": [
+     "389600"
+    ],
+    "none": [
+     "572,212"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-modifier-019",
+   "section": "modifier",
+   "text": "how much is the Robert Salazar invoice",
+   "expect": {
+    "digits": [
+     "403300"
+    ],
+    "none": [
+     "572,212"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-modifier-020",
+   "section": "modifier",
+   "text": "Karen Abernathy invoice amount",
+   "expect": {
+    "digits": [
+     "417000"
+    ],
+    "none": [
+     "572,212"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-modifier-021",
+   "section": "modifier",
+   "text": "what's the Donald Sorenson bill",
+   "expect": {
+    "digits": [
+     "430700"
+    ],
+    "none": [
+     "572,212"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-modifier-022",
+   "section": "modifier",
+   "text": "how much is the Deborah Ortega invoice total",
+   "expect": {
+    "digits": [
+     "444400"
+    ],
+    "none": [
+     "572,212"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-agree-023",
+   "section": "agree",
+   "text": "which maintenance agreements expire in 2026",
+   "expect": {
+    "all": [
+     [
+      "19 maintenance agreement"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-agree-024",
+   "section": "agree",
+   "text": "how many maintenance agreements expire in 2026",
+   "expect": {
+    "all": [
+     [
+      "19 maintenance agreement"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-agree-025",
+   "section": "agree",
+   "text": "how many maintenance agreements run through 2027",
+   "expect": {
+    "all": [
+     [
+      "8 maintenance agreement"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-agree-026",
+   "section": "agree",
+   "text": "which maintenance agreements end in 2027",
+   "expect": {
+    "all": [
+     [
+      "8 maintenance agreement"
+     ],
+     [
+      "Copper Sky Dental"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-agree-027",
+   "section": "agree",
+   "text": "list the maintenance agreements expiring in 2027",
+   "expect": {
+    "all": [
+     [
+      "8 maintenance agreement"
+     ],
+     [
+      "Holy Trinity Church"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-agree-028",
+   "section": "agree",
+   "text": "how many maintenance agreements are ending in 2026",
+   "expect": {
+    "all": [
+     [
+      "19 maintenance agreement"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-agree-029",
+   "section": "agree",
+   "text": "do any maintenance agreements expire in 2027",
+   "expect": {
+    "all": [
+     [
+      "8 maintenance agreement"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-agree-030",
+   "section": "agree",
+   "text": "how many maintenance agreements run through the end of 2026",
+   "expect": {
+    "all": [
+     [
+      "27 maintenance agreement"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-agree-031",
+   "section": "agree",
+   "text": "how many maintenance agreements expire before 2027",
+   "expect": {
+    "all": [
+     [
+      "19 maintenance agreement"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-agree-032",
+   "section": "agree",
+   "text": "how many maintenance agreements expire by 2027",
+   "expect": {
+    "all": [
+     [
+      "27 maintenance agreement"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-agree-033",
+   "section": "agree",
+   "text": "how many maintenance agreements end after 2026",
+   "expect": {
+    "all": [
+     [
+      "8 maintenance agreement"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-agree-034",
+   "section": "agree",
+   "text": "which maintenance agreements expire in 2025",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "future date"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-agree-035",
+   "section": "agree",
+   "text": "how many maintenance agreements expire in 2025",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "future date"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-agree-036",
+   "section": "agree",
+   "text": "which maintenance agreements end in 2028",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "future date"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-agree-037",
+   "section": "agree",
+   "text": "how many maintenance agreements run through 2029",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "future date"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-agree-038",
+   "section": "agree",
+   "text": "how many service agreements expire in 2026",
+   "expect": {
+    "all": [
+     [
+      "19 maintenance agreement"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-agree-039",
+   "section": "agree",
+   "text": "which maintenance agreements are valid through 2027",
+   "expect": {
+    "all": [
+     [
+      "8 maintenance agreement"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-agree-040",
+   "section": "agree",
+   "text": "maintenance agreements expiring in 2026",
+   "expect": {
+    "all": [
+     [
+      "19 maintenance agreement"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-agree-041",
+   "section": "agree",
+   "text": "how many agreements expire in 2027",
+   "expect": {
+    "all": [
+     [
+      "8 maintenance agreement"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-agree-042",
+   "section": "agree",
+   "text": "show me maintenance agreements that expire in 2027",
+   "expect": {
+    "all": [
+     [
+      "8 maintenance agreement"
+     ],
+     [
+      "Cactus Rose Restaurant"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-agree-043",
+   "section": "agree",
+   "text": "which maintenance agreements end in 2026",
+   "expect": {
+    "all": [
+     [
+      "Ronald Bracken"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-agree-044",
+   "section": "agree",
+   "text": "how many maintenance agreements end in 2027",
+   "expect": {
+    "all": [
+     [
+      "8 maintenance agreement"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-agree-045",
+   "section": "agree",
+   "text": "which maintenance agreements run until 2027",
+   "expect": {
+    "all": [
+     [
+      "8 maintenance agreement"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "ltl-agree-046",
+   "section": "agree",
+   "text": "how many maintenance agreements are good through 2027",
+   "expect": {
+    "all": [
+     [
+      "8 maintenance agreement"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  }
+ ]
+}

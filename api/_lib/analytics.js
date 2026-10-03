@@ -1384,7 +1384,7 @@ const FUTURE_YEAR_TOKEN_RE = /\b(19\d{2}|20\d{2}|21\d{2})\b/g;
 // R34: a FORWARD-LOOKING record field is legitimately dated in the future - "which warranties expire in 2027" is answerable from the
 // warranty end dates on file, not "a future date, nothing on file". Only a question about a past EVENT (filed/issued/logged/did) in a future
 // year is declined here.
-const FORWARD_RECORD_FIELD_RE = /\b(?:expir\w*|renew\w*|ends?|ending|due|schedul\w*|upcoming|coverage|covered|valid\s+(?:through|until)|good\s+(?:through|until))\b/i;
+const FORWARD_RECORD_FIELD_RE = /\b(?:expir\w*|renew\w*|ends?|ending|due|schedul\w*|upcoming|coverage|covered|valid\s+(?:through|until)|good\s+(?:through|until)|runs?\s+(?:through|thru|until|till|to)|agreements?|contracts?|terms?)\b/i;
 export function mentionsFutureYear(question, today) {
   const q = String(question ?? '');
   if (FORWARD_RECORD_FIELD_RE.test(q)) return false;

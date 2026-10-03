@@ -117,6 +117,7 @@ import { parseCustomerCount, runCustomerCount } from "./_lib/lookups/namedCompar
 import { buildClarifyAnswer, clarifyEnabled, ADDRESS_RE } from "./_lib/lookups/clarify.js";
 import { answerAddressConflict, softConflictNote } from "./_lib/addressConflict.js";
 import { capInlineNameList } from "./_lib/router/brevity.js";
+import { resolvePartialNameInQuestion, buildPartialNameClarify } from "./_lib/vocab/partialNames.js";
 import { classifySafety, buildSafetyAnswer, unverifiedTypeNote, normalizeInputText, neutralizeMarkup } from "./_lib/router/safetyGate.js";
 import { classifyEarlyDecline, buildEarlyDeclineAnswer, earlyDeclineEnabled, triggerMatchesCustomerName } from "./_lib/router/earlyDecline.js";
 // Round 20 (J1): the general precision guard (THE #1 PROBLEM — false confidence, r19_blind3_clusters.json's
@@ -1001,6 +1002,17 @@ export default async function handler(req, res) {
         if (nick) { question = nick.question; techTypoNote = nick.note; }
       } catch (err) {
         console.error("Nickname resolution failed, using original question:", err?.message);
+      }
+    }
+
+    // A partial organization name ("Sunrise Valley Elementary") resolves to the one customer it can mean, or asks which (vocab/partialNames.js).
+    if (!meta && tenantVocab && !techTypoNote) {
+      try {
+        const part = resolvePartialNameInQuestion(question, tenantVocab);
+        if (part?.ambiguous) return send(200, { success: true, data: attachCitations(buildPartialNameClarify(part.ambiguous), { records: [], total: 0, kind: "searched", basis: "Matched the name you typed to more than one customer; none is picked." }) });
+        if (part) { question = part.question; if (part.note) techTypoNote = part.note; }
+      } catch (err) {
+        console.error("Partial name resolution failed, using original question:", err?.message);
       }
     }
 

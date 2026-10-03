@@ -43,6 +43,7 @@ import { parseCompoundQuestion } from './lookups/compound.js';
 import { parseAggregate, runAggregate } from './lookups/aggregates.js';
 import { parseSerialQuestion, runSerialLookup } from './lookups/serialLookup.js';
 import { parseDocNumberQuestion, runDocNumberLookup } from './lookups/docNumberLookup.js';
+import { parseAgreementEndQuestion, runAgreementEnd } from './lookups/agreementEnd.js';
 import { parseFalsePremise, runFalsePremise } from './lookups/falsePremise.js';
 
 // R32 (loop 3/4): "have we been out to <addr> in the last 90 days" / "any service calls at <addr> last year" / "did we do any work at <addr> this year".
@@ -122,6 +123,9 @@ export function classifyDeterministic(question, opts = {}) {
   const docNo = process.env.DONOVAN_DOCNUMBER === '0' || serial?.anchored ? null : parseDocNumberQuestion(String(question ?? ''));
   if (docNo) return { route: 'docnumber', intent: docNo };
   if (serial) return { route: 'serial', intent: serial };
+  // Agreement end dates are a document field ("expire in 2026", "run through 2027") - lookups/agreementEnd.js.
+  const agEnd = parseAgreementEndQuestion(String(question ?? ''));
+  if (agEnd) return { route: 'agreementend', intent: agEnd };
 
   // R35 loop 3: "why did X replace the compressor at <address>" with no such work on file -> honest "no compressor work on file".
   const premise = parseFalsePremise(String(question ?? ''));
@@ -537,6 +541,7 @@ async function runDeterministicCore(db, intent, { today } = {}) {
   const t = todayIso(today);
   if (intent.route === 'serial') return runSerialLookup(db, intent.intent, { today: t });
   if (intent.route === 'docnumber') return runDocNumberLookup(db, intent.intent);
+  if (intent.route === 'agreementend') return runAgreementEnd(db, intent.intent);
   if (intent.route === 'premise') return runFalsePremise(db, intent.intent);
   if (intent.route === 'aggregate') return runAggregate(db, intent.intent, { today: t });
   if (intent.route === 'comparison') return runComparison(db, intent.intent);
