@@ -24,7 +24,8 @@
 // A money-document noun ("invoice", "quote", "PO", "bill", "agreement", ...). Stems, not
 // literal words, so invoice/invoiced/invoicing, bill/billed/billing/bills, quote/quoted/
 // quotes/quoting all match.
-const FIN_NOUN_RE = /\b(?:invoic\w*|quote[sd]?|quoting|estimat\w*|proposal\w*|purchase\s*orders?|\bpos\b|receipts?|agreements?|bill(?:s|ed|ing)?)\b/i;
+import { isPoMoneyQuestion } from '../lookups/vendorPo.js';
+const FIN_NOUN_RE = /\b(?:invoic\w*|quote[sd]?|quoting|estimat\w*|proposal\w*|purchase\s*orders?|\bpos?\b|receipts?|agreements?|bill(?:s|ed|ing)?)\b/i;
 
 // A payment/status word that only makes sense next to money.
 const FIN_STATUS_RE = /\b(?:overdue|past[\s-]?due|unpaid|outstanding|delinquent|paid|partial(?:ly)?|open|owe[sd]?|owing|owed|uncollected|collected|verify|verified|unverified)\b/i;
@@ -82,6 +83,7 @@ const FIN_COUNT_OR_AVG_RE = /\b(?:how many|how much|average|avg|total\s+(?:value
 export function isFinancialQuestion(question) {
   const q = String(question ?? '').toLowerCase();
   if (!q.trim()) return false;
+  if (isPoMoneyQuestion(q)) return true; // "PO total for Watsco" — purchase-order money question, any phrasing
   if (FIN_MONEY_WORD_RE.test(q)) return true;
   // R32: "did we invoice more in 2019 than 2023" / "did we bring in less this year than last" — a two-year invoiced-revenue comparison with no other money word.
   if (/\bthan\b/.test(q) && /\b(?:more|less|higher|lower|fewer|bigger|greater|smaller)\b/.test(q) && /\b(?:invoic\w*|bring(?:ing)?\s+in|brought\s+in|billed)\b/.test(q) && (q.match(/\bthis\s+year\b|\blast\s+year\b|\b(?:19|20)\d{2}\b/g) ?? []).length >= 2) return true;

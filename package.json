@@ -31,6 +31,7 @@
     "verify:packs-resolver": "node scripts/verify-packs-resolver.mjs",
     "verify:lt-donovan": "node scripts/verify-lt-donovan.mjs",
     "verify:lt-loop": "node scripts/verify-lt-loop.mjs",
+    "verify:lt-loop2": "node scripts/verify-lt-loop2.mjs",
     "verify:insights": "node scripts/verify-insights.mjs",
     "verify:hardening": "node scripts/verify-hardening.mjs",
     "verify:auth": "node scripts/verify-auth.mjs",

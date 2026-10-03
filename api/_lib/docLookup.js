@@ -26,6 +26,8 @@ import { ENTITY_SYNONYMS, STREET_ADDRESS_RE, KNOWN_AZ_CITY_NAMES, KNOWN_US_CITY_
 import { docTypeFromWord, docTypeSynonymAlternation, documentTypeLabel, DOCTYPE_TRIGGER_WORDS } from "./documentTypes.js";
 import { mergeDocumentVia } from "./routes/customers.js";
 // TEAM C (citations everywhere): every branch below states what it searched / read.
+import { isPoMoneyQuestion } from "./lookups/vendorPo.js";
+import { answerInternalMemos } from "./lookups/internalMemos.js";
 import { attachCitations, customerRecord, documentRecord } from "./citations/records.js";
 import { documentRecordsFor } from "./citations/enrich.js";
 import { withTypoNote } from "./lookups/typoResolve.js";
@@ -386,6 +388,7 @@ export function parseDocLookupQuestion(question, opts = {}) {
   // whether ask.js's docLookupIntent gate is truthy at all; if this pure/sync function doesn't
   // recognize the shape, runDocLookup (and its own `parsed.internalMemo` branch) never runs.
   if (isInternalMemoQuestion(raw)) return { internalMemo: true };
+  if (isPoMoneyQuestion(raw.toLowerCase())) return null; // PO spend/total (optionally per vendor) belongs to the finance handler, not a doc-listing lookup
 
   // R16 F3: a compound question ("model and serial", "name and phone", "under
   // warranty and whos the tech") never names a document TYPE at all, so it
@@ -513,6 +516,8 @@ async function runDocLookupCore(db, question, opts = {}) {
   // never touches `db` by design — so the actual decline is built here, in the async
   // orchestration, exactly like the `compound` dispatch right below handles its own shape.
   if (parsed.internalMemo) {
+    const memoAns = await answerInternalMemos(db, question);
+    if (memoAns) return memoAns;
     const n = await countInternalDocuments(db);
     if (n === 0) {
       return attachCitations(

@@ -20,6 +20,7 @@
  *
  * parseMoneyIntent is pure (unit-tested with no DB). runMoneyIntent touches `db`.
  */
+import { isPoMoneyQuestion, matchVendor, vendorPoEnabled } from '../lookups/vendorPo.js';
 import { resolveCalendarSpan } from '../timeSpans.js';
 import { formatMoney } from '../fastPath.js';
 import { resolveContactCandidates, resolveAddressCandidates } from '../contactLookup.js';
@@ -230,7 +231,7 @@ const RE = {
   avg: /\baverage\s+(?:ticket|invoice|job|sale|bill|repair|quote|estimate|proposal)\b|\bavg\s+(?:ticket|invoice)\b/i,
   last: /\b(?:last|latest|most recent|newest|previous)\s+(?:invoice|bill|job|ticket|charge|one|visit|service|repair|install(?:ation)?)\b/i,
   totalInvoiced: /\b(?:how much|total|revenue|sales|invoiced|billed|billing|income|earn(?:ed)?|brought in|made)\b/i,
-  po: /\bpurchase orders?\b|\bpos\b/i,
+  po: /\bpurchase orders?\b|\bpos?\b/i,
 };
 
 /*
@@ -422,6 +423,7 @@ export function parseMoneyIntent(question, { today }) {
   // question was silently mis-answered as vendor-BILL spend (spendTotal only ever looks at
   // doc_kind='invoice', never 'po', so it either undercounted or found nothing). Purchase-order
   // phrasing always means po_total, "spent" or not.
+  if (isPoMoneyQuestion(q)) return mk('po_total', { subject: null });
   if (RE.spend.test(q) && !/\b(?:invoice|billed|bill) (?:we|to)\b/.test(q) && !RE.po.test(q)) return mk('spend_total', { subject });
   if (RE.po.test(q) && RE.totalInvoiced.test(q)) return mk('po_total', { subject: null });
   if (QUOTES_TOTAL_RE.test(q)) return mk('quotes_total', { subject: null });
@@ -1101,16 +1103,22 @@ async function spendTotal(db, intent, ctx) {
 async function poTotal(db, intent, ctx) {
   const p = intent.period;
   const inRange = `(($2::date IS NULL AND $3::date IS NULL) OR (f.doc_date >= COALESCE($2::date, '0001-01-01') AND f.doc_date <= COALESCE($3::date, '9999-12-31')))`;
+  let vendor = null;
+  if (vendorPoEnabled()) {
+    const vr = await q(db, `SELECT DISTINCT f.vendor_name FROM financials f WHERE f.doc_kind = 'po' AND f.vendor_name IS NOT NULL`, [], ctx.hu);
+    vendor = matchVendor(intent.raw ?? '', vr.map((r) => r.vendor_name));
+  }
+  const vSql = ` AND ($4::text IS NULL OR f.vendor_name = $4::text)`;
   const [a] = await q(db,
     `SELECT count(*) FILTER (WHERE f.total IS NOT NULL)::int AS n, COALESCE(sum(f.total) FILTER (WHERE f.total IS NOT NULL), 0) AS amount,
             count(*) FILTER (WHERE f.total IS NULL)::int AS n_no_total
-       FROM financials f WHERE f.doc_kind = 'po' AND f.currency = 'USD' AND ${inRange}`, [p?.from ?? null, p?.to ?? null], ctx.hu);
-  const docs = await q(db, `SELECT f.* FROM financials f WHERE f.doc_kind = 'po' AND f.currency = 'USD' AND f.total IS NOT NULL AND ${inRange} ORDER BY f.doc_date DESC NULLS LAST LIMIT 200`, [p?.from ?? null, p?.to ?? null], ctx.hu);
-  if (!a || a.n === 0) return baseAnswer('No purchase orders with printed totals are on file yet.', [], { confidence: 1, ...zeroCite('Searched every purchase order on file; none have a printed total.') });
-  const text = `Purchase orders${p ? ` in ${p.label}` : ''} total ${fmt(a.amount)} across ${plural(a.n, 'purchase order')}.${exclusionText({ noTotal: a.n_no_total, noun: 'purchase order' })}`;
+       FROM financials f WHERE f.doc_kind = 'po' AND f.currency = 'USD' AND ${inRange}${vSql}`, [p?.from ?? null, p?.to ?? null, vendor], ctx.hu);
+  const docs = await q(db, `SELECT f.* FROM financials f WHERE f.doc_kind = 'po' AND f.currency = 'USD' AND f.total IS NOT NULL AND ${inRange}${vSql} ORDER BY f.doc_date DESC NULLS LAST LIMIT 200`, [p?.from ?? null, p?.to ?? null, vendor], ctx.hu);
+  if (!a || a.n === 0) return baseAnswer(`No purchase orders${vendor ? ` from ${vendor}` : ''} with printed totals are on file yet.`, [], { confidence: 1, ...zeroCite('Searched every purchase order on file; none have a printed total.') });
+  const text = `Purchase orders${vendor ? ` from ${vendor}` : ''}${p ? ` in ${p.label}` : ''} total ${fmt(a.amount)} across ${plural(a.n, 'purchase order')}.${exclusionText({ noTotal: a.n_no_total, noun: 'purchase order' })}`;
   return baseAnswer(text, [{ label: 'Purchase orders', value: fmt(a.amount), status: 'ok', sources: docs.slice(0, 40).map((d) => docSource(d.document_id, d.total_page)) }, ...docs.slice(0, 8).map((d) => invoiceFact(d))],
     { sources: docs.slice(0, 25).map((d) => docSource(d.document_id, d.total_page)), interpretation: 'purchase order total',
-      cite: { records: financeRecords(docs), total: a.n, claimedCount: a.n, basis: `Summed the printed totals of ${plural(a.n, 'purchase order')}${p ? ` dated ${p.label}` : ''}.` } });
+      cite: { records: financeRecords(docs), total: a.n, claimedCount: a.n, basis: `Summed the printed totals of ${plural(a.n, 'purchase order')}${vendor ? ` from ${vendor}` : ''}${p ? ` dated ${p.label}` : ''}.` } });
 }
 
 const INVOICE_SCOPE = `f.direction = 'receivable' AND f.doc_kind = 'invoice' AND f.currency = 'USD'`;

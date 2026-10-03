@@ -1,0 +1,446 @@
+{
+ "version": "lt-loop-2026-10-03b",
+ "questions": [
+  {
+   "id": "ltl2-memo-001",
+   "section": "memo",
+   "text": "how many internal memos do we have",
+   "expect": {
+    "digits": [
+     "20"
+    ]
+   },
+   "baseline": "unknown"
+  },
+  {
+   "id": "ltl2-memo-002",
+   "section": "memo",
+   "text": "how many internal memos are on file",
+   "expect": {
+    "digits": [
+     "20"
+    ]
+   },
+   "baseline": "unknown"
+  },
+  {
+   "id": "ltl2-memo-003",
+   "section": "memo",
+   "text": "do we have any internal memos",
+   "expect": {
+    "none": [
+     "no internal-only documents",
+     "no internal memos"
+    ],
+    "all": [
+     [
+      "20",
+      "memo"
+     ]
+    ]
+   },
+   "baseline": "unknown"
+  },
+  {
+   "id": "ltl2-memo-004",
+   "section": "memo",
+   "text": "any internal memos on file?",
+   "expect": {
+    "none": [
+     "no internal-only documents"
+    ],
+    "all": [
+     [
+      "memo"
+     ]
+    ]
+   },
+   "baseline": "unknown"
+  },
+  {
+   "id": "ltl2-memo-005",
+   "section": "memo",
+   "text": "what does the internal memo about Karen Abernathy say",
+   "expect": {
+    "all": [
+     [
+      "filter size"
+     ]
+    ],
+    "none": [
+     "no internal-only documents"
+    ]
+   },
+   "baseline": "unknown"
+  },
+  {
+   "id": "ltl2-memo-006",
+   "section": "memo",
+   "text": "internal memo for David Prentiss",
+   "expect": {
+    "all": [
+     [
+      "filter size"
+     ]
+    ],
+    "none": [
+     "no internal-only documents"
+    ]
+   },
+   "baseline": "unknown"
+  },
+  {
+   "id": "ltl2-memo-007",
+   "section": "memo",
+   "text": "show me the memo about Carol Rios",
+   "expect": {
+    "all": [
+     [
+      "filter size"
+     ]
+    ],
+    "none": [
+     "no internal-only documents"
+    ]
+   },
+   "baseline": "unknown"
+  },
+  {
+   "id": "ltl2-memo-008",
+   "section": "memo",
+   "text": "any memos for Brian Chavez",
+   "expect": {
+    "all": [
+     [
+      "filter size"
+     ]
+    ],
+    "none": [
+     "no internal-only documents"
+    ]
+   },
+   "baseline": "unknown"
+  },
+  {
+   "id": "ltl2-memo-009",
+   "section": "memo",
+   "text": "wat internal memos mention James Tovar",
+   "expect": {
+    "all": [
+     [
+      "filter size"
+     ]
+    ],
+    "none": [
+     "no internal-only documents"
+    ]
+   },
+   "baseline": "unknown"
+  },
+  {
+   "id": "ltl2-memo-010",
+   "section": "memo",
+   "text": "list the internal memos",
+   "expect": {
+    "none": [
+     "no internal-only documents",
+     "no internal memos"
+    ],
+    "all": [
+     [
+      "memo"
+     ]
+    ]
+   },
+   "baseline": "unknown"
+  },
+  {
+   "id": "ltl2-memo-011",
+   "section": "memo",
+   "text": "how many internal memos were dated 09/21/2026",
+   "expect": {
+    "digits": [
+     "3"
+    ],
+    "none": [
+     "no internal-only documents"
+    ]
+   },
+   "baseline": "unknown"
+  },
+  {
+   "id": "ltl2-memo-012",
+   "section": "memo",
+   "text": "count of memos to all techs",
+   "expect": {
+    "digits": [
+     "20"
+    ],
+    "none": [
+     "no internal-only documents"
+    ]
+   },
+   "baseline": "unknown"
+  },
+  {
+   "id": "ltl2-memo-013",
+   "section": "memo",
+   "text": "is there an internal memo about Patricia Esparza",
+   "expect": {
+    "all": [
+     [
+      "filter size"
+     ]
+    ],
+    "none": [
+     "no internal-only documents"
+    ]
+   },
+   "baseline": "unknown"
+  },
+  {
+   "id": "ltl2-memo-014",
+   "section": "memo",
+   "text": "internal memos about customers",
+   "expect": {
+    "none": [
+     "no internal-only documents"
+    ],
+    "all": [
+     [
+      "memo"
+     ]
+    ]
+   },
+   "baseline": "unknown"
+  },
+  {
+   "id": "ltl2-memo-015",
+   "section": "memo",
+   "text": "what do the internal memos say",
+   "expect": {
+    "none": [
+     "no internal-only documents"
+    ],
+    "all": [
+     [
+      "filter"
+     ]
+    ]
+   },
+   "baseline": "unknown"
+  },
+  {
+   "id": "ltl2-memo-016",
+   "section": "memo",
+   "text": "how many dispatch notes are on file",
+   "expect": {
+    "digits": [
+     "25"
+    ]
+   },
+   "baseline": "unknown"
+  },
+  {
+   "id": "ltl2-vendor-017",
+   "section": "vendor",
+   "text": "how much did we spend with Baker on POs",
+   "expect": {
+    "digits": [
+     "920"
+    ],
+    "none": [
+     "1,788"
+    ]
+   },
+   "baseline": "unknown"
+  },
+  {
+   "id": "ltl2-vendor-018",
+   "section": "vendor",
+   "text": "how much did we spend with Baker Distributing on purchase orders",
+   "expect": {
+    "digits": [
+     "920"
+    ],
+    "none": [
+     "1,788"
+    ]
+   },
+   "baseline": "unknown"
+  },
+  {
+   "id": "ltl2-vendor-019",
+   "section": "vendor",
+   "text": "total PO spend with Baker",
+   "expect": {
+    "digits": [
+     "920"
+    ],
+    "none": [
+     "1,788"
+    ]
+   },
+   "baseline": "unknown"
+  },
+  {
+   "id": "ltl2-vendor-020",
+   "section": "vendor",
+   "text": "what have we paid Baker on POs",
+   "expect": {
+    "digits": [
+     "920"
+    ],
+    "none": [
+     "1,788"
+    ]
+   },
+   "baseline": "unknown"
+  },
+  {
+   "id": "ltl2-vendor-021",
+   "section": "vendor",
+   "text": "how much did we spend with Watsco on POs",
+   "expect": {
+    "digits": [
+     "868"
+    ],
+    "none": [
+     "1,788"
+    ]
+   },
+   "baseline": "unknown"
+  },
+  {
+   "id": "ltl2-vendor-022",
+   "section": "vendor",
+   "text": "how much did we spend with Watsco Supply on purchase orders",
+   "expect": {
+    "digits": [
+     "868"
+    ],
+    "none": [
+     "1,788"
+    ]
+   },
+   "baseline": "unknown"
+  },
+  {
+   "id": "ltl2-vendor-023",
+   "section": "vendor",
+   "text": "PO total for Watsco",
+   "expect": {
+    "digits": [
+     "868"
+    ],
+    "none": [
+     "1,788"
+    ]
+   },
+   "baseline": "unknown"
+  },
+  {
+   "id": "ltl2-vendor-024",
+   "section": "vendor",
+   "text": "how many POs to Baker",
+   "expect": {
+    "digits": [
+     "10"
+    ],
+    "none": [
+     "1,788"
+    ]
+   },
+   "baseline": "unknown"
+  },
+  {
+   "id": "ltl2-vendor-025",
+   "section": "vendor",
+   "text": "how many purchase orders with Watsco",
+   "expect": {
+    "digits": [
+     "9"
+    ],
+    "none": [
+     "1,788"
+    ]
+   },
+   "baseline": "unknown"
+  },
+  {
+   "id": "ltl2-vendor-026",
+   "section": "vendor",
+   "text": "hw much did we spend wit baker on POs",
+   "expect": {
+    "digits": [
+     "920"
+    ],
+    "none": [
+     "1,788"
+    ]
+   },
+   "baseline": "unknown"
+  },
+  {
+   "id": "ltl2-vendor-027",
+   "section": "vendor",
+   "text": "spend with Baker Distributing on POs",
+   "expect": {
+    "digits": [
+     "920"
+    ],
+    "none": [
+     "1,788"
+    ]
+   },
+   "baseline": "unknown"
+  },
+  {
+   "id": "ltl2-vendor-028",
+   "section": "vendor",
+   "text": "Watsco PO spend",
+   "expect": {
+    "digits": [
+     "868"
+    ],
+    "none": [
+     "1,788"
+    ]
+   },
+   "baseline": "unknown"
+  },
+  {
+   "id": "ltl2-vendor-029",
+   "section": "vendor",
+   "text": "how much did we spend on POs in total",
+   "expect": {
+    "digits": [
+     "1788"
+    ]
+   },
+   "baseline": "unknown"
+  },
+  {
+   "id": "ltl2-vendor-030",
+   "section": "vendor",
+   "text": "how many purchase orders do we have",
+   "expect": {
+    "digits": [
+     "19"
+    ]
+   },
+   "baseline": "unknown"
+  },
+  {
+   "id": "ltl2-vendor-031",
+   "section": "vendor",
+   "text": "total purchase order spend",
+   "expect": {
+    "digits": [
+     "1788"
+    ]
+   },
+   "baseline": "unknown"
+  }
+ ]
+}

@@ -1290,6 +1290,8 @@ function restoreTypedNameTokens(parsed, rawQuestion) {
 
 /** R31: the classic regex shapes first (unchanged), then entity-first slot filling as the last resort. */
 export function parseContactLookupQuestion(question, opts = {}) {
+  // internal-memo questions ("any internal memos on file?") are not a contact-field lookup ("X on file") — docLookup owns them
+  if (process.env.DONOVAN_MEMO_AUDIENCE !== "0" && /\b(?:internal\s+memos?|memos?\s+on\s+file)\b/i.test(String(question ?? ""))) return null;
   // R31 loop 3: technician job counts first — the entity (a known technician's full name) is a far stronger signal
   // than the core shapes' "number of ... for NAME" = phone-number reading. Needs the tenant's technician names.
   try {

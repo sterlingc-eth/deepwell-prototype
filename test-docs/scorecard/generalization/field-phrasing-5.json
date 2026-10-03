@@ -1620,12 +1620,14 @@
       "text": "any memos for Carol Rios",
       "category": "field-phrasing-5",
       "shape": "team_scoped",
-      "cmp": "honest-zero",
+      "cmp": "number",
       "oracle": {
-        "sql": "SELECT (\n  (SELECT count(*) FROM documents WHERE audience = 'internal')\n  + (SELECT count(*) FROM extractions WHERE field_key = '_audience' AND value = 'internal')\n) AS n",
+        "sql": "SELECT count(DISTINCT document_id) AS n FROM document_pages WHERE text ~* 'internal memo' AND text ILIKE '%Carol Rios%'",
         "params": []
       },
-      "note": "no internal-audience document exists anywhere in this corpus"
+      "tolerance": 0,
+      "citationRequired": false,
+      "note": "2026-10-03 loop fix #5: a memo that names a customer is still an internal memo; the old honest-zero oracle encoded the false 'none on file'"
     },
     {
       "id": "k088",
