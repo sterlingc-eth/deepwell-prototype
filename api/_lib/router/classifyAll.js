@@ -49,7 +49,7 @@ import { isUnitRankingQuestion, isReasoningQuestion } from "../agent/intents.js"
 import { isInstallDateExtremeQuestion } from "../analytics/detPlan.js";
 import { normalizeQuestion as normalizeQuestionForAnalytics } from "../nlNormalize.js";
 import { stripConversationalFrame } from "./frame.js";
-import { rewriteQuestion } from "./rewrite.js";
+import { rewriteQuestion, rewriteRelWindow } from "./rewrite.js";
 import { detectAmbiguousSurname, clarifyEnabled } from "../lookups/clarify.js";
 import { isFutureRecordQuestion } from "./futureDate.js";
 import { performance } from "node:perf_hooks";
@@ -369,7 +369,9 @@ async function classifyAllInner(question, ctx = {}) {
   // deterministic stage claims it, because the rewrite only respells words the classifiers already know (mfr -> manufacturer, spoken
   // digits -> digits, "train unit" -> "trane unit"); an unchanged question never reaches this branch.
   if (process.env.DONOVAN_REWRITE !== "0") {
-    const rewritten = rewriteQuestion(stripped ?? question);
+    let rewritten = rewriteQuestion(stripped ?? question, ctx?.today);
+    // R3 relwindow: the frame stripper can eat a window word ("service calls today" -> "service calls"); try the window rewrite on the raw text too.
+    if (!rewritten && stripped) { const rw = rewriteRelWindow(question, ctx?.today); if (rw !== question) rewritten = rw; }
     if (rewritten) {
       const third = await classifyAllOnce(rewritten, ctx);
       const thirdName = third.winner?.name ?? null;

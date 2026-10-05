@@ -63,6 +63,33 @@ export function extractPoints(text) {
   return { points: found.map((f) => f.p), keys: found.map((f) => f.key), rest };
 }
 
+/**
+ * Pure. Pull ONE date window (a day / month / year, "A to B" range, or since/after/before/until + one point) out of lowercase question text.
+ * @returns {{from,to,label,open?,range?, rest:string}} (rest = the text with the date and its connector words removed) or null when there is no
+ * window, it is invalid/ambiguous, or it is shaped in a way we do not claim (two points without between/from, a keyword not next to its date).
+ */
+export function extractWindow(q) {
+  const ex = extractPoints(q);
+  if (!ex || ex.points.length < 1 || ex.points.length > 2) return null;
+  const [a, b] = ex.points;
+  const kws = q.match(/\b(?:since|after|before|until|till)\b/g) ?? [];
+  const strip = (t) => t.replace(/\b(?:between|from|since|after|before|until|till|through|thru|to|in|on|during|within|for|of|and)\b/g, " ").replace(/\s+/g, " ").trim();
+  const step = (d, n) => { const t = new Date(`${d}T00:00:00Z`); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
+  if (kws.length) {
+    if (b || kws.length !== 1 || /\b(?:between|from|to|through|thru)\b/.test(q)) return null;
+    const esc = ex.keys[0].replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const w = kws[0] === "till" ? "until" : kws[0];
+    if (!new RegExp(`\\b${kws[0]}\\s+(?:on\\s+|in\\s+)?${esc}`).test(q)) return null;
+    const [f, t] = w === "since" ? [a.from, "9999-12-31"] : w === "after" ? [step(a.to, 1), "9999-12-31"] : w === "before" ? ["0001-01-01", step(a.from, -1)] : ["0001-01-01", a.to];
+    return { from: f, to: t, label: `${w} ${a.label}`, open: true, rest: strip(ex.rest) };
+  }
+  if (b) {
+    if (!/\b(?:between\b.*\band\b|from\b.*\b(?:to|through|thru|until|till)\b)/.test(q) || b.from < a.from) return null;
+    return { from: a.from, to: b.to, label: `${a.label} through ${b.label}`, range: true, rest: strip(ex.rest) };
+  }
+  return { from: a.from, to: a.to, label: a.label, rest: strip(ex.rest) };
+}
+
 const SERVICE_RE = /\bservice\s+(?:visits?|calls?)\b/;
 const INSTALL_RE = /\b(?:(?:units?|systems?|equipment|pieces?\s+of\s+equipment|ac\s+units?|hvac\s+units?|furnaces?|heat\s+pumps?)\b.*\binstall(?:ed|s)?|install(?:ed|s)?\b.*\b(?:units?|systems?|equipment|pieces?\s+of\s+equipment))\b/;
 const INVOICE_RE = /\binvoices?\b/;

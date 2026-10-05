@@ -21,6 +21,7 @@
  * analytics/retrieval question" guards this shares with contactLookup.js.
  */
 import { localYmdIn } from "./util/localDate.js";
+import { extractWindow } from "./lookups/dateQualifiers.js";
 import { correctTriggerWordTypos, normalizeQuestion } from "./nlNormalize.js";
 import { ENTITY_SYNONYMS, STREET_ADDRESS_RE, KNOWN_AZ_CITY_NAMES, KNOWN_US_CITY_NAMES } from "./analytics.js";
 import { docTypeFromWord, docTypeSynonymAlternation, documentTypeLabel, DOCTYPE_TRIGGER_WORDS } from "./documentTypes.js";
@@ -383,6 +384,57 @@ function titleCase(s) {
  * "how many invoices this year", retrieval for "show me the invoice from
  * March" / "what's on the Mercer invoice").
  */
+
+// R3 nameyear loop: "invoices for Linda Fitzgerald in 2009" -> name "Linda Fitzgerald" + year 2009 (the year used to ride along inside the name).
+// Kill switch DONOVAN_NAME_YEAR=0. An address (digit-led) is never split.
+const NAME_YEAR_TAIL_RE = /^(.+?)\s+(?:in|during|for|from|of)\s+(?:the\s+)?(?:year\s+)?((?:19|20)\d\d)$/i;
+function splitNameYear(phrase) {
+  if (process.env.DONOVAN_NAME_YEAR === "0") return { name: phrase, year: null };
+  const m = NAME_YEAR_TAIL_RE.exec(String(phrase ?? "").trim());
+  if (!m || /^\d/.test(m[1])) return { name: phrase, year: null };
+  return { name: m[1].trim(), year: m[2] };
+}
+
+// R3 namewindow loop: any other trailing absolute date window after a name ("invoices for Linda Fitzgerald from 2009 to 2011", "... since 2009", "... before 2010",
+// "... in september 2010", "... 2009-2011", "... in Q3 2010") is split off the name and applied as a from/to range instead of riding along inside it.
+// Only absolute windows the shared date reader understands, and only when the WHOLE tail is the window. Kill switch DONOVAN_NAME_WINDOW=0. Digit-led names (addresses) never split.
+const NW_START_RE = /^(?:in|during|for|from|of|since|after|before|until|till|between|on|through|last|previous|prior|this|current|over)\b|^(?:19|20)\d\d\b|^q[1-4]\b|^(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b/i;
+function windowFromTail(tail) {
+  let t = String(tail).toLowerCase().replace(/[?.!,\s]+$/, "").replace(/\b((?:19|20)\d\d)\s*[-\u2013]\s*((?:19|20)\d\d)\b/, "from $1 to $2");
+  // R3 relname: relative period after a name ("last year", "this month", "last quarter"): resolved against today at run time. Kill switch DONOVAN_NAME_REL=0.
+  const rm = process.env.DONOVAN_NAME_REL === "0" ? null : /^(?:in\s+|during\s+|for\s+|from\s+|over\s+|of\s+)?(?:the\s+)?(last|previous|prior|this|current)\s+(year|month|quarter)$/.exec(t);
+  if (rm) return { rel: `${/^(?:this|current)$/.test(rm[1]) ? "this" : "last"} ${rm[2]}`, from: "", to: "", text: `in ${rm[0].replace(/^(?:in|during|for|from|over|of)\s+/, "").replace(/^the\s+/, "")}` };
+  const qm = /^(?:in\s+|during\s+|for\s+|of\s+)?(?:the\s+)?q([1-4])\s+((?:19|20)\d\d)$/.exec(t);
+  if (qm) { const a = (Number(qm[1]) - 1) * 3 + 1, y = qm[2], e = a + 2; const ld = new Date(Date.UTC(Number(y), e, 0)).getUTCDate(); return { from: `${y}-${String(a).padStart(2, "0")}-01`, to: `${y}-${String(e).padStart(2, "0")}-${ld}`, text: `in Q${qm[1]} ${y}` }; }
+  const w = extractWindow(t);
+  if (!w || w.rest !== "" || !/^\d{4}-\d{2}-\d{2}$/.test(w.from) || !/^\d{4}-\d{2}-\d{2}$/.test(w.to)) return null;
+  const text = w.open ? w.label : w.range ? `from ${w.label}` : /^[A-Z][a-z]+ \d{4}$/.test(w.label) || /^\d{4}$/.test(w.label) ? `in ${w.label}` : `on ${w.label}`;
+  return { from: w.from, to: w.to, text };
+}
+function resolveRelWin(rel, today0) {
+  const today = /^\d{4}-\d{2}-\d{2}$/.test(String(today0 ?? "")) ? today0 : new Date().toISOString().slice(0, 10);
+  const [dir, unit] = rel.split(" "), off = dir === "last" ? -1 : 0;
+  const y0 = Number(today.slice(0, 4)), m0 = Number(today.slice(5, 7)) - 1, p2 = (n) => String(n).padStart(2, "0");
+  const MN = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const lastDay = (y, m) => new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+  if (unit === "year") { const y = y0 + off; return { from: `${y}-01-01`, to: `${y}-12-31`, text: `in ${y}` }; }
+  if (unit === "month") { const d = new Date(Date.UTC(y0, m0 + off, 1)); const y = d.getUTCFullYear(), m = d.getUTCMonth(); return { from: `${y}-${p2(m + 1)}-01`, to: `${y}-${p2(m + 1)}-${lastDay(y, m)}`, text: `in ${MN[m]} ${y}` }; }
+  const d = new Date(Date.UTC(y0, m0 + off * 3, 1)); const y = d.getUTCFullYear(), qn = Math.floor(d.getUTCMonth() / 3), a = qn * 3, e = a + 2;
+  return { from: `${y}-${p2(a + 1)}-01`, to: `${y}-${p2(e + 1)}-${lastDay(y, e)}`, text: `in Q${qn + 1} ${y}` };
+}
+function splitNameWindow(phrase) {
+  if (process.env.DONOVAN_NAME_WINDOW === "0") return null;
+  const words = String(phrase ?? "").trim().split(/\s+/);
+  if (words.length < 2 || /^\d/.test(words[0])) return null;
+  for (let i = 1; i < words.length; i++) {
+    const tail = words.slice(i).join(" ");
+    if (!NW_START_RE.test(tail)) continue;
+    const win = windowFromTail(tail);
+    if (win) return { name: words.slice(0, i).join(" "), win };
+  }
+  return null;
+}
+
 export function parseDocLookupQuestion(question, opts = {}) {
   const overlay = opts?.overlay;
   const raw = String(question ?? "").trim();
@@ -409,13 +461,15 @@ export function parseDocLookupQuestion(question, opts = {}) {
   for (const re of SHAPES) {
     const m = q.match(re);
     if (!m) continue;
-    const namePhrase = stripTrailingFillerWord(m[1].trim());
+    let { name: namePhrase, year } = splitNameYear(stripTrailingFillerWord(m[1].trim()));
+    let win = null;
+    if (!year) { const nw = splitNameWindow(stripTrailingFillerWord(m[1].trim())); if (nw) { namePhrase = nw.name; win = nw.win; } }
     const trailingJob = TRAILING_JOB_WORD_RE.test(m[0]);
     if (!isRealNameOrAddressPhrase(namePhrase, { trailingJob })) continue;
     const doctypeWordMatch = m[0].match(DOCTYPE_WORD_RE);
     const doctype = doctypeWordMatch ? docTypeFromWord(doctypeWordMatch[0]) : null;
     if (!doctype) continue;
-    return { doctype, namePhrase, isAddress: /^\d/.test(namePhrase) };
+    return { doctype, namePhrase, isAddress: /^\d/.test(namePhrase), ...(year ? { year } : {}), ...(win ? { win } : {}) };
   }
 
   const bare = q.match(NAME_DOCTYPE_RE);
@@ -540,7 +594,9 @@ async function runDocLookupCore(db, question, opts = {}) {
   // above — dispatch to its own splitter/resolver rather than the document-
   // type machinery below, which has no `doctype` to work with here at all.
   if (parsed.compound) return runCompound(db, question, opts);
-  const { doctype, namePhrase, isAddress } = parsed;
+  const { doctype, namePhrase, isAddress, year } = parsed;
+  let win = parsed.win;
+  if (win?.rel) win = resolveRelWin(win.rel, opts?.today);
   const yesNo = YES_NO_SHAPE_RE.test(String(question ?? ""));
   const docLabel = documentTypeLabel(doctype);
   const docLabelLower = docLabel.charAt(0).toLowerCase() + docLabel.slice(1);
@@ -641,11 +697,12 @@ async function runDocLookupCore(db, question, opts = {}) {
   };
   if (!ids.length) return await none();
 
-  const { rows } = await db.raw(
+  let { rows } = await db.raw(
     `SELECT d.id, d.document_type, d.original_filename, d.created_at,
             (SELECT x.value FROM extractions x
               WHERE x.document_id = d.id AND x.field_key = 'service_date' AND x.${TENANT_SQL}
               ORDER BY x.created_at DESC LIMIT 1) AS service_date,
+            (SELECT f.invoice_date::text FROM document_financials f WHERE f.document_id = d.id AND f.${TENANT_SQL} ORDER BY f.created_at DESC LIMIT 1) AS fin_date,
             (SELECT c.data->>'customer_name'
                FROM document_entity_links l
                JOIN entities en ON en.id = l.entity_id AND en.merged_into IS NULL AND en.${TENANT_SQL}
@@ -658,6 +715,42 @@ async function runDocLookupCore(db, question, opts = {}) {
       LIMIT ${MAX_DOCS}`,
     [ids, docTypeAliases(doctype)]
   );
+  if (year) {
+    // R3 nameyear: keep only documents dated in that year (service date, else the invoice date); undated ones are not claimed for any year.
+    const inYear = (r) => /(?:^|\D)(\d{4})-\d{2}-\d{2}/.test(String(r.service_date ?? "")) ? String(r.service_date).match(/(\d{4})-\d{2}-\d{2}/)[1] === year
+      : /\d{4}/.test(String(r.service_date ?? "")) ? new RegExp(`\\b${year}\\b`).test(String(r.service_date)) : String(r.fin_date ?? "").slice(0, 4) === year;
+    const before = rows.length;
+    rows = rows.filter(inYear);
+    subject = `${subject} in ${year}`;
+    if (!rows.length) {
+      return attachCitations({
+        kind: "answer",
+        text: `${yesNo ? "No — no" : "No"} ${docLabelLower} on file for ${subject}.`,
+        facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+      }, {
+        records: await documentRecordsFor(db, ids), total: ids.length, kind: "searched",
+        basis: `Searched all ${ids.length} document${ids.length === 1 ? "" : "s"} linked to ${subject.replace(` in ${year}`, "")}; ${before ? `none of its ${docLabelLower} is dated ${year}` : `none is a ${docLabelLower}`}.`,
+      });
+    }
+  }
+  if (win) {
+    // R3 namewindow: keep only documents whose own date (service date, else invoice date) falls in the window; undated ones are not claimed.
+    const iso = (v) => { const t = String(v ?? ""); const a = /(\d{4})-(\d{2})-(\d{2})/.exec(t); if (a) return a[0]; const u = /(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(t); return u ? `${u[3]}-${u[1].padStart(2, "0")}-${u[2].padStart(2, "0")}` : null; };
+    const before = rows.length;
+    rows = rows.filter((r) => { const d = iso(r.service_date) ?? iso(r.fin_date); return d && d >= win.from && d <= win.to; });
+    const base = subject;
+    subject = `${subject} ${win.text}`;
+    if (!rows.length) {
+      return attachCitations({
+        kind: "answer",
+        text: `${yesNo ? "No — no" : "No"} ${docLabelLower} on file for ${subject}.`,
+        facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+      }, {
+        records: await documentRecordsFor(db, ids), total: ids.length, kind: "searched",
+        basis: `Searched all ${ids.length} document${ids.length === 1 ? "" : "s"} linked to ${base}; ${before ? `none of its ${docLabelLower} is dated ${win.text}` : `none is a ${docLabelLower}`}.`,
+      });
+    }
+  }
   if (!rows.length) return await none();
 
   const multi = customers.length > 1;

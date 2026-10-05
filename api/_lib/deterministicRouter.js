@@ -49,7 +49,9 @@ import { parsePaidQuestion, runPaidLookup } from './lookups/paidLookup.js';
 import { parseDocExtreme, runDocExtreme } from './lookups/docExtremes.js';
 import { parseCustomerDocRank, runCustomerDocRank } from './lookups/customerDocRank.js';
 import { parseCountQualifier, runCountQualifier } from './lookups/countQualifiers.js';
+import { parsePersonAmount, runPersonAmount } from './lookups/personAmount.js';
 import { parseTonnageCount, runTonnageCount } from './lookups/tonnageCount.js';
+import { parseBrandUnitCount, runBrandUnitCount } from './lookups/brandUnitCount.js';
 import { parseFieldQuestion, runFieldMatch } from './lookups/fieldMatch.js';
 import { parseDateQualifier, runDateQualifier } from './lookups/dateQualifiers.js';
 import { parseDocWindow, runDocWindow } from './lookups/dateDocWindow.js';
@@ -136,11 +138,17 @@ export function classifyDeterministic(question, opts = {}) {
   const agEnd = parseAgreementEndQuestion(String(question ?? ''));
   if (agEnd) return { route: 'agreementend', intent: agEnd };
   // Count questions with a qualifier the old path dropped (invoices over <words>, out-of-state customers, commercial/residential permits) - lookups/countQualifiers.js.
+  // Person + amount invoice questions ("Linda Fitzgerald invoices over $500") - lookups/personAmount.js.
+  const perAmt = parsePersonAmount(String(question ?? ''));
+  if (perAmt) return { route: 'personamt', intent: perAmt };
   const cntQ = parseCountQualifier(String(question ?? ''));
   if (cntQ) return { route: 'countqual', intent: cntQ };
   // "How many 5 ton units": unit field + tonnage stated in linked documents, with the no-tonnage count - lookups/tonnageCount.js.
   const tonQ = parseTonnageCount(String(question ?? ''));
   if (tonQ) return { route: 'tonnage', intent: tonQ };
+  // "How many Carrier units" / "R410A systems": count by manufacturer/refrigerant, says what it counted - lookups/brandUnitCount.js.
+  const brandQ = parseBrandUnitCount(String(question ?? ''));
+  if (brandQ) return { route: 'brandunits', intent: brandQ };
   // Customer x document-type rank / none / have and quote-status counts (customer with most invoices, customers with no quotes, open quotes) - lookups/customerDocRank.js.
   const cdrQ = parseCustomerDocRank(String(question ?? ''));
   if (cdrQ) return { route: 'custdocrank', intent: cdrQ };
@@ -597,8 +605,10 @@ async function runDeterministicCore(db, intent, { today } = {}) {
   }
   if (intent.route === 'datequal') return runDateQualifier(db, intent.intent);
   if (intent.route === 'datedocs') return runDocWindow(db, intent.intent);
+  if (intent.route === 'personamt') return runPersonAmount(db, intent.intent);
   if (intent.route === 'countqual') return runCountQualifier(db, intent.intent);
   if (intent.route === 'tonnage') return runTonnageCount(db, intent.intent);
+  if (intent.route === 'brandunits') return runBrandUnitCount(db, intent.intent);
   if (intent.route === 'premise') return runFalsePremise(db, intent.intent);
   if (intent.route === 'aggregate') return runAggregate(db, intent.intent, { today: t });
   if (intent.route === 'comparison') return runComparison(db, intent.intent);

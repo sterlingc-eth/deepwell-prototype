@@ -76,6 +76,19 @@ export function resolveCalendarSpan(question, today) {
   const bad = findInvalidDate(q);
   if (bad) return bad;
 
+  // Two numeric/ISO dates joined by between..and / from..to ("between 9/14/2026 and 9/20/2026", "from 2026-09-01 to 2026-09-15") are one
+  // inclusive window, never the first date alone (DONOVAN_REL_WINDOW=0 restores the single-day read).
+  if (process.env.DONOVAN_REL_WINDOW !== '0' && (m = q.match(/\b(?:between|from)\s+(\d{1,2}\/\d{1,2}\/\d{4}|\d{4}-\d{2}-\d{2})\s+(?:and|to|through|thru|until)\s+(\d{1,2}\/\d{1,2}\/\d{4}|\d{4}-\d{2}-\d{2})\b/))) {
+    const one = (x) => { const a = x.match(ISO_DATE_RE) ?? x.match(NUMERIC_DATE_RE); return ISO_DATE_RE.test(x) ? { y: Number(a[1]), m: Number(a[2]), d: Number(a[3]) } : { y: Number(a[3]), m: Number(a[1]), d: Number(a[2]) }; };
+    const [a, b] = [one(m[1]), one(m[2])];
+    if (validDay(a.y, a.m, a.d) && validDay(b.y, b.m, b.d)) {
+      let [x, y] = [iso(a.y, a.m, a.d), iso(b.y, b.m, b.d)]; let [da, db] = [a, b];
+      if (x > y) { [x, y] = [y, x]; [da, db] = [b, a]; }
+      const lab = `${fmtLong(da.y, da.m, da.d)} through ${fmtLong(db.y, db.m, db.d)}`;
+      return { from: x, to: y, label: `from ${lab}`, bare: lab };
+    }
+  }
+
   // One specific day: "on September 21, 2026", "on 9/21/2026", "21 September 2026", "2026-09-21", "on March 3" (this year).
   const dts = explicitDates(q);
   if (dts.length) {
@@ -129,8 +142,11 @@ export function resolveCalendarSpan(question, today) {
   // Year ranges: "between 2020 and 2022", "from 2018 to 2019", "2018-2020", "2018 through 2020".
   if ((m = q.match(/\b(?:between|from)\s+(?:the\s+year\s+)?(\d{4})\s+(?:and|to|through|thru|until|till)\s+(\d{4})\b/)) || (m = q.match(/\b(\d{4})\s*(?:-|–|to|through|thru)\s*(\d{4})\b/))) {
     let a = year4(m[1]); let b = year4(m[2]);
+    // A reversed range ("between 2012 and 2010") is read oldest-to-newest and the answer says so (DONOVAN_REVERSED_RANGE=0 restores the silent swap).
+    const rev = a > b && process.env.DONOVAN_REVERSED_RANGE !== '0';
     if (a > b) [a, b] = [b, a];
-    return { from: iso(a, 1, 1), to: iso(b, 12, 31), label: `${a} through ${b}`, bare: `${a} through ${b}` };
+    const note = rev ? ' (the range was typed in reverse, so I read it oldest to newest)' : '';
+    return { from: iso(a, 1, 1), to: iso(b, 12, 31), label: `${a} through ${b}${note}`, bare: `${a} through ${b}${note}` };
   }
 
   // "between March and May [2024]" / "from March to May 2024"
@@ -140,6 +156,25 @@ export function resolveCalendarSpan(question, today) {
     if (!m[3] && iso(y, a, 1) > todayISO) y -= 1;
     const yb = b < a ? y + 1 : y;
     return { from: iso(y, a, 1), to: iso(yb, b, lastDay(yb, b)), label: `${cap(MONTHS[a - 1])} through ${cap(MONTHS[b - 1])} ${yb}`, bare: `${cap(MONTHS[a - 1])} through ${cap(MONTHS[b - 1])} ${yb}` };
+  }
+
+  // Month name with NO year (DONOVAN_MONTH_NOYEAR=0 disables): resolves to the most recent such month that is not in the future
+  // relative to `today` ("sept" on 2026-09-25 -> September 2026, "october" -> October 2025). "since <month> [year]" runs from the
+  // 1st of that month to today. Needs a lead-in word so the verb "may" / "march on" never reads as a month.
+  if (process.env.DONOVAN_MONTH_NOYEAR !== '0') {
+    const LEAD = '(?:in|during|for|of|from|on|within|throughout|since|starting|beginning)';
+    const noPrefix = (idx) => !/\b(?:last|this|next|every|each|past|previous|prior|coming)\s+(?:the\s+)?(?:month\s+of\s+)?$/.test(q.slice(Math.max(0, idx - 24), idx));
+    if ((m = q.match(new RegExp(`\\bsince\\s+(?:the\\s+(?:start|beginning)\\s+of\\s+)?(?:the\\s+month\\s+of\\s+)?(${MONTH_ALT})\\b\\.?(?:[\\s,]+(?:of\\s+)?(\\d{4})\\b)?`))) && noPrefix(m.index)) {
+      const mo = monthNum(m[1]); let y = m[2] ? year4(m[2]) : Y;
+      if (!m[2] && iso(y, mo, 1) > todayISO) y -= 1;
+      const from = iso(y, mo, 1);
+      if (from <= todayISO) return { from, to: todayISO, label: `since ${cap(MONTHS[mo - 1])} 1, ${y}`, bare: `since ${cap(MONTHS[mo - 1])} 1, ${y}` };
+    }
+    if ((m = q.match(new RegExp(`\\b${LEAD}\\s+(?:the\\s+month\\s+of\\s+)?(${MONTH_ALT})\\b\\.?(?![\\s,]+(?:of\\s+)?\\d)`))) && noPrefix(m.index)) {
+      const mo = monthNum(m[1]); let y = Y;
+      if (iso(y, mo, 1) > todayISO) y -= 1;
+      return { from: iso(y, mo, 1), to: iso(y, mo, lastDay(y, mo)), label: `in ${cap(MONTHS[mo - 1])} ${y}`, bare: `${cap(MONTHS[mo - 1])} ${y}` };
+    }
   }
 
   // Abbreviated / any month name + year ("feb 2024", "Sept 2023") - the long-name resolver already handles full names.

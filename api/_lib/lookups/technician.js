@@ -25,6 +25,7 @@ import { attachCitations, documentRecord } from "../citations/records.js";
 import { stripConversationalFrame } from "../router/frame.js";
 import { TENANT_SQL } from "../scope.js";
 import { LEX } from "./lexicon.js";
+import { extractWindow } from "./dateQualifiers.js";
 
 const TLEX = new Set([
   ...[...LEX].filter((w) => !["no.", "nr", "num", "#", "ph"].includes(w)),
@@ -41,12 +42,20 @@ const esc = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const norm = (s) => String(s ?? "").toLowerCase().replace(/[‘’]/g, "'").replace(/[^a-z0-9'+ ]+/g, " ").replace(/\s+/g, " ").trim();
 
 /** @returns {{kind:'total'|'city'|'ever'|'compare'|'sum'|'threshold', techs:string[], city?:string, type?:string, min?:number, dir?:'more'|'fewer'}|null} */
-export function parseTechnician(question, tenantVocab) {
+export function parseTechnician(question, tenantVocab, opts = {}) {
   const names = tenantVocab?.technicians?.phrases;
   if (!Array.isArray(names) || !names.length) return null;
-  const raw = String(question ?? "").trim();
+  let raw = String(question ?? "").trim();
   if (!raw || raw.length > 200) return null;
-  let t = norm(stripConversationalFrame(raw) ?? raw);
+  // "tickets by Danny in 2011", "jobs by Danny Ochoa", "service calls by Danny last year" (no "how many"): a record noun + "by <name>" is the same
+  // one-technician count. Roster-gated below (an unknown name still returns null). Kill switch: DONOVAN_TECH_BY=0.
+  if (process.env.DONOVAN_TECH_BY !== "0" && !/\bhow many\b|\bnumber of\b|\bcount\b|\btotal\b/i.test(raw)) {
+    const by = /^\s*(?:(?:show\s+me|list|gimme|give\s+me|get\s+me|pull\s+up|any)\s+)?(?:the\s+|all\s+)?(?:service\s+tickets?|tickets?|tix|work\s*orders?|service\s+calls?|calls?|jobs?|visits?)\s+(?:done\s+|worked\s+|run\s+|logged\s+)?by\s+(?:tech(?:nician)?\s+)?(.+?)\s*[?.!]*\s*$/i.exec(raw);
+    if (by) raw = `how many jobs by ${by[1]}`;
+  }
+  // A date window (in 2012, since 2020-01-01, between 2010 and 2012) is read first and taken out of the text; only a plain one-technician total may carry it.
+  const win = process.env.DONOVAN_TECH_WINDOW === "0" || !opts.allowWindow ? null : extractWindow(raw.toLowerCase().replace(/[\u2019`]/g, "'").replace(/[?!]+$/, ""));
+  let t = norm(stripConversationalFrame(win ? win.rest : raw) ?? (win ? win.rest : raw));
   if (!t || (t.match(/\?/g) ?? []).length > 1) return null;
 
   // 1. technician names (exact full names, verbatim in the question; possessive "'s" allowed)
@@ -56,6 +65,17 @@ export function parseTechnician(question, tenantVocab) {
     const re = new RegExp(`\\b${esc(norm(nm)).replace(/\s+/g, "\\s+")}(?:'s)?\\b`);
     const m = re.exec(t0);
     if (m) { hits.push({ nm: String(nm), at: m.index }); t = t.replace(re, " ").replace(/\s+/g, " "); }
+  }
+  if (!hits.length && process.env.DONOVAN_TECH_FIRST !== "0") {
+    // "how many calls did Danny do": a first name that is exactly one technician's, in a "did/by/tech/<name>'s" slot
+    const firsts = new Map();
+    for (const nm of names) { const f = norm(nm).split(" ")[0]; if (f) firsts.set(f, [...(firsts.get(f) ?? []), String(nm)]); }
+    for (const [f, nms] of firsts) {
+      if (nms.length !== 1 || TLEX.has(f)) continue;
+      const re = new RegExp(`\\b(?:did|by|tech|technician|from)\\s+${esc(f)}\\b|\\b${esc(f)}(?:'s)?\\s+(?:do|did|run|ran|done|logged|jobs?|calls?|visits?)\\b`);
+      const m = re.exec(t);
+      if (m) { hits.push({ nm: nms[0], at: m.index }); t = t.replace(new RegExp(`\\b${esc(f)}(?:'s)?\\b`), " ").replace(/\s+/g, " "); }
+    }
   }
   if (hits.length > 2) return null;
   const found = hits.sort((x, y) => x.at - y.at).map((h) => h.nm); // question order (matters for "does A have more than B")
@@ -101,6 +121,10 @@ export function parseTechnician(question, tenantVocab) {
     return null;
   }
   if (min !== null) return null;
+  if (win) {
+    if (found.length !== 1 || city || type || has(/\bthan\b|\bmore\b|\bfewer\b|\bless\b|\bever\b|\bany\b|\bcombined\b|\bplus\b|\bboth\b/) || !has(/\b(?:how many|number|count|total)\b/)) return null;
+    return { kind: "window", techs: found, window: { from: win.from, to: win.to, label: win.label, open: !!win.open, range: !!win.range } };
+  }
   if (found.length === 2) {
     if (city || type) return null;
     if (has(/\bthan\b/) || has(/\b(?:ahead|behind|trail|trails|trailing|lead|leads|leading)\b/)) {
@@ -172,6 +196,20 @@ export async function runTechnician(db, parsed) {
       : `No — ${rows.filter((r) => r.n < parsed.min).map((r) => `${r.tech} has ${r.n}`).join(", ")}, below ${parsed.min}. The lowest is ${low.tech}.`;
     const docs = await techRows(db, rows.map((r) => r.tech));
     return answer(text, rows.map((r) => ({ label: r.tech, value: `${r.n} jobs`, sources: [] })), docs, `Counted the technician entries on every service record, per technician (${rows.length} technicians).`);
+  }
+  if (kind === "window") {
+    const W = parsed.window, a0 = techs[0];
+    const { rows: wr } = await db.raw(
+      `SELECT DISTINCT t.id, t.tech, t.document_id, d.original_filename, s.v AS sd FROM (${TECH_CTE}) t LEFT JOIN documents d ON d.id = t.document_id
+         JOIN (SELECT document_id, coalesce(nullif(corrected_value, ''), value) AS v FROM extractions WHERE field_key = 'service_date' AND ${TENANT_SQL}) s ON s.document_id = t.document_id
+        WHERE t.tech = $1`, [a0]);
+    const isoOf = (v) => { const m = /(\d{4})-(\d{2})-(\d{2})/.exec(String(v ?? "")); if (m) return `${m[1]}-${m[2]}-${m[3]}`; const u = /(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(String(v ?? "")); return u ? `${u[3]}-${String(+u[1]).padStart(2, "0")}-${String(+u[2]).padStart(2, "0")}` : null; };
+    const seen = new Set(), hit = [];
+    for (const r of wr) { const d = isoOf(r.sd); if (d && d >= W.from && d <= W.to && !seen.has(r.document_id)) { seen.add(r.document_id); hit.push(r); } }
+    const when = W.open ? W.label : W.range ? `from ${W.label}` : /^\d{4}$|^[A-Z][a-z]+ \d{4}$/.test(W.label) ? `in ${W.label}` : `on ${W.label}`;
+    const basis = `Counted the service records with ${a0} as technician whose service date is ${W.from} through ${W.to}.`;
+    if (!hit.length) return answer(`No jobs on file for ${a0} ${when}.`, [{ label: `${a0} jobs ${when}`, value: "0", sources: [] }], [], basis);
+    return answer(`${a0} has ${plural(hit.length, "job")} ${when} on file.`, [{ label: `${a0} jobs ${when}`, value: String(hit.length), sources: [] }], hit, basis);
   }
   const rows = await techRows(db, techs, { city: parsed.city, type: parsed.type });
   const per = new Map(techs.map((n) => [n, rows.filter((r) => r.tech === n).length]));

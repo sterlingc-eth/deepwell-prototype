@@ -111,6 +111,7 @@ import { logRouteDecision } from "./_lib/agent/router.js";
 // module's own header and its call site below ("unified pre-router classification").
 import { classifyAll } from "./_lib/router/classifyAll.js";
 // R32: general early declines (off-domain / untracked component attribute / dangling follow-up with no conversation).
+import { rewriteInvoiceTotal } from "./_lib/lookups/countQualifiers.js";
 import { buildAddressMissAnswer } from "./_lib/lookups/addressMiss.js";
 import { buildUnknownNameDecline } from "./_lib/lookups/unknownName.js";
 import { parseCustomerCount, runCustomerCount } from "./_lib/lookups/namedCompare.js";
@@ -878,6 +879,7 @@ export default async function handler(req, res) {
     question = normalizeInputText(question);
     if (!question) return res.status(400).json({ error: "Missing question" });
     askedText = question;
+    { const rw = rewriteInvoiceTotal(question); if (rw) question = rw; } // "total of invoices in 2012" -> dollar total (kill switch DONOVAN_AMOUNT_NOHOW=0)
 
     // ---- Round 29: how-to questions about the app itself ("how do I invite a tech", "where is billing") -------
     // Answered from the signed-in DeepWell Help KB at $0, labelled "From DeepWell Help: <article>". Two layers keep
@@ -1068,7 +1070,7 @@ export default async function handler(req, res) {
     // loadAnalyticsRouteModule/loadAgentModule are THIS file's own memoized loaders (unchanged from
     // before this existed) — passed in so the analytics stage's lazy import happens at the exact same
     // point production always reached it, never earlier (verify-cold-start.mjs is unaffected).
-    const preRouter = await classifyAll(question, { meta, overlay, pack, tenantVocab, loadAnalyticsRouteModule, loadAgentModule });
+    const preRouter = await classifyAll(question, { today: resolveToday(today), meta, overlay, pack, tenantVocab, loadAnalyticsRouteModule, loadAgentModule });
     const { normalizedForAnalytics, gated } = preRouter;
     if (preRouter.effectiveQuestion) question = preRouter.effectiveQuestion; // R31: conversational-frame-stripped text when it made a deterministic stage claim
     const relationsIntent = gated.relations;

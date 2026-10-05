@@ -19,6 +19,7 @@
  * pure: parseAggregate     db: runAggregate
  */
 import { unframe } from "./unframe.js";
+import { extractWindow } from "./dateQualifiers.js";
 import { serviceType, resolveTechnician } from "./namedCompare.js";
 import { attachCitations, documentRecord, unitRecord, customerRecord } from "../citations/records.js";
 import { answerEnvelope, TENANT_SQL, todayIso } from "../scope.js";
@@ -74,6 +75,9 @@ function parseAggregateCore(question) {
   const q = raw.replace(/\bunits'?\b/g, "units");
   const hasBrandWords = true; // brand tokens are admitted at run time (the DB knows the manufacturers); parse admits any single unknown word flagged below
 
+  // --- R3 warrexp: units/warranties expiring in a named period (this/next year, in 2026, this/next month, Q4 ...). Kill switch DONOVAN_WARR_EXP=0.
+  if (process.env.DONOVAN_WARR_EXP !== "0") { const wp = parseWarrPeriod(q); if (wp) return wp; }
+
   // --- warranty extreme: earliest / latest warranty expiration (never "soonest/next": that is a from-today reading)
   if (/\bwarrant(?:y|ies)\b/.test(q) && !/\bhow many\b|\bnumber of\b|\bcount\b/.test(q)) {
     const early = /\b(?:earliest|first|oldest)\b/.test(q);
@@ -127,10 +131,20 @@ function parseAggregateCore(question) {
     }
   }
 
+  // --- R3 techlist: "list the techs" / "who are our technicians" -> the roster with job counts. Kill switch DONOVAN_TECH_LIST=0.
+  if (process.env.DONOVAN_TECH_LIST !== "0" && !/\d/.test(q) && !/\b(?:how many|number|count|total|most|fewest|never)\b/.test(q) && /\b(?:tech|techs|technicians?|technicans?|techncians?|technitians?|roster)\b/.test(q)) {
+    const vocab = setOf(["list", "lst", "lists", "show", "me", "name", "names", "give", "roster", "tech", "techs", "technician", "technicians", "technican", "technicans", "techncian", "techncians", "technitian", "technitians", "guys", "crew", "staff", "field", "work", "works", "working", "employ", "employed", "available", "tell", "see", "display", "all", "every", "complete", "full", "whos", "can", "you", "could", "who's", "s"]);
+    if (closed(q, vocab)) return { kind: "tech-list" };
+  }
+
   // --- technician extremes over every technician row: "who has done the most jobs overall" / "who has the fewest jobs on file"
   if (/\b(?:most|highest|fewest|least|lowest)\b/.test(q) && /\b(?:jobs?|visits?|calls?|tickets?|job count|visit count)\b/.test(q) && /\b(?:who|which\s+(?:tech|technician|guy|one))\b/.test(q) && !/\b(?:year|month|week|quarter|today|yesterday|this|last|customers?|different|ytd|summer|winter|spring|fall|q[1-4])\b/.test(q)) {
     const vocab = setOf(["who's", "whos", "technician", "technicians", "tech", "techs", "guy", "one", "who", "which", "done", "logged", "worked", "run", "has", "have", "most", "highest", "fewest", "least", "lowest", "jobs", "job", "visits", "visit", "calls", "call", "tickets", "ticket", "count", "overall", "number", "of", "on", "file", "ever", "crew", "our", "the", "ve", "s"]);
-    if (closed(q, vocab)) return { kind: "tech-extreme", dir: /\b(?:fewest|least|lowest)\b/.test(q) ? "asc" : "desc" };
+    // R3 nameyear: "which tech did the most calls in 2012" must apply the year (a bare number used to be ignored as glue). Kill switch DONOVAN_NAME_YEAR=0.
+    const win = process.env.DONOVAN_NAME_YEAR === "0" ? null : extractWindow(q);
+    const dirOf = /\b(?:fewest|least|lowest)\b/.test(q) ? "asc" : "desc";
+    if (win && closed(win.rest, vocab)) return { kind: "tech-extreme", dir: dirOf, window: { from: win.from, to: win.to, label: win.label, open: !!win.open, range: !!win.range } };
+    if (!win && closed(q, vocab) && !(process.env.DONOVAN_NAME_YEAR !== "0" && /\b(?:19|20)\d\d\b/.test(q))) return { kind: "tech-extreme", dir: dirOf };
   }
 
   // --- per-technician typed count: "repair count for Danny Ochoa" / "PM count for Denise Ford"
@@ -208,8 +222,10 @@ async function runAggregateCore(db, intent, { today } = {}) {
   switch (intent.kind) {
     case "warranty-extreme": return warrantyExtreme(db, intent);
     case "warranty-count": return warrantyCount(db, intent, t);
+    case "warranty-period": return warrantyPeriod(db, intent, t);
     case "tech-never": return techNever(db, intent, t);
     case "tech-extreme": return techExtreme(db, intent);
+    case "tech-list": return techList(db);
     case "tech-typed-count": return techTypedCount(db, intent);
     case "no-text-docs": return noTextDocs(db);
     case "history-skew": return historySkew(db, intent, t);
@@ -240,6 +256,86 @@ async function warrantyExtreme(db, intent) {
   const text = `The ${intent.dir === "asc" ? "earliest" : "latest"} ${scope}warranty expiration on file is ${formatDateHumanWithIso(best)} — ${tied.length === 1 ? label : `${tied.length} units share that date, including ${label}`}.`;
   return attachCitations(answerEnvelope({ text, facts: [{ label: `${intent.dir === "asc" ? "Earliest" : "Latest"} ${scope}warranty expiration`, value: formatDateHumanWithIso(best), sources: [] }], extra: { fastIntent: "warranty_extreme" } }),
     { records: unitCite(tied), total: tied.length, kind: "searched", basis: `Compared the warranty end date of every ${scope}unit that has one on file (${rows.length}); the ${intent.dir === "asc" ? "earliest" : "latest"} is listed.` });
+}
+
+
+/* ------------------------------------------------------------ R3 warrexp: expiring by period */
+const MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+const WARR_TYPO = /\bwar+[aeiu]n+t(?:y|ies|ys|ee|ees)\b/g;
+const WARR_REJECT = /\b(?:transfer\w*|how long|cover\w*|claims?|registr\w*|agreements?|plans?|contracts?|memberships?|insurance|extended|labou?r|parts|soon|already|expired|ago|customers?|clients?|accounts?|invoices?|quotes?|installed|install|installation|without|unknown|earliest|latest|first|oldest|newest|most|least|never|not|no|longer|still|under|out of|last|past|previous|before|since|after|between|from|than|over)\b/;
+const WARR_VOCAB = setOf(V.unit, ["warranty", "warranties", "expiring", "expire", "expires", "end", "ends", "ending", "run", "runs", "running", "out", "up", "lapse", "lapses", "lapsing", "come", "comes", "coming", "off", "list", "show", "me", "tell", "which", "whose", "during", "calendar", "year", "month", "quarter", "next", "this", "that", "can", "you", "are", "due", "by", "within", "of", "ours", "its", "their", "one", "ones", "them", "units", "unit", "s", "d", "q", "th", "st", "nd", "rd", "first", "second", "third", "fourth", "have", "has", "a", "on", "file"]);
+function parseWarrPeriod(q) {
+  let t = q.replace(WARR_TYPO, "warranty").replace(/\bexpi?r\w*/g, "expiring");
+  const hasWar = /\bwarranty\b|\bwarranties\b/.test(t);
+  const hasUnit = /\b(?:units?|systems?|equipment|furnaces?|condensers?|heaters?|acs?|hvac|pieces?)\b/.test(t);
+  const hasExp = /\bexpiring\b|\b(?:runs?|running)\s+out\b|\blaps\w+\b|\bcomes?\s+off\b|\bcoming\s+off\b|\b(?:ends?|ending)\b|\bup\b/.test(t);
+  if (!(hasWar || hasUnit) || !hasExp) return null;
+  if (!hasWar && !/\bexpiring\b|\b(?:runs?|running)\s+out\b/.test(t)) return null;
+  if (WARR_REJECT.test(q) || /\b(?:expired|expire(?:d)?\s+(?:so far|already))\b/.test(q)) return null;
+  if (/\bthe\s+(?:next|coming|following|upcoming)\b|\bnext\s+(?:\d+|a|an|one|two|three|few|several|\w+)\s+(?:months?|years?|days?|weeks?|quarters?)\b|\bwithin\b|\bupcoming\b|\brolling\b/.test(t)) return null; // rolling windows ("in the next year", "within 90 days") stay with the existing count paths
+  // exactly one period
+  let period = null; let rest = t;
+  const take = (re, mk) => { const m = re.exec(rest); if (!m) return false; if (period) { period = "dup"; return true; } period = mk(m); rest = rest.replace(re, " "); return true; };
+  const Q = { first: 1, "1st": 1, second: 2, "2nd": 2, third: 3, "3rd": 3, fourth: 4, "4th": 4 };
+  take(/\bthis\s+(?:calendar\s+|fiscal\s+)?year\b|\bcurrent\s+year\b/, () => ({ t: "year", rel: 0 }));
+  take(/\bnext\s+(?:calendar\s+|fiscal\s+)?year\b/, () => ({ t: "year", rel: 1 }));
+  take(/\bthis\s+month\b/, () => ({ t: "month", rel: 0 }));
+  take(/\bnext\s+month\b/, () => ({ t: "month", rel: 1 }));
+  take(/\bthis\s+quarter\b/, () => ({ t: "quarter", rel: 0 }));
+  take(/\bnext\s+quarter\b/, () => ({ t: "quarter", rel: 1 }));
+  take(/\bq([1-4])(?:\s+(?:of\s+)?(20\d\d))?\b/, (m) => ({ t: "quarter", q: +m[1], y: m[2] ? +m[2] : null }));
+  take(/\b(first|second|third|fourth|1st|2nd|3rd|4th)\s+quarter(?:\s+(?:of\s+)?(20\d\d))?\b/, (m) => ({ t: "quarter", q: Q[m[1]], y: m[2] ? +m[2] : null }));
+  take(new RegExp(`\\b(${MONTHS.join("|")})(?:\\s+(20\\d\\d))?\\b`), (m) => ({ t: "month", m: MONTHS.indexOf(m[1]) + 1, y: m[2] ? +m[2] : null }));
+  take(/\b(20\d\d)\b/, (m) => ({ t: "year", y: +m[1] }));
+  if (!period || period === "dup") return null;
+  rest = rest.replace(/\b(?:in|during|for|by|within|the|calendar|fiscal|of)\b/g, " ");
+  const unknown = words(rest).filter((w) => /[a-z0-9]/.test(w) && !(GLUE.has(w) || WARR_VOCAB.has(w) || /^\d+$/.test(w)));
+  if (unknown.length > 2) return null;
+  return { kind: "warranty-period", period, unknown };
+}
+
+function warrPeriodWindow(p, today) {
+  const y0 = +today.slice(0, 4), m0 = +today.slice(5, 7);
+  const pad2 = (n) => String(n).padStart(2, "0");
+  const last = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate();
+  if (p.t === "year") { const y = p.y ?? y0 + p.rel; return { from: `${y}-01-01`, to: `${y}-12-31`, label: String(y) }; }
+  if (p.t === "month") {
+    let y = p.y ?? y0, m = p.m ?? m0;
+    if (p.rel != null) { m = m0 + p.rel; if (m > 12) { m -= 12; y = y0 + 1; } }
+    return { from: `${y}-${pad2(m)}-01`, to: `${y}-${pad2(m)}-${last(y, m)}`, label: `${MONTHS[m - 1][0].toUpperCase()}${MONTHS[m - 1].slice(1)} ${y}` };
+  }
+  let y = p.y ?? y0, q = p.q ?? Math.ceil(m0 / 3);
+  if (p.rel != null) { q += p.rel; if (q > 4) { q -= 4; y = y0 + 1; } }
+  const m1 = q * 3 - 2, m2 = q * 3;
+  return { from: `${y}-${pad2(m1)}-01`, to: `${y}-${pad2(m2)}-${last(y, m2)}`, label: `Q${q} ${y}` };
+}
+
+async function warrantyPeriod(db, intent, today) {
+  const sc = await brandScope(db, intent.question ?? "", intent.unknown);
+  if (!sc.ok) return null;
+  const w = warrPeriodWindow(intent.period, today);
+  const params = sc.brand ? [sc.brand] : [];
+  const { rows } = await db.raw(
+    `SELECT id, customer_id, data->>'manufacturer' AS manufacturer, data->>'equipment_type' AS equipment_type, data->>'model' AS model, data->>'serial_number' AS serial_number, data->>'service_address' AS address,
+            CASE WHEN data#>>'{warranty,expires}' ~ ${DATE_RE} THEN substr(data#>>'{warranty,expires}', 1, 10) END AS expires
+       FROM entities WHERE ${EQUIP} ${sc.brand ? "AND lower(data->>'manufacturer') = lower($1)" : ""}`, params);
+  if (!rows.length) return null;
+  const dated = rows.filter((r) => r.expires);
+  const hit = dated.filter((r) => r.expires >= w.from && r.expires <= w.to).sort((a, b) => a.expires.localeCompare(b.expires) || String(a.id).localeCompare(String(b.id)));
+  const scope = sc.brand ? `${sc.brand} ` : "";
+  const noDate = rows.length - dated.length;
+  const basis = `Date basis: each unit's warranty end date on file (the date the warranty stops), not the install date or any service date.${noDate ? ` ${noDate} unit${noDate === 1 ? " has" : "s have"} no warranty end date on file and ${noDate === 1 ? "isn't" : "aren't"} counted.` : ""}`;
+  const n = hit.length;
+  let text;
+  if (!n) text = `No ${scope}unit on file has a warranty ending in ${w.label} (of ${dated.length} with an end date on file). ${basis}`;
+  else {
+    const past = hit.filter((r) => r.expires < today).length;
+    const lead = `${n} ${scope}unit${n === 1 ? " has a warranty" : "s have warranties"} ending in ${w.label}${past ? ` (${past} already ended as of ${today}${past === n ? "" : `, ${n - past} still to come`})` : ""}`;
+    const items = hit.slice(0, 10).map((r) => `${[r.manufacturer, r.equipment_type].filter(Boolean).join(" ") || "Unit"}${r.address ? ` at ${r.address}` : ""} - ends ${formatDateHumanWithIso(r.expires)}`);
+    text = `${lead}: ${items.join("; ")}${n > 10 ? `; and ${n - 10} more` : ""}. ${basis}`;
+  }
+  return attachCitations(answerEnvelope({ text, facts: [{ label: `${scope}warranties ending in ${w.label}`, value: String(n), sources: [] }], extra: { fastIntent: "warranty_period" } }),
+    { records: unitCite(hit), total: n, claimedCount: n, kind: "searched", basis: `Counted the ${scope}units whose warranty end date falls from ${w.from} to ${w.to}; every counted unit is listed.` });
 }
 
 async function warrantyCount(db, intent, today) {
@@ -422,17 +518,39 @@ async function techRows(db) {
 }
 
 async function techExtreme(db, intent) {
-  const rows = await techRows(db);
+  let rows = await techRows(db);
+  const W = intent.window;
+  if (W) {
+    const { rows: sd } = await db.raw(`SELECT document_id AS id, coalesce(nullif(corrected_value, ''), value) AS v FROM extractions WHERE field_key = 'service_date' AND ${TENANT_SQL}`, []);
+    const isoOf = (v) => { const m = /(\d{4})-(\d{2})-(\d{2})/.exec(String(v ?? "")); if (m) return `${m[1]}-${m[2]}-${m[3]}`; const u = /(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(String(v ?? "")); return u ? `${u[3]}-${String(+u[1]).padStart(2, "0")}-${String(+u[2]).padStart(2, "0")}` : null; };
+    const dateOf = new Map(); for (const r of sd) { const d = isoOf(r.v); if (d && !dateOf.has(r.id)) dateOf.set(r.id, d); }
+    rows = rows.filter((r) => { const d = dateOf.get(r.id); return d && d >= W.from && d <= W.to; });
+    const when = W.open ? W.label : W.range ? `from ${W.label}` : /^\d{4}$|^[A-Z][a-z]+ \d{4}$/.test(W.label) ? `in ${W.label}` : `on ${W.label}`;
+    if (!rows.length) return attachCitations(answerEnvelope({ text: `No technician has a dated job on file ${when}.`, facts: [], extra: { fastIntent: "tech_extreme" } }),
+      { records: [], total: 0, kind: "searched", basis: `Looked for service records naming a technician with a service date ${W.from} through ${W.to}; none.` });
+    intent = { ...intent, whenText: when };
+  }
   if (!rows.length) return null;
   const per = new Map(); for (const r of rows) { if (!per.has(r.tech)) per.set(r.tech, new Set()); per.get(r.tech).add(r.id); }
   const entries = [...per.entries()].map(([name, set]) => ({ name, n: set.size, ids: [...set] })).sort((a, b) => (intent.dir === "asc" ? a.n - b.n : b.n - a.n) || a.name.localeCompare(b.name));
   const best = entries[0].n; const winners = entries.filter((e) => e.n === best);
   const names = winners.map((w) => w.name).join(" and ");
   const word = intent.dir === "asc" ? "fewest" : "most";
-  const text = `${names} ${winners.length > 1 ? "are tied for the" : "has the"} ${word} jobs on file, with ${best}${winners.length > 1 ? " each" : ""} (counting every document that names the technician).`;
+  const text = `${names} ${winners.length > 1 ? "are tied for the" : "has the"} ${word} jobs ${intent.whenText ? `${intent.whenText}, ` : "on file, "}with ${best}${winners.length > 1 ? " each" : ""} (counting every document that names the technician${intent.whenText ? " and is dated in that window" : ""}).`;
   const docIds = [...new Set(winners.flatMap((w) => w.ids))].slice(0, 150);
   return attachCitations(answerEnvelope({ text, facts: winners.map((w) => ({ label: w.name, value: String(w.n), sources: [{ documentId: w.ids[0], location: {} }] })), extra: { fastIntent: "tech_extreme" } }),
     { records: docIds.map((id) => documentRecord({ id })), total: docIds.length, kind: "searched", basis: `Counted the documents naming each of the ${entries.length} technicians (${entries.map((e) => `${e.name} ${e.n}`).join(", ")}); the ${word} are listed.` });
+}
+
+async function techList(db) {
+  const rows = await techRows(db);
+  if (!rows.length) return null;
+  const per = new Map(); for (const r of rows) { if (!per.has(r.tech)) per.set(r.tech, new Set()); per.get(r.tech).add(r.id); }
+  const entries = [...per.entries()].map(([name, set]) => ({ name, n: set.size, ids: [...set] })).sort((a, b) => b.n - a.n || a.name.localeCompare(b.name));
+  const text = `${entries.length} technician${entries.length === 1 ? "" : "s"} on file: ${entries.map((e) => `${e.name} (${e.n} job${e.n === 1 ? "" : "s"})`).join(", ")}.`;
+  const docIds = [...new Set(entries.flatMap((e) => e.ids))].slice(0, 150);
+  return attachCitations(answerEnvelope({ text, facts: entries.map((e) => ({ label: e.name, value: String(e.n), sources: [{ documentId: e.ids[0], location: {} }] })), extra: { fastIntent: "tech_list" } }),
+    { records: docIds.map((id) => documentRecord({ id })), total: docIds.length, kind: "searched", basis: `Listed every distinct technician named on a service record; job counts are the documents naming each (${entries.length} technicians).` });
 }
 
 async function techTypedCount(db, intent) {

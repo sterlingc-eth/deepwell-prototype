@@ -390,6 +390,11 @@ export function parseMoneyIntent(question, { today }) {
   {
     const thM = q.match(THRESHOLD_RE);
     if (thM && /\binvoices?\b/.test(q)) {
+      // A date we cannot read ("in Q3", "last month") or a person/company named next to the amount is a qualifier this count would drop: hand off (no answer from here) rather than count all-time.
+      if (process.env.DONOVAN_AMOUNT_WINDOW !== '0') {
+        const rest = q.replace(thM[0], ' ');
+        if (/\b(?:(?:19|20)\d{2}|q[1-4]|quarter|jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|last|this|past|ago|today|yesterday|week|month|year|since|between|before|after|until|during)\b/.test(rest) || /\b[A-Z][a-z]+\s+[A-Z][a-z]+\b/.test(String(question ?? '').replace(/^\s*\S+\s+/, ''))) return null;
+      }
       const amt = Number(thM[2].replace(/,/g, ''));
       if (Number.isFinite(amt)) return mk('threshold_invoices', { subject: null, thresholdDir: /^(?:over|above|more than|greater than)$/i.test(thM[1]) ? 'over' : 'under', thresholdAmount: amt });
     }
@@ -1155,7 +1160,7 @@ async function thresholdInvoices(db, intent, ctx) {
   const cmp = thresholdDir === 'over' ? '>' : '<';
   const rows = await q(db, `SELECT f.* FROM financials f WHERE ${INVOICE_SCOPE} AND f.total IS NOT NULL AND f.total ${cmp} $2::numeric ORDER BY f.total DESC LIMIT 200`, [thresholdAmount], ctx.hu);
   const [a] = await q(db, `SELECT count(*) FILTER (WHERE f.total IS NULL)::int AS n_no_total FROM financials f WHERE ${INVOICE_SCOPE}`, [], ctx.hu);
-  const text = `${plural(rows.length, 'invoice')} ${rows.length === 1 ? 'is' : 'are'} ${thresholdDir} ${fmt(String(thresholdAmount))}.${exclusionText({ noTotal: a.n_no_total })}`;
+  const text = `${plural(rows.length, 'invoice')} ${rows.length === 1 ? 'is' : 'are'} ${thresholdDir} ${fmt(String(thresholdAmount))}.${process.env.DONOVAN_AMOUNT_BASIS === '0' ? '' : ' That counts every invoice on file, any date, paid or unpaid.'}${exclusionText({ noTotal: a.n_no_total })}`;
   return baseAnswer(text, rows.slice(0, 40).map((r) => invoiceFact(r)), {
     sources: rows.slice(0, 25).map((r) => docSource(r.document_id, r.total_page)), interpretation: `invoices ${thresholdDir} ${fmt(String(thresholdAmount))}`,
     cite: { records: financeRecords(rows), total: rows.length, claimedCount: rows.length, basis: `Counted invoices with a printed total ${thresholdDir} ${fmt(String(thresholdAmount))}.` },

@@ -1295,7 +1295,7 @@ export function parseContactLookupQuestion(question, opts = {}) {
   // R31 loop 3: technician job counts first — the entity (a known technician's full name) is a far stronger signal
   // than the core shapes' "number of ... for NAME" = phone-number reading. Needs the tenant's technician names.
   try {
-    const tech = parseTechnician(question, opts.tenantVocab);
+    const tech = parseTechnician(question, opts.tenantVocab, { allowWindow: true });
     if (tech) return { field: "technician", ...tech };
   } catch (err) { console.error("technician parse failed, deferring:", err?.message); }
   const core = parseContactLookupQuestionCore(question, opts);

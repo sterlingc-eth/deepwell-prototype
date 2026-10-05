@@ -11,6 +11,7 @@
  * address) so a rewrite can never turn a non-record question into a record one; spoken digits need >= 3 consecutive digit words.
  *   rewriteQuestion(q) -> rewritten string, or null when nothing changed. Pure.
  */
+import { withinEditDistance1, VOCAB } from "../nlNormalize.js";
 const DIGITS = { zero: "0", oh: "0", o: "0", one: "1", two: "2", three: "3", four: "4", five: "5", six: "6", seven: "7", eight: "8", nine: "9" };
 const DIGIT_SEQ_RE = /\b(?:(?:zero|oh|one|two|three|four|five|six|seven|eight|nine)\s+){2,}(?:zero|oh|one|two|three|four|five|six|seven|eight|nine)\b/gi;
 const UNIT_CTX = String.raw`(?:unit|units|system|systems|equipment|ac|a\/c|furnace|heat\s+pump|air\s+handler|condenser|hvac)`;
@@ -219,15 +220,148 @@ function rewriteLoopR5(q) {
   return q;
 }
 
-export function rewriteQuestion(question) {
+
+// R6 loop: count phrasing + typos. "number of / count of / total number of / num of <record noun> ..." -> "how many <noun> ..." (only when a
+// record noun follows, so "number of days in a week" is never touched), and typo'd count leads ("how mny", "hw many", "numbr of") plus
+// edit-distance-1 misspellings of the main record nouns inside a count-shaped question. Spelling only, never meaning.
+// Kill switch: DONOVAN_COUNT_PHRASING=0.
+const R6_NOUNS = ["invoices", "tickets", "customers", "warranties", "equipment", "technicians", "estimates", "proposals", "agreements", "permits", "installs", "visits"];
+const R6_NOUN_SRC = String.raw`(?:invoices?|tickets?|quotes?|estimates?|proposals?|customers?|clients?|units?|installs?|installations?|equipment|permits?|agreements?|contracts?|pos|purchase\s+orders?|service\s+(?:visits?|calls?|tickets?|jobs?)|visits?|calls?|jobs?|technicians?|techs?|warranties|photos?|pdfs?|documents?|docs|systems?|pieces|furnaces|heat\s+pumps)`;
+const COUNT_LEAD_TYPO = /\b(?:how|hw|hou|hoe)\s*(?:mny|mnay|mant|many?y|manny|maney|manu|mamy|mayn|mni|mny)\b|\bhowmany\b/gi;
+function rewriteCountPhrasing(q) {
+  if (process.env.DONOVAN_COUNT_PHRASING === "0") return q;
+  let s = q;
+  s = s.replace(COUNT_LEAD_TYPO, "how many");
+  s = s.replace(/^(\s*(?:so\s+|ok\s+|hey\s+)?(?:what(?:'s|s|\s+is)\s+|whats\s+|tell\s+me\s+|give\s+me\s+)?(?:the\s+)?(?:total\s+)?)(?:numbr|nmber|numer|numbe|nuber|number|num|nbr|countt|count|no\.?|#)\s*of\s+(?=\S)/i, (m, pre) => `${pre.replace(/\b(?:what(?:'s|s|\s+is)|whats|tell\s+me|give\s+me|so|ok|hey|the|total)\b\s*/gi, "")}how many `);
+  if (!/\bhow\s+many\b/i.test(s)) return q;
+  s = s.replace(/\bhow\s+many\s+(?=\S)/i, "how many ");
+  // typo'd record nouns (only in a count-shaped question): edit distance 1 from the noun list, word length >= 6, never a vocab word itself
+  s = s.replace(/\b[a-z]{6,12}\b/gi, (w) => {
+    const lw = w.toLowerCase();
+    if (R6_NOUNS.includes(lw) || R6_NOUNS.some((n) => n.slice(0, -1) === lw || n.slice(0, -2) === lw) || /(?:ed|ing|ers?)$/.test(lw) || VOCAB.has(lw)) return w; // real words (invoiced, install, installed, equipments) are never "fixed"
+    const hit = R6_NOUNS.find((n) => withinEditDistance1(lw, n));
+    return hit ?? w;
+  });
+  return s;
+}
+
+// R3 nameyear loop: a trailing year after a document type or a "tech <name>" ("inspection reports for 2026", "tickets for tech Danny in 2011") ->
+// the count shapes the engine already answers with the year applied. Whole-question matches only. Kill switch: DONOVAN_NAME_YEAR=0.
+const NY_DOC_SRC = String.raw`(?:service\s+tickets?|tickets?|work\s*orders?|start-?\s?up\s+(?:sheets?|reports?)|inspection\s+reports?|inspections?|quotes|proposals|estimates|purchase\s+orders?|pos?|invoices?|permits|warranty\s+registrations?)`;
+function rewriteNameYear(q) {
+  if (process.env.DONOVAN_NAME_YEAR === "0") return q;
+  const E = String.raw`\s*[?.!]*\s*$`;
+  const Y = String.raw`(?:in|during|for|from|of)\s+(?:the\s+year\s+)?((?:19|20)\d\d)`;
+  let m = new RegExp(String.raw`^\s*(?:how\s+many\s+|number\s+of\s+|count\s+of\s+|any\s+)?(${NY_DOC_SRC})\s+` + Y + E, "i").exec(q);
+  if (m) return `how many ${m[1].toLowerCase().replace(/\s+/g, " ").replace(/^pos?$/, "purchase orders")} in ${m[2]}`;
+  m = new RegExp(String.raw`^\s*(?:how\s+many\s+|number\s+of\s+|count\s+of\s+|any\s+|show\s+me\s+|list\s+)?(?:service\s+tickets?|tickets?|jobs?|calls?|visits?|service\s+calls?)\s+(?:for|by|from)\s+(?:the\s+)?tech(?:nician)?\s+([A-Za-z][A-Za-z'.-]*(?:\s+[A-Za-z][A-Za-z'.-]*)?)\s+` + Y + E, "i").exec(q);
+  if (m && !/^(?:in|on|for)$/i.test(m[1])) return `how many calls did ${m[1]} do in ${m[2]}`;
+  return q;
+}
+
+// R3 relwindow loop: relative / period / yearless date windows on a record noun WITHOUT "how many" ("tickets in the last 7 days", "service calls
+// this week", "quotes this month", "invoices Q1 2026", "jobs on 9/12", "invoices between 9/1 and 9/15") fell to the model. Whole-question shape
+// <lead?> <record noun> <window>; the window is resolved against `today` into an explicit calendar range the count engine already answers
+// ("between 2026-09-18 and 2026-09-25", "on 9/12/2026"), so the answer states the dates used. Same week rule as analytics (Monday start).
+// Kill switch: DONOVAN_REL_WINDOW=0.
+const RW_DOC = String.raw`(?:service\s+tickets?|tickets?|tikets?|tickts?|tix|work\s*orders?|service\s+calls?|servcie\s+calls?|calls?|jobs?|service\s+visits?|visits?|quotes|proposals|estimates|invoi?ces?|inspection\s+reports?|purchase\s+orders?|permits)`;
+const RW_MON = "jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?";
+const rwIso = (d) => d.toISOString().slice(0, 10);
+function rwYear(m, d, today) { // most recent such day not in the future
+  const y = Number(today.slice(0, 4));
+  return `${m}/${d}/${`${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}` > today ? y - 1 : y}`;
+}
+function rwWindow(tail, today) {
+  let t = tail.trim().toLowerCase().replace(/^(?:in|for|during|over|within|on|of)\s+/, "").replace(/^from\s+(?=(?:the\s+)?(?:last|past|previous|this)\b)/, "").replace(/^the\s+(?=(?:last|past|previous)\b)/, "");
+  const T = new Date(`${today}T00:00:00Z`); const add = (d, n) => new Date(d.getTime() + n * 86400000);
+  let m;
+  if ((m = /^(?:last|past|previous)\s+(\d{1,3})\s+(day|week)s?$/.exec(t))) {
+    const n = Number(m[1]) * (m[2] === "week" ? 7 : 1);
+    if (n < 1 || n > 400) return null;
+    return `since ${rwIso(add(T, -n))}`;
+  }
+  // Rolling calendar-month/year windows ("last 3 months", "past 2 years", "past year"): start = today minus N months (day clamped), end = today.
+  // Kill switch: DONOVAN_ROLLING=0.
+  if (process.env.DONOVAN_ROLLING !== "0" && (m = /^(?:last|past|previous)\s+(?:(\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|a)\s+)?(month|mon|mos?|months|year|yr|yrs|years)$/.exec(t)) && (m[1] !== undefined || /^past\s+year$/.test(t))) {
+    const W = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, a: 1 };
+    const n = m[1] === undefined ? 1 : (W[m[1]] ?? Number(m[1]));
+    const months = n * (/^y/.test(m[2]) ? 12 : 1);
+    if (months < 1 || months > 240) return null;
+    const tgt = new Date(Date.UTC(T.getUTCFullYear(), T.getUTCMonth() - months, 1));
+    const last = new Date(Date.UTC(tgt.getUTCFullYear(), tgt.getUTCMonth() + 1, 0)).getUTCDate();
+    tgt.setUTCDate(Math.min(T.getUTCDate(), last));
+    return `between ${rwIso(tgt)} and ${today}`;
+  }
+  const mon = add(T, -((T.getUTCDay() + 6) % 7));
+  if (t === "this week") return `since ${rwIso(mon)}`;
+  if (t === "last week") return `between ${rwIso(add(mon, -7))} and ${rwIso(add(mon, -1))}`;
+  if (t === "this month" || t === "last month") {
+    const d = new Date(Date.UTC(T.getUTCFullYear(), T.getUTCMonth() - (t === "last month" ? 1 : 0), 1));
+    return `in ${["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"][d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  }
+  if (/^(?:today|yesterday|this\s+(?:year|quarter)|last\s+(?:year|quarter)|q[1-4]\s*(?:of\s+)?(?:fy\s*)?\d{4})$/.test(t)) return t;
+  if ((m = /^(\d{1,2})\/(\d{1,2})$/.exec(t))) return `on ${rwYear(+m[1], +m[2], today)}`;
+  if ((m = /^(?:between|from)\s+(\d{1,2})\/(\d{1,2})\s+(?:and|to|through|thru|until)\s+(\d{1,2})\/(\d{1,2})$/.exec(t))) return `between ${rwYear(+m[1], +m[2], today)} and ${rwYear(+m[3], +m[4], today)}`;
+  if ((m = new RegExp(String.raw`^(?:between|from)\s+(${RW_MON})\.?\s+(\d{1,2})(?:st|nd|rd|th)?\s+(?:and|to|through|thru|until)\s+(${RW_MON})\.?\s+(\d{1,2})(?:st|nd|rd|th)?$`).exec(t))) {
+    const y = Number(today.slice(0, 4)); const MN = "jan feb mar apr may jun jul aug sep oct nov dec".split(" ");
+    const num = (w) => MN.indexOf(w.slice(0, 3)) + 1;
+    const [ra, rb] = [rwYear(num(m[1]), +m[2], today), rwYear(num(m[3]), +m[4], today)];
+    return y ? `between ${ra} and ${rb}` : null;
+  }
+  return null;
+}
+export function rewriteRelWindow(q, today) {
+  if (process.env.DONOVAN_REL_WINDOW === "0" || !/^\d{4}-\d{2}-\d{2}$/.test(String(today ?? ""))) return q;
+  const m = new RegExp(String.raw`^\s*(?:(?:show\s+me|list|gimme|give\s+me|get\s+me|pull\s+up|any|how\s+many|number\s+of|count\s+of|total)\s+)?(?:the\s+|all\s+|our\s+)?(${RW_DOC})\s+(?:(?:were|was|did\s+we\s+(?:have|do|get|send|write))\s+)?(.+?)\s*[?.!]*\s*$`, "i").exec(q);
+  if (!m) return q;
+  const win = rwWindow(m[2], today);
+  if (!win) return q;
+  const noun = m[1].toLowerCase().replace(/\s+/g, " ").replace(/^(?:tix|tikets?|tickts?)$/, (x) => (x.endsWith("s") || x === "tix" ? "tickets" : "ticket")).replace(/^servcie/, "service").replace(/^invoces?/, (x) => `invoice${x.endsWith("s") ? "s" : ""}`);
+  return `how many ${noun} ${win}`;
+}
+
+// R3 rangenoun loop: a shop-wide year range on a record noun with no "how many" ("service tickets 2010-2012", "invoices from 2010 through 2012", "jobs between 2009 and 2011")
+// fell to the model. Rewritten into the count form the engine already answers, so the answer states the years used. Reversed ranges are left to their own rule.
+// Kill switch: DONOVAN_RANGE_NOUN=0.
+export function rewriteRangeNoun(q) {
+  if (process.env.DONOVAN_RANGE_NOUN === "0") return q;
+  const m = new RegExp(String.raw`^\s*(?:(?:how\s+many|number\s+of|count\s+of|total|any)\s+)?(?:the\s+|all\s+|our\s+)?(${RW_DOC})\s+(?:(from|between|in|during|over|for)\s+)?((?:19|20)\d\d)\s*(-|\u2013|to|through|thru|and|until)\s*((?:19|20)\d\d)\s*[?.!]*\s*$`, "i").exec(q);
+  if (!m || Number(m[3]) > Number(m[5]) || (m[4] === "and" && String(m[2]).toLowerCase() !== "between")) return q; // "in 2010 and 2026" is two separate years, not a range
+  const noun = m[1].toLowerCase().replace(/\s+/g, " ").replace(/^(?:tix|tikets?|tickts?)$/, (x) => (x.endsWith("s") || x === "tix" ? "tickets" : "ticket")).replace(/^servcie/, "service").replace(/^invoces?/, (x) => `invoice${x.endsWith("s") ? "s" : ""}`);
+  return `how many ${noun} from ${m[3]} to ${m[5]}`;
+}
+
+// R3 techrank loop: "jobs per technician" / "busiest tech" / "tech with most jobs" -> the shapes the engine answers consistently (roster with job counts; top technician by
+// jobs on file). "busiest technician" used to count visits and report a different, tied winner than "which tech has the most jobs". Kill switch: DONOVAN_TECH_RANK=0.
+export function rewriteTechRank(q, today) {
+  if (process.env.DONOVAN_TECH_RANK === "0") return q;
+  const T = String.raw`(?:techs?|technicians?)`, N = String.raw`(?:jobs?|tickets?|calls?|visits?|service\s+calls?)`, E = String.raw`\s*[?.!]*\s*$`;
+  if (new RegExp(String.raw`^\s*(?:show\s+me\s+|list\s+)?${N}\s+(?:per|by|for\s+each|for\s+every|by\s+each)\s+${T}` + E, "i").test(q)) return "list the techs";
+  const by = new RegExp(String.raw`^\s*((?:how\s+many|number\s+of|count\s+of)\s+)?(?:(?:show\s+me|list|gimme|give\s+me|get\s+me|pull\s+up|any)\s+)?(?:the\s+|all\s+)?(?:service\s+tickets?|tickets?|tix|work\s*orders?|service\s+calls?|calls?|visits?|jobs?)\s+(?:done\s+|worked\s+|run\s+|logged\s+)?by\s+(?:tech(?:nician)?\s+)?([A-Za-z][A-Za-z'.-]*(?:\s+[A-Za-z][A-Za-z'.-]*)?.*?)` + E, "i").exec(q);
+  if (by && !new RegExp(String.raw`^${T}s?$`, "i").test(by[2].trim())) {
+    let rest = by[2];
+    const y = /^\d{4}-/.test(String(today ?? "")) ? Number(today.slice(0, 4)) : null;
+    if (y) rest = rest.replace(/\s+(?:in\s+|during\s+|for\s+|from\s+)?(last|previous|this)\s+year$/i, (_, w) => ` in ${/^this$/i.test(w) ? y : y - 1}`);
+    return `${by[1] ? "how many " : ""}jobs by ${rest}`;
+  }
+  if (new RegExp(String.raw`^\s*(?:who(?:'?s|\s+is)\s+(?:our\s+|the\s+)?busiest\s+${T}|(?:our\s+|the\s+)?busiest\s+${T}|${T}\s+with\s+(?:the\s+)?most\s+${N}|who\s+has\s+(?:the\s+)?most\s+${N},?\s+${T}\s*(?:wise)?)` + E, "i").test(q)) return "which tech has the most jobs";
+  return q;
+}
+
+export function rewriteQuestion(question, today) {
   const src = String(question ?? "");
   if (!src.trim() || src.length > 300) return null;
   let q = rewriteShorthand(src);
   q = q.replace(DIGIT_SEQ_RE, (m) => m.toLowerCase().split(/\s+/).map((w) => DIGITS[w] ?? w).join(""));
   for (const [re, rep] of RULES) q = q.replace(re, rep);
+  q = rewriteCountPhrasing(q);
   q = rewriteWindowShapes(q);
   q = rewriteLoopR3(q);
   q = rewriteLoopR4(q);
   q = rewriteLoopR5(q);
+  q = rewriteNameYear(q);
+  q = rewriteRelWindow(q, today);
+  q = rewriteRangeNoun(q);
+  q = rewriteTechRank(q, today);
   return q !== src ? q : null;
 }
