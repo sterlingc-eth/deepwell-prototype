@@ -61,6 +61,7 @@
     "verify:r3-warrexp": "tsx scripts/verify-r3-warrexp.mjs",
     "verify:r3-relname": "tsx scripts/verify-r3-relname.mjs",
     "verify:r3-techby": "tsx scripts/verify-r3-techby.mjs",
+    "verify:r3-techwindow": "tsx scripts/verify-r3-techwindow.mjs",
     "verify:r3-nameyear": "tsx scripts/verify-r3-nameyear.mjs",
     "verify:r3-namewindow": "tsx scripts/verify-r3-namewindow.mjs",
     "verify:r3-amtnohow": "tsx scripts/verify-r3-amtnohow.mjs",

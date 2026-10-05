@@ -337,10 +337,23 @@ export function rewriteTechRank(q, today) {
   if (process.env.DONOVAN_TECH_RANK === "0") return q;
   const T = String.raw`(?:techs?|technicians?)`, N = String.raw`(?:jobs?|tickets?|calls?|visits?|service\s+calls?)`, E = String.raw`\s*[?.!]*\s*$`;
   if (new RegExp(String.raw`^\s*(?:show\s+me\s+|list\s+)?${N}\s+(?:per|by|for\s+each|for\s+every|by\s+each)\s+${T}` + E, "i").test(q)) return "list the techs";
+  // R3 techwindow: open phrasings ("what did Danny do in march 2024", "service visits for tech Danny this month", "tickets Danny worked on in 2011", "work done by Danny last year") become the
+  // "jobs by <name> <window>" shape below. Names are NOT matched here (roster-gated downstream); pronouns excluded. Kill switch: DONOVAN_TECH_WINDOW=0.
+  if (process.env.DONOVAN_TECH_WINDOW !== "0") {
+    const lc = String(q).replace(/[\u2019`]/g, "'").replace(/[?!.]+\s*$/, "").trim();
+    const NM = String.raw`(?!(?:they|we|you|he|she|it|i|the|our|my|who|what|that|this)\b)([A-Za-z][A-Za-z'.-]*(?:\s+[A-Za-z][A-Za-z'.-]*)?)`;
+    const CUE = /\b(?:(?:19|20)\d\d|last|this|previous|since|between|before|after|january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\b/i;
+    let mm;
+    if ((mm = new RegExp(String.raw`^(?:what|which\s+(?:jobs?|tickets?|calls?|visits?))\s+(?:work\s+|jobs?\s+|tickets?\s+)?(?:did|has|have)\s+(?:tech(?:nician)?\s+)?${NM}\s+(?:do|done|work\s+on|worked\s+on|run|handle|handled)\s+(.+)$`, "i").exec(lc)) && CUE.test(mm[2])) q = `jobs by ${mm[1]} ${mm[2]}`;
+    else if ((mm = new RegExp(String.raw`^(?:the\s+|all\s+)?(?:service\s+tickets?|tickets?|work\s*orders?|service\s+calls?|service\s+visits?|calls?|jobs?|visits?|work)\s+(?:for|from)\s+tech(?:nician)?\s+(.+)$`, "i").exec(lc))) q = `jobs by ${mm[1]}`;
+    else if ((mm = /^work\s+(?:done|completed|performed)\s+by\s+(?:tech(?:nician)?\s+)?(.+)$/i.exec(lc))) q = `jobs by ${mm[1]}`;
+    else if ((mm = new RegExp(String.raw`^(?:the\s+|all\s+)?(?:service\s+tickets?|tickets?|work\s*orders?|service\s+calls?|calls?|jobs?|visits?)\s+${NM}\s+(?:worked\s+on|ran|handled|completed)\s+(.+)$`, "i").exec(lc)) && CUE.test(mm[2])) q = `jobs by ${mm[1]} ${mm[2]}`;
+  }
   const by = new RegExp(String.raw`^\s*((?:how\s+many|number\s+of|count\s+of)\s+)?(?:(?:show\s+me|list|gimme|give\s+me|get\s+me|pull\s+up|any)\s+)?(?:the\s+|all\s+)?(?:service\s+tickets?|tickets?|tix|work\s*orders?|service\s+calls?|calls?|visits?|jobs?)\s+(?:done\s+|worked\s+|run\s+|logged\s+)?by\s+(?:tech(?:nician)?\s+)?([A-Za-z][A-Za-z'.-]*(?:\s+[A-Za-z][A-Za-z'.-]*)?.*?)` + E, "i").exec(q);
   if (by && !new RegExp(String.raw`^${T}s?$`, "i").test(by[2].trim())) {
     let rest = by[2];
     const y = /^\d{4}-/.test(String(today ?? "")) ? Number(today.slice(0, 4)) : null;
+    if (y && process.env.DONOVAN_TECH_WINDOW !== "0") rest = rest.replace(/\s+(?:in\s+|during\s+|for\s+|from\s+)?(this|last|previous)\s+month$/i, (_, w) => { const mo = Number(today.slice(5, 7)) - (/^this$/i.test(w) ? 0 : 1); const yy = mo < 1 ? y - 1 : y; return ` in ${["January","February","March","April","May","June","July","August","September","October","November","December"][(mo + 11) % 12]} ${yy}`; });
     if (y) rest = rest.replace(/\s+(?:in\s+|during\s+|for\s+|from\s+)?(last|previous|this)\s+year$/i, (_, w) => ` in ${/^this$/i.test(w) ? y : y - 1}`);
     return `${by[1] ? "how many " : ""}jobs by ${rest}`;
   }
