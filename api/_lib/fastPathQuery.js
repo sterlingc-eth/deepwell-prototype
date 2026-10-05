@@ -16,6 +16,12 @@
 import { dropConflicting } from './addressConflict.js';
 import { normalizeMatchText } from './recordsStore.js';
 import { documentTypeLabel } from './documentTypes.js';
+
+// Lazy on purpose: industry/index.js -> packs/hvac.js -> contentCount.js -> ... -> this file is an import cycle
+// when the entry point is contentCount.js, so the pack resolver is loaded on first use, not at module load.
+async function packForDb(db) {
+  try { return await (await import('./industry/index.js')).packForTenant(db); } catch { return null; }
+}
 import { isoDate, extractUnitDesignator, addressHasUnit } from './scope.js';
 import { alertTier } from './warrantyRules.js';
 // R15 (Team C, follow-up round): read-only — financialsTableExists is the same tolerant probe
@@ -669,7 +675,7 @@ async function runWarranty(db, resolution, intent, today, labelOverride, teamSco
   const citationRow = pickBestExtraction(rows);
   if (!citationRow) return null;
 
-  return buildWarrantyAnswer({ intent, resolution: equipmentResolution, stable, today, citationRow, labelOverride });
+  return buildWarrantyAnswer({ intent, resolution: equipmentResolution, stable, today, citationRow, labelOverride, pack: await packForDb(db) });
 }
 
 /* ======================================================= R16 owner address-answer policy

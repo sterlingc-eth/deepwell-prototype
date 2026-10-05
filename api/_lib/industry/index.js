@@ -56,9 +56,28 @@ export function listPacks() {
   return PACK_IDS.map((id) => PACKS_BY_ID.get(id));
 }
 
+/**
+ * Industry notes for the Donovan system prompts (2A). '' for the hvac pack or
+ * no pack, so the HVAC prompts stay byte-identical. For any other pack: what the
+ * shared words mean in this industry (the records store everything as customer /
+ * equipment / technician; a plumbing, electrical or property company means
+ * something different by them) and the document types it files. Pure and built
+ * only from the pack, so one company can never hear another industry's words.
+ */
+export function industryPromptNotes(pack) {
+  if (!pack || pack.id === 'hvac') return '';
+  const types = (pack.documentTypes ?? []).filter((t) => t.id !== 'other' && t.id !== 'internal').map((t) => t.label).join(', ');
+  const isProperty = pack.id === 'property';
+  const mapping = isProperty
+    ? 'In the data views a "customer" is the property OWNER, a "technician" is the VENDOR who did the work, and "equipment" is an APPLIANCE in a unit; unit numbers, tenants and lease dates are document fields.'
+    : `In the data views a "customer" is this company's client, a "technician" is the company's own field worker, and "equipment" is the ${pack.unitNoun} or other installed item the work was done on.`;
+  return `\n\nINDUSTRY: this company is a ${pack.businessNoun}. ${mapping} Its documents are filed as: ${types}. Use this industry's own words in answers (never another trade's), and when a field a question asks about is not captured say so plainly instead of guessing.`;
+}
+
 /* ------------------------------------------------------------ tenant resolution */
 
-const TENANT_INDUSTRY_TTL_MS = 10 * 60 * 1000;
+// 60 s (was 10 min): see resolver.js.
+const TENANT_INDUSTRY_TTL_MS = 60 * 1000;
 const tenantIndustryCache = new Map();
 
 /** Clears the resolved-industry cache; scripts/verify-industry.mjs uses this
@@ -75,6 +94,9 @@ export function invalidateTenantIndustryCache(tenantId) {
   if (tenantId == null) return;
   tenantIndustryCache.delete(`db:${tenantId}`);
   tenantIndustryCache.delete(`ctx:${tenantId}`);
+  // 2A: entries resolved through the {withTenant, ctxArg} shape are keyed by tenantKey, but a settings write only
+  // knows the tenant uuid, so each entry also remembers its uuid and is dropped by it.
+  for (const [k, v] of tenantIndustryCache) if (v.tenantId === tenantId) tenantIndustryCache.delete(k);
 }
 
 /** True for anything that already looks like an open, tenant-scoped store
@@ -119,9 +141,12 @@ export async function packForTenant(dbOrCtx) {
       const hit = tenantIndustryCache.get(cacheKey);
       if (hit && hit.expiresAt > Date.now()) return getPack(hit.industry);
     }
-    let industry = null;
-    try { industry = await queryIndustry(dbOrCtx); } catch { industry = null; }
-    if (cacheKey) tenantIndustryCache.set(cacheKey, { industry, expiresAt: Date.now() + TENANT_INDUSTRY_TTL_MS });
+    let industry = null; let failed = false;
+    try { industry = await queryIndustry(dbOrCtx); } catch { industry = null; failed = true; }
+    // 2A: a FAILED lookup is never cached. Before, one connection blip stored
+    // "hvac" for this tenant for 10 minutes, so a plumbing company was answered
+    // as an HVAC shop. It still falls back to hvac for THIS call only.
+    if (cacheKey && !failed) tenantIndustryCache.set(cacheKey, { industry, tenantId: dbOrCtx.tenantId, expiresAt: Date.now() + TENANT_INDUSTRY_TTL_MS });
     return getPack(industry);
   }
 
@@ -134,13 +159,13 @@ export async function packForTenant(dbOrCtx) {
   }
   if (typeof withTenant !== 'function' || !ctx) return hvacPack;
 
-  let industry = null;
+  let industry = null; let failed = false; let tenantId = null;
   try {
-    industry = await withTenant(ctx, (db) => queryIndustry(db));
+    ({ industry, tenantId } = await withTenant(ctx, async (db) => ({ industry: await queryIndustry(db), tenantId: db?.tenantId ?? null })));
   } catch {
-    industry = null;
+    industry = null; failed = true;
   }
-  if (cacheKey) tenantIndustryCache.set(cacheKey, { industry, expiresAt: Date.now() + TENANT_INDUSTRY_TTL_MS });
+  if (cacheKey && !failed) tenantIndustryCache.set(cacheKey, { industry, tenantId, expiresAt: Date.now() + TENANT_INDUSTRY_TTL_MS });
   return getPack(industry);
 }
 

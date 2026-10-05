@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { IngestProgress } from '../services/ingestClient';
 import { summarizeProgress, type BulkFileState } from '../services/bulkImport';
 import type { BillingInterval, BillingStatus } from '../services/billingClient';
+import type { IndustryInfo } from '../lib/industry';
 import { DEFAULT_CUSTOMER_FILTERS, type CustomerFilters } from '../core/customerFilters';
 import type { WorkFilterChoice } from '../core/workFilter';
 import { ensureDocLoaded } from '../core/entityGraph';
@@ -254,6 +255,11 @@ interface AppState {
   billingStatus: BillingStatus | null;
   setBillingStatus: (status: BillingStatus | null) => void;
 
+  // Build 2 stage 2A: this company's industry, from the bootstrap payload. null until it loads (every consumer
+  // then answers as HVAC, the historical default).
+  industry: IndustryInfo | null;
+  setIndustry: (info: IndustryInfo | null) => void;
+
   // Startup performance (handoffs/STARTUP_PERF_R13.md): status of the one
   // POST /api/records action=bootstrap round trip useBootstrap.ts fires on
   // load. NotificationsPanel reads `notificationsUnread` for an instant
@@ -416,6 +422,9 @@ export const useAppStore = create<AppState>((set) => ({
 
   billingStatus: null,
   setBillingStatus: (status) => set({ billingStatus: status }),
+
+  industry: null,
+  setIndustry: (info) => set({ industry: info }),
 
   bootstrapStatus: 'idle',
   setBootstrapStatus: (status) => set({ bootstrapStatus: status }),

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowRight, Check, ChevronDown, ChevronRight, ClipboardList, Copy, Loader2, Mail, Upload, User, X } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
+import { IndustryAttentionCard } from '../components/IndustryAttentionCard';
 import { DataHealthStrip } from '../components/DataHealthStrip';
 import { FinancialsCard } from '../components/FinancialsCard';
 import { InsightsCard } from '../components/insights/InsightsCard';
@@ -421,6 +422,7 @@ export function DashboardScreen() {
         {/* Kept at the top, always expanded — the one section the owner asked to never bury (R17 UX audit
             fix #12). R36: it used to sit under ~550px of Data health tiles, i.e. below the fold at 1280x800. */}
         {!DEMO_MODE && <InsightsCard onAsk={askQuestion} onOpenInbox={() => { setCurrentScreen('ingest'); setInboxTab('needs-person'); }} />}
+        {!DEMO_MODE && <IndustryAttentionCard onAsk={askQuestion} />}
         <DataHealthStrip />
         {!DEMO_MODE && (
           <section aria-labelledby="financials-heading" className="space-y-3">

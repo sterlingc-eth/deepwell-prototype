@@ -177,11 +177,11 @@ const DOCUMENT_TYPE_GUIDE = DOCUMENT_TYPES.map((t) => `- ${t.id}: ${DOCUMENT_TYP
 const KNOWN_FIELD_KIND = {
   reminder_trigger: 'reminder_trigger',
   cost: 'money', rent_amount: 'money', security_deposit: 'money',
-  labor_hours: 'number', amperage: 'number', voltage: 'number', gallons: 'number',
+  labor_hours: 'number', amperage: 'text', voltage: 'text', gallons: 'number',
 };
 function inferFieldKind(key) {
   if (KNOWN_FIELD_KIND[key]) return KNOWN_FIELD_KIND[key];
-  if (/_date$/.test(key) || key === 'warranty_expires' || key === 'coi_expires') return 'date';
+  if (/_(?:date|expiry|due)$/.test(key) || key === 'warranty_expires' || key === 'coi_expires') return 'date';
   return 'text';
 }
 
@@ -203,7 +203,7 @@ function packFieldMeta(pack) {
     key: f.key,
     kind: inferFieldKind(f.key),
     desc: f.description ?? f.label,
-    repeatable: f.key === 'work_performed' || f.key === 'part_number',
+    repeatable: f.key === 'work_performed' || f.key === 'part_number' || f.key === 'correction_items' || f.key === 'policy_expiry',
   }));
   const specByKey = new Map(specs.map((s) => [s.key, s]));
   const unitScoped = new Set(pack.fields.filter((f) => f.perUnit).map((f) => f.key));
@@ -211,7 +211,7 @@ function packFieldMeta(pack) {
   const docTypeGuide = pack.documentTypes.map((t) => `- ${t.id}: ${t.definition}`).join('\n');
   const tool = buildExtractToolFor(pack.documentTypes.map((t) => t.id), specs.map((s) => s.key));
 
-  const meta = { specs, specByKey, unitScoped, fieldGuide, docTypeGuide, tool };
+  const meta = { specs, specByKey, unitScoped, fieldGuide, docTypeGuide, tool, conflictDrop: new Set(['inspection_type', 'inspection_result'].filter((k) => specByKey.has(k))), repeatable: new Set(specs.filter((x) => x.repeatable).map((x) => x.key)) };
   packFieldCache.set(pack.id, meta);
   return meta;
 }
@@ -763,9 +763,17 @@ function dedupe(fields, meta = { specs: FIELD_SPECS, unitScoped: UNIT_SCOPED_FIE
   const unitScoped = meta.unitScoped ?? UNIT_SCOPED_FIELDS;
   const best = new Map();
   const out = [];
+  // a document that lists several inspections with different stages/results is never stored as one mixed row
+  if (meta.conflictDrop?.size) {
+    const seen = new Map();
+    const cls = (k, v) => { const t = String(v).toLowerCase(); if (k === 'inspection_type') return /pre[- ]?final/.test(t) ? 'prefinal' : /final/.test(t) ? 'final' : /rough/.test(t) ? 'rough' : /underground/.test(t) ? 'underground' : /service|meter|temporary/.test(t) ? 'service' : t; return /fail|reject|denied|correction|not (?:approved|passed|accepted)|unsatisf/.test(t) ? 'fail' : 'ok'; };
+    for (const f of fields) if (meta.conflictDrop.has(f.field_key)) { const st = seen.get(f.field_key) ?? new Set(); st.add(cls(f.field_key, f.value)); seen.set(f.field_key, st); }
+    const drop = new Set([...seen].filter(([, st]) => st.size > 1).map(([k]) => k));
+    if (drop.size) fields = fields.filter((f) => !drop.has(f.field_key));
+  }
 
   for (const f of fields) {
-    if (REPEATABLE.has(f.field_key)) {
+    if (REPEATABLE.has(f.field_key) || meta.repeatable?.has(f.field_key)) {
       const id = `${f.field_key}::${f.value.toLowerCase()}`;
       if (best.has(id)) continue;
       best.set(id, f);
@@ -783,7 +791,7 @@ function dedupe(fields, meta = { specs: FIELD_SPECS, unitScoped: UNIT_SCOPED_FIE
     if (better) best.set(groupKey, f);
   }
 
-  for (const f of best.values()) if (!REPEATABLE.has(f.field_key)) out.push(f);
+  for (const f of best.values()) if (!REPEATABLE.has(f.field_key) && !meta.repeatable?.has(f.field_key)) out.push(f);
   return out.sort((a, b) => order.indexOf(baseKeyOf(a.field_key)) - order.indexOf(baseKeyOf(b.field_key)));
 }
 

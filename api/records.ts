@@ -26,6 +26,12 @@ import { getAsksThisMonth, resetsOnIso } from './_lib/usage.js';
 import { normalizeContentType, sanitizeUploadFilename } from './_lib/r2.js';
 import { checkUploadFile } from './_lib/uploadTypes.js';
 import { DOCUMENT_TYPE_IDS } from './_lib/documentTypes.js';
+import { industrySummaryFromSettings } from './_lib/industry/resolver.js';
+
+/** Industry block for the bootstrap payload (stage 2A), from the settings already selected: no extra query. */
+function industryBootstrap(tenantRow: any) {
+  return industrySummaryFromSettings({ industry: tenantRow?.industry_id ?? undefined, packs: tenantRow?.packs_raw ?? undefined });
+}
 
 export const config = {
   api: { bodyParser: { sizeLimit: '1mb' } },
@@ -148,7 +154,8 @@ async function runBootstrap(db: any, auth: any, payload: any): Promise<any> {
 
   const [tenantRow, documentsStored, pagesThisMonth, asksThisMonth, recordsRows, notifRows] = await Promise.all([
     db.raw(
-      `SELECT plan, billing_status, trial_ends_at, current_period_end, cancel_at_period_end, limits
+      `SELECT plan, billing_status, trial_ends_at, current_period_end, cancel_at_period_end, limits,
+            settings->>'industry' AS industry_id, settings->'packs' AS packs_raw
          FROM tenants WHERE id = $1`,
       [db.tenantId]
     ).then((r: any) => r.rows[0] ?? null).catch(() => null),
@@ -178,6 +185,8 @@ async function runBootstrap(db: any, auth: any, payload: any): Promise<any> {
       limits: clientLimits(tenantRow),
       usage: { documentsStored, pagesThisMonth, asksThisMonth, resetsOn: resetsOnIso() },
     },
+    // Build 2 stage 2A: the company's industry, resolved from the same row (no extra query).
+    industry: tenantRow ? industryBootstrap(tenantRow) : undefined,
     notifications: { items: notifRows.items ?? [], unreadCount: Number(notifRows.unread_count) || 0 },
     records: { rows: recordsRows, total: documentsStored },
   };

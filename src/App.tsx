@@ -22,6 +22,7 @@ import { ScreenLoadBoundary } from './components/ScreenLoadBoundary';
 import { AskScreen } from './screens/AskScreen';
 import { LoginScreen } from './screens/LoginScreen';
 import { OnboardingScreen } from './screens/OnboardingScreen';
+import { usePendingIndustry } from './hooks/usePendingIndustry';
 import { isAdminRole } from './services/teamClient';
 import './index.css';
 
@@ -180,6 +181,7 @@ function App() {
   // the sessionStorage copy it keeps around to survive a Clerk auth/org
   // redirect — see useDeepLink.ts's DEEP_LINK_STORAGE_KEY comment.
   useDeepLink(!!isSignedIn && !!orgId);
+  usePendingIndustry(!DEMO_MODE && !!isSignedIn, orgId, isAdminRole(orgRole ?? null), userId);
 
   // Billing status backs AppShell's global banner, BillingScreen's own
   // display, and — HARD GATE (owner decision, 2026-09-21) — whether this

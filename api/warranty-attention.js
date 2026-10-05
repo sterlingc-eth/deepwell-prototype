@@ -2,6 +2,7 @@ import { handleCors, handleError } from "./_lib/claude.js";
 import { tenantToday } from "./_lib/util/localDate.js";
 import { denyAuth } from "./_lib/auth.js";
 import { withTenant } from "./_lib/recordsStore.js";
+import { packForTenant } from "./_lib/industry/index.js";
 import { describeWarranty, addDays, ruleCoverage, isPlausibleToday, alertTier, upsell, daysBetween } from "./_lib/warrantyRules.js";
 import { requireAuthOrKey, assertScope } from "./_lib/apiKeyAuth.js";
 import { limit } from "./_lib/rateLimit.js";
@@ -86,7 +87,7 @@ export async function getWarrantyAttention(auth, params) {
   const EXPIRED_LOOKBACK_DAYS = 730;
   const fetchExpiringWithin = Math.max(expiringWithin, ALERT_TIER_HORIZON_DAYS);
 
-  const { rows, dismissedAlertKeys } = await withTenant(
+  const { rows, dismissedAlertKeys, pack } = await withTenant(
     { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId },
     async (db) => ({
       rows: await db.listWarrantyAttention({
@@ -102,13 +103,14 @@ export async function getWarrantyAttention(auth, params) {
       // dropped below, before counts/summary are computed, so the Dashboard
       // count and this endpoint's own `summary` never include them.
       dismissedAlertKeys: await loadDismissedAlertKeys(db),
+      pack: await packForTenant(db),
     })
   );
 
   const items = rows
     .map((r) => {
       const stable = r.warranty ?? {};
-      const now = describeWarranty(stable, today, { expiringWithinDays: expiringWithin });
+      const now = describeWarranty(stable, today, { expiringWithinDays: expiringWithin, pack });
       const tier = alertTier(stable, today);
       const daysLeft =
         tier === 'unregistered-window-closing'
@@ -132,7 +134,7 @@ export async function getWarrantyAttention(auth, params) {
         ...now,
         tier,
         daysLeft,
-        upsell: upsell(stable, today),
+        upsell: upsell(stable, today, pack),
       };
     })
     // A row is kept if the legacy urgency logic names an action OR it lands

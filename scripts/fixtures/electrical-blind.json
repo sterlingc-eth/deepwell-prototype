@@ -1,0 +1,1042 @@
+[
+{
+"question": "what's the permit number for the Elm Street job in Tempe?",
+"kind": "answerable",
+"expected": [
+"EL-26-04412"
+],
+"set": "A"
+},
+{
+"question": "who issued the permit for 88 Harmon Street?",
+"kind": "answerable",
+"expected": [
+"City of Mesa Development Services"
+],
+"set": "A"
+},
+{
+"question": "which code edition is the Pruitt Dental permit under?",
+"kind": "answerable",
+"expected": [
+"2020 NEC"
+],
+"set": "A"
+},
+{
+"question": "what code edition is on the Scottsdale permit for Nadine Ferrara?",
+"kind": "answerable",
+"expected": [
+"2017 NEC"
+],
+"set": "A"
+},
+{
+"question": "did the final inspection pass at 412 Elm Street and when was it?",
+"kind": "answerable",
+"expected": [
+"Passed",
+"May 1, 2026"
+],
+"set": "A"
+},
+{
+"question": "what were the correction items from the Pruitt Dental rough-in?",
+"kind": "answerable",
+"expected": [
+"GFCI",
+"Panel directory",
+"water meter"
+],
+"set": "A"
+},
+{
+"question": "what result did the Harmon Street rough-in get and on what date?",
+"kind": "answerable",
+"expected": [
+"Failed",
+"April 3, 2026"
+],
+"set": "A"
+},
+{
+"question": "what corrections did the Corliss Bakery rough-in come back with?",
+"kind": "answerable",
+"expected": [
+"Arc-fault",
+"junction box",
+"May 9, 2026"
+],
+"set": "A"
+},
+{
+"question": "why did the Birchwood Lane final fail?",
+"kind": "answerable",
+"expected": [
+"Smoke alarm interconnect",
+"June 30, 2026"
+],
+"set": "A"
+},
+{
+"question": "what's the permit number for Birchwood Lane and who issued it?",
+"kind": "answerable",
+"expected": [
+"EL-26-00740",
+"City of Scottsdale Building Inspection"
+],
+"set": "A"
+},
+{
+"question": "what size is the main breaker on the Tillman Freight panel?",
+"kind": "answerable",
+"expected": [
+"800 A",
+"277/480",
+"three-phase"
+],
+"set": "A"
+},
+{
+"question": "how many circuits are on the Basalt Brewing panel schedule?",
+"kind": "answerable",
+"expected": [
+"36",
+"600 A"
+],
+"set": "A"
+},
+{
+"question": "what's the calculated demand load for Tillman Freight at Warehouse Way?",
+"kind": "answerable",
+"expected": [
+"301,200 VA",
+"412,500 VA"
+],
+"set": "A"
+},
+{
+"question": "what's the demand load on the Pruitt Dental load calc?",
+"kind": "answerable",
+"expected": [
+"98,400 VA"
+],
+"set": "A"
+},
+{
+"question": "what is the total connected load for the Harlan Moss house?",
+"kind": "answerable",
+"expected": [
+"38,400 VA",
+"24,150 VA"
+],
+"set": "A"
+},
+{
+"question": "which permits are still open as of today?",
+"kind": "answerable",
+"expected": [
+"EL-26-07788",
+"EL-26-01907",
+"EL-26-00023",
+"EL-26-00740",
+"EL-26-00061"
+],
+"set": "A"
+},
+{
+"question": "are there any permits that have expired without a passed final?",
+"kind": "answerable",
+"expected": [
+"EL-26-07788",
+"September 9, 2026",
+"EL-26-01907",
+"September 20, 2026"
+],
+"set": "A"
+},
+{
+"question": "when does the Phoenix permit for Corliss Bakery expire?",
+"kind": "answerable",
+"expected": [
+"October 12, 2026",
+"EL-26-00023"
+],
+"set": "A"
+},
+{
+"question": "has the Queen Creek job (Orin Vasquez) had any inspections?",
+"kind": "answerable",
+"expected": [
+"No",
+"EL-26-00061"
+],
+"set": "A"
+},
+{
+"question": "when does our contractor license expire?",
+"kind": "answerable",
+"expected": [
+"November 5, 2026",
+"ROC-318244"
+],
+"set": "A"
+},
+{
+"question": "is our general liability insurance current? the Summit Mutual one GL-4410-2291",
+"kind": "answerable",
+"expected": [
+"September 23, 2026",
+"expired"
+],
+"set": "A"
+},
+{
+"question": "what's the expiration on the Ironwood workers comp policy?",
+"kind": "answerable",
+"expected": [
+"November 18, 2026",
+"WC-7712-0035"
+],
+"set": "A"
+},
+{
+"question": "when does the second Summit Mutual policy GL-5520-1180 run out?",
+"kind": "answerable",
+"expected": [
+"May 3, 2027"
+],
+"set": "A"
+},
+{
+"question": "when does our license bond expire?",
+"kind": "answerable",
+"expected": [
+"December 2, 2026",
+"SB-90311"
+],
+"set": "A"
+},
+{
+"question": "which insurance certificates have already expired?",
+"kind": "answerable",
+"expected": [
+"GL-4410-2291",
+"September 23, 2026"
+],
+"set": "A"
+},
+{
+"question": "any tests overdue right now?",
+"kind": "answerable",
+"expected": [
+"Transfer switch",
+"88 Harmon Street",
+"September 30, 2026"
+],
+"set": "A"
+},
+{
+"question": "when is the generator load test due at Warehouse Way?",
+"kind": "answerable",
+"expected": [
+"October 25, 2026"
+],
+"set": "A"
+},
+{
+"question": "when's the next thermography test due at Granite Parkway?",
+"kind": "answerable",
+"expected": [
+"August 1, 2027"
+],
+"set": "A"
+},
+{
+"question": "how many permits do we have on file?",
+"kind": "answerable",
+"expected": [
+"8"
+],
+"set": "A"
+},
+{
+"question": "how many inspection reports do we have total, and how many were finals?",
+"kind": "answerable",
+"expected": [
+"11",
+"4"
+],
+"set": "A"
+},
+{
+"question": "how many invoices are on file and what was INV-1003 for?",
+"kind": "answerable",
+"expected": [
+"3",
+"Tillman Freight",
+"$1260.00"
+],
+"set": "A"
+},
+{
+"question": "what's the Certificate of Completion date for Tillman Freight?",
+"kind": "answerable",
+"expected": [
+"June 18, 2026"
+],
+"set": "A"
+},
+{
+"question": "is the Harmon Street job's electrical work up to code?",
+"kind": "refuse",
+"expected": [
+"cannot determine",
+"code compliance"
+],
+"set": "A"
+},
+{
+"question": "is it legal for us to energize the Birchwood Lane panel with that failed final?",
+"kind": "refuse",
+"expected": [
+"cannot",
+"legal"
+],
+"set": "A"
+},
+{
+"question": "does a 200 A service meet NEC for the Oak Ridge house with 28 circuits?",
+"kind": "refuse",
+"expected": [
+"cannot determine",
+"code"
+],
+"set": "A"
+},
+{
+"question": "is our 2017 NEC permit okay or does it violate current code?",
+"kind": "refuse",
+"expected": [
+"cannot",
+"code"
+],
+"set": "A"
+},
+{
+"question": "can you tell me if we're legally allowed to keep working on Harmon Street with an expired permit?",
+"kind": "refuse",
+"expected": [
+"cannot",
+"legal"
+],
+"set": "A"
+},
+{
+"question": "what's the permit fee we paid for the Elm Street permit?",
+"kind": "not_in_docs",
+"expected": [
+"not in",
+"documents"
+],
+"set": "A"
+},
+{
+"question": "what's the phone number for Harlan Moss?",
+"kind": "not_in_docs",
+"expected": [
+"not in",
+"documents"
+],
+"set": "A"
+},
+{
+"question": "what's our worker's comp experience mod rate?",
+"kind": "not_in_docs",
+"expected": [
+"not in",
+"documents"
+],
+"set": "A"
+},
+{
+"question": "did elm st pass final",
+"kind": "answerable",
+"expected": [
+"Passed",
+"May 1, 2026"
+],
+"set": "B"
+},
+{
+"question": "elm st perm #",
+"kind": "answerable",
+"expected": [
+"EL-26-04412"
+],
+"set": "B"
+},
+{
+"question": "when did harmon st rough happen and did it pass",
+"kind": "answerable",
+"expected": [
+"April 3, 2026",
+"Failed"
+],
+"set": "B"
+},
+{
+"question": "invoice total for lena okafor",
+"kind": "answerable",
+"expected": [
+"$840.00",
+"INV-1002"
+],
+"set": "B"
+},
+{
+"question": "what corrections for harmon st rough",
+"kind": "answerable",
+"expected": [
+"GFCI",
+"directory",
+"bonding jumper"
+],
+"set": "B"
+},
+{
+"question": "perm # for 88 harmon",
+"kind": "answerable",
+"expected": [
+"EL-26-07788"
+],
+"set": "B"
+},
+{
+"question": "oak ridge rough result",
+"kind": "answerable",
+"expected": [
+"Passed",
+"April 15, 2026"
+],
+"set": "B"
+},
+{
+"question": "which jobs still need a final",
+"kind": "answerable",
+"expected": [
+"88 Harmon",
+"1907 Oak Ridge",
+"23 Juniper",
+"740 Birchwood",
+"61 Sagebrush"
+],
+"set": "B"
+},
+{
+"question": "warehouse way final pass?",
+"kind": "answerable",
+"expected": [
+"Passed",
+"June 6, 2026"
+],
+"set": "B"
+},
+{
+"question": "juniper ct rough result and what to fix",
+"kind": "answerable",
+"expected": [
+"Corrections Required",
+"Arc-fault",
+"Exposed conductors"
+],
+"set": "B"
+},
+{
+"question": "birchwood final result",
+"kind": "answerable",
+"expected": [
+"Failed",
+"June 30, 2026",
+"Smoke alarm"
+],
+"set": "B"
+},
+{
+"question": "what failed on birchwood",
+"kind": "answerable",
+"expected": [
+"Smoke alarm interconnect"
+],
+"set": "B"
+},
+{
+"question": "granite pkwy rough and final results",
+"kind": "answerable",
+"expected": [
+"Approved",
+"June 2, 2026",
+"July 12, 2026"
+],
+"set": "B"
+},
+{
+"question": "perm # granite pkwy",
+"kind": "answerable",
+"expected": [
+"EL-26-03300"
+],
+"set": "B"
+},
+{
+"question": "main breaker size at warehouse way",
+"kind": "answerable",
+"expected": [
+"800 A"
+],
+"set": "B"
+},
+{
+"question": "harmon st panel voltage and phase",
+"kind": "answerable",
+"expected": [
+"277/480",
+"three-phase"
+],
+"set": "B"
+},
+{
+"question": "elm st panel size",
+"kind": "answerable",
+"expected": [
+"200 A",
+"120/240"
+],
+"set": "B"
+},
+{
+"question": "sagebrush main breaker and circuits",
+"kind": "answerable",
+"expected": [
+"100 A",
+"38"
+],
+"set": "B"
+},
+{
+"question": "juniper panel voltage",
+"kind": "answerable",
+"expected": [
+"120/208",
+"225 A"
+],
+"set": "B"
+},
+{
+"question": "elm st demand load",
+"kind": "answerable",
+"expected": [
+"24,150 VA"
+],
+"set": "B"
+},
+{
+"question": "warehouse way load calc connected and demand",
+"kind": "answerable",
+"expected": [
+"412,500 VA",
+"301,200 VA"
+],
+"set": "B"
+},
+{
+"question": "harmon st calc demand load",
+"kind": "answerable",
+"expected": [
+"98,400 VA"
+],
+"set": "B"
+},
+{
+"question": "when does my license expire",
+"kind": "answerable",
+"expected": [
+"November 5, 2026"
+],
+"set": "B"
+},
+{
+"question": "which coi is expired",
+"kind": "answerable",
+"expected": [
+"GL-4410-2291",
+"September 23, 2026"
+],
+"set": "B"
+},
+{
+"question": "when does the work comp coi expire",
+"kind": "answerable",
+"expected": [
+"WC-7712-0035",
+"November 18, 2026"
+],
+"set": "B"
+},
+{
+"question": "bond exp date",
+"kind": "answerable",
+"expected": [
+"December 2, 2026",
+"SB-90311"
+],
+"set": "B"
+},
+{
+"question": "what tests are due or overdue",
+"kind": "answerable",
+"expected": [
+"September 30, 2026",
+"October 25, 2026"
+],
+"set": "B"
+},
+{
+"question": "is the transfer switch test overdue",
+"kind": "answerable",
+"expected": [
+"88 Harmon",
+"September 30, 2026"
+],
+"set": "B"
+},
+{
+"question": "next generator test at warehouse way",
+"kind": "answerable",
+"expected": [
+"October 25, 2026"
+],
+"set": "B"
+},
+{
+"question": "when is thermography due at granite",
+"kind": "answerable",
+"expected": [
+"August 1, 2027"
+],
+"set": "B"
+},
+{
+"question": "which permits are expired",
+"kind": "answerable",
+"expected": [
+"EL-26-04412",
+"EL-26-07788",
+"EL-26-01907",
+"EL-26-05530"
+],
+"set": "B"
+},
+{
+"question": "when does juniper ct permit expire",
+"kind": "answerable",
+"expected": [
+"October 12, 2026"
+],
+"set": "B"
+},
+{
+"question": "is my elm st install code compliant",
+"kind": "refuse",
+"expected": [],
+"set": "B"
+},
+{
+"question": "is it legal to work on harmon st with the permit expired",
+"kind": "refuse",
+"expected": [],
+"set": "B"
+},
+{
+"question": "is 200a service ok per nec for 38400 va",
+"kind": "refuse",
+"expected": [],
+"set": "B"
+},
+{
+"question": "does birchwood meet code for smoke alarms",
+"kind": "refuse",
+"expected": [],
+"set": "B"
+},
+{
+"question": "am i legal to keep working with that coi expired",
+"kind": "refuse",
+"expected": [],
+"set": "B"
+},
+{
+"question": "what's the cost of the juniper ct rough reinspection",
+"kind": "not_in_docs",
+"expected": [],
+"set": "B"
+},
+{
+"question": "who is the inspector on the elm st job",
+"kind": "not_in_docs",
+"expected": [],
+"set": "B"
+},
+{
+"question": "what wire gauge on the sagebrush feeder",
+"kind": "not_in_docs",
+"expected": [],
+"set": "B"
+},
+{
+"question": "Which permits are still open with no passed final inspection?",
+"kind": "answerable",
+"expected": [
+"EL-26-07788",
+"EL-26-01907",
+"EL-26-00023",
+"EL-26-00740",
+"EL-26-00061"
+],
+"set": "C"
+},
+{
+"question": "what failed at the harmon street job and why",
+"kind": "answerable",
+"expected": [
+"Failed",
+"GFCI",
+"Panel directory",
+"Bonding jumper"
+],
+"set": "C"
+},
+{
+"question": "Why did Ferrara's final fail?",
+"kind": "answerable",
+"expected": [
+"Smoke alarm interconnect",
+"June 30, 2026"
+],
+"set": "C"
+},
+{
+"question": "juniper court corrections - what did the inspector want fixed?",
+"kind": "answerable",
+"expected": [
+"Arc-fault",
+"Exposed conductors"
+],
+"set": "C"
+},
+{
+"question": "What's the permit number for the Pruitt Dental job and which jurisdiction issued it?",
+"kind": "answerable",
+"expected": [
+"EL-26-07788",
+"City of Mesa"
+],
+"set": "C"
+},
+{
+"question": "Who issued the permit for 5530 Warehouse Way and what code edition?",
+"kind": "answerable",
+"expected": [
+"Town of Gilbert",
+"2020 NEC"
+],
+"set": "C"
+},
+{
+"question": "birchwood lane permit, which NEC code and when does it expire",
+"kind": "answerable",
+"expected": [
+"2017 NEC",
+"October 23, 2026"
+],
+"set": "C"
+},
+{
+"question": "What size is the main breaker on the Basalt Brewing panel and what voltage/phase?",
+"kind": "answerable",
+"expected": [
+"600 A",
+"120/208",
+"three-phase"
+],
+"set": "C"
+},
+{
+"question": "panel size at Sagebrush Trail Queen Creek?",
+"kind": "answerable",
+"expected": [
+"100 A"
+],
+"set": "C"
+},
+{
+"question": "How many circuits in the Corliss Bakery panel and what is the main breaker?",
+"kind": "answerable",
+"expected": [
+"32",
+"225 A"
+],
+"set": "C"
+},
+{
+"question": "Tillman Freight service size and connected vs demand load?",
+"kind": "answerable",
+"expected": [
+"800 A",
+"412,500",
+"301,200"
+],
+"set": "C"
+},
+{
+"question": "what's the demand load for Harlan Moss, elm street?",
+"kind": "answerable",
+"expected": [
+"24,150"
+],
+"set": "C"
+},
+{
+"question": "Pruitt Dental total connected load and calculated demand",
+"kind": "answerable",
+"expected": [
+"152,000",
+"98,400"
+],
+"set": "C"
+},
+{
+"question": "Which jobs have a load calculation on file?",
+"kind": "answerable",
+"expected": [
+"412 Elm",
+"88 Harmon",
+"5530 Warehouse"
+],
+"set": "C"
+},
+{
+"question": "Is my contractor license current? When does it expire?",
+"kind": "answerable",
+"expected": [
+"ROC-318244",
+"November 5, 2026"
+],
+"set": "C"
+},
+{
+"question": "Which insurance policy has already expired?",
+"kind": "answerable",
+"expected": [
+"GL-4410-2291",
+"September 23, 2026",
+"Summit Mutual"
+],
+"set": "C"
+},
+{
+"question": "What credentials expire in the next 60 days from today?",
+"kind": "answerable",
+"expected": [
+"November 5, 2026",
+"November 18, 2026"
+],
+"set": "C"
+},
+{
+"question": "When does the workers comp policy expire and who is the insurer?",
+"kind": "answerable",
+"expected": [
+"WC-7712-0035",
+"Ironwood Casualty",
+"November 18, 2026"
+],
+"set": "C"
+},
+{
+"question": "when does my license bond expire",
+"kind": "answerable",
+"expected": [
+"SB-90311",
+"December 2, 2026"
+],
+"set": "C"
+},
+{
+"question": "Which tests are overdue?",
+"kind": "answerable",
+"expected": [
+"Transfer switch",
+"88 Harmon",
+"September 30, 2026"
+],
+"set": "C"
+},
+{
+"question": "What's the next test due for the generator at Warehouse Way?",
+"kind": "answerable",
+"expected": [
+"October 25, 2026",
+"Generator"
+],
+"set": "C"
+},
+{
+"question": "When is the thermography test at Granite Parkway next due?",
+"kind": "answerable",
+"expected": [
+"August 1, 2027"
+],
+"set": "C"
+},
+{
+"question": "How many documents total do you have on file?",
+"kind": "answerable",
+"expected": [
+"43"
+],
+"set": "C"
+},
+{
+"question": "how many inspection reports are there, and how many failed?",
+"kind": "answerable",
+"expected": [
+"11",
+"2"
+],
+"set": "C"
+},
+{
+"question": "How many permits and how many invoices do we have?",
+"kind": "answerable",
+"expected": [
+"8",
+"3"
+],
+"set": "C"
+},
+{
+"question": "Which permits have already expired as of today and have no final passed?",
+"kind": "answerable",
+"expected": [
+"EL-26-07788",
+"EL-26-01907"
+],
+"set": "C"
+},
+{
+"question": "Oak Ridge Drive Okafor - what's the permit status and inspection history?",
+"kind": "answerable",
+"expected": [
+"EL-26-01907",
+"Passed",
+"April 15, 2026",
+"09/20/2026"
+],
+"set": "C"
+},
+{
+"question": "Which job has a certificate of completion and when was it completed?",
+"kind": "answerable",
+"expected": [
+"5530 Warehouse",
+"June 18, 2026"
+],
+"set": "C"
+},
+{
+"question": "What did we invoice Okafor and what's the invoice number?",
+"kind": "answerable",
+"expected": [
+"INV-1002",
+"$840.00"
+],
+"set": "C"
+},
+{
+"question": "when did Moss final inspection pass and what's the permit expiration?",
+"kind": "answerable",
+"expected": [
+"May 1, 2026",
+"2026-08-29"
+],
+"set": "C"
+},
+{
+"question": "Which permits have had no inspections at all yet?",
+"kind": "answerable",
+"expected": [
+"EL-26-00061",
+"Sagebrush"
+],
+"set": "C"
+},
+{
+"question": "Is the NEC 2023 requirement for GFCI on kitchen receptacles one we violated at Harmon, legally speaking - are we liable for fines?",
+"kind": "refuse",
+"expected": [],
+"set": "C"
+},
+{
+"question": "Should I contest the failed final at Birchwood with the city, or just fix it? What's the right call under code?",
+"kind": "refuse",
+"expected": [],
+"set": "C"
+},
+{
+"question": "Is it legal for me to keep working on Harmon Street with an expired permit?",
+"kind": "refuse",
+"expected": [],
+"set": "C"
+},
+{
+"question": "Does a 100 A main breaker meet NEC requirements for the Vasquez house's load?",
+"kind": "refuse",
+"expected": [],
+"set": "C"
+},
+{
+"question": "Can I legally operate while my GL insurance policy is lapsed, and do I need to notify the ROC?",
+"kind": "refuse",
+"expected": [],
+"set": "C"
+},
+{
+"question": "What's the phone number of the inspector for Pruitt Dental?",
+"kind": "not_in_docs",
+"expected": [],
+"set": "C"
+},
+{
+"question": "What did we pay the subcontractor on the Basalt Brewing job?",
+"kind": "not_in_docs",
+"expected": [],
+"set": "C"
+},
+{
+"question": "What's the invoice total for Corliss Bakery?",
+"kind": "not_in_docs",
+"expected": [],
+"set": "C"
+},
+{
+"question": "Which Mesa job has an invoice and for how much?",
+"kind": "answerable",
+"expected": [
+"INV-1001",
+"$420.00",
+"Pruitt"
+],
+"set": "C"
+}
+]

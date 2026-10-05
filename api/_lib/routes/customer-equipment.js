@@ -1,6 +1,7 @@
 import { handleCors, handleError } from "../claude.js";
 import { denyAuth } from "../auth.js";
 import { withTenant } from "../recordsStore.js";
+import { packForTenant } from "../industry/index.js";
 import { describeWarranty, isPlausibleToday } from "../warrantyRules.js";
 import { requireAuthOrKey, assertScope } from "../apiKeyAuth.js";
 import { limit } from "../rateLimit.js";
@@ -56,9 +57,9 @@ export class EquipmentLookupError extends Error {
 }
 
 /** Same shape on every equipment row, regardless of which query found it. */
-function formatEquipmentWarranty(u, today, expiringWithin) {
+function formatEquipmentWarranty(u, today, expiringWithin, pack = null) {
   const stable = u.warranty ?? {};
-  const now = describeWarranty(stable, today, { expiringWithinDays: expiringWithin });
+  const now = describeWarranty(stable, today, { expiringWithinDays: expiringWithin, pack });
   return {
     entityId: u.id,
     serialNumber: u.serial_number,
@@ -114,13 +115,13 @@ export async function getCustomerEquipment(auth, params) {
       const customer = await db.getEntity(customerId);
       if (!customer || customer.entity_type !== "customer") return null;
       const equipment = await db.listCustomerEquipment(customerId);
-      return { customer, equipment };
+      return { customer, equipment, pack: await packForTenant(db) };
     }
   );
 
   if (!result) throw new EquipmentLookupError("Customer not found", 404);
 
-  const equipment = result.equipment.map((u) => formatEquipmentWarranty(u, today, expiringWithin));
+  const equipment = result.equipment.map((u) => formatEquipmentWarranty(u, today, expiringWithin, result.pack));
   return {
     today,
     customerId,
@@ -151,22 +152,24 @@ export async function getEquipmentBySerial(auth, params) {
     { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId },
     async (db) => {
       const equipment = await db.listEntities("equipment");
-      return equipment.find((e) => (e.data?.serial_number ?? "").toLowerCase() === serial.toLowerCase()) ?? null;
+      const found = equipment.find((e) => (e.data?.serial_number ?? "").toLowerCase() === serial.toLowerCase()) ?? null;
+      return found ? { found, pack: await packForTenant(db) } : null;
     }
   );
 
   if (!match) throw new EquipmentLookupError("No equipment found for that serial number", 404);
 
+  const { found, pack } = match;
   const row = {
-    id: match.id,
-    serial_number: match.data?.serial_number ?? null,
-    model: match.data?.model ?? null,
-    manufacturer: match.data?.manufacturer ?? null,
-    equipment_type: match.data?.equipment_type ?? null,
-    service_address: match.data?.service_address ?? null,
-    warranty: match.data?.warranty ?? null,
+    id: found.id,
+    serial_number: found.data?.serial_number ?? null,
+    model: found.data?.model ?? null,
+    manufacturer: found.data?.manufacturer ?? null,
+    equipment_type: found.data?.equipment_type ?? null,
+    service_address: found.data?.service_address ?? null,
+    warranty: found.data?.warranty ?? null,
   };
-  return { today, equipment: formatEquipmentWarranty(row, today, expiringWithin) };
+  return { today, equipment: formatEquipmentWarranty(row, today, expiringWithin, pack) };
 }
 
 export default async function handler(req, res) {

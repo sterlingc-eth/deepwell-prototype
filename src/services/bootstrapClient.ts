@@ -14,6 +14,7 @@
 import { authHeader } from './authToken';
 import type { BillingStatus } from './billingClient';
 import type { DocumentRow } from '../hooks/usePostgresSync';
+import type { IndustryInfo } from '../lib/industry';
 
 const API_URL = '/api/records';
 
@@ -30,6 +31,8 @@ export interface BootstrapResponse {
   billing: BillingStatus;
   notifications: { items: unknown[]; unreadCount: number };
   records: { rows: DocumentRow[]; total: number };
+  /** Absent on an API deployed before stage 2A. */
+  industry?: IndustryInfo;
 }
 
 export const bootstrapClient = {

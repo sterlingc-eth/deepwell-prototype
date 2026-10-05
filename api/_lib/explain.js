@@ -134,7 +134,7 @@ function warrantySentence(subject, install, stable, tier, desc) {
   return `${subject} is flagged because its parts warranty ${verb}${stable.expires ? ` on ${humanDate(stable.expires)}` : ''} (installed ${install}).${desc.action ? ` ${desc.action}` : ''}`;
 }
 
-async function explainWarrantyAlert(db, ctx, today) {
+async function explainWarrantyAlert(db, ctx, today, pack = null) {
   const units = ctx.scope.equipment;
   if (!units.length) {
     return citeSearched(db, answerEnvelope({ text: `No units on file for ${ctx.label} to flag a warranty alert on.`, facts: [] }), [], { basis: `${ctx.label} has no equipment on file.` });
@@ -154,7 +154,7 @@ async function explainWarrantyAlert(db, ctx, today) {
       facts.push({ label: factLabel, value: 'No warranty information on file' });
       continue;
     }
-    const desc = describeWarranty(stable, today);
+    const desc = describeWarranty(stable, today, { pack });
     const tier = alertTier(stable, today);
     const sentence = warrantySentence(subject, install, stable, tier, desc);
     facts.push({ label: factLabel, value: tier === 'ok' ? `Active${stable.expires ? ` through ${humanDate(stable.expires)}` : ''}` : (desc.action ?? tier) });
@@ -249,7 +249,7 @@ async function explainFollowUp(db, ctx, pack, today) {
     if (!stable) continue;
     const tier = alertTier(stable, today);
     if (tier === 'ok' || tier === 'unknown') continue;
-    const desc = describeWarranty(stable, today);
+    const desc = describeWarranty(stable, today, { pack });
     const who = ownerNameFor(ctx, u.customer_id) ?? ctx.label;
     return attachCitations(answerEnvelope({
       text: `${who} needs a follow-up: the ${brandModel(u)}'s ${desc.action ?? 'warranty needs attention'}`,
@@ -288,7 +288,7 @@ export async function runExplain(db, intent, { today, pack } = {}) {
   const t = todayIso(today);
   const ctx = await resolveOne(db, intent.name);
   if (!ctx) return null;
-  if (intent.kind === 'warranty-alert') return explainWarrantyAlert(db, ctx, t);
+  if (intent.kind === 'warranty-alert') return explainWarrantyAlert(db, ctx, t, pack ?? await packForTenant(db));
   if (intent.kind === 'last-visit') return explainLastVisit(db, ctx, t);
   if (intent.kind === 'follow-up') return explainFollowUp(db, ctx, pack ?? await packForTenant(db), t);
   return null;

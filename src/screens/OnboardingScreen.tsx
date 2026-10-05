@@ -1,13 +1,14 @@
-import { useState, type CSSProperties } from 'react';
-import { CreateOrganization, OrganizationList, useClerk } from '@clerk/clerk-react';
+import { useEffect, useState, type CSSProperties } from 'react';
+import { CreateOrganization, OrganizationList, useAuth, useClerk } from '@clerk/clerk-react';
 import { ArrowLeft, Building2, LogOut, Users } from 'lucide-react';
 import { Wordmark } from '../components/Wordmark';
 import { deepLinkRedirectTarget } from '../hooks/useDeepLink';
+import { INDUSTRY_CHOICES, PENDING_INDUSTRY_KEY, encodePendingIndustry, type IndustryId } from '../lib/industry';
 
 /** Matches LoginScreen's plate so the two screens read as one flow. */
 const PLATE = '#F6F8F6';
 
-type Mode = 'choose' | 'create' | 'join';
+type Mode = 'choose' | 'industry' | 'create' | 'join';
 
 const clerkAppearance = {
   elements: {
@@ -54,7 +55,20 @@ const LIGHT_PLATE_TOKENS = {
  */
 export function OnboardingScreen() {
   const [mode, setMode] = useState<Mode>('choose');
+  const [industry, setIndustry] = useState<IndustryId>('hvac');
+  // A pick only counts while the person is actually creating a company: going back or choosing "I was invited"
+  // drops it, so it can never be applied to a company they merely joined.
+  useEffect(() => {
+    if (mode === 'choose' || mode === 'join') {
+      try {
+        window.localStorage.removeItem(PENDING_INDUSTRY_KEY);
+      } catch {
+        /* storage blocked: nothing was saved */
+      }
+    }
+  }, [mode]);
   const { signOut } = useClerk();
+  const { userId } = useAuth();
   // Carries a `?plan=`/`?screen=` deep link through org creation/selection —
   // both do a real page navigation, which loses the plan pick that had
   // already been applied to the (now-discarded) in-memory store. See
@@ -86,7 +100,7 @@ export function OnboardingScreen() {
 
             <button
               type="button"
-              onClick={() => setMode('create')}
+              onClick={() => setMode('industry')}
               className="dw-card border-line px-4 py-3 flex items-center gap-3 text-left hover:border-forest-700 focus-visible:outline-brass-300 transition-colors duration-quick"
             >
               <Building2 className="w-5 h-5 text-forest-700 shrink-0" aria-hidden="true" />
@@ -114,11 +128,62 @@ export function OnboardingScreen() {
           </>
         )}
 
-        {mode === 'create' && (
+        {mode === 'industry' && (
           <>
             <button
               type="button"
               onClick={() => setMode('choose')}
+              className="inline-flex items-center gap-2 min-h-touch text-body text-ink-2 hover:text-ink self-start focus-visible:outline-brass-300 rounded-md"
+            >
+              <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+              Back
+            </button>
+            <fieldset className="flex flex-col gap-3 border-0 p-0 m-0">
+              <legend className="text-body text-ink-2 mb-1">
+                What kind of company is this? Donovan uses your industry's own words and paperwork. You can change this later.
+              </legend>
+              {INDUSTRY_CHOICES.map((c) => (
+                <label
+                  key={c.id}
+                  className={`dw-card px-4 py-3 flex items-start gap-3 cursor-pointer ${industry === c.id ? 'border-forest-700' : 'border-line'}`}
+                >
+                  <input
+                    type="radio"
+                    name="industry"
+                    value={c.id}
+                    checked={industry === c.id}
+                    onChange={() => setIndustry(c.id)}
+                    className="mt-1"
+                  />
+                  <span>
+                    <span className="block font-medium text-ink">{c.label}</span>
+                    <span className="block text-caption text-ink-3">{c.blurb}</span>
+                  </span>
+                </label>
+              ))}
+            </fieldset>
+            <button
+              type="button"
+              onClick={() => {
+                try {
+                  window.localStorage.setItem(PENDING_INDUSTRY_KEY, encodePendingIndustry(industry, userId ?? '', Date.now()));
+                } catch {
+                  /* storage blocked: the company simply starts as HVAC, the default, and can change it later */
+                }
+                setMode('create');
+              }}
+              className="dw-card border-forest-700 px-4 py-3 text-center font-medium text-ink hover:border-forest-900 focus-visible:outline-brass-300"
+            >
+              Continue
+            </button>
+          </>
+        )}
+
+        {mode === 'create' && (
+          <>
+            <button
+              type="button"
+              onClick={() => setMode('industry')}
               className="inline-flex items-center gap-2 min-h-touch text-body text-ink-2 hover:text-ink self-start focus-visible:outline-brass-300 rounded-md"
             >
               <ArrowLeft className="w-4 h-4" aria-hidden="true" />

@@ -52,7 +52,7 @@ const DISPATCH_TARGETS = [
   'api/_lib/routes/outreach.js', 'api/_lib/routes/followups.js', 'api/_lib/routes/expenses.js',
   'api/_lib/routes/financials.js', 'api/_lib/routes/graph.js', 'api/_lib/routes/entity-merge.js',
   'api/_lib/routes/naming.js', 'api/_lib/routes/intake-resolve.js', 'api/_lib/grid/route.js',
-  'api/_lib/routes/ask-suggest.js', 'api/_lib/routes/unit-address-backfill.js',
+  'api/_lib/routes/ask-suggest.js', 'api/_lib/routes/unit-address-backfill.js', 'api/_lib/routes/industry.js',
   'api/_lib/routes/insights.js', 'api/_lib/audience/route.js', 'api/_lib/support/route.js',
   // api/v1.js RESOURCES
   'api/_lib/routes/v1-equipment.js', 'api/_lib/routes/v1-warranty.js', 'api/_lib/routes/v1-ingest.js',

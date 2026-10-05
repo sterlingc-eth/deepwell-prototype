@@ -23,6 +23,15 @@ const documentTypes = [
   { id: 'other', label: 'Other', definition: 'Does not clearly fit any type above.', requires: [], visitType: true, financial: false },
   // Electrical-specific, per the expansion brief's "▲" addition:
   { id: 'panel-schedule', label: 'Panel schedule', definition: 'Maps a panel\'s breakers to circuits/loads — the whole panel\'s circuit map, not one equipment record.', requires: ['service_address', 'amperage'], visitType: false, financial: false },
+  // 2B (Build 2): the trade's own paperwork. Required lists stay short on purpose (a missing optional field never blocks).
+  { id: 'correction-notice', label: 'Correction notice', definition: 'An inspector\'s list of items that must be fixed before re-inspection, with a due date.', requires: ['service_address'], visitType: true, financial: false },
+  { id: 'certificate-of-completion', label: 'Certificate of completion', definition: 'A final approval / sign-off for electrical work at a site.', requires: ['service_address', 'service_date'], visitType: true, financial: false },
+  { id: 'load-calculation', label: 'Load calculation', definition: 'A service or feeder load calculation: connected load, demand load, service size.', requires: ['service_address'], visitType: false, financial: false },
+  { id: 'contractor-license', label: 'Contractor license', definition: 'An electrical contractor, master or journeyman license or card, with a license number and expiry.', requires: ['license_number', 'license_expiry'], visitType: false, financial: false },
+  { id: 'certificate-of-insurance', label: 'Certificate of insurance', definition: 'A liability or workers\' compensation certificate: insurer, policy number and expiry.', requires: ['policy_number', 'policy_expiry'], visitType: false, financial: false },
+  { id: 'surety-bond', label: 'Surety bond', definition: 'A contractor license or permit bond: bond number and expiry.', requires: ['bond_number', 'bond_expiry'], visitType: false, financial: false },
+  { id: 'test-report', label: 'Test or study report', definition: 'A megger, thermography, arc-flash or generator/transfer-switch test report with a next-due date.', requires: ['service_address', 'service_date'], visitType: true, financial: false },
+  { id: 'utility-application', label: 'Utility application', definition: 'A utility interconnection, service-upgrade or EV-charger application, with an application number.', requires: ['service_address'], visitType: false, financial: false },
 ];
 
 const fields = [
@@ -58,6 +67,29 @@ const fields = [
   { key: 'status', label: 'Status', perUnit: false, description: 'Completed, Pending, In Progress, Passed, Failed.' },
   { key: 'notes', label: 'Notes', perUnit: false, description: 'A short observation that does not fit another field.' },
   { key: 'permit_number', label: 'Permit number', perUnit: false, description: 'A government or utility permit number referenced on the document.' },
+  { key: 'jurisdiction', label: 'Jurisdiction', perUnit: false, description: 'The city, county or building department (the authority having jurisdiction) that issued or inspected, as printed.' },
+  { key: 'application_number', label: 'Application number', perUnit: false, description: 'A permit or utility application number as printed (not the issued permit number).' },
+  { key: 'permit_issue_date', label: 'Permit issued', perUnit: false, description: 'Date the permit was issued.' },
+  { key: 'permit_expiry', label: 'Permit expires', perUnit: false, description: 'Date the permit expires or goes inactive, as printed.' },
+  { key: 'inspection_type', label: 'Inspection type', perUnit: false, description: 'Which inspection this is, exactly as written (Rough-in, Final, Service, Underground, ...).' },
+  { key: 'inspection_result', label: 'Inspection result', perUnit: false, description: 'Result exactly as written (Passed, Failed, Approved, Corrections required, ...).' },
+  { key: 'correction_items', label: 'Correction item', perUnit: false, description: 'One correction item listed by the inspector. Return one field per item.' },
+  { key: 'correction_due', label: 'Correction due', perUnit: false, description: 'Date the corrections are due, or the re-inspection date.' },
+  { key: 'license_number', label: 'License number', perUnit: false, description: 'Contractor, master or journeyman license number as printed.' },
+  { key: 'license_holder', label: 'License holder', perUnit: false, description: 'Person or company the license is issued to.' },
+  { key: 'license_expiry', label: 'License expires', perUnit: false, description: 'License expiration date.' },
+  { key: 'insurer', label: 'Insurer', perUnit: false, description: 'Insurance company named on a certificate of insurance.' },
+  { key: 'policy_number', label: 'Policy number', perUnit: false, description: 'Insurance policy number as printed.' },
+  { key: 'policy_expiry', label: 'Policy expires', perUnit: false, description: 'Insurance policy expiration date.' },
+  { key: 'bond_number', label: 'Bond number', perUnit: false, description: 'Surety bond number as printed.' },
+  { key: 'bond_expiry', label: 'Bond expires', perUnit: false, description: 'Surety bond expiration date.' },
+  { key: 'code_edition', label: 'Code edition', perUnit: false, description: 'The code edition label a document names (for example "2023 NEC"). A label only.' },
+  { key: 'connected_load', label: 'Connected load', perUnit: false, description: 'Connected load on a load calculation, with its unit (kVA or amps).' },
+  { key: 'demand_load', label: 'Demand load', perUnit: false, description: 'Demand load on a load calculation, with its unit (kVA or amps).' },
+  { key: 'service_size', label: 'Service size', perUnit: false, description: 'Service size on a load calculation or utility application, as printed.' },
+  { key: 'circuit_count', label: 'Circuits', perUnit: true, description: 'Number of circuits or spaces on a panel schedule.' },
+  { key: 'next_test_due', label: 'Next test due', perUnit: false, description: 'Date the next test or study is due.' },
+  { key: 'utility', label: 'Utility', perUnit: false, description: 'The electric utility named on an application.' },
 ];
 
 const brands = ['Square D', 'Siemens', 'Eaton', 'Generac', 'ChargePoint', 'Tesla', 'Leviton', 'Cutler-Hammer', 'GE', 'Kohler'];
@@ -75,9 +107,19 @@ const synonyms = {
   'fuse box': ['fuse box', 'fuse boxes', 'fused panel'],
   outage: ['outage', 'outages', 'power outage', 'no power'],
   spark: ['spark', 'sparking', 'sparks', 'arcing'],
+  permit: ['permit', 'permits', 'electrical permit'],
+  'rough-in': ['rough-in', 'rough in', 'rough', 'cover inspection'],
+  final: ['final', 'finaled', 'final inspection', 'sign-off', 'sign off'],
+  coi: ['coi', 'certificate of insurance', 'insurance certificate', 'insurance certificates'],
+  license: ['license', 'licence', 'contractor license', 'master license', 'journeyman card'],
+  bond: ['bond', 'surety bond', 'license bond'],
+  'load calculation': ['load calculation', 'load calc', 'load calcs', 'demand load'],
+  ahj: ['ahj', 'building department', 'code enforcement', 'inspector'],
+  evse: ['evse', 'ev charger', 'level 2 charger'],
+  'transfer switch': ['transfer switch', 'ats', 'automatic transfer switch'],
 };
 
-const abbreviations = { amp: 'amperage', amps: 'amperage', v: 'voltage', gfci: 'gfci', afci: 'afci', ev: 'electric vehicle', po: 'purchase order' };
+const abbreviations = { coi: 'certificate of insurance', ahj: 'building department', evse: 'ev charger', ats: 'transfer switch', amp: 'amperage', amps: 'amperage', v: 'voltage', gfci: 'gfci', afci: 'afci', ev: 'electric vehicle', po: 'purchase order' };
 const typos = { panle: 'panel', braker: 'breaker', genrator: 'generator', ampereage: 'amperage' };
 
 const personas = [

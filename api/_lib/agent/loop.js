@@ -35,7 +35,7 @@ import { selectWorkedExamples, formatWorkedExamples } from "../learning/recipes.
 // Sonnet escalation for hard questions / failed Haiku runs (escalation.js) and the page-image tool's prompt text.
 import { escalationModel, classifyQuestionDifficulty, needsEscalation, sonnetAllowed, recordSonnetSpend, MIN_ESCALATION_MS, isEscalationEnabled } from "./escalation.js";
 import { VIEW_PAGE_DOCS } from "./viewPage.js";
-import { packForTenant } from "../industry/index.js";
+import { packForTenant, industryPromptNotes } from "../industry/index.js";
 
 export const AGENT_MODEL = process.env.DONOVAN_AGENT_MODEL || ANALYTICS_MODEL;
 export const MAX_TURNS = 4;
@@ -124,7 +124,7 @@ export const AGENT_SYSTEM_PROMPT = agentSystemPromptFor('HVAC shop');
  *  pass the tenant's resolved pack (packForTenant); omit/hvac for the exact
  *  string above. */
 export function buildAgentSystemPrompt(pack) {
-  return agentSystemPromptFor(pack?.businessNoun ?? 'HVAC shop');
+  return agentSystemPromptFor(pack?.businessNoun ?? 'HVAC shop') + industryPromptNotes(pack);
 }
 
 /** Any change to the model, prompt or tool schemas invalidates cached agent answers. */

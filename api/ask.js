@@ -66,6 +66,7 @@ import { answerRelationsQuestion } from "./_lib/relations/questions.js";
 // before the analytics planner — see the "0.42 query decomposition" block below.
 import { runDecompose } from "./_lib/decompose/index.js";
 import { packForTenant } from "./_lib/industry/index.js";
+import { laneForPack } from "./_lib/industry/lanes.js";
 // Round 11 (literature #6/#7): per-tenant vocabulary (brands/models/technicians/customers actually on
 // file, cached per tenant by data-version) — widens normalization's fuzzy-typo correction beyond the
 // generic/pack vocabulary and grounds the analytics planner prompt in what THIS tenant's data contains.
@@ -1100,6 +1101,33 @@ export default async function handler(req, res) {
     // near-identical phrasings ("What's the warranty?" / "whats the warranty")
     // share a cache entry — same normalization the meta-router already uses.
     const questionHash = hashQuestion(normalizeQuestion(question));
+
+    // ---- industry lane (Build 2, no model, DB only) --------------------------------------------------------------
+    // A non-HVAC company's own paperwork questions (open permits, inspection results, expiring licences...) answered from
+    // its extractions with a citation per fact. HVAC has no lane (laneForPack -> null), so its path is untouched. null = not
+    // sure -> the normal chain carries on; any failure also falls through.
+    if (pack?.id && pack.id !== "hvac" && !conversationContext) {
+      try {
+        const lane = await laneForPack(pack);
+        const laneIntent = lane?.classify(question, { today: todayResolved });
+        if (laneIntent) {
+          const laneData = await timer.time("industry_lane", () =>
+            withTenant(ctxArg, async (db) => {
+              const result = await withCitations(db, lane.run(db, laneIntent, { today: todayResolved }));
+              if (result) {
+                try {
+                  await db.logAction({ action: "document.queried", resource_type: "question", clerk_user_id: auth.userId,
+                    changes: { question_hash: hashQuestion(question), documents: [...new Set((result.sources ?? []).map((s) => s.documentId))], passages: 0, fast: true, lane: pack.id } });
+                } catch (err) { console.error("Failed to write document.queried audit row (industry lane):", err?.message); }
+              }
+              return result;
+            }));
+          if (laneData) return send(200, { success: true, data: laneData, fast: true });
+        }
+      } catch (err) {
+        console.error("Industry lane failed, falling through:", err?.message);
+      }
+    }
 
     // ---- Donovan agent fallback (DONOVAN_AGENT, default on) ----------------
     // Tried at most once per request, from three places below: an honest analytics fallback / an

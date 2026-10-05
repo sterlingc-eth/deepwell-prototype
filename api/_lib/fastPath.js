@@ -1683,11 +1683,11 @@ export function buildBrandMatchYesAnswer({ label, manufacturer, row }) {
  * on file to say anything (no brand rule, no expiry, or no citation row) —
  * this is exactly where the fast path must defer rather than guess.
  */
-export function buildWarrantyAnswer({ intent, resolution, stable, today, citationRow, labelOverride }) {
+export function buildWarrantyAnswer({ intent, resolution, stable, today, citationRow, labelOverride, pack = null }) {
   if (!stable || !stable.expires || !citationRow) return null;
   const tier = alertTier(stable, today);
   if (tier === 'unknown') return null;
-  const described = describeWarranty(stable, today);
+  const described = describeWarranty(stable, today, { pack });
 
   const label = labelOverride ?? subjectLabel(resolution);
   const dateHuman = formatDateHuman(stable.expires);

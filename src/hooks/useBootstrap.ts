@@ -63,6 +63,7 @@ export function useBootstrap(enabled: boolean, orgId: string | null | undefined,
   const setBillingStatus = useAppStore((s) => s.setBillingStatus);
   const setNotificationsUnread = useAppStore((s) => s.setNotificationsUnread);
   const setBootstrapStatus = useAppStore((s) => s.setBootstrapStatus);
+  const setIndustry = useAppStore((s) => s.setIndustry);
   const tenantKey = orgId ?? userId ?? null;
   const cacheKey = cacheKeyFor(orgId, userId);
   // Guards against StrictMode's double-invoked effect and re-renders that
@@ -79,6 +80,7 @@ export function useBootstrap(enabled: boolean, orgId: string | null | undefined,
     if (ranFor.current !== null && ranFor.current !== tenantKey) {
       setBillingStatus(null);
       setNotificationsUnread(0);
+      setIndustry(null);
       setBootstrapStatus('idle');
     }
 
@@ -97,6 +99,9 @@ export function useBootstrap(enabled: boolean, orgId: string | null | undefined,
         setBillingStatus(data.billing);
         writeCachedBilling(cacheKey, data.billing);
         setNotificationsUnread(data.notifications.unreadCount);
+        // Never let a bootstrap that was read before the onboarding pick was saved overwrite the fresh choice.
+        if (data.industry && useAppStore.getState().industry?.chosen !== true) setIndustry(data.industry);
+        else if (!data.industry) setIndustry(null);
         seedDocsPartial(data.records.rows);
         setBootstrapStatus('ready');
       })
@@ -121,5 +126,5 @@ export function useBootstrap(enabled: boolean, orgId: string | null | undefined,
     return () => {
       cancelled = true;
     };
-  }, [enabled, tenantKey, cacheKey, setBillingStatus, setNotificationsUnread, setBootstrapStatus]);
+  }, [enabled, tenantKey, cacheKey, setBillingStatus, setNotificationsUnread, setBootstrapStatus, setIndustry]);
 }

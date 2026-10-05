@@ -29,6 +29,7 @@ import { completeIntake } from "./intake/autofill.js";
 import { classifyDocumentAudience } from "./audience/store.js";
 // R32 (model avoidance): a plain labelled form is a lookup, not reasoning — see modelAvoidance/textExtract.js.
 import { extractFromText } from "./modelAvoidance/textExtract.js";
+import { extractElectrical, missingRequired } from "./industry/electrical/extract.js";
 import { isDeterministicExtractEnabled } from "./modelAvoidance/switches.js";
 // R33: a REQUIRED field the extraction left empty is looked up on the page by its printed label — see labelFill.js.
 import { planLabelFill } from "./modelAvoidance/labelFill.js";
@@ -88,6 +89,20 @@ export const EXTRACT_MODEL = process.env.EXTRACT_MODEL || "claude-haiku-4-5";
  *                    fields: object[], dropped: object[], truncated: boolean, model: string,
  *                    pagesRead: number, pagesTotal: number}>}
  */
+/** Electrical-pack deterministic read (see industry/electrical/extract.js). Returns {type, toolInput} or null. */
+const ELECTRICAL_OWN_TYPES = new Set(['permit', 'inspection-report', 'correction-notice', 'certificate-of-completion', 'panel-schedule', 'load-calculation', 'contractor-license', 'certificate-of-insurance', 'surety-bond', 'test-report', 'utility-application']);
+function tryElectricalDeterministic(pages, pack) {
+  try {
+    const r = extractElectrical(pages);
+    if (!r || r.confidence < 0.9 || !ELECTRICAL_OWN_TYPES.has(r.type) || r.fields.length < 3) return null;
+    if (missingRequired(r.type, r.fields, pack).length) return null;
+    if ((r.type === 'inspection-report' || r.type === 'correction-notice') && !r.fields.some((f) => f.key === 'inspection_type')) return null; // an unlabelled stage is read by the model, never left blank
+    return { type: r.type, toolInput: { document_type: r.type, document_type_confidence: r.confidence, fields: r.fields } };
+  } catch {
+    return null;
+  }
+}
+
 export async function extractDocumentFields(ctx, documentId, { userId, documentType, modelAttempts } = {}) {
   // Every documents.id is a uuid; a malformed value survives a bare
   // typeof/truthiness check and only fails once bound against that column,
@@ -140,10 +155,21 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
   const det = !documentType && !truncated && isDeterministicExtractEnabled()
     ? extractFromText(selected, { pack })
     : null;
+  // 2B: an electrical company's own paperwork (permits, inspections, licenses, certificates, panel schedules...) is read
+  // by label first, $0, no model. Accepted only when the type is one of the trade's own and every field that type
+  // requires was found; anything else falls through to the model exactly as before. Never runs for any other industry.
+  const detElec = !det?.accepted && pack?.id === 'electrical' && !documentType && !truncated && isDeterministicExtractEnabled()
+    ? tryElectricalDeterministic(selected, pack)
+    : null;
   let extractMethod = "model";
   let extractModelLabel = EXTRACT_MODEL;
   let toolUse;
-  if (det?.accepted) {
+  if (detElec) {
+    extractMethod = "text";
+    extractModelLabel = "deterministic-text";
+    toolUse = { type: "tool_use", input: detElec.toolInput };
+    console.log(JSON.stringify({ route: "extract", method: "text", type: detElec.type, fields: detElec.toolInput.fields.length, industry: "electrical" }));
+  } else if (det?.accepted) {
     extractMethod = "text";
     extractModelLabel = "deterministic-text";
     toolUse = { type: "tool_use", input: det.toolInput };

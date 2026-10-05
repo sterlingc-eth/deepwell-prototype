@@ -905,7 +905,7 @@ export function deriveWarranty(facts = {}, today = null, pack = null, fieldSourc
   }
 
   // ---- 3. urgency, only if a clock was supplied --------------------------
-  if (today) Object.assign(out, describeWarranty(out, today));
+  if (today) Object.assign(out, describeWarranty(out, today, { pack }));
 
   return out;
 }
@@ -929,8 +929,11 @@ export function deriveWarranty(facts = {}, today = null, pack = null, fieldSourc
  * @param {string} today   YYYY-MM-DD
  * @param {{expiringWithinDays?: number}} [opts]
  */
-export function describeWarranty(stable, today, { expiringWithinDays = 365 } = {}) {
-  const rule = stable?.brand ? BRAND_RULES[stable.brand]?.rule ?? null : null;
+export function describeWarranty(stable, today, { expiringWithinDays = 365, pack = null } = {}) {
+  // Pack-aware (2A): the brand table comes from the company's own industry
+  // pack. No pack, or the hvac pack, is the module-level BRAND_RULES exactly as
+  // before, so HVAC output is unchanged.
+  const rule = stable?.brand ? brandRulesForPack(pack)[stable.brand]?.rule ?? null : null;
   const label = stable?.brandLabel ?? 'the manufacturer';
 
   const out = {
@@ -1050,7 +1053,7 @@ export function alertTier(stable, today) {
  * @param {string|null} today
  * @returns {{eligible: boolean, reason: string}}
  */
-export function upsell(stable, today) {
+export function upsell(stable, today, pack = null) {
   const reasons = [];
   const tier = alertTier(stable, today);
 
@@ -1060,7 +1063,7 @@ export function upsell(stable, today) {
     reasons.push('Parts warranty expires within the next year — the extended-warranty window is still open.');
   }
 
-  if (stable?.brand && BRAND_RULES[stable.brand]?.rule) {
+  if (stable?.brand && brandRulesForPack(pack)[stable.brand]?.rule) {
     reasons.push(
       `${stable.brandLabel ?? 'The manufacturer'}'s warranty covers parts only — no labor term is modeled, ` +
       'so a maintenance agreement fills a real gap regardless of expiry.'

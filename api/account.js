@@ -19,6 +19,7 @@ import askSuggest from "./_lib/routes/ask-suggest.js";
 import unitAddress from "./_lib/routes/unit-address-backfill.js";
 import insights from "./_lib/routes/insights.js";
 import audience from "./_lib/audience/route.js";
+import industry from "./_lib/routes/industry.js";
 
 /**
  * Account-level operations, behind one function — see api/v1.js for why.
@@ -51,6 +52,9 @@ import audience from "./_lib/audience/route.js";
  *                                                      document's audience, one-tap override — any
  *                                                      member — round 18, owner ask (a))
  *
+ *   POST industry             -> ?action=industry  (company industry: get / set (owner only, audit-logged); picks the
+ *                                                      industry pack + capability layers — Build 2 stage 2A)
+ *
  *   GET/POST support          -> ?action=support    (DeepWell Support Assistant, round 28: website widget (no auth,
  *                                                      surface=public) and in-app help (Clerk); lazy-imported so the
  *                                                      Anthropic SDK stays out of the cold-start graph)
@@ -65,7 +69,7 @@ import audience from "./_lib/audience/route.js";
  */
 export const config = { api: { bodyParser: { sizeLimit: "64kb" } }, maxDuration: 300 };
 
-const ACTIONS = { keys, export: tenantExport, delete: tenantDelete, sweep: cronSweep, merge: mergeTenant, notifications, outreach, followups, expenses, financials, graph, "entity-merge": entityMerge, naming, intake, grid, "ask-suggest": askSuggest, "unit-address": unitAddress, insights, audience, support: (q, s) => import("./_lib/support/route.js").then((m) => m.default(q, s)) };
+const ACTIONS = { keys, export: tenantExport, delete: tenantDelete, sweep: cronSweep, merge: mergeTenant, notifications, outreach, followups, expenses, financials, graph, "entity-merge": entityMerge, naming, intake, grid, "ask-suggest": askSuggest, "unit-address": unitAddress, insights, audience, support: (q, s) => import("./_lib/support/route.js").then((m) => m.default(q, s)) , industry};
 
 export default async function handler(req, res) {
   const action = String(req.query?.action ?? "");

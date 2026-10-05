@@ -46,7 +46,7 @@ import { citeAgentData } from "../citations/agent.js";
 import { selectWorkedExamples, formatWorkedExamples } from "../learning/recipes.js";
 import { escalationModel, sonnetAllowed, recordSonnetSpend, isEscalationEnabled, classifyQuestionDifficulty, needsEscalation, MIN_ESCALATION_MS } from "./escalation.js";
 import { VIEW_PAGE_DOCS } from "./viewPage.js";
-import { packForTenant } from "../industry/index.js";
+import { packForTenant, industryPromptNotes } from "../industry/index.js";
 import { runToolsBounded } from "./loop.js";
 import { verifyFacts, createDbSourceFetcher } from "./verify.js";
 import { verifyAnswerClaims } from "../claims/index.js";
@@ -193,7 +193,7 @@ search_documents note: it now also tries to work out which customer or unit the 
 
 /** This tenant's resolved system prompt (Team G industry packs, same mechanism as loop.js). */
 export function buildResearchSystemPrompt(pack) {
-  return researchSystemPromptFor(pack?.businessNoun ?? "HVAC shop");
+  return researchSystemPromptFor(pack?.businessNoun ?? "HVAC shop") + industryPromptNotes(pack);
 }
 export const RESEARCH_SYSTEM_PROMPT = researchSystemPromptFor("HVAC shop");
 

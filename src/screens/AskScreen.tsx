@@ -15,6 +15,7 @@ import { PreflightPill, SamplePromptChips, SamplePromptsPlaceholder, DidYouMeanC
 import { ask, AskApiError } from '../services/answerService';
 import { friendlyErrorMessage } from '../services/httpError';
 import { useAppStore } from '../store/appStore';
+import { exampleQuestionsFor } from '../lib/industry';
 
 // TEAM T2 / Round 18 P2: matches api/_lib/conversation.js's own MAX_CONTEXT_TURNS (that module isn't
 // importable into the client bundle — it pulls in server-only deps — so the cap is kept in sync here by
@@ -24,11 +25,6 @@ const MAX_CONTEXT_TURNS = 4;
 // Shown only when the account has nothing ingested yet, so there is nothing
 // real to suggest. Clearly labelled "e.g." — never presented as though they
 // are this tenant's own records — and paired with one action: go add some.
-const EXAMPLE_QUESTIONS = [
-  'Is the unit at 2847 N 24th St still under warranty?',
-  'What serial number is on the unit at 2847 N 24th St?',
-  'Which warranties expire in the next 12 months?',
-];
 
 export function AskScreen() {
   const pendingQuestion = useAppStore((s) => s.pendingQuestion);
@@ -42,6 +38,7 @@ export function AskScreen() {
   const openEntity = useAppStore((s) => s.openEntity);
   const openCustomer = useAppStore((s) => s.openCustomer);
   const fieldMode = useAppStore((s) => s.fieldMode);
+  const industryId = useAppStore((s) => s.industry?.industry ?? null);
   const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
   // Re-run the current question whenever the graph changes (a review correction changes the answer)
   const graphVersion = useGraph((s) => s.docs);
@@ -391,7 +388,7 @@ export function AskScreen() {
             ) : (
               <>
                 <ul className="flex flex-wrap gap-2">
-                  {EXAMPLE_QUESTIONS.map((q) => (
+                  {exampleQuestionsFor(industryId).map((q) => (
                     <li key={q}>
                       <span className="dw-btn-secondary !min-h-[44px] !py-2 text-left font-normal opacity-70 cursor-default select-none">
                         e.g. {q}
