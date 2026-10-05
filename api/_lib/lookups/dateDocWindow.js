@@ -117,7 +117,7 @@ export async function runDocWindow(db, it) {
     dated = [...seen.values()].filter((r) => r.date && (!it.dtype || r.type === it.dtype));
   }
   hits = dated.filter((r) => inAny(r.date, ws));
-  const basis = `Compared the ${it.field.replace(/_/g, " ")} on ${dated.length} ${it.kind === "install" ? "units" : "documents"} to ${ws.map((w) => `${w.from} through ${w.to}`).join(" and ")}.`;
+  const basis = `Compared the ${it.field.replace(/_/g, " ")} on ${dated.length} ${it.kind === "install" ? "units" : "dated documents"} to ${ws.map((w) => `${w.from} through ${w.to}`).join(" and ")}.`;
   if (!hits.length) return none(`No ${it.noun[1]} on file ${where}.${coverage}`, `${basis} None fall in it.`);
   const per = it.mode === "list" ? ` (${ws.map((w) => `${dated.filter((r) => r.date >= w.from && r.date <= w.to).length} ${when(w, "single")}`).join(", ")})` : "";
   const text = `${hits.length} ${plural(hits.length)} ${where}${per}.${coverage}`;

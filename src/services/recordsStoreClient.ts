@@ -80,6 +80,11 @@ export class RecordsStoreClient implements RecordsStore {
     return this.call('getDocument', { id });
   }
 
+  /** One page's extracted text (the cited page / sheet chunk of a Word, Excel or CSV file). null when there is none. */
+  async getDocumentPage(id: string, pageNo: number): Promise<{ page_no: number; text: string } | null> {
+    return this.call('getDocumentPage', { id, page_no: pageNo });
+  }
+
   async listDocuments(filters?: DocumentFilters): Promise<Document[]> {
     return this.call('listDocuments', { filters });
   }

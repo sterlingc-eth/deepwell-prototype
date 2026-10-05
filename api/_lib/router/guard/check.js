@@ -137,7 +137,10 @@ function hasDateShapedValue(data) {
  *  one, since every invoice/warranty IS a document but should be probed against ITS OWN narrower total, not
  *  the whole-portfolio document count. */
 function inferPortfolioEntityKey(data) {
-  const hay = `${(data?.facts ?? [])[0]?.label ?? ''} ${data?.text ?? ''}`.toLowerCase();
+  // The service-visit answer says what it counted ("... - counted from every document with a service date: 120 invoices, ..."); that note names other
+  // document types and must not decide which total this count is compared to.
+  const text = String(data?.text ?? '').replace(/ - counted from every document with a service date:[^.]*\./i, '.');
+  const hay = `${(data?.facts ?? [])[0]?.label ?? ''} ${text}`.toLowerCase();
   if (/\binvoice/.test(hay)) return 'invoices';
   if (/\bwarrant/.test(hay)) return 'warranties';
   if (/\bvisit|\bjob/.test(hay)) return 'serviceVisits';

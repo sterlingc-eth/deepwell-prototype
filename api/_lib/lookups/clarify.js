@@ -151,25 +151,26 @@ export function buildClarifyChips(question, vocab, ctx = {}) {
  * Returns null unless there are at least 2 chips (a single chip is a guess, not a clarification) - except the ambiguous-surname case,
  * where the candidate list itself is the answer to "which one?".
  */
+import { attachCitations } from "../citations/records.js";
 export function buildClarifyAnswer(question, vocab, ctx = {}) {
   if (!clarifyEnabled()) return null;
   const q = tidy(question);
   const amb = detectAmbiguousSurname(q, vocab);
   if (amb) {
-    return {
+    return attachCitations({
       kind: "no-answer",
       text: `"${amb.token}" matches more than one customer (${amb.names.join(", ")}). Which one do you mean? I won't guess whose record it is. Tap one, or ask by full name.`,
       facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
       clarify: true, clarifyReason: "ambiguous-surname", didYouMean: buildClarifyChips(q, vocab, ctx),
-    };
+    }, { records: [], total: 0, kind: "searched", basis: "More than one customer has that name, so nothing was looked up until you pick one." });
   }
   const chips = buildClarifyChips(q, vocab, ctx);
   if (chips.length < 2) return null;
   const subject = findNamedCustomer(q, vocab) ?? (ctx.knownAddress === true ? ADDRESS_RE.exec(q)?.[0]?.replace(/\.$/, "") : null) ?? "that";
-  return {
+  return attachCitations({
     kind: "no-answer",
     text: `I can't answer that exactly as worded. Here is what I can look up for ${subject}: tap one.`,
     facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
     clarify: true, clarifyReason: "recognised-entity", didYouMean: chips,
-  };
+  }, { records: [], total: 0, kind: "searched", basis: `I could not map the wording to one exact lookup, so nothing has been answered or searched yet. The options are lookups available for ${subject === "that" ? "what you named" : subject}.` });
 }

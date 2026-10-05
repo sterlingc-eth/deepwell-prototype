@@ -119,10 +119,10 @@ export async function runCountQualifier(db, intent) {
     }
     const hits = rows.filter((r) => ({ ">": r.total > intent.amount, ">=": r.total >= intent.amount, "<": r.total < intent.amount, "<=": r.total <= intent.amount })[intent.op]);
     const text = W
-      ? (rows.length ? `${hits.length} of ${rows.length} invoices dated${win} are ${intent.label} ${usd(intent.amount)} (by invoice total).` : `No invoices on file${win}.`)
-      : `${hits.length} of ${rows.length} invoices on file are ${intent.label} ${usd(intent.amount)} (by invoice total${intent.basis ? `; ${intent.op === ">=" || intent.op === "<=" ? "an invoice of exactly that amount counts" : "an invoice of exactly that amount does not count"}). That counts every invoice on file, any date, paid or unpaid.` : ")."}`;
+      ? (rows.length ? `${hits.length} invoice${hits.length === 1 ? "" : "s"} dated${win} ${hits.length === 1 ? "is" : "are"} ${intent.label} ${usd(intent.amount)} (by invoice total).` : `No invoices on file${win}.`)
+      : `${hits.length} invoice${hits.length === 1 ? "" : "s"} on file ${hits.length === 1 ? "is" : "are"} ${intent.label} ${usd(intent.amount)} (by invoice total${intent.basis ? `; ${intent.op === ">=" || intent.op === "<=" ? "an invoice of exactly that amount counts" : "an invoice of exactly that amount does not count"}). That counts every invoice on file, any date, paid or unpaid.` : ")."}`;
     return attachCitations(answerEnvelope({ text, facts: [{ label: `Invoices ${intent.label} ${usd(intent.amount)}${win}`, value: String(hits.length), sources: hits.slice(0, 20).map((r) => ({ documentId: r.document_id, location: { field: "total" } })) }], extra: { fastIntent: "count_qualifier" } }),
-      { records: await documentRecordsFor(db, hits.slice(0, 200).map((r) => r.document_id)), total: hits.length, claimedCount: hits.length, basis: W ? `Compared the total to ${usd(intent.amount)} on the ${rows.length} invoices whose invoice date is ${W.from} through ${W.to}.` : `Compared the total on each of the ${rows.length} invoices to ${usd(intent.amount)}.` });
+      { records: await documentRecordsFor(db, hits.slice(0, 200).map((r) => r.document_id)), total: hits.length, claimedCount: hits.length, basis: W ? `Compared the total to ${usd(intent.amount)} on the ${rows.length} invoices whose invoice date is ${W.from} through ${W.to}.` : `Compared the total on every invoice on file (${rows.length} in all) to ${usd(intent.amount)}.` });
   }
   if (intent.kind === "out-of-state") {
     const { rows } = await db.raw(`SELECT id, data->>'customer_name' AS name, data->>'service_address' AS addr FROM entities WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT_SQL}`, []);
@@ -134,10 +134,10 @@ export async function runCountQualifier(db, intent) {
     const noState = rows.length - withState.length;
     const list = out.slice(0, 12).map((r) => `${r.name} (${r.st})`).join(", ");
     const text = out.length
-      ? `${out.length} of ${rows.length} customers have a service address outside ${home} (${home} is where most of your customers are): ${list}.${noState ? ` ${noState} customer${noState === 1 ? " has" : "s have"} no state on file.` : ""}`
+      ? `${out.length} customer${out.length === 1 ? " has" : "s have"} a service address outside ${home} (${home} is where most of your customers are): ${list}.${noState ? ` ${noState} customer${noState === 1 ? " has" : "s have"} no state on file.` : ""}`
       : `No customers have a service address outside ${home} (${home} is where most of your customers are).`;
     return attachCitations(answerEnvelope({ text, facts: out.slice(0, 20).map((r) => ({ label: "Out-of-state customer", value: `${r.name} (${r.st})`, entityIds: [r.id], sources: [] })), extra: { fastIntent: "count_qualifier" } }),
-      { records: await customerRecordsFor(db, out.map((r) => r.id)), total: out.length, claimedCount: out.length, basis: `Read the state in the service address of ${withState.length} customers; "out of state" = not ${home}, the most common state.` });
+      { records: await customerRecordsFor(db, out.map((r) => r.id)), total: out.length, claimedCount: out.length, basis: `Read the state in the service address of every customer that has one (${withState.length} in all); "out of state" = not ${home}, the most common state.` });
   }
   if (intent.kind === "permit-scope") {
     const { rows } = await db.raw(
@@ -149,9 +149,9 @@ export async function runCountQualifier(db, intent) {
     for (const r of rows) by[scopeOf(r.body)].push(r.id);
     const hits = by[intent.scope];
     const rest = rows.length - by.commercial.length - by.residential.length;
-    const text = `${hits.length} of ${rows.length} permits on file are ${intent.scope} (by the "Scope of Work" line on the permit).${rest ? ` ${rest} permit${rest === 1 ? " is" : "s are"} neither labelled commercial nor residential.` : ""}`;
+    const text = `${hits.length} ${intent.scope} permit${hits.length === 1 ? "" : "s"} ${hits.length === 1 ? "is" : "are"} on file (by the "Scope of Work" line on the permit).${rest ? ` ${rest} permit${rest === 1 ? " is" : "s are"} neither labelled commercial nor residential.` : ""}`;
     return attachCitations(answerEnvelope({ text, facts: [{ label: `${intent.scope[0].toUpperCase()}${intent.scope.slice(1)} permits`, value: String(hits.length), sources: hits.slice(0, 20).map((id) => ({ documentId: id, location: {} })) }], extra: { fastIntent: "count_qualifier" } }),
-      { records: await documentRecordsFor(db, hits.slice(0, 200)), total: hits.length, claimedCount: hits.length, basis: `Read the "Scope of Work" line on each of the ${rows.length} permits.` });
+      { records: await documentRecordsFor(db, hits.slice(0, 200)), total: hits.length, claimedCount: hits.length, basis: `Read the "Scope of Work" line on each permit (${rows.length} in all).` });
   }
   return null;
 }

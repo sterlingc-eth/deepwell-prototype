@@ -201,6 +201,7 @@ endpoint is what runs. In this order:
    `donovan_scorecard_results`, `donovan_scorecard_runs`, `staff_access_log`, `support_access_grants`,
    `proposals`, `schema_versions`, `entities`, `customer_activity`, `customer_activity_dirty`, `audit_log`,
    `users`, `api_keys`, `usage_counters`.
+   The monthly page tally `page_usage_monthly` is deliberately RETAINED (it holds no customer content; keeping it means "delete all my data" cannot reset the paid page allowance); it is removed when the company row itself is deleted.
    The shop's stored settings (the known-shop-contacts list, follow-up and digest settings) are cleared.
    The delete also sweeps any other table that carries a `tenant_id` column but is not on that list, so a
    table added by a later migration cannot be missed at runtime; and `scripts/verify-readiness.mjs` fails

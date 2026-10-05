@@ -7,6 +7,7 @@ import { INTAKE_SOURCES, PIPELINE_STAGES, type Batch, type Doc, type IntakeSourc
 import { classifyByFilename, fileTypeOf, SAMPLE_UPLOADS } from '../domains/hvac/intake';
 import { useAppStore } from '../store/appStore';
 import { documentName, hasFriendlyName } from '../core/documentName';
+import { ACCEPT_ATTRIBUTE, ACCEPTED_TYPES_SENTENCE } from '../../api/_lib/uploadTypes.js';
 import { ingestFiles, STILL_PROCESSING_LINK_LABEL, STILL_PROCESSING_MESSAGE, type IngestProgress, type IngestResult } from '../services/ingestClient';
 import {
   startBulkImport,
@@ -55,6 +56,9 @@ const SKIP_REASON_LABEL: Record<NonNullable<BulkFileState['skipReason']>, string
   empty: 'Empty file',
   'too-large': 'Too large',
   'unsupported-type': 'Unsupported type',
+  'unsafe-path': 'Unsafe file name',
+  'nested-zip': 'Zip inside a zip',
+  'zip-bomb': 'Zip not opened',
 };
 
 const ZIP_EXTENSION = /\.zip$/i;
@@ -564,11 +568,14 @@ export function IntakeBody() {
           >
             <FolderArchive className="w-6 h-6 mx-auto text-ink-3" aria-hidden="true" />
             <p className="mt-2 text-body text-ink-2">Drag a .zip export or a folder of files here</p>
+            <p className="mt-1 text-caption text-ink-3" data-testid="accepted-types-hint">
+              Reads {ACCEPTED_TYPES_SENTENCE}. iPhone photos are converted to JPEG automatically in Safari; other browsers need the iPhone camera set to Most Compatible. Old .doc / .xls and macro files are not read: save them as .docx / .xlsx first.
+            </p>
             <input
               ref={bulkInput}
               type="file"
               multiple
-              accept=".zip,.pdf,.jpg,.jpeg,.png,.webp,.tiff,.tif,.txt,.csv"
+              accept={`.zip,${ACCEPT_ATTRIBUTE},.heic,.heif`}
               className="sr-only"
               aria-label="Choose files or a zip for bulk import"
               onChange={(e) => {
@@ -709,6 +716,7 @@ export function IntakeBody() {
                       multiple
                       className="sr-only"
                       aria-label="Add files to batch"
+                      accept={`${ACCEPT_ATTRIBUTE},.heic,.heif`}
                       onChange={(e) => { const fs = Array.from(e.target.files ?? []); e.target.value = ''; void uploadFiles(fs); }}
                     />
                     <button type="button" className="dw-btn-secondary !min-h-[40px] !py-1.5" disabled={uploading} onClick={() => fileInput.current?.click()}>

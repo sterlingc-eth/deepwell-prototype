@@ -20,6 +20,7 @@
  * the resolved subject -> null, an intent this file has no extraction field
  * for (seer, filter size) -> null, always.
  */
+import { parseDocFieldAsk } from './lookups/docFieldAsk.js';
 import { describeWarranty, alertTier } from './warrantyRules.js';
 // TEAM C (citations everywhere): equipment / document lists cite the exact rows they list.
 import { attachCitations, unitRecord, documentRecord, customerRecord } from './citations/records.js';
@@ -293,7 +294,9 @@ const TRIGGERS = [
   // R32 (loop 2): any yes/no framing whose object is "a <brand>" ("is the equipment at <addr> a daikin", "would that be a trane unit at <addr>", "<addr> - is that a carrier").
   // The exactly-one-brand rule in extractAskedBrand still guards "a trane or a carrier".
   ['brand_match', new RegExp(`\\b(?:is|are|isn't|would|could|might|was)\\b[^?.!]*\\b(?:a|an)\\s+(?:${BRAND_WORDS_SRC})\\b`, 'i')],
-  ['installer', /\bwho (?:installed|did the install)\b|\bwho put\b[\s\S]*\bin\b|\binstaller\b/i],
+  // Defect 6 (limit test 2026-10-03): "which tech installed David Prentiss's system" / "which technician did the install for X" / "who set up the system" asked for the INSTALLER
+  // and was answered with the last technician out. "which|what <tech> installed/put in/set up" is the same ask as "who installed".
+  ['installer', /\bwho (?:installed|did the install)\b|\bwho put\b[\s\S]*\bin\b|\binstaller\b|\b(?:which|what)\s+(?:tech(?:nician)?|guy|crew|company|contractor)\s+(?:installed|did\s+the\s+install(?:ation)?|put\s+in|set\s+up|did\s+the\s+setup)\b|\bwho\s+(?:set\s+up|did\s+the\s+(?:setup|install(?:ation)?))\b/i],
   ['install_date', /\binstall(?:ed|ation)?\b[\s\S]*\b(date|when)\b|\b(date|when)\b[\s\S]*\binstall(?:ed|ation)?\b|\binstall date\b/i],
   ['last_service_tech', /\bwho\b[\s\S]*\b(last|out|worked on|came out|serviced)\b/i],
   ['last_service_tech', /\b(last|latest) (?:tech|technician)\b/i],
@@ -340,7 +343,7 @@ const TRIGGERS = [
   // made this intent's own subject.hasAny true and let it steal these two questions from analytics
   // — caught as a real regression (correct -> needs-model) by this round's own offline-exam
   // measurement before this exclusion was added.
-  ['equipment_age', /^(?!.*\b(?:oldest|newest)\b)[\s\S]*(?:\bhow old\b[\s\S]*\b(?:unit|system|equipment)\b|\b(?:unit|system|equipment)\b[\s\S]*\bhow old\b)/i],
+  ['equipment_age', /^(?!.*\b(?:oldest|newest)\b)[\s\S]*(?:\bhow old\b[\s\S]*\b(?:unit|system|equipment)\b|\b(?:unit|system|equipment)\b[\s\S]*\bhow old\b|\bage\s+of\s+(?:the\s+|his\s+|her\s+|their\s+)?(?:unit|system|equipment|ac|a\/c|furnace|heat\s*pump)\b|\bhow\s+long\s+ago\b[\s\S]*\b(?:unit|system|equipment|ac)\b[\s\S]*\binstalled\b)/i],
   // R15 (Team C, follow-up round): "when was the last invoice for X" asks for a DATE, never an
   // amount — this trigger used to fire for it anyway (the shared "last/latest invoice" phrasing),
   // but fetchInvoiceTotal's own answer template only ever states a dollar figure, never a date,
@@ -550,7 +553,7 @@ const LOOSE_ADDRESS_RE = new RegExp(
 // examples). A bare 4-digit year or a short word never qualifies.
 const IDENTIFIER_RE = /\b[A-Za-z0-9][A-Za-z0-9-]{7,}\b/g;
 
-const NAME_HINT_RE = new RegExp(`\\b(?:for|at|on)\\s+(?!${STOP_WORD}\\b)([A-Z][A-Za-z'&.-]+(?:\\s+[A-Z][A-Za-z'&.-]+){0,3})(?:'s)?\\b`);
+const NAME_HINT_RE = new RegExp(`\\b(?:for|at|on|out\\s+to)\\s+(?!${STOP_WORD}\\b)([A-Z][A-Za-z'&.-]+(?:\\s+[A-Z][A-Za-z'&.-]+){0,3})(?:'s)?\\b`);
 const POSSESSIVE_NAME_RE = new RegExp(`\\b(?!${STOP_WORD}\\b)([A-Z][A-Za-z'-]+(?:\\s+[A-Z][A-Za-z'-]+)?)'s\\b`);
 // R31 (Team A, P1 roadmap "THE_NAME_NOUN_RE /i root fix"): the trailing /i lets the leading `[A-Z]` match ANY letter,
 // which is deliberate for a dispatcher's lowercase "the mercer unit" but also read "the OLDEST unit" / "the LAST job" /
@@ -880,6 +883,8 @@ export function extractSubject(question) {
   // generically, after every name-hint branch above (not just NAME_HINT_RE's own) so any hint added
   // the same way later inherits the fix rather than needing its own copy; a no-op for every name
   // that already came back clean (POSSESSIVE_NAME_RE and the rest never include the "'s" at all).
+  // Defect 6: a capitalised equipment noun after the possessive ("on Deborah Ortega's AC") was swallowed into the name by NAME_HINT_RE's capital run.
+  if (name) name = name.replace(/['’]s\s+(?:AC|A\/C|HVAC|RTU|HP|Unit|Units|System|Systems|Furnace|Heater|Heat Pump|Condenser|Air Conditioner|Thermostat|Equipment)\s*$/i, '').trim() || name;
   if (name) name = name.replace(/['’]s$/i, '').trim() || name;
 
   const ordinal = ORDINAL_RE.test(q) ? 'last' : null;
@@ -1133,6 +1138,8 @@ export function buildOutOfDomainDecline() {
  * rather than relying on that invariant holding at every future call site.
  */
 export function classifyFastPath(question) {
+  // Defect 19/21: one printed field of one kind of document is docLookup's (lookups/docFieldAsk.js), never a neighbouring fast-path field.
+  if (parseDocFieldAsk(question)) return null;
   // R19 (I1, C8): checked first and unconditionally — a meta-linguistic wrapper phrase overrides
   // every ordinary trigger/anchor gate below (see isMetaLinguisticQuestion's own doc comment for why
   // this can only ever narrow non-business coverage, never swallow a real question).
@@ -1405,7 +1412,8 @@ const FIELD_INTRO = {
   serial: (label, value) => `${label}'s serial number is ${value}.`,
   manufacturer: (label, value) => `${label} is a ${value} unit.`,
   install_date: (label, value) => `${label} was installed on ${formatDateHuman(value)}.`,
-  installer: (label, value) => `${value} installed ${label.replace(/^The /, 'the ')}.`,
+  // a customer label (a person / business name, no "The ..." unit description) is the owner of the system, not the thing installed
+  installer: (label, value) => `${value} installed ${/^the\b/i.test(label) || /\d/.test(label) ? label.replace(/^The /, 'the ') : `${label}'s system`}.`,
   last_service_tech: (label, value) => `${value} was the last technician out to ${label.replace(/^The /, 'the ')}.`,
   last_service_date: (label, value) => `${label} was last serviced on ${formatDateHuman(value)}.`,
   service_address: (label, value) => `${label}'s service address is ${value}.`,
@@ -1573,11 +1581,12 @@ export function ageYearsBetween(fromYmd, toYmd) {
  *  exists; otherwise (the same "own-value fallback" convention installDate/unitFieldFact already use
  *  for a date that lives only on the equipment entity's own record, never independently extracted)
  *  stated uncited, `sources: []` — a real, on-file value, never a guess. */
-export function buildEquipmentAgeAnswer({ label, years, installIso, row }) {
+export function buildEquipmentAgeAnswer({ label, years, installIso, row, months = null }) {
   if (years == null || years < 0) return null;
-  const text = `${label} is ${years} year${years === 1 ? '' : 's'} old — installed ${formatDateHuman(installIso)}.`;
+  const ageText = years < 2 && months != null && months >= 0 ? (years === 0 ? `0 years, ${months} month${months === 1 ? '' : 's'}` : `${years} year, ${months - 12} month${months - 12 === 1 ? '' : 's'}`) : `${years} year${years === 1 ? '' : 's'}`;
+  const text = `${label} is ${ageText} old — installed ${formatDateHuman(installIso)}.`;
   const sources = row ? [{ documentId: row.document_id, location: { field: row.field_key } }] : [];
-  const fact = { label: 'Equipment age', value: `${years} year${years === 1 ? '' : 's'}`, basis: row ? 'printed' : 'record', sources };
+  const fact = { label: 'Equipment age', value: ageText, basis: row ? 'printed' : 'record', sources };
   return {
     kind: 'answer',
     text,

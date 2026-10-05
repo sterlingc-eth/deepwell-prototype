@@ -33,6 +33,9 @@ function describeFilter(entity, f) {
     case 'installYear': return `installed ${f.op === 'eq' ? 'in' : f.op} ${v}`;
     case 'warrantyStatus': return `with a ${v} warranty`;
     case 'documentType': return `of type ${v}`;
+    case 'permitScope': return `that are ${v}`;
+    case 'permitCity': return `issued by the City of ${v}`;
+    case 'agreementEnd': return `${{ eq: 'ending on', gte: 'ending on or after', lte: 'ending on or before', gt: 'ending after', lt: 'ending before' }[f.op] ?? 'ending'} ${v}`;
     case 'technician': return `serviced by ${v}`;
     case 'customerName': return `named like ${v}`;
     case 'hasEmail': return f.value ? 'with an email on file' : 'missing an email address';

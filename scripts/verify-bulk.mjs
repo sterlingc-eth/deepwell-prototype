@@ -70,8 +70,8 @@ const eq = (name, got, want) =>
   const empty = classifyEntry({ path: 'blank.pdf', isDir: false, sizeBytes: 0 });
   eq('a zero-byte file is skipped as empty', [empty.accept, empty.reason], [false, 'empty']);
 
-  const unsupported = classifyEntry({ path: 'notes.docx', isDir: false, sizeBytes: 400 });
-  eq('an unsupported extension is skipped', [unsupported.accept, unsupported.reason], [false, 'unsupported-type']);
+  const unsupported = classifyEntry({ path: 'notes.doc', isDir: false, sizeBytes: 400 });
+  eq('an unsupported extension is skipped (.doc: Word is read as .docx now, the old .doc is not)', [unsupported.accept, unsupported.reason], [false, 'unsupported-type']);
   const noExt = classifyEntry({ path: 'README', isDir: false, sizeBytes: 400 });
   eq('no extension at all is skipped as unsupported, not crashes', [noExt.accept, noExt.reason], [false, 'unsupported-type']);
 
@@ -90,7 +90,8 @@ const eq = (name, got, want) =>
   eq('extOf lowercases and strips the dot', extOf('Invoice.PDF'), 'pdf');
   eq('extOf on a file with no extension is empty', extOf('README'), '');
   eq('contentTypeFor maps a known extension', contentTypeFor('a.pdf'), 'application/pdf');
-  eq('contentTypeFor falls back for an unknown extension', contentTypeFor('a.docx'), 'application/octet-stream');
+  eq('contentTypeFor falls back for an unknown extension', contentTypeFor('a.exe'), 'application/octet-stream');
+  eq('contentTypeFor maps Word and Excel to their canonical types', [contentTypeFor('a.docx'), contentTypeFor('a.XLSX')], ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
 }
 
 /* ------------------------------------------------------------------- chunk */

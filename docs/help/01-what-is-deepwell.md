@@ -26,7 +26,7 @@ If your business keeps documents or paperwork, yes. DeepWell reads invoices, con
 
 ### How does DeepWell work?
 ~ how does it work, how it works, how does deepwell work, ingest link ask, walkthrough, explain how, capture, process, steps, workflow
-Three steps. **Ingest:** paper, PDFs, spreadsheets and photos go in as they are. **Link:** each document is read for serials, addresses, dates, names and amounts, and connected to the matching customer and equipment. **Ask:** you type a question and get the answer with the source page attached. Uncertain reads are flagged for a quick human check.
+Three steps. **Ingest:** paper, PDFs, Word and Excel files, CSVs and photos go in as they are. **Link:** each document is read for serials, addresses, dates, names and amounts, and connected to the matching customer and equipment. **Ask:** you type a question and get the answer with the source page attached. Uncertain reads are flagged for a quick human check.
 
 ### What kinds of records can DeepWell read?
 ~ what documents, what files, what records, kinds of documents, kinds of records, types of documents, what types of records, handwriting, handwritten, nameplate photos, carbon copies, what can i upload, which documents can it read, what paperwork

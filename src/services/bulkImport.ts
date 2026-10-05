@@ -43,10 +43,17 @@ import {
   type PresignRequestItem,
   type PresignResultItem,
 } from './ingestClient.ts';
+import {
+  EXT_KIND, EXT_CONTENT_TYPES, KIND_CAP_BYTES, MAX_ABSOLUTE_BYTES, MAX_MODEL_READ_BYTES, extensionOf, refusalForExtension,
+} from '../../api/_lib/uploadTypes.js';
+import { prepareImageForUpload } from './imageConvert.ts';
 
 // ------------------------------------------------------------- archive walk
 
-export type SkipReason = 'macosx' | 'dotfile' | 'directory' | 'empty' | 'too-large' | 'unsupported-type';
+export type SkipReason =
+  | 'macosx' | 'dotfile' | 'directory' | 'empty' | 'too-large' | 'unsupported-type'
+  // Zip protection (walkZip): an entry whose name climbs out of the archive, a zip inside the zip, or a size/ratio that looks like a bomb.
+  | 'unsafe-path' | 'nested-zip' | 'zip-bomb';
 
 export interface SkippedEntry {
   path: string;
@@ -54,39 +61,37 @@ export interface SkippedEntry {
   detail: string;
 }
 
-/** filename extension (lowercased, no dot) -> content type. Also the accepted-extension allowlist. */
-const CONTENT_TYPES: Record<string, string> = {
-  pdf: 'application/pdf',
-  jpg: 'image/jpeg',
-  jpeg: 'image/jpeg',
-  png: 'image/png',
-  webp: 'image/webp',
-  tiff: 'image/tiff',
-  tif: 'image/tiff',
-  txt: 'text/plain',
-  csv: 'text/csv',
-};
-export const SUPPORTED_EXTENSIONS = Object.keys(CONTENT_TYPES);
+/**
+ * The allow-list is the SERVER's (api/_lib/uploadTypes.js, imported here so the two can never drift): pdf, jpg, jpeg, png, gif,
+ * webp, txt, md, csv, tsv, json, docx, xlsx. HEIC/HEIF are also let through here ONLY because the browser converts them to JPEG
+ * before upload (imageConvert.ts); the server itself refuses them.
+ */
+const CONVERTED_EXTENSIONS = ['heic', 'heif'];
+export const SUPPORTED_EXTENSIONS = [...Object.keys(EXT_KIND), ...CONVERTED_EXTENSIONS];
 
 /**
- * Mirrors MAX_PDF_BYTES in api/_lib/readDocument.js. This is a client-side
- * pre-filter to avoid spending an upload on a file the server would reject
- * outright, not a security boundary — /api/upload-url enforces its own
- * (more precise, per-content-type) limits regardless, and remains the source
- * of truth.
+ * Mirrors the 24 MB PDF/photo read cap (api/_lib/uploadTypes.js KIND_CAP_BYTES, which /api/upload-url enforces per kind). This is a
+ * client-side pre-filter to avoid spending an upload on a file the server would reject outright, not a security boundary.
  */
-export const MAX_BULK_FILE_BYTES = 24 * 1024 * 1024;
+export const MAX_BULK_FILE_BYTES = MAX_MODEL_READ_BYTES;
 
 export function extOf(name: string): string {
-  const i = name.lastIndexOf('.');
-  return i === -1 ? '' : name.slice(i + 1).toLowerCase();
+  return extensionOf(name);
 }
 
 export function contentTypeFor(name: string): string {
-  return CONTENT_TYPES[extOf(name)] ?? 'application/octet-stream';
+  const ext = extOf(name);
+  return EXT_CONTENT_TYPES[ext]?.[0] ?? (CONVERTED_EXTENSIONS.includes(ext) ? 'image/heic' : 'application/octet-stream');
 }
 
 export type ClassifyVerdict = { accept: true } | { accept: false; reason: SkipReason; detail: string };
+
+/** Names that are never safe to take from an archive: absolute, drive-lettered, or climbing out with "..". Pure. */
+export function isUnsafeArchivePath(path: string): boolean {
+  const p = path.replace(/\\/g, '/');
+  if (p.startsWith('/') || /^[A-Za-z]:/.test(p)) return true;
+  return p.split('/').some((seg) => seg === '..');
+}
 
 /**
  * Pure accept/skip decision for one archive entry or dropped file. Used by
@@ -110,11 +115,15 @@ export function classifyEntry(entry: { path: string; isDir: boolean; sizeBytes: 
     return { accept: false, reason: 'empty', detail: 'Zero-byte file' };
   }
   const ext = extOf(base);
-  if (!SUPPORTED_EXTENSIONS.includes(ext)) {
-    return { accept: false, reason: 'unsupported-type', detail: ext ? `Unsupported file type .${ext}` : 'No file extension' };
+  if (ext === 'zip') {
+    return { accept: false, reason: 'nested-zip', detail: 'A .zip inside a .zip is not opened. Unzip it yourself and add the files inside.' };
   }
-  if (sizeBytes > MAX_BULK_FILE_BYTES) {
-    return { accept: false, reason: 'too-large', detail: `Larger than ${Math.round(MAX_BULK_FILE_BYTES / (1024 * 1024))} MB` };
+  if (!SUPPORTED_EXTENSIONS.includes(ext)) {
+    return { accept: false, reason: 'unsupported-type', detail: ext ? refusalForExtension(ext) : 'No file extension' };
+  }
+  const cap = CONVERTED_EXTENSIONS.includes(ext) ? MAX_ABSOLUTE_BYTES : (KIND_CAP_BYTES[EXT_KIND[ext] as string] ?? MAX_BULK_FILE_BYTES);
+  if (sizeBytes > cap) {
+    return { accept: false, reason: 'too-large', detail: `Larger than ${Math.round(cap / (1024 * 1024))} MB` };
   }
   return { accept: true };
 }
@@ -160,35 +169,124 @@ async function sizeOfZipEntry(entry: any): Promise<number> {
   return bytes.byteLength;
 }
 
-/** Unzip an archive client-side and classify every entry. Never rejects on a bad entry — that entry is just skipped. */
+// Zip-bomb protection. The numbers are generous for a real export (a field-service archive is thousands of small PDFs and photos)
+// and tight for a hostile one. Declared sizes come from the archive's own directory; jszip checks every inflated entry against its
+// declared size and CRC, so a lie surfaces as an error on that entry, never as more bytes than declared.
+export const MAX_ZIP_FILE_BYTES = 2 * 1024 * 1024 * 1024; // the .zip itself (a browser cannot hold more in memory anyway)
+export const MAX_ZIP_ENTRIES = 10_000; // directory entries + files
+export const MAX_ZIP_TOTAL_DECLARED_BYTES = 6 * 1024 * 1024 * 1024; // all accepted entries after inflating
+export const MAX_ZIP_RATIO = 200; // inflated / compressed, for any entry over 1 MiB (real PDFs/photos are ~1x, text up to ~20x)
+const ZIP_RATIO_MIN_BYTES = 1024 * 1024;
+
+export const ZIP_TOO_MANY_ENTRIES_MESSAGE = `This .zip holds more than ${MAX_ZIP_ENTRIES.toLocaleString('en-US')} items, which is more than DeepWell unzips at once. Split it into smaller zips and add them one at a time.`;
+export const ZIP_TOO_BIG_MESSAGE = 'This .zip is larger than 2 GB. Split it into smaller zips and add them one at a time.';
+export const ZIP_BOMB_MESSAGE = 'This .zip expands to far more data than it should (a "zip bomb" or a damaged file), so it was not opened. Make a new zip of the files and try again.';
+export const ZIP_UNREADABLE_MESSAGE = "This .zip couldn't be opened (it may be damaged or password-protected). Make a new zip, or add the files without zipping them.";
+
+export interface ZipEntryInfo {
+  name: string;
+  dir: boolean;
+  /** Declared (directory) sizes; NaN/undefined when unknown. */
+  compressedSize?: number;
+  uncompressedSize?: number;
+}
+
+export interface ZipPlan {
+  /** Whole-archive refusal; when set nothing from this archive is read. */
+  refused: string | null;
+  /** One verdict per input entry, same order. */
+  verdicts: ClassifyVerdict[];
+}
+
+/**
+ * Pure: classify every entry of an archive from its directory alone (names and declared sizes), applying the allow-list, the
+ * path rules and the bomb limits. No bytes are inflated. Entries with unsafe names are skipped (never extracted under a name that
+ * could climb out of a folder), nested archives are refused, and one entry with an absurd ratio or size is skipped on its own.
+ */
+export function planZipEntries(entries: ZipEntryInfo[]): ZipPlan {
+  if (entries.length > MAX_ZIP_ENTRIES) return { refused: ZIP_TOO_MANY_ENTRIES_MESSAGE, verdicts: [] };
+  let total = 0;
+  const verdicts: ClassifyVerdict[] = entries.map((e) => {
+    if (e.dir) return classifyEntry({ path: e.name, isDir: true, sizeBytes: 0 });
+    if (isUnsafeArchivePath(e.name)) {
+      return { accept: false, reason: 'unsafe-path', detail: 'The name points outside the folder (.. or an absolute path), so this entry was ignored' };
+    }
+    const size = Number.isFinite(e.uncompressedSize) ? (e.uncompressedSize as number) : 1;
+    const comp = Number.isFinite(e.compressedSize) ? (e.compressedSize as number) : 0;
+    const verdict = classifyEntry({ path: e.name, isDir: false, sizeBytes: size });
+    if (!verdict.accept) return verdict;
+    if (size > ZIP_RATIO_MIN_BYTES && size / Math.max(1, comp) > MAX_ZIP_RATIO) {
+      return { accept: false, reason: 'zip-bomb', detail: `Expands ${Math.round(size / Math.max(1, comp))}x, far more than a real document does` };
+    }
+    total += size;
+    return verdict;
+  });
+  if (total > MAX_ZIP_TOTAL_DECLARED_BYTES) return { refused: ZIP_BOMB_MESSAGE, verdicts: [] };
+  return { refused: null, verdicts };
+}
+
+/** Pure: the entry count the end-of-central-directory record of an archive declares, read from its LAST bytes (no parsing of the entries); null when not found, Infinity when zip64 (count too large for the classic field). */
+export function declaredZipEntryCount(tail: Uint8Array): number | null {
+  for (let i = tail.length - 22; i >= 0; i--) {
+    if (tail[i] === 0x50 && tail[i + 1] === 0x4b && tail[i + 2] === 0x05 && tail[i + 3] === 0x06) {
+      const n = (tail[i + 10] as number) | ((tail[i + 11] as number) << 8);
+      return n === 0xffff ? Infinity : n;
+    }
+  }
+  return null;
+}
+
+/** Unzip an archive client-side and classify every entry. Never rejects on a bad entry — that entry is just skipped. A hostile or damaged archive as a whole comes back as one skipped "(archive)" row with the reason. */
 export async function walkZip(zipFile: File | Blob): Promise<ZipWalkResult> {
+  const refuseArchive = (reason: SkipReason, detail: string): ZipWalkResult => ({
+    accepted: [],
+    skipped: [{ path: (zipFile as File).name || '(archive)', reason, detail }],
+  });
+  if (zipFile.size > MAX_ZIP_FILE_BYTES) return refuseArchive('too-large', ZIP_TOO_BIG_MESSAGE);
+  try {
+    const tail = new Uint8Array(await zipFile.slice(Math.max(0, zipFile.size - 66_000)).arrayBuffer());
+    const declared = declaredZipEntryCount(tail);
+    if (declared !== null && declared > MAX_ZIP_ENTRIES) return refuseArchive('zip-bomb', ZIP_TOO_MANY_ENTRIES_MESSAGE);
+  } catch {
+    /* unreadable tail: let loadAsync report it */
+  }
   const JSZip = await loadJSZip();
-  const zip = await JSZip.loadAsync(zipFile);
+  let zip: any;
+  try {
+    zip = await JSZip.loadAsync(zipFile, { checkCRC32: true });
+  } catch {
+    return refuseArchive('unsupported-type', ZIP_UNREADABLE_MESSAGE);
+  }
   const accepted: WalkedFile[] = [];
   const skipped: SkippedEntry[] = [];
 
-  for (const entry of Object.values(zip.files) as any[]) {
+  const all = Object.values(zip.files) as any[];
+  const plan = planZipEntries(
+    all.map((entry) => ({
+      name: String(entry.name),
+      dir: !!entry.dir,
+      compressedSize: entry?._data?.compressedSize,
+      uncompressedSize: entry?._data?.uncompressedSize,
+    }))
+  );
+  if (plan.refused) return refuseArchive('zip-bomb', plan.refused);
+
+  for (const [i, entry] of all.entries()) {
     const path: string = entry.name;
-    if (entry.dir) {
-      skipped.push({ path, reason: 'directory', detail: 'Folder entry' });
-      continue;
-    }
-    const name = path.split('/').filter(Boolean).pop() ?? path;
-
-    // Name-only checks (macOS junk, dotfiles, unsupported extensions) first,
-    // so those never pay to decompress. `sizeBytes: 1` is a placeholder that
-    // can only trip the size checks, which are re-run for real below.
-    const cheapVerdict = classifyEntry({ path, isDir: false, sizeBytes: 1 });
-    if (!cheapVerdict.accept && cheapVerdict.reason !== 'empty' && cheapVerdict.reason !== 'too-large') {
-      skipped.push({ path, reason: cheapVerdict.reason, detail: cheapVerdict.detail });
-      continue;
-    }
-
-    const sizeBytes = await sizeOfZipEntry(entry);
-    const verdict = classifyEntry({ path, isDir: false, sizeBytes });
+    const verdict = plan.verdicts[i] as ClassifyVerdict;
     if (!verdict.accept) {
       skipped.push({ path, reason: verdict.reason, detail: verdict.detail });
       continue;
+    }
+    const name = path.split('/').filter(Boolean).pop() ?? path;
+    const sizeBytes = typeof entry?._data?.uncompressedSize === 'number' ? entry._data.uncompressedSize : await sizeOfZipEntry(entry);
+    if (typeof entry?._data?.uncompressedSize !== 'number') {
+      // Size was not in the directory: it is only known after inflating, so apply the same size rule now.
+      const real = classifyEntry({ path, isDir: false, sizeBytes });
+      if (!real.accept) {
+        skipped.push({ path, reason: real.reason, detail: real.detail });
+        continue;
+      }
     }
 
     accepted.push({
@@ -484,7 +582,7 @@ export function startBulkImport(
     });
     emit();
 
-    for (const group of chunk(workIndexes, MAX_BATCH_PRESIGN_FILES)) {
+    for (let group of chunk(workIndexes, MAX_BATCH_PRESIGN_FILES)) {
       if (signal.aborted || dailyCap.hit) break;
 
       group.forEach((i) => {
@@ -494,14 +592,32 @@ export function startBulkImport(
 
       let prepared: { source: WalkedFile; file: File; sha256: string }[];
       try {
-        prepared = await Promise.all(
+        const attempts = await Promise.all(
           group.map(async (i) => {
             const source = sources[i] as WalkedFile;
-            const file = await source.toFile();
+            let file = await source.toFile();
+            // iPhone photos (HEIC/HEIF) are converted to JPEG here, per file: one that this browser cannot decode fails alone.
+            const prep = await prepareImageForUpload(file);
+            if (!prep.ok) return { i, error: prep.message };
+            file = prep.file;
+            // The converted copy is a different file: it is uploaded (and listed) under its new .jpg name.
+            const upSource: WalkedFile = prep.converted
+              ? { ...source, path: source.path.replace(/\.[A-Za-z0-9]+$/, '.jpg'), name: file.name, sizeBytes: file.size }
+              : source;
+            // A converted file is a new, different file: re-apply the size rule to the JPEG that will actually be uploaded.
+            if (prep.converted && file.size > MAX_BULK_FILE_BYTES) return { i, error: 'This photo is larger than 24 MB even after conversion. Choose a smaller photo.' };
             const sha256 = await sha256Hex(file);
-            return { source, file, sha256 };
+            return { i, value: { source: upSource, file, sha256 } };
           })
         );
+        for (const a of attempts) {
+          if ('error' in a && a.error) states[a.i] = { ...(states[a.i] as BulkFileState), status: 'failed', error: a.error };
+        }
+        const okAttempts = attempts.filter((a): a is { i: number; value: { source: WalkedFile; file: File; sha256: string } } => 'value' in a);
+        group = okAttempts.map((a) => a.i);
+        prepared = okAttempts.map((a) => a.value);
+        emit();
+        if (!group.length) continue;
       } catch (err) {
         group.forEach((i) => {
           states[i] = { ...(states[i] as BulkFileState), status: 'failed', error: err instanceof Error ? err.message : String(err) };

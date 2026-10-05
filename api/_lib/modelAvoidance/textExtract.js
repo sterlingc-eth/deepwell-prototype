@@ -100,10 +100,16 @@ function classifyLines(lines) {
 }
 
 /* --------------------------------------------------------------------- lines */
+// Word/Excel pages (api/_lib/office) start with ONE locator line: `Section: <heading>`, `Part k of n`, or
+// `Sheet "<name>" rows a-b of n`. It is navigation for a citation, not document content, so it must not count as an
+// unexplained line (that sent every headed .docx invoice to the paid model). First line of a page only.
+const LOCATOR_LINE_RE = /^(?:Section: .{1,100}|Part \d+ of \d+|Sheet ".{0,130}" rows \d+-\d+ of \d+(?: \(hidden sheet\))?)$/;
+
 function toLines(pages) {
   const out = [];
   for (const p of pages ?? []) {
     const raw = String(p?.text ?? "").split(/\r?\n/);
+    if (raw.length > 1 && LOCATOR_LINE_RE.test(raw[0].trim())) raw.shift();
     for (const r of raw) {
       const t = norm(r).replace(/\s+$/g, "").replace(/^\s+/, "");
       if (t) out.push({ t, page: Number(p.page_no) || 1 });

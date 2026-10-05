@@ -109,7 +109,7 @@ check('the completeness check itself works: an extra unlisted tenant table is re
   missingFromDeletePath(new Set([...schemaTables, 'zz_future_table']), DELETE_ORDER, RETAINED_TABLES).join() === 'zz_future_table');
 eq('DELETE_ORDER has no entry that is not a real tenant table (typo guard)', DELETE_ORDER.filter((t) => !schemaTables.has(t)), []);
 eq('DELETE_ORDER has no duplicates', DELETE_ORDER.length, new Set(DELETE_ORDER).size);
-eq('retained tables are exactly the account row, deletion receipt and Stripe event ledger', Object.keys(RETAINED_TABLES).sort(), ['billing_events', 'tenant_deletions', 'tenants']);
+eq('retained tables are exactly the account row, deletion receipt, Stripe event ledger and the monthly page tally (M3-config/67; no customer content, so "delete all my data" cannot reset the paid page allowance)', Object.keys(RETAINED_TABLES).sort(), ['billing_events', 'page_usage_monthly', 'tenant_deletions', 'tenants']);
 for (const [child, parents] of Object.entries({
   extractions: ['documents', 'facets'], document_pages: ['documents'], facets: ['documents'], document_financial_lines: ['document_financials', 'documents'],
   document_financials: ['documents'], intake_needs_info: ['documents', 'entities'], document_entity_links: ['documents', 'entities'],

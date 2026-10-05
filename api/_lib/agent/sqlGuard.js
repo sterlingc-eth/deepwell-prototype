@@ -66,6 +66,7 @@ export const REAL_TABLES = Object.freeze([
   // M3-config/65-scale-donovan-and-customers.sql (R41): the Customers-list summary and its to-do list. Derived data only
   // (last activity, document counts); Donovan reads customers through the `customers` view, never these.
   "customer_activity", "customer_activity_dirty",
+  "page_usage_monthly", // M3-config/67 (H-4): the monthly page tally; billing data, never read by Donovan
 ]);
 
 const DENY_TOKENS = new Set([
@@ -93,6 +94,7 @@ const DENY_TOKENS = new Set([
   "mark_tenant_digest_sent", "mark_tenant_notified", "record_warranty_notification",
   "expenses_delete", "expenses_insert", "expenses_list", "expenses_totals", "expenses_update",
   "support_public_bump", // M3-config/61 (R30 L5)
+  "page_usage_current_month", "page_usage_months", "page_counter_import_window", "page_usage_count_insert", // M3-config/67 (H-4)
 ]);
 const DENY_PREFIXES = ["pg_", "lo_", "dblink", "information_schema", "txid_", "xpath", "query_to_xml", "table_to_xml", "cursor_to_xml"];
 

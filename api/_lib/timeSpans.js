@@ -23,17 +23,24 @@ const year4 = (s) => Number(s);
 
 const DAY_FIRST_RE = new RegExp(`\\b(?:on\\s+|dated\\s+)?(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:of\\s+)?(${MONTH_ALT})\\b\\.?,?(?:\\s+(\\d{4}))?`, 'i');
 const MONTH_FIRST_RE = new RegExp(`\\b(${MONTH_ALT})\\b\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b(?!\\s*(?:years?|yrs?|days?|months?|weeks?|%|units?|tons?|invoices?|jobs?))(?:,?\\s+(\\d{4}))?`, 'i');
-const NUMERIC_DATE_RE = /\b(\d{1,2})\/(\d{1,2})\/(\d{4}|\d{2})\b/;
+// Slash dates may carry a 2-digit year; dotted dates ("9.21.2026", "9.21.26", "21.09.2026") too, but a dotted run of more than three numbers (a version / part number) is never a date.
+const NUMERIC_DATE_RE = /\b(\d{1,2})\/(\d{1,2})\/(\d{4}|\d{2})\b|(?<![\d.])(\d{1,2})\.(\d{1,2})\.(\d{4}|\d{2})\b(?!\.\d)/;
 const ISO_DATE_RE = /\b(\d{4})-(\d{2})-(\d{2})\b/;
+// Year-first dates with dot or slash separators ("2026.09.21", "2026/9/21"): the month must be a real month, so a version-like "2026.25.3" is never a date.
+const YMD_SEP_RE = /\b(\d{4})([./])(0?[1-9]|1[0-2])\2(\d{1,2})\b/;
 
 /** All explicit calendar dates in the question as {y,m,d,text}; y may be null when none was typed. */
 function explicitDates(q) {
   const out = [];
   let m;
   if ((m = q.match(ISO_DATE_RE))) out.push({ y: year4(m[1]), m: Number(m[2]), d: Number(m[3]), text: m[0] });
+  else if ((m = q.match(YMD_SEP_RE))) out.push({ y: year4(m[1]), m: Number(m[3]), d: Number(m[4]), text: m[0] });
   else if ((m = q.match(NUMERIC_DATE_RE))) {
-    const yy = m[3].length === 2 ? 2000 + Number(m[3]) : year4(m[3]);
-    out.push({ y: yy, m: Number(m[1]), d: Number(m[2]), text: m[0] });
+    const a = m[1] ?? m[4]; const b = m[2] ?? m[5]; const yr = m[3] ?? m[6];
+    const yy = yr.length === 2 ? 2000 + Number(yr) : year4(yr);
+    // 9/21/2026 is month-first; "21/09/2026" / "21.09.2026" can only be day-first (21 is not a month) and is read that way.
+    if (Number(a) > 12 && Number(b) <= 12) out.push({ y: yy, m: Number(b), d: Number(a), text: m[0] });
+    else out.push({ y: yy, m: Number(a), d: Number(b), text: m[0] });
   } else if ((m = q.match(MONTH_FIRST_RE))) {
     out.push({ y: m[3] ? year4(m[3]) : null, m: monthNum(m[1]), d: Number(m[2]), text: m[0].trim() });
   } else if ((m = q.match(DAY_FIRST_RE))) {
@@ -50,8 +57,6 @@ export function findInvalidDate(question) {
   for (const dt of explicitDates(q)) {
     const y = dt.y ?? 2024; // a year-less "February 29" is judged against a leap year; "September 31" is invalid in any year
     if (dt.d > 31 || dt.m < 1 || dt.m > 12 || !validDay(y, dt.m, dt.d)) {
-      // numeric d/m ambiguity: "21/9/2026" is a legal day-first date, never flag it
-      if (/\//.test(dt.text) && dt.m > 12 && dt.d <= 12) continue;
       return { invalid: true, text: dt.text };
     }
     if (dt.y != null && dt.m === 2 && dt.d === 29 && !validDay(dt.y, 2, 29)) return { invalid: true, text: dt.text };
@@ -86,6 +91,19 @@ export function resolveCalendarSpan(question, today) {
       if (x > y) { [x, y] = [y, x]; [da, db] = [b, a]; }
       const lab = `${fmtLong(da.y, da.m, da.d)} through ${fmtLong(db.y, db.m, db.d)}`;
       return { from: x, to: y, label: `from ${lab}`, bare: lab };
+    }
+  }
+  // Two explicit dates joined by a range word: "between 9/1/2026 and 9/15/2026", "from March 3 to March 9, 2026". Checked BEFORE the single-day
+  // reading below, which would otherwise keep only the first date and answer for one day (a collapsed range).
+  const DATE_ALT = `(?:\\d{4}[./-]\\d{1,2}[./-]\\d{1,2}|\\d{1,2}[/.]\\d{1,2}[/.]\\d{2,4}|(?:${MONTH_ALT})\\.?\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,?\\s+\\d{4})?|\\d{1,2}(?:st|nd|rd|th)?\\s+(?:of\\s+)?(?:${MONTH_ALT})\\.?(?:,?\\s+\\d{4})?)`;
+  if ((m = q.match(new RegExp(`\\b(?:between|from)\\s+(${DATE_ALT})\\s+(?:and|to|through|thru|until|till|-|–)\\s+(${DATE_ALT})`)))) {
+    const d1 = explicitDates(m[1])[0]; const d2 = explicitDates(m[2])[0];
+    if (d1 && d2) {
+      const y2 = d2.y ?? d1.y ?? Y; const y1 = d1.y ?? y2;
+      let a = iso(y1, d1.m, d1.d); let b = iso(y2, d2.m, d2.d);
+      if (a > b) [a, b] = [b, a];
+      const [ya, ma, da] = a.split('-').map(Number); const [yb, mb, db] = b.split('-').map(Number);
+      return { from: a, to: b, label: `from ${fmtLong(ya, ma, da)} through ${fmtLong(yb, mb, db)}`, bare: `${fmtLong(ya, ma, da)} through ${fmtLong(yb, mb, db)}` };
     }
   }
 
@@ -158,6 +176,37 @@ export function resolveCalendarSpan(question, today) {
     return { from: iso(y, a, 1), to: iso(yb, b, lastDay(yb, b)), label: `${cap(MONTHS[a - 1])} through ${cap(MONTHS[b - 1])} ${yb}`, bare: `${cap(MONTHS[a - 1])} through ${cap(MONTHS[b - 1])} ${yb}` };
   }
 
+  // Month + year on BOTH ends: "between January 2020 and December 2021", "from March 2019 to May 2019", "Jan 2010 - Dec 2012".
+  // (Without this the first "Month YYYY" below was kept alone and the question answered for one month.)
+  {
+    const MY = `(${MONTH_ALT})\\b\\.?(?:[\\s,]+(?:of\\s+)?(\\d{4}))?`;
+    const SEP = '\\s*(?:and|to|through|thru|until|till|-|–|—)\\s*';
+    const withPrefix = q.match(new RegExp(`\\b(?:between|from)\\s+${MY}${SEP}${MY}`));
+    const SEP2 = '\\s*(?:to|through|thru|until|till|-|–|—)\\s*'; // no "and" without between/from: "March 2019 and May 2019" names two months, not the span
+    const noPrefix = q.match(new RegExp(`\\b${MY.replace('(?:[\\s,]+(?:of\\s+)?(\\d{4}))?', '[\\s,]+(?:of\\s+)?(\\d{4})')}${SEP2}${MY.replace('(?:[\\s,]+(?:of\\s+)?(\\d{4}))?', '[\\s,]+(?:of\\s+)?(\\d{4})')}`));
+    const mm = withPrefix && withPrefix[2] ? withPrefix : noPrefix;
+    if (mm && mm[2]) {
+      let a = monthNum(mm[1]); let b = monthNum(mm[3]);
+      let y1 = year4(mm[2]); let y2 = mm[4] ? year4(mm[4]) : y1;
+      if (!mm[4] && b < a) y2 = y1 + 1;
+      if (y1 * 12 + a > y2 * 12 + b) { [a, b] = [b, a]; [y1, y2] = [y2, y1]; } // reversed range
+      const text = `${cap(MONTHS[a - 1])} ${y1} through ${cap(MONTHS[b - 1])} ${y2}`;
+      return { from: iso(y1, a, 1), to: iso(y2, b, lastDay(y2, b)), label: `from ${text}`, bare: text };
+    }
+  }
+  // Numeric month ranges: "between 3/2019 and 5/2019".
+  if ((m = q.match(/\b(?:between|from)\s+(\d{1,2})[/.](\d{4})\s*(?:and|to|through|thru|until|till|-|–)\s*(\d{1,2})[/.](\d{4})\b/)) && m[1] >= 1 && m[1] <= 12 && m[3] >= 1 && m[3] <= 12) {
+    let a = [year4(m[2]), Number(m[1])]; let b = [year4(m[4]), Number(m[3])];
+    if (a[0] * 12 + a[1] > b[0] * 12 + b[1]) [a, b] = [b, a];
+    return { from: iso(a[0], a[1], 1), to: iso(b[0], b[1], lastDay(b[0], b[1])), label: `from ${cap(MONTHS[a[1] - 1])} ${a[0]} through ${cap(MONTHS[b[1] - 1])} ${b[0]}`, bare: `${cap(MONTHS[a[1] - 1])} ${a[0]} through ${cap(MONTHS[b[1] - 1])} ${b[0]}` };
+  }
+  // A numeric month: "9/2026", "09/2026", "9.2026", "2026/09", "2026.9", "2026-09" (a full date was already handled above).
+  {
+    const my = q.match(/(?<![\d/.-])(0?[1-9]|1[0-2])[/.](\d{4})(?![\d/])/) ?? null;
+    const ym = my ? null : q.match(/(?<![\d/.-])(\d{4})[/.-](0?[1-9]|1[0-2])(?![\d/.-]|\d)/);
+    const yy = my ? year4(my[2]) : ym ? year4(ym[1]) : null; const mo = my ? Number(my[1]) : ym ? Number(ym[2]) : null;
+    if (yy && mo && yy >= 1990 && yy <= 2100) return { from: iso(yy, mo, 1), to: iso(yy, mo, lastDay(yy, mo)), label: `in ${cap(MONTHS[mo - 1])} ${yy}`, bare: `${cap(MONTHS[mo - 1])} ${yy}` };
+  }
   // Month name with NO year (DONOVAN_MONTH_NOYEAR=0 disables): resolves to the most recent such month that is not in the future
   // relative to `today` ("sept" on 2026-09-25 -> September 2026, "october" -> October 2025). "since <month> [year]" runs from the
   // 1st of that month to today. Needs a lead-in word so the verb "may" / "march on" never reads as a month.

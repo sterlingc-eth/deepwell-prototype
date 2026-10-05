@@ -111,6 +111,8 @@ const EXTRA_DOMAIN_WORDS = [
   // just in the opposite direction (the typo table lacked the correct word
   // itself, not the misspelling).
   'fewest',
+  // Defect 19e / 3 (limit test 2026-10-03): real words fuzzyCorrect was rewriting into other vocab words ("worth" -> "north", "quoted" -> "quote").
+  'worth', 'quoted',
 ];
 
 function buildVocab() {

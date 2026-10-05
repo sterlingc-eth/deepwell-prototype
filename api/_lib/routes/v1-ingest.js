@@ -1,7 +1,7 @@
 import { handleCors } from "../claude.js";
 import { denyAuth } from "../auth.js";
 import { requireAuthOrKey, assertScope } from "../apiKeyAuth.js";
-import { limit } from "../rateLimit.js";
+import { limit, refundPlanRefusal } from "../rateLimit.js";
 import { createUploadUrl, respondUploadError, checkUploadGate } from "../../upload-url.js";
 
 /**
@@ -49,6 +49,7 @@ export default async function handler(req, res) {
   // failure for an already-paying partner integration.
   const gate = await checkUploadGate(auth);
   if (!gate.allowed) {
+    if (gate.status === 402) await refundPlanRefusal(req); // a plan refusal does not spend the rate-limit unit (bounded, see rateLimit.js)
     return handleCors(res, req).status(gate.status).json({ error: gate.error, url: gate.url });
   }
 
@@ -61,6 +62,7 @@ export default async function handler(req, res) {
       then: "/api/read-document",
     });
   } catch (error) {
-    return respondUploadError(res, req, error);
+    // omitCode: this route has never put the import "code" in its 402 body; the in-transaction recheck keeps it that way.
+    return await respondUploadError(res, req, error, { omitCode: true });
   }
 }

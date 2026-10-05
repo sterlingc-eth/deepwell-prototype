@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState } from 'react'
 import { AlertTriangle, Camera, CheckCircle2, CloudOff, FileUp, Loader2, LogIn, Trash2 } from 'lucide-react'
-import { IngestHttpError, sha256Hex, waitForIngest, type IngestProgress, type IngestResult } from '../services/ingestClient'
+import { IngestHttpError, preflightUpload, sha256Hex, waitForIngest, type IngestProgress, type IngestResult } from '../services/ingestClient'
 import { fetchDocumentIntakeSummaries, type DocumentIntakeSummary } from '../services/intakeClient'
 import { whenIdle } from './idle'
 import { combineToPdf, prefetchPdfLib, preparePhoto, scanFilename, type PreparedPage } from './imagePrep'
@@ -255,6 +255,12 @@ export const ScanTab = memo(function ScanTab({
 
       const runOne = async (file: File): Promise<ScanResult> => {
         report(file.name, 'hashing')
+        // An iPhone HEIC photo this phone's browser could not shrink above is never uploaded or queued raw: say what to do.
+        const pre = await preflightUpload(file)
+        if (!pre.ok) {
+          report(file.name, 'error', pre.message)
+          return { filename: file.name, error: pre.message }
+        }
         let sha256: string
         try {
           sha256 = await sha256Hex(file)

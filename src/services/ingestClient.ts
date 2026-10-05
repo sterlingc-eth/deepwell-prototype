@@ -29,6 +29,8 @@
 
 import { authHeader } from './authToken.ts';
 import { messageFromResponse, parseRetryAfterSeconds } from './httpError.ts';
+import { checkUploadFile } from '../../api/_lib/uploadTypes.js';
+import { prepareImageForUpload } from './imageConvert.ts';
 
 export type IngestStatus = 'hashing' | 'uploading' | 'reading' | 'queued' | 'pending' | 'waiting' | 'done' | 'error';
 
@@ -274,6 +276,23 @@ export class IngestRateGate {
   }
 }
 
+/**
+ * The client-side half of the allow-list, run on every file just before it is hashed and uploaded: an iPhone HEIC/HEIF photo is
+ * converted to JPEG in the browser (the server never accepts HEIC), and the same extension / declared-type / size rules the
+ * server enforces (api/_lib/uploadTypes.js) are applied so a refusal costs no round trip. `file` is what to upload (possibly the
+ * converted copy, whose bytes and hash differ from the original); `status` is the HTTP-style status the server would give.
+ */
+export async function preflightUpload(
+  original: File
+): Promise<{ ok: true; file: File; converted: boolean } | { ok: false; message: string; status: number }> {
+  const prepared = await prepareImageForUpload(original);
+  if (!prepared.ok) return { ok: false, message: prepared.message, status: 415 };
+  const file = prepared.file;
+  const verdict = checkUploadFile({ filename: file.name, contentType: file.type, sizeBytes: file.size > 0 ? file.size : undefined });
+  if (!verdict.ok) return { ok: false, message: verdict.message, status: verdict.status };
+  return { ok: true, file, converted: prepared.converted };
+}
+
 /** Ingest one file. Resolves with a result rather than throwing, so one bad
  *  file in a batch of forty does not abandon the other thirty-nine.
  *
@@ -286,13 +305,24 @@ export class IngestRateGate {
  *  before each retry — see the module comment just above. A 'per-day' 429,
  *  a 402, or a 413 is never retried, whether or not a gate was passed. */
 export async function ingestFile(
-  file: File,
+  original: File,
   onProgress?: (p: IngestProgress) => void,
   signal?: AbortSignal,
   gate?: IngestRateGate
 ): Promise<IngestResult> {
+  // Progress and results keep the NAME THE PERSON CHOSE (the screen matches rows by it) even when an iPhone photo is
+  // converted to a renamed .jpg below.
   const report = (status: IngestStatus, error?: string) =>
-    onProgress?.({ filename: file.name, status, error });
+    onProgress?.({ filename: original.name, status, error });
+
+  // iPhone HEIC/HEIF -> JPEG in the browser (the server never accepts HEIC); a browser that cannot decode it says so and
+  // nothing is uploaded. Then the same allow-list the server enforces, so a refusal costs no network round trip.
+  const pre = await preflightUpload(original);
+  if (!pre.ok) {
+    report('error', pre.message);
+    return { filename: original.name, error: pre.message };
+  }
+  const file = pre.file;
 
   for (let attempt = 1; ; attempt++) {
     try {
@@ -308,7 +338,7 @@ export async function ingestFile(
 
       if (alreadyUploaded) {
         report('done');
-        return { filename: file.name, documentId, duplicate: true };
+        return { filename: original.name, documentId, duplicate: true };
       }
 
       if (uploadUrl) {
@@ -321,7 +351,7 @@ export async function ingestFile(
       if (read.queued) {
         report('queued');
         return {
-          filename: file.name,
+          filename: original.name,
           documentId,
           queued: true,
           awaitingExtraction: read.extract !== false,
@@ -329,12 +359,12 @@ export async function ingestFile(
       }
 
       report('done');
-      return { filename: file.name, documentId, pages: read.pages };
+      return { filename: original.name, documentId, pages: read.pages };
     } catch (err) {
       if (isAbortError(err)) {
         // Deliberately cancelled (screen unmounted) — not a failure, and
         // nobody is watching this progress anymore, so stay quiet.
-        return { filename: file.name, error: 'Cancelled' };
+        return { filename: original.name, error: 'Cancelled' };
       }
       if (gate && isRetryableIngestStatus(err) && attempt <= MAX_INGEST_RATE_LIMIT_RETRIES) {
         gate.noteRateLimited(err, attempt);
@@ -345,7 +375,7 @@ export async function ingestFile(
       const error = err instanceof Error ? err.message : String(err);
       const billingUrl = err instanceof IngestHttpError && err.status === 402 ? (err.body as { url?: string } | null)?.url : undefined;
       report('error', error);
-      return { filename: file.name, error, billingUrl };
+      return { filename: original.name, error, billingUrl };
     }
   }
 }

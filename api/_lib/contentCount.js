@@ -445,6 +445,11 @@ export function parseContentCountQuestion(question, pack = null) {
   const jobSummary = parseJobSummaryQuestion(q);
   if (jobSummary) return jobSummary;
 
+  // D14: a SPECIFIC refrigerant ("how many units run on R-22", "how many R-454B units") is not "documents that mention refrigerant" - the generic
+  // refrigerant term group would drop the code and count every document that says refrigerant at all ("300 documents ... mention refrigerant").
+  // Leave it to the unit filters (analytics.js refrigerant condition) / the next lane.
+  if (/\br-?\d{2,3}[a-z]?\b/i.test(lower)) return null;
+
   const replaced = parseReplacedQuestion(lower);
   if (replaced) {
     const terms = extractKnownTerms(lower, pack);

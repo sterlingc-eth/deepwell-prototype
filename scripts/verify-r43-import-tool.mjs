@@ -161,7 +161,7 @@ try {
   family = 'dry-run';
   {
     const c = makeCase({
-      ...mixedTree(), '.DS_Store': 'x', 'Thumbs.db': 'x', '~$report.docx': 'x', 'a/.hidden.pdf': 'x', 'letter.docx': 'x', 'sheet.xlsx': 'x', 'iphone.heic': 'x', 'scan.tif': 'x',
+      ...mixedTree(), '.DS_Store': 'x', 'Thumbs.db': 'x', '~$report.docx': 'x', 'a/.hidden.pdf': 'x', 'letter.doc': 'x', 'sheet.xls': 'x', 'iphone.heic': 'x', 'scan.tif': 'x',
       'doc.gdoc': '{}', 'sheet.gsheet': '{}', 'empty.pdf': '', 'noext': 'x', '.git/config': 'x', '$RECYCLE.BIN/x.pdf': 'x',
     });
     fs.writeFileSync(path.join(c.folder, 'huge.pdf'), ''); fs.truncateSync(path.join(c.folder, 'huge.pdf'), 25 * 1024 * 1024);
@@ -171,10 +171,10 @@ try {
     check('dry run exits 0', r.code === 0, `${r.code} ${r.stderr}`);
     check('dry run makes no network calls (mock saw nothing) and uploads nothing', m.presigns.length === 0 && m.puts.length === 0 && m.statusPolls === 0);
     check('dry run says nothing is uploaded', /Nothing was uploaded/.test(r.stdout));
-    check('dry run counts 6 files to upload (3 types shown)', /Will be uploaded: 6 files/.test(r.stdout) && /PDFs: 2/.test(r.stdout) && /Photos: 2/.test(r.stdout) && /Text\/CSV: 2/.test(r.stdout), r.stdout.slice(0, 600));
+    check('dry run counts 6 files to upload (3 types shown)', /Will be uploaded: 6 files/.test(r.stdout) && /PDFs: 2/.test(r.stdout) && /Photos: 2/.test(r.stdout) && /Text\/CSV\/Word\/Excel: 2/.test(r.stdout), r.stdout.slice(0, 600));
     check('hidden/system files skipped (.DS_Store, Thumbs.db, ~$ temp, dotfile)', /Hidden, system or temporary files: 4 /.test(r.stdout), r.stdout);
     check('Google stubs are named with the export-to-PDF instruction', /Google Docs\/Sheets shortcuts[^\n]*: 2 /.test(r.stdout) && /Export the real file to PDF/.test(r.stdout));
-    check('unsupported types (Word, Excel, HEIC, TIFF, no extension) are skipped with what to do', /Types DeepWell cannot read: 5 /.test(r.stdout) && /Convert the file to PDF or JPEG/.test(r.stdout), r.stdout);
+    check('unsupported types (old .doc / .xls, HEIC, TIFF, no extension) are skipped with what to do', /Types DeepWell cannot read: 5 /.test(r.stdout) && /Convert the file to PDF or JPEG/.test(r.stdout), r.stdout);
     check('empty and oversize files are skipped with the reason', /Empty files \(0 bytes\): 1 /.test(r.stdout) && /Too large to read: 2 /.test(r.stdout));
     check('hidden/system FOLDERS are skipped and not counted', /Hidden\/system or unreadable folders skipped: 2/.test(r.stdout));
     check('files found total adds up (6 + 4 + 2 + 5 + 1 + 2)', /Files found: 20\b/.test(r.stdout), r.stdout.slice(0, 200));
@@ -191,7 +191,7 @@ try {
   family = 'happy-path';
   {
     const files = mixedTree();
-    const c = makeCase({ ...files, '.DS_Store': 'x', 'old.docx': 'x', 'empty.pdf': '' });
+    const c = makeCase({ ...files, '.DS_Store': 'x', 'old.doc': 'x', 'empty.pdf': '' });
     const r = await runTool(common(m, c.folder), { cwd: c.dir, env: withKey });
     check('exits 0', r.code === 0, `${r.code}\n${r.stdout}\n${r.stderr}`);
     check('every supported file was PUT to storage exactly once, with the bytes unchanged', m.puts.length === 6 && [...m.putsBySha.values()].every((n) => n === 1) && Object.values(files).every((b) => m.putsBySha.get(sha(b)) === 1));
@@ -207,7 +207,7 @@ try {
     eq('report: found / uploaded / present / skipped / failed / not attempted', n, { found: 9, uploaded: 6, present: 0, skipped: 3, failed: 0, notAttempted: 0 });
     check('report math adds up and says it matches', n.uploaded + n.present + n.skipped + n.failed + n.notAttempted === n.found && /matches files found/.test(rep));
     const csv = fs.readFileSync(`${c.state}.errors.csv`, 'utf8');
-    check('errors.csv lists the skipped files with a reason and what to do', /skipped,old\.docx/.test(csv) && /skipped,empty\.pdf/.test(csv) && /Convert the file to PDF or JPEG/.test(csv));
+    check('errors.csv lists the skipped files with a reason and what to do', /skipped,old\.doc/.test(csv) && /skipped,empty\.pdf/.test(csv) && /Save As to make a \.docx/.test(csv));
     check('live progress line printed', /Progress: 6\/6 files/.test(r.stdout));
     m.reset();
   }
@@ -729,7 +729,7 @@ family = 'no-self-grant';
   const fromRequest = apiFiles.filter((f) => /(body|payload|req\.query|query)\??\.\s*(staffImport|limits)\b/.test(fs.readFileSync(f, 'utf8')));
   check('static: no API code reads staffImport or limits out of a request body/query', fromRequest.length === 0, fromRequest.join(', '));
   const readers = apiFiles.filter((f) => /staffImport/.test(fs.readFileSync(f, 'utf8'))).map((f) => path.relative(root, f)).sort();
-  check('static: staffImport is referenced only by the code that reads it for the gate, keys, limits and status', readers.every((f) => ['api/_lib/plan.js', 'api/_lib/rateLimit.js', 'api/billing.js', 'api/upload-url.js', 'api/_lib/recordsStore.js', 'api/_lib/apiKeyAuth.js', 'api/_lib/support/tools.js', 'api/records.ts', 'api/_lib/staffImport.js'].includes(f)), readers.join(', '));
+  check('static: staffImport is referenced only by the code that reads it for the gate, keys, limits and status', readers.every((f) => ['api/_lib/plan.js', 'api/_lib/readDocument.js', 'api/_lib/rateLimit.js', 'api/billing.js', 'api/upload-url.js', 'api/_lib/recordsStore.js', 'api/_lib/apiKeyAuth.js', 'api/_lib/support/tools.js', 'api/records.ts', 'api/_lib/staffImport.js'].includes(f)), readers.join(', '));
   const stripe = read('api/_lib/billing.js');
   check('static: the Stripe webhook path never reads customer-supplied fields into limits.staffImport', !/staffImport/.test(stripe));
 }

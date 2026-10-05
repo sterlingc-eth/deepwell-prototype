@@ -154,7 +154,7 @@ export async function runDateQualifier(db, intent) {
     const w = whenIn(intent);
     if (!hits.length) {
       return attachCitations({ kind: "no-answer", text: `No ${noun[1]} on file ${w}.`, facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [] },
-        { records: [], total: 0, kind: "searched", basis: `Compared the ${field.replace("_", " ")} on ${dated.length} documents to ${intent.from} through ${intent.to}; none fall in it.` });
+        { records: [], total: 0, kind: "searched", basis: `Compared the ${field.replace("_", " ")} on ${dated.length} dated documents to ${intent.from} through ${intent.to}; none fall in it.` });
     }
     let split = "";
     if (intent.kind === "service") {
@@ -164,7 +164,7 @@ export async function runDateQualifier(db, intent) {
     } else split = ".";
     const text = `${hits.length} ${noun[hits.length === 1 ? 0 : 1]} ${w}${split}`;
     return attachCitations(answerEnvelope({ text, facts: [{ label: `${noun[1][0].toUpperCase()}${noun[1].slice(1)} ${w}`, value: String(hits.length), sources: hits.slice(0, 20).map((r) => ({ documentId: r.id, location: { field } })) }], extra: { fastIntent: "date_qualifier" } }),
-      { records: await documentRecordsFor(db, hits.slice(0, 200).map((r) => r.id)), total: hits.length, claimedCount: hits.length, basis: `Compared the ${field.replace("_", " ")} on ${dated.length} documents to ${intent.from} through ${intent.to}.` });
+      { records: await documentRecordsFor(db, hits.slice(0, 200).map((r) => r.id)), total: hits.length, claimedCount: hits.length, basis: `Compared the ${field.replace("_", " ")} on ${dated.length} dated documents to ${intent.from} through ${intent.to}.` });
   }
   // installs: equipment records by installation date
   const { rows } = await db.raw(`SELECT id, data->>'installation_date' AS d FROM entities WHERE entity_type = 'equipment' AND merged_into IS NULL AND ${TENANT_SQL}`, []);

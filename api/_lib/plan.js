@@ -12,6 +12,10 @@
  */
 import { getTenantContext, withTenant } from './recordsStore.js';
 import { TTLCache, memoAsync, logStage, registerTenantCache } from './perf.js';
+import { DOCX_CONTENT_TYPE, XLSX_CONTENT_TYPE } from './uploadTypes.js';
+import {
+  ESTIMATE_DOCX_FIXED_BYTES, ESTIMATE_DOCX_BYTES_PER_PAGE, ESTIMATE_XLSX_FIXED_BYTES, ESTIMATE_XLSX_BYTES_PER_PAGE, ESTIMATE_CSV_BYTES_PER_PAGE, ESTIMATE_DOCX_MAX_PAGES, ESTIMATE_SHEET_MAX_PAGES,
+} from './office/limits.js';
 import { STAFF_IMPORT_KEY, STAFF_IMPORT_MAX_DAYS, STAFF_IMPORT_CEILINGS, staffImportFor, staffImportWindowFor, staffImportNow, noteDatabaseClock } from './staffImport.js';
 export { STAFF_IMPORT_KEY, STAFF_IMPORT_MAX_DAYS, STAFF_IMPORT_CEILINGS, staffImportFor, staffImportWindowFor, staffImportNow, noteDatabaseClock };
 
@@ -319,6 +323,14 @@ export function estimatePagesForUpload(contentType, sizeBytes) {
   const bytes = Number.isFinite(size) && size > 0 ? size : 0;
   const type = String(contentType ?? '').toLowerCase();
   if (type.startsWith('image/')) return 1;
+  // Office build: Word / Excel / CSV by the rule in office/limits.js (a compressed size is all that is known before reading).
+  if (type === DOCX_CONTENT_TYPE) {
+    return Math.max(1, Math.min(ESTIMATE_DOCX_MAX_PAGES, Math.ceil(Math.max(0, bytes - ESTIMATE_DOCX_FIXED_BYTES) / ESTIMATE_DOCX_BYTES_PER_PAGE)));
+  }
+  if (type === XLSX_CONTENT_TYPE) return Math.max(1, Math.min(ESTIMATE_SHEET_MAX_PAGES, Math.ceil(Math.max(0, bytes - ESTIMATE_XLSX_FIXED_BYTES) / ESTIMATE_XLSX_BYTES_PER_PAGE)));
+  if (type === 'text/csv' || type === 'text/tab-separated-values') {
+    return Math.max(1, Math.min(ESTIMATE_SHEET_MAX_PAGES, Math.ceil(bytes / ESTIMATE_CSV_BYTES_PER_PAGE)));
+  }
   const per = type === 'application/pdf' ? 204_800 : 6_000;
   return Math.max(1, Math.min(200, Math.ceil(bytes / per)));
 }

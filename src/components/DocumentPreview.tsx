@@ -8,6 +8,7 @@ import { useAppStore } from '../store/appStore';
 import { StagePill } from './StagePill';
 import { locationLabel } from './SourceList';
 import { getOriginalUrl, type OriginalUrl } from '../services/documentClient';
+import { recordsStore } from '../services/recordsStoreClient';
 import { requirementLabel } from '../domains/hvac/schema';
 import { documentName, hasFriendlyName, originalFilename } from '../core/documentName';
 
@@ -79,6 +80,22 @@ export function DocumentPreview({ documentId, location, excerpt, onClose }: Docu
       cancelled = true;
     };
   }, [documentId]);
+
+  // Word / Excel / CSV have no picture to open: show the extracted text of the CITED page (a Word page, or a sheet chunk
+  // that starts with its "Sheet ... rows a-b of n" / "Section: ..." locator line) instead.
+  const [pageText, setPageText] = useState<{ no: number; text: string } | null>(null);
+  const officeLike = !!doc && /\.(docx|xlsx|csv|tsv)$/i.test(doc.filename);
+  const citedPage = location?.page ?? 1;
+  useEffect(() => {
+    setPageText(null);
+    if (!officeLike || !UUID_RE.test(documentId)) return;
+    let cancelled = false;
+    recordsStore
+      .getDocumentPage(documentId, citedPage)
+      .then((r) => { if (!cancelled && r?.text) setPageText({ no: r.page_no, text: r.text }); })
+      .catch(() => { /* the page text is a convenience; the rest of the preview still works */ });
+    return () => { cancelled = true; };
+  }, [documentId, citedPage, officeLike]);
 
   useEffect(() => {
     restoreRef.current = document.activeElement as HTMLElement | null;
@@ -213,6 +230,19 @@ export function DocumentPreview({ documentId, location, excerpt, onClose }: Docu
                   </a>
                 );
               })()}
+            </div>
+          )}
+
+          {pageText && (
+            <div className="rounded-lg border border-line" data-testid="cited-page-text">
+              <p className="dw-label px-4 pt-3">Text of page {pageText.no}</p>
+              <pre className="p-4 pt-1 font-mono text-data sm:text-[14px] sm:leading-6 whitespace-pre-wrap max-h-[50vh] overflow-y-auto">
+                {needle
+                  ? splitByPassage(pageText.text, needle).map((seg, k) =>
+                      seg.hit ? <mark key={k} data-passage="true" className={markCls}>{seg.text}</mark> : <span key={k}>{seg.text}</span>
+                    )
+                  : pageText.text}
+              </pre>
             </div>
           )}
 

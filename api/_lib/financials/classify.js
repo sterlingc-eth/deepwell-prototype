@@ -20,6 +20,7 @@
  *
  * Pure (no DB). Tested with many phrasings in scripts/verify-financials.mjs.
  */
+import { parseThreshold } from '../amountWords.js';
 
 // A money-document noun ("invoice", "quote", "PO", "bill", "agreement", ...). Stems, not
 // literal words, so invoice/invoiced/invoicing, bill/billed/billing/bills, quote/quoted/
@@ -55,7 +56,7 @@ const FIN_QUOTE_WAITING_RE = /\b(?:quotes?|proposals?|estimates?)\b[^?]*\bwaitin
 const FIN_THRESHOLD_RE = /\b(?:over|above|more than|greater than|under|below|less than)\s*\$?\s?[\d,]+(?:\.\d+)?\b(?!\s*days?\b)|\$\s?\d/i;
 
 // A superlative ("biggest/smallest/highest/lowest invoice").
-const FIN_SUPERLATIVE_RE = /\b(?:biggest|largest|smallest|highest|lowest)\b/i;
+const FIN_SUPERLATIVE_RE = /\b(?:biggest|largest|smallest|highest|lowest|most\s+expensive|least\s+expensive|cheapest|priciest|(?:costs?|priced?|worth)\s+(?:the\s+)?(?:most|least))\b/i;
 
 // R20 (J3, i020/i021): "how many purchase orders have we cut to Baker Distributing" — a per-vendor
 // DOCUMENT count (analytics.js's detPlan.js now has a real, deterministic 'vendor' filter for this
@@ -73,7 +74,9 @@ const VENDOR_RECIPIENT_RE = /\b(?:cut|issued|sent|placed|written|made\s+out)\s+t
 // R21 M2 (breadth-financials-051): "how much" added alongside "how many" — always gated by
 // FIN_NOUN_RE (a real money-document noun) at the call site just below, same as every other
 // alternative here, so this can never fire on an unrelated "how much time"/"how much work" question.
-const FIN_COUNT_OR_AVG_RE = /\b(?:how many|how much|average|avg|total\s+(?:value|amount)|annual\s+fee|last|latest|most recent|bring(?:s|ing)?\s+in|spent)\b/i;
+const FIN_QUOTE_ASK_RE = /\b(?:quote[sd]?|estimates?|proposals?)\b[^?]*\b(?:price|amount|total|worth|cost|dated?|when)\b|\b(?:price|amount|total|cost|when|date)\b[^?]*\b(?:quote[sd]?|estimates?|proposals?)\b|\bwhat\b[^?]*\bdid we quote\b|\bquoted\s+price\b/i;
+const FIN_CUSTOMER_PAY_RE = /\b(?:what|how much)\b[^?]*\b(?:did|does|do|has|have|will|was|were)\s+(?!we\b|you\b|i\b|they\b)(?:[a-z][\w'.-]*\s+){1,4}?(?:pay|paid|spend|spent|charged)\b/i;
+const FIN_COUNT_OR_AVG_RE = /\b(?:how many|how(?:'?s)? much|amount\s+(?:of|on|for)|(?:come|comes)\s+to|average|avg|total\s+(?:value|amount|of)|annual\s+fee|last|latest|most recent|bring(?:s|ing)?\s+in|spent)\b/i;
 
 /**
  * @param {string} question  the ALREADY fuzzy-corrected / lowercased question text
@@ -90,8 +93,15 @@ export function isFinancialQuestion(question) {
   if (FIN_JOB_COST_RE.test(q)) return true;
   if (FIN_STANDALONE_RE.test(q)) return true;
   if (FIN_QUOTE_WAITING_RE.test(q)) return true;
-  if (FIN_THRESHOLD_RE.test(q) && FIN_NOUN_RE.test(q)) return true;
+  // D10: a threshold in words / shorthand ("over three thousand dollars", "above ten grand", "over 2.5k") is a dollar threshold too (amountWords.js).
+  if ((FIN_THRESHOLD_RE.test(q) || parseThreshold(q)) && FIN_NOUN_RE.test(q)) return true;
   if (FIN_SUPERLATIVE_RE.test(q) && FIN_NOUN_RE.test(q)) return true;
+  // Defect 19e: "biggest maintenance contract we have" - a service contract is a maintenance agreement (FIN_NOUN_RE only lists "agreement").
+  if (FIN_SUPERLATIVE_RE.test(q) && /\b(?:maintenance|service)\s+(?:contracts?|plans?)\b/.test(q)) return true;
+  // Defect 3: "what did we quote Ronald Bracken" / "quote total for Holy Trinity Church" / "when was the proposal sent to X" - a customer's quote amount or date.
+  if (FIN_QUOTE_ASK_RE.test(q)) return true;
+  // Defect 13: "what did William Quintana pay for his new system" / "how much did Amy Isaacson pay" / "what was Kevin Zimmerman charged" - what a named customer paid / was charged.
+  if (FIN_CUSTOMER_PAY_RE.test(q)) return true;
   if (FIN_NOUN_RE.test(q) && FIN_COUNT_OR_AVG_RE.test(q)) {
     // Round 15 follow-up (P0 hook, generalization audit): "how many maintenance agreements are
     // there" / "how many customers are locked into a maintenance agreement" are a plain DOCUMENT

@@ -44,7 +44,7 @@ Read the "skipped" list with the customer. Typical findings and what to do:
 | Message | What it means | What to do |
 |---|---|---|
 | Google Docs/Sheets shortcuts (.gdoc, .gsheet ...) | These are tiny pointer files, not the documents | In Google Drive, export the real files to PDF (File > Download > PDF) and add them to the folder |
-| Types DeepWell cannot read (.docx, .xlsx, .heic, .tif ...) | Word, Excel, iPhone photos and TIFF cannot be read | Convert to PDF or JPEG (Word/Excel: "Save as PDF"; iPhone photos: export as JPEG) |
+| Types DeepWell cannot read (.doc, .xls, .docm, .xlsm, .heic, .tif ...) | Old Word/Excel, macro files, iPhone photos (this tool cannot convert them; a browser does) and TIFF are not read. Word (.docx) and Excel (.xlsx) are read | Re-save old Word/Excel as .docx/.xlsx (or PDF); convert iPhone photos and TIFF to JPEG or PDF |
 | Too large to read | PDFs and photos must be under 24 MB; text/CSV under 20 MB | Split the PDF, or scan again at a lower resolution |
 | Empty files / hidden or system files | Nothing to read (.DS_Store, Thumbs.db, ~$ temp files) | Nothing. They are skipped automatically |
 | Shortcuts / symbolic links | The tool never follows links, so it can never wander outside the folder | Copy the real file into the folder if it is needed |

@@ -19,11 +19,12 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireAuth, denyAuth, hasShop, requireRole } from './_lib/auth.js';
 import { withTenant } from './_lib/recordsStore.js';
 import { handleCors, scrubErrorForLog } from './_lib/claude.js';
-import { limit } from './_lib/rateLimit.js';
-import { checkUploadGate } from './upload-url.js';
+import { limit, refundPlanRefusal } from './_lib/rateLimit.js';
+import { checkUploadGate, assertUploadRoomInTx, loadBillingRowForRecheck } from './upload-url.js';
 import { clientLimits, planStateFor } from './_lib/plan.js';
 import { getAsksThisMonth, resetsOnIso } from './_lib/usage.js';
 import { normalizeContentType, sanitizeUploadFilename } from './_lib/r2.js';
+import { checkUploadFile } from './_lib/uploadTypes.js';
 import { DOCUMENT_TYPE_IDS } from './_lib/documentTypes.js';
 
 export const config = {
@@ -46,7 +47,7 @@ const MONTH_MS = 30 * 24 * 60 * 60 * 1000;
  * rate-limited exactly like /api/upload-url, and never accepts a client storage_key (see the case below).
  */
 export const RECORDS_READ_ACTIONS: ReadonlySet<string> = new Set([
-  'getDocument', 'listDocuments', 'browseDocuments', 'browseFacets',
+  'getDocument', 'getDocumentPage', 'listDocuments', 'browseDocuments', 'browseFacets',
   'reviewSummary', 'listUnverifiedDocuments', 'listEntitiesByIds',
   'getFacet', 'listFacetsByDocument',
   'getExtraction', 'listExtractionsByDocument', 'listExtractionsByDocuments', 'listExtractionsByEntity',
@@ -81,7 +82,7 @@ const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
  * content type each ended as a raw Postgres error (a 500, with the detail in the server log), and a 60 KB filename or a
  * right-to-left override in it was stored as typed. Only the columns an upload sets are passed on.
  */
-export function cleanCreateDocumentPayload(p: any): { ok: true; value: Record<string, unknown> } | { ok: false; error: string } {
+export function cleanCreateDocumentPayload(p: any): { ok: true; value: Record<string, unknown> } | { ok: false; error: string; status?: number } {
   const filename = sanitizeUploadFilename(p?.original_filename);
   if (!filename) return { ok: false, error: 'original_filename is required' };
   if (typeof p?.sha256_hash !== 'string' || !/^[0-9a-f]{64}$/.test(p.sha256_hash)) return { ok: false, error: 'sha256_hash must be a 64-character hex digest' };
@@ -92,6 +93,10 @@ export function cleanCreateDocumentPayload(p: any): { ok: true; value: Record<st
   if (typeof size !== 'number' || !Number.isInteger(size) || size <= 0 || size > MAX_CREATE_BYTES) return { ok: false, error: 'file_size_bytes must be a whole number of bytes between 1 and 100 MB' };
   if (p?.content_type != null && typeof p.content_type !== 'string') return { ok: false, error: 'content_type must be a string' };
   if (p?.batch_id != null && (typeof p.batch_id !== 'string' || !UUID_SHAPE.test(p.batch_id))) return { ok: false, error: 'batch_id must be a uuid' };
+  // Office build: the same allow-list /api/upload-url applies (extension + declared type + per-kind size cap). A refused file
+  // is a 4xx here, before anything is inserted, and the stored type is the canonical one for the extension.
+  const verdict = checkUploadFile({ filename, contentType: normalizeContentType(p?.content_type), sizeBytes: size });
+  if (!verdict.ok) return { ok: false, error: verdict.message, status: verdict.status };
   const dt = typeof p?.document_type === 'string' ? p.document_type.trim().toLowerCase().replace(/[\s_]+/g, '-') : null;
   return {
     ok: true,
@@ -99,7 +104,7 @@ export function cleanCreateDocumentPayload(p: any): { ok: true; value: Record<st
       original_filename: filename,
       sha256_hash: p.sha256_hash,
       file_size_bytes: size,
-      content_type: normalizeContentType(p?.content_type),
+      content_type: verdict.contentType,
       batch_id: p?.batch_id ?? null,
       // A type is kept only when it is a known id; anything else is left for classification to decide.
       document_type: dt && DOCUMENT_TYPE_IDS.has(dt) ? dt : null,
@@ -228,7 +233,7 @@ export async function processRecords(req: VercelRequest, res: VercelResponse, au
     delete payload.storage_key;
     delete payload.stage;
     const cleaned = cleanCreateDocumentPayload(payload);
-    if (!cleaned.ok) return handleCors(res, req).status(400).json({ error: cleaned.error });
+    if (!cleaned.ok) return handleCors(res, req).status(cleaned.status ?? 400).json({ error: cleaned.error });
     for (const k of Object.keys(payload)) delete payload[k];
     Object.assign(payload, cleaned.value);
     payload.clerk_user_id = auth.userId;
@@ -247,14 +252,27 @@ export async function processRecords(req: VercelRequest, res: VercelResponse, au
     payload.action = a.startsWith('client.') ? a : `client.${a}`;
   }
 
+  // createDocument: the plan row is loaded before the transaction opens (pool of 3), then re-checked under the company's
+  // upload lock inside the inserting transaction, so simultaneous creates cannot overshoot a cap (same helper as upload-url.js).
+  const recheckRow = action === 'createDocument' ? await loadBillingRowForRecheck(auth) : undefined;
   try {
     const result = await withTenant(
       { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId },
       async (db) => {
         switch (action) {
           // ---- documents ----
-          case 'createDocument': return { id: (await db.createDocument(payload))?.id };
+          case 'createDocument': {
+            await assertUploadRoomInTx(db, recheckRow);
+            return { id: (await db.createDocument(payload))?.id };
+          }
           case 'getDocument': return await db.getDocument(payload.id);
+          // The cited page's extracted text (Word/Excel/CSV have no picture): ONE page, bounded, tenant-scoped by RLS + the query.
+          case 'getDocumentPage': {
+            const n = Math.trunc(Number(payload.page_no));
+            if (typeof payload.id !== 'string' || !Number.isInteger(n) || n < 1 || n > 100000) return null;
+            const pg = await db.getPage(payload.id, n);
+            return pg ? { page_no: pg.page_no, text: String(pg.text ?? '').slice(0, 60000) } : null;
+          }
           case 'listDocuments': return await db.listDocuments(payload.filters);
           // Records Browse (round 12 contract): the paginated/filtered/faceted
           // list behind the records screen. `payload.filters` is caller input,
@@ -326,7 +344,11 @@ export async function processRecords(req: VercelRequest, res: VercelResponse, au
       return res.status(400).json({ error: `Unknown action: ${action}` });
     }
     return res.json(result ?? null);
-  } catch (err) {
+  } catch (err: any) {
+    if (err?.name === 'UploadGateRefusal') {
+      if (err.status === 402) await refundPlanRefusal(req);
+      return handleCors(res, req).status(err.status ?? 402).json({ error: err.gate?.error, url: err.gate?.url });
+    }
     // Log the detail, return none of it — raw messages leak schema and
     // connection internals to anonymous callers.
     console.error('API error:', scrubErrorForLog(err));

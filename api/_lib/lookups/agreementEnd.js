@@ -4,6 +4,7 @@
  * the end date), never declined as a "future date". Shop-wide only (a named customer / address / possessive falls through).
  *   expire/end in|during|on|for Y -> end year = Y   | by/before Y -> end year <= Y / < Y   | after Y -> end year > Y
  *   run(s) through|thru|until|till|to Y, "through Y" -> still in force at end of Y (end year >= Y)
+ *   "in force / active / valid at the end of Y" -> end date on or after Dec 31 of Y
  * pure: parseAgreementEndQuestion     db: runAgreementEnd
  */
 import { attachCitations } from "../citations/records.js";
@@ -13,6 +14,8 @@ import { TENANT_SQL, answerEnvelope } from "../scope.js";
 const NOUN_RE = /\b(?:(?:maintenance|service|annual|preventive|preventative)\s+(?:agreements?|contracts?|plans?)|agreements?)\b/i;
 const YEAR_RE = /\b(20\d{2})\b/g;
 const THROUGH_RE = /\b(?:run|runs|running|ran|good|valid|active|in\s+force|in\s+effect|covered|extend\w*)\s+(?:through|thru|until|till|to)\b|\b(?:through|thru|until|till)\s+(?:the\s+(?:end\s+of\s+)?)?(?:20\d{2})/i;
+// "still in force / active / valid at (by, as of) the end of 2026": in force on the LAST DAY of that year (end date on or after Dec 31), not merely ending that year.
+const AT_END_RE = /\b(?:in\s+force|in\s+effect|active|valid|running|covered|good)\s+(?:at|by|as\s+of|on)\s+(?:the\s+)?(?:very\s+)?end\s+of\s+(?:the\s+year\s+)?20\d{2}\b/i;
 const ENDS_RE = /\b(?:expir\w*|end|ends|ending|ended|lapse\w*|terminat\w*)\b/i;
 const VAL = (a) => `COALESCE(NULLIF(${a}.corrected_value, ''), ${a}.value)`;
 
@@ -28,7 +31,9 @@ export function parseAgreementEndQuestion(question) {
   const year = years[0];
   const q = raw.toLowerCase();
   let op = null;
-  if (THROUGH_RE.test(q)) op = "gte";
+  let eoy = false;
+  if (AT_END_RE.test(q)) { op = "gte"; eoy = true; }
+  else if (THROUGH_RE.test(q)) op = "gte";
   else if (ENDS_RE.test(q)) {
     if (/\b(?:before|prior to|earlier than)\b/.test(q)) op = "lt";
     else if (/\bby\b/.test(q)) op = "lte";
@@ -36,7 +41,7 @@ export function parseAgreementEndQuestion(question) {
     else op = "eq";
   }
   if (!op) return null;
-  return { op, year, count: /\b(?:how many|count|number of|total)\b/.test(q) };
+  return { op, year, ...(eoy ? { eoy: true } : {}), count: /\b(?:how many|count|number of|total)\b/.test(q) };
 }
 
 const lastDate = (term) => {
@@ -64,7 +69,7 @@ export async function runAgreementEnd(db, intent) {
   const all = [...byDoc.values()].map((r) => ({ ...r, end: lastDate(r.term) }));
   const dated = all.filter((r) => r.end);
   const y = intent.year;
-  const hit = dated.filter((r) => ({ eq: r.end.y === y, gte: r.end.y >= y, lte: r.end.y <= y, lt: r.end.y < y, gt: r.end.y > y })[intent.op]);
+  const hit = dated.filter((r) => ({ eq: r.end.y === y, gte: intent.eoy ? (r.end.y > y || (r.end.y === y && r.end.mo === 12 && r.end.d === 31)) : r.end.y >= y, lte: r.end.y <= y, lt: r.end.y < y, gt: r.end.y > y })[intent.op]);
   const phrase = `${PHRASE[intent.op]} ${y}`;
   const unread = all.length - dated.length;
   const tail = unread ? ` (${unread} agreement${unread === 1 ? " has" : "s have"} no readable end date.)` : "";

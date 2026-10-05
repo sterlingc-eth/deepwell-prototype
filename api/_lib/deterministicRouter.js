@@ -55,6 +55,7 @@ import { parseBrandUnitCount, runBrandUnitCount } from './lookups/brandUnitCount
 import { parseFieldQuestion, runFieldMatch } from './lookups/fieldMatch.js';
 import { parseDateQualifier, runDateQualifier } from './lookups/dateQualifiers.js';
 import { parseDocWindow, runDocWindow } from './lookups/dateDocWindow.js';
+import { parseDocFieldAsk } from './lookups/docFieldAsk.js';
 import { parseFalsePremise, runFalsePremise } from './lookups/falsePremise.js';
 
 // R32 (loop 3/4): "have we been out to <addr> in the last 90 days" / "any service calls at <addr> last year" / "did we do any work at <addr> this year".
@@ -126,6 +127,8 @@ function subjectFromPhrase(phrase) {
 export function classifyDeterministic(question, opts = {}) {
   const q = fixRouterWordTypos(normalizeQuestion(String(question ?? ''), { overlay: opts?.overlay }).normalized);
   if (!q) return null;
+  // Defect 19/21: one printed field of one kind of document is docLookup's (lookups/docFieldAsk.js): it reads the document text, never a neighbouring field.
+  if (parseDocFieldAsk(String(question ?? ''))) return null;
 
   // R35 (owner decision 2026-10-01): any question ABOUT a serial the user typed is a deterministic serial lookup (lookups/serialLookup.js).
   const serial = parseSerialQuestion(String(question ?? ''));

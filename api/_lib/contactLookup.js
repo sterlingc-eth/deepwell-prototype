@@ -27,6 +27,7 @@
  * scripts/verify-analytics.mjs's contact-lookup section. resolveContact/
  * runContactLookup are the only functions here that touch `db`.
  */
+import { parseDocFieldAsk } from './lookups/docFieldAsk.js';
 import { dropConflicting } from './addressConflict.js';
 import { normalizeQuestion, correctTriggerWordTypos } from "./nlNormalize.js";
 // TEAM C (citations everywhere): each answer names the record(s) it was read from.
@@ -99,7 +100,8 @@ import { parseTechnician, runTechnician, loadTechnicianVocab } from "./lookups/t
 // "serial number" already is closes it at the root (a bare "number" was never actually a safe phone
 // signal next to EITHER trailing noun, this just never had a second caller to expose it).
 const FIELD_RE = {
-  phone: /\bphone(?:\s*number)?\b|\bph\s?#|(?<!serial\s)(?<!model\s)\bnumber\b/i,
+  // Defect 7: "invoice number for Amy Isaacson" asked for the INVOICE's number, not her phone: a bare "number" after a document noun is never a phone request.
+  phone: /\bphone(?:\s*number)?\b|\bph\s?#|(?<!serial\s)(?<!model\s)(?<!(?:invoice|inv|permit|po|purchase\s+order|work\s+order|wo|ticket|order|quote|estimate|proposal|agreement|contract|customer|account|job|check|confirmation|reference|claim|policy)\s)\bnumber\b/i,
   email: /\be-?mail\b/i,
   address: /\b(?:service\s+)?address\b/i,
   serial: /\bserial(?:\s*number)?\b/i,
@@ -149,7 +151,7 @@ const NAME_ACCOUNT_JOB_LEAD_RE =
 // purpose — a name-first "bracken serial number" must still resolve to the
 // serial field, never phone, the same collision FIELD_RE's own phone pattern
 // guards against with its negative lookbehind.
-const FIELD_WORDS_ALT = "phone(?:\\s*number)?|ph\\s?#|e-?mail|(?:service\\s+)?address|serial(?:\\s*number)?|last\\s+(?:visit|service)|number";
+const FIELD_WORDS_ALT = "phone(?:\\s*number)?|ph\\s?#|e-?mail|(?:service\\s+)?address|serial(?:\\s*number)?|last\\s+(?:visit|service)|(?<!(?:invoice|inv|permit|po|purchase\\s+order|work\\s+order|wo|ticket|order|quote|estimate|proposal|agreement|contract|customer|account|job|check|confirmation|reference|claim|policy)\\s)number";
 
 // Reviewer NO-GO (2026-09-21): "whats thomas mercer's phone number" / "donna
 // thornton's email" / "brian chavez address?" put the NAME before the field
@@ -839,6 +841,54 @@ function isUntrackedFieldQuestion(q) {
   return true;
 }
 
+const SENSITIVE_ID_RE = /\b(?:social\s+security|ssn|social\s+sec|(?:credit|debit)\s+card|card\s+(?:number|on\s+file|info)|bank\s+account|routing\s+number|account\s+and\s+routing|tax\s+(?:id|identification)|\bein\b|drivers?'?\s+licen[sc]e|date\s+of\s+birth|passport|\bdob\b)|\bsocial\s*$|\bsocial\s*\?*$/i;
+const COMPETITOR_RE = /\b(?:competitors?|rivals?|(?:the\s+)?other\s+(?:hvac\s+)?(?:compan(?:y|ies)|businesses|business|contractors?|outfits?|shops?)|another\s+(?:hvac\s+)?(?:compan(?:y|ies)|business|contractor))\b/i;
+const CO_WORD = "(?:Heating|Cooling|HVAC|Air|Mechanical|Plumbing|Electric|Electrical|Pros|Services|Service|Co|Inc|LLC|Company|Conditioning|Climate|Comfort|Refrigeration|Contractors|Mechanicals)";
+const CO_NAME = `((?:[A-Z][\\w&.-]*\\s+){1,4}${CO_WORD}(?:\\s+(?:&|and)\\s+[A-Z][\\w.-]*)?(?:,?\\s+(?:Inc|LLC|Co)\\.?)?)`;
+const OTHER_CO_POSS_RE = new RegExp(`\\b${CO_NAME}(?:'s?|s')\\s+(?:customers?|clients?)\\b`);
+const OTHER_CO_PREP_RE = new RegExp(`\\b(?:customers?|clients?)(?:\\s+list)?\\s+(?:of|for|from|at)\\s+${CO_NAME}`);
+const OTHER_CO_LIST_AFTER_RE = new RegExp(`\\b${CO_NAME}\\s+(?:customer|client)s?\\s+(?:list|roster|database)\\b`);
+/** Pure: the company name a question asks the customers of (another company, or possibly our own letterhead name), or null. */
+function otherCompanyNamed(q) {
+  for (const re of [OTHER_CO_POSS_RE, OTHER_CO_PREP_RE, OTHER_CO_LIST_AFTER_RE]) { const m = re.exec(q); if (m) return m[1].trim(); }
+  return null;
+}
+function notHeldKind(t) {
+  const q = String(t ?? "");
+  if (SENSITIVE_ID_RE.test(q)) return { kind: "sensitive" };
+  if (/\b(?:competitors?|competition|rivals?)\b/i.test(q) && /\b(?:customers?|clients?|accounts?|invoices?|pricing|prices?|revenue|jobs?|list)\b/i.test(q)) return { kind: "competitor" };
+  if (COMPETITOR_RE.test(q) && /\b(?:customers?|clients?|accounts?|invoices?|pricing|prices?|revenue|jobs?|list)\b/i.test(q)) return { kind: "competitor" };
+  const co = otherCompanyNamed(q);
+  if (co && !/\b(?:our|my)\b/i.test(q)) return { kind: "competitor", company: co };
+  return null;
+}
+
+/** The tenant's own company name is not in the request context (tenantName is only the org id), so a named company is "ours" when it is the
+ *  letterhead (first line) of a large share of this tenant's own first pages. Data-derived; no name is hard-coded. */
+async function isOwnCompanyName(db, name) {
+  const clean = String(name ?? "").replace(/[%_\\]/g, "").replace(/[,.]?\s+(?:LLC|L\.L\.C|Inc|Incorporated|Corp|Corporation|Co|Company|Ltd)\.?$/i, "").trim();
+  if (clean.length < 3) return false;
+  try {
+    const { rows } = await db.raw(
+      `SELECT count(*) FILTER (WHERE text ILIKE $1)::int AS m, count(*)::int AS t FROM document_pages WHERE ${TENANT_SQL} AND page_no = 1`,
+      [`%${clean}%`]
+    );
+    const r = rows?.[0];
+    return !!r && r.t > 0 && r.m * 4 >= r.t;
+  } catch (err) { console.error("own-company check failed:", err?.message); return false; }
+}
+
+/** Pure: the decline for a sensitive identifier or another company's records (kind 'no-answer'). */
+export function buildNotHeldAnswer(kind) {
+  const text = kind === "sensitive"
+    ? "I don't store or give out sensitive identifiers such as social security, tax ID, card or bank numbers, so there is nothing on file to answer that."
+    : "I only hold this company's own records, so I can't see another company's customers or anything about them.";
+  return attachCitations(
+    { kind: "no-answer", text, facts: [], sources: [], confidence: 0, verifiedCount: 0, unverifiedCount: 0, closest: [] },
+    { records: [], total: 0, kind: "searched", basis: kind === "sensitive" ? "Sensitive identifiers are never stored or returned; nothing was looked up." : "Only this company's own records are available; nothing was looked up." }
+  );
+}
+
 /** Pure: the decline for isUntrackedFieldQuestion — kind 'no-answer', same honest-zero shape as
  *  buildOutOfDomainAnswer, but scoped to "this specific field isn't something we track", not "this
  *  isn't a business question at all" (the address, when there is one, is real domain content). */
@@ -933,6 +983,9 @@ function parseContactLookupQuestionCore(question, opts = {}) {
   // answer. In practice the two never overlap.
   // R31: also tested on the question as typed (frame-stripped) — the vocabulary corrector above can rewrite a plain word
   // ("play" -> "plan", "mount" -> "count") into a different one and hide an off-topic phrase from the closed patterns.
+  // Defect 15/16: a sensitive personal/financial identifier (SSN, card, bank, tax id ...) is never stored, and another company's customers are not our records:
+  // both are plain declines, never a nearby field (the phone) or our own customer list.
+  { const nh = notHeldKind(raw) || notHeldKind(q); if (nh) return { field: "notHeld", kind: nh.kind, company: nh.company ?? null, namePhrase: null }; }
   if (isOutOfDomainQuestion(q) || isOutOfDomainQuestion(stripConversationalFrame(raw) ?? raw)) return { field: "outOfDomain", namePhrase: null };
   if (isLiveStatusQuestion(q) || isLiveStatusQuestion(stripConversationalFrame(raw) ?? raw)) return { field: "outOfDomain", namePhrase: null };
 
@@ -1292,6 +1345,8 @@ function restoreTypedNameTokens(parsed, rawQuestion) {
 export function parseContactLookupQuestion(question, opts = {}) {
   // internal-memo questions ("any internal memos on file?") are not a contact-field lookup ("X on file") — docLookup owns them
   if (process.env.DONOVAN_MEMO_AUDIENCE !== "0" && /\b(?:internal\s+memos?|memos?\s+on\s+file)\b/i.test(String(question ?? ""))) return null;
+  // Defect 19/21: one printed field of one kind of document is docLookup's (lookups/docFieldAsk.js).
+  if (parseDocFieldAsk(question)) return null;
   // R31 loop 3: technician job counts first — the entity (a known technician's full name) is a far stronger signal
   // than the core shapes' "number of ... for NAME" = phone-number reading. Needs the tenant's technician names.
   try {
@@ -1959,6 +2014,11 @@ async function runContactLookupCore(db, question, opts = {}) {
   if (parsed.field === "slotFill") return runSlotFill(db, parsed, { today, question });
   if (parsed.field === "outOfDomain") return buildOutOfDomainAnswer();
   if (parsed.field === "untrackedField") return buildUntrackedFieldAnswer();
+  if (parsed.field === "notHeld") {
+    // D16: a company named in a "customers of <Name>" shape that IS this tenant's own letterhead is "our customers", not another company's.
+    if (parsed.company && await isOwnCompanyName(db, parsed.company)) return null;
+    return buildNotHeldAnswer(parsed.kind);
+  }
 
   // R16 F3: existence — a plain yes/no, never ambiguity-blocked (see
   // buildExistenceAnswer's own doc comment). Always answers (never null):

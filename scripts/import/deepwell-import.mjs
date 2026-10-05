@@ -26,9 +26,13 @@ const MB = 1024 * 1024;
 const BACKOFF_BASE_MS = Math.max(1, Number(process.env.DEEPWELL_IMPORT_BACKOFF_MS) || 2000);
 const POLL_MS = Math.max(50, Number(process.env.DEEPWELL_IMPORT_POLL_MS) || 30_000);
 
-/** Mirrors api/upload-url.js: PDFs and photos under 24 MB, text/CSV under 20 MB, 100 MB absolute. */
+/**
+ * Mirrors api/_lib/uploadTypes.js (the server's allow-list; scripts/verify-office-uploads.mjs fails if the two drift): PDFs and
+ * photos under 24 MB, text/CSV/Word/Excel under 20 MB, 100 MB absolute. This tool stays dependency-free so it can run from a
+ * folder on its own, which is why the table is repeated here rather than imported.
+ */
 export const LIMITS = Object.freeze({ model: 24 * MB, text: 20 * MB, absolute: 100 * MB });
-/** What the reader can actually read (api/_lib/readDocument.js). TIFF/BMP/HEIC are NOT readable, so they are not here. */
+/** What the server accepts and the reader reads: [canonical content type, kind]. `text` = read without the model (no per-page AI cost). HEIC/HEIF are NOT here: this tool runs in Node and cannot convert them (a browser does). */
 export const SUPPORTED = Object.freeze({
   pdf: ['application/pdf', 'pdf'],
   jpg: ['image/jpeg', 'photo'],
@@ -37,12 +41,20 @@ export const SUPPORTED = Object.freeze({
   webp: ['image/webp', 'photo'],
   gif: ['image/gif', 'photo'],
   txt: ['text/plain', 'text'],
+  md: ['text/markdown', 'text'],
   csv: ['text/csv', 'text'],
+  tsv: ['text/tab-separated-values', 'text'],
+  json: ['application/json', 'text'],
+  docx: ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text'],
+  xlsx: ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text'],
 });
+/** Pages one file adds, by the same rules as api/_lib/plan.js estimatePagesForUpload (constants from api/_lib/office/limits.js). */
+const PAGE_RULES = Object.freeze({ docxFixed: 6_000, docxPerPage: 1_500, xlsxFixed: 2_000, xlsxPerPage: 1_500, csvPerPage: 3_000, docxMaxPages: 200, sheetMaxPages: 2_000 });
 
 const GOOGLE_STUBS = new Set(['gdoc', 'gsheet', 'gslides', 'gdraw', 'gform', 'gmap', 'gsite', 'gjam', 'gscript', 'gtable']);
 const CONVERT_HINTS = {
-  doc: 'Word', docx: 'Word', odt: 'OpenDocument text', rtf: 'rich text', xls: 'Excel', xlsx: 'Excel', ods: 'OpenDocument sheet',
+  doc: 'Word, old format', odt: 'OpenDocument text', rtf: 'rich text', xls: 'Excel, old format', ods: 'OpenDocument sheet',
+  docm: 'Word with macros', xlsm: 'Excel with macros', xlsb: 'Excel binary', dotm: 'Word template with macros', xltm: 'Excel template with macros',
   ppt: 'PowerPoint', pptx: 'PowerPoint', heic: 'iPhone photo (HEIC)', heif: 'iPhone photo (HEIC)', tif: 'TIFF image', tiff: 'TIFF image',
   bmp: 'BMP image', svg: 'SVG drawing', zip: 'zip archive', eml: 'email', msg: 'email', mp4: 'video', mov: 'video',
 };
@@ -99,23 +111,27 @@ export function classifyFile(name, sizeBytes) {
   const supported = SUPPORTED[ext];
   if (!supported) {
     const what = CONVERT_HINTS[ext];
-    return {
-      ok: false, reason: 'unsupported-type',
-      note: ext
-        ? `.${ext}${what ? ` (${what})` : ''} files cannot be read. DeepWell reads PDF, JPEG, PNG, WebP, GIF, plain text and CSV. Convert the file to PDF or JPEG first.`
-        : 'The file has no extension, so its type is unknown. Rename it with the right extension or convert it to PDF.',
-    };
+    let note;
+    if (!ext) note = 'The file has no extension, so its type is unknown. Rename it with the right extension or convert it to PDF.';
+    else if (ext === 'doc' || ext === 'xls') note = `.${ext} (${what}) files cannot be read. Open the file, use Save As to make a .${ext === 'doc' ? 'docx' : 'xlsx'} (or a PDF), and put that copy in the folder.`;
+    else if (['docm', 'xlsm', 'xlsb', 'dotm', 'xltm'].includes(ext)) note = `.${ext} (${what}) files are not accepted because they can contain macros. Open the file, use Save As to make a plain .${ext.startsWith('d') ? 'docx' : 'xlsx'} (or a PDF), and put that copy in the folder.`;
+    else if (ext === 'heic' || ext === 'heif') note = '.heic (iPhone photo) files cannot be uploaded by this tool (a browser converts them to JPEG, this tool cannot). Convert the photo to JPEG first (Photos or Preview: File > Export), or set the iPhone camera to Most Compatible, then put the JPEG in the folder.';
+    else note = `.${ext}${what ? ` (${what})` : ''} files cannot be read. DeepWell reads PDF, JPEG, PNG, WebP, GIF, Word (.docx), Excel (.xlsx), plain text, Markdown, JSON and CSV/TSV. Convert the file to PDF or JPEG first.`;
+    return { ok: false, reason: 'unsupported-type', note };
   }
   const [contentType, kind] = supported;
   if (sizeBytes > LIMITS.absolute) return { ok: false, reason: 'too-large', note: 'Larger than 100 MB. Split it into smaller files.' };
-  if (kind === 'text' && sizeBytes > LIMITS.text) return { ok: false, reason: 'too-large', note: 'Text and CSV files must be under 20 MB. Split it into smaller files.' };
+  if (kind === 'text' && sizeBytes > LIMITS.text) return { ok: false, reason: 'too-large', note: 'Text, CSV, Word and Excel files must be under 20 MB. Split it into smaller files.' };
   if (kind !== 'text' && sizeBytes > LIMITS.model) return { ok: false, reason: 'too-large', note: 'PDFs and photos must be under 24 MB to be read. Split the file, or scan again at a lower resolution.' };
   return { ok: true, ext, contentType, kind };
 }
 
 /** Pure: the pages the server's own gate expects one file to add (api/_lib/plan.js estimatePagesForUpload). */
-export function gatePages(kind, sizeBytes) {
+export function gatePages(kind, sizeBytes, ext = '') {
   if (kind === 'photo') return 1;
+  if (ext === 'docx') return Math.max(1, Math.min(PAGE_RULES.docxMaxPages, Math.ceil(Math.max(0, sizeBytes - PAGE_RULES.docxFixed) / PAGE_RULES.docxPerPage)));
+  if (ext === 'xlsx') return Math.max(1, Math.min(PAGE_RULES.sheetMaxPages, Math.ceil(Math.max(0, sizeBytes - PAGE_RULES.xlsxFixed) / PAGE_RULES.xlsxPerPage)));
+  if (ext === 'csv' || ext === 'tsv') return Math.max(1, Math.min(PAGE_RULES.sheetMaxPages, Math.ceil(sizeBytes / PAGE_RULES.csvPerPage)));
   const per = kind === 'pdf' ? PLANNING.bytesPerPdfPage : PLANNING.charsPerTextPage;
   return Math.max(1, Math.min(200, Math.ceil(sizeBytes / per)));
 }
@@ -124,10 +140,10 @@ export function gatePages(kind, sizeBytes) {
 export function estimate(files) {
   let pdfDocs = 0, photos = 0, textPages = 0, bySize = 0;
   for (const f of files) {
-    bySize += gatePages(f.kind, f.size);
+    bySize += gatePages(f.kind, f.size, f.ext);
     if (f.kind === 'pdf') pdfDocs++;
     else if (f.kind === 'photo') photos++;
-    else textPages += gatePages(f.kind, f.size);
+    else textPages += gatePages(f.kind, f.size, f.ext);
   }
   const pagesLow = Math.ceil(pdfDocs * PLANNING.pagesPerDocLow) + photos + textPages;
   const pagesHigh = Math.ceil(pdfDocs * PLANNING.pagesPerDocHigh) + photos + textPages;
@@ -529,8 +545,8 @@ async function sha256File(abs) {
 function skipSummary(skipped, skippedFolders) {
   const by = new Map();
   for (const s of skipped) {
-    const g = by.get(s.reason) ?? { reason: s.reason, count: 0, bytes: 0, note: s.note, exts: new Map() };
-    g.count++; g.bytes += s.size;
+    const g = by.get(s.reason) ?? { reason: s.reason, count: 0, bytes: 0, note: s.note, notes: new Set(), exts: new Map() };
+    g.count++; g.bytes += s.size; g.notes.add(s.note); // different file types in one group (old .doc vs .heic) each need their own what-to-do
     const e = extOf(s.rel.split('/').pop()) || 'no extension';
     g.exts.set(e, (g.exts.get(e) ?? 0) + 1);
     by.set(s.reason, g);
@@ -558,12 +574,12 @@ export function describeScan(scan) {
   const found = scan.files.length + scan.skipped.length;
   lines.push(`Files found: ${fmtInt(found)}`);
   lines.push(`  Will be uploaded: ${fmtInt(scan.files.length)} files, ${fmtBytes(totalBytes)}`);
-  lines.push(`    PDFs: ${fmtInt(kinds.pdf[0])} (${fmtBytes(kinds.pdf[1])})   Photos: ${fmtInt(kinds.photo[0])} (${fmtBytes(kinds.photo[1])})   Text/CSV: ${fmtInt(kinds.text[0])} (${fmtBytes(kinds.text[1])})`);
+  lines.push(`    PDFs: ${fmtInt(kinds.pdf[0])} (${fmtBytes(kinds.pdf[1])})   Photos: ${fmtInt(kinds.photo[0])} (${fmtBytes(kinds.photo[1])})   Text/CSV/Word/Excel: ${fmtInt(kinds.text[0])} (${fmtBytes(kinds.text[1])})`);
   lines.push(`  Will be skipped: ${fmtInt(scan.skipped.length)}`);
   for (const g of sk.groups) {
     const exts = [...g.exts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([e, n]) => `${e === 'no extension' ? e : `.${e}`} x${fmtInt(n)}`).join(', ');
     lines.push(`    ${REASON_TITLES[g.reason] ?? g.reason}: ${fmtInt(g.count)}${g.bytes ? ` (${fmtBytes(g.bytes)})` : ''} [${exts}]`);
-    lines.push(`      Why / what to do: ${g.note}`);
+    for (const n of [...g.notes].slice(0, 6)) lines.push(`      Why / what to do: ${n}`);
   }
   if (sk.folders) lines.push(`  Hidden/system or unreadable folders skipped: ${fmtInt(sk.folders)} (their contents are not counted)`);
   const biggest = [...scan.files].sort((a, b) => b.size - a.size).slice(0, 3);

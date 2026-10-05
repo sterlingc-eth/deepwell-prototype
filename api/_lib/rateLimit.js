@@ -329,6 +329,49 @@ export function perUserAskPerMinute(tenantPerMinute) {
   return Math.max(6, Math.ceil(Number(tenantPerMinute) / 2));
 }
 
+/**
+ * FIX 3 (DC3b): what limit() charged a request, keyed by the request object, so the code that later refuses it with a PLAN
+ * 402 (document / monthly page / import cap, billing state) can hand the unit back. A 402 is not abuse of the endpoint, it is a
+ * customer at a cap. Never used for 400/413 validation errors or 429s.
+ */
+const chargeReceipts = new WeakMap();
+
+/** How many plan-refused units per tenant, bucket and minute are handed back. Beyond this they stay spent (see below). */
+export const PLAN_REFUND_UNITS_PER_MINUTE = 20;
+
+/**
+ * Hand back the rate-limit units (per-minute window AND daily counter) of a request the plan gate refused with 402.
+ *
+ * Abuse bound: the hand-back is capped at PLAN_REFUND_UNITS_PER_MINUTE units per tenant/bucket/minute, counted in a shared
+ * Postgres counter (bucket `refused:<bucket>`, same atomic function and per-minute window as the burst limiter, so it is exact
+ * across instances). Past the cap a refused request keeps its unit, so a flood of 402-refused requests is still stopped by
+ * the per-minute window (at most perMinute + the cap requests per minute reach the gate) and by the daily cap. If the counter
+ * cannot be read, nothing is handed back (fails to the stricter side). The receipt is single-use.
+ *
+ * @returns {Promise<boolean>} true when the units were handed back
+ */
+export async function refundPlanRefusal(req) {
+  const r = req && typeof req === "object" ? chargeReceipts.get(req) : null;
+  if (!r) return false;
+  chargeReceipts.delete(req);
+  try {
+    const { rows } = await getAuxPool().query(
+      "SELECT increment_rate_limit_window($1, $2, $3::timestamptz, $4) AS units",
+      [r.tenantUuid, `refused:${r.bucket}`, r.minuteIso, r.units]
+    );
+    const used = Number(rows[0]?.units);
+    if (!Number.isFinite(used) || used > PLAN_REFUND_UNITS_PER_MINUTE) return false;
+  } catch (err) {
+    logOnce("rate_limit_windows", err);
+    return false;
+  }
+  await Promise.all([
+    refund(r.tenantUuid, r.bucket, r.minuteIso, r.units),
+    refund(r.tenantUuid, dailyBucketKey(r.bucket), r.dayIso, r.units),
+  ]);
+  return true;
+}
+
 export async function limit(req, res, auth, bucket, overrides, cost) {
   const tenantKey = auth?.tenantId;
   // Auth resolved but produced no tenant identity: there is nothing to meter
@@ -412,19 +455,21 @@ export async function limit(req, res, auth, bucket, overrides, cost) {
   if (tenantUuid) {
     const today = new Date(now).toISOString().slice(0, 10);
     let requestsToday = null;
-    const [bucketRes, reportRes] = await Promise.allSettled([
-      getAuxPool().query(
+    // FIX 3 (RU1): the per-bucket daily counter is read FIRST and usage_counters.requests (report-only) is bumped only for
+    // a request that is let through, so a request refused by the daily cap no longer shows up in the usage report. (They
+    // used to run side by side; usage_counters cannot be decremented, so a refusal could not take its unit back.)
+    try {
+      const { rows } = await getAuxPool().query(
         "SELECT increment_rate_limit_window($1, $2, $3::timestamptz, $4) AS units",
         [tenantUuid, dailyBucketKey(bucket), utcDayStartIso(now), units]
-      ),
-      getAuxPool().query("SELECT * FROM increment_usage_counters($1, $2::date, $3, 0, 0, 0)", [tenantUuid, today, units]),
-    ]);
-    if (bucketRes.status === "fulfilled") requestsToday = bucketRes.value.rows[0]?.units ?? null;
-    else logOnce("rate_limit_windows", bucketRes.reason);
-    if (reportRes.status === "rejected") logOnce("usage_counters", reportRes.reason);
+      );
+      requestsToday = rows[0]?.units ?? null;
+    } catch (err) {
+      logOnce("rate_limit_windows", err);
+    }
 
     if (requestsToday != null && Number(requestsToday) > limits.perDay) {
-      // R35: the denied units come back out of both counters so the 429 itself does not eat tomorrow-bound budget
+      // R35: the denied units come back out of the rate-limit counters so the 429 itself does not eat tomorrow-bound budget
       // or the minute window of the other people in the shop.
       await Promise.all([
         refund(tenantUuid, dailyBucketKey(bucket), utcDayStartIso(now), units),
@@ -439,6 +484,15 @@ export async function limit(req, res, auth, bucket, overrides, cost) {
           : { details: `Daily limit of ${limits.perDay} ${bucket} units reached for this tenant.`, scope: "per-day" }
       );
       return false;
+    }
+    try {
+      await getAuxPool().query("SELECT * FROM increment_usage_counters($1, $2::date, $3, 0, 0, 0)", [tenantUuid, today, units]);
+    } catch (err) {
+      logOnce("usage_counters", err);
+    }
+    // Remember what this request was charged, so a later plan-gate refusal (402) can hand the unit back (refundPlanRefusal).
+    if (req && typeof req === "object") {
+      chargeReceipts.set(req, { tenantUuid, bucket, units, minuteIso: new Date(minuteWindowStart(now)).toISOString(), dayIso: utcDayStartIso(now) });
     }
   }
 

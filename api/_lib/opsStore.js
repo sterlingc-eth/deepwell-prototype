@@ -535,6 +535,7 @@ export const RETAINED_TABLES = Object.freeze({
   tenants: 'the account row itself (id, name, plan, Stripe ids): resolve_tenant() and billing must keep working',
   tenant_deletions: 'the deletion receipt: proof that the deletion happened (counts and object keys only)',
   billing_events: 'Stripe webhook idempotency ledger (event id + event type only; no content, no payload)',
+  page_usage_monthly: 'H-4 (M3-config/67): the monthly page tally (tenant id, month, a number; no customer content). Kept so "delete all my data" cannot reset the paid monthly page allowance. Deleting the company itself (the tenants row) removes it through the foreign key.',
 });
 
 /**

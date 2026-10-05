@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { localYmd } from '../core/localDate';
 import { Camera, ChevronDown, ChevronRight, Download, ExternalLink, Loader2, Paperclip, Pencil, Plus, Receipt, Sparkles, Trash2, Upload, X } from 'lucide-react';
+import { prepareImageForUpload } from '../services/imageConvert';
 import {
   EXPENSE_CATEGORIES,
   addExpense,
@@ -58,10 +59,14 @@ function unsupportedReason(file: File): string | null {
   if (RECEIPT_TYPE_RE.test(file.type)) {
     return file.size > MAX_RECEIPT_BYTES ? 'This file is over 24 MB. Try a smaller photo or PDF.' : null;
   }
-  const heic = /heic|heif/i.test(file.type) || /\.(heic|heif)$/i.test(file.name);
-  return heic
-    ? "HEIC photos can't be read. Re-save it as a JPG or PDF (on iPhone: Settings > Camera > Formats > Most Compatible), then add it again."
-    : 'This file type is not supported. Use a JPG, PNG, WebP or PDF.';
+  return 'This file type is not supported. Use a JPG, PNG, WebP or PDF.';
+}
+
+/** An iPhone HEIC photo is converted to JPEG here, in the browser (imageConvert.ts); a browser that cannot says what to do. */
+async function prepareReceipt(file: File): Promise<{ file: File; reason: string | null }> {
+  const prep = await prepareImageForUpload(file);
+  if (!prep.ok) return { file, reason: prep.message };
+  return { file: prep.file, reason: unsupportedReason(prep.file) };
 }
 
 function newDraft(): ExpenseFieldsInput {
@@ -343,13 +348,13 @@ export function ExpensesScreen() {
     }
   };
 
-  const enqueueFiles = (files: FileList | File[]) => {
-    const list = Array.from(files);
-    if (list.length === 0) return;
+  const enqueueFiles = async (files: FileList | File[]) => {
+    const picked = Array.from(files);
+    if (picked.length === 0) return;
     setShowAddForm(true);
-    const entries: QueueItem[] = list.map((file) => {
+    const list = await Promise.all(picked.map(prepareReceipt));
+    const entries: QueueItem[] = list.map(({ file, reason }) => {
       const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const reason = unsupportedReason(file);
       if (!reason) pendingRef.current.push({ id, file });
       return { id, file, status: reason ? 'error' : 'waiting', message: reason ?? undefined, draft: newDraft() };
     });
@@ -375,8 +380,8 @@ export function ExpensesScreen() {
 
   /* ---- existing rows ---- */
 
-  const attachReceipt = async (row: ExpenseRow, file: File) => {
-    const reason = unsupportedReason(file);
+  const attachReceipt = async (row: ExpenseRow, picked: File) => {
+    const { file, reason } = await prepareReceipt(picked);
     if (reason) return setError(reason);
     setAttachingId(row.id);
     setError(null);

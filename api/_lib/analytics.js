@@ -165,6 +165,12 @@ export const FILTER_FIELDS = [
   // see routes/analytics.js's queryDocumentsByEquipmentBrand for the dedicated join query this
   // needs (buildAnalyticsSQL's documents branch has no notion of an equipment join).
   'linkedEquipmentBrand',
+  // D4: a maintenance agreement's END date (the last date of its "Agreement Period: start - end" term) — a forward-looking record field that
+  // legitimately names a future year ("which agreements expire in 2027"); documents only, see detPlan.js's detectAgreementEnd.
+  'agreementEnd',
+  // D8: a permit's scope ('commercial' | 'residential', read from its "Scope of Work" line) and the city that issued it ("CITY OF TUCSON"); documents only,
+  // see detPlan.js's detectPermitFilters. Both need the permit's page text (buildAnalyticsSQL's documents branch selects it when one is in the plan).
+  'permitScope', 'permitCity',
 ];
 /** hasEmail/hasPhone (item 2, 2026-09-21 live miss): "how many customers have
  *  an email on file" returned the plain customer count — there was no filter
@@ -1184,6 +1190,8 @@ export function withLearnedOverlay(overlay, fn) {
  * existed. Every OTHER regex used here (WHO_HAS_RE, GEO_WORD_RE, BRAND_RE,
  * ...) is not synonym-driven and stays exactly as-is regardless of overlay.
  */
+const AGREEMENT_END_ADMIT_RE = /\b(?:agreements?|contracts?)\b(?=[\s\S]*\b(?:expir\w*|ends?|ending|renew\w*|(?:run|runs|running|good|valid|active|effective|in\s+effect)\s+(?:through|thru|until|till|to))\b)(?=[\s\S]*\b(?:19|20|21)\d{2}\b)/i;
+
 export function preClassifyAnalytics(question, opts = {}) {
   const overlay = opts?.overlay;
   const q = String(question ?? '').trim();
@@ -1251,7 +1259,10 @@ export function preClassifyAnalytics(question, opts = {}) {
       // COMPARISON_THAN_RE admission just above only ever covers an explicit "X than Y" comparison,
       // so this needs its own admission line the same way the warranty-registered-vs-unregistered
       // "than" comparison above it did before COMPARISON_THAN_RE existed.
-      WARRANTY_REG_DAYS_MAJORITY_ADMIT_RE.test(q)
+      WARRANTY_REG_DAYS_MAJORITY_ADMIT_RE.test(q) ||
+      // D4: "maintenance agreements ending in 2028", "any contracts that expire in 2027" - an agreement noun + an END cue + a year names the
+      // agreement END year (detPlan.js's detectAgreementEndYear) even with no "how many"/"which" quantifier.
+      AGREEMENT_END_ADMIT_RE.test(q)
     ) {
       return true;
     }
@@ -1389,10 +1400,20 @@ const FUTURE_YEAR_TOKEN_RE = /\b(19\d{2}|20\d{2}|21\d{2})\b/g;
 // R34: a FORWARD-LOOKING record field is legitimately dated in the future - "which warranties expire in 2027" is answerable from the
 // warranty end dates on file, not "a future date, nothing on file". Only a question about a past EVENT (filed/issued/logged/did) in a future
 // year is declined here.
-const FORWARD_RECORD_FIELD_RE = /\b(?:expir\w*|renew\w*|ends?|ending|due|schedul\w*|upcoming|coverage|covered|valid\s+(?:through|until)|good\s+(?:through|until)|runs?\s+(?:through|thru|until|till|to)|agreements?|contracts?|terms?)\b/i;
+const FORWARD_RECORD_FIELD_RE_MAIN = /\b(?:expir\w*|renew\w*|ends?|ending|due|schedul\w*|upcoming|coverage|covered|valid\s+(?:through|until)|good\s+(?:through|until)|runs?\s+(?:through|thru|until|till|to)|agreements?|contracts?|terms?)\b/i;
+// D4: "run(s) through 2027", "good/valid/active/effective through 2028", and a contract/warranty/plan noun followed by through/until ("agreements through 2031")
+// name the END of a term the same way "expire" does.
+const FORWARD_RECORD_FIELD_RE = new RegExp(
+  '\\b(?:expir\\w*|renew\\w*|ends?|ending|due|schedul\\w*|upcoming|coverage|covered|valid\\s+(?:through|until)|good\\s+(?:through|until))\\b'
+  + '|\\b(?:run|runs|running|ran|good|valid|active|effective|in\\s+effect|current|lasts?|lasting)\\s+(?:through|thru|until|till|to)\\b'
+  + '|\\b(?:agreements?|contracts?|warrant(?:y|ies))\\b[^.?]{0,40}\\b(?:through|thru|until|till)\\b'
+  // D4: "agreements still active in 2027" / "contracts that run past 2026" are end-of-term questions too.
+  + '|\\b(?:agreements?|contracts?|memberships?)\\b[^.?]{0,40}\\b(?:(?:still\\s+)?(?:active|valid|in\\s+force|in\\s+effect)\\s+(?:in|during|at|by)|(?:run|runs|running|extend\\w*|go|goes|going)\\s+(?:past|beyond))\\b',
+  'i'
+);
 export function mentionsFutureYear(question, today) {
   const q = String(question ?? '');
-  if (FORWARD_RECORD_FIELD_RE.test(q)) return false;
+  if (FORWARD_RECORD_FIELD_RE.test(q) || FORWARD_RECORD_FIELD_RE_MAIN.test(q)) return false;
   const now = today ? new Date(today) : new Date();
   if (Number.isNaN(now.getTime())) return false;
   const currentYear = now.getUTCFullYear();
@@ -1688,7 +1709,8 @@ export function missingConditions(plan, question) {
   const missing = new Set();
   for (const c of detectedConditions(question)) {
     if (c === 'month') {
-      if (!plan?.timeRange) missing.add(c);
+      // D4: an agreement-end plan carries the year as agreementEnd bounds, not as a timeRange.
+      if (!plan?.timeRange && !plan?.filters?.some((f) => f.field === 'agreementEnd')) missing.add(c);
       continue;
     }
     const field = CONDITION_PLAN_FIELD[c];
@@ -1721,6 +1743,8 @@ export function missingConditions(plan, question) {
     // data — same "silently answer wrong/nothing" failure this whole function exists to
     // prevent, just from the override path instead of a dropped condition.
     if (c === 'brand' && plan?.filters?.some((f) => f.field === 'linkedEquipmentBrand')) continue;
+    // D8: a permit's issuing city is its own filter (permitCity), not the customer-geo `city`.
+    if (c === 'city' && plan?.filters?.some((f) => f.field === 'permitCity')) continue;
     if (!plan?.filters?.some((f) => f.field === field)) missing.add(c);
   }
   return missing;
@@ -1780,7 +1804,9 @@ function isNegatedWord(q, word) {
   // word this call is checking (bounded window, so an unrelated "don't have
   // an email" earlier in a long sentence never flips a LATER, unrelated
   // city/brand mention).
-  return new RegExp(`\\b(?:don'?t|doesn'?t|do not|does not)\\s+have\\b[\\s\\S]{0,20}\\b${esc}\\b`, 'i').test(q);
+  if (new RegExp(`\\b(?:don'?t|doesn'?t|do not|does not)\\s+have\\b[\\s\\S]{0,20}\\b${esc}\\b`, 'i').test(q)) return true;
+  // "customers who do not live in Arizona" / "aren't located in Mesa" / "not based in AZ": a negated residence verb right before the place.
+  return new RegExp(`\\b(?:don'?t|doesn'?t|do not|does not|aren'?t|are not|isn'?t|is not|not|never)\\s+(?:live|lives|living|located|based|reside|resides|residing|situated|from)\\s+(?:in|at|within|inside)?\\s*(?:the\\s+)?(?:state\\s+of\\s+)?${esc}\\b`, 'i').test(q);
 }
 
 /**
@@ -3094,6 +3120,18 @@ export function validatePlan(raw) {
       filters.push({ field: f.field, op: f.op, value: f.value === true || s === 'true' });
       continue;
     }
+    if (f.field === 'permitScope' || f.field === 'permitCity') {
+      if (p.entity !== 'documents' || f.op !== 'eq' || typeof f.value !== 'string') return null;
+      if (f.field === 'permitScope' && !['commercial', 'residential'].includes(f.value)) return null;
+      filters.push({ field: f.field, op: f.op, value: f.value });
+      continue;
+    }
+    if (f.field === 'agreementEnd') {
+      // D4: the end DATE of a maintenance agreement's term (YYYY-MM-DD); documents only; direction-ful comparisons only.
+      if (p.entity !== 'documents' || !['eq', 'gte', 'lte', 'gt', 'lt'].includes(f.op) || !/^\d{4}-\d{2}-\d{2}$/.test(String(f.value))) return null;
+      filters.push({ field: f.field, op: f.op, value: String(f.value) });
+      continue;
+    }
     if (f.field === 'warrantyExpires') {
       // R18 P4 (C3): a raw YYYY-MM-DD (or YYYY-MM/YYYY) date-range test on the unit's own
       // warranty.expires — equipment/warranties only, gte/lte/eq only (a direction-less
@@ -3344,7 +3382,7 @@ const DATA_QUALITY_ROW_KEY = Object.fromEntries(DATA_QUALITY_BOOLEAN_FIELDS.map(
 // convention installDateInFuture/queryInstallDateExtreme (routes/analytics.js) already rely on for
 // every other date-shaped string field in this corpus, so a plain string compare is correct here
 // too (never coerceNumber's numeric parse, which would just see NaN for a date string).
-const DATE_STRING_FIELDS = new Set(['warrantyExpires', 'installDate']);
+const DATE_STRING_FIELDS = new Set(['warrantyExpires', 'installDate', 'agreementEnd']);
 
 export function matchesFilter(row, filter) {
   const { field, op, value } = filter;
@@ -3580,6 +3618,22 @@ export function buildAnalyticsSQL(plan, { audienceClause = 'TRUE' } = {}) {
     // link the frontend itself treats as "linked" (see routes/integrity.js's
     // loadUnlinkedCandidates doc comment on why this is the one link that
     // counts, not a transitive one via a linked unit's own customer_id).
+    // D4: only an agreement-end question needs the agreement term and the linked customer's name.
+    const permitCols = (plan.filters ?? []).some((f) => f.field === 'permitScope' || f.field === 'permitCity')
+      ? `,
+                   (SELECT string_agg(pg.text, E'\\n' ORDER BY pg.page_no) FROM document_pages pg
+                     WHERE pg.document_id = d.id AND pg.${TENANT_SQL}) AS permit_text`
+      : '';
+    const agreementCols = (plan.filters ?? []).some((f) => f.field === 'agreementEnd')
+      ? `,
+                   (SELECT a.value FROM extractions a
+                     WHERE a.document_id = d.id AND a.field_key = 'agreement_term' AND a.${TENANT_SQL}
+                     ORDER BY a.created_at DESC LIMIT 1) AS agreement_term,
+                   (SELECT c.data->>'customer_name' FROM document_entity_links l2
+                      JOIN entities c ON c.id = l2.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL AND c.${TENANT_SQL}
+                     WHERE l2.document_id = d.id AND l2.${TENANT_SQL}
+                     ORDER BY l2.created_at DESC LIMIT 1) AS agreement_customer`
+      : '';
     return {
       sql: `SELECT d.id, d.document_type, d.original_filename, d.created_at,
                    (SELECT x.value FROM extractions x
@@ -3593,7 +3647,7 @@ export function buildAnalyticsSQL(plan, { audienceClause = 'TRUE' } = {}) {
                    -- the same correlated-scalar way as service_date just above.
                    (SELECT v.value FROM extractions v
                      WHERE v.document_id = d.id AND v.field_key = 'vendor_name' AND v.${TENANT_SQL}
-                     ORDER BY v.created_at DESC LIMIT 1) AS vendor
+                     ORDER BY v.created_at DESC LIMIT 1) AS vendor${agreementCols}${permitCols}
               FROM documents d
              WHERE ${where.join(' AND ')} AND (${audienceClause})
              ORDER BY d.created_at DESC
@@ -3647,7 +3701,9 @@ export function buildAnalyticsSQL(plan, { audienceClause = 'TRUE' } = {}) {
                    ORDER BY mf.created_at DESC LIMIT 1) AS manufacturer,
                  (SELECT st.value FROM extractions st
                    WHERE st.document_id = x.document_id AND st.field_key = 'service_type' AND st.${TENANT_SQL}
-                   ORDER BY st.created_at DESC LIMIT 1) AS service_type
+                   ORDER BY st.created_at DESC LIMIT 1) AS service_type,
+                 -- D20: what KIND of paper this "visit" is (service ticket, invoice, work order, ...) so the answer can say what was counted.
+                 (SELECT dt.document_type FROM documents dt WHERE dt.id = x.document_id AND dt.${TENANT_SQL}) AS document_type
             FROM extractions x
            WHERE x.field_key = 'service_date' AND ${TENANT_SQL}
            ORDER BY x.value DESC
@@ -3823,6 +3879,36 @@ export function formatAnalyticsAnswer(plan, opts) {
   return out;
 }
 
+/** D20: "22 service tickets, 3 work orders, 2 inspection reports (every document with a service date counts as a visit)" - what a
+ *  service-visit count is made of, so a 27-visit answer is never mistaken for 27 service tickets. null when no row carries a type. */
+export function serviceVisitBasisNote(rows) {
+  const counts = new Map();
+  for (const r of rows ?? []) {
+    if (!r?.documentType) continue;
+    const label = documentTypeLabel(r.documentType).toLowerCase();
+    counts.set(label, (counts.get(label) ?? 0) + 1);
+  }
+  if (!counts.size) return null;
+  const parts = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([label, n]) => `${n} ${label}${n === 1 ? '' : 's'}`);
+  return `counted from every document with a service date: ${parts.join(', ')}`;
+}
+
+/** "end in 2026" / "end between 2026 and 2027" / "run through 2027 or later" ... from a plan's agreementEnd bounds. */
+function agreementEndPhrase(filters) {
+  const lower = filters.find((f) => f.op === 'gte' || f.op === 'gt');
+  const upper = filters.find((f) => f.op === 'lte' || f.op === 'lt');
+  const yr = (f) => f.value.slice(0, 4);
+  const yearStart = (f) => f.op === 'gte' && f.value.slice(5) === '01-01';
+  const yearEnd = (f) => f.op === 'lte' && f.value.slice(5) === '12-31';
+  if (lower && upper) {
+    if (yearStart(lower) && yearEnd(upper)) return yr(lower) === yr(upper) ? `end in ${yr(lower)}` : `end between ${yr(lower)} and ${yr(upper)}`;
+    return `end between ${lower.value} and ${upper.value}`;
+  }
+  if (lower) return lower.op === 'gte' && lower.value.slice(5) === '12-31' ? `run through ${yr(lower)} or later` : lower.op === 'gt' && lower.value.slice(5) === '12-31' ? `end after ${yr(lower)}` : `end ${lower.op === 'gt' ? 'after' : 'on or after'} ${lower.value}`;
+  if (upper) return yearEnd(upper) ? `end in ${yr(upper)} or earlier` : upper.op === 'lt' && upper.value.slice(5) === '01-01' ? `end before ${yr(upper)}` : `end ${upper.op === 'lt' ? 'before' : 'on or before'} ${upper.value}`;
+  return 'end on the date asked';
+}
+
 function formatAnalyticsAnswerBase(plan, opts) {
   const {
     total = 0, groups = [], rows = [], sum = null, unfilteredTotal = null, broaderGroups = null,
@@ -3922,6 +4008,32 @@ function formatAnalyticsAnswerBase(plan, opts) {
     return { kind: 'answer', text, facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [] };
   }
 
+  // D4: "which maintenance agreements expire in 2026" / "how many run through 2027" - worded from the end-year condition itself.
+  // D8: "how many commercial permits" / "which residential permits are in Chandler" - worded from the scope/city conditions themselves.
+  const permitScopeF = plan.entity === 'documents' ? (plan.filters ?? []).find((f) => f.field === 'permitScope') : null;
+  const permitCityF = plan.entity === 'documents' ? (plan.filters ?? []).find((f) => f.field === 'permitCity') : null;
+  if ((permitScopeF || permitCityF) && (plan.op === 'count' || plan.op === 'list')) {
+    const where = `${permitScopeF ? `${permitScopeF.value} ` : ''}permit${total === 1 ? '' : 's'}${permitCityF ? ` issued by the City of ${titleCaseWords(permitCityF.value)}` : ''}`;
+    const text = total === 0 ? `No ${where} on file.` : `${total} ${where} on file.`;
+    const facts = plan.op === 'count'
+      ? [{ label: 'Permits', value: String(total), sources: [] }]
+      : rows.slice(0, MAX_FACT_ROWS).map((r) => ({ label: r.permitNumber ? `Permit ${r.permitNumber}` : r.value, value: [r.permitCity ? `City of ${titleCaseWords(r.permitCity)}` : null, r.permitScopeText].filter(Boolean).join(' - ') || r.value, sources: [] }));
+    return { kind: 'answer', text, facts, sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [] };
+  }
+
+  const endFilters = plan.entity === 'documents' ? (plan.filters ?? []).filter((f) => f.field === 'agreementEnd') : [];
+  if (endFilters.length && (plan.op === 'count' || plan.op === 'list')) {
+    const phrase = agreementEndPhrase(endFilters);
+    const single = total === 1;
+    const text = total === 0
+      ? `No maintenance agreements ${phrase}.`
+      : `${total} maintenance agreement${single ? '' : 's'} ${single ? phrase.replace(/^end\b/, 'ends').replace(/^run\b/, 'runs') : phrase}.`;
+    const facts = plan.op === 'count'
+      ? [{ label: 'Maintenance agreements', value: String(total), sources: [] }]
+      : rows.slice(0, MAX_FACT_ROWS).map((r) => ({ label: r.customerName || r.value, value: r.agreementTerm ? `term ${r.agreementTerm}` : r.value, sources: [] }));
+    return { kind: 'answer', text, facts, sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [] };
+  }
+
   if (plan.op === 'count') {
     const of = unfilteredTotal != null && unfilteredTotal !== total ? ` (of ${unfilteredTotal} total)` : '';
     // Item 1: "N jobs in August 2026" style, once there's a real single-month
@@ -3941,7 +4053,12 @@ function formatAnalyticsAnswerBase(plan, opts) {
     // Team A: customers counted through their units ("customers with a unit newer than 5 years") also name the unit count.
     const unitsNote = plan.entity === 'customers' && opts?.unitCount != null && opts.unitCount !== total
       ? ` (${opts.unitCount} matching unit${opts.unitCount === 1 ? '' : 's'} across them)` : '';
-    const text = scopedText ?? `You have ${total} ${noun}${of}${unitsNote}.`;
+    let text = scopedText ?? `You have ${total} ${noun}${of}${unitsNote}.`;
+    // D20: a "service visit" here is any document carrying a service date, not only a service ticket - say what was counted.
+    if (plan.entity === 'serviceVisits' && total > 0) {
+      const note = serviceVisitBasisNote(rows);
+      if (note) text = text.replace(/\.$/, ` - ${note}.`);
+    }
     const label =
       customerContactFactLabel(plan.entity, plan.filters) ??
       brandFactLabel(plan.entity, plan.filters) ??

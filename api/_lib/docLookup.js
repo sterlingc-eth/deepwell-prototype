@@ -35,7 +35,7 @@ import { withTypoNote } from "./lookups/typoResolve.js";
 import { resolveAddressCandidates, nameTokens, resolveNamedCustomers, resolveContactCandidatesDetailed, corroboratesCandidate } from "./contactLookup.js";
 // Team A (2026-09-24): address/name scopes that include EVERY customer and unit at an address (apartments), the same
 // document union the customer profile uses, and legacy-tolerant document-type matching.
-import { resolveAddressScope, scopeFromCustomers, scopeDocumentIds, extractUnitDesignator, docTypeAliases, typeSql } from "./scope.js";
+import { resolveAddressScope, scopeFromCustomers, scopeDocumentIds, extractUnitDesignator, extractUnitDesignators, docTypeAliases, typeSql } from "./scope.js";
 // R16 F3 (compound questions): "whats the model and serial on the unit at
 // <address>" / "is Abernathy still under warranty and whos the tech that did
 // it" — two sub-asks in one question, neither a document-type lookup at all.
@@ -43,6 +43,7 @@ import { resolveAddressScope, scopeFromCustomers, scopeDocumentIds, extractUnitD
 // lookups/compound.js's own header comment for why this is wired in HERE
 // rather than through a new api/ask.js call site.
 import { parseCompoundQuestion, runCompound } from "./lookups/compound.js";
+import { parseDocFieldAsk, extractField } from "./lookups/docFieldAsk.js";
 // R19 (I1, owner ask (a)/audience adoption): internal/team-only documents must never feed a
 // customer-scoped document-list answer here unless the question itself is about team/internal
 // material — see fastPath.js's isTeamScopedQuestion and audience/sql.js's own header.
@@ -257,6 +258,7 @@ const DOCTYPE_WORD_RE = new RegExp(DOCTYPE_RE_SRC, "i");
 // "Thomas Mercer invoices" — bare "<name> <doctype>", no connector at all.
 // Anchored to the WHOLE string so this never fires on "how many invoices
 // this year" (starts with a stopword, rejected by isRealNamePhrase below).
+const BARE_LEADIN_RE = /\b(?:amounts?|totals?|prices?|costs?|how|hows|how's|much|what|whats|what's|which|who|whos|when|many|come|comes|came|number|numbers)\b/i;
 const NAME_DOCTYPE_RE = new RegExp(`^(${NAME_OR_ADDRESS_SRC})\\s+${DOCTYPE_RE_SRC}s?\\s*\\??$`, "i");
 
 const MONTH_NAMES = new Set([
@@ -371,6 +373,35 @@ function titleCase(s) {
     .join(" ");
 }
 
+// Defect 7: "invoice number for Amy Isaacson" / "whats Thomas Mercer's invoice number" / "invoice # for Gary Villegas" / "what invoice number was David Prentiss billed
+// under" ask for the DOCUMENT's own number (extracted invoice_number / po_number / permit_number), not a phone number or the document list.
+const NUMBER_FIELD_BY_DOCTYPE = { invoice: "invoice_number", "purchase-order": "po_number", permit: "permit_number" };
+const NUMBER_ASK_RE = new RegExp(`\\b(${DOCTYPE_RE_SRC})s?\\s*(?:#|numbers?|nos?\\b\\.?|num\\b)(?!\\s+of\\b)`, "i");
+const NAME_SRC = "[A-Za-z0-9][A-Za-z0-9'.&\\u2019-]*(?:\\s+[A-Za-z0-9'.&\\u2019-]+){0,4}?";
+const NUMBER_NAME_RES = [
+  new RegExp(`\\b(?:for|on|of|under|to)\\s+(?:the\\s+)?(${NAME_SRC})(?:['\\u2019]s\\s+(?:account|job|file|system|unit|place|house))?\\s*$`, "i"),
+  new RegExp(`(?:^|\\s)(${NAME_SRC})['\\u2019]s\\s+(?:\\w+\\s+)?(?:${DOCTYPE_RE_SRC})s?\\s*(?:#|number|no|num)\\b`, "i"),
+  new RegExp(`\\b(?:was|is|did)\\s+(?:the\\s+)?(${NAME_SRC})\\s+(?:billed|invoiced|issued|given|get|under|get\\s+billed)\\b`, "i"),
+];
+const NUMBER_FILLER_RE = /^(?:(?:what|whats|what's|whos|who's|which|is|are|was|the|a|an|give|me|tell|get|pull|up|find|need|want|show|can|you|i|do|we|have|our|their|his|her)\s+)+/i;
+function parseDocNumberAsk(raw) {
+  const text = String(raw ?? "").trim().replace(/[?!.]+$/, "");
+  const m = NUMBER_ASK_RE.exec(text);
+  if (!m) return null;
+  const doctype = docTypeFromWord(m[1]);
+  if (!doctype || !NUMBER_FIELD_BY_DOCTYPE[doctype]) return null;
+  for (const re of NUMBER_NAME_RES) {
+    const nm = re.exec(text);
+    if (!nm) continue;
+    let namePhrase = nm[1].trim();
+    for (let i = 0; i < 4; i++) { const next = namePhrase.replace(NUMBER_FILLER_RE, "").trim(); if (next === namePhrase) break; namePhrase = next; }
+    namePhrase = stripTrailingFillerWord(namePhrase.replace(/['\u2019]s(?:\s+(?:account|job|file|system|unit|place|house))?$/i, "").trim());
+    if (!namePhrase || !isRealNameOrAddressPhrase(namePhrase) || BARE_LEADIN_RE.test(namePhrase) || new RegExp(`^${DOCTYPE_RE_SRC}s?$`, "i").test(namePhrase)) continue;
+    return { doctype, namePhrase, isAddress: /^\d/.test(namePhrase), numberField: NUMBER_FIELD_BY_DOCTYPE[doctype] };
+  }
+  return null;
+}
+
 /**
  * Pure: question text -> {doctype, namePhrase, isAddress} or null.
  * `doctype` is a canonical id from documentTypes.js's DOCUMENT_TYPES.
@@ -435,6 +466,20 @@ function splitNameWindow(phrase) {
   return null;
 }
 
+// Defect 17: "<doc type> at/for <street address> [apt N [and apt M]]" said in any order ("show the invoice for Apt 105 & Apt 106 at 3300 S Alma School Rd") is the one canonical
+// "<doc type>s for <address> apt N and apt M" shape the address lookup already answers. Only fires when a unit designator AND a street suffix are present.
+const STREET_ADDR_RE = /\b(\d{1,6}\s+(?:[nsew]\s+)?(?:[a-z0-9.'-]+\s+){0,3}?(?:st|street|rd|road|ave|avenue|dr|drive|ln|lane|blvd|boulevard|ct|court|cir|circle|way|pl|place|pkwy|parkway|trl|trail|hwy|highway))\b\.?/i;
+function reshapeUnitAddressQuestion(q) {
+  const units = extractUnitDesignators(q);
+  if (!units.length) return q;
+  const addr = STREET_ADDR_RE.exec(q);
+  const dt = DOCTYPE_WORD_RE.exec(q);
+  if (!addr || !dt) return q;
+  const word = dt[0].toLowerCase();
+  const plural = /s$/.test(word) ? word : `${word}s`;
+  return `${plural} for ${addr[1].trim()}`;
+}
+
 export function parseDocLookupQuestion(question, opts = {}) {
   const overlay = opts?.overlay;
   const raw = String(question ?? "").trim();
@@ -455,11 +500,23 @@ export function parseDocLookupQuestion(question, opts = {}) {
   const compound = parseCompoundQuestion(raw);
   if (compound) return { compound: true, ...compound };
 
-  const q = normalizeQuestion(correctTriggerWordTypos(raw, DOCTYPE_TRIGGER_WORDS), { overlay }).normalized;
+  // Defect 19/21: one printed field of one kind of document (permit city/status, PO vendor/parts, warranty registered/term, startup tech, invoice date, agreement period,
+  // nameplate, document count, "does X have a permit"). Answered from the document's own text.
+  const fieldAsk = parseDocFieldAsk(raw);
+  if (fieldAsk && (fieldAsk.docNumber || !fieldAsk.namePhrase || (isRealNameOrAddressPhrase(fieldAsk.namePhrase) && !BARE_LEADIN_RE.test(fieldAsk.namePhrase)))) {
+    return { ...fieldAsk, doctype: fieldAsk.docField.doctype };
+  }
+
+  const numberAsk = parseDocNumberAsk(raw);
+  if (numberAsk) return numberAsk;
+
+  let q = normalizeQuestion(correctTriggerWordTypos(raw, DOCTYPE_TRIGGER_WORDS), { overlay }).normalized;
   if (!q || !DOCTYPE_WORD_RE.test(q)) return null; // cheap reject before trying every shape
+  const reshaped = reshapeUnitAddressQuestion(q);
 
   for (const re of SHAPES) {
-    const m = q.match(re);
+    let m = q.match(re);
+    if (!m && reshaped !== q) { m = reshaped.match(re); if (m) q = reshaped; }
     if (!m) continue;
     let { name: namePhrase, year } = splitNameYear(stripTrailingFillerWord(m[1].trim()));
     let win = null;
@@ -475,7 +532,9 @@ export function parseDocLookupQuestion(question, opts = {}) {
   const bare = q.match(NAME_DOCTYPE_RE);
   if (bare) {
     const namePhrase = bare[1].trim();
-    if (isRealNameOrAddressPhrase(namePhrase)) {
+    // Defect 1: "amount of the Copper Sky Dental invoice" / "invoice total for the Grace Community invoice" is a how-much question carrying a lead-in,
+    // not a bare "<name> invoices" lookup: never capture the lead-in words as part of a customer name.
+    if (isRealNameOrAddressPhrase(namePhrase) && !BARE_LEADIN_RE.test(namePhrase)) {
       // The doctype word is whatever comes AFTER the captured name, never a
       // doctype-shaped word matched inside the name itself (e.g. a company
       // named "Ticket Masters") — read it from the tail of the match, not
@@ -487,6 +546,112 @@ export function parseDocLookupQuestion(question, opts = {}) {
   }
 
   return null;
+}
+
+/* ============================================================ Defect 5: memos by document type */
+
+const MEMO_HEADER_RE = /^\s*(?:(?:internal|staff|team|shop)\s+)?memo(?:randum)?\s*$/im;
+const MEMO_QUALIFIER_RE = /\b(?:today|yesterday|tonight|this\s+(?:morning|week|month|year|afternoon)|last\s+(?:week|month|year)|next\s+(?:week|month)|week|recent(?:ly)?|latest|newest|oldest|first|went\s+out|sent|send|broadcast(?:ed)?|circulate[ds]?|announce\w*|everyone|everybody|all\s+(?:staff|techs?|hands)|entire\s+team|whole\s+team|crew|techs?|technicians?|dispatch|management|office|(?:19|20)\d\d)\b|\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i;
+const AUDIENCE_TERM_RE = /\b(?:internal|staff|team|shop)[-\s]only\b/i;
+
+/** Every document whose first page is headed MEMO / INTERNAL MEMO: [{id, filename, created_at, text}]. Tenant-scoped read, never a model call. */
+async function listMemoDocuments(db) {
+  const { rows } = await db.raw(
+    `SELECT d.id, d.original_filename, d.created_at, p.page_no, p.text
+       FROM document_pages p JOIN documents d ON d.id = p.document_id AND d.${TENANT_SQL}
+      WHERE p.${TENANT_SQL} AND p.tsv @@ websearch_to_tsquery('english', 'memo')
+      ORDER BY d.created_at DESC, p.page_no
+      LIMIT 500`
+  );
+  const seen = new Set();
+  const out = [];
+  for (const r of rows) {
+    if (seen.has(r.id) || !MEMO_HEADER_RE.test(String(r.text ?? ""))) continue;
+    seen.add(r.id);
+    out.push({ id: r.id, filename: r.original_filename, created_at: r.created_at, text: String(r.text ?? "") });
+  }
+  return out;
+}
+
+function memoFields(text) {
+  const lines = String(text ?? "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const at = lines.findIndex((l) => MEMO_HEADER_RE.test(l));
+  const rest = at >= 0 ? lines.slice(at + 1) : lines;
+  const get = (k) => (rest.find((l) => new RegExp(`^${k}\\s*:`, "i").test(l)) ?? "").replace(new RegExp(`^${k}\\s*:\\s*`, "i"), "");
+  const body = rest.filter((l) => !/^(?:date|to|from|re|subject)\s*:/i.test(l)).join(" ");
+  return { date: get("date"), to: get("to"), re: get("re") || get("subject"), body };
+}
+
+const memoNoun = (n) => (n === 1 ? "internal memo" : "internal memos");
+
+async function answerMemoQuestion(db, question, opts) {
+  const raw = String(question ?? "");
+  let memos;
+  try { memos = await listMemoDocuments(db); } catch { return null; } // best-effort: no page index -> the audience-based answer below
+  if (!memos.length) return null; // none headed MEMO: the audience-based honest decline below stays correct
+  const records = async (list) => await documentRecordsFor(db, list.map((m) => m.id));
+  const qualified = MEMO_QUALIFIER_RE.test(raw) || AUDIENCE_TERM_RE.test(raw);
+  const counting = /\b(?:how\s+many|count|number\s+of|total)\b/i.test(raw);
+  // A named customer (full name on file): the memo(s) that mention them. A time / audience / sender qualifier is never silently dropped.
+  let namePhrase = null;
+  const nm = raw.match(/\b(about|for|on|regarding|re|mentioning|mentions?|concerning|with)\s+(?:the\s+)?([A-Za-z][A-Za-z'.-]*(?:\s+[A-Za-z][A-Za-z'.-]*){0,3}?)(?:\s+(?:memo|account|job|file|say|says|said|read|mention|mentions)\b.*|\s*[?.!]*)$/i);
+  if (nm) namePhrase = nm[2].trim().replace(/['\u2019]s$/i, "");
+  // "any memos for <name>" / "is there a memo for <name>" asks whether a memo was ADDRESSED to them (these memos go "To: All Techs"): that is not the same as a
+  // memo that merely mentions their name, so it is answered as "none addressed to them", pointing at the mention lookup (see the plain statement below).
+  const addressedTo = !!nm && /^for$/i.test(nm[1]) && /^\s*(?:any|is\s+there|are\s+there|do\s+we\s+have|have\s+we|has\s+anyone)\b/i.test(raw);
+  if (namePhrase && isRealNameOrAddressPhrase(namePhrase) && !qualified && !addressedTo) {
+    const { candidates } = await resolveCandidates(db, question, namePhrase, false);
+    if (candidates.length > 0 && candidates.length <= 3) {
+      const mine = [];
+      for (const m of memos) {
+        const textLower = m.text.toLowerCase().replace(/\u2019/g, "'");
+        const hit = candidates.some((c) => c.customer_name && textLower.includes(String(c.customer_name).toLowerCase()));
+        if (hit) mine.push(m);
+      }
+      const who = candidates.map((c) => c.customer_name).filter(Boolean).join(" / ") || namePhrase;
+      if (!mine.length) {
+        return attachCitations({
+          kind: "answer", text: `No internal memo mentions ${who}. There ${memos.length === 1 ? "is" : "are"} ${memos.length} ${memoNoun(memos.length)} on file in all.`,
+          facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+        }, { records: await records(memos.slice(0, 20)), total: memos.length, kind: "searched", basis: `Read all ${memos.length} documents headed MEMO for ${who}'s name; none mention them.` });
+      }
+      const f = mine.map((m) => ({ m, f: memoFields(m.text) }));
+      const one = (x) => `${x.f.re ? `"${x.f.re}"` : "memo"}${x.f.date ? `, ${x.f.date}` : ""}${x.f.to ? `, to ${x.f.to}` : ""}: ${x.f.body}`;
+      const text = counting
+        ? `${f.length} internal memo${f.length === 1 ? "" : "s"} ${f.length === 1 ? "mentions" : "mention"} ${who}: ${f.slice(0, 4).map(one).join(" | ")}`
+        : f.length === 1
+        ? `The internal memo about ${who} (${one(f[0])})`
+        : `${f.length} internal memos mention ${who}: ${f.slice(0, 4).map(one).join(" | ")}`;
+      return attachCitations({
+        kind: "answer", text,
+        facts: f.map((x) => ({ label: `Memo${x.f.date ? ` ${x.f.date}` : ""}`, value: `${x.f.re ? `${x.f.re} — ` : ""}${x.f.body}`, sources: [{ documentId: x.m.id, location: {} }] })),
+        sources: [], confidence: 1, verifiedCount: f.length, unverifiedCount: 0, closest: [],
+      }, { records: await records(mine), total: mine.length, claimedCount: mine.length, basis: `Read the ${mine.length === 1 ? "memo" : `${mine.length} memos`} (documents headed MEMO) that name ${who}.` });
+    }
+    // an unresolved name falls through to the plain statement below
+  }
+  if (counting && !qualified) {
+    const list = memos.slice(0, 8);
+    return attachCitations({
+      kind: "answer",
+      text: `${memos.length} ${memoNoun(memos.length)} ${memos.length === 1 ? "is" : "are"} on file (documents headed INTERNAL MEMO).`,
+      facts: [{ label: "Internal memos on file", value: String(memos.length), status: "info", sources: list.map((m) => ({ documentId: m.id, location: {} })) }],
+      sources: [], confidence: 1, verifiedCount: memos.length, unverifiedCount: 0, closest: [],
+    }, { records: await records(list), total: memos.length, claimedCount: memos.length, basis: `Counted every document whose page is headed MEMO (${memos.length}); the audience setting itself marks none of them team-only because they name a customer.` });
+  }
+  if (namePhrase && addressedTo && isRealNameOrAddressPhrase(namePhrase) && !qualified) {
+    return attachCitations({
+      kind: "no-answer",
+      text: `I couldn't find a memo addressed to ${titleCase(namePhrase)}: the memos on file (${memos.length}) are headed INTERNAL MEMO and go to the whole team. To see one that mentions a customer by name, ask "what does the internal memo about (customer name) say".`,
+      facts: [], sources: [], confidence: 0, verifiedCount: 0, unverifiedCount: 0, closest: [],
+    }, { records: await records(memos.slice(0, 10)), total: memos.length, kind: "searched", basis: `Looked at the ${memos.length} documents headed MEMO; matching by who a memo is addressed to is not something I can do.` });
+  }
+  // Everything else (who it was sent to, when it went out, "internal-only" as an audience flag): say plainly what could not be applied.
+  return attachCitations({
+    kind: "no-answer",
+    text: `I couldn't find a memo matching that. There ${memos.length === 1 ? "is" : "are"} ${memos.length} ${memoNoun(memos.length)} on file (documents headed INTERNAL MEMO), but I can't filter them by who they went to, when they went out, or an internal-only flag. Try "how many internal memos do we have" or "what does the internal memo about (customer name) say".`,
+    facts: [], sources: [], confidence: 0, verifiedCount: 0, unverifiedCount: 0, closest: [],
+  }, { records: await records(memos.slice(0, 10)), total: memos.length, kind: "searched", basis: `Found ${memos.length} documents headed MEMO; none could be matched to the extra condition in the question.` });
 }
 
 /* ============================================================ DB resolution */
@@ -577,6 +742,11 @@ async function runDocLookupCore(db, question, opts = {}) {
   if (parsed.internalMemo) {
     const memoAns = await answerInternalMemos(db, question);
     if (memoAns) return memoAns;
+    // Defect 5 (limit test 2026-10-03): memos name a customer, so the audience classifier files them as customer paperwork BY DESIGN and the
+    // audience count below is 0 - but INTERNAL MEMO documents are on file, and "no internal-only documents on file at all" was false. Answer by
+    // document type (a page headed MEMO) instead; whatever part of the question cannot be applied (who it went to, when) is said plainly.
+    const memoAnswer = await answerMemoQuestion(db, question, opts);
+    if (memoAnswer) return memoAnswer;
     const n = await countInternalDocuments(db);
     if (n === 0) {
       return attachCitations(
@@ -594,11 +764,12 @@ async function runDocLookupCore(db, question, opts = {}) {
   // above — dispatch to its own splitter/resolver rather than the document-
   // type machinery below, which has no `doctype` to work with here at all.
   if (parsed.compound) return runCompound(db, question, opts);
+  if (parsed.docNumber) return runDocNumberField(db, parsed);
   const { doctype, namePhrase, isAddress, year } = parsed;
   let win = parsed.win;
   if (win?.rel) win = resolveRelWin(win.rel, opts?.today);
   const yesNo = YES_NO_SHAPE_RE.test(String(question ?? ""));
-  const docLabel = documentTypeLabel(doctype);
+  const docLabel = documentTypeLabel(doctype ?? "invoice");
   const docLabelLower = docLabel.charAt(0).toLowerCase() + docLabel.slice(1);
 
   // ---- resolve the scope: every customer/unit the phrase names -------------------------------------------------
@@ -608,7 +779,8 @@ async function runDocLookupCore(db, question, opts = {}) {
   if (isAddress) {
     // Team A: an address with several customers/units on it (an apartment complex) is answered FOR THE ADDRESS across
     // all of them, never "which one did you mean" — unless the question names the unit ("Apt 104").
-    scope = await resolveAddressScope(db, namePhrase, { unit: extractUnitDesignator(question) });
+    const unitList = extractUnitDesignators(question);
+    scope = await resolveAddressScope(db, namePhrase, { unit: unitList.length > 1 ? unitList : extractUnitDesignator(question) });
     customers = scope.customers;
     if (!customers.length && !scope.equipment.length) {
       // TEAM C: nothing matched - say what was searched (honest zero).
@@ -697,6 +869,20 @@ async function runDocLookupCore(db, question, opts = {}) {
   };
   if (!ids.length) return await none();
 
+  // Defect 21: "how many documents are on file for X" - every document linked to the customer, by type.
+  if (parsed.docField?.field === "count") {
+    const { rows: byType } = await db.raw(
+      `SELECT ${typeSql("d.document_type")} AS t, count(*)::int AS n FROM documents d WHERE d.id = ANY($1::uuid[]) AND d.${TENANT_SQL} GROUP BY 1 ORDER BY 2 DESC, 1`, [ids]);
+    const total = byType.reduce((a, r) => a + r.n, 0);
+    const parts = byType.map((r) => `${r.n} ${documentTypeLabel(r.t).toLowerCase()}${r.n === 1 ? "" : "s"}`);
+    return attachCitations({
+      kind: "answer",
+      text: `${subject} has ${total} document${total === 1 ? "" : "s"} on file: ${parts.join(", ")}.`,
+      facts: [{ label: "Documents on file", value: String(total), sources: [] }],
+      sources: [], confidence: 1, verifiedCount: total, unverifiedCount: 0, closest: [],
+    }, { records: await documentRecordsFor(db, ids), total, claimedCount: total, basis: `Counted every document linked to ${subject}${customers.length > 1 ? ` (across ${customers.length} customers)` : ""}, grouped by document type.` });
+  }
+
   let { rows } = await db.raw(
     `SELECT d.id, d.document_type, d.original_filename, d.created_at,
             (SELECT x.value FROM extractions x
@@ -753,6 +939,45 @@ async function runDocLookupCore(db, question, opts = {}) {
   }
   if (!rows.length) return await none();
 
+  // Defect 19/21: the question asked for one printed field of this kind of document - read it from the document text.
+  if (parsed.docField) {
+    const out = await answerDocField(db, parsed.docField, rows, { subject, docLabelLower, docLabel, multi: customers.length > 1 });
+    if (out) return out;
+  }
+
+  // Defect 7: the question asked for the document's NUMBER - state it (never the phone, never just the file list).
+  if (parsed.numberField) {
+    const { rows: nums } = await db.raw(
+      `SELECT x.document_id, COALESCE(NULLIF(x.corrected_value, ''), x.value) AS value FROM extractions x
+        WHERE x.document_id = ANY($1::uuid[]) AND x.field_key = $2 AND x.${TENANT_SQL} AND COALESCE(NULLIF(x.corrected_value, ''), x.value) <> ''`,
+      [rows.map((r) => r.id), parsed.numberField]
+    );
+    const byDoc = new Map();
+    for (const n of nums) if (!byDoc.has(n.document_id)) byDoc.set(n.document_id, String(n.value).trim());
+    const withNum = rows.filter((r) => byDoc.has(r.id));
+    if (withNum.length) {
+      const noun = docLabelLower;
+      const one = (r) => `${byDoc.get(r.id)}${r.service_date || r.created_at ? ` (${formatDateLabel(r.service_date ?? r.created_at)})` : ""}`;
+      const text = withNum.length === 1
+        ? `${subject}'s ${noun} number is ${byDoc.get(withNum[0].id)}.`
+        : `${subject} has ${withNum.length} ${noun}s on file: ${withNum.slice(0, 6).map(one).join("; ")}${withNum.length > 6 ? `, and ${withNum.length - 6} more` : ""}.`;
+      return attachCitations({
+        kind: "answer", text,
+        facts: withNum.map((r) => ({ label: `${docLabel} number`, value: byDoc.get(r.id), sources: [{ documentId: r.id, location: { field: parsed.numberField } }] })),
+        sources: [], confidence: 1, verifiedCount: withNum.length, unverifiedCount: 0, closest: [],
+      }, {
+        records: withNum.map((r) => documentRecord(r, { label: `${docLabel} · ${byDoc.get(r.id)}`, sublabel: formatDateLabel(r.service_date ?? r.created_at) })),
+        total: withNum.length, claimedCount: withNum.length,
+        basis: `Read the ${parsed.numberField.replace(/_/g, " ")} printed on the ${withNum.length === 1 ? noun : `${withNum.length} ${noun}s`} linked to ${subject}.`,
+      });
+    }
+  }
+
+  // Defect 17: a named unit that matched no door is said plainly, never silently dropped.
+  const missingUnits = isAddress ? (scope.unitsMissing ?? []) : [];
+  const unitNote = missingUnits.length
+    ? ` Nothing on file names ${missingUnits.map((u) => `Apt ${u.toUpperCase()}`).join(" or ")}${scope.unitNarrowed ? ", so only the other unit(s) you named are shown" : ", so this covers every unit at the address"}.`
+    : "";
   const multi = customers.length > 1;
   const plural = rows.length === 1 ? docLabelLower : `${docLabelLower}${docLabelLower.endsWith("s") ? "" : "s"}`;
   const line = (r) => `${formatDateLabel(r.service_date ?? r.created_at)} · ${r.original_filename ?? r.id}${multi && r.customer_name ? ` · ${r.customer_name}` : ""}`;
@@ -760,7 +985,7 @@ async function runDocLookupCore(db, question, opts = {}) {
   const more = rows.length > 3 ? `, and ${rows.length - 3} more` : "";
   return attachCitations({
     kind: "answer",
-    text: `${yesNo ? "Yes — " : ""}${rows.length} ${plural} on file for ${subject}: ${summaryList}${more}.`,
+    text: `${yesNo ? "Yes — " : ""}${rows.length} ${plural} on file for ${subject}: ${summaryList}${more}.${unitNote}`,
     facts: rows.map((r) => ({
       label: docLabel,
       value: line(r),
@@ -772,6 +997,119 @@ async function runDocLookupCore(db, question, opts = {}) {
     total: rows.length, claimedCount: rows.length,
     basis: `Looked through the ${ids.length} document${ids.length === 1 ? "" : "s"} linked to ${subject}${multi ? ` (${customers.length} customers)` : ""} for ${docLabelLower}; dates are service dates (upload date when none was extracted).`,
   });
+}
+
+async function pageTextFor(db, docIds) {
+  const { rows } = await db.raw(
+    `SELECT p.document_id, string_agg(p.text, E'\n' ORDER BY p.page_no) AS text FROM document_pages p
+      WHERE p.document_id = ANY($1::uuid[]) AND p.${TENANT_SQL} GROUP BY p.document_id`, [docIds]);
+  return new Map(rows.map((r) => [r.document_id, String(r.text ?? "")]));
+}
+
+const permitOf = (s) => (/^Permit\b/.test(s) ? s : `${s}'s permit`);
+const FIELD_SENTENCE = {
+  "permit.city": (s, v) => `${s}'s permit was issued by the City of ${v}.`,
+  "permit.status": (s, v) => `${s}'s permit status is ${v}.`,
+  "permit.issued": (s, v) => `${permitOf(s)} shows ${v} as its date.`,
+  "permit.expires": (s, v) => `${permitOf(s)} expires ${v}.`,
+  "permit.inspection": (s, v) => `${permitOf(s)} lists its inspection as ${v}.`,
+  "permit.fee": (s, v) => `${permitOf(s)} lists a fee of ${v}.`,
+  "permit.contractor": (s, v) => `The contractor on ${permitOf(s)} is ${v}.`,
+  "permit.scope": (s, v) => `The scope of work on ${permitOf(s)} is ${v}.`,
+  "purchase-order.vendor": (s, v) => `${s} is from ${v}.`,
+  "purchase-order.parts": (s, v) => `${s} lists these parts: ${v}.`,
+  "warranty-registration.registered": (s, v) => `${s}'s warranty was registered on ${v}.`,
+  "warranty-registration.term": (s, v) => `The warranty term on ${s}'s registration is ${v}.`,
+  "startup-sheet.technician": (s, v) => `${v} did the startup for ${s}.`,
+  "invoice.date": (s, v) => `${s} was invoiced on ${v}.`,
+  "maintenance-agreement.period": (s, v) => `${s}'s maintenance agreement period is ${v}.`,
+  "maintenance-agreement.units": (s, v) => `${s}'s maintenance agreement covers ${v}.`,
+  "maintenance-agreement.coverage": (s, v) => `${s}'s maintenance agreement covers: ${v}.`,
+  "dispatch-note.note": (s, v) => `The dispatch note for ${s} says: ${v}.`,
+  "correspondence.exists": (s, v) => v,
+  "permit.exists": (s, v) => v,
+  "maintenance-agreement.exists": (s, v) => v,
+  "nameplate-photo.plate": (s, v) => `Nameplate for ${s}: ${v}.`,
+};
+
+/** What a field is called when the document does not print it ("... prints no issue date"), for the plain not-printed answer. */
+const FIELD_NOUN = { "permit.issued": "issue date", "permit.expires": "expiration date", "permit.inspection": "inspection date", "permit.fee": "fee", "permit.contractor": "contractor", "permit.scope": "scope of work" };
+
+/** Answer one printed field from each matching document's text; null when no document states it (the caller then lists the documents). */
+async function answerDocField(db, docField, rows, { subject, docLabel, docLabelLower, multi }) {
+  const key = `${docField.doctype}.${docField.field}`;
+  const sentence = FIELD_SENTENCE[key];
+  if (!sentence || !rows.length) return null;
+  const texts = await pageTextFor(db, rows.map((r) => r.id));
+  const got = [];
+  for (const r of rows) {
+    const res = extractField(docField.doctype, docField.field, texts.get(r.id) ?? "");
+    if (res) got.push({ r, res });
+  }
+  if (!got.length) {
+    return attachCitations({
+      kind: "answer",
+      text: FIELD_NOUN[key]
+        ? `${subject} has ${rows.length} ${docLabelLower}${rows.length === 1 ? "" : "s"} on file, but ${rows.length === 1 ? "it prints" : "none prints"} no ${FIELD_NOUN[key]}.`
+        : `${subject} has ${rows.length} ${docLabelLower}${rows.length === 1 ? "" : "s"} on file, but none prints that detail.`,
+      facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+    }, { records: rows.map((r) => documentRecord(r, { label: `${docLabel} · ${r.original_filename ?? r.id}`, sublabel: "" })), total: rows.length, kind: "searched", basis: `Read the ${rows.length} ${docLabelLower}${rows.length === 1 ? "" : "s"} linked to ${subject}; the requested line is not printed on ${rows.length === 1 ? "it" : "them"}.` });
+  }
+  const distinct = [...new Set(got.map((g) => g.res.value))];
+  let text;
+  if (docField.field === "exists" && multi && got.some((g) => g.r.customer_name)) text = `Yes — ${got.length} ${docLabelLower}${got.length === 1 ? "" : "s"} on file for ${subject}: ${got.slice(0, 8).map((g) => `${g.r.customer_name ?? "customer"} (${g.res.value})`).join("; ")}.`;
+  else if (docField.field === "exists") text = `Yes — ${subject} has ${got.length === 1 ? "a" : got.length} ${docLabelLower}${got.length === 1 ? "" : "s"} on file: ${distinct.join("; ")}.`;
+  else if (got.length === 1 || distinct.length === 1) text = sentence(subject, got[0].res.value);
+  else text = `${subject} has ${got.length} ${docLabelLower}s on file with different values: ${got.slice(0, 6).map((g) => `${g.res.value}${multi && g.r.customer_name ? ` (${g.r.customer_name})` : ""}`).join("; ")}.`;
+  const extras = [...new Set(got.map((g) => g.res.extra).filter(Boolean))];
+  if (extras.length === 1) text += ` ${extras[0]}`;
+  return attachCitations({
+    kind: "answer", text,
+    facts: got.map((g) => ({ label: `${docLabel} ${docField.field}`, value: g.res.value, sources: [{ documentId: g.r.id, location: {} }] })),
+    sources: [], confidence: 1, verifiedCount: got.length, unverifiedCount: 0, closest: [],
+  }, {
+    records: got.map((g) => documentRecord(g.r, { label: `${docLabel} · ${g.r.original_filename ?? g.r.id}`, sublabel: "" })),
+    total: got.length, claimedCount: got.length,
+    basis: docField.field === "exists" ? `Looked through the documents linked to ${subject}; found ${got.length} ${docLabelLower}${got.length === 1 ? "" : "s"}.` : `Read the printed ${docField.field} on the ${got.length === 1 ? docLabelLower : `${got.length} ${docLabelLower}s`} linked to ${subject}.`,
+  });
+}
+
+/** "status of permit BP-2026-10023" / "which vendor was PO-9081 from": find the one document carrying that number and read the field. */
+async function runDocNumberField(db, parsed) {
+  const { doctype, field } = parsed.docField;
+  const num = parsed.docNumber;
+  const label = documentTypeLabel(doctype);
+  const lower = label.charAt(0).toLowerCase() + label.slice(1);
+  const { rows } = await db.raw(
+    `SELECT d.id, d.document_type, d.original_filename, d.created_at, string_agg(p.text, E'\n' ORDER BY p.page_no) AS text
+       FROM documents d JOIN document_pages p ON p.document_id = d.id AND p.${TENANT_SQL}
+      WHERE d.${TENANT_SQL} AND ${typeSql("d.document_type")} = ANY($1::text[]) AND position(lower($2::text) in lower(p.text)) > 0
+      GROUP BY d.id, d.document_type, d.original_filename, d.created_at ORDER BY d.created_at DESC LIMIT 5`,
+    [docTypeAliases(doctype), num]
+  );
+  if (!rows.length) {
+    return attachCitations({
+      kind: "answer", text: `I couldn't find ${lower} ${num} on file.`,
+      facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+    }, { records: [], total: 0, kind: "searched", basis: `Searched the text of every ${lower} on file for ${num}; none carries it.` });
+  }
+  const sentence = FIELD_SENTENCE[`${doctype}.${field}`];
+  const got = rows.map((r) => ({ r, res: extractField(doctype, field, r.text) })).filter((g) => g.res);
+  if (!sentence || !got.length) {
+    return attachCitations({
+      kind: "answer", text: `${label} ${num} is on file, but it doesn't print that detail.`,
+      facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+    }, { records: rows.map((r) => documentRecord(r, { label: `${label} · ${r.original_filename ?? r.id}`, sublabel: "" })), total: rows.length, kind: "searched", basis: `Read ${lower} ${num}; the requested line is not printed on it.` });
+  }
+  const g = got[0];
+  const subj = `${label} ${num}`;
+  let text = (field === "city" ? `${subj} was issued by the City of ${g.res.value}.` : field === "status" ? `${subj} status: ${g.res.value}.` : sentence(subj, g.res.value));
+  if (g.res.extra) text += ` ${g.res.extra}`;
+  return attachCitations({
+    kind: "answer", text,
+    facts: [{ label: `${label} ${field}`, value: g.res.value, sources: [{ documentId: g.r.id, location: {} }] }],
+    sources: [], confidence: 1, verifiedCount: 1, unverifiedCount: 0, closest: [],
+  }, { records: [documentRecord(g.r, { label: `${label} · ${g.r.original_filename ?? g.r.id}`, sublabel: "" })], total: 1, claimedCount: 1, basis: `Read the printed ${field} on ${lower} ${num}.` });
 }
 
 /* ============================================================ item 8: honest-

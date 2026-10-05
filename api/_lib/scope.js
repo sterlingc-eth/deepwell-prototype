@@ -205,6 +205,17 @@ export function extractUnitDesignator(text) {
   return m ? m[1].toLowerCase() : null;
 }
 
+/** Every unit designator named ("Apt 101 and Apt 102", "units 103, 104") -> ["101","102"]; [] when none. A bare list after the first keyword ("Apt 101, 103 and 104") continues it. */
+export function extractUnitDesignators(text) {
+  const t = String(text ?? '');
+  const out = [];
+  const kw = /\b(?:apts?|apartments?|suites?|ste|units?)\.?\s*#?\s*((?:\d+[A-Za-z]?|[A-Za-z]\b)(?:\s*(?:,|&|and|\/)\s*(?:(?:apts?|apartments?|suites?|ste|units?)\.?\s*#?\s*)?(?:\d+[A-Za-z]?\b|[A-Za-z]\b))*)/gi;
+  let m;
+  while ((m = kw.exec(t))) for (const u of m[1].split(/\s*(?:,|&|and|\/)\s*/i)) { const v = u.replace(/^(?:apts?|apartments?|suites?|ste|units?)\.?\s*#?\s*/i, '').trim().toLowerCase(); if (v && !out.includes(v)) out.push(v); }
+  for (const h of t.matchAll(/#\s*(\d+[A-Za-z]?)\b/g)) if (!out.includes(h[1].toLowerCase())) out.push(h[1].toLowerCase());
+  return out;
+}
+
 /** Does an address string carry this unit designator ("... Apt 104, Mesa")? */
 export function addressHasUnit(address, unit) {
   if (!unit) return true;
@@ -261,18 +272,24 @@ export async function resolveAddressScope(db, addressText, { unit = null, limit 
   }
 
   let unitNarrowed = false;
+  let unitsMissing = [];
   if (unit) {
-    const custHit = new Set(customers.filter((c) => addressHasUnit(c.service_address, unit)).map((c) => c.id));
-    const equipHit = equipment.filter((e) => addressHasUnit(e.service_address, unit) || custHit.has(e.customer_id));
+    // several units named ("Apt 101 and Apt 102"): keep every door that carries ANY of them (Defect 17).
+    const units = Array.isArray(unit) ? unit : [unit];
+    const hasAny = (addr) => units.some((u) => addressHasUnit(addr, u));
+    const custHit = new Set(customers.filter((c) => hasAny(c.service_address)).map((c) => c.id));
+    const equipHit = equipment.filter((e) => hasAny(e.service_address) || custHit.has(e.customer_id));
     for (const e of equipHit) if (e.customer_id) custHit.add(e.customer_id);
     if (custHit.size || equipHit.length) {
       customers = customers.filter((c) => custHit.has(c.id));
       equipment = equipHit;
       unitNarrowed = true;
     }
+    // Defect 17: a unit that matched no stored address/door is reported, never silently dropped.
+    unitsMissing = units.filter((u) => !customers.some((c) => addressHasUnit(c.service_address, u)) && !equipment.some((e) => addressHasUnit(e.service_address, u)));
   }
   const entityIds = [...new Set([...customers.map((c) => c.id), ...equipment.map((e) => e.id)])];
-  return { customers, equipment, entityIds, addressPatterns: patterns, unitNarrowed };
+  return { customers, equipment, entityIds, addressPatterns: patterns, unitNarrowed, unitsMissing };
 }
 
 /** Scope for already-resolved customer rows (name lookups): their units and every id worth searching documents by. */

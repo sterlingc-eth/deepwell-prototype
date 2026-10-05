@@ -278,7 +278,7 @@ const ctxA = { tenantKey: 'org_r34_a', tenantName: 'org_r34_a' };
 
   const nul = await one({ filename: 'a\u0000b.pdf', sizeBytes: 100, contentType: 'application/pdf' });
   check('NUL filename no longer 500s; stored without the NUL', (await lite.query('select original_filename from documents where id=$1', [nul.documentId])).rows[0].original_filename === 'ab.pdf');
-  const rlo = await one({ filename: 'invoice_‮fdp.exe', sizeBytes: 100 });
+  const rlo = await one({ filename: 'invoice_‮fdp.pdf', sizeBytes: 100 });
   check('RLO stripped from the stored name', !/‮/.test((await lite.query('select original_filename from documents where id=$1', [rlo.documentId])).rows[0].original_filename));
   const longName = await one({ filename: 'x'.repeat(60000) + '.pdf', sizeBytes: 100 });
   check('60,000-char filename stored bounded', (await lite.query('select length(original_filename) n from documents where id=$1', [longName.documentId])).rows[0].n <= R2.MAX_FILENAME_CHARS);
@@ -295,7 +295,10 @@ const ctxA = { tenantKey: 'org_r34_a', tenantName: 'org_r34_a' };
   check('presign: sized PUT signs content-length (a longer PUT is refused by R2)', /content-length/i.test(new URL(bigU.uploadUrl).searchParams.get('X-Amz-SignedHeaders') ?? ''));
 
   // Original serving through the API.
-  const html = await one({ filename: 'x.pdf', sizeBytes: 5, contentType: 'text/html' });
+  // Office build: the request-time allow-list now refuses a .pdf declared text/html, so this legacy row (stored before the
+  // allow-list existed) is inserted directly: the serving rule is defence in depth and must still hold for any such row.
+  await throws('a .pdf declared text/html is refused at request time (415)', () => one({ filename: 'x.pdf', sizeBytes: 5, contentType: 'text/html' }), 415);
+  const html = { documentId: await RS.withTenant(ctxA, async (db) => (await db.createDocument({ original_filename: 'x.pdf', sha256_hash: rnd(), file_size_bytes: 5, content_type: 'text/html', storage_key: R2.objectKey(db.tenantId, rnd(), 'x.pdf') })).id) };
   const got = await UP.getOriginalUrl(authA, html.documentId);
   const gq = new URL(got.url).searchParams;
   check('GET of a stored text/html upload is forced to a download type', gq.get('response-content-type') === 'application/octet-stream' && /^attachment/.test(gq.get('response-content-disposition') ?? ''), `${gq.get('response-content-type')} ${gq.get('response-content-disposition')}`);
@@ -388,9 +391,13 @@ family = 'ingest/flow';
   };
   let modelCalls = 0;
   RD.__setAnthropicClientFactoryForTests(() => ({ messages: { create: async () => { modelCalls++; throw new Error('model must not be called'); } } }));
-  const put = async (bytes, { filename = 'f.pdf', contentType = 'application/pdf', declared = null } = {}) => {
+  const put = async (bytes, { filename = 'f.pdf', contentType = 'application/pdf', declared = null, direct = false } = {}) => {
     const sha = crypto.createHash('sha256').update(bytes).update(rnd()).digest('hex');
-    const r = await UP.createUploadUrl(authA, { filename, sha256: sha, contentType, sizeBytes: declared ?? Math.max(1, bytes.length) });
+    // Office build: `direct` inserts the row the way a pre-allow-list upload would have left it (the request-time allow-list now
+    // refuses a .tif / .exe at upload-url), so the READ-time refusal of such a stored file stays covered.
+    const r = direct
+      ? { documentId: await RS.withTenant(ctxA, async (db) => (await db.createDocument({ original_filename: filename, sha256_hash: sha, file_size_bytes: Math.max(1, bytes.length), content_type: contentType, storage_key: R2.objectKey(db.tenantId, sha, filename) })).id) }
+      : await UP.createUploadUrl(authA, { filename, sha256: sha, contentType, sizeBytes: declared ?? Math.max(1, bytes.length) });
     const [{ storage_key }] = (await lite.query('select storage_key from documents where id=$1', [r.documentId])).rows;
     store.set(storage_key, bytes);
     return { id: r.documentId, key: storage_key };
@@ -412,7 +419,7 @@ family = 'ingest/flow';
   check('the rejection is recorded on the document (visible in the Inbox)', /web page|program|empty|SVG/.test((await docRow(x.id)).error ?? ''), JSON.stringify(await docRow(x.id)));
   x = await ingest(Buffer.from('MZ\x90\x00\x03\x00\x00\x00\x04\x00\x00\x00\xff\xff\x00\x00\xb8\x00\x00\x00\x00\x00\x00\x00\x40\x00\x00\x00\x00\x00\x00\x00\x00\x01\x02\x03\x04'.repeat(4), 'latin1'), { filename: 'x.txt', contentType: 'text/plain' });
   check('binary declared text/plain: 415, not stored as page text', !x.ok && x.status === 415 && /not readable text/.test(x.message), `${x.status} ${x.message}`);
-  x = await ingest(Buffer.from('II*\x00' + 'x'.repeat(200), 'latin1'), { filename: 'scan.tif', contentType: 'image/tiff' });
+  x = await ingest(Buffer.from('II*\x00' + 'x'.repeat(200), 'latin1'), { filename: 'scan.tif', contentType: 'image/tiff', direct: true });
   check('TIFF: 415 with the convert-it message, no model call', !x.ok && x.status === 415 && /PDF, JPEG or PNG/.test(x.message) && modelCalls === 0, `${x.status} ${x.message}`);
 
   // Text-layer PDF never touches the model.

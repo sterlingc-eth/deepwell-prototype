@@ -362,12 +362,37 @@ async function fetchFieldRowsForResolution(db, resolution, fieldKey, teamScoped 
 
 /* ============================================================ intent handlers */
 
-async function fetchInstaller(db, resolution, teamScoped = false) {
-  const rows = await fetchFieldRowsForResolution(db, resolution, 'technician', teamScoped);
+/** Who installed: a startup sheet / work order first (existing rule), else an INVOICE whose work description says "Install ..." (Defect 6). */
+async function installerFromRows(db, rows) {
   // Team A (2026-09-24): "who installed it" is answered ONLY from a document that records an install (a startup sheet or a
   // work order). The old fallback to ANY technician on ANY document told owners a tech installed a unit he only serviced.
   const preferred = rows.filter((r) => r.document_type === 'work-order' || r.document_type === 'startup-sheet');
-  return pickBestExtraction(preferred);
+  if (preferred.length) return pickBestExtraction(preferred);
+  // Defect 6: no startup sheet / work order on file - an INVOICE whose work description says "Install ..." records the install and the technician who did it
+  // (never an invoice for some other work, never a service ticket).
+  const invoices = rows.filter((r) => r.document_type === 'invoice' && r.document_id);
+  if (!invoices.length) return null;
+  const { rows: work } = await db.raw(
+    `SELECT x.document_id FROM extractions x
+      WHERE x.document_id = ANY($1::uuid[]) AND x.field_key = 'work_performed' AND x.${TENANT_SQL} AND x.value ~* '\\minstall'`,
+    [[...new Set(invoices.map((r) => r.document_id))]]
+  );
+  const installDocs = new Set(work.map((w) => w.document_id));
+  return pickBestExtraction(invoices.filter((r) => installDocs.has(r.document_id)));
+}
+
+async function fetchInstaller(db, resolution, teamScoped = false) {
+  const rows = await fetchFieldRowsForResolution(db, resolution, 'technician', teamScoped);
+  const hit = await installerFromRows(db, rows);
+  if (hit || resolution.kind !== 'equipment' || !resolution.equipment.customer_id) return hit;
+  // A unit's own documents record no install: when the customer has exactly ONE unit, the customer's paperwork is that unit's paperwork.
+  const cid = resolution.equipment.customer_id;
+  const { rows: cnt } = await db.raw(`SELECT count(*)::int AS n FROM entities WHERE entity_type = 'equipment' AND merged_into IS NULL AND customer_id = $1 AND ${TENANT_SQL}`, [cid]);
+  if (Number(cnt[0]?.n) !== 1) return null;
+  const { rows: docs } = await db.raw(
+    `SELECT document_id FROM document_entity_links WHERE entity_id = $1 AND ${TENANT_SQL} UNION SELECT document_id FROM extractions WHERE entity_id = $1 AND ${TENANT_SQL}`, [cid]);
+  if (!docs.length) return null;
+  return installerFromRows(db, await fetchFieldRowsByDocumentIds(db, docs.map((d) => d.document_id), 'technician', teamScoped));
 }
 
 async function fetchLastServiceTech(db, resolution, teamScoped = false) {
@@ -562,7 +587,11 @@ async function runEquipmentAge(db, resolution, today, teamScoped = false) {
   const rows = await fetchFieldRowsForResolution(db, equipmentResolution, 'installation_date', teamScoped);
   const row = pickBestExtraction(rows);
   const label = subjectLabel(equipmentResolution);
-  return buildEquipmentAgeAnswer({ label, years, installIso, row });
+  // Defect 19: under two years old is stated in months ("7 months old"), never rounded down to "0 years old".
+  const [iy, im, id] = installIso.split('-').map(Number);
+  const [ty, tm, td] = t.split('-').map(Number);
+  const months = (ty - iy) * 12 + (tm - im) - (td < id ? 1 : 0);
+  return buildEquipmentAgeAnswer({ label, years, installIso, row, months });
 }
 
 /**

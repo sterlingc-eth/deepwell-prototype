@@ -21,7 +21,7 @@
  * a self-scheduled timer for each item's own backoff — see `wireAutoDrain`.
  */
 
-import { IngestHttpError, putFile, readDocument, requestUploadUrl } from '../../services/ingestClient'
+import { IngestHttpError, preflightUpload, putFile, readDocument, requestUploadUrl, sha256Hex } from '../../services/ingestClient'
 import { createMemoryStore, defaultQueueStore, type QueuedUpload, type QueueErrorClass, type QueueStore } from './queue'
 
 export type { QueuedUpload, QueueErrorClass } from './queue'
@@ -44,7 +44,14 @@ export interface UploadOutcome {
  * see api/upload-url.js) is IDENTICAL whether this is the first try or the
  * fifth: the same hash always resolves to the same document, never a new one.
  */
-export async function attemptUploadOnce(file: File, sha256: string, signal?: AbortSignal, expectedTenant?: string): Promise<UploadOutcome> {
+export async function attemptUploadOnce(original: File, originalSha256: string, signal?: AbortSignal, expectedTenant?: string): Promise<UploadOutcome> {
+  // Office build: every phone upload (live attempt, and a scan queued by an older app version) passes the allow-list; an iPhone HEIC
+  // is converted to JPEG first (new bytes, so a new hash) or refused with a plain message, never sent raw. A refusal is a
+  // 415, which classifyUploadError treats as permanent (retrying the same bytes changes nothing).
+  const pre = await preflightUpload(original)
+  if (!pre.ok) throw new IngestHttpError(pre.message, pre.status, null)
+  const file = pre.file
+  const sha256 = pre.converted ? await sha256Hex(file) : originalSha256
   const { documentId, uploadUrl, alreadyUploaded } = await requestUploadUrl(
     { filename: file.name, sha256, contentType: file.type || undefined, sizeBytes: file.size },
     signal,

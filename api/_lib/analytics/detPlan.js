@@ -341,6 +341,81 @@ function detectVendorPurchaseOrderCount(q) {
 }
 
 /**
+ * D4: "which maintenance agreements expire in 2026" / "how many agreements run through 2027" / "contracts ending in 2028" - the year names the END
+ * of the agreement's term (the last date of "Agreement Period: start - end"), a forward-looking record field that legitimately sits in the future.
+ * Without this the year became a service-date window on the agreement document (-> "No documents match that") or, for a future year, the generic
+ * "that's a future date, nothing on file" decline. Needs an agreement/contract noun, an END cue and at least one 4-digit year; a question about
+ * an EVENT in a future year ("agreements signed in 2029") has no end cue and is left to the future-date decline.
+ */
+const AGREEMENT_NOUN_RE = /\b(?:(?:maintenance|service|annual|hvac|pm)\s+(?:agreements?|contracts?|plans?)|agreements?|contracts?|memberships?)\b/i;
+const AGREEMENT_END_CUE_RE = /\b(?:expir\w*|ends?|ending|renew\w*|lapse\w*|(?:run|runs|running|good|valid|active|effective|in\s+effect|current|lasts?|lasting)\s+(?:through|thru|until|till|to)|in\s+force|(?:still\s+)?(?:active|valid|running)\s+(?:in|during|at|by)|(?:run|runs|running|extend\w*|go|goes|going|last\w*|stay\w*)\s+(?:past|beyond))\b/i;
+const AGREEMENT_EXCLUDE_RE = /\b(?:warrant(?:y|ies)|registered|registration|invoice[sd]?|paid|signed|started|began|begin)\b/i;
+
+function detectAgreementEnd(q) {
+  if (!AGREEMENT_NOUN_RE.test(q) || !AGREEMENT_END_CUE_RE.test(q) || AGREEMENT_EXCLUDE_RE.test(q)) return null;
+  const years = [...q.matchAll(/\b((?:19|20|21)\d{2})\b/g)].map((m) => Number(m[1]));
+  if (!years.length || years.length > 2) return null;
+  const filters = [{ field: 'documentType', op: 'eq', value: 'maintenance-agreement' }];
+  const lo = Math.min(...years); const hi = Math.max(...years);
+  const end = (op, y, md) => filters.push({ field: 'agreementEnd', op, value: `${y}-${md}` });
+  if (years.length === 2 && lo !== hi) {
+    if (!/\b(?:between|from)\b[\s\S]*\b(?:and|to|through|thru)\b|\b\d{4}\s*(?:-|–|to|through)\s*\d{4}\b/i.test(q)) return null;
+    end('gte', lo, '01-01'); end('lte', hi, '12-31');
+  } else {
+    const y = lo;
+    // "run through the end of 2026" / "still in force at the end of 2026": the "end" is the end of the YEAR, not an end-date cue, so it is taken out before
+    // the expire/end test; "through"/"until"/"at the end of" a year = still running on its last day (end date >= Dec 31); "active/in force IN 2027" = still
+    // running at some point in that year (end date >= Jan 1).
+    const qn = q.replace(/\bend\s+of\s+(?:the\s+)?(?:year\s+)?(?=\d{4})/gi, ' ');
+    const standaloneEnd = /\b(?:expir\w*|ends?|ending)\b/i.test(qn);
+    if (!standaloneEnd && /\b(?:run|runs|running|good|valid|active|effective|in\s+effect|in\s+force|current|lasts?|lasting)\s+(?:through|thru|until|till|to)\b|\b(?:through|thru|until|till)\s+(?:at\s+least\s+)?(?:the\s+)?(?:end\s+of\s+)?(?:year\s+)?\d{4}|\b(?:in\s+force|in\s+effect|active|valid|running)\s+(?:at|by)\s+(?:the\s+)?end\s+of\s+(?:the\s+)?(?:year\s+)?\d{4}/i.test(q)) end('gte', y, '12-31');
+    else if (!standaloneEnd && /\b(?:still\s+)?(?:in\s+force|in\s+effect|active|valid|running)\s+(?:in|during)\s+(?:the\s+year\s+)?\d{4}/i.test(q)) end('gte', y, '01-01');
+    else if (/\b(?:by|on\s+or\s+before|no\s+later\s+than)\s+(?:the\s+)?(?:end\s+of\s+)?(?:year\s+)?\d{4}/i.test(q)) end('lte', y, '12-31');
+    else if (/\bbefore\s+(?:the\s+)?(?:end\s+of\s+)?(?:year\s+)?\d{4}/i.test(q)) end('lt', y, '01-01');
+    else if (/\b(?:after|later\s+than|beyond|past)\s+(?:the\s+)?(?:end\s+of\s+)?(?:year\s+)?\d{4}/i.test(q)) end('gt', y, '12-31');
+    else { end('gte', y, '01-01'); end('lte', y, '12-31'); }
+  }
+  return { entity: 'documents', op: HOW_MANY_RE.test(q) ? 'count' : 'list', filters };
+}
+
+/**
+ * D8: "how many commercial permits do we have" / "which residential permits are in Chandler" / "permits issued by the City of Tucson" - a permit's
+ * scope (commercial vs residential, from its "Scope of Work" line) and issuing city are real conditions on a permit that no filter carried, so the
+ * count was every permit ("You have 27 documents"). Needs a permit noun and at least one of scope / city; a permit NUMBER, a state/county/zip, or both
+ * scopes in one question is not something this can apply, so the whole plan bails (the question goes to the next lane) instead of answering the
+ * broader question. Returns the plan, the BAIL sentinel, or null (no permit scope/city condition named at all - existing behaviour untouched).
+ */
+const OUT_OF_STATE_RE = /\bout[\s-]*of[\s-]*(?:the\s+)?state\b|\bnon[\s-]*(?:local|resident)\b|\boutside\s+(?:of\s+)?(?:the\s+)?state\b|\bnot\s+(?:in|from)\s+(?:the\s+)?(?:our\s+)?(?:home\s+)?state\b|\bother\s+states?\b|\b(?:another|an?\s+different|different|diff)\s+state\b/i;
+const PERMIT_BAIL = Symbol('permitBail');
+function detectPermitFilters(q) {
+  if (!/\bpermits?\b/i.test(q)) return null;
+  const hasCommercial = /\bcomm?ercial\b/i.test(q); const hasResidential = /\bresidential\b/i.test(q);
+  const found = detectedConditions(q);
+  const cityWanted = found.has('city');
+  // A permit prints no issue date: any year/month window on a permit question ("how many permits were issued in 2026") hands on, never a false "0 documents in 2026".
+  if (found.has('month') || /\b(?:19|20)\d{2}\b|\b(?:this|last)\s+(?:year|month|quarter)\b|\byear\s+to\s+date\b|\bytd\b/i.test(q)) {
+    if (!/\b(?:bp|pm|mp|pr)-?\d{3,}/i.test(q)) return PERMIT_BAIL;
+  }
+  if (!hasCommercial && !hasResidential && !cityWanted) return null;
+  // A question about CUSTOMERS with / without a permit ("which Tucson customers don't have a permit on file") is a customer list, not a permit count:
+  // with a scope word it cannot be applied here (bail); without one it is left to the existing customer paths.
+  if (/\b(?:customers?|clients?|accounts?|homeowners?|businesses|who)\b|\b(?:don'?t|doesn'?t|do\s+not|does\s+not|without|never|missing|lack\w*|haven'?t|hasn'?t|no|not)\b/i.test(q)) return hasCommercial || hasResidential ? PERMIT_BAIL : null;
+  if (/\b(?:bp|pm|mp|pr)-?\d{3,}/i.test(q) || (hasCommercial && hasResidential)) return PERMIT_BAIL;
+  if (found.has('county') || found.has('state') || found.has('zip') || found.has('brand') || found.has('money') || found.has('email') || found.has('phone') || found.has('warranty')) return PERMIT_BAIL;
+  // A permit prints no issue date, so a year/month/"this year" window cannot be applied to it: never answer "none on file" (the window zeroed the set) or the broader
+  // count as if the window were applied - hand on instead.
+  if (found.has('month') || /\b(?:19|20)\d{2}\b|\b(?:this|last)\s+(?:year|month|quarter)\b|\byear\s+to\s+date\b|\bytd\b/i.test(q)) return PERMIT_BAIL;
+  const filters = [{ field: 'documentType', op: 'eq', value: 'permit' }];
+  if (hasCommercial || hasResidential) filters.push({ field: 'permitScope', op: 'eq', value: hasCommercial ? 'commercial' : 'residential' });
+  if (cityWanted) {
+    const c = buildConditionOverrideFilter('city', q, 'documents');
+    if (!c || c.op !== 'eq') return PERMIT_BAIL;
+    filters.push({ field: 'permitCity', op: 'eq', value: c.value.toLowerCase() });
+  }
+  return { entity: 'documents', op: HOW_MANY_RE.test(q) ? 'count' : 'list', filters };
+}
+
+/**
  * R21 (M2, g103): "how many trane jobs have we done total" — a bare brand-only count of DOCUMENTS
  * linked to an equipment entity of that manufacturer (see routes/analytics.js's
  * queryDocumentsByEquipmentBrand for the exact join this oracle wants — no service_date/service-visit
@@ -941,7 +1016,9 @@ function mergeDetectedConditions(plan, q) {
  * that's impliedWarrantyStatus's own, non-time-windowed territory) so this never fires for a
  * question that named no real window at all.
  */
-const WARRANTY_EXPIRE_WORD_RE = /\bwarrant(?:y|ies)\b[\s\S]{0,20}\bexpir\w*\b|\bexpir\w*\b[\s\S]{0,20}\bwarrant(?:y|ies)\b/i;
+const WARRANTY_EXPIRE_WORD_RE = /\bwarrant(?:y|ies)\b[\s\S]{0,20}\b(?:expir\w*|ends?|ending|lapse\w*|runs?\s+out)\b|\b(?:expir\w*|ends?|ending|lapse\w*)\b[\s\S]{0,20}\bwarrant(?:y|ies)\b/i;
+// D4: "warranties that run through 2030" / "good until 2031" - the term runs to (at least) the end of that year.
+const WARRANTY_RUN_THROUGH_RE = /\bwarrant(?:y|ies)\b[\s\S]{0,40}\b(?:run|runs|running|good|valid|active|covered|last|lasts|lasting)\s+(?:through|thru|until|till|to)\s+(?:the\s+end\s+of\s+)?((?:19|20|21)\d{2})\b/i;
 
 // R21 (review fix): `today` was silently dropped here — every OTHER date-sensitive detector on the
 // same `dedicated` chain below (detectInstallYearRelative, detectInstallDateRelativeRange) already
@@ -951,6 +1028,8 @@ const WARRANTY_EXPIRE_WORD_RE = /\bwarrant(?:y|ies)\b[\s\S]{0,20}\bexpir\w*\b|\b
 // sync with a pinned `today` — exactly the confident-wrong-date failure this file exists to prevent
 // (routes/analytics.js passes its own `today` through to detectAnalyticsPlan for this very reason).
 function detectWarrantyExpiryWindow(q, today) {
+  const through = WARRANTY_RUN_THROUGH_RE.exec(q);
+  if (through) return { entity: 'equipment', op: opFromShape(q), filters: [{ field: 'warrantyExpires', op: 'gte', value: `${through[1]}-12-31` }] };
   if (!WARRANTY_EXPIRE_WORD_RE.test(q)) return null;
   const range = resolveAnyTimeRange(q, today);
   if (!range) return null;
@@ -1418,6 +1497,13 @@ function detectAnalyticsPlanInner(question, tenantVocab, today) {
     if (UNTRACKED_CONCEPT_DENY_RE.test(q)) return null;
 
     // ---- dedicated shapes, most specific first --------------------------
+    // D4: an agreement END year must be recognised before the cross-document ("customers with a maintenance agreement") and
+    // missing-field detectors, which would otherwise read "maintenance contracts ... 2031" as a customer count in that year.
+    const agreementEnd = detectAgreementEnd(q);
+    if (agreementEnd) return agreementEnd;
+    const permitFilters = detectPermitFilters(q);
+    if (permitFilters === PERMIT_BAIL) return null;
+    if (permitFilters) return permitFilters;
     const missingField = detectMissingFieldCondition(q);
     if (missingField) return missingField;
     const lockedDocType = detectLockedIntoDocType(q);
@@ -1478,6 +1564,13 @@ function detectAnalyticsPlanInner(question, tenantVocab, today) {
     const op = opFromShape(q);
     const { filters, unresolved } = buildSafetyNetFilters(q, entity);
     if (unresolved) return null;
+    // D9: "how many customers are out of state" names no state, so nothing built a filter and the count was every customer. "Out of state" is
+    // relative to the shop's home state, which only the executor can resolve from the customer list (routes/analytics.js, OUT_OF_STATE_HOME).
+    // Only the customer list is answered here; a units/documents/visits question would get a customer count, so that plan bails to the next lane instead.
+    if (OUT_OF_STATE_RE.test(q) && !filters.some((f) => f.field === 'state')) {
+      if (entity !== 'customers') return null;
+      filters.push({ field: 'state', op: 'neq', value: 'HOME' });
+    }
 
     // R18 P4 (C2, multi-hop AND-drop): captured BEFORE the entity is possibly forced to
     // 'customers' just below, and used for every equipment-level condition after that point —

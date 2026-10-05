@@ -22,6 +22,10 @@
 import { serializeClient, assertTenantUuid, isNonBlankId, explicitPgSsl } from './util/pgClient.js';
 import pg from 'pg';
 import { keyBelongsToTenant } from './r2.js';
+import { DOCX_CONTENT_TYPE, XLSX_CONTENT_TYPE } from './uploadTypes.js';
+import {
+  ESTIMATE_DOCX_FIXED_BYTES, ESTIMATE_DOCX_BYTES_PER_PAGE, ESTIMATE_XLSX_FIXED_BYTES, ESTIMATE_XLSX_BYTES_PER_PAGE, ESTIMATE_CSV_BYTES_PER_PAGE, ESTIMATE_DOCX_MAX_PAGES, ESTIMATE_SHEET_MAX_PAGES,
+} from './office/limits.js';
 import { staffImportWindowFor, noteDatabaseClock } from './staffImport.js';
 import {
   customerMatchScore, CUSTOMER_MATCH_THRESHOLD, normalizeSurname, normalizeAddressKey, normalizeUnitKey,
@@ -309,6 +313,35 @@ export async function getTenantContext(tenantKey, tenantName) {
 export function bustTenantCache(tenantKeyOrUuid) {
   bustTenantCaches(tenantKeyOrUuid, uuidToTenantKey);
 }
+
+/**
+ * H-4: has M3-config/67 (page_usage_monthly + its read helpers) been run? Same migration-tolerance contract as
+ * financialsTableExists: to_regclass()/to_regproc() are catalogue reads that cannot abort the transaction (a failed SELECT
+ * would), a positive answer is remembered for the life of the warm instance, a negative one is re-checked every 20 s so
+ * pasting the migration takes effect without a redeploy. A transient failure is never remembered and means "not ready" (the
+ * live count is used, exactly as before the migration).
+ * @param {(sql: string, params?: any[]) => Promise<{rows: any[]}>} q
+ */
+let pageCounterKnown = null; // true | {falseUntil: number}
+const PAGE_COUNTER_NEGATIVE_TTL_MS = 20_000;
+export async function pageCounterReady(q) {
+  if (pageCounterKnown === true) return true;
+  if (pageCounterKnown && pageCounterKnown.falseUntil > Date.now()) return false;
+  try {
+    const r = await q(
+      `SELECT (to_regclass('public.page_usage_monthly') IS NOT NULL
+               AND to_regprocedure('public.page_usage_current_month()') IS NOT NULL
+               AND to_regprocedure('public.page_usage_months(date,date)') IS NOT NULL) AS ok`, []
+    );
+    const ok = r.rows?.[0]?.ok === true;
+    pageCounterKnown = ok ? true : { falseUntil: Date.now() + PAGE_COUNTER_NEGATIVE_TTL_MS };
+    return ok;
+  } catch {
+    return false;
+  }
+}
+/** Test-only: forget what pageCounterReady learned. */
+export function _resetPageCounterProbe() { pageCounterKnown = null; }
 
 /** Test-only: clear the tenant context cache between fixtures. */
 export function _resetTenantContextCache() {
@@ -2046,21 +2079,40 @@ function makeStore(db, tenantId) {
     // may be passed when the caller already holds the tenant row (the upload gate does, so it costs nothing extra there);
     // `undefined` = look the company's own window up here (one primary-key read); null = exclude nothing. Still one index
     // range count for the pages themselves.
+    // H-4: the page meter cannot be reset by deleting documents. M3-config/67 keeps a monthly tally (page_usage_monthly) that
+    // only ever goes up (a trigger on document_pages adds each really-inserted page; staff-import pages are skipped by the same
+    // rule as the live count). The number shown and enforced everywhere is GREATEST(this UTC month's tally, the live count
+    // below): deleting lowers only the live part; if the tally is behind (migration just run, or pages written by older code)
+    // the live part backstops it; and with the migration not run (probe says no table) it is exactly the live count as before.
+    // The tally is for the CURRENT month, so it is used only when the caller's window reaches back to the 1st (callers pass
+    // "now minus 30 days", which the month floor below clamps to the 1st).
     countPagesSince: async (sinceIso, excludeWindow = undefined) => {
       if (excludeWindow === undefined) {
         const t = await one(`SELECT limits -> 'staffImport' AS si FROM tenants WHERE id = (current_setting('app.tenant_id', true))::uuid`, []);
         excludeWindow = staffImportWindowFor({ limits: { staffImport: t?.si } });
       }
-      const r = await one(
+      const live =
         // No join to documents: document_pages carries its own tenant_id (RLS filters on it), and with
         // M3-config/63-page-count-index.sql this is an index range count (240k pages: 421 ms -> 4 ms). It runs on every
         // upload gate and every bootstrap, so it must not grow with the shop's whole history.
         `SELECT count(*)::int AS n FROM document_pages dp
           WHERE ${TENANT.replace('tenant_id', 'dp.tenant_id')}
             AND dp.created_at >= GREATEST($1::timestamptz, date_trunc('month', NOW() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')
-            AND ($2::timestamptz IS NULL OR dp.created_at < $2::timestamptz OR dp.created_at >= $3::timestamptz)`,
-        [sinceIso, excludeWindow?.from ?? null, excludeWindow?.to ?? null]
-      );
+            AND ($2::timestamptz IS NULL OR dp.created_at < $2::timestamptz OR dp.created_at >= $3::timestamptz)`;
+      const params = [sinceIso, excludeWindow?.from ?? null, excludeWindow?.to ?? null];
+      if (await pageCounterReady((sql, p) => db.query(sql, p))) {
+        // page_usage_current_month() answers 0 (never an error) if the table vanished behind a warm probe.
+        const r = await one(
+          `SELECT GREATEST(
+                    (${live}),
+                    CASE WHEN $1::timestamptz <= (date_trunc('month', NOW() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')
+                         THEN page_usage_current_month() ELSE 0 END
+                  )::bigint AS n`,
+          params
+        );
+        return Number(r?.n) || 0;
+      }
+      const r = await one(live, params);
       return r?.n ?? 0;
     },
     // R43: pages read between two instants (the staff import window), for the import page budget. Index range count.
@@ -2083,6 +2135,10 @@ function makeStore(db, tenantId) {
         `SELECT COALESCE(SUM(CASE
                   WHEN d.content_type ILIKE 'image/%' THEN 1
                   WHEN d.content_type ILIKE 'application/pdf' THEN GREATEST(1, LEAST(200, CEIL(COALESCE(d.file_size_bytes, 0) / 204800.0)))
+                  -- Office build: Word / Excel / CSV by the same rule as plan.js estimatePagesForUpload (constants from office/limits.js)
+                  WHEN d.content_type = '${DOCX_CONTENT_TYPE}' THEN GREATEST(1, LEAST(${ESTIMATE_DOCX_MAX_PAGES}, CEIL(GREATEST(0, COALESCE(d.file_size_bytes, 0) - ${ESTIMATE_DOCX_FIXED_BYTES}) / ${ESTIMATE_DOCX_BYTES_PER_PAGE}.0)))
+                  WHEN d.content_type = '${XLSX_CONTENT_TYPE}' THEN GREATEST(1, LEAST(${ESTIMATE_SHEET_MAX_PAGES}, CEIL(GREATEST(0, COALESCE(d.file_size_bytes, 0) - ${ESTIMATE_XLSX_FIXED_BYTES}) / ${ESTIMATE_XLSX_BYTES_PER_PAGE}.0)))
+                  WHEN d.content_type IN ('text/csv', 'text/tab-separated-values') THEN GREATEST(1, LEAST(${ESTIMATE_SHEET_MAX_PAGES}, CEIL(COALESCE(d.file_size_bytes, 0) / ${ESTIMATE_CSV_BYTES_PER_PAGE}.0)))
                   ELSE GREATEST(1, LEAST(200, CEIL(COALESCE(d.file_size_bytes, 0) / 6000.0)))
                 END), 0)::int AS n
            FROM documents d
@@ -2387,6 +2443,12 @@ function makeStore(db, tenantId) {
       return r?.has === true;
     },
 
+    // One page's text (the cited page/sheet chunk of a Word/Excel/CSV file shown in the app). Tenant-scoped like every read here.
+    getPage: (documentId, pageNo) => one(
+      `SELECT page_no, text FROM document_pages WHERE document_id = $1 AND page_no = $2 AND ${TENANT}`,
+      [documentId, pageNo]
+    ),
+
     listPages: (documentId) => many(
       `SELECT id, page_no, text, r2_path FROM document_pages
         WHERE document_id = $1 AND ${TENANT} ORDER BY page_no`, [documentId]
@@ -2560,7 +2622,11 @@ function makeStore(db, tenantId) {
       // `.sort(...).slice(0, limit)`; otherwise fuse in the vector hits (RRF), identifiers pinned.
       return finishHybrid(db, sem, {
         tenantId, question, limit, documentIds, identifierPageIds,
-        keywordRows: [...rows.values()].sort((a, b) => b.rank - a.rank),
+        // Pages an identifier/serial token matched come FIRST even when full-text found them with a lower rank (hybrid.js
+        // pins them the same way once the semantic step runs; without it a part number / ticket number in a long sheet lost
+        // to pages that merely repeat the question's common words).
+        keywordRows: [...rows.values()].sort((a, b) =>
+          (identifierPageIds.has(b.id) ? 1 : 0) - (identifierPageIds.has(a.id) ? 1 : 0) || b.rank - a.rank),
       });
     },
 

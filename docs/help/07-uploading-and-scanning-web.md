@@ -3,7 +3,7 @@ id: uploading-and-scanning-web
 title: Uploading and scanning on the web app
 audience: app
 surface: desktop
-keywords: upload, scan, inbox, files, pdf, photos, ingest, import, bulk upload, zip, drag and drop, file types, file size
+keywords: upload, scan, inbox, files, pdf, photos, word, excel, docx, xlsx, csv, heic, ingest, import, bulk upload, zip, drag and drop, file types, file size
 updated: 2026-09-29
 ---
 Records go in through the Inbox in the web app, or through Scan in the phone app. Nothing has to be renamed or filed first.
@@ -16,11 +16,11 @@ Open **Inbox**, stay on the **Add files** tab and press **Add files** (top right
 ### What file types can I upload?
 ~ file types, file formats, supported formats, supported file types, pdf, jpg, png, tiff, csv, zip, word, excel, docx, xlsx, heic, what can i upload, allowed files, unsupported file, what image formats, image formats, what formats do you accept, formats accepted, what image formats do you accept, accepted formats, which formats, photo formats, zip, folder, drag a folder, skipped files, skipped, why were files skipped, cancel upload, stop an upload, bulk import files, hidden files, cancel an upload in progress, stop an upload in progress
 !covers:A-UPLOAD-BULK
-On the desktop **Inbox → Add files → Bulk import** takes **Choose files or a .zip**, or drag a .zip or folder in. Accepted: .zip .pdf .jpg .jpeg .png .webp .tiff .tif .txt .csv. It skips folders, hidden files, macOS archive metadata, empty files, unsupported types and files that are too large, and shows counts like "12 files · 9 uploaded · 3 skipped". **Cancel** stops a run. Word and Excel files aren't accepted; save them as PDF first.
+On the desktop **Inbox → Add files → Bulk import** takes **Choose files or a .zip**, or drag a .zip or folder in. Accepted: .zip .pdf .jpg .jpeg .png .gif .webp .txt .md .csv .tsv .json .docx .xlsx (iPhone .heic/.heif photos are converted to JPEG automatically in Safari). It skips folders, hidden files, macOS archive metadata, empty files, unsupported types and files that are too large, and shows counts like "12 files · 9 uploaded · 3 skipped". A .zip inside a .zip is not opened, and a .zip that expands to far more than it should is refused. **Cancel** stops a run. Old Word and Excel files (.doc, .xls), files with macros (.docm, .xlsm, .xlsb) and password-protected files are not read: open them and Save As .docx or .xlsx (or PDF) first.
 
 ### Which file types can I upload, and is there a size limit?
 ~ file types, file formats, supported formats, supported file types, pdf, jpg, png, tiff, csv, zip, word, excel, docx, xlsx, heic, what can i upload, allowed files, unsupported file, what image formats, image formats, what formats do you accept, formats accepted, what image formats do you accept, accepted formats, which formats, photo formats, file size, size limit, max size, maximum file size, too big, too large, how big can a file be, can i upload pdf, can i upload photos, can i upload a zip, upload limit, does it accept
-DeepWell works on paper, PDFs, spreadsheets and photos: invoices, warranty cards, nameplate photos, startup sheets, permits, dispatch notes, work orders and service tickets. Nothing has to be renamed or filed first, and it reads handwriting, carbon copies and low-quality scans. The website doesn't publish a list of file formats or a size limit, so if you have an unusual format or very large files, I can pass the question to the team.
+DeepWell reads PDFs, photos (JPEG, PNG, GIF, WebP), Word (.docx) and Excel (.xlsx) files, CSV and plain text. Old Word and Excel files (.doc, .xls), files with macros and password-protected files are not read: re-save them as .docx or .xlsx (or PDF). iPhone photos are converted to JPEG automatically in Safari; in another browser, set the iPhone camera to Most Compatible. Nothing has to be renamed or filed first, and it reads handwriting, carbon copies and low-quality scans. For an unusual format or very large files, I can pass the question to the team.
 !handoff:file-types
 !audience:public-only
 !source:index.html
@@ -28,7 +28,15 @@ DeepWell works on paper, PDFs, spreadsheets and photos: invoices, warranty cards
 ### Is there a file size limit?
 ~ file size, size limit, max size, maximum file size, too big, too large, file too large, upload limit, how big can a file be, megabytes, mb limit, 50 files, how many files at once, daily upload limit, upload limit reached, todays upload limit, 24 mb, 20 mb, biggest file i can upload, whats the biggest file, largest file, how many files can i upload at once, files per upload, how many files at a time
 !covers:A-UPLOAD-LIMITS
-PDFs and photos must be under 24 MB, text and CSV files under 20 MB, and 100 MB is the hard ceiling. Up to 50 files go in per upload request (bulk import sends them in groups). Your plan also has a monthly page allowance and there is a daily upload limit that resets at UTC midnight. For a bigger PDF, split it into smaller files first.
+PDFs and photos must be under 24 MB, text, CSV, Word and Excel files under 20 MB, and 100 MB is the hard ceiling. Up to 50 files go in per upload request (bulk import sends them in groups). Your plan also has a monthly page allowance and there is a daily upload limit that resets at UTC midnight. For a bigger PDF, split it into smaller files first.
+
+### Why wasn't my Word or Excel file read?
+~ word file not read, excel file not read, docx not read, xlsx not read, doc file, xls file, old word file, old excel file, macro file, docm, xlsm, xlsb, password protected, password-protected word, password protected excel, encrypted excel, encrypted word, cant read word, cant read excel, word not accepted, excel not accepted, save as docx, save as xlsx, scanned images in word, pictures in word, charts in excel, formulas, what does donovan read in word, what does donovan read in excel, tracked changes
+DeepWell reads Word (.docx) and Excel (.xlsx) files: the text and tables of a Word file and every sheet of an Excel file. Formulas show the value that was last saved in the file. Pictures inside a Word file (including a scanned page pasted in as an image), and charts or pictures in a spreadsheet, are not read, so save or scan that page as a PDF or photo instead. Old .doc and .xls files, files that can contain macros (.docm, .xlsm, .xlsb) and password-protected files are not read: open the file, use Save As to make a plain .docx or .xlsx (remove the password first), then upload that copy. A file renamed to .docx that isn't really a Word file is refused.
+
+### What happens to iPhone photos?
+~ iphone photos, heic, heif, iphone photo format, high efficiency, most compatible, photo wont upload iphone, iphone photo error, heic not supported, convert heic, camera format, ios photos, iphone pictures
+An iPhone saves photos as HEIC by default. DeepWell converts them to JPEG automatically, on the device, in Safari on iPhone and iPad (and Safari on a Mac), then uploads the JPEG. Other browsers often can't open HEIC; if you see a message saying the photo can't be converted, set the iPhone camera to Settings > Camera > Formats > Most Compatible, or share or export the photo as a JPEG, and add it again. DeepWell never receives the raw HEIC file.
 
 ### How long until an upload is searchable?
 ~ how long, how long does it take, processing time, how fast, searchable, ready to search, wait time, when will it be ready, turnaround, how quickly, upload speed, how soon, progress, status pill, processing n of m, uploaded sorted read matched checked, where do i see progress, watch progress, is it done, checking uploading reading queued, how do i know when my upload is finished, upload finished, is my upload done, when is my upload done, upload complete, finished uploading, how do i know its done

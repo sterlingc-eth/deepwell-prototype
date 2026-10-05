@@ -296,6 +296,13 @@ export function uploadExpirySeconds(sizeBytes) {
 
 const SAFE_INLINE_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'text/plain', 'text/csv']);
 const EXT_TYPES = { pdf: 'application/pdf', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', txt: 'text/plain', csv: 'text/csv' };
+// Word / Excel originals: served with their real content type but ALWAYS as a download (a browser has no inline viewer for
+// them, and an Office file must never be rendered in-page). The type is forced from the extension or the declared type.
+const DOWNLOAD_ONLY_TYPES = {
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+};
+const DOWNLOAD_ONLY_BY_TYPE = new Map(Object.entries(DOWNLOAD_ONLY_TYPES).map(([e, t]) => [t, e]));
 
 /**
  * Pure: how a presigned GET of a stored original is served. R2 serves an object with whatever Content-Type the uploader's PUT
@@ -312,6 +319,10 @@ export function originalServing(filename, declaredType) {
   const utf8 = encodeURIComponent(clean).replace(/['()*]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase());
   const ext = clean.includes('.') ? clean.split('.').pop().toLowerCase() : '';
   const declared = normalizeContentType(declaredType);
+  const officeType = (declared && DOWNLOAD_ONLY_BY_TYPE.has(declared) ? declared : null) ?? DOWNLOAD_ONLY_TYPES[ext] ?? null;
+  if (officeType && (!declared || declared === officeType || ['application/octet-stream', 'application/zip', 'application/x-zip-compressed'].includes(declared))) {
+    return { contentType: officeType, disposition: `attachment; filename="${ascii}"; filename*=UTF-8''${utf8}` };
+  }
   const type = declared && SAFE_INLINE_TYPES.has(declared) ? declared : (!declared && EXT_TYPES[ext]) || null;
   return {
     contentType: type ?? 'application/octet-stream',

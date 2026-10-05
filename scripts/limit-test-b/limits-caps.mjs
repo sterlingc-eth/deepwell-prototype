@@ -31,15 +31,20 @@ setFamily('size');
   await t('pdf at cap (25,165,824 B = 24 MiB)', file({ filename: 'a.pdf', contentType: 'application/pdf', sizeBytes: PDF }), 200);
   await t('pdf cap+1', file({ filename: 'a.pdf', contentType: 'application/pdf', sizeBytes: PDF + 1 }), 413, /PDFs and photos have to be under 24 MB to be read/);
   for (const ct of ['image/jpeg', 'image/png', 'image/webp', 'image/gif']) {
-    await t(`${ct} at cap`, file({ filename: 'p.jpg', contentType: ct, sizeBytes: PDF }), 200);
-    await t(`${ct} cap+1`, file({ filename: 'p.jpg', contentType: ct, sizeBytes: PDF + 1 }), 413, /under 24 MB/);
+    // Office build: the declared type must match the extension (a .jpg declared image/png is a mislabel and is refused), so the name follows the type.
+    const pn = `p.${ct === 'image/jpeg' ? 'jpg' : ct.split('/')[1]}`;
+    await t(`${ct} at cap`, file({ filename: pn, contentType: ct, sizeBytes: PDF }), 200);
+    await t(`${ct} cap+1`, file({ filename: pn, contentType: ct, sizeBytes: PDF + 1 }), 413, /under 24 MB/);
   }
   await t('PDF with uppercase + charset parameter cap+1 (normalised)', file({ filename: 'b.pdf', contentType: 'Application/PDF; charset=binary', sizeBytes: PDF + 1 }), 413);
   await t('text/csv at cap (20 MiB)', file({ filename: 'a.csv', contentType: 'text/csv', sizeBytes: TXT }), 200);
   await t('text/csv cap+1', file({ filename: 'a.csv', contentType: 'text/csv', sizeBytes: TXT + 1 }), 413, /Text and spreadsheet files have to be under 20 MB/);
   await t('application/json cap+1', file({ filename: 'a.json', contentType: 'application/json', sizeBytes: TXT + 1 }), 413);
-  await t('hard ceiling: 104,857,600 B (100 MiB) other type', file({ filename: 'a.bin', contentType: 'application/octet-stream', sizeBytes: MAX }), 200);
-  await t('hard ceiling +1', file({ filename: 'a.bin', contentType: 'application/octet-stream', sizeBytes: MAX + 1 }), 413, /File is larger than 100 MB/);
+  // Office build: every accepted kind now has a cap at or under 24 MiB, so the 100 MiB ceiling is only the message for anything larger and
+  // a no-extension / unlisted-type file is refused outright (415) instead of being accepted up to 100 MiB.
+  await t('hard ceiling: 104,857,600 B (100 MiB) is over the PDF cap -> 413', file({ filename: 'a.pdf', contentType: 'application/octet-stream', sizeBytes: MAX }), 413, /under 24 MB/);
+  await t('hard ceiling +1', file({ filename: 'a.pdf', contentType: 'application/octet-stream', sizeBytes: MAX + 1 }), 413, /File is larger than 100 MB/);
+  await t('an unlisted type (a.bin, 1 MiB) is refused 415, not accepted up to 100 MiB', file({ filename: 'a.bin', contentType: 'application/octet-stream', sizeBytes: SIZE.MiB }), 415, /not accepted/);
   await t('size missing', { filename: 'a.pdf', sha256: sha(), contentType: 'application/pdf' }, 400, /sizeBytes is required/);
   await t('size 0', file({ sizeBytes: 0 }), 400, /This file is empty \(0 bytes\)/);
   for (const bad of [-1, 1.5, '100', NaN, null, Infinity, 2 ** 60]) await t(`size ${JSON.stringify(bad)}`, file({ sizeBytes: bad }), bad === null ? 400 : bad === 2 ** 60 ? 400 : 400);

@@ -1,4 +1,5 @@
 import { authHeader } from './authToken';
+import { HEIC_CANNOT_CONVERT_MESSAGE, isHeicFile } from './imageConvert';
 
 /**
  * Read an equipment nameplate from a photo.
@@ -39,23 +40,6 @@ const MAX_EDGE = 1600;
 
 /** The route caps at 8MB of base64-decoded bytes; stay well under it. */
 const JPEG_QUALITY = 0.85;
-
-/**
- * True when the bytes are HEIC/HEIF, whatever the file claims to be.
- *
- * An iPhone set to "High Efficiency" hands HEIC to a file input in some iOS
- * versions and JPEG in others, and the `type` property is not reliable either
- * way. The server sniffs the same signature and refuses HEIC with a message
- * telling the technician to go and change a camera setting — which is a
- * terrible thing to read while standing on a roof. Detecting it here means we
- * can convert instead of refusing.
- */
-async function isHeic(file: File): Promise<boolean> {
-  const head = new Uint8Array(await file.slice(0, 12).arrayBuffer());
-  if (head.length < 12) return false;
-  const brand = String.fromCharCode(...head.subarray(4, 12));
-  return brand.startsWith('ftyp') && /heic|heix|heim|heis|hevc|hevx|mif1|msf1/.test(brand.slice(4));
-}
 
 /**
  * Normalize a captured photo into a JPEG the API will accept.
@@ -102,16 +86,13 @@ async function toBase64(blob: Blob): Promise<string> {
  * holding a phone, not by a developer reading a log.
  */
 export async function readPlate(file: File): Promise<PlateRead> {
-  if (await isHeic(file)) {
-    // createImageBitmap decodes HEIC on iOS (where the photos come from) and
-    // not on most desktops. Attempting it is right: on the device that produces
-    // HEIC, it works.
+  if (await isHeicFile(file)) {
+    // createImageBitmap decodes HEIC on iOS (where the photos come from) and not on most desktops. Attempting it is right:
+    // on the device that produces HEIC, it works. Detection and the message are the shared ones (imageConvert.ts).
     try {
       await createImageBitmap(file);
     } catch {
-      throw new Error(
-        "This photo is in a format we can't read. Take the photo again from inside DeepWell, or send it as a JPEG."
-      );
+      throw new Error(HEIC_CANNOT_CONVERT_MESSAGE);
     }
   }
 

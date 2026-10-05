@@ -241,6 +241,8 @@ export async function planAnalyticsQuestion(question, { today, overlay, tenantVo
     // see that function's own doc comment for why the model's date math is
     // not trusted by default, and when it is trusted anyway.
     let input = base ? { ...base, timeRange: reconcileTimeRange(base.timeRange, question, today) } : base;
+    // D4: the year in "which agreements expire in 2026" is the END year (agreementEnd), never a service-date window on the document.
+    if (input?.filters?.some((f) => f?.field === 'agreementEnd')) input = { ...input, timeRange: undefined };
     // R32: a typed visit filter is only trustworthy on a plain count/existence question; a negated or "which/who/each" question
     // is a different relation (which technicians NEVER logged a PM visit) that a positive typed count would answer wrongly.
     if (input?.entity === 'serviceVisits' && input.filters?.some((f) => f.field === 'hasServiceType' || f.field === 'lacksServiceType')
@@ -299,6 +301,58 @@ function pgBool(v) {
 // filter needs, computed once here rather than four times inline below.
 function present(v) {
   return v != null && String(v).trim() !== '';
+}
+
+/** The END date (YYYY-MM-DD) of an agreement term string - the last date printed in it ("01/01/2025 - 12/31/2026" -> 2026-12-31). A term that only
+ *  prints years ("2025 - 2026") ends on 12/31 of the last year; null when no date or year is printed. */
+function agreementEndOf(term) {
+  const t = String(term ?? '');
+  const dates = [];
+  for (const m of t.matchAll(/\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/g)) dates.push({ i: m.index, iso: `${m[3]}-${String(m[1]).padStart(2, '0')}-${String(m[2]).padStart(2, '0')}` });
+  for (const m of t.matchAll(/\b(\d{4})-(\d{2})-(\d{2})\b/g)) dates.push({ i: m.index, iso: m[0] });
+  if (dates.length) return dates.sort((a, b) => a.i - b.i)[dates.length - 1].iso;
+  const years = t.match(/\b(?:19|20|21)\d{2}\b/g);
+  return years?.length ? `${years[years.length - 1]}-12-31` : null;
+}
+
+/** D14: unit fields that are only filled in for some units (nameplate / startup-sheet / registration data) - filter field, entity data key, plain label. */
+const PARTIAL_UNIT_FIELDS = [
+  { filter: 'tonnage', key: 'tonnage', label: 'tonnage' },
+  { filter: 'refrigerant', key: 'refrigerant', label: 'refrigerant' },
+];
+
+/** D9: the filter value detPlan.js uses for "out of state" - resolved to the shop's home state at execution time (see resolveHomeState). */
+const OUT_OF_STATE_HOME = 'HOME';
+
+/** The state most customers are in (ties broken alphabetically), with how many of the customers that carry a state it covers; null when none has one. */
+async function resolveHomeState(db) {
+  const { rows } = await db.raw(
+    `SELECT data->>'service_address' AS service_address FROM entities
+      WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT_SQL}`,
+    []
+  );
+  const counts = new Map();
+  let total = 0;
+  for (const r of rows) {
+    const st = deriveGeo(r.service_address).state;
+    if (!st) continue;
+    total += 1;
+    counts.set(st, (counts.get(st) ?? 0) + 1);
+  }
+  if (!counts.size) return null;
+  const [state, count] = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
+  return { state, count, total };
+}
+
+/** D8: what a permit's own text says - its "Scope of Work" line (commercial vs residential), the city on its "CITY OF X" header and its number. */
+function permitFactsOf(text) {
+  const t = String(text ?? '');
+  const scopeLine = /scope of work:\s*([^\n]*)/i.exec(t)?.[1]?.trim() ?? null;
+  const basis = scopeLine ?? t;
+  const scope = /\bcommercial\b|\brtu\b|\brooftop\b/i.test(basis) ? 'commercial' : /\bresidential\b|single[- ]family|\bhome\b|\bhouse\b/i.test(basis) ? 'residential' : null;
+  const city = /\bcity of\s+([a-z][a-z .'-]*?)\s*,/i.exec(t)?.[1]?.trim().toLowerCase() ?? null;
+  const number = /permit\s*(?:no\.?|number|#)\s*:?\s*([a-z0-9-]+)/i.exec(t)?.[1] ?? null;
+  return { scope, city, number, scopeLine };
 }
 
 function shapeCustomerRow(r) {
@@ -478,6 +532,11 @@ function shapeDocumentRow(r, dateBasis) {
     hasCustomerLink: pgBool(r.has_customer_link),
     // R20 (J3, i020/i021): the vendor_name extraction — see buildAnalyticsSQL's documents branch.
     vendor: r.vendor ?? null,
+    // D4: the agreement's own term ("01/01/2025 - 12/31/2026") and its END year (the last year printed in it); only selected for an end-year question.
+    ...(r.permit_text != null ? (() => { const pf = permitFactsOf(r.permit_text); return { permitScope: pf.scope, permitCity: pf.city, permitNumber: pf.number, permitScopeText: pf.scopeLine }; })() : {}),
+    agreementTerm: r.agreement_term ?? null,
+    agreementEnd: agreementEndOf(r.agreement_term),
+    customerName: r.agreement_customer ?? null,
   };
 }
 
@@ -515,7 +574,7 @@ const ENTITY_SUPPORTED_FIELDS = {
   warranties: new Set(['state', 'county', 'city', 'zip', 'brand', 'model', 'equipmentType', 'warrantyStatus', 'warrantyExpires']),
   // R21 (M2, g103): 'linkedEquipmentBrand' — see queryDocumentsByEquipmentBrand's own doc comment
   // for why this needs its own dedicated join query rather than a plain column filter.
-  documents: new Set(['documentType', 'hasServiceDate', 'hasCustomerLink', 'vendor', 'linkedEquipmentBrand']),
+  documents: new Set(['documentType', 'hasServiceDate', 'hasCustomerLink', 'vendor', 'linkedEquipmentBrand', 'agreementEnd', 'permitScope', 'permitCity']),
   // R21 (L3): 'hasServiceType' — a visit's OWN service_type (see buildAnalyticsSQL's serviceVisits
   // branch, analytics.js, and the row-merge just above where it is set) — was missing here, so
   // "how many repair visits have we logged" always failed this whitelist and fell straight to
@@ -1526,6 +1585,7 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel, au
       // eq (analytics.js) — the two never collide since a plan's entity picks which path runs.
       brand: r.manufacturer ?? null,
       hasServiceType: r.service_type ?? null,
+      documentType: r.document_type ?? null, // D20: lets the count say what kind of document each "visit" is
       month: /^\d{4}-\d{2}/.test(r.value ?? '') ? r.value.slice(0, 7) : null,
     }));
     // buildAnalyticsSQL's own query is `ORDER BY x.value DESC`, so the first
@@ -1604,7 +1664,18 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel, au
         (f) => !DOC_TYPE_FILTER_FIELDS.includes(f.field) && !SERVICE_TYPE_FILTER_FIELDS.includes(f.field) && f.field !== 'linkedEquipmentBrand'
       )
     : plan.filters;
-  const filtered = applyEntityFilters(rows, filtersToApply);
+  // D9: "out of state" = not in the shop's home state (the state most customers are in) - resolved against the live customer list, never
+  // guessed; a customer whose state is unknown is not "out of state" either.
+  let homeState = null;
+  let filtersResolved = filtersToApply;
+  if ((filtersToApply ?? []).some((f) => f.field === 'state' && f.value === OUT_OF_STATE_HOME)) {
+    const homeInfo = await resolveHomeState(db);
+    if (!homeInfo) return null; // no customer states on file to take a home state from - never guess
+    homeState = homeInfo;
+    filtersResolved = filtersToApply.map((f) => (f.field === 'state' && f.value === OUT_OF_STATE_HOME ? { ...f, value: homeInfo.state } : f));
+    rows = rows.filter((r) => r.state);
+  }
+  const filtered = applyEntityFilters(rows, filtersResolved);
   const total = filtered.length;
 
   let groups = [];
@@ -1664,7 +1735,7 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel, au
   }
 
   // TEAM C: records + basis from the SAME `filtered` rows (and the same group keys) the answer counts.
-  return withAnalyticsCitations(formatAnalyticsAnswer(plan, {
+  const answered = withAnalyticsCitations(formatAnalyticsAnswer(plan, {
     total, groups, rows: filtered, sum, unfilteredTotal, broaderGroups, mostRecentServiceVisit, timeRangeLabel,
     unitCount, futureVisitCount,
   }), plan, {
@@ -1672,6 +1743,64 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel, au
     unfilteredRows: total === 0 ? rows : null, timeRangeLabel, monthLabel: timeRangeLabel ? null : monthRangeLabel(plan.timeRange),
     futureVisitCount, // TEAM C: future-dated visits are mentioned in the basis, never cited as records
   });
+  // D14: a count by tonnage / refrigerant only sees the units that HAVE that field; the rest (about half the units in a typical file) are neither
+  // counted nor ruled out, so the number is never presented as the whole answer - say how many units have no value on file.
+  if (answered && typeof answered.text === 'string' && plan.op !== 'groupBy' && (plan.entity === 'equipment' || plan.entity === 'customers' || plan.entity === 'warranties')) {
+    const partialFields = PARTIAL_UNIT_FIELDS.filter((pf) => (plan.filters ?? []).some((f) => f.field === pf.filter));
+    if (partialFields.length) {
+      const notes = [];
+      // Single partial field on a plain unit count: complete it from the invoice / startup-sheet text that names the unit's serial.
+      const only = partialFields.length === 1 && plan.op === 'count' && plan.entity === 'equipment'
+        && !plan.timeRange // a date window is a second condition the text completion cannot apply: keep the record count plus the note
+        && (plan.filters ?? []).every((f) => f.field === partialFields[0].filter && f.op === 'eq' && typeof f.value === 'string');
+      if (only) {
+        const pf = partialFields[0];
+        const want = (plan.filters ?? [])[0].value;
+        const norm = (v) => (pf.key === 'tonnage' ? (/(\d+(?:\.\d+)?)/.exec(String(v))?.[1] ?? '') : String(v).toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/^R/, ''));
+        const textRe = pf.key === 'tonnage' ? /(\d+(?:\.\d+)?)\s*-?\s*ton\b/gi : /\bR-?(\d{2,3}[A-Z]?)\b/g;
+        const { rows: units } = await db.raw(
+          `SELECT data->>'serial_number' AS serial, COALESCE(data->>'${pf.key}', '') AS val
+             FROM entities WHERE entity_type = 'equipment' AND merged_into IS NULL AND ${TENANT_SQL}`, []);
+        const { rows: pages } = await db.raw(`SELECT text FROM document_pages WHERE ${TENANT_SQL}`, []);
+        const have = units.filter((u) => u.val !== '');
+        const lacking = units.filter((u) => u.val === '');
+        let inferredHits = 0; let stillNone = 0;
+        for (const u of lacking) {
+          const serial = String(u.serial ?? '').trim();
+          const vals = new Set();
+          if (serial.length >= 4) {
+            for (const pg of pages) {
+              const t = String(pg.text ?? '');
+              if (!t.includes(serial)) continue;
+              for (const m of t.matchAll(textRe)) vals.add(norm(m[0]).replace(/^R-?/i, ''));
+            }
+          }
+          if (vals.size === 1) { if ([...vals][0] === norm(want)) inferredHits += 1; } else stillNone += 1;
+        }
+        if (lacking.length > 0) {
+          const recorded = have.filter((u) => norm(u.val) === norm(want)).length;
+          const sum2 = recorded + inferredHits;
+          const what = pf.key === 'tonnage' ? `${want} units` : `units with ${want}`;
+          answered.text = `${recorded} ${what} on the unit records. Another ${inferredHits} show it only in invoice or startup-sheet text, so ${sum2} in all. Note: ${stillNone} of the ${units.length} units have no ${pf.label} on file or in their paperwork, so the true number could be higher.`;
+          return answered;
+        }
+      }
+      for (const pf of partialFields) {
+        const { rows: cnt } = await db.raw(
+          `SELECT count(*)::int AS total, count(*) FILTER (WHERE COALESCE(data->>'${pf.key}', '') = '')::int AS missing
+             FROM entities WHERE entity_type = 'equipment' AND merged_into IS NULL AND ${TENANT_SQL}`, []);
+        const { total: unitsTotal, missing } = cnt[0] ?? {};
+        if (missing > 0) notes.push(`${missing} of the ${unitsTotal} units on file have no ${pf.label} recorded, so units that match could be among them and this count may be low`);
+      }
+      if (notes.length) answered.text = `${answered.text.replace(/\s+$/, '')} Note: ${notes.join('; ')}.`;
+    }
+  }
+  if (homeState && answered && typeof answered.text === 'string' && plan.op !== 'groupBy' && (plan.entity === 'customers')) {
+    // D9: say what "out of state" meant, so the number is never read as something else.
+    const names = plan.op === 'list' && total > 0 && total <= 12 ? `: ${filtered.map((r) => r.label).join(', ')}` : '';
+    answered.text = `${total} customer${total === 1 ? ' is' : 's are'} out of state${names} (service address not in ${homeState.state}, where ${homeState.count} customers are).`;
+  }
+  return answered;
 }
 
 /**

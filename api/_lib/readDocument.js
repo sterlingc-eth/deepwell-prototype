@@ -12,6 +12,12 @@ import { embedDocumentPages } from "./search/store.js";
 // R32 (model avoidance): a born-digital PDF already contains its text — read it in-process instead of paying a vision model.
 import { readPdfTextLayer } from "./modelAvoidance/pdfText.js";
 import { isTextLayerReadEnabled } from "./modelAvoidance/switches.js";
+// Word / Excel / CSV: read in-process (no model, no cost). decodeText lives with the readers so both share one copy.
+import { readOfficeFile, extOf, decodeText, REFUSED_OFFICE_EXT } from "./office/index.js";
+// The ONE accepted-types sentence (Engineer B's allow-list module) so every message says the same thing.
+import { ACCEPTED_TYPES_SENTENCE } from "./uploadTypes.js";
+import { getCachedBillingRow, staffImportFor, monthResetLabel, planStateFor, pageCapFor } from "./plan.js";
+export { decodeText };
 
 /**
  * The ingestion pipeline itself, with no HTTP in it.
@@ -35,6 +41,63 @@ export const IMAGE_MAX_TOKENS = 3000;
 const TEXT_TYPES = /^(text\/|application\/(json|csv|xml))/;
 const PAGE_CHARS = 6000;
 
+// Office / sheet-text detection tables for ingestDocument. A declared type is only a browser's guess, so these decide
+// nothing alone: they decide whether a file with no recognisable signature is routed to the office reader (and refused
+// there with an honest message) instead of the vision model or the plain-text path.
+const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+const GENERIC_BINARY = ["application/octet-stream", "application/zip", "application/x-zip-compressed", "binary/octet-stream"];
+const OFFICE_DECLARED_OK = {
+  docx: new Set([DOCX_MIME, ...GENERIC_BINARY]),
+  xlsx: new Set([XLSX_MIME, ...GENERIC_BINARY]),
+};
+const OFFICE_MIME_KIND = new Set([
+  DOCX_MIME, XLSX_MIME, "application/msword", "application/vnd.ms-excel", "application/vnd.ms-powerpoint",
+  "application/vnd.ms-word.document.macroenabled.12", "application/vnd.ms-excel.sheet.macroenabled.12",
+  "application/vnd.ms-excel.sheet.binary.macroenabled.12", "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+]);
+const SHEET_TEXT_MIMES = new Set(["text/csv", "text/tab-separated-values", "application/csv", "text/x-csv"]);
+
+const MS_PER_MONTH = 30 * 24 * 60 * 60 * 1000; // same window the upload gate counts
+
+/**
+ * READ-TIME allowance check for Word / Excel / CSV. The upload gate only sees an ESTIMATE made from the file size, and a
+ * repetitive file can read as many more pages than it estimated. Once the real pages are known, refuse a file whose pages
+ * would not fit in what is left of this month's allowance, BEFORE anything is written (nothing is counted).
+ * Mirrors the gate: no-op for an uncapped plan or a free preview, skipped while a staff import runs (its own budget), and
+ * FAILS OPEN on any lookup error. Pages already counted for this same document (a forced re-read) are not counted twice.
+ * @returns {Promise<string|null>} the refusal message, or null to go ahead
+ */
+export async function officeAllowanceRefusal(ctx, newPages, existingPages = 0) {
+  try {
+    if (!(newPages > 0)) return null;
+    const row = await getCachedBillingRow(ctx);
+    if (staffImportFor(row)?.active) return null;
+    const used = await withTenant(ctx, (db) => db.countPagesSince(new Date(Date.now() - MS_PER_MONTH).toISOString()));
+    // Only a plan that is really in force has a monthly cap to enforce here (a free preview / unknown plan is a no-op, like the gate).
+    if (!["trialing", "active", "past_due"].includes(planStateFor(row))) return null;
+    const cap = pageCapFor(row);
+    if (cap == null) return null;
+    const own = Math.min(Math.max(0, Math.trunc(Number(existingPages) || 0)), used);
+    const left = Math.max(0, cap - used) + own;
+    if (newPages <= left) return null;
+    const fmt = (n) => Number(n).toLocaleString("en-US");
+    return `This file would use ${fmt(newPages)} pages and you have ${fmt(left)} left this month, so it was not added and nothing was counted. ` +
+      `Split it into smaller files, wait until your allowance resets on ${monthResetLabel(new Date())}, or upgrade your plan for more pages.`;
+  } catch (err) {
+    console.error("office read-time allowance check failed open:", err?.message);
+    return null;
+  }
+}
+
+/** What a sniffed signature is, for "named like X but really Y" messages. */
+function realKindLabel(sniffedType) {
+  if (sniffedType === "application/pdf") return "a PDF";
+  if (sniffedType === "image/heic") return "an iPhone HEIC photo";
+  if (String(sniffedType).startsWith("image/")) return "a photo/image (" + String(sniffedType).slice(6).toUpperCase() + ")";
+  return "a different kind of file";
+}
+
 // The vision API accepts exactly these. HEIC/HEIF — what an iPhone camera
 // produces by default — is not among them; sending it anyway is how a
 // technician's photo turns into an opaque 500 from Anthropic's API instead of
@@ -42,9 +105,8 @@ const PAGE_CHARS = 6000;
 const VISION_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
 
 const IPHONE_PHOTO_MESSAGE =
-  "iPhone photos need to be JPEG or PNG — change your camera's format setting " +
-  "(Settings > Camera > Formats > Most Compatible) or share the photo rather " +
-  "than sending the original, then upload again.";
+  "This is an iPhone HEIC/HEIF photo, which DeepWell cannot read directly. Convert it to JPEG (Settings > Camera > Formats > " +
+  "Most Compatible, or share/export the photo as JPEG) and upload again.";
 
 /** Strip control characters a text column should never hold. NUL (0x00) is
  * fatal to Postgres TEXT; the rest are junk no transcribed page has business
@@ -483,11 +545,27 @@ export async function ingestDocument(ctx, documentId, { userId, force = false } 
   // R34: a declared type is a browser's guess and is client-controlled: "Application/PDF", "application/pdf; charset=binary".
   const contentType = sniffed || normalizeContentType(doc.content_type) || sniff(bytes, doc.original_filename);
 
+  // Office route: Word / Excel / CSV are read in-process by api/_lib/office (no model, no cost). Decided from the REAL bytes
+  // first (a zip or an OLE2 file), then from a name/declared type that claims Office or CSV when the bytes are not a package.
+  const ext = extOf(doc.original_filename);
+  const declared = normalizeContentType(doc.content_type);
+  const realIsPackage = sniffed === "application/zip" || sniffed === "application/x-ole-storage";
+  const claimsOffice = Boolean(REFUSED_OFFICE_EXT[ext]) || ext === "docx" || ext === "xlsx" || OFFICE_MIME_KIND.has(declared ?? "");
+  const claimsSheetText = ext === "csv" || ext === "tsv" || SHEET_TEXT_MIMES.has(declared ?? "");
+  const officeRoute = realIsPackage || (!sniffed && (claimsOffice || claimsSheetText));
+  if (sniffed && !realIsPackage && claimsOffice) {
+    // A real PDF/photo/etc. carrying an Office name or type: refuse, saying what it really is (never guess which is right).
+    const message = `This file is named like a Word/Excel file (${ext ? "." + ext : declared}) but it is really ${realKindLabel(sniffed)}. ` +
+      "Rename it so the name matches what it is (or open the original and save it as .docx or .xlsx) and upload again.";
+    await withTenant(ctx, (db) => db.markExtracted(documentId, { error: message }));
+    throw new IngestError(message, 415);
+  }
+
   // R34: the bytes said nothing definite, yet the type (declared, or guessed from the extension) names a format the model
   // reads. An HTML page / SVG / program / empty or truncated file renamed ".pdf" or ".jpg" used to go to the vision model
   // anyway: an API call that can only fail with a 400, retried three times by the queue, and recorded as "the AI service had a
   // temporary problem" - the wrong message, the wrong retry, and a wasted call. Refuse it here with the real reason.
-  if (!sniffed && (contentType === "application/pdf" || VISION_IMAGE_TYPES.has(contentType))) {
+  if (!officeRoute && !sniffed && (contentType === "application/pdf" || VISION_IMAGE_TYPES.has(contentType))) {
     const okPdf = contentType === "application/pdf" && bytes.subarray(0, 1024).toString("latin1").includes("%PDF");
     if (!okPdf) {
       const message = describeTypeMismatch(bytes, contentType);
@@ -500,7 +578,32 @@ export async function ingestDocument(ctx, documentId, { userId, force = false } 
   let method;
   let readSource = null;
 
-  if (TEXT_TYPES.test(contentType)) {
+  if (officeRoute) {
+    const refuseOffice = async (message, status) => {
+      // 415/422 are recorded here like every other terminal "cannot read this file"; a 413 is recorded by the caller.
+      if (status !== 413) await withTenant(ctx, (db) => db.markExtracted(documentId, { error: message }));
+      throw new IngestError(message, status);
+    };
+    if (!realIsPackage && claimsSheetText && looksBinaryText(decodeText(bytes.subarray(0, 100_000)))) {
+      await refuseOffice("This file is not readable text - it looks like a program, archive or other binary file. " +
+        "Export it as a PDF, a photo (JPEG/PNG) or a plain text/CSV file and upload again.", 415);
+    }
+    const asCsvName = !realIsPackage && claimsSheetText && ext !== "csv" && ext !== "tsv" ? `${doc.original_filename || "file"}.csv` : (doc.original_filename || "");
+    const r = readOfficeFile(bytes, { filename: asCsvName });
+    if (!r.ok) await refuseOffice(r.message, r.status);
+    if (r.kind === "docx" || r.kind === "xlsx") {
+      const label = r.kind === "docx" ? "a Word document (.docx)" : "an Excel workbook (.xlsx)";
+      if (ext && ext !== r.kind) {
+        await refuseOffice(`This file is named ".${ext}" but it is really ${label}. Rename it to end in .${r.kind} (or save it again from Word/Excel) and upload again.`, 415);
+      }
+      if (declared && !OFFICE_DECLARED_OK[r.kind].has(declared)) {
+        await refuseOffice(`This file's type (${declared.slice(0, 60)}) says it is not ${label}, but its contents are. Rename it to end in .${r.kind} (or save it again from Word/Excel) and upload again.`, 415);
+      }
+    }
+    pages = r.pages.map((p) => ({ ...p, model: "office-text", confidence: 1 }));
+    method = "text";
+    readSource = `office-${r.kind}`;
+  } else if (TEXT_TYPES.test(contentType)) {
     const decoded = decodeText(bytes);
     // R34: a program, archive or other binary declared "text/plain" decoded to a page of mojibake and control characters that
     // was stored as the document's text and then sent to the extraction model. Refuse it.
@@ -547,6 +650,15 @@ export async function ingestDocument(ctx, documentId, { userId, force = false } 
       db.markExtracted(documentId, { error: message })
     );
     throw new IngestError(message, 415);
+  }
+
+  // Word/Excel/CSV only: the real page count is known now; refuse (402) a file that would exceed the remaining allowance.
+  if (readSource?.startsWith("office-")) {
+    const refusal = await officeAllowanceRefusal(ctx, pages.length, doc.page_count);
+    if (refusal) {
+      await withTenant(ctx, (db) => db.markExtracted(documentId, { error: refusal }));
+      throw new IngestError(refusal, 402);
+    }
   }
 
   // NUL and other control characters have no business in transcribed text —
@@ -862,74 +974,6 @@ export async function extractWithClaude(bytes, contentType, ctx, startedAt) {
   return Array.from(byPageNo.values()).sort((a, b) => a.page_no - b.page_no);
 }
 
-/**
- * Decode a text file honestly instead of assuming UTF-8.
- *
- * `bytes.toString("utf8")` on a UTF-16 file is not a near miss, it is garbage:
- * a degree sign and an accented name come back as replacement characters once
- * the interleaved NUL bytes are stripped. Nothing errors. page_count is right.
- * Extraction then runs happily over corrupted text and writes a customer name
- * with a replacement character in it, into the exact field findOrCreateCustomer
- * matches on.
- *
- * This is not an exotic input. "Unicode text" is what Windows Notepad and some
- * Excel exports mean by their default text encoding, and a contractor exporting
- * a customer list from an old system lands squarely in that path.
- *
- * Byte-order marks are checked first because they are unambiguous. Without one,
- * UTF-16 is still detectable by the NUL bytes that ASCII-range characters leave
- * in every other position, a pattern that essentially never occurs in real
- * UTF-8 text.
- */
-export function decodeText(bytes) {
-  if (bytes.length >= 2) {
-    if (bytes[0] === 0xff && bytes[1] === 0xfe) return bytes.subarray(2).toString("utf16le");
-    if (bytes[0] === 0xfe && bytes[1] === 0xff) return swap16(bytes.subarray(2)).toString("utf16le");
-  }
-  if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
-    return bytes.subarray(3).toString("utf8");
-  }
-
-  // No BOM. Sample the head for the alternating-NUL signature of UTF-16.
-  const sample = bytes.subarray(0, Math.min(bytes.length, 2048));
-  let evenNuls = 0;
-  let oddNuls = 0;
-  for (let i = 0; i + 1 < sample.length; i += 2) {
-    if (sample[i] === 0x00) evenNuls++;
-    if (sample[i + 1] === 0x00) oddNuls++;
-  }
-  const pairs = Math.floor(sample.length / 2);
-  if (pairs >= 8) {
-    if (oddNuls / pairs > 0.3 && evenNuls / pairs < 0.1) return bytes.toString("utf16le");
-    if (evenNuls / pairs > 0.3 && oddNuls / pairs < 0.1) return swap16(bytes).toString("utf16le");
-  }
-
-  // R34: a file that is not valid UTF-8 is, in practice, Windows-1252 (an old accounting/dispatch system's export: "Jos\xE9",
-  // "Mu\xF1oz", a degree sign). Decoded as UTF-8 each such byte became U+FFFD in the stored text and in the customer name
-  // extraction then matched on. Valid UTF-8 (including one that really contains U+FFFD) is untouched.
-  const utf8 = bytes.toString("utf8");
-  if (!utf8.includes("\uFFFD")) return utf8;
-  try {
-    new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-    return utf8;
-  } catch {
-    return new TextDecoder("windows-1252").decode(bytes);
-  }
-}
-
-/** Big-endian UTF-16 to little-endian, so Node can decode it. */
-function swap16(buf) {
-  const out = Buffer.from(buf);
-  // An odd trailing byte cannot be half of a code unit; leave it rather than
-  // reading past the end.
-  for (let i = 0; i + 1 < out.length; i += 2) {
-    const t = out[i];
-    out[i] = out[i + 1];
-    out[i + 1] = t;
-  }
-  return out;
-}
-
 /** Pure (R34): why these bytes are not the PDF/photo they were declared to be, in words a person can act on. */
 export function describeTypeMismatch(bytes, claimed) {
   const kind = claimed === "application/pdf" ? "PDF" : "photo (JPEG, PNG, GIF or WebP)";
@@ -939,7 +983,10 @@ export function describeTypeMismatch(bytes, claimed) {
   if (/^\s*(\xEF\xBB\xBF)?\s*<(!doctype|html|svg|\?xml|script|head|body)/i.test(head) || /<(html|svg|script)[\s>]/i.test(head)) {
     return `This file is named like a ${kind} but it is really a web page or SVG drawing. ${fix}`;
   }
-  if (head.startsWith("MZ") || head.startsWith("\x7fELF") || head.startsWith("PK\x03\x04") || head.startsWith("\x1f\x8b") || head.startsWith("Rar!")) {
+  if (head.startsWith("PK\x03\x04") || head.startsWith("PK\x05\x06")) {
+    return `This file is named like a ${kind} but it is really a ZIP-based file (a Word/Excel document, a program package or an archive). ${fix}`;
+  }
+  if (head.startsWith("MZ") || head.startsWith("\x7fELF") || head.startsWith("\x1f\x8b") || head.startsWith("Rar!")) {
     return `This file is named like a ${kind} but it is really a program or compressed archive. ${fix}`;
   }
   if (bytes.length < 64) return `This file is too small (${bytes.length} bytes) to be a real ${kind} - it looks cut off or damaged. ${fix}`;
@@ -950,9 +997,9 @@ export function describeTypeMismatch(bytes, claimed) {
 export function unsupportedTypeMessage(contentType) {
   const t = String(contentType ?? "this type");
   if (/^image\/(tiff?|bmp|x-ms-bmp|svg\+xml|avif|x-icon|vnd\.microsoft\.icon)$/.test(t)) {
-    return "TIFF, BMP, SVG and similar image files cannot be read yet. Save or export the page as a PDF, JPEG or PNG and upload again.";
+    return `TIFF, BMP, SVG and similar image files cannot be read. Save or export the page as a PDF, JPEG or PNG and upload again (DeepWell reads ${ACCEPTED_TYPES_SENTENCE}).`;
   }
-  return `This kind of file (${t.slice(0, 60)}) cannot be read yet. DeepWell reads PDFs, photos (JPEG, PNG, GIF, WebP) and plain text or CSV - convert it and upload again.`;
+  return `This kind of file (${t.slice(0, 60)}) cannot be read. DeepWell reads ${ACCEPTED_TYPES_SENTENCE} - convert it to one of those and upload again.`;
 }
 
 /**
@@ -1036,13 +1083,19 @@ export function sniffMagicBytes(bytes) {
     const brand = head.subarray(8, 12).toString("latin1");
     if (HEIC_BRANDS.has(brand)) return "image/heic";
   }
+  // Office: a ZIP (docx/xlsx and every other zip, told apart by the office reader) or an OLE2 compound file (old .doc/.xls/.ppt,
+  // or a password-protected docx/xlsx). Recognised by signature only; ingestDocument decides what the zip really is.
+  if (head[0] === 0x50 && head[1] === 0x4b && ((head[2] === 3 && head[3] === 4) || (head[2] === 5 && head[3] === 6) || (head[2] === 7 && head[3] === 8))) return "application/zip";
+  if (bytes.length >= 8 && head.subarray(0, 8).toString("hex") === "d0cf11e0a1b11ae1") return "application/x-ole-storage";
   return null;
 }
 
 const EXT_MEDIA_TYPES = {
   txt: "text/plain", csv: "text/csv", json: "application/json", md: "text/plain",
   pdf: "application/pdf", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg",
-  webp: "image/webp", heic: "image/heic", heif: "image/heif",
+  webp: "image/webp", heic: "image/heic", heif: "image/heif", gif: "image/gif", tsv: "text/tab-separated-values",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 };
 
 /** Magic bytes beat file extensions, which beat nothing. */

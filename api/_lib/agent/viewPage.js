@@ -27,6 +27,9 @@ export const MAX_VIEW_PDF_PAGES = 5;
 export const MAX_VIEW_PDF_BYTES = 4 * 1024 * 1024;
 export const MAX_VIEW_IMAGE_BYTES = 5 * 1024 * 1024; // the vision API's own per-image ceiling
 export const VIEW_TOOL_NAME = "view_document_page";
+const MAX_VIEW_TEXT_CHARS = 12_000;
+const OFFICE_TEXT_EXT = new Set(["docx", "xlsx", "csv", "tsv"]);
+const OFFICE_TEXT_TYPE = /wordprocessingml|spreadsheetml|text\/csv|tab-separated/i;
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -77,6 +80,24 @@ export function createPageViewer({ withTenant, ctxArg, ledger, fetchObject, dead
     if (!doc.storage_key) return fail("this document has no stored original; use the transcript text");
     if (doc.page_count && pageNo > doc.page_count) return fail(`this document has only ${doc.page_count} page(s)`);
 
+    // Word / Excel / CSV have no picture to look at: the page IS the extracted text (a Word page, or a sheet chunk with its
+    // "Sheet ... rows a-b of n" locator and repeated header). Hand that text back, free of any vision cost, and register it
+    // as citable evidence exactly like a viewed image. Not counted against the view limit (no model-image cost).
+    const nameExt = String(doc.original_filename ?? "").toLowerCase().split(".").pop();
+    if (OFFICE_TEXT_EXT.has(nameExt) || OFFICE_TEXT_TYPE.test(String(doc.content_type ?? ""))) {
+      const rows = await withTenant(ctxArg, (db) => db.listPages(documentId));
+      const pg = (rows ?? []).find((r) => Number(r.page_no) === pageNo);
+      if (!pg || !String(pg.text ?? "").trim()) return fail(`page ${pageNo} of this document has no text; use the transcript text (search_documents)`);
+      ledger.addPassage(documentId, pageNo, doc.stage, doc.original_filename);
+      const text = String(pg.text).slice(0, MAX_VIEW_TEXT_CHARS);
+      return {
+        ok: true,
+        content: `Text of page ${pageNo} of ${doc.page_count || "?"} of document ${documentId} (a Word/Excel/CSV file has no picture; this is its extracted text, starting with its section/sheet locator). Cite it as documentId ${documentId}, page ${pageNo}.\n\n${text}`,
+        rowCount: 1,
+        inputSummary: "view:text",
+      };
+    }
+
     // R30 H1: with the real R2 fetcher (no test double injected), only ever fetch a key under the row's own tenant.
     if (!fetchObject && !keyBelongsToTenant(doc.storage_key, doc.tenant_id)) return fail("this document's stored original is not available; use the transcript text");
 
@@ -100,7 +121,7 @@ export function createPageViewer({ withTenant, ctxArg, ledger, fetchObject, dead
     } else if (type === "image/heic" || type === "image/heif") {
       return fail("this is an iPhone HEIC photo the system cannot display; use the transcript text");
     } else {
-      return fail("this file type cannot be viewed; use the transcript text");
+      return fail("this file type cannot be viewed as a picture; use the transcript text (search_documents)");
     }
 
     views++;

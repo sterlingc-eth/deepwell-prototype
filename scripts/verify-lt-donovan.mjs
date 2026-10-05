@@ -7,7 +7,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const NOF = /not on file|no .{0,50} on file|couldn'?t find|could not find|no record|no match|nothing|isn'?t on file|don'?t have|not found|no such|unable|can'?t (?:help|share|provide|answer|do)|not something|not in your|outside|only (?:answer|help)|no documents|0 |zero|none|isn'?t a question|future|doesn'?t exist|not a valid|invalid|impossible|read-only|not able|no warranty|no permit|no maintenance|no invoice|no purchase/i;
 const norm = (s) => String(s ?? "").toLowerCase().replace(/[–—]/g, "-");
 let fails = 0, passes = 0, logged = 0;
-for (const file of ["lt-donovan-2026-10-03.json", "lt-breakit-2026-10-03.json"]) {
+for (const file of fs.readdirSync(path.join(ROOT, "test-docs/scorecard/blind")).filter((f) => /^lt-.*\.json$/.test(f) && !/^lt-loop/.test(f)).sort()) {
   const set = JSON.parse(fs.readFileSync(path.join(ROOT, "test-docs/scorecard/blind", file), "utf8"));
   const tmp = path.join(os.tmpdir(), `lt-${process.pid}-${file}`);
   const r = spawnSync("node", [path.join(ROOT, "scripts/lt-run.mjs"), path.join(ROOT, "test-docs/scorecard/blind", file), tmp], { env: { ...process.env, TZ: "America/Phoenix", EXAM_TODAY: "2026-09-25" }, encoding: "utf8" });
