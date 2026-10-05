@@ -10,7 +10,7 @@ These items are marked coming soon on the website, or are called out as not done
 
 ### What features are coming soon?
 ~ coming soon, roadmap, planned features, future features, upcoming features, when will, what is not available, not available yet, in development, being built, will you add, do you plan to, on the roadmap, release date, when is it coming, feature request, google drive sync coming, drive sync, when is google drive sync, email intake, folder sync, when is it coming, when will it be available, what are you building, what's next, whats next, what is next
-Nothing here has a date, and I can't promise one. Live today: ask donovan, phone app scanning, warranty tracking and export, records search, help chat. Marked **coming soon** on the site, being built next: email and folder upload, google drive sync, branch scoping, callback analytics, backups and per-company restore, public status page and uptime sla. Later, not available today: electrical, plumbing, property management, fleet and equipment rental.
+Nothing here has a date, and I can't promise one. Live today: ask donovan, phone app scanning, warranty tracking and export, bulk upload, records search, help chat. Marked **coming soon** on the site, being built next: email and folder upload, google drive sync, branch scoping, callback analytics, backups and per-company restore, public status page and uptime sla. Later, not available today: electrical, plumbing, property management, fleet and equipment rental.
 
 ### Does DeepWell make backups?
 ~ backups, backup, restore, off site backups, disaster recovery, recover my data, restore data, data loss, point in time restore, do you back up my data, rpo

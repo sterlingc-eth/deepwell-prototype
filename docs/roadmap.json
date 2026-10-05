@@ -4,6 +4,7 @@
     { "id": "ask-donovan", "title": "Ask Donovan", "text": "Ask a plain-English question and get an answer with the original page attached as the source." },
     { "id": "phone-scanning", "title": "Phone app scanning", "text": "Scan paperwork on your phone, even with no signal; pages upload when it returns." },
     { "id": "warranty", "title": "Warranty tracking and export", "text": "See which coverage is expiring across every unit and export warranty records any time." },
+    { "id": "bulk-upload", "title": "Bulk upload", "text": "Drag in a whole folder or a .zip and every file is read, sorted and filed." },
     { "id": "records-search", "title": "Records search", "text": "Find a customer, address, serial number or date across every document you have sent in." },
     { "id": "help-chat", "title": "Help chat", "text": "Ask the help chat how DeepWell works, any time, with answers drawn from our public help articles." }
   ],
