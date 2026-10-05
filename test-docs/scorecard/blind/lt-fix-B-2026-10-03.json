@@ -1,0 +1,1773 @@
+{
+ "version": "lt-fix-B-2026-10-03",
+ "questions": [
+  {
+   "id": "lt-fixB-d04-01",
+   "section": "d04",
+   "text": "which maintenance agreements expire in 2026",
+   "expect": {
+    "all": [
+     [
+      "19 maintenance agreement",
+      "19 agreement",
+      "19 document",
+      "19 customer",
+      "19 contract",
+      "19 of the",
+      "19 of our",
+      "19 match"
+     ]
+    ],
+    "none": [
+     "future date",
+     "no documents match",
+     "nothing on file for it"
+    ]
+   },
+   "baseline": "pass",
+   "note": "19 agreements end 12/31/2026"
+  },
+  {
+   "id": "lt-fixB-d04-02",
+   "section": "d04",
+   "text": "how many maintenance agreements run through 2027",
+   "expect": {
+    "all": [
+     [
+      "8 maintenance agreement",
+      "8 agreement",
+      "8 document",
+      "8 customer",
+      "8 contract",
+      "8 of the",
+      "8 of our",
+      "8 match"
+     ]
+    ],
+    "none": [
+     "future date",
+     "no documents match",
+     "nothing on file for it"
+    ]
+   },
+   "baseline": "pass",
+   "note": "8 end 12/31/2027"
+  },
+  {
+   "id": "lt-fixB-d04-03",
+   "section": "d04",
+   "text": "how many maintenance agreements expire in 2027",
+   "expect": {
+    "all": [
+     [
+      "8 maintenance agreement",
+      "8 agreement",
+      "8 document",
+      "8 customer",
+      "8 contract",
+      "8 of the",
+      "8 of our",
+      "8 match"
+     ]
+    ],
+    "none": [
+     "future date",
+     "no documents match",
+     "nothing on file for it"
+    ]
+   },
+   "baseline": "pass",
+   "note": ""
+  },
+  {
+   "id": "lt-fixB-d04-04",
+   "section": "d04",
+   "text": "which agreements end in 2026",
+   "expect": {
+    "all": [
+     [
+      "19 maintenance agreement",
+      "19 agreement",
+      "19 document",
+      "19 customer",
+      "19 contract",
+      "19 of the",
+      "19 of our",
+      "19 match"
+     ]
+    ],
+    "none": [
+     "future date",
+     "no documents match",
+     "nothing on file for it"
+    ]
+   },
+   "baseline": "pass",
+   "note": ""
+  },
+  {
+   "id": "lt-fixB-d04-05",
+   "section": "d04",
+   "text": "maintanence agreements ending in 2028 ?",
+   "expect": {
+    "all": [
+     [
+      "0 maintenance",
+      "no maintenance",
+      "0 agreement",
+      "no agreement",
+      "none",
+      "0 documents",
+      "0 contracts",
+      "no contract",
+      "0 of",
+      "nothing"
+     ]
+    ],
+    "none": [
+     "future date"
+    ]
+   },
+   "baseline": "pass",
+   "note": "none end 2028 - an honest zero, not 'future date'"
+  },
+  {
+   "id": "lt-fixB-d04-06",
+   "section": "d04",
+   "text": "any maintenance contracts that end in 2031",
+   "expect": {
+    "all": [
+     [
+      "0 maintenance",
+      "no maintenance",
+      "0 agreement",
+      "no agreement",
+      "none",
+      "0 documents",
+      "0 contracts",
+      "no contract",
+      "0 of",
+      "nothing"
+     ]
+    ],
+    "none": [
+     "future date"
+    ]
+   },
+   "baseline": "pass",
+   "note": ""
+  },
+  {
+   "id": "lt-fixB-d04-07",
+   "section": "d04",
+   "text": "how many of our maintenance agreements are good through 2027",
+   "expect": {
+    "all": [
+     [
+      "8 maintenance agreement",
+      "8 agreement",
+      "8 document",
+      "8 customer",
+      "8 contract",
+      "8 of the",
+      "8 of our",
+      "8 match"
+     ]
+    ],
+    "none": [
+     "future date",
+     "no documents match",
+     "nothing on file for it"
+    ]
+   },
+   "baseline": "pass",
+   "note": ""
+  },
+  {
+   "id": "lt-fixB-d04-08",
+   "section": "d04",
+   "text": "number of agreements expiring by the end of 2026",
+   "expect": {
+    "all": [
+     [
+      "19 maintenance agreement",
+      "19 agreement",
+      "19 document",
+      "19 customer",
+      "19 contract",
+      "19 of the",
+      "19 of our",
+      "19 match"
+     ]
+    ],
+    "none": [
+     "future date",
+     "no documents match",
+     "nothing on file for it"
+    ]
+   },
+   "baseline": "pass",
+   "note": ""
+  },
+  {
+   "id": "lt-fixB-d04-09",
+   "section": "d04",
+   "text": "list maintenance agreements that end in 2027",
+   "expect": {
+    "all": [
+     [
+      "8 maintenance agreement",
+      "8 agreement",
+      "8 document",
+      "8 customer",
+      "8 contract",
+      "8 of the",
+      "8 of our",
+      "8 match"
+     ]
+    ],
+    "none": [
+     "future date",
+     "no documents match",
+     "nothing on file for it"
+    ]
+   },
+   "baseline": "pass",
+   "note": ""
+  },
+  {
+   "id": "lt-fixB-d04-10",
+   "section": "d04",
+   "text": "how many warranties expire in 2028",
+   "expect": {
+    "all": [
+     [
+      "5 pieces",
+      "5 units",
+      "5 warrant",
+      "5 of"
+     ]
+    ],
+    "none": [
+     "future date"
+    ]
+   },
+   "baseline": "pass",
+   "note": "control: warranty end (computed) already answered"
+  },
+  {
+   "id": "lt-fixB-d04-11",
+   "section": "d04",
+   "text": "how many service calls were logged in 2029",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "19 ",
+     "8 service"
+    ]
+   },
+   "baseline": "pass",
+   "note": "control: activity in a future year stays declined"
+  },
+  {
+   "id": "lt-fixB-d04-12",
+   "section": "d04",
+   "text": "is there an invoice dated January 1st, 2030",
+   "expect": {
+    "notOnFile": true
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixB-d04-13",
+   "section": "d04",
+   "text": "how many jobs did we do in 2031",
+   "expect": {
+    "notOnFile": true
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixB-d04-14",
+   "section": "d04",
+   "text": "how many maintenance agreements do we have",
+   "expect": {
+    "all": [
+     [
+      "27"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixB-d04-15",
+   "section": "d04",
+   "text": "when does Joseph Norwood's maintenance agreement expire",
+   "expect": {
+    "all": [
+     [
+      "12/31/2026",
+      "december 31, 2026"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixB-d08-01",
+   "section": "d08",
+   "text": "how many commercial permits do we have",
+   "expect": {
+    "all": [
+     [
+      "8 permit",
+      "8 commercial",
+      "8 residential",
+      "8 document"
+     ]
+    ],
+    "none": [
+     "27 documents",
+     "27 permits"
+    ]
+   },
+   "baseline": "pass",
+   "note": "8 commercial (RTU) permits"
+  },
+  {
+   "id": "lt-fixB-d08-02",
+   "section": "d08",
+   "text": "how many residential permits do we have",
+   "expect": {
+    "all": [
+     [
+      "19 permit",
+      "19 commercial",
+      "19 residential",
+      "19 document"
+     ]
+    ],
+    "none": [
+     "27 documents",
+     "27 permits"
+    ]
+   },
+   "baseline": "pass",
+   "note": "19 residential"
+  },
+  {
+   "id": "lt-fixB-d08-03",
+   "section": "d08",
+   "text": "how many permits are for commercial jobs",
+   "expect": {
+    "all": [
+     [
+      "8 permit",
+      "8 commercial",
+      "8 residential",
+      "8 document"
+     ]
+    ],
+    "none": [
+     "27 documents",
+     "27 permits"
+    ]
+   },
+   "baseline": "fail",
+   "note": ""
+  },
+  {
+   "id": "lt-fixB-d08-04",
+   "section": "d08",
+   "text": "commercial permit count",
+   "expect": {
+    "all": [
+     [
+      "8 permit",
+      "8 commercial",
+      "8 residential",
+      "8 document"
+     ]
+    ],
+    "none": [
+     "27 documents",
+     "27 permits"
+    ]
+   },
+   "baseline": "pass",
+   "note": ""
+  },
+  {
+   "id": "lt-fixB-d08-05",
+   "section": "d08",
+   "text": "how many comercial permits did we pull",
+   "expect": {
+    "all": [
+     [
+      "8 permit",
+      "8 commercial",
+      "8 residential",
+      "8 document"
+     ]
+    ],
+    "none": [
+     "27 documents",
+     "27 permits"
+    ]
+   },
+   "baseline": "pass",
+   "note": "typo"
+  },
+  {
+   "id": "lt-fixB-d08-06",
+   "section": "d08",
+   "text": "which commercial permits are in Tucson",
+   "expect": {
+    "all": [
+     [
+      "BP-2026-25006"
+     ],
+     [
+      "BP-2026-25007"
+     ]
+    ],
+    "none": [
+     "BP-2026-10084",
+     "BP-2026-10089"
+    ]
+   },
+   "baseline": "pass",
+   "note": "2 commercial permits in Tucson"
+  },
+  {
+   "id": "lt-fixB-d08-07",
+   "section": "d08",
+   "text": "how many residential permits are in Chandler",
+   "expect": {
+    "all": [
+     [
+      "2 permit",
+      "2 commercial",
+      "2 residential",
+      "2 document"
+     ]
+    ],
+    "none": [
+     "BP-2026-25003"
+    ]
+   },
+   "baseline": "pass",
+   "note": "BP-2026-10023, 10029"
+  },
+  {
+   "id": "lt-fixB-d08-08",
+   "section": "d08",
+   "text": "how many permits do we have",
+   "expect": {
+    "all": [
+     [
+      "27"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixB-d09-01",
+   "section": "d09",
+   "text": "how many customers are out of state",
+   "expect": {
+    "all": [
+     [
+      "4 customers",
+      "4 of",
+      "4 clients",
+      "4 out"
+     ]
+    ],
+    "none": [
+     "120 customers"
+    ]
+   },
+   "baseline": "pass",
+   "note": "NV 2, NM 1, CA 1"
+  },
+  {
+   "id": "lt-fixB-d09-02",
+   "section": "d09",
+   "text": "which customers live outside Arizona",
+   "expect": {
+    "all": [
+     [
+      "Linda Hutchins"
+     ],
+     [
+      "Thomas Osborn"
+     ],
+     [
+      "Donna Vance"
+     ],
+     [
+      "Ronald Dominguez"
+     ]
+    ],
+    "none": [
+     "120 customers"
+    ]
+   },
+   "baseline": "pass",
+   "note": ""
+  },
+  {
+   "id": "lt-fixB-d09-03",
+   "section": "d09",
+   "text": "how many out of state customers do we have",
+   "expect": {
+    "all": [
+     [
+      "4 customers",
+      "4 of",
+      "4 clients",
+      "4 out"
+     ]
+    ],
+    "none": [
+     "120 customers"
+    ]
+   },
+   "baseline": "pass",
+   "note": ""
+  },
+  {
+   "id": "lt-fixB-d09-04",
+   "section": "d09",
+   "text": "any customers not in AZ?",
+   "expect": {
+    "all": [
+     [
+      "4 customers",
+      "4 of",
+      "4 clients",
+      "4 out",
+      "Linda Hutchins"
+     ]
+    ],
+    "none": [
+     "120 customers"
+    ]
+   },
+   "baseline": "pass",
+   "note": ""
+  },
+  {
+   "id": "lt-fixB-d09-05",
+   "section": "d09",
+   "text": "how many clients are located out-of-state",
+   "expect": {
+    "all": [
+     [
+      "4 customers",
+      "4 of",
+      "4 clients",
+      "4 out"
+     ]
+    ],
+    "none": [
+     "120 customers"
+    ]
+   },
+   "baseline": "pass",
+   "note": ""
+  },
+  {
+   "id": "lt-fixB-d09-06",
+   "section": "d09",
+   "text": "list the customers that are out of state",
+   "expect": {
+    "all": [
+     [
+      "Linda Hutchins"
+     ],
+     [
+      "Thomas Osborn"
+     ],
+     [
+      "Donna Vance"
+     ],
+     [
+      "Ronald Dominguez"
+     ]
+    ],
+    "none": [
+     "120 customers"
+    ]
+   },
+   "baseline": "pass",
+   "note": ""
+  },
+  {
+   "id": "lt-fixB-d09-07",
+   "section": "d09",
+   "text": "how many customers are in Arizona",
+   "expect": {
+    "all": [
+     [
+      "116"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixB-d09-08",
+   "section": "d09",
+   "text": "how many customers are in Nevada",
+   "expect": {
+    "all": [
+     [
+      "2 customers",
+      "2 of",
+      "2 clients",
+      "2 in"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixB-d10-01",
+   "section": "d10",
+   "text": "how many invoices over three thousand dollars",
+   "expect": {
+    "all": [
+     [
+      "106 invoice",
+      "106 of",
+      "106 match",
+      "106 document"
+     ]
+    ],
+    "none": [
+     "120 invoices"
+    ]
+   },
+   "baseline": "pass",
+   "note": "106"
+  },
+  {
+   "id": "lt-fixB-d10-02",
+   "section": "d10",
+   "text": "how many invoices over five thousand dollars",
+   "expect": {
+    "all": [
+     [
+      "54 invoice",
+      "54 of",
+      "54 match",
+      "54 document"
+     ]
+    ],
+    "none": [
+     "120 invoices"
+    ]
+   },
+   "baseline": "pass",
+   "note": "54"
+  },
+  {
+   "id": "lt-fixB-d10-03",
+   "section": "d10",
+   "text": "how many invoices over 4k",
+   "expect": {
+    "all": [
+     [
+      "77 invoice",
+      "77 of",
+      "77 match",
+      "77 document"
+     ]
+    ],
+    "none": [
+     "120 invoices"
+    ]
+   },
+   "baseline": "pass",
+   "note": "77"
+  },
+  {
+   "id": "lt-fixB-d10-04",
+   "section": "d10",
+   "text": "how many invoices above 2.5k",
+   "expect": {
+    "all": [
+     [
+      "112 invoice",
+      "112 of",
+      "112 match",
+      "112 document"
+     ]
+    ],
+    "none": [
+     "120 invoices"
+    ]
+   },
+   "baseline": "pass",
+   "note": "112"
+  },
+  {
+   "id": "lt-fixB-d10-05",
+   "section": "d10",
+   "text": "how many invoices above ten grand",
+   "expect": {
+    "all": [
+     [
+      "0 invoices",
+      "no invoices",
+      "none",
+      "0 of",
+      "0 matching"
+     ]
+    ],
+    "none": [
+     "120 invoices"
+    ]
+   },
+   "baseline": "pass",
+   "note": "none > 10000"
+  },
+  {
+   "id": "lt-fixB-d10-06",
+   "section": "d10",
+   "text": "how many invoices under two thousand dollars",
+   "expect": {
+    "all": [
+     [
+      "8 invoice",
+      "8 of",
+      "8 match",
+      "8 document"
+     ]
+    ],
+    "none": [
+     "120 invoices"
+    ]
+   },
+   "baseline": "pass",
+   "note": "8"
+  },
+  {
+   "id": "lt-fixB-d10-07",
+   "section": "d10",
+   "text": "how many invoices over four thousand five hundred dollars",
+   "expect": {
+    "all": [
+     [
+      "65 invoice",
+      "65 of",
+      "65 match",
+      "65 document"
+     ]
+    ],
+    "none": [
+     "120 invoices"
+    ]
+   },
+   "baseline": "pass",
+   "note": "65"
+  },
+  {
+   "id": "lt-fixB-d10-08",
+   "section": "d10",
+   "text": "how many invoices over 7.5k",
+   "expect": {
+    "all": [
+     [
+      "6 invoice",
+      "6 of",
+      "6 match",
+      "6 document"
+     ]
+    ],
+    "none": [
+     "120 invoices"
+    ]
+   },
+   "baseline": "pass",
+   "note": "6"
+  },
+  {
+   "id": "lt-fixB-d10-09",
+   "section": "d10",
+   "text": "how many invoices over $3,000",
+   "expect": {
+    "all": [
+     [
+      "106 invoice",
+      "106 of",
+      "106 match",
+      "106 document"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixB-d10-10",
+   "section": "d10",
+   "text": "how many invoices over 3000 dollars",
+   "expect": {
+    "all": [
+     [
+      "106 invoice",
+      "106 of",
+      "106 match",
+      "106 document"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixB-d11-01",
+   "section": "d11",
+   "text": "how many service visits on 2026.09.21",
+   "expect": {
+    "all": [
+     [
+      "22 service ticket",
+      "22 ticket",
+      "22 service visit",
+      "22 visit",
+      "22 service call"
+     ]
+    ],
+    "none": [
+     "317 service visits"
+    ]
+   },
+   "baseline": "pass",
+   "note": "22 tickets (27 visit documents)"
+  },
+  {
+   "id": "lt-fixB-d11-02",
+   "section": "d11",
+   "text": "how many service visits in 9/2026",
+   "expect": {
+    "all": [
+     [
+      "23 service ticket",
+      "23 ticket",
+      "23 service visit",
+      "23 visit",
+      "23 service call"
+     ]
+    ],
+    "none": [
+     "317 service visits"
+    ]
+   },
+   "baseline": "pass",
+   "note": "23 tickets (28 docs)"
+  },
+  {
+   "id": "lt-fixB-d11-03",
+   "section": "d11",
+   "text": "how many service visits in 09/2026",
+   "expect": {
+    "all": [
+     [
+      "23 service ticket",
+      "23 ticket",
+      "23 service visit",
+      "23 visit",
+      "23 service call"
+     ]
+    ],
+    "none": [
+     "317 service visits"
+    ]
+   },
+   "baseline": "pass",
+   "note": ""
+  },
+  {
+   "id": "lt-fixB-d11-04",
+   "section": "d11",
+   "text": "how many service calls on 21 Sep 2026",
+   "expect": {
+    "all": [
+     [
+      "22 service ticket",
+      "22 ticket",
+      "22 service visit",
+      "22 visit",
+      "22 service call"
+     ]
+    ],
+    "none": [
+     "317 service visits"
+    ]
+   },
+   "baseline": "pass",
+   "note": ""
+  },
+  {
+   "id": "lt-fixB-d11-05",
+   "section": "d11",
+   "text": "how many visits on 21/09/2026",
+   "expect": {
+    "all": [
+     [
+      "22 service ticket",
+      "22 ticket",
+      "22 service visit",
+      "22 visit",
+      "22 service call"
+     ]
+    ],
+    "none": [
+     "317 service visits"
+    ]
+   },
+   "baseline": "pass",
+   "note": ""
+  },
+  {
+   "id": "lt-fixB-d11-06",
+   "section": "d11",
+   "text": "how many service visits on 9.21.2026",
+   "expect": {
+    "all": [
+     [
+      "22 service ticket",
+      "22 ticket",
+      "22 service visit",
+      "22 visit",
+      "22 service call"
+     ]
+    ],
+    "none": [
+     "317 service visits"
+    ]
+   },
+   "baseline": "pass",
+   "note": ""
+  },
+  {
+   "id": "lt-fixB-d11-07",
+   "section": "d11",
+   "text": "how many service visits during 2026/09",
+   "expect": {
+    "all": [
+     [
+      "23 service ticket",
+      "23 ticket",
+      "23 service visit",
+      "23 visit",
+      "23 service call"
+     ]
+    ],
+    "none": [
+     "317 service visits"
+    ]
+   },
+   "baseline": "pass",
+   "note": ""
+  },
+  {
+   "id": "lt-fixB-d11-08",
+   "section": "d11",
+   "text": "how many invoices dated 2012.04.28",
+   "expect": {
+    "all": [
+     [
+      "1 invoice"
+     ]
+    ],
+    "none": [
+     "120 invoices"
+    ]
+   },
+   "baseline": "pass",
+   "note": "INV-20003"
+  },
+  {
+   "id": "lt-fixB-d11-09",
+   "section": "d11",
+   "text": "how many invoices were dated 28 Apr 2012",
+   "expect": {
+    "all": [
+     [
+      "1 invoice"
+     ]
+    ],
+    "none": [
+     "120 invoices"
+    ]
+   },
+   "baseline": "pass",
+   "note": ""
+  },
+  {
+   "id": "lt-fixB-d11-10",
+   "section": "d11",
+   "text": "how many invoices in 4/2012",
+   "expect": {
+    "all": [
+     [
+      "3 invoice",
+      "3 of",
+      "3 match",
+      "3 document"
+     ]
+    ],
+    "none": [
+     "120 invoices"
+    ]
+   },
+   "baseline": "pass",
+   "note": "3 invoices April 2012"
+  },
+  {
+   "id": "lt-fixB-d11-11",
+   "section": "d11",
+   "text": "how many service tickets on 2026-09-21",
+   "expect": {
+    "all": [
+     [
+      "22"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixB-d12-01",
+   "section": "d12",
+   "text": "how many units were installed between January 2020 and December 2021",
+   "expect": {
+    "all": [
+     [
+      "14 pieces of equipment",
+      "14 units",
+      "14 unit",
+      "14 installed",
+      "14 systems"
+     ]
+    ],
+    "none": [
+     "0 pieces of equipment in january"
+    ]
+   },
+   "baseline": "pass",
+   "note": "14"
+  },
+  {
+   "id": "lt-fixB-d12-02",
+   "section": "d12",
+   "text": "how many units were installed from March 2019 to May 2019",
+   "expect": {
+    "all": [
+     [
+      "3 pieces of equipment",
+      "3 units",
+      "3 unit",
+      "3 installed",
+      "3 systems"
+     ]
+    ],
+    "none": [
+     "0 pieces"
+    ]
+   },
+   "baseline": "pass",
+   "note": "3"
+  },
+  {
+   "id": "lt-fixB-d12-03",
+   "section": "d12",
+   "text": "how many units were installed 2020 through 2022",
+   "expect": {
+    "all": [
+     [
+      "21 pieces of equipment",
+      "21 units",
+      "21 unit",
+      "21 installed",
+      "21 systems"
+     ]
+    ],
+    "none": [
+     "0 pieces"
+    ]
+   },
+   "baseline": "pass",
+   "note": "21"
+  },
+  {
+   "id": "lt-fixB-d12-04",
+   "section": "d12",
+   "text": "how many pieces of equipment were installed between 2015 and 2017",
+   "expect": {
+    "all": [
+     [
+      "23 pieces of equipment",
+      "23 units",
+      "23 unit",
+      "23 installed",
+      "23 systems"
+     ]
+    ],
+    "none": [
+     "0 pieces"
+    ]
+   },
+   "baseline": "pass",
+   "note": "23"
+  },
+  {
+   "id": "lt-fixB-d12-05",
+   "section": "d12",
+   "text": "how many systems went in from Jan 2010 to Dec 2012",
+   "expect": {
+    "all": [
+     [
+      "22 pieces of equipment",
+      "22 units",
+      "22 unit",
+      "22 installed",
+      "22 systems"
+     ]
+    ],
+    "none": [
+     "0 pieces"
+    ]
+   },
+   "baseline": "pass",
+   "note": "22"
+  },
+  {
+   "id": "lt-fixB-d12-06",
+   "section": "d12",
+   "text": "how many units were instaled between June 2018 and February 2019",
+   "expect": {
+    "all": [
+     [
+      "3 pieces of equipment",
+      "3 units",
+      "3 unit",
+      "3 installed",
+      "3 systems"
+     ]
+    ],
+    "none": [
+     "0 pieces"
+    ]
+   },
+   "baseline": "pass",
+   "note": "3"
+  },
+  {
+   "id": "lt-fixB-d12-07",
+   "section": "d12",
+   "text": "how many invoices between January 2015 and June 2016",
+   "expect": {
+    "all": [
+     [
+      "9 invoice",
+      "9 of",
+      "9 match",
+      "9 document"
+     ]
+    ],
+    "none": [
+     "120 invoices"
+    ]
+   },
+   "baseline": "pass",
+   "note": "9"
+  },
+  {
+   "id": "lt-fixB-d12-08",
+   "section": "d12",
+   "text": "how many invoices from March 2012 to May 2012",
+   "expect": {
+    "all": [
+     [
+      "3 invoice",
+      "3 of",
+      "3 match",
+      "3 document"
+     ]
+    ],
+    "none": [
+     "120 invoices"
+    ]
+   },
+   "baseline": "pass",
+   "note": "3"
+  },
+  {
+   "id": "lt-fixB-d12-09",
+   "section": "d12",
+   "text": "how many service visits between 2013 and 2014",
+   "expect": {
+    "all": [
+     [
+      "37",
+      "13"
+     ]
+    ],
+    "none": [
+     "317 service visits"
+    ]
+   },
+   "baseline": "pass",
+   "note": "37 visit docs (13 tickets)"
+  },
+  {
+   "id": "lt-fixB-d12-10",
+   "section": "d12",
+   "text": "how many units were installed in 2020",
+   "expect": {
+    "all": [
+     [
+      "7 pieces of equipment",
+      "7 units",
+      "7 unit",
+      "7 installed",
+      "7 systems"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixB-d12-11",
+   "section": "d12",
+   "text": "how many units were installed in March 2019",
+   "expect": {
+    "all": [
+     [
+      "3 pieces of equipment",
+      "3 units",
+      "3 unit",
+      "3 installed",
+      "3 systems"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixB-d14-01",
+   "section": "d14",
+   "text": "how many 5 ton units",
+   "expect": {
+    "all": [
+     [
+      "no tonnage",
+      "no recorded tonnage",
+      "without a tonnage",
+      "without tonnage",
+      "tonnage on file",
+      "tonnage recorded",
+      "tonnage is on file",
+      "tonnage listed",
+      "have no tonnage",
+      "22 five",
+      "22 units",
+      "22 pieces"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "13 with field; 62 units no tonnage field; 22 incl. text"
+  },
+  {
+   "id": "lt-fixB-d14-02",
+   "section": "d14",
+   "text": "how many 3 ton units do we have",
+   "expect": {
+    "all": [
+     [
+      "no tonnage",
+      "no recorded tonnage",
+      "without a tonnage",
+      "without tonnage",
+      "tonnage on file",
+      "tonnage recorded",
+      "tonnage is on file",
+      "tonnage listed",
+      "have no tonnage",
+      "50 units",
+      "50 pieces"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "29 field / 50 incl text; 62 no field"
+  },
+  {
+   "id": "lt-fixB-d14-03",
+   "section": "d14",
+   "text": "how many 4 ton systems do we have",
+   "expect": {
+    "all": [
+     [
+      "no tonnage",
+      "no recorded tonnage",
+      "without a tonnage",
+      "without tonnage",
+      "tonnage on file",
+      "tonnage recorded",
+      "tonnage is on file",
+      "tonnage listed",
+      "have no tonnage",
+      "24 units",
+      "24 pieces"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "13 field / 24 incl text"
+  },
+  {
+   "id": "lt-fixB-d14-04",
+   "section": "d14",
+   "text": "how many five ton units are on file",
+   "expect": {
+    "all": [
+     [
+      "no tonnage",
+      "no recorded tonnage",
+      "without a tonnage",
+      "without tonnage",
+      "tonnage on file",
+      "tonnage recorded",
+      "tonnage is on file",
+      "tonnage listed",
+      "have no tonnage",
+      "22 five",
+      "22 units",
+      "22 pieces"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": ""
+  },
+  {
+   "id": "lt-fixB-d14-05",
+   "section": "d14",
+   "text": "how many 2 tons units",
+   "expect": {
+    "all": [
+     [
+      "no tonnage",
+      "no recorded tonnage",
+      "without a tonnage",
+      "without tonnage",
+      "tonnage on file",
+      "tonnage recorded",
+      "tonnage is on file",
+      "tonnage listed",
+      "have no tonnage",
+      "24 units",
+      "24 pieces"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "15 field / 24 incl text"
+  },
+  {
+   "id": "lt-fixB-d14-06",
+   "section": "d14",
+   "text": "how many units use R-454B refrigerant",
+   "expect": {
+    "all": [
+     [
+      "no refrigerant",
+      "without a refrigerant",
+      "without refrigerant",
+      "refrigerant on file",
+      "refrigerant recorded",
+      "12 units",
+      "12 pieces"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "8 on file / 12 incl. text; 62 no field"
+  },
+  {
+   "id": "lt-fixB-d14-07",
+   "section": "d14",
+   "text": "how many units do we have",
+   "expect": {
+    "all": [
+     [
+      "132"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixB-d14-08",
+   "section": "d14",
+   "text": "how many Trane units do we have",
+   "expect": {
+    "all": [
+     [
+      "16"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixB-d20-01",
+   "section": "d20",
+   "text": "how many service visits in 2013",
+   "expect": {
+    "all": [
+     [
+      "service ticket"
+     ],
+     [
+      "19",
+      "6"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "19 visit docs = 6 tickets + 6 invoices + 3 startup + 2 WO + 2 inspections"
+  },
+  {
+   "id": "lt-fixB-d20-02",
+   "section": "d20",
+   "text": "how many service visits did we do in 2019",
+   "expect": {
+    "all": [
+     [
+      "service ticket"
+     ],
+     [
+      "18",
+      "8"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "18 docs / 8 tickets"
+  },
+  {
+   "id": "lt-fixB-d20-03",
+   "section": "d20",
+   "text": "how many service calls in 2023",
+   "expect": {
+    "all": [
+     [
+      "service ticket"
+     ],
+     [
+      "20",
+      "9"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "20 docs / 9 tickets"
+  },
+  {
+   "id": "lt-fixB-d20-04",
+   "section": "d20",
+   "text": "how many jobs did we do in 2017",
+   "expect": {
+    "all": [
+     [
+      "service ticket"
+     ],
+     [
+      "18",
+      "7"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "18/7"
+  },
+  {
+   "id": "lt-fixB-d20-05",
+   "section": "d20",
+   "text": "how many service visits do we have on file",
+   "expect": {
+    "all": [
+     [
+      "service ticket"
+     ],
+     [
+      "317",
+      "120"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "317 docs / 120 tickets"
+  },
+  {
+   "id": "lt-fixB-d20-06",
+   "section": "d20",
+   "text": "how many service visits on 2026-09-21",
+   "expect": {
+    "all": [
+     [
+      "service ticket"
+     ],
+     [
+      "22",
+      "27"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "27 docs / 22 tickets"
+  },
+  {
+   "id": "lt-fixB-d20-07",
+   "section": "d20",
+   "text": "how many service tickets in 2013",
+   "expect": {
+    "all": [
+     [
+      "6"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixB-d04-16",
+   "section": "d04",
+   "text": "how many warranties end in 2029",
+   "expect": {
+    "all": [
+     [
+      "8 pieces",
+      "8 units",
+      "8 warrant",
+      "8 of"
+     ]
+    ],
+    "none": [
+     "0 units in 2029"
+    ]
+   },
+   "baseline": "pass",
+   "note": "8 units whose computed warranty end is 2029"
+  },
+  {
+   "id": "lt-fixB-d04-17",
+   "section": "d04",
+   "text": "which warranties run through 2030",
+   "expect": {
+    "all": [
+     [
+      "12 pieces",
+      "12 units",
+      "12 warrant"
+     ]
+    ],
+    "none": [
+     "132 units",
+     "future date"
+    ]
+   },
+   "baseline": "pass",
+   "note": "12 units with warranty end on/after 2030-12-31"
+  },
+  {
+   "id": "lt-fixB-d04-18",
+   "section": "d04",
+   "text": "how many warranties are good through 2028",
+   "expect": {
+    "all": [
+     [
+      "24 pieces",
+      "24 units",
+      "24 warrant"
+     ]
+    ],
+    "none": [
+     "future date"
+    ]
+   },
+   "baseline": "pass",
+   "note": "24"
+  },
+  {
+   "id": "lt-fixB-d04-19",
+   "section": "d04",
+   "text": "which maintenance agreements are valid through 2026",
+   "expect": {
+    "all": [
+     [
+      "27 maintenance agreement",
+      "27 agreement",
+      "27 document"
+     ]
+    ],
+    "none": [
+     "future date",
+     "no documents match",
+     "nothing on file for it"
+    ]
+   },
+   "baseline": "pass",
+   "note": "all 27 end on/after 2026-12-31"
+  },
+  {
+   "id": "lt-fixB-d04-20",
+   "section": "d04",
+   "text": "how many agreements expire before 2027",
+   "expect": {
+    "all": [
+     [
+      "19 maintenance agreement",
+      "19 agreement",
+      "19 document"
+     ]
+    ],
+    "none": [
+     "future date",
+     "no documents match",
+     "nothing on file for it"
+    ]
+   },
+   "baseline": "pass",
+   "note": "19"
+  },
+  {
+   "id": "lt-fixB-d10-11",
+   "section": "d10",
+   "text": "which invoices are over seven thousand dollars",
+   "expect": {
+    "all": [
+     [
+      "14 invoices"
+     ]
+    ],
+    "none": [
+     "120 documents"
+    ]
+   },
+   "baseline": "pass",
+   "note": "14"
+  },
+  {
+   "id": "lt-fixB-d10-12",
+   "section": "d10",
+   "text": "how many invoices at least five thousand dollars",
+   "expect": {
+    "all": [
+     [
+      "54 invoices"
+     ]
+    ],
+    "none": [
+     "120 invoices"
+    ]
+   },
+   "baseline": "pass",
+   "note": "54"
+  },
+  {
+   "id": "lt-fixB-d10-13",
+   "section": "d10",
+   "text": "how many invoices over fifteen hundred dollars",
+   "expect": {
+    "all": [
+     [
+      "112 invoices"
+     ]
+    ],
+    "none": [
+     "120 invoices"
+    ]
+   },
+   "baseline": "pass",
+   "note": "112 (>1500)"
+  },
+  {
+   "id": "lt-fixB-d10-14",
+   "section": "d10",
+   "text": "how many invoices over 6k",
+   "expect": {
+    "all": [
+     [
+      "32 invoices"
+     ]
+    ],
+    "none": [
+     "120 invoices"
+    ]
+   },
+   "baseline": "pass",
+   "note": "32"
+  },
+  {
+   "id": "lt-fixB-d14-09",
+   "section": "d14",
+   "text": "how many units run on R-22",
+   "expect": {
+    "all": [
+     [
+      "0 pieces",
+      "no refrigerant",
+      "have no refrigerant",
+      "refrigerant recorded"
+     ]
+    ],
+    "none": [
+     "300 documents"
+    ]
+   },
+   "baseline": "pass",
+   "note": "none on file; 62 units have no refrigerant recorded"
+  },
+  {
+   "id": "lt-fixB-d09-09",
+   "section": "d09",
+   "text": "how many customers are out of state",
+   "expect": {
+    "all": [
+     [
+      "not in AZ",
+      "outside AZ",
+      "out of state"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "says what out of state means"
+  }
+ ]
+}

@@ -1,0 +1,5 @@
+[
+ {"file":"large-service-manual-150pages.docx","question":"What is the blower wheel set screw torque","date":"2026-10-03","reason":"Ranking only: '85 inch-pounds' is on stored page 9 (the reader kept it); keyword search over 156 near-identical filler pages returns 150,135,95,92,85 (top-12 also misses page 9). Production adds Voyage semantic search, which PGlite lacks."},
+ {"file":"pricelist-hvac-2026.xlsx","question":"What contractor discount applies","date":"2026-10-03","reason":"Ranking only: '15%' is on stored page 80 (Labor Rates sheet); keyword search over 81 sheet pages returns 16,3,8,5,6,... and top-12 misses page 80. Non-identifier question; semantic search absent in PGlite."},
+ {"file":"pricelist-hvac-2026.xlsx","question":"When do the new prices take effect","date":"2026-10-03","reason":"Ranking only: 'April 1, 2026' is on stored page 81 (Read Me sheet); keyword search returns 2,3,4,5,6,... and top-12 misses page 81. Non-identifier question; semantic search absent in PGlite."}
+]

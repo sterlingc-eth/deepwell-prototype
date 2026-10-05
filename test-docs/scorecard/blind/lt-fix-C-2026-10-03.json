@@ -1,0 +1,2018 @@
+{
+ "version": "lt-fix-C-2026-10-03",
+ "questions": [
+  {
+   "id": "lt-fixC-01",
+   "section": "d16own",
+   "text": "Sonoran Comfort Air's customers",
+   "expect": {
+    "all": [
+     [
+      "120"
+     ]
+    ],
+    "none": [
+     "only hold this company",
+     "another company",
+     "can't see another",
+     "cannot see another"
+    ]
+   },
+   "baseline": "fail",
+   "note": "own company name is NOT another company; 120 customers on file"
+  },
+  {
+   "id": "lt-fixC-02",
+   "section": "d16own",
+   "text": "list Sonoran Comfort Air's customers",
+   "expect": {
+    "all": [
+     [
+      "120"
+     ]
+    ],
+    "none": [
+     "only hold this company",
+     "another company",
+     "can't see another",
+     "cannot see another"
+    ]
+   },
+   "baseline": "fail",
+   "note": "own company name is NOT another company; 120 customers on file"
+  },
+  {
+   "id": "lt-fixC-03",
+   "section": "d16own",
+   "text": "who are Sonoran Comfort Air's clients",
+   "expect": {
+    "all": [
+     [
+      "120"
+     ]
+    ],
+    "none": [
+     "only hold this company",
+     "another company",
+     "can't see another",
+     "cannot see another"
+    ]
+   },
+   "baseline": "fail",
+   "note": "own company name is NOT another company; 120 customers on file"
+  },
+  {
+   "id": "lt-fixC-04",
+   "section": "d16own",
+   "text": "show me our customers",
+   "expect": {
+    "all": [
+     [
+      "120"
+     ]
+    ],
+    "none": [
+     "only hold this company",
+     "another company",
+     "can't see another",
+     "cannot see another"
+    ]
+   },
+   "baseline": "pass",
+   "note": "own company name is NOT another company; 120 customers on file"
+  },
+  {
+   "id": "lt-fixC-05",
+   "section": "d16own",
+   "text": "how many customers does Sonoran Comfort Air have",
+   "expect": {
+    "all": [
+     [
+      "120"
+     ]
+    ],
+    "none": [
+     "only hold this company",
+     "another company",
+     "can't see another",
+     "cannot see another"
+    ]
+   },
+   "baseline": "fail",
+   "note": "own company name is NOT another company; 120 customers on file"
+  },
+  {
+   "id": "lt-fixC-06",
+   "section": "d16own",
+   "text": "sonoran comfort air customers list pls",
+   "expect": {
+    "all": [
+     [
+      "120"
+     ]
+    ],
+    "none": [
+     "only hold this company",
+     "another company",
+     "can't see another",
+     "cannot see another"
+    ]
+   },
+   "baseline": "pass",
+   "note": "own company name is NOT another company; 120 customers on file"
+  },
+  {
+   "id": "lt-fixC-07",
+   "section": "d16oth",
+   "text": "customer list of Desert Breeze Heating & Cooling",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "120 customers",
+     "you have 120"
+    ]
+   },
+   "baseline": "pass",
+   "note": "another company's records: must decline, never list our 120"
+  },
+  {
+   "id": "lt-fixC-08",
+   "section": "d16oth",
+   "text": "customers of ABC Air Conditioning",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "120 customers",
+     "you have 120"
+    ]
+   },
+   "baseline": "pass",
+   "note": "another company's records: must decline, never list our 120"
+  },
+  {
+   "id": "lt-fixC-09",
+   "section": "d16oth",
+   "text": "which of our customers also use the competition",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "120 customers",
+     "you have 120"
+    ]
+   },
+   "baseline": "pass",
+   "note": "another company's records: must decline, never list our 120"
+  },
+  {
+   "id": "lt-fixC-10",
+   "section": "d16oth",
+   "text": "give me Comfort Zone Mechanical's customers",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "120 customers",
+     "you have 120"
+    ]
+   },
+   "baseline": "pass",
+   "note": "another company's records: must decline, never list our 120"
+  },
+  {
+   "id": "lt-fixC-11",
+   "section": "d16oth",
+   "text": "list the customers of our rival",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "120 customers",
+     "you have 120"
+    ]
+   },
+   "baseline": "pass",
+   "note": "another company's records: must decline, never list our 120"
+  },
+  {
+   "id": "lt-fixC-12",
+   "section": "d16oth",
+   "text": "what customers does the other contractor down the street have",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "120 customers",
+     "you have 120"
+    ]
+   },
+   "baseline": "pass",
+   "note": "another company's records: must decline, never list our 120"
+  },
+  {
+   "id": "lt-fixC-13",
+   "section": "d16oth",
+   "text": "show me Valley Cooling Inc's client list",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "120 customers",
+     "you have 120"
+    ]
+   },
+   "baseline": "pass",
+   "note": "another company's records: must decline, never list our 120"
+  },
+  {
+   "id": "lt-fixC-14",
+   "section": "d16oth",
+   "text": "who are the competitors' customers",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "120 customers",
+     "you have 120"
+    ]
+   },
+   "baseline": "pass",
+   "note": "another company's records: must decline, never list our 120"
+  },
+  {
+   "id": "lt-fixC-15",
+   "section": "d16oth",
+   "text": "get me the customer list for Arctic Air Services",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "120 customers",
+     "you have 120"
+    ]
+   },
+   "baseline": "pass",
+   "note": "another company's records: must decline, never list our 120"
+  },
+  {
+   "id": "lt-fixC-16",
+   "section": "d9",
+   "text": "which customers live in another state",
+   "expect": {
+    "all": [
+     [
+      "4 customers",
+      "4 out",
+      "Las Vegas",
+      "Albuquerque",
+      "Los Angeles",
+      "Linda Hutchins"
+     ]
+    ],
+    "none": [
+     "120 customers",
+     "you have 120"
+    ]
+   },
+   "baseline": "pass",
+   "note": "4 out of state: Linda Hutchins & Thomas Osborn (Las Vegas NV), Donna Vance (Albuquerque NM), Ronald Dominguez (Los Angeles CA); or hand on"
+  },
+  {
+   "id": "lt-fixC-17",
+   "section": "d9",
+   "text": "which customers are outside Arizona",
+   "expect": {
+    "all": [
+     [
+      "4 customers",
+      "4 out",
+      "Las Vegas",
+      "Albuquerque",
+      "Los Angeles",
+      "Linda Hutchins"
+     ]
+    ],
+    "none": [
+     "120 customers",
+     "you have 120"
+    ]
+   },
+   "baseline": "pass",
+   "note": "4 out of state: Linda Hutchins & Thomas Osborn (Las Vegas NV), Donna Vance (Albuquerque NM), Ronald Dominguez (Los Angeles CA); or hand on"
+  },
+  {
+   "id": "lt-fixC-18",
+   "section": "d9",
+   "text": "list customers not in AZ",
+   "expect": {
+    "all": [
+     [
+      "4 customers",
+      "4 out",
+      "Las Vegas",
+      "Albuquerque",
+      "Los Angeles",
+      "Linda Hutchins"
+     ]
+    ],
+    "none": [
+     "120 customers",
+     "you have 120"
+    ]
+   },
+   "baseline": "pass",
+   "note": "4 out of state: Linda Hutchins & Thomas Osborn (Las Vegas NV), Donna Vance (Albuquerque NM), Ronald Dominguez (Los Angeles CA); or hand on"
+  },
+  {
+   "id": "lt-fixC-19",
+   "section": "d9",
+   "text": "show me customers living out of state",
+   "expect": {
+    "all": [
+     [
+      "4 customers",
+      "4 out",
+      "Las Vegas",
+      "Albuquerque",
+      "Los Angeles",
+      "Linda Hutchins"
+     ]
+    ],
+    "none": [
+     "120 customers",
+     "you have 120"
+    ]
+   },
+   "baseline": "pass",
+   "note": "4 out of state: Linda Hutchins & Thomas Osborn (Las Vegas NV), Donna Vance (Albuquerque NM), Ronald Dominguez (Los Angeles CA); or hand on"
+  },
+  {
+   "id": "lt-fixC-20",
+   "section": "d9",
+   "text": "which customers do not live in Arizona",
+   "expect": {
+    "all": [
+     [
+      "4 customers",
+      "4 out",
+      "Las Vegas",
+      "Albuquerque",
+      "Los Angeles",
+      "Linda Hutchins"
+     ]
+    ],
+    "none": [
+     "120 customers",
+     "you have 120"
+    ]
+   },
+   "baseline": "pass",
+   "note": "4 out of state: Linda Hutchins & Thomas Osborn (Las Vegas NV), Donna Vance (Albuquerque NM), Ronald Dominguez (Los Angeles CA); or hand on"
+  },
+  {
+   "id": "lt-fixC-21",
+   "section": "d9",
+   "text": "customers in a different state than the rest",
+   "expect": {
+    "all": [
+     [
+      "4 customers",
+      "4 out",
+      "Las Vegas",
+      "Albuquerque",
+      "Los Angeles",
+      "Linda Hutchins"
+     ]
+    ],
+    "none": [
+     "120 customers",
+     "you have 120"
+    ]
+   },
+   "baseline": "fail",
+   "note": "4 out of state: Linda Hutchins & Thomas Osborn (Las Vegas NV), Donna Vance (Albuquerque NM), Ronald Dominguez (Los Angeles CA); or hand on"
+  },
+  {
+   "id": "lt-fixC-22",
+   "section": "d9",
+   "text": "who are our out-of-state customers",
+   "expect": {
+    "all": [
+     [
+      "4 customers",
+      "4 out",
+      "Las Vegas",
+      "Albuquerque",
+      "Los Angeles",
+      "Linda Hutchins"
+     ]
+    ],
+    "none": [
+     "120 customers",
+     "you have 120"
+    ]
+   },
+   "baseline": "fail",
+   "note": "4 out of state: Linda Hutchins & Thomas Osborn (Las Vegas NV), Donna Vance (Albuquerque NM), Ronald Dominguez (Los Angeles CA); or hand on"
+  },
+  {
+   "id": "lt-fixC-23",
+   "section": "d9",
+   "text": "which clients are located outside of AZ",
+   "expect": {
+    "all": [
+     [
+      "4 customers",
+      "4 out",
+      "Las Vegas",
+      "Albuquerque",
+      "Los Angeles",
+      "Linda Hutchins"
+     ]
+    ],
+    "none": [
+     "120 customers",
+     "you have 120"
+    ]
+   },
+   "baseline": "pass",
+   "note": "4 out of state: Linda Hutchins & Thomas Osborn (Las Vegas NV), Donna Vance (Albuquerque NM), Ronald Dominguez (Los Angeles CA); or hand on"
+  },
+  {
+   "id": "lt-fixC-24",
+   "section": "d9",
+   "text": "how many customers are out of state",
+   "expect": {
+    "all": [
+     [
+      "4"
+     ]
+    ],
+    "none": [
+     "120 customers"
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixC-25",
+   "section": "d9",
+   "text": "how many customers do we have in Nevada",
+   "expect": {
+    "all": [
+     [
+      "2"
+     ]
+    ],
+    "none": [
+     "120 customers"
+    ],
+    "review": true
+   },
+   "baseline": "unknown",
+   "note": "control: 2 NV (Las Vegas)"
+  },
+  {
+   "id": "lt-fixC-26",
+   "section": "d19p",
+   "text": "when was the permit issued for Mark Ibarra",
+   "expect": {
+    "all": [
+     [
+      "no issue date",
+      "no date",
+      "not on file",
+      "isn't on file",
+      "does not show",
+      "doesn't show",
+      "doesn't list",
+      "does not list",
+      "not printed",
+      "doesn't carry",
+      "does not carry",
+      "doesn't include",
+      "does not include",
+      "no issued date",
+      "not shown",
+      "not listed",
+      "isn't listed",
+      "isn't shown",
+      "doesn't have",
+      "does not have",
+      "no expiration",
+      "no inspection",
+      "no fee"
+     ]
+    ],
+    "none": [
+     "permit status is",
+     "status is issued",
+     "status: issued"
+    ]
+   },
+   "baseline": "pass",
+   "note": "permit text has Status: Issued but NO date; answer: date not on file"
+  },
+  {
+   "id": "lt-fixC-27",
+   "section": "d19p",
+   "text": "when was Mark Ibarra's permit issued",
+   "expect": {
+    "all": [
+     [
+      "no issue date",
+      "no date",
+      "not on file",
+      "isn't on file",
+      "does not show",
+      "doesn't show",
+      "doesn't list",
+      "does not list",
+      "not printed",
+      "doesn't carry",
+      "does not carry",
+      "doesn't include",
+      "does not include",
+      "no issued date",
+      "not shown",
+      "not listed",
+      "isn't listed",
+      "isn't shown",
+      "doesn't have",
+      "does not have",
+      "no expiration",
+      "no inspection",
+      "no fee"
+     ]
+    ],
+    "none": [
+     "permit status is",
+     "status is issued",
+     "status: issued"
+    ]
+   },
+   "baseline": "pass",
+   "note": "permit text has Status: Issued but NO date; answer: date not on file"
+  },
+  {
+   "id": "lt-fixC-28",
+   "section": "d19p",
+   "text": "what date was permit BP-2026-10023 issued",
+   "expect": {
+    "all": [
+     [
+      "no issue date",
+      "no date",
+      "not on file",
+      "isn't on file",
+      "does not show",
+      "doesn't show",
+      "doesn't list",
+      "does not list",
+      "not printed",
+      "doesn't carry",
+      "does not carry",
+      "doesn't include",
+      "does not include",
+      "no issued date",
+      "not shown",
+      "not listed",
+      "isn't listed",
+      "isn't shown",
+      "doesn't have",
+      "does not have",
+      "no expiration",
+      "no inspection",
+      "no fee"
+     ]
+    ],
+    "none": [
+     "permit status is",
+     "status is issued",
+     "status: issued"
+    ]
+   },
+   "baseline": "pass",
+   "note": "permit text has Status: Issued but NO date; answer: date not on file"
+  },
+  {
+   "id": "lt-fixC-29",
+   "section": "d19p",
+   "text": "permit issue date for Deborah Ortega",
+   "expect": {
+    "all": [
+     [
+      "no issue date",
+      "no date",
+      "not on file",
+      "isn't on file",
+      "does not show",
+      "doesn't show",
+      "doesn't list",
+      "does not list",
+      "not printed",
+      "doesn't carry",
+      "does not carry",
+      "doesn't include",
+      "does not include",
+      "no issued date",
+      "not shown",
+      "not listed",
+      "isn't listed",
+      "isn't shown",
+      "doesn't have",
+      "does not have",
+      "no expiration",
+      "no inspection",
+      "no fee"
+     ]
+    ],
+    "none": [
+     "permit status is",
+     "status is issued",
+     "status: issued"
+    ]
+   },
+   "baseline": "pass",
+   "note": "permit text has Status: Issued but NO date; answer: date not on file"
+  },
+  {
+   "id": "lt-fixC-30",
+   "section": "d19p",
+   "text": "what day did they issue the permit for William Quintana",
+   "expect": {
+    "all": [
+     [
+      "no issue date",
+      "no date",
+      "not on file",
+      "isn't on file",
+      "does not show",
+      "doesn't show",
+      "doesn't list",
+      "does not list",
+      "not printed",
+      "doesn't carry",
+      "does not carry",
+      "doesn't include",
+      "does not include",
+      "no issued date",
+      "not shown",
+      "not listed",
+      "isn't listed",
+      "isn't shown",
+      "doesn't have",
+      "does not have",
+      "no expiration",
+      "no inspection",
+      "no fee"
+     ]
+    ],
+    "none": [
+     "permit status is",
+     "status is issued",
+     "status: issued"
+    ]
+   },
+   "baseline": "pass",
+   "note": "permit text has Status: Issued but NO date; answer: date not on file"
+  },
+  {
+   "id": "lt-fixC-31",
+   "section": "d19p",
+   "text": "when did the city issue permit BP-2026-10001",
+   "expect": {
+    "all": [
+     [
+      "no issue date",
+      "no date",
+      "not on file",
+      "isn't on file",
+      "does not show",
+      "doesn't show",
+      "doesn't list",
+      "does not list",
+      "not printed",
+      "doesn't carry",
+      "does not carry",
+      "doesn't include",
+      "does not include",
+      "no issued date",
+      "not shown",
+      "not listed",
+      "isn't listed",
+      "isn't shown",
+      "doesn't have",
+      "does not have",
+      "no expiration",
+      "no inspection",
+      "no fee"
+     ]
+    ],
+    "none": [
+     "permit status is",
+     "status is issued",
+     "status: issued"
+    ]
+   },
+   "baseline": "pass",
+   "note": "permit text has Status: Issued but NO date; answer: date not on file"
+  },
+  {
+   "id": "lt-fixC-32",
+   "section": "d19p",
+   "text": "when does permit BP-2026-10023 expire",
+   "expect": {
+    "all": [
+     [
+      "no issue date",
+      "no date",
+      "not on file",
+      "isn't on file",
+      "does not show",
+      "doesn't show",
+      "doesn't list",
+      "does not list",
+      "not printed",
+      "doesn't carry",
+      "does not carry",
+      "doesn't include",
+      "does not include",
+      "no issued date",
+      "not shown",
+      "not listed",
+      "isn't listed",
+      "isn't shown",
+      "doesn't have",
+      "does not have",
+      "no expiration",
+      "no inspection",
+      "no fee",
+      "no expir",
+      "not on file"
+     ]
+    ],
+    "none": [
+     "permit status is",
+     "status is issued"
+    ]
+   },
+   "baseline": "pass",
+   "note": "permit text has no expiry/inspection/fee"
+  },
+  {
+   "id": "lt-fixC-33",
+   "section": "d19p",
+   "text": "what's the expiration date on the permit for Mark Ibarra",
+   "expect": {
+    "all": [
+     [
+      "no issue date",
+      "no date",
+      "not on file",
+      "isn't on file",
+      "does not show",
+      "doesn't show",
+      "doesn't list",
+      "does not list",
+      "not printed",
+      "doesn't carry",
+      "does not carry",
+      "doesn't include",
+      "does not include",
+      "no issued date",
+      "not shown",
+      "not listed",
+      "isn't listed",
+      "isn't shown",
+      "doesn't have",
+      "does not have",
+      "no expiration",
+      "no inspection",
+      "no fee",
+      "no expir",
+      "not on file"
+     ]
+    ],
+    "none": [
+     "permit status is",
+     "status is issued"
+    ]
+   },
+   "baseline": "pass",
+   "note": "permit text has no expiry/inspection/fee"
+  },
+  {
+   "id": "lt-fixC-34",
+   "section": "d19p",
+   "text": "what is the inspection date for permit BP-2026-10001",
+   "expect": {
+    "all": [
+     [
+      "no issue date",
+      "no date",
+      "not on file",
+      "isn't on file",
+      "does not show",
+      "doesn't show",
+      "doesn't list",
+      "does not list",
+      "not printed",
+      "doesn't carry",
+      "does not carry",
+      "doesn't include",
+      "does not include",
+      "no issued date",
+      "not shown",
+      "not listed",
+      "isn't listed",
+      "isn't shown",
+      "doesn't have",
+      "does not have",
+      "no expiration",
+      "no inspection",
+      "no fee",
+      "no expir",
+      "not on file"
+     ]
+    ],
+    "none": [
+     "permit status is",
+     "status is issued"
+    ]
+   },
+   "baseline": "pass",
+   "note": "permit text has no expiry/inspection/fee"
+  },
+  {
+   "id": "lt-fixC-35",
+   "section": "d19p",
+   "text": "what was the permit fee for Deborah Ortega",
+   "expect": {
+    "all": [
+     [
+      "no issue date",
+      "no date",
+      "not on file",
+      "isn't on file",
+      "does not show",
+      "doesn't show",
+      "doesn't list",
+      "does not list",
+      "not printed",
+      "doesn't carry",
+      "does not carry",
+      "doesn't include",
+      "does not include",
+      "no issued date",
+      "not shown",
+      "not listed",
+      "isn't listed",
+      "isn't shown",
+      "doesn't have",
+      "does not have",
+      "no expiration",
+      "no inspection",
+      "no fee",
+      "no expir",
+      "not on file"
+     ]
+    ],
+    "none": [
+     "permit status is",
+     "status is issued"
+    ]
+   },
+   "baseline": "pass",
+   "note": "permit text has no expiry/inspection/fee"
+  },
+  {
+   "id": "lt-fixC-36",
+   "section": "d19p",
+   "text": "who is the contractor on permit BP-2026-10023",
+   "expect": {
+    "all": [
+     [
+      "Sonoran Comfort Air"
+     ]
+    ],
+    "review": true
+   },
+   "baseline": "unknown",
+   "note": "Contractor: Sonoran Comfort Air"
+  },
+  {
+   "id": "lt-fixC-37",
+   "section": "d19p",
+   "text": "what's the status on permit BP-2026-10023",
+   "expect": {
+    "all": [
+     [
+      "Issued"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixC-38",
+   "section": "d19p",
+   "text": "which city issued Deborah Ortega's permit",
+   "expect": {
+    "all": [
+     [
+      "Mesa"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixC-39",
+   "section": "d19p",
+   "text": "what is the scope of work on permit BP-2026-25000",
+   "expect": {
+    "all": [
+     [
+      "Commercial RTU"
+     ]
+    ],
+    "review": true
+   },
+   "baseline": "unknown",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixC-40",
+   "section": "d4",
+   "text": "how many maintenance agreements run through the end of 2026",
+   "expect": {
+    "all": [
+     [
+      "27"
+     ]
+    ],
+    "none": [
+     "19 maintenance agreements end",
+     "19 agreements"
+    ]
+   },
+   "baseline": "pass",
+   "note": "end date >= 12/31/2026: 19 end 12/31/2026 + 8 end 2027 = 27"
+  },
+  {
+   "id": "lt-fixC-41",
+   "section": "d4",
+   "text": "how many agreements run through the end of 2026",
+   "expect": {
+    "all": [
+     [
+      "27"
+     ]
+    ],
+    "none": [
+     "19 maintenance agreements end",
+     "19 agreements"
+    ]
+   },
+   "baseline": "pass",
+   "note": "end date >= 12/31/2026: 19 end 12/31/2026 + 8 end 2027 = 27"
+  },
+  {
+   "id": "lt-fixC-42",
+   "section": "d4",
+   "text": "which contracts run until the end of 2026",
+   "expect": {
+    "all": [
+     [
+      "27"
+     ]
+    ],
+    "none": [
+     "19 maintenance agreements end",
+     "19 agreements"
+    ]
+   },
+   "baseline": "pass",
+   "note": "end date >= 12/31/2026: 19 end 12/31/2026 + 8 end 2027 = 27"
+  },
+  {
+   "id": "lt-fixC-43",
+   "section": "d4",
+   "text": "how many maintenance contracts are still in force at the end of 2026",
+   "expect": {
+    "all": [
+     [
+      "27"
+     ]
+    ],
+    "none": [
+     "19 maintenance agreements end",
+     "19 agreements"
+    ]
+   },
+   "baseline": "pass",
+   "note": "end date >= 12/31/2026: 19 end 12/31/2026 + 8 end 2027 = 27"
+  },
+  {
+   "id": "lt-fixC-44",
+   "section": "d4",
+   "text": "how many maintenance agreements run through 2026",
+   "expect": {
+    "all": [
+     [
+      "27"
+     ]
+    ],
+    "none": [
+     "19 maintenance agreements end",
+     "19 agreements"
+    ]
+   },
+   "baseline": "pass",
+   "note": "end date >= 12/31/2026: 19 end 12/31/2026 + 8 end 2027 = 27"
+  },
+  {
+   "id": "lt-fixC-45",
+   "section": "d4",
+   "text": "how many agreements are still active through the end of 2026",
+   "expect": {
+    "all": [
+     [
+      "27"
+     ]
+    ],
+    "none": [
+     "19 maintenance agreements end",
+     "19 agreements"
+    ]
+   },
+   "baseline": "pass",
+   "note": "end date >= 12/31/2026: 19 end 12/31/2026 + 8 end 2027 = 27"
+  },
+  {
+   "id": "lt-fixC-46",
+   "section": "d4",
+   "text": "how many maintenance agreements run past 2026",
+   "expect": {
+    "all": [
+     [
+      "8"
+     ]
+    ],
+    "none": [
+     "27 maintenance",
+     "19 maintenance"
+    ]
+   },
+   "baseline": "pass",
+   "note": "end after 2026 = 8 (end 2027)"
+  },
+  {
+   "id": "lt-fixC-47",
+   "section": "d4",
+   "text": "how many agreements extend beyond 2026",
+   "expect": {
+    "all": [
+     [
+      "8"
+     ]
+    ],
+    "none": [
+     "27 maintenance",
+     "19 maintenance"
+    ]
+   },
+   "baseline": "pass",
+   "note": "end after 2026 = 8 (end 2027)"
+  },
+  {
+   "id": "lt-fixC-48",
+   "section": "d4",
+   "text": "how many agreements are still active in 2027",
+   "expect": {
+    "all": [
+     [
+      "8"
+     ]
+    ],
+    "none": [
+     "27 maintenance",
+     "19 maintenance"
+    ]
+   },
+   "baseline": "pass",
+   "note": "end after 2026 = 8 (end 2027)"
+  },
+  {
+   "id": "lt-fixC-49",
+   "section": "d4",
+   "text": "how many maintenance agreements expire in 2026",
+   "expect": {
+    "all": [
+     [
+      "19"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixC-50",
+   "section": "d4",
+   "text": "how many maintenance agreements run through 2027",
+   "expect": {
+    "all": [
+     [
+      "8"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixC-51",
+   "section": "d4",
+   "text": "which maintenance agreements end in 2027",
+   "expect": {
+    "all": [
+     [
+      "8"
+     ]
+    ],
+    "review": true
+   },
+   "baseline": "unknown",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixC-52",
+   "section": "d10yr",
+   "text": "how many invoices over five thousand dollars in 2025",
+   "expect": {
+    "all": [
+     [
+      "3"
+     ]
+    ],
+    "none": [
+     "54 invoices",
+     "54 "
+    ]
+   },
+   "baseline": "pass",
+   "note": "invoices >5000 dated 2025 = 3 (>5000 any year = 54?) "
+  },
+  {
+   "id": "lt-fixC-53",
+   "section": "d10yr",
+   "text": "how many invoices over $5,000 in 2025",
+   "expect": {
+    "all": [
+     [
+      "3"
+     ]
+    ],
+    "none": [
+     "54 invoices",
+     "54 "
+    ]
+   },
+   "baseline": "pass",
+   "note": "invoices >5000 dated 2025 = 3 (>5000 any year = 54?) "
+  },
+  {
+   "id": "lt-fixC-54",
+   "section": "d10yr",
+   "text": "number of invoices above 5000 dated 2025",
+   "expect": {
+    "all": [
+     [
+      "3"
+     ]
+    ],
+    "none": [
+     "54 invoices",
+     "54 "
+    ]
+   },
+   "baseline": "fail",
+   "note": "invoices >5000 dated 2025 = 3 (>5000 any year = 54?) "
+  },
+  {
+   "id": "lt-fixC-55",
+   "section": "d10yr",
+   "text": "count invoices > $5000 for 2025",
+   "expect": {
+    "all": [
+     [
+      "3"
+     ]
+    ],
+    "none": [
+     "54 invoices",
+     "54 "
+    ]
+   },
+   "baseline": "fail",
+   "note": "invoices >5000 dated 2025 = 3 (>5000 any year = 54?) "
+  },
+  {
+   "id": "lt-fixC-56",
+   "section": "d10yr",
+   "text": "how many invoices were more than five thousand in 2025",
+   "expect": {
+    "all": [
+     [
+      "3"
+     ]
+    ],
+    "none": [
+     "54 invoices",
+     "54 "
+    ]
+   },
+   "baseline": "pass",
+   "note": "invoices >5000 dated 2025 = 3 (>5000 any year = 54?) "
+  },
+  {
+   "id": "lt-fixC-57",
+   "section": "d10yr",
+   "text": "invoices over 5k in 2025 how many",
+   "expect": {
+    "all": [
+     [
+      "3"
+     ]
+    ],
+    "none": [
+     "54 invoices",
+     "54 "
+    ]
+   },
+   "baseline": "pass",
+   "note": "invoices >5000 dated 2025 = 3 (>5000 any year = 54?) "
+  },
+  {
+   "id": "lt-fixC-58",
+   "section": "d10yr",
+   "text": "how many invoices over 3000 dollars in 2024",
+   "expect": {
+    "all": [
+     [
+      "5"
+     ]
+    ],
+    "none": [
+     "106 invoices",
+     "106 "
+    ]
+   },
+   "baseline": "pass",
+   "note": "2024: 5, 2026: 5"
+  },
+  {
+   "id": "lt-fixC-59",
+   "section": "d10yr",
+   "text": "how many invoices above $3,000 in 2026",
+   "expect": {
+    "all": [
+     [
+      "5"
+     ]
+    ],
+    "none": [
+     "106 invoices",
+     "106 "
+    ]
+   },
+   "baseline": "pass",
+   "note": "2024: 5, 2026: 5"
+  },
+  {
+   "id": "lt-fixC-60",
+   "section": "d10city",
+   "text": "how many invoices over 3000 for Mesa customers",
+   "expect": {
+    "all": [
+     [
+      "15"
+     ]
+    ],
+    "none": [
+     "106 invoices",
+     "106 "
+    ]
+   },
+   "baseline": "pass",
+   "note": "Mesa 15, Tucson 10 (customer service-address city)"
+  },
+  {
+   "id": "lt-fixC-61",
+   "section": "d10city",
+   "text": "how many invoices over $3,000 for customers in Mesa",
+   "expect": {
+    "all": [
+     [
+      "15"
+     ]
+    ],
+    "none": [
+     "106 invoices",
+     "106 "
+    ]
+   },
+   "baseline": "pass",
+   "note": "Mesa 15, Tucson 10 (customer service-address city)"
+  },
+  {
+   "id": "lt-fixC-62",
+   "section": "d10city",
+   "text": "number of invoices above 3000 from Mesa customers",
+   "expect": {
+    "all": [
+     [
+      "15"
+     ]
+    ],
+    "none": [
+     "106 invoices",
+     "106 "
+    ]
+   },
+   "baseline": "pass",
+   "note": "Mesa 15, Tucson 10 (customer service-address city)"
+  },
+  {
+   "id": "lt-fixC-63",
+   "section": "d10city",
+   "text": "count invoices greater than three thousand dollars Mesa",
+   "expect": {
+    "all": [
+     [
+      "15"
+     ]
+    ],
+    "none": [
+     "106 invoices",
+     "106 "
+    ]
+   },
+   "baseline": "pass",
+   "note": "Mesa 15, Tucson 10 (customer service-address city)"
+  },
+  {
+   "id": "lt-fixC-64",
+   "section": "d10city",
+   "text": "how many invoices over 3000 dollars for our Tucson customers",
+   "expect": {
+    "all": [
+     [
+      "10"
+     ]
+    ],
+    "none": [
+     "106 invoices",
+     "106 "
+    ]
+   },
+   "baseline": "pass",
+   "note": "Mesa 15, Tucson 10 (customer service-address city)"
+  },
+  {
+   "id": "lt-fixC-65",
+   "section": "d10ctl",
+   "text": "how many invoices over three thousand dollars",
+   "expect": {
+    "all": [
+     [
+      "106"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixC-66",
+   "section": "d10ctl",
+   "text": "how many invoices over 5000",
+   "expect": {
+    "all": [
+     [
+      "54"
+     ]
+    ],
+    "review": true
+   },
+   "baseline": "unknown",
+   "note": "control: >5000 any year (checked in truth)"
+  },
+  {
+   "id": "lt-fixC-67",
+   "section": "d2sup",
+   "text": "what is the largest purchase order from Baker",
+   "expect": {
+    "all": [
+     [
+      "124",
+      "$124"
+     ]
+    ],
+    "none": [
+     "$132",
+     "132"
+    ]
+   },
+   "baseline": "pass",
+   "note": "Baker: max 124 (PO-9048/9098 tie), min 60, avg 92; Watsco max 132"
+  },
+  {
+   "id": "lt-fixC-68",
+   "section": "d2sup",
+   "text": "which PO from Baker Distributing was the biggest",
+   "expect": {
+    "all": [
+     [
+      "124",
+      "$124"
+     ]
+    ],
+    "none": [
+     "$132",
+     "132"
+    ]
+   },
+   "baseline": "pass",
+   "note": "Baker: max 124 (PO-9048/9098 tie), min 60, avg 92; Watsco max 132"
+  },
+  {
+   "id": "lt-fixC-69",
+   "section": "d2sup",
+   "text": "biggest purchase order from Watsco",
+   "expect": {
+    "all": [
+     [
+      "132",
+      "$132"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "Baker: max 124 (PO-9048/9098 tie), min 60, avg 92; Watsco max 132"
+  },
+  {
+   "id": "lt-fixC-70",
+   "section": "d2sup",
+   "text": "what's the smallest PO from Baker",
+   "expect": {
+    "all": [
+     [
+      "60",
+      "$60"
+     ]
+    ],
+    "none": [
+     "$132",
+     "132"
+    ]
+   },
+   "baseline": "pass",
+   "note": "Baker: max 124 (PO-9048/9098 tie), min 60, avg 92; Watsco max 132"
+  },
+  {
+   "id": "lt-fixC-71",
+   "section": "d2sup",
+   "text": "average purchase order from Baker Distributing",
+   "expect": {
+    "all": [
+     [
+      "92",
+      "$92"
+     ]
+    ],
+    "none": [
+     "$132",
+     "132"
+    ]
+   },
+   "baseline": "pass",
+   "note": "Baker: max 124 (PO-9048/9098 tie), min 60, avg 92; Watsco max 132"
+  },
+  {
+   "id": "lt-fixC-72",
+   "section": "d8yr",
+   "text": "how many commercial permits were issued in 2026",
+   "expect": {
+    "all": [
+     [
+      "8",
+      "no issue date",
+      "no date",
+      "not on file",
+      "doesn't carry",
+      "does not carry",
+      "doesn't show",
+      "does not show",
+      "not printed"
+     ]
+    ],
+    "none": [
+     "No commercial permits",
+     "no commercial permits on file"
+    ]
+   },
+   "baseline": "fail",
+   "note": "8 commercial permits; permits carry numbers BP-2026- but no issue date; must not say none exist"
+  },
+  {
+   "id": "lt-fixC-73",
+   "section": "d8yr",
+   "text": "commercial permits issued in 2026",
+   "expect": {
+    "all": [
+     [
+      "8",
+      "no issue date",
+      "no date",
+      "not on file",
+      "doesn't carry",
+      "does not carry",
+      "doesn't show",
+      "does not show",
+      "not printed"
+     ]
+    ],
+    "none": [
+     "No commercial permits",
+     "no commercial permits on file"
+    ]
+   },
+   "baseline": "fail",
+   "note": "8 commercial permits; permits carry numbers BP-2026- but no issue date; must not say none exist"
+  },
+  {
+   "id": "lt-fixC-74",
+   "section": "d8yr",
+   "text": "how many commercial permits were issued this year",
+   "expect": {
+    "all": [
+     [
+      "8",
+      "no issue date",
+      "no date",
+      "not on file",
+      "doesn't carry",
+      "does not carry",
+      "doesn't show",
+      "does not show",
+      "not printed"
+     ]
+    ],
+    "none": [
+     "No commercial permits",
+     "no commercial permits on file"
+    ]
+   },
+   "baseline": "fail",
+   "note": "8 commercial permits; permits carry numbers BP-2026- but no issue date; must not say none exist"
+  },
+  {
+   "id": "lt-fixC-75",
+   "section": "d8yr",
+   "text": "commercial permit count for 2026",
+   "expect": {
+    "all": [
+     [
+      "8",
+      "no issue date",
+      "no date",
+      "not on file",
+      "doesn't carry",
+      "does not carry",
+      "doesn't show",
+      "does not show",
+      "not printed"
+     ]
+    ],
+    "none": [
+     "No commercial permits",
+     "no commercial permits on file"
+    ]
+   },
+   "baseline": "fail",
+   "note": "8 commercial permits; permits carry numbers BP-2026- but no issue date; must not say none exist"
+  },
+  {
+   "id": "lt-fixC-76",
+   "section": "d8ctl",
+   "text": "how many commercial permits do we have",
+   "expect": {
+    "all": [
+     [
+      "8"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixC-77",
+   "section": "d11",
+   "text": "how many service tickets on 09.21.26",
+   "expect": {
+    "all": [
+     [
+      "22"
+     ]
+    ],
+    "none": [
+     "120 documents",
+     "you have 120"
+    ]
+   },
+   "baseline": "pass",
+   "note": "22 service tickets dated 2026-09-21"
+  },
+  {
+   "id": "lt-fixC-78",
+   "section": "d11",
+   "text": "how many service tickets on 09.21.2026",
+   "expect": {
+    "all": [
+     [
+      "22"
+     ]
+    ],
+    "none": [
+     "120 documents",
+     "you have 120"
+    ]
+   },
+   "baseline": "pass",
+   "note": "22 service tickets dated 2026-09-21"
+  },
+  {
+   "id": "lt-fixC-79",
+   "section": "d11",
+   "text": "service tickets on 9.21.26",
+   "expect": {
+    "all": [
+     [
+      "22"
+     ]
+    ],
+    "none": [
+     "120 documents",
+     "you have 120"
+    ]
+   },
+   "baseline": "fail",
+   "note": "22 service tickets dated 2026-09-21"
+  },
+  {
+   "id": "lt-fixC-80",
+   "section": "d11",
+   "text": "how many service tickets on 21.9.2026",
+   "expect": {
+    "all": [
+     [
+      "22"
+     ]
+    ],
+    "none": [
+     "120 documents",
+     "you have 120"
+    ]
+   },
+   "baseline": "pass",
+   "note": "22 service tickets dated 2026-09-21"
+  },
+  {
+   "id": "lt-fixC-81",
+   "section": "d11",
+   "text": "how many service tickets on 2026/9/21",
+   "expect": {
+    "all": [
+     [
+      "22"
+     ]
+    ],
+    "none": [
+     "120 documents",
+     "you have 120"
+    ]
+   },
+   "baseline": "pass",
+   "note": "22 service tickets dated 2026-09-21"
+  },
+  {
+   "id": "lt-fixC-82",
+   "section": "d11",
+   "text": "how many service tickets on 2026.09.21",
+   "expect": {
+    "all": [
+     [
+      "22"
+     ]
+    ],
+    "none": [
+     "120 documents",
+     "you have 120"
+    ]
+   },
+   "baseline": "pass",
+   "note": "22 service tickets dated 2026-09-21"
+  },
+  {
+   "id": "lt-fixC-83",
+   "section": "d11",
+   "text": "how many service tickets on 5.16.10",
+   "expect": {
+    "all": [
+     [
+      "1 service",
+      "1 ticket",
+      "1 document",
+      "one"
+     ]
+    ],
+    "none": [
+     "120 documents"
+    ],
+    "review": true
+   },
+   "baseline": "unknown",
+   "note": "1 ticket 05/16/2010"
+  },
+  {
+   "id": "lt-fixC-84",
+   "section": "d11ctl",
+   "text": "how many service tickets on 09/21/2026",
+   "expect": {
+    "all": [
+     [
+      "22"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixC-85",
+   "section": "d11ctl",
+   "text": "how many service tickets in 9/2026",
+   "expect": {
+    "all": [
+     [
+      "23"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixC-86",
+   "section": "d10x",
+   "text": "how many invoices over 3000 in Mesa in 2024",
+   "expect": {
+    "all": [
+     [
+      "1 invoice"
+     ]
+    ],
+    "none": [
+     "106 invoices"
+    ]
+   },
+   "baseline": "pass",
+   "note": "Mesa (service address) + 2024 + >3000"
+  },
+  {
+   "id": "lt-fixC-87",
+   "section": "d10x",
+   "text": "how many invoices over 3000 for Linda Fitzgerald",
+   "expect": {
+    "all": [
+     [
+      "0 invoices",
+      "no invoices"
+     ]
+    ],
+    "none": [
+     "106 invoices"
+    ]
+   },
+   "baseline": "pass",
+   "note": "customer named; her invoice is 2800"
+  },
+  {
+   "id": "lt-fixC-88",
+   "section": "d10x",
+   "text": "how many invoices over 1000 for Mercer",
+   "expect": {
+    "all": [
+     [
+      "2 invoices"
+     ]
+    ],
+    "none": [
+     "106 invoices"
+    ]
+   },
+   "baseline": "pass",
+   "note": "Thomas + Laura Mercer"
+  },
+  {
+   "id": "lt-fixC-89",
+   "section": "d10x",
+   "text": "how many invoices over 3000 for commercial customers",
+   "expect": {
+    "all": [
+     [
+      "could not also apply",
+      "can't apply",
+      "cannot apply",
+      "not reflected",
+      "couldn't work that particular question out"
+     ]
+    ]
+   },
+   "baseline": "fail",
+   "note": "commercial group cannot be applied: must say so (or hand on)"
+  },
+  {
+   "id": "lt-fixC-90",
+   "section": "r2",
+   "text": "how many permits were issued this year",
+   "expect": {
+    "all": [
+     [
+      "don't carry",
+      "does not carry",
+      "no issue date",
+      "no date",
+      "not on file",
+      "couldn't work",
+      "prints no"
+     ]
+    ],
+    "none": [
+     "0 documents",
+     "27 documents",
+     "27 permits",
+     "no permits"
+    ]
+   },
+   "baseline": "fail",
+   "note": "reviewer-2 follow-up"
+  },
+  {
+   "id": "lt-fixC-91",
+   "section": "r2",
+   "text": "how many permits were issued in 2025",
+   "expect": {
+    "all": [
+     [
+      "don't carry",
+      "does not carry",
+      "no issue date",
+      "no date",
+      "not on file",
+      "couldn't work",
+      "prints no"
+     ]
+    ],
+    "none": [
+     "0 documents",
+     "27 documents",
+     "27 permits",
+     "no permits"
+    ]
+   },
+   "baseline": "fail",
+   "note": "reviewer-2 follow-up"
+  },
+  {
+   "id": "lt-fixC-92",
+   "section": "r2",
+   "text": "how many permits for 2026",
+   "expect": {
+    "all": [
+     [
+      "don't carry",
+      "does not carry",
+      "no issue date",
+      "no date",
+      "not on file",
+      "couldn't work",
+      "prints no"
+     ]
+    ],
+    "none": [
+     "0 documents",
+     "27 documents",
+     "27 permits",
+     "no permits"
+    ]
+   },
+   "baseline": "fail",
+   "note": "reviewer-2 follow-up"
+  },
+  {
+   "id": "lt-fixC-93",
+   "section": "r2",
+   "text": "permits issued in 2026",
+   "expect": {
+    "all": [
+     [
+      "don't carry",
+      "does not carry",
+      "no issue date",
+      "no date",
+      "not on file",
+      "couldn't work",
+      "prints no"
+     ]
+    ],
+    "none": [
+     "0 documents",
+     "27 documents",
+     "27 permits",
+     "no permits"
+    ]
+   },
+   "baseline": "fail",
+   "note": "reviewer-2 follow-up"
+  },
+  {
+   "id": "lt-fixC-94",
+   "section": "r2",
+   "text": "customers of Sonoran Comfort Air Inc",
+   "expect": {
+    "none": [
+     "only hold this company",
+     "another company"
+    ]
+   },
+   "baseline": "fail",
+   "note": "reviewer-2 follow-up"
+  },
+  {
+   "id": "lt-fixC-95",
+   "section": "r2",
+   "text": "who are the customers of Sonoran Comfort Air Co.",
+   "expect": {
+    "none": [
+     "only hold this company",
+     "another company"
+    ]
+   },
+   "baseline": "fail",
+   "note": "reviewer-2 follow-up"
+  },
+  {
+   "id": "lt-fixC-96",
+   "section": "r2",
+   "text": "when does the permit for Mark Ibarra expire",
+   "expect": {
+    "all": [
+     [
+      "prints no",
+      "no expir",
+      "not printed",
+      "doesn't print",
+      "not on file"
+     ]
+    ],
+    "none": [
+     "Issued"
+    ]
+   },
+   "baseline": "pass",
+   "note": "reviewer-2 follow-up"
+  },
+  {
+   "id": "lt-fixC-97",
+   "section": "r2",
+   "text": "when does Deborah Ortega's permit expire",
+   "expect": {
+    "all": [
+     [
+      "prints no",
+      "no expir",
+      "not printed",
+      "doesn't print",
+      "not on file"
+     ]
+    ],
+    "none": [
+     "Issued"
+    ]
+   },
+   "baseline": "pass",
+   "note": "reviewer-2 follow-up"
+  }
+ ]
+}

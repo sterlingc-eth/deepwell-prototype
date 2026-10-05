@@ -1,0 +1,301 @@
+{
+ "version": "lt-review2-2026-10-03",
+ "questions": [
+  {
+   "id": "lt-rev2-01",
+   "section": "d16",
+   "text": "who are the customers of Sonoran Comfort Air LLC",
+   "expect": {
+    "none": [
+     "only hold this company",
+     "another company"
+    ]
+   },
+   "baseline": "fail",
+   "note": "our own name with a legal suffix: must not be declined as another company (hand-on or list ok)"
+  },
+  {
+   "id": "lt-rev2-02",
+   "section": "d16",
+   "text": "what customers does Valley Comfort Heating & Air have",
+   "expect": {
+    "all": [
+     [
+      "only hold",
+      "this company",
+      "can't see"
+     ]
+    ],
+    "none": [
+     "Ronald Bracken",
+     "120 customers"
+    ]
+   },
+   "baseline": "fail",
+   "note": "other company: decline"
+  },
+  {
+   "id": "lt-rev2-03",
+   "section": "d10",
+   "text": "how many invoices over 500 for Sonoran Grill Restaurant",
+   "expect": {
+    "all": [
+     [
+      "1 invoice"
+     ]
+    ],
+    "none": [
+     "could not also apply",
+     "120 invoices"
+    ]
+   },
+   "baseline": "pass",
+   "note": "1 invoice 840; the restaurant is the named customer, not an unapplied group qualifier"
+  },
+  {
+   "id": "lt-rev2-04",
+   "section": "d10",
+   "text": "how many invoices over three thousand dollars in 2022",
+   "expect": {
+    "all": [
+     [
+      "7 "
+     ]
+    ],
+    "none": [
+     "106"
+    ]
+   },
+   "baseline": "pass",
+   "note": "7"
+  },
+  {
+   "id": "lt-rev2-05",
+   "section": "d10",
+   "text": "how many invoices over $4,000 in Chandler",
+   "expect": {
+    "all": [
+     [
+      "8 "
+     ]
+    ],
+    "none": [
+     "106",
+     "54 invoices"
+    ]
+   },
+   "baseline": "pass",
+   "note": "8 (customer service address city Chandler)"
+  },
+  {
+   "id": "lt-rev2-06",
+   "section": "d10",
+   "text": "how many invoices under 1000 dated 2018",
+   "expect": {
+    "all": [
+     [
+      "1 invoice"
+     ]
+    ],
+    "none": [
+     "7 invoices"
+    ]
+   },
+   "baseline": "pass",
+   "note": "1"
+  },
+  {
+   "id": "lt-rev2-07",
+   "section": "d10",
+   "text": "invoices over 3000 for Mesa and Tempe customers",
+   "expect": {
+    "all": [
+     [
+      "could not",
+      "22 ",
+      "15 "
+     ]
+    ],
+    "none": [
+     "106 invoices are over"
+    ]
+   },
+   "baseline": "fail",
+   "note": "15 Mesa + 7 Tempe =22 or say plainly both could not be applied"
+  },
+  {
+   "id": "lt-rev2-08",
+   "section": "d2",
+   "text": "smallest purchase order from Watsco",
+   "expect": {
+    "all": [
+     [
+      "68"
+     ]
+    ],
+    "none": [
+     "$60"
+    ]
+   },
+   "baseline": "pass",
+   "note": "68 shared by PO-9021 and PO-9081"
+  },
+  {
+   "id": "lt-rev2-09",
+   "section": "d2",
+   "text": "what was the biggest PO from Watsco in 2025",
+   "expect": {
+    "none": [
+     "$132",
+     "$124"
+    ],
+    "all": [
+     [
+      "no purchase orders",
+      "none",
+      "not on file",
+      "no PO",
+      "0 "
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "no Watsco PO dated 2025"
+  },
+  {
+   "id": "lt-rev2-10",
+   "section": "d2",
+   "text": "average purchase order in 2026",
+   "expect": {
+    "all": [
+     [
+      "102"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "4 POs, mean 102"
+  },
+  {
+   "id": "lt-rev2-11",
+   "section": "d2",
+   "text": "smallest purchase order from Bakersfield Supply",
+   "expect": {
+    "none": [
+     "$60",
+     "$68"
+    ],
+    "notOnFile": true
+   },
+   "baseline": "fail",
+   "note": "no such vendor"
+  },
+  {
+   "id": "lt-rev2-12",
+   "section": "d9",
+   "text": "how many customers live outside Nevada",
+   "expect": {
+    "all": [
+     [
+      "118"
+     ]
+    ],
+    "none": [
+     "4 customers",
+     "116"
+    ]
+   },
+   "baseline": "pass",
+   "note": "118 not NV"
+  },
+  {
+   "id": "lt-rev2-13",
+   "section": "d8",
+   "text": "how many permits were issued in 2026",
+   "expect": {
+    "none": [
+     "27 permits",
+     "27 documents",
+     "no permits"
+    ],
+    "notOnFile": true,
+    "review": true
+   },
+   "baseline": "fail",
+   "note": "permits print no issue date: hand on or say so; never 27 or none"
+  },
+  {
+   "id": "lt-rev2-14",
+   "section": "d4",
+   "text": "which agreements are still active in 2027",
+   "expect": {
+    "all": [
+     [
+      "8 "
+     ]
+    ],
+    "none": [
+     "27 maintenance",
+     "27 agreements"
+    ]
+   },
+   "baseline": "pass",
+   "note": "end >= 2027: 8"
+  },
+  {
+   "id": "lt-rev2-15",
+   "section": "d4",
+   "text": "agreements that end after 2026",
+   "expect": {
+    "all": [
+     [
+      "8 "
+     ]
+    ],
+    "none": [
+     "19 "
+    ]
+   },
+   "baseline": "pass",
+   "note": "8"
+  },
+  {
+   "id": "lt-rev2-16",
+   "section": "d11",
+   "text": "how many service tickets on 9.21.26",
+   "expect": {
+    "all": [
+     [
+      "22"
+     ]
+    ],
+    "none": [
+     "120 documents"
+    ]
+   },
+   "baseline": "pass",
+   "note": "22"
+  },
+  {
+   "id": "lt-rev2-17",
+   "section": "d19",
+   "text": "when does the permit for Thomas Mercer expire",
+   "expect": {
+    "all": [
+     [
+      "prints no",
+      "no expir",
+      "not printed",
+      "doesn't print",
+      "not on file"
+     ]
+    ],
+    "none": [
+     "Issued"
+    ]
+   },
+   "baseline": "pass",
+   "note": "permit text has no expiry"
+  }
+ ]
+}

@@ -1,0 +1,78 @@
+[
+ {
+  "file": "invoice-register-2026.csv",
+  "set": {
+   "structure.pagesRange": [
+    22,
+    138
+   ]
+  },
+  "why": "Oracle error (tester): the page-count estimate ignored the repeated header row, delimiters and formatted dates/currency that the chunking rule (limits.js: header repeated + rows up to 6,000 chars) adds, so the upper bound was too tight. Upper bound widened 1.5x; lower bound and every answer unchanged."
+ },
+ {
+  "file": "invoice-register-2026.xlsx",
+  "set": {
+   "structure.pagesRange": [
+    22,
+    138
+   ]
+  },
+  "why": "Oracle error (tester): the page-count estimate ignored the repeated header row, delimiters and formatted dates/currency that the chunking rule (limits.js: header repeated + rows up to 6,000 chars) adds, so the upper bound was too tight. Upper bound widened 1.5x; lower bound and every answer unchanged."
+ },
+ {
+  "file": "large-service-history-20000.xlsx",
+  "set": {
+   "structure.pagesRange": [
+    110,
+    664
+   ]
+  },
+  "why": "Oracle error (tester): the page-count estimate ignored the repeated header row, delimiters and formatted dates/currency that the chunking rule (limits.js: header repeated + rows up to 6,000 chars) adds, so the upper bound was too tight. Upper bound widened 1.5x; lower bound and every answer unchanged."
+ },
+ {
+  "file": "pricelist-hvac-2026.xlsx",
+  "set": {
+   "structure.pagesRange": [
+    14,
+    90
+   ]
+  },
+  "why": "Oracle error (tester): the page-count estimate ignored the repeated header row, delimiters and formatted dates/currency that the chunking rule (limits.js: header repeated + rows up to 6,000 chars) adds, so the upper bound was too tight. Upper bound widened 1.5x; lower bound and every answer unchanged."
+ },
+ {
+  "file": "pricelist-plumbing-2026.xlsx",
+  "set": {
+   "structure.pagesRange": [
+    4,
+    27
+   ]
+  },
+  "why": "Oracle error (tester): the page-count estimate ignored the repeated header row, delimiters and formatted dates/currency that the chunking rule (limits.js: header repeated + rows up to 6,000 chars) adds, so the upper bound was too tight. Upper bound widened 1.5x; lower bound and every answer unchanged."
+ },
+ {
+  "file": "workorders-open-closed-2026.xlsx",
+  "set": {
+   "structure.pagesRange": [
+    1,
+    13
+   ]
+  },
+  "why": "Oracle error (tester): the page-count estimate ignored the repeated header row, delimiters and formatted dates/currency that the chunking rule (limits.js: header repeated + rows up to 6,000 chars) adds, so the upper bound was too tight. Upper bound widened 1.5x; lower bound and every answer unchanged."
+ },
+ {
+  "file": "large-service-manual-150pages.docx",
+  "question": "What static pressure",
+  "set": {
+   "pageTolerance": 10
+  },
+  "why": "Oracle error (tester): my page offset assumed exactly 3,000 chars/page; real chunks run ~8-10% shorter so deep pages drift. Tolerance now ~12% of the page number."
+ },
+ {
+  "file": "large-service-manual-150pages.docx",
+  "question": "How long is the factory warranty",
+  "set": {
+   "pageTolerance": 18
+  },
+  "why": "same as above"
+ }
+]

@@ -1,0 +1,7121 @@
+{
+ "schema": 1,
+ "note": "Oracle written from generator source data before any reader ran. Never edited after results; corrections go in errata/ files.",
+ "reasonClasses": [
+  "empty",
+  "corrupt",
+  "mismatch",
+  "encrypted",
+  "legacy",
+  "macro",
+  "limit",
+  "hostile",
+  "unsupported"
+ ],
+ "files": {
+  "archive.zip": {
+   "type": "zip",
+   "upload": "reject",
+   "contentType": "application/octet-stream",
+   "status": "refused",
+   "reason": [
+    "unsupported"
+   ],
+   "structure": {},
+   "keys": [],
+   "questions": [],
+   "bytes": 2541
+  },
+  "book.xlsb": {
+   "type": "xlsb",
+   "upload": "reject",
+   "contentType": "application/octet-stream",
+   "status": "refused",
+   "reason": [
+    "unsupported"
+   ],
+   "structure": {},
+   "keys": [],
+   "questions": [],
+   "bytes": 368
+  },
+  "contract-maintenance-agreement.docx": {
+   "type": "docx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+   "status": "read",
+   "structure": {
+    "pagesRange": [
+     1,
+     2
+    ],
+    "docx": true,
+    "trackedChanges": false
+   },
+   "keys": [
+    "MA-2026-0417",
+    "Tamsin Escobedo",
+    "Governing Law",
+    "State of Arizona",
+    "$329.00"
+   ],
+   "questions": [
+    {
+     "question": "What is the termination notice period in the contract?",
+     "answers": [
+      [
+       "thirty (30)"
+      ],
+      [
+       "days written notice"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [
+      "terminate"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What is the late fee on unpaid balances?",
+     "answers": [
+      [
+       "1.5%"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [
+      "percent"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is the annual fee for the Gold plan?",
+     "answers": [
+      [
+       "$329.00"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "table"
+     },
+     "same": [
+      "Gold"
+     ],
+     "mustNot": [],
+     "hard": [
+      "table",
+      "currency"
+     ],
+     "global": false
+    },
+    {
+     "question": "Which state law governs the agreement?",
+     "answers": [
+      [
+       "State of Arizona"
+      ],
+      [
+       "Maricopa County"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What is the agreement number?",
+     "answers": [
+      [
+       "MA-2026-0417"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "header"
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [
+      "header"
+     ],
+     "global": false
+    },
+    {
+     "question": "How quickly will the contractor respond to emergency calls?",
+     "answers": [
+      [
+       "24 hours"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    }
+   ],
+   "bytes": 4555
+  },
+  "contract-maintenance-redline.docx": {
+   "type": "docx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+   "status": "read",
+   "structure": {
+    "pagesRange": [
+     1,
+     2
+    ],
+    "docx": true,
+    "trackedChanges": true
+   },
+   "keys": [
+    "MA-2026-0452",
+    "Barnaby Vasquez",
+    "Governing Law",
+    "State of Arizona",
+    "$329.00"
+   ],
+   "questions": [
+    {
+     "question": "What is the termination notice period in the contract?",
+     "answers": [
+      [
+       "sixty (60)"
+      ],
+      [
+       "days written notice"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [
+      "terminate"
+     ],
+     "mustNot": [
+      "thirty (30)"
+     ],
+     "hard": [
+      "tracked-change"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is the late fee on unpaid balances?",
+     "answers": [
+      [
+       "1.5%"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [
+      "percent"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is the annual fee for the Gold plan?",
+     "answers": [
+      [
+       "$329.00"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "table"
+     },
+     "same": [
+      "Gold"
+     ],
+     "mustNot": [],
+     "hard": [
+      "table",
+      "currency"
+     ],
+     "global": false
+    },
+    {
+     "question": "Which state law governs the agreement?",
+     "answers": [
+      [
+       "State of Arizona"
+      ],
+      [
+       "Maricopa County"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What is the agreement number?",
+     "answers": [
+      [
+       "MA-2026-0452"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "header"
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [
+      "header"
+     ],
+     "global": false
+    },
+    {
+     "question": "How quickly will the contractor respond to emergency calls?",
+     "answers": [
+      [
+       "4 hours"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [],
+     "mustNot": [
+      "24 hours"
+     ],
+     "hard": [
+      "tracked-change"
+     ],
+     "global": false
+    },
+    {
+     "question": "Does the customer waive warranty claims arising from deferred maintenance?",
+     "answers": [
+      [
+       "Liability is limited"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [],
+     "mustNot": [
+      "waives all warranty claims"
+     ],
+     "hard": [
+      "tracked-change"
+     ],
+     "global": false
+    }
+   ],
+   "bytes": 4710,
+   "mustNotAnywhere": [
+    "thirty (30)",
+    "waives all warranty claims"
+   ]
+  },
+  "corrupt-badxml.docx": {
+   "type": "docx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+   "status": "refused",
+   "reason": [
+    "corrupt"
+   ],
+   "structure": {},
+   "keys": [],
+   "questions": [],
+   "bytes": 2864
+  },
+  "corrupt-truncated.docx": {
+   "type": "docx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+   "status": "refused",
+   "reason": [
+    "corrupt"
+   ],
+   "structure": {},
+   "keys": [],
+   "questions": [],
+   "bytes": 1621
+  },
+  "corrupt-truncated.xlsx": {
+   "type": "xlsx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": "refused",
+   "reason": [
+    "corrupt"
+   ],
+   "structure": {},
+   "keys": [],
+   "questions": [],
+   "bytes": 2202
+  },
+  "corrupt-zeroed.xlsx": {
+   "type": "xlsx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": "refused",
+   "reason": [
+    "corrupt"
+   ],
+   "structure": {},
+   "keys": [],
+   "questions": [],
+   "bytes": 3670
+  },
+  "customers-clean.xlsx": {
+   "type": "xlsx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": "read",
+   "structure": {
+    "sheets": [
+     {
+      "name": "Customers",
+      "state": "visible",
+      "nonEmpty": true,
+      "dataRows": 91
+     }
+    ],
+    "pagesRange": [
+     1,
+     4
+    ]
+   },
+   "keys": [
+    "Cactus Flats Apartments LLC",
+    "Ignacio Fairbanks",
+    "Copper Canyon Diner",
+    "Corinne Dunleavy",
+    "Tamsin Escobedo",
+    "Agave Ridge HOA",
+    "Hector Cordero",
+    "Leland Prescott",
+    "Ocotillo Chiropractic",
+    "Beverly Fontaine",
+    "Hattie Zamora",
+    "Barnaby Ballard",
+    "Tomas Tavares",
+    "Barnaby Vasquez",
+    "Barnaby Ibarra",
+    "Cecil Montoya",
+    "Gordon Villanueva",
+    "Yolanda Sandoval",
+    "Alonzo Holloway",
+    "Tomas Wetherby",
+    "Rafael Whitcombe",
+    "Tomas Yazzie",
+    "Odette Abernathy",
+    "Tomas Ostrander",
+    "Cecil Thibodeaux",
+    "Alonzo Lindqvist",
+    "Odette Pemberton",
+    "Tamsin Nakamura",
+    "Russell Underhill",
+    "Rafael Quintero",
+    "Kenji Escobedo",
+    "Corinne Holloway",
+    "Mateo Holloway",
+    "Cecil Tavares",
+    "Imelda Pemberton",
+    "Noelle Yazzie",
+    "Wendell Abernathy",
+    "Tomas Underhill",
+    "Marisol Dunleavy",
+    "Hector Vasquez",
+    "Imelda Escobedo",
+    "Cecil Whitcombe",
+    "Tamsin Sandoval",
+    "Tomas Ramanathan",
+    "Tamsin Castellanos",
+    "Ingrid Whitcombe",
+    "Gordon Yazzie",
+    "Gordon Montoya",
+    "Kenji Holloway",
+    "Priya Dunleavy",
+    "Mateo Tavares",
+    "Ignacio Ramanathan",
+    "Alonzo Okonkwo",
+    "Rosalind Okonkwo",
+    "Lucinda Fairbanks",
+    "Cecil Lindqvist",
+    "Delphine Castellanos",
+    "Tamsin Holloway",
+    "Wendell Thibodeaux",
+    "Alonzo Abernathy",
+    "Odette Castellanos",
+    "Gordon Underhill",
+    "Barnaby Escobedo",
+    "Kenji Montoya",
+    "Wendell Escobedo",
+    "Yolanda Vasquez",
+    "Paloma Dunleavy",
+    "Duncan Fairbanks",
+    "Tamsin Fairbanks",
+    "Tomas Villanueva",
+    "Leland Whitcombe",
+    "Ingrid Ramanathan",
+    "Hattie Okonkwo",
+    "Imelda Zamora",
+    "Yolanda Abernathy",
+    "Dwayne Prescott",
+    "Rafael Fairbanks",
+    "Alonzo Thibodeaux",
+    "Rafael Villanueva",
+    "Duncan Whitcombe",
+    "Imelda Quintero",
+    "Paloma Vasquez",
+    "Yolanda Nakamura",
+    "Hector Wetherby",
+    "Tamsin Dunleavy",
+    "Leland Ostrander",
+    "Corinne Montoya",
+    "Russell Tavares",
+    "Kenji Castellanos",
+    "Hattie Ibarra",
+    "(480) 555-0106",
+    "(520) 555-0151",
+    "(480) 555-0129",
+    "(520) 555-0103",
+    "(623) 555-0168",
+    "(602) 555-0104",
+    "(520) 555-0183",
+    "(520) 555-0197",
+    "(480) 555-0102",
+    "(623) 555-0180",
+    "(520) 555-0173",
+    "(480) 555-0155",
+    "(480) 555-0187",
+    "(520) 555-0152",
+    "(602) 555-0192",
+    "(602) 555-0169",
+    "(480) 555-0168",
+    "(623) 555-0162",
+    "(520) 555-0185",
+    "(480) 555-0108",
+    "(480) 555-0138",
+    "(480) 555-0171",
+    "(623) 555-0107",
+    "(480) 555-0159",
+    "(602) 555-0140",
+    "(602) 555-0181",
+    "(520) 555-0106",
+    "(480) 555-0170",
+    "(520) 555-0174",
+    "(623) 555-0151",
+    "(480) 555-0115",
+    "(520) 555-0127",
+    "(480) 555-0176",
+    "(480) 555-0120",
+    "(480) 555-0143",
+    "(520) 555-0169",
+    "(602) 555-0166",
+    "(623) 555-0179",
+    "(520) 555-0149",
+    "(623) 555-0182",
+    "(520) 555-0115",
+    "(480) 555-0186",
+    "(480) 555-0197",
+    "(480) 555-0130",
+    "(480) 555-0132",
+    "(520) 555-0195",
+    "(623) 555-0141",
+    "(623) 555-0183",
+    "(480) 555-0147",
+    "(520) 555-0170",
+    "(520) 555-0108",
+    "(623) 555-0195",
+    "(480) 555-0183",
+    "(602) 555-0195",
+    "(602) 555-0156",
+    "(520) 555-0139",
+    "(623) 555-0111",
+    "(480) 555-0191",
+    "(520) 555-0179",
+    "(602) 555-0141",
+    "(623) 555-0172",
+    "(602) 555-0119",
+    "(480) 555-0156",
+    "(623) 555-0154",
+    "(623) 555-0198",
+    "(520) 555-0142",
+    "(602) 555-0168",
+    "(602) 555-0153",
+    "(602) 555-0187",
+    "(623) 555-0108",
+    "(602) 555-0126",
+    "(602) 555-0155",
+    "(480) 555-0152",
+    "(520) 555-0130",
+    "(623) 555-0152",
+    "(623) 555-0193",
+    "(520) 555-0191",
+    "(623) 555-0174",
+    "(602) 555-0107",
+    "(623) 555-0130",
+    "(602) 555-0158",
+    "(480) 555-0163",
+    "(623) 555-0132",
+    "(623) 555-0102",
+    "(520) 555-0121",
+    "(623) 555-0112",
+    "(623) 555-0115",
+    "(480) 555-0114",
+    "(480) 555-0140",
+    "(623) 555-0105"
+   ],
+   "questions": [
+    {
+     "question": "What is the phone number of customer Copper Canyon Diner?",
+     "answers": [
+      [
+       "(480) 555-0129"
+      ]
+     ],
+     "where": {
+      "sheet": "Customers",
+      "row": 4
+     },
+     "same": [
+      "Copper Canyon Diner"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What is the phone number of customer Yolanda Sandoval?",
+     "answers": [
+      [
+       "(623) 555-0162"
+      ]
+     ],
+     "where": {
+      "sheet": "Customers",
+      "row": 19
+     },
+     "same": [
+      "Yolanda Sandoval"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What is the phone number of customer Rafael Quintero?",
+     "answers": [
+      [
+       "(623) 555-0151"
+      ]
+     ],
+     "where": {
+      "sheet": "Customers",
+      "row": 31
+     },
+     "same": [
+      "Rafael Quintero"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What address is on file for Hector Cordero?",
+     "answers": [
+      [
+       "9545 S Rural Rd"
+      ]
+     ],
+     "where": {
+      "sheet": "Customers",
+      "row": 8
+     },
+     "same": [
+      "Hector Cordero"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "When did Tomas Tavares become a customer?",
+     "answers": [
+      [
+       "2018-09-11",
+       "9/11/2018",
+       "09/11/2018",
+       "11-Sep-18",
+       "11-Sep-2018",
+       "Sep 11, 2018",
+       "September 11, 2018"
+      ]
+     ],
+     "where": {
+      "sheet": "Customers",
+      "row": 14
+     },
+     "same": [
+      "Tomas Tavares"
+     ],
+     "mustNot": [],
+     "hard": [
+      "serial-date"
+     ],
+     "global": false
+    },
+    {
+     "question": "What service plan is Rafael Whitcombe on?",
+     "answers": [
+      [
+       "Gold"
+      ]
+     ],
+     "where": {
+      "sheet": "Customers",
+      "row": 22
+     },
+     "same": [
+      "Rafael Whitcombe"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    }
+   ],
+   "bytes": 8070
+  },
+  "customers-messy-contacts.xlsx": {
+   "type": "xlsx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": "read",
+   "structure": {
+    "sheets": [
+     {
+      "name": "Sheet1",
+      "state": "visible",
+      "nonEmpty": true,
+      "dataRows": 25
+     }
+    ],
+    "pagesRange": [
+     1,
+     3
+    ]
+   },
+   "keys": [
+    "Cactus Flats Apartments LLC",
+    "Ignacio Fairbanks",
+    "Copper Canyon Diner",
+    "Corinne Dunleavy",
+    "Tamsin Escobedo",
+    "Agave Ridge HOA",
+    "Hector Cordero",
+    "Leland Prescott",
+    "Ocotillo Chiropractic",
+    "Beverly Fontaine",
+    "Hattie Zamora",
+    "Barnaby Ballard",
+    "Tomas Tavares",
+    "Barnaby Vasquez",
+    "Barnaby Ibarra",
+    "Cecil Montoya",
+    "Gordon Villanueva",
+    "Yolanda Sandoval",
+    "Alonzo Holloway",
+    "Tomas Wetherby",
+    "(480) 555-0106",
+    "(520) 555-0151",
+    "(480) 555-0129",
+    "(520) 555-0103",
+    "(623) 555-0168",
+    "(602) 555-0104",
+    "(520) 555-0183",
+    "(520) 555-0197",
+    "(480) 555-0102",
+    "(623) 555-0180",
+    "(520) 555-0173",
+    "(480) 555-0155",
+    "(480) 555-0187",
+    "(520) 555-0152",
+    "(602) 555-0192",
+    "(602) 555-0169",
+    "(480) 555-0168",
+    "(623) 555-0162",
+    "(520) 555-0185",
+    "(480) 555-0108"
+   ],
+   "questions": [
+    {
+     "question": "What is the phone number of Leland Prescott?",
+     "answers": [
+      [
+       "(520) 555-0197"
+      ]
+     ],
+     "where": {
+      "sheet": "Sheet1",
+      "row": 15
+     },
+     "same": [
+      "Leland Prescott"
+     ],
+     "mustNot": [],
+     "hard": [
+      "messy",
+      "title-block"
+     ],
+     "global": false
+    },
+    {
+     "question": "What does the note say about Tamsin Escobedo?",
+     "answers": [
+      [
+       "gate code"
+      ]
+     ],
+     "where": {
+      "sheet": "Sheet1",
+      "row": 11,
+      "col": "J"
+     },
+     "same": [
+      "Tamsin Escobedo"
+     ],
+     "mustNot": [],
+     "hard": [
+      "messy",
+      "odd-cell"
+     ],
+     "global": false
+    },
+    {
+     "question": "What was the deposit for Corinne Dunleavy?",
+     "answers": [
+      [
+       "$700.00",
+       "700.00",
+       "700.00",
+       "700"
+      ]
+     ],
+     "where": {
+      "sheet": "Sheet1",
+      "row": 10
+     },
+     "same": [
+      "Corinne Dunleavy"
+     ],
+     "mustNot": [],
+     "hard": [
+      "text-number",
+      "messy"
+     ],
+     "global": false
+    },
+    {
+     "question": "What was the deposit for Hattie Zamora?",
+     "answers": [
+      [
+       "$450.00",
+       "450.00",
+       "450.00",
+       "450"
+      ]
+     ],
+     "where": {
+      "sheet": "Sheet1",
+      "row": 18
+     },
+     "same": [
+      "Hattie Zamora"
+     ],
+     "mustNot": [],
+     "hard": [
+      "currency",
+      "messy"
+     ],
+     "global": false
+    },
+    {
+     "question": "When did Ignacio Fairbanks move in?",
+     "answers": [
+      [
+       "06/10/25",
+       "06/10/2025",
+       "2025-06-10"
+      ]
+     ],
+     "where": {
+      "sheet": "Sheet1",
+      "row": 8
+     },
+     "same": [
+      "Ignacio Fairbanks"
+     ],
+     "mustNot": [],
+     "hard": [
+      "mixed-dates",
+      "messy"
+     ],
+     "global": false
+    },
+    {
+     "question": "What was the unit number for Ocotillo Chiropractic?",
+     "answers": [
+      [
+       "0108"
+      ]
+     ],
+     "where": {
+      "sheet": "Sheet1",
+      "row": 16
+     },
+     "same": [
+      "Ocotillo Chiropractic"
+     ],
+     "mustNot": [],
+     "hard": [
+      "text-number"
+     ],
+     "global": false
+    }
+   ],
+   "bytes": 3819
+  },
+  "customers.csv": {
+   "type": "csv",
+   "upload": "accept",
+   "contentType": "text/csv",
+   "status": "read",
+   "structure": {
+    "csv": true,
+    "pagesRange": [
+     1,
+     4
+    ]
+   },
+   "keys": [
+    "Cactus Flats Apartments LLC",
+    "Ignacio Fairbanks",
+    "Copper Canyon Diner",
+    "Corinne Dunleavy",
+    "Tamsin Escobedo",
+    "Agave Ridge HOA",
+    "Hector Cordero",
+    "Leland Prescott",
+    "Ocotillo Chiropractic",
+    "Beverly Fontaine",
+    "Hattie Zamora",
+    "Barnaby Ballard",
+    "Tomas Tavares",
+    "Barnaby Vasquez",
+    "Barnaby Ibarra",
+    "Cecil Montoya",
+    "Gordon Villanueva",
+    "Yolanda Sandoval",
+    "Alonzo Holloway",
+    "Tomas Wetherby",
+    "Rafael Whitcombe",
+    "Tomas Yazzie",
+    "Odette Abernathy",
+    "Tomas Ostrander",
+    "Cecil Thibodeaux",
+    "Alonzo Lindqvist",
+    "Odette Pemberton",
+    "Tamsin Nakamura",
+    "Russell Underhill",
+    "Rafael Quintero",
+    "Kenji Escobedo",
+    "Corinne Holloway",
+    "Mateo Holloway",
+    "Cecil Tavares",
+    "Imelda Pemberton",
+    "Noelle Yazzie",
+    "Wendell Abernathy",
+    "Tomas Underhill",
+    "Marisol Dunleavy",
+    "Hector Vasquez",
+    "Imelda Escobedo",
+    "Cecil Whitcombe",
+    "Tamsin Sandoval",
+    "Tomas Ramanathan",
+    "Tamsin Castellanos",
+    "Ingrid Whitcombe",
+    "Gordon Yazzie",
+    "Gordon Montoya",
+    "Kenji Holloway",
+    "Priya Dunleavy",
+    "Mateo Tavares",
+    "Ignacio Ramanathan",
+    "Alonzo Okonkwo",
+    "Rosalind Okonkwo",
+    "Lucinda Fairbanks",
+    "Cecil Lindqvist",
+    "Delphine Castellanos",
+    "Tamsin Holloway",
+    "Wendell Thibodeaux",
+    "Alonzo Abernathy",
+    "Odette Castellanos",
+    "Gordon Underhill",
+    "Barnaby Escobedo",
+    "Kenji Montoya",
+    "Wendell Escobedo",
+    "Yolanda Vasquez",
+    "Paloma Dunleavy",
+    "Duncan Fairbanks",
+    "Tamsin Fairbanks",
+    "Tomas Villanueva",
+    "Leland Whitcombe",
+    "Ingrid Ramanathan",
+    "Hattie Okonkwo",
+    "Imelda Zamora",
+    "Yolanda Abernathy",
+    "Dwayne Prescott",
+    "Rafael Fairbanks",
+    "Alonzo Thibodeaux",
+    "Rafael Villanueva",
+    "Duncan Whitcombe",
+    "Imelda Quintero",
+    "Paloma Vasquez",
+    "Yolanda Nakamura",
+    "Hector Wetherby",
+    "Tamsin Dunleavy",
+    "Leland Ostrander",
+    "Corinne Montoya",
+    "Russell Tavares",
+    "Kenji Castellanos",
+    "Hattie Ibarra",
+    "(480) 555-0106",
+    "(520) 555-0151",
+    "(480) 555-0129",
+    "(520) 555-0103",
+    "(623) 555-0168",
+    "(602) 555-0104",
+    "(520) 555-0183",
+    "(520) 555-0197",
+    "(480) 555-0102",
+    "(623) 555-0180",
+    "(520) 555-0173",
+    "(480) 555-0155",
+    "(480) 555-0187",
+    "(520) 555-0152",
+    "(602) 555-0192",
+    "(602) 555-0169",
+    "(480) 555-0168",
+    "(623) 555-0162",
+    "(520) 555-0185",
+    "(480) 555-0108",
+    "(480) 555-0138",
+    "(480) 555-0171",
+    "(623) 555-0107",
+    "(480) 555-0159",
+    "(602) 555-0140",
+    "(602) 555-0181",
+    "(520) 555-0106",
+    "(480) 555-0170",
+    "(520) 555-0174",
+    "(623) 555-0151",
+    "(480) 555-0115",
+    "(520) 555-0127",
+    "(480) 555-0176",
+    "(480) 555-0120",
+    "(480) 555-0143",
+    "(520) 555-0169",
+    "(602) 555-0166",
+    "(623) 555-0179",
+    "(520) 555-0149",
+    "(623) 555-0182",
+    "(520) 555-0115",
+    "(480) 555-0186",
+    "(480) 555-0197",
+    "(480) 555-0130",
+    "(480) 555-0132",
+    "(520) 555-0195",
+    "(623) 555-0141",
+    "(623) 555-0183",
+    "(480) 555-0147",
+    "(520) 555-0170",
+    "(520) 555-0108",
+    "(623) 555-0195",
+    "(480) 555-0183",
+    "(602) 555-0195",
+    "(602) 555-0156",
+    "(520) 555-0139",
+    "(623) 555-0111",
+    "(480) 555-0191",
+    "(520) 555-0179",
+    "(602) 555-0141",
+    "(623) 555-0172",
+    "(602) 555-0119",
+    "(480) 555-0156",
+    "(623) 555-0154",
+    "(623) 555-0198",
+    "(520) 555-0142",
+    "(602) 555-0168",
+    "(602) 555-0153",
+    "(602) 555-0187",
+    "(623) 555-0108",
+    "(602) 555-0126",
+    "(602) 555-0155",
+    "(480) 555-0152",
+    "(520) 555-0130",
+    "(623) 555-0152",
+    "(623) 555-0193",
+    "(520) 555-0191",
+    "(623) 555-0174",
+    "(602) 555-0107",
+    "(623) 555-0130",
+    "(602) 555-0158",
+    "(480) 555-0163",
+    "(623) 555-0132",
+    "(623) 555-0102",
+    "(520) 555-0121",
+    "(623) 555-0112",
+    "(623) 555-0115",
+    "(480) 555-0114",
+    "(480) 555-0140",
+    "(623) 555-0105"
+   ],
+   "questions": [
+    {
+     "question": "What is the phone number of customer Ignacio Fairbanks?",
+     "answers": [
+      [
+       "(520) 555-0151"
+      ]
+     ],
+     "where": {
+      "row": 3
+     },
+     "same": [
+      "Ignacio Fairbanks"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What is the phone number of customer Barnaby Ibarra?",
+     "answers": [
+      [
+       "(602) 555-0192"
+      ]
+     ],
+     "where": {
+      "row": 16
+     },
+     "same": [
+      "Barnaby Ibarra"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What is the phone number of customer Alonzo Lindqvist?",
+     "answers": [
+      [
+       "(602) 555-0181"
+      ]
+     ],
+     "where": {
+      "row": 27
+     },
+     "same": [
+      "Alonzo Lindqvist"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What city does Beverly Fontaine live in?",
+     "answers": [
+      [
+       "Peoria"
+      ]
+     ],
+     "where": {
+      "row": 11
+     },
+     "same": [
+      "Beverly Fontaine"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "Which customers ID belongs to Odette Abernathy?",
+     "answers": [
+      [
+       "C-1023"
+      ]
+     ],
+     "where": {
+      "row": 24
+     },
+     "same": [
+      "Odette Abernathy"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    }
+   ],
+   "bytes": 8520
+  },
+  "customers.tsv": {
+   "type": "tsv",
+   "upload": "accept",
+   "contentType": "text/tab-separated-values",
+   "status": "read",
+   "structure": {
+    "csv": true,
+    "pagesRange": [
+     1,
+     3
+    ]
+   },
+   "keys": [
+    "Cactus Flats Apartments LLC",
+    "Ignacio Fairbanks",
+    "Copper Canyon Diner",
+    "Corinne Dunleavy",
+    "Tamsin Escobedo",
+    "Agave Ridge HOA",
+    "Hector Cordero",
+    "Leland Prescott",
+    "Ocotillo Chiropractic",
+    "Beverly Fontaine",
+    "Hattie Zamora",
+    "Barnaby Ballard",
+    "Tomas Tavares",
+    "Barnaby Vasquez",
+    "Barnaby Ibarra",
+    "Cecil Montoya",
+    "Gordon Villanueva",
+    "Yolanda Sandoval",
+    "Alonzo Holloway",
+    "Tomas Wetherby",
+    "Rafael Whitcombe",
+    "Tomas Yazzie",
+    "Odette Abernathy",
+    "Tomas Ostrander",
+    "Cecil Thibodeaux",
+    "Alonzo Lindqvist",
+    "Odette Pemberton",
+    "Tamsin Nakamura",
+    "Russell Underhill",
+    "Rafael Quintero",
+    "Kenji Escobedo",
+    "Corinne Holloway",
+    "Mateo Holloway",
+    "Cecil Tavares",
+    "Imelda Pemberton",
+    "Noelle Yazzie",
+    "Wendell Abernathy",
+    "Tomas Underhill",
+    "Marisol Dunleavy",
+    "Hector Vasquez",
+    "Imelda Escobedo",
+    "Cecil Whitcombe",
+    "Tamsin Sandoval",
+    "Tomas Ramanathan",
+    "Tamsin Castellanos",
+    "Ingrid Whitcombe",
+    "Gordon Yazzie",
+    "Gordon Montoya",
+    "Kenji Holloway",
+    "Priya Dunleavy",
+    "Mateo Tavares",
+    "Ignacio Ramanathan",
+    "Alonzo Okonkwo",
+    "Rosalind Okonkwo",
+    "Lucinda Fairbanks",
+    "Cecil Lindqvist",
+    "Delphine Castellanos",
+    "Tamsin Holloway",
+    "Wendell Thibodeaux",
+    "Alonzo Abernathy"
+   ],
+   "questions": [
+    {
+     "question": "What is the phone number of Cactus Flats Apartments LLC?",
+     "answers": [
+      [
+       "(480) 555-0106"
+      ]
+     ],
+     "where": {
+      "row": 2
+     },
+     "same": [
+      "Cactus Flats Apartments LLC"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What is the phone number of Hattie Zamora?",
+     "answers": [
+      [
+       "(520) 555-0173"
+      ]
+     ],
+     "where": {
+      "row": 12
+     },
+     "same": [
+      "Hattie Zamora"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What is the phone number of Russell Underhill?",
+     "answers": [
+      [
+       "(520) 555-0174"
+      ]
+     ],
+     "where": {
+      "row": 30
+     },
+     "same": [
+      "Russell Underhill"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What plan is Agave Ridge HOA on?",
+     "answers": [
+      [
+       "Gold"
+      ]
+     ],
+     "where": {
+      "row": 7
+     },
+     "same": [
+      "Agave Ridge HOA"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What is the customer ID of Gordon Villanueva?",
+     "answers": [
+      [
+       "C-1017"
+      ]
+     ],
+     "where": {
+      "row": 18
+     },
+     "same": [
+      "Gordon Villanueva"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    }
+   ],
+   "bytes": 3199
+  },
+  "dispatch-notes-week10.txt": {
+   "type": "txt",
+   "upload": "accept",
+   "contentType": "text/plain",
+   "status": "read",
+   "structure": {
+    "pagesRange": [
+     1,
+     3
+    ]
+   },
+   "keys": [
+    "T-7000",
+    "T-7003",
+    "T-7006",
+    "T-7009",
+    "T-7012",
+    "T-7015",
+    "T-7018",
+    "T-7021",
+    "T-7024",
+    "T-7027",
+    "T-7030",
+    "T-7033",
+    "T-7036",
+    "T-7039",
+    "T-7042",
+    "T-7045",
+    "T-7048",
+    "T-7051",
+    "T-7054",
+    "T-7057"
+   ],
+   "questions": [
+    {
+     "question": "Which technician was on ticket T-7003?",
+     "answers": [
+      [
+       "Sofia Brandt"
+      ]
+     ],
+     "where": {
+      "page": 1
+     },
+     "same": [
+      "T-7003"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false,
+     "pageTolerance": 2
+    },
+    {
+     "question": "What was the result of ticket T-7042?",
+     "answers": [
+      [
+       "coil cleaned"
+      ]
+     ],
+     "where": {
+      "page": 1
+     },
+     "same": [
+      "T-7042"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false,
+     "pageTolerance": 1
+    },
+    {
+     "question": "What was the result of ticket T-7059?",
+     "answers": [
+      [
+       "blower motor replaced"
+      ]
+     ],
+     "where": {
+      "page": 2
+     },
+     "same": [
+      "T-7059"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false,
+     "pageTolerance": 1
+    },
+    {
+     "question": "Which address was stop 17 at?",
+     "answers": [
+      [
+       "9545 S Rural Rd Phoenix"
+      ]
+     ],
+     "where": {
+      "page": 1
+     },
+     "same": [
+      "Stop 17"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false,
+     "pageTolerance": 1
+    },
+    {
+     "question": "Who was on ticket T-7010?",
+     "answers": [
+      [
+       "Dale Whitfield"
+      ]
+     ],
+     "where": {
+      "page": 1
+     },
+     "same": [
+      "T-7010"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false,
+     "pageTolerance": 1
+    }
+   ],
+   "bytes": 7543
+  },
+  "empty.csv": {
+   "type": "csv",
+   "upload": "reject",
+   "contentType": "text/csv",
+   "status": "refused",
+   "reason": [
+    "empty"
+   ],
+   "structure": {},
+   "note": "a 0-byte file cannot be signed for upload",
+   "keys": [],
+   "questions": [],
+   "bytes": 0
+  },
+  "empty.docx": {
+   "type": "docx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+   "status": "refused",
+   "reason": [
+    "empty"
+   ],
+   "structure": {},
+   "keys": [],
+   "questions": [],
+   "bytes": 2884
+  },
+  "empty.xlsx": {
+   "type": "xlsx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": "refused",
+   "reason": [
+    "empty"
+   ],
+   "structure": {},
+   "keys": [],
+   "questions": [],
+   "bytes": 2401
+  },
+  "encrypted-legacy.xls": {
+   "type": "xls",
+   "upload": "reject",
+   "contentType": "application/octet-stream",
+   "status": "refused",
+   "reason": [
+    "encrypted",
+    "legacy"
+   ],
+   "structure": {},
+   "keys": [],
+   "questions": [],
+   "bytes": 5632
+  },
+  "encrypted-ole.docx": {
+   "type": "docx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+   "status": "refused",
+   "reason": [
+    "encrypted"
+   ],
+   "structure": {},
+   "keys": [],
+   "questions": [],
+   "bytes": 9728
+  },
+  "encrypted-ole.xlsx": {
+   "type": "xlsx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": "refused",
+   "reason": [
+    "encrypted"
+   ],
+   "structure": {},
+   "keys": [],
+   "questions": [],
+   "bytes": 13824
+  },
+  "heic-named.jpg": {
+   "type": "jpg",
+   "upload": "accept",
+   "contentType": "image/jpeg",
+   "status": "refused",
+   "reason": [
+    "unsupported",
+    "mismatch"
+   ],
+   "structure": {},
+   "keys": [],
+   "questions": [],
+   "bytes": 824
+  },
+  "heic-photo.heic": {
+   "type": "heic",
+   "upload": "reject",
+   "contentType": "application/octet-stream",
+   "status": "refused",
+   "reason": [
+    "unsupported"
+   ],
+   "structure": {},
+   "keys": [],
+   "questions": [],
+   "bytes": 824
+  },
+  "hostile-bigcell.xlsx": {
+   "type": "xlsx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": "refused",
+   "reason": [
+    "limit"
+   ],
+   "structure": {},
+   "hostile": true,
+   "keys": [],
+   "questions": [],
+   "bytes": 53423
+  },
+  "hostile-billion-laughs.docx": {
+   "type": "docx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+   "status": "either",
+   "reason": [
+    "hostile",
+    "corrupt",
+    "limit"
+   ],
+   "structure": {},
+   "hostile": true,
+   "mustNotAnywhere": [
+    "lollollol"
+   ],
+   "timeLimitMs": 20000,
+   "keys": [],
+   "questions": [],
+   "bytes": 2993
+  },
+  "hostile-deep-nesting.docx": {
+   "type": "docx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+   "status": "refused",
+   "reason": [
+    "limit"
+   ],
+   "structure": {},
+   "hostile": true,
+   "keys": [],
+   "questions": [],
+   "bytes": 4465
+  },
+  "hostile-embedded-ole-zipinzip.docx": {
+   "type": "docx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+   "status": "read",
+   "structure": {
+    "pagesRange": [
+     1,
+     2
+    ],
+    "docx": true
+   },
+   "keys": [
+    "Lucinda Pemberton",
+    "P-55120"
+   ],
+   "mustNotAnywhere": [
+    "SECRET-INNER-TEXT",
+    "MZ-looks-like"
+   ],
+   "questions": [
+    {
+     "question": "What is the permit number on the lift station inspection?",
+     "answers": [
+      [
+       "P-55120"
+      ]
+     ],
+     "where": {
+      "page": 1
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [
+      "embedded-ole"
+     ],
+     "global": false
+    },
+    {
+     "question": "What phone number is given for Lucinda Pemberton?",
+     "answers": [
+      [
+       "(602) 555-0166"
+      ]
+     ],
+     "where": {
+      "page": 1
+     },
+     "same": [
+      "Lucinda Pemberton"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "When is the next lift station visit?",
+     "answers": [
+      [
+       "June 2, 2026"
+      ]
+     ],
+     "where": {
+      "page": 1
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What was billed for the lift station inspection?",
+     "answers": [
+      [
+       "$640.00"
+      ],
+      [
+       "640.00"
+      ]
+     ],
+     "where": {
+      "page": 1
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [
+      "currency"
+     ],
+     "global": false
+    },
+    {
+     "question": "Who is the technician for the lift station inspection?",
+     "answers": [
+      [
+       "Dale Whitfield"
+      ]
+     ],
+     "where": {
+      "page": 1
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    }
+   ],
+   "bytes": 3796
+  },
+  "hostile-empty-paragraphs.docx": {
+   "type": "docx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+   "status": "read",
+   "structure": {
+    "pagesRange": [
+     1,
+     1
+    ],
+    "docx": true,
+    "exactPages": 1
+   },
+   "keys": [
+    "B-4471",
+    "Wendell Montoya",
+    "W-90210"
+   ],
+   "questions": [
+    {
+     "question": "What boiler tag is on the flood fixture?",
+     "answers": [
+      [
+       "B-4471"
+      ]
+     ],
+     "where": {
+      "page": 1
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [
+      "empty-paragraphs"
+     ],
+     "global": false
+    },
+    {
+     "question": "Which customer owns boiler B-4471?",
+     "answers": [
+      [
+       "Wendell Montoya"
+      ]
+     ],
+     "where": {
+      "page": 1
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What is the price of the boiler flush?",
+     "answers": [
+      [
+       "$215.00"
+      ],
+      [
+       "215.00"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "table"
+     },
+     "same": [
+      "Boiler flush"
+     ],
+     "mustNot": [],
+     "hard": [
+      "table"
+     ],
+     "global": false
+    },
+    {
+     "question": "What warranty number was registered?",
+     "answers": [
+      [
+       "W-90210"
+      ]
+     ],
+     "where": {
+      "page": 1
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What was the empty paragraph flood fixture about?",
+     "answers": [
+      [
+       "boiler"
+      ]
+     ],
+     "where": {
+      "page": 1
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    }
+   ],
+   "bytes": 4956
+  },
+  "hostile-entries-bomb.xlsx": {
+   "type": "xlsx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": "refused",
+   "reason": [
+    "limit"
+   ],
+   "structure": {},
+   "hostile": true,
+   "keys": [],
+   "questions": [],
+   "bytes": 301876
+  },
+  "hostile-external-link.xlsx": {
+   "type": "xlsx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": "read",
+   "structure": {
+    "sheets": [
+     {
+      "name": "Jobs",
+      "state": "visible",
+      "nonEmpty": true,
+      "dataRows": 6
+     }
+    ],
+    "pagesRange": [
+     1,
+     2
+    ]
+   },
+   "keys": [
+    "J-8801",
+    "J-8805"
+   ],
+   "neverFetch": true,
+   "mustNotAnywhere": [
+    "169.254",
+    "etc/passwd"
+   ],
+   "questions": [
+    {
+     "question": "What is the total for job J-8801?",
+     "answers": [
+      [
+       "$1,432.50",
+       "1,432.50",
+       "1432.50",
+       "1432.5"
+      ]
+     ],
+     "where": {
+      "sheet": "Jobs",
+      "row": 2
+     },
+     "same": [
+      "J-8801"
+     ],
+     "mustNot": [],
+     "hard": [
+      "external-link"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is the total for job J-8802?",
+     "answers": [
+      [
+       "$288.00",
+       "288.00",
+       "288.00",
+       "288"
+      ]
+     ],
+     "where": {
+      "sheet": "Jobs",
+      "row": 3
+     },
+     "same": [
+      "J-8802"
+     ],
+     "mustNot": [],
+     "hard": [
+      "external-link"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is the total for job J-8803?",
+     "answers": [
+      [
+       "$99.99",
+       "99.99",
+       "99.99",
+       "99.99"
+      ]
+     ],
+     "where": {
+      "sheet": "Jobs",
+      "row": 4
+     },
+     "same": [
+      "J-8803"
+     ],
+     "mustNot": [],
+     "hard": [
+      "external-link"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is the total for job J-8804?",
+     "answers": [
+      [
+       "$12,000.00",
+       "12,000.00",
+       "12000.00",
+       "12000"
+      ]
+     ],
+     "where": {
+      "sheet": "Jobs",
+      "row": 5
+     },
+     "same": [
+      "J-8804"
+     ],
+     "mustNot": [],
+     "hard": [
+      "external-link"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is the total for job J-8805?",
+     "answers": [
+      [
+       "$45.10",
+       "45.10",
+       "45.10",
+       "45.1"
+      ]
+     ],
+     "where": {
+      "sheet": "Jobs",
+      "row": 6
+     },
+     "same": [
+      "J-8805"
+     ],
+     "mustNot": [],
+     "hard": [
+      "external-link"
+     ],
+     "global": false
+    }
+   ],
+   "bytes": 3424
+  },
+  "hostile-sheet-count.xlsx": {
+   "type": "xlsx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": "refused",
+   "reason": [
+    "limit"
+   ],
+   "structure": {},
+   "hostile": true,
+   "keys": [],
+   "questions": [],
+   "bytes": 38211
+  },
+  "hostile-traversal.docx": {
+   "type": "docx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+   "status": "either",
+   "reason": [
+    "hostile",
+    "corrupt"
+   ],
+   "structure": {},
+   "hostile": true,
+   "readQuestions": [
+    [
+     "Traversal fixture customer phone",
+     "(480) 555-0191"
+    ]
+   ],
+   "neverWritePaths": true,
+   "keys": [],
+   "questions": [],
+   "bytes": 3426
+  },
+  "hostile-xxe.docx": {
+   "type": "docx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+   "status": "either",
+   "reason": [
+    "hostile",
+    "corrupt"
+   ],
+   "structure": {},
+   "hostile": true,
+   "mustNotAnywhere": [
+    "root:x:",
+    "daemon:",
+    "AccessKeyId",
+    "nobody:"
+   ],
+   "neverFetch": true,
+   "keys": [],
+   "questions": [],
+   "bytes": 3020
+  },
+  "hostile-xxe.xlsx": {
+   "type": "xlsx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": "either",
+   "reason": [
+    "hostile",
+    "corrupt"
+   ],
+   "structure": {},
+   "hostile": true,
+   "mustNotAnywhere": [
+    "root:x:",
+    "daemon:",
+    "ami-id",
+    "nobody:"
+   ],
+   "neverFetch": true,
+   "keys": [],
+   "questions": [],
+   "bytes": 2572
+  },
+  "hostile-zipbomb.docx": {
+   "type": "docx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+   "status": "refused",
+   "reason": [
+    "limit"
+   ],
+   "structure": {},
+   "hostile": true,
+   "keys": [],
+   "questions": [],
+   "bytes": 1123945
+  },
+  "hostile-zipbomb.xlsx": {
+   "type": "xlsx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": "refused",
+   "reason": [
+    "limit"
+   ],
+   "structure": {},
+   "hostile": true,
+   "keys": [],
+   "questions": [],
+   "bytes": 1123570
+  },
+  "installer.exe": {
+   "type": "exe",
+   "upload": "reject",
+   "contentType": "application/octet-stream",
+   "status": "refused",
+   "reason": [
+    "unsupported"
+   ],
+   "structure": {},
+   "keys": [],
+   "questions": [],
+   "bytes": 602
+  },
+  "invoice-batch-paloverde-April.xlsx": {
+   "type": "xlsx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": "read",
+   "structure": {
+    "sheets": [
+     {
+      "name": "Invoices",
+      "state": "visible",
+      "nonEmpty": true,
+      "dataRows": 15
+     },
+     {
+      "name": "Line Items",
+      "state": "visible",
+      "nonEmpty": true,
+      "dataRows": 13
+     },
+     {
+      "name": "Notes",
+      "state": "visible",
+      "nonEmpty": true,
+      "dataRows": 3
+     }
+    ],
+    "pagesRange": [
+     3,
+     6
+    ]
+   },
+   "keys": [
+    "INV-30100",
+    "INV-30101",
+    "INV-30102",
+    "INV-30103",
+    "INV-30104",
+    "INV-30105",
+    "INV-30106",
+    "INV-30107",
+    "INV-30108",
+    "INV-30109",
+    "INV-30110",
+    "INV-30111",
+    "INV-30112",
+    "INV-30113",
+    "Hattie Zamora",
+    "Barnaby Ballard",
+    "Tomas Tavares",
+    "Barnaby Vasquez",
+    "Barnaby Ibarra",
+    "Cecil Montoya",
+    "Gordon Villanueva",
+    "Yolanda Sandoval",
+    "Alonzo Holloway",
+    "Tomas Wetherby",
+    "Rafael Whitcombe",
+    "Tomas Yazzie",
+    "Odette Abernathy",
+    "Tomas Ostrander",
+    "Warranty callbacks are billed at zero"
+   ],
+   "questions": [
+    {
+     "question": "What was invoice INV-30103 for Barnaby Vasquez?",
+     "answers": [
+      [
+       "$314.17",
+       "314.17",
+       "314.17",
+       "314.17"
+      ]
+     ],
+     "where": {
+      "sheet": "Invoices",
+      "row": 5
+     },
+     "same": [
+      "INV-30103"
+     ],
+     "mustNot": [],
+     "hard": [
+      "currency"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is the status of invoice INV-30109?",
+     "answers": [
+      [
+       "Open"
+      ]
+     ],
+     "where": {
+      "sheet": "Invoices",
+      "row": 11
+     },
+     "same": [
+      "INV-30109"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What date was invoice INV-30100 issued?",
+     "answers": [
+      [
+       "2026-04-01",
+       "4/1/2026",
+       "04/01/2026",
+       "1-Apr-26",
+       "1-Apr-2026",
+       "Apr 1, 2026",
+       "April 1, 2026"
+      ]
+     ],
+     "where": {
+      "sheet": "Invoices",
+      "row": 2
+     },
+     "same": [
+      "INV-30100"
+     ],
+     "mustNot": [],
+     "hard": [
+      "serial-date"
+     ],
+     "global": false
+    },
+    {
+     "question": "How is a warranty callback billed according to the notes?",
+     "answers": [
+      [
+       "billed at zero"
+      ]
+     ],
+     "where": {
+      "sheet": "Notes",
+      "row": 3
+     },
+     "same": [
+      "Void"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What was the labor line amount on invoice INV-30102?",
+     "answers": [
+      [
+       "$988.85",
+       "988.85",
+       "988.85",
+       "988.85"
+      ]
+     ],
+     "where": {
+      "sheet": "Line Items",
+      "row": 6
+     },
+     "same": [
+      "INV-30102",
+      "Labor"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    }
+   ],
+   "bytes": 4362
+  },
+  "invoice-ironwood-INV-5531.docx": {
+   "type": "docx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+   "status": "read",
+   "structure": {
+    "pagesRange": [
+     1,
+     2
+    ],
+    "docx": true
+   },
+   "keys": [
+    "INV-5531",
+    "Corinne Dunleavy",
+    "(520) 555-0103",
+    "Angela Ruiz",
+    "Diagnostic and service call",
+    "Delta Condensate Pump",
+    "Goodman Expansion Tank",
+    "Moen Filter Drier",
+    "Rheem Breaker 20A",
+    "Square D Angle Stop",
+    "$6,023.97",
+    "ROC 301772"
+   ],
+   "questions": [
+    {
+     "question": "What is the total due on invoice INV-5531?",
+     "answers": [
+      [
+       "$6,023.97",
+       "6,023.97",
+       "6023.97",
+       "6023.97"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "table"
+     },
+     "same": [
+      "INV-5531"
+     ],
+     "mustNot": [],
+     "hard": [
+      "table",
+      "currency"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is the phone number of customer Corinne Dunleavy on invoice INV-5531?",
+     "answers": [
+      [
+       "(520) 555-0103",
+       "520-555-0103"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [
+      "Corinne Dunleavy"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "Who is the technician on invoice INV-5531?",
+     "answers": [
+      [
+       "Angela Ruiz"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [
+      "INV-5531"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "When is invoice INV-5531 due?",
+     "answers": [
+      [
+       "2026-03-14",
+       "3/14/2026",
+       "03/14/2026",
+       "14-Mar-26",
+       "14-Mar-2026",
+       "Mar 14, 2026",
+       "March 14, 2026",
+       "March 14, 2026"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [
+      "INV-5531"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What is the unit price of the Delta Condensate Pump on invoice INV-5531?",
+     "answers": [
+      [
+       "$532.96",
+       "532.96",
+       "532.96",
+       "532.96"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "table"
+     },
+     "same": [
+      "Delta Condensate Pump"
+     ],
+     "mustNot": [],
+     "hard": [
+      "table"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is Ironwood Plumbing Co.'s contractor license number?",
+     "answers": [
+      [
+       "ROC 301772"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "header"
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [
+      "header"
+     ],
+     "global": false
+    },
+    {
+     "question": "What are the payment terms and late fee on the Ironwood Plumbing Co. invoice INV-5531?",
+     "answers": [
+      [
+       "Net 15"
+      ],
+      [
+       "1.5%"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "footer"
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [
+      "footer",
+      "percent"
+     ],
+     "global": false
+    }
+   ],
+   "bytes": 4365
+  },
+  "invoice-ironwood-INV-5540.xlsx": {
+   "type": "xlsx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": "read",
+   "structure": {
+    "sheets": [
+     {
+      "name": "Invoice",
+      "state": "visible",
+      "nonEmpty": true,
+      "dataRows": 18
+     }
+    ],
+    "pagesRange": [
+     1,
+     2
+    ]
+   },
+   "keys": [
+    "INV-5540",
+    "Tamsin Escobedo",
+    "(623) 555-0168",
+    "Sofia Brandt",
+    "Diagnostic and service call",
+    "Trane Water Heater Element",
+    "Square D Expansion Tank",
+    "Goodman Service Panel",
+    "Trane Float Switch",
+    [
+     "$2,013.64",
+     "2,013.64",
+     "2013.64",
+     "2013.64"
+    ],
+    [
+     "2026-03-02",
+     "3/2/2026",
+     "03/02/2026",
+     "2-Mar-26",
+     "2-Mar-2026",
+     "Mar 2, 2026",
+     "March 2, 2026"
+    ]
+   ],
+   "mustNotAnywhere": [
+    "SUM(",
+    "B12*C12"
+   ],
+   "questions": [
+    {
+     "question": "What is the total due on invoice INV-5540?",
+     "answers": [
+      [
+       "$2,013.64",
+       "2,013.64",
+       "2013.64",
+       "2013.64"
+      ]
+     ],
+     "where": {
+      "sheet": "Invoice",
+      "row": 20,
+      "kind": "formula"
+     },
+     "same": [
+      "INV-5540"
+     ],
+     "mustNot": [
+      "SUM(",
+      "D12+D"
+     ],
+     "hard": [
+      "formula",
+      "currency"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is the date of invoice INV-5540?",
+     "answers": [
+      [
+       "2026-03-02",
+       "3/2/2026",
+       "03/02/2026",
+       "2-Mar-26",
+       "2-Mar-2026",
+       "Mar 2, 2026",
+       "March 2, 2026"
+      ]
+     ],
+     "where": {
+      "sheet": "Invoice",
+      "row": 5
+     },
+     "same": [
+      "INV-5540"
+     ],
+     "mustNot": [
+      "46083"
+     ],
+     "hard": [
+      "serial-date"
+     ],
+     "global": false
+    },
+    {
+     "question": "What tax rate was charged on invoice INV-5540?",
+     "answers": [
+      [
+       "8.05%",
+       "0.0805"
+      ]
+     ],
+     "where": {
+      "sheet": "Invoice",
+      "row": 18
+     },
+     "same": [
+      "INV-5540"
+     ],
+     "mustNot": [],
+     "hard": [
+      "percent"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is the phone number for Tamsin Escobedo on invoice INV-5540?",
+     "answers": [
+      [
+       "(623) 555-0168"
+      ]
+     ],
+     "where": {
+      "sheet": "Invoice",
+      "row": 7
+     },
+     "same": [
+      "Tamsin Escobedo"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "Which technician worked invoice INV-5540?",
+     "answers": [
+      [
+       "Sofia Brandt"
+      ]
+     ],
+     "where": {
+      "sheet": "Invoice",
+      "row": 9
+     },
+     "same": [
+      "INV-5540"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What is the subtotal before tax on invoice INV-5540?",
+     "answers": [
+      [
+       "$1,863.62",
+       "1,863.62",
+       "1863.62",
+       "1863.62"
+      ]
+     ],
+     "where": {
+      "sheet": "Invoice",
+      "row": 17,
+      "kind": "formula"
+     },
+     "same": [
+      "INV-5540"
+     ],
+     "mustNot": [
+      "SUM(D12"
+     ],
+     "hard": [
+      "formula"
+     ],
+     "global": false
+    }
+   ],
+   "bytes": 3196
+  },
+  "invoice-mesquite-M-1180.docx": {
+   "type": "docx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+   "status": "read",
+   "structure": {
+    "pagesRange": [
+     1,
+     2
+    ],
+    "docx": true
+   },
+   "keys": [
+    "M-1180",
+    "Barnaby Ballard",
+    "(480) 555-0155",
+    "Sofia Brandt",
+    "Diagnostic and service call",
+    "Goodman Service Panel",
+    "Trane Contactor",
+    "Eaton Contactor",
+    "Goodman Refrigerant Line Set",
+    "Square D Service Panel",
+    "$4,365.76",
+    "ROC 310245"
+   ],
+   "questions": [
+    {
+     "question": "What is the total due on invoice M-1180?",
+     "answers": [
+      [
+       "$4,365.76",
+       "4,365.76",
+       "4365.76",
+       "4365.76"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "table"
+     },
+     "same": [
+      "M-1180"
+     ],
+     "mustNot": [],
+     "hard": [
+      "table",
+      "currency"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is the phone number of customer Barnaby Ballard on invoice M-1180?",
+     "answers": [
+      [
+       "(480) 555-0155",
+       "480-555-0155"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [
+      "Barnaby Ballard"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "Who is the technician on invoice M-1180?",
+     "answers": [
+      [
+       "Sofia Brandt"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [
+      "M-1180"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "When is invoice M-1180 due?",
+     "answers": [
+      [
+       "2026-02-14",
+       "2/14/2026",
+       "02/14/2026",
+       "14-Feb-26",
+       "14-Feb-2026",
+       "Feb 14, 2026",
+       "February 14, 2026",
+       "February 14, 2026"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [
+      "M-1180"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What is the unit price of the Goodman Service Panel on invoice M-1180?",
+     "answers": [
+      [
+       "$137.82",
+       "137.82",
+       "137.82",
+       "137.82"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "table"
+     },
+     "same": [
+      "Goodman Service Panel"
+     ],
+     "mustNot": [],
+     "hard": [
+      "table"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is Mesquite Property Services's contractor license number?",
+     "answers": [
+      [
+       "ROC 310245"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "header"
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [
+      "header"
+     ],
+     "global": false
+    },
+    {
+     "question": "What are the payment terms and late fee on the Mesquite Property Services invoice M-1180?",
+     "answers": [
+      [
+       "Net 15"
+      ],
+      [
+       "1.5%"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "footer"
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [
+      "footer",
+      "percent"
+     ],
+     "global": false
+    }
+   ],
+   "bytes": 4347
+  },
+  "invoice-paloverde-2026-0207.docx": {
+   "type": "docx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+   "status": "read",
+   "structure": {
+    "pagesRange": [
+     1,
+     2
+    ],
+    "docx": true
+   },
+   "keys": [
+    "PV-2026-0207",
+    "Leland Prescott",
+    "(520) 555-0197",
+    "Dale Whitfield",
+    "Diagnostic and service call",
+    "Rheem Service Panel",
+    "Eaton Evaporator Coil",
+    "Lennox Filter Drier",
+    "$750.47",
+    "ROC 287456"
+   ],
+   "questions": [
+    {
+     "question": "What is the total due on invoice PV-2026-0207?",
+     "answers": [
+      [
+       "$750.47",
+       "750.47",
+       "750.47",
+       "750.47"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "table"
+     },
+     "same": [
+      "PV-2026-0207"
+     ],
+     "mustNot": [],
+     "hard": [
+      "table",
+      "currency"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is the phone number of customer Leland Prescott on invoice PV-2026-0207?",
+     "answers": [
+      [
+       "(520) 555-0197",
+       "520-555-0197"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [
+      "Leland Prescott"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "Who is the technician on invoice PV-2026-0207?",
+     "answers": [
+      [
+       "Dale Whitfield"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [
+      "PV-2026-0207"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "When is invoice PV-2026-0207 due?",
+     "answers": [
+      [
+       "2026-04-17",
+       "4/17/2026",
+       "04/17/2026",
+       "17-Apr-26",
+       "17-Apr-2026",
+       "Apr 17, 2026",
+       "April 17, 2026",
+       "April 17, 2026"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [
+      "PV-2026-0207"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What is the unit price of the Rheem Service Panel on invoice PV-2026-0207?",
+     "answers": [
+      [
+       "$479.25",
+       "479.25",
+       "479.25",
+       "479.25"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "table"
+     },
+     "same": [
+      "Rheem Service Panel"
+     ],
+     "mustNot": [],
+     "hard": [
+      "table"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is Palo Verde Electric's contractor license number?",
+     "answers": [
+      [
+       "ROC 287456"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "header"
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [
+      "header"
+     ],
+     "global": false
+    },
+    {
+     "question": "What are the payment terms and late fee on the Palo Verde Electric invoice PV-2026-0207?",
+     "answers": [
+      [
+       "Net 15"
+      ],
+      [
+       "1.5%"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "footer"
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [
+      "footer",
+      "percent"
+     ],
+     "global": false
+    }
+   ],
+   "bytes": 4271
+  },
+  "invoice-paloverde-PV-2026-0215.xlsx": {
+   "type": "xlsx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": "read",
+   "structure": {
+    "sheets": [
+     {
+      "name": "Invoice",
+      "state": "visible",
+      "nonEmpty": true,
+      "dataRows": 19
+     }
+    ],
+    "pagesRange": [
+     1,
+     2
+    ]
+   },
+   "keys": [
+    "PV-2026-0215",
+    "Ocotillo Chiropractic",
+    "(480) 555-0102",
+    "Terrance Oyelaran",
+    "Diagnostic and service call",
+    "Goodman Expansion Tank",
+    "Moen Thermostat",
+    "Eaton Hose Bib",
+    "Rheem Igniter",
+    "Moen Ceiling Fan Kit",
+    [
+     "$2,918.91",
+     "2,918.91",
+     "2918.91",
+     "2918.91"
+    ],
+    [
+     "2026-04-11",
+     "4/11/2026",
+     "04/11/2026",
+     "11-Apr-26",
+     "11-Apr-2026",
+     "Apr 11, 2026",
+     "April 11, 2026"
+    ]
+   ],
+   "mustNotAnywhere": [
+    "SUM(",
+    "B12*C12"
+   ],
+   "questions": [
+    {
+     "question": "What is the total due on invoice PV-2026-0215?",
+     "answers": [
+      [
+       "$2,918.91",
+       "2,918.91",
+       "2918.91",
+       "2918.91"
+      ]
+     ],
+     "where": {
+      "sheet": "Invoice",
+      "row": 21,
+      "kind": "formula"
+     },
+     "same": [
+      "PV-2026-0215"
+     ],
+     "mustNot": [
+      "SUM(",
+      "D12+D"
+     ],
+     "hard": [
+      "formula",
+      "currency"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is the date of invoice PV-2026-0215?",
+     "answers": [
+      [
+       "2026-04-11",
+       "4/11/2026",
+       "04/11/2026",
+       "11-Apr-26",
+       "11-Apr-2026",
+       "Apr 11, 2026",
+       "April 11, 2026"
+      ]
+     ],
+     "where": {
+      "sheet": "Invoice",
+      "row": 5
+     },
+     "same": [
+      "PV-2026-0215"
+     ],
+     "mustNot": [
+      "46123"
+     ],
+     "hard": [
+      "serial-date"
+     ],
+     "global": false
+    },
+    {
+     "question": "What tax rate was charged on invoice PV-2026-0215?",
+     "answers": [
+      [
+       "8.05%",
+       "0.0805"
+      ]
+     ],
+     "where": {
+      "sheet": "Invoice",
+      "row": 19
+     },
+     "same": [
+      "PV-2026-0215"
+     ],
+     "mustNot": [],
+     "hard": [
+      "percent"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is the phone number for Ocotillo Chiropractic on invoice PV-2026-0215?",
+     "answers": [
+      [
+       "(480) 555-0102"
+      ]
+     ],
+     "where": {
+      "sheet": "Invoice",
+      "row": 7
+     },
+     "same": [
+      "Ocotillo Chiropractic"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "Which technician worked invoice PV-2026-0215?",
+     "answers": [
+      [
+       "Terrance Oyelaran"
+      ]
+     ],
+     "where": {
+      "sheet": "Invoice",
+      "row": 9
+     },
+     "same": [
+      "PV-2026-0215"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What is the subtotal before tax on invoice PV-2026-0215?",
+     "answers": [
+      [
+       "$2,701.44",
+       "2,701.44",
+       "2701.44",
+       "2701.44"
+      ]
+     ],
+     "where": {
+      "sheet": "Invoice",
+      "row": 18,
+      "kind": "formula"
+     },
+     "same": [
+      "PV-2026-0215"
+     ],
+     "mustNot": [
+      "SUM(D12"
+     ],
+     "hard": [
+      "formula"
+     ],
+     "global": false
+    }
+   ],
+   "bytes": 3242
+  },
+  "invoice-register-2026.csv": {
+   "type": "csv",
+   "upload": "accept",
+   "contentType": "text/csv",
+   "status": "read",
+   "structure": {
+    "csv": true,
+    "pagesRange": [
+     22,
+     92
+    ],
+    "headerRepeated": [
+     "Invoice No",
+     "Amount"
+    ],
+    "minPages": 20
+   },
+   "keys": [
+    "INV-10000",
+    "INV-10051",
+    "INV-10102",
+    "INV-10153",
+    "INV-10204",
+    "INV-10255",
+    "INV-10306",
+    "INV-10357",
+    "INV-10408",
+    "INV-10459",
+    "INV-10510",
+    "INV-10561",
+    "INV-10612",
+    "INV-10663",
+    "INV-10714",
+    "INV-10765",
+    "INV-10816",
+    "INV-10867",
+    "INV-10918",
+    "INV-10969",
+    "INV-11020",
+    "INV-11071",
+    "INV-11122",
+    "INV-11173",
+    "INV-11224",
+    "INV-11275",
+    "INV-11326",
+    "INV-11377",
+    "INV-11428",
+    "INV-11479",
+    "INV-11530",
+    "INV-11581",
+    "INV-11632",
+    "INV-11683",
+    "INV-11734",
+    "INV-11785",
+    "INV-11836",
+    "INV-11887",
+    "INV-11938",
+    "INV-11989",
+    "INV-12040",
+    "INV-12091",
+    "INV-12142",
+    "INV-12193",
+    "INV-12244",
+    "INV-12295",
+    "INV-12346",
+    "INV-12397",
+    "INV-12448",
+    "INV-12499",
+    "INV-12550",
+    "INV-12601",
+    "INV-12652",
+    "INV-12703",
+    "INV-12754",
+    "INV-12805",
+    "INV-12856",
+    "INV-12907",
+    "INV-12958",
+    "INV-13009"
+   ],
+   "questions": [
+    {
+     "question": "What was the amount of invoice INV-12888?",
+     "answers": [
+      [
+       "3146.66",
+       "$3146.66"
+      ]
+     ],
+     "where": {
+      "row": 2890,
+      "kind": "csv-row"
+     },
+     "same": [
+      "INV-12888"
+     ],
+     "mustNot": [],
+     "hard": [
+      "far-row"
+     ],
+     "global": false
+    },
+    {
+     "question": "What was the amount of invoice INV-11198?",
+     "answers": [
+      [
+       "3642.38",
+       "$3642.38"
+      ]
+     ],
+     "where": {
+      "row": 1200,
+      "kind": "csv-row"
+     },
+     "same": [
+      "INV-11198"
+     ],
+     "mustNot": [],
+     "hard": [
+      "far-row"
+     ],
+     "global": false
+    },
+    {
+     "question": "What was the amount of invoice INV-13099?",
+     "answers": [
+      [
+       "725.60",
+       "$725.60"
+      ]
+     ],
+     "where": {
+      "row": 3101,
+      "kind": "csv-row"
+     },
+     "same": [
+      "INV-13099"
+     ],
+     "mustNot": [],
+     "hard": [
+      "far-row"
+     ],
+     "global": false
+    },
+    {
+     "question": "Who was the technician on invoice INV-11998?",
+     "answers": [
+      [
+       "Sofia Brandt"
+      ]
+     ],
+     "where": {
+      "row": 2000
+     },
+     "same": [
+      "INV-11998"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What is the status of invoice INV-12948?",
+     "answers": [
+      [
+       "Paid"
+      ]
+     ],
+     "where": {
+      "row": 2950
+     },
+     "same": [
+      "INV-12948"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    }
+   ],
+   "bytes": 270399
+  },
+  "invoice-register-2026.xlsx": {
+   "type": "xlsx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": "read",
+   "structure": {
+    "sheets": [
+     {
+      "name": "Register",
+      "state": "visible",
+      "nonEmpty": true,
+      "dataRows": 3201
+     }
+    ],
+    "pagesRange": [
+     22,
+     92
+    ],
+    "headerRepeated": [
+     "Invoice No",
+     "Amount"
+    ],
+    "minPages": 20
+   },
+   "keys": [
+    "INV-10000",
+    "INV-10040",
+    "INV-10080",
+    "INV-10120",
+    "INV-10160",
+    "INV-10200",
+    "INV-10240",
+    "INV-10280",
+    "INV-10320",
+    "INV-10360",
+    "INV-10400",
+    "INV-10440",
+    "INV-10480",
+    "INV-10520",
+    "INV-10560",
+    "INV-10600",
+    "INV-10640",
+    "INV-10680",
+    "INV-10720",
+    "INV-10760",
+    "INV-10800",
+    "INV-10840",
+    "INV-10880",
+    "INV-10920",
+    "INV-10960",
+    "INV-11000",
+    "INV-11040",
+    "INV-11080",
+    "INV-11120",
+    "INV-11160",
+    "INV-11200",
+    "INV-11240",
+    "INV-11280",
+    "INV-11320",
+    "INV-11360",
+    "INV-11400",
+    "INV-11440",
+    "INV-11480",
+    "INV-11520",
+    "INV-11560",
+    "INV-11600",
+    "INV-11640",
+    "INV-11680",
+    "INV-11720",
+    "INV-11760",
+    "INV-11800",
+    "INV-11840",
+    "INV-11880",
+    "INV-11920",
+    "INV-11960",
+    "INV-12000",
+    "INV-12040",
+    "INV-12080",
+    "INV-12120",
+    "INV-12160",
+    "INV-12200",
+    "INV-12240",
+    "INV-12280",
+    "INV-12320",
+    "INV-12360",
+    "INV-12400",
+    "INV-12440",
+    "INV-12480",
+    "INV-12520",
+    "INV-12560",
+    "INV-12600",
+    "INV-12640",
+    "INV-12680",
+    "INV-12720",
+    "INV-12760",
+    "INV-12800",
+    "INV-12840",
+    "INV-12880",
+    "INV-12920",
+    "INV-12960",
+    "INV-13000",
+    "INV-13040",
+    "INV-13080",
+    "INV-13120",
+    "INV-13160"
+   ],
+   "questions": [
+    {
+     "question": "What was the amount of invoice INV-12898?",
+     "answers": [
+      [
+       "$1,655.08",
+       "1,655.08",
+       "1655.08",
+       "1655.08"
+      ]
+     ],
+     "where": {
+      "sheet": "Register",
+      "row": 2900
+     },
+     "same": [
+      "INV-12898"
+     ],
+     "mustNot": [],
+     "hard": [
+      "far-row",
+      "currency"
+     ],
+     "global": false
+    },
+    {
+     "question": "Who was the customer on invoice INV-11498?",
+     "answers": [
+      [
+       "Gordon Yazzie"
+      ]
+     ],
+     "where": {
+      "sheet": "Register",
+      "row": 1500
+     },
+     "same": [
+      "INV-11498"
+     ],
+     "mustNot": [],
+     "hard": [
+      "far-row"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is the status of invoice INV-13199?",
+     "answers": [
+      [
+       "Open"
+      ]
+     ],
+     "where": {
+      "sheet": "Register",
+      "row": 3201
+     },
+     "same": [
+      "INV-13199"
+     ],
+     "mustNot": [],
+     "hard": [
+      "far-row"
+     ],
+     "global": false
+    },
+    {
+     "question": "Which technician handled invoice INV-10775?",
+     "answers": [
+      [
+       "Marcus Bell"
+      ]
+     ],
+     "where": {
+      "sheet": "Register",
+      "row": 777
+     },
+     "same": [
+      "INV-10775"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What type of job was invoice INV-10000?",
+     "answers": [
+      [
+       "Drain clearing"
+      ]
+     ],
+     "where": {
+      "sheet": "Register",
+      "row": 2
+     },
+     "same": [
+      "INV-10000"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "On what date was invoice INV-12498 issued?",
+     "answers": [
+      [
+       "2026-04-04",
+       "4/4/2026",
+       "04/04/2026",
+       "4-Apr-26",
+       "4-Apr-2026",
+       "Apr 4, 2026",
+       "April 4, 2026"
+      ]
+     ],
+     "where": {
+      "sheet": "Register",
+      "row": 2500
+     },
+     "same": [
+      "INV-12498"
+     ],
+     "mustNot": [],
+     "hard": [
+      "serial-date",
+      "far-row"
+     ],
+     "global": false
+    },
+    {
+     "question": "How many invoices in the register have status Open?",
+     "answers": [],
+     "where": {
+      "sheet": "Register"
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [],
+     "global": false,
+     "kind": "aggregate",
+     "allOf": [
+      "INV-10003",
+      "INV-10073",
+      "INV-10153",
+      "INV-10231",
+      "INV-10332",
+      "INV-10405",
+      "INV-10483",
+      "INV-10563",
+      "INV-10621",
+      "INV-10707",
+      "INV-10793",
+      "INV-10904",
+      "INV-10956",
+      "INV-11031",
+      "INV-11112",
+      "INV-11206",
+      "INV-11311",
+      "INV-11348",
+      "INV-11413",
+      "INV-11472",
+      "INV-11536",
+      "INV-11593",
+      "INV-11653",
+      "INV-11727",
+      "INV-11796",
+      "INV-11862",
+      "INV-11944",
+      "INV-12063",
+      "INV-12115",
+      "INV-12239",
+      "INV-12314",
+      "INV-12380",
+      "INV-12467",
+      "INV-12552",
+      "INV-12644",
+      "INV-12741",
+      "INV-12815",
+      "INV-12889",
+      "INV-13003",
+      "INV-13100"
+     ],
+     "expectedCount": 645
+    }
+   ],
+   "bytes": 129298
+  },
+  "invoice-saguaro-INV-20418.docx": {
+   "type": "docx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+   "status": "read",
+   "structure": {
+    "pagesRange": [
+     1,
+     2
+    ],
+    "docx": true
+   },
+   "keys": [
+    "INV-20418",
+    "Cactus Flats Apartments LLC",
+    "(480) 555-0106",
+    "Marcus Bell",
+    "Diagnostic and service call",
+    "Rheem Hose Bib",
+    "Lennox Water Heater Element",
+    "Rheem Condenser Fan Motor",
+    "$2,920.66",
+    "ROC 298114"
+   ],
+   "questions": [
+    {
+     "question": "What is the total due on invoice INV-20418?",
+     "answers": [
+      [
+       "$2,920.66",
+       "2,920.66",
+       "2920.66",
+       "2920.66"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "table"
+     },
+     "same": [
+      "INV-20418"
+     ],
+     "mustNot": [],
+     "hard": [
+      "table",
+      "currency"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is the phone number of customer Cactus Flats Apartments LLC on invoice INV-20418?",
+     "answers": [
+      [
+       "(480) 555-0106",
+       "480-555-0106"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [
+      "Cactus Flats Apartments LLC"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "Who is the technician on invoice INV-20418?",
+     "answers": [
+      [
+       "Marcus Bell"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [
+      "INV-20418"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "When is invoice INV-20418 due?",
+     "answers": [
+      [
+       "2026-03-29",
+       "3/29/2026",
+       "03/29/2026",
+       "29-Mar-26",
+       "29-Mar-2026",
+       "Mar 29, 2026",
+       "March 29, 2026",
+       "March 29, 2026"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [
+      "INV-20418"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What is the unit price of the Rheem Hose Bib on invoice INV-20418?",
+     "answers": [
+      [
+       "$353.66",
+       "353.66",
+       "353.66",
+       "353.66"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "table"
+     },
+     "same": [
+      "Rheem Hose Bib"
+     ],
+     "mustNot": [],
+     "hard": [
+      "table"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is Saguaro Air & Heating's contractor license number?",
+     "answers": [
+      [
+       "ROC 298114"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "header"
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [
+      "header"
+     ],
+     "global": false
+    },
+    {
+     "question": "What are the payment terms and late fee on the Saguaro Air & Heating invoice INV-20418?",
+     "answers": [
+      [
+       "Net 15"
+      ],
+      [
+       "1.5%"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "footer"
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [
+      "footer",
+      "percent"
+     ],
+     "global": false
+    }
+   ],
+   "bytes": 4314
+  },
+  "invoice-saguaro-INV-20431.xlsx": {
+   "type": "xlsx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": "read",
+   "structure": {
+    "sheets": [
+     {
+      "name": "Invoice",
+      "state": "visible",
+      "nonEmpty": true,
+      "dataRows": 19
+     }
+    ],
+    "pagesRange": [
+     1,
+     2
+    ]
+   },
+   "keys": [
+    "INV-20431",
+    "Ignacio Fairbanks",
+    "(520) 555-0151",
+    "Marcus Bell",
+    "Diagnostic and service call",
+    "Delta GFCI Outlet",
+    "Trane Hose Bib",
+    "Bradford Refrigerant Line Set",
+    "Eaton Breaker 20A",
+    "Square D Evaporator Coil",
+    [
+     "$3,108.60",
+     "3,108.60",
+     "3108.60",
+     "3108.6"
+    ],
+    [
+     "2026-03-20",
+     "3/20/2026",
+     "03/20/2026",
+     "20-Mar-26",
+     "20-Mar-2026",
+     "Mar 20, 2026",
+     "March 20, 2026"
+    ]
+   ],
+   "mustNotAnywhere": [
+    "SUM(",
+    "B12*C12"
+   ],
+   "questions": [
+    {
+     "question": "What is the total due on invoice INV-20431?",
+     "answers": [
+      [
+       "$3,108.60",
+       "3,108.60",
+       "3108.60",
+       "3108.6"
+      ]
+     ],
+     "where": {
+      "sheet": "Invoice",
+      "row": 21,
+      "kind": "formula"
+     },
+     "same": [
+      "INV-20431"
+     ],
+     "mustNot": [
+      "SUM(",
+      "D12+D"
+     ],
+     "hard": [
+      "formula",
+      "currency"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is the date of invoice INV-20431?",
+     "answers": [
+      [
+       "2026-03-20",
+       "3/20/2026",
+       "03/20/2026",
+       "20-Mar-26",
+       "20-Mar-2026",
+       "Mar 20, 2026",
+       "March 20, 2026"
+      ]
+     ],
+     "where": {
+      "sheet": "Invoice",
+      "row": 5
+     },
+     "same": [
+      "INV-20431"
+     ],
+     "mustNot": [
+      "46101"
+     ],
+     "hard": [
+      "serial-date"
+     ],
+     "global": false
+    },
+    {
+     "question": "What tax rate was charged on invoice INV-20431?",
+     "answers": [
+      [
+       "8.05%",
+       "0.0805"
+      ]
+     ],
+     "where": {
+      "sheet": "Invoice",
+      "row": 19
+     },
+     "same": [
+      "INV-20431"
+     ],
+     "mustNot": [],
+     "hard": [
+      "percent"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is the phone number for Ignacio Fairbanks on invoice INV-20431?",
+     "answers": [
+      [
+       "(520) 555-0151"
+      ]
+     ],
+     "where": {
+      "sheet": "Invoice",
+      "row": 7
+     },
+     "same": [
+      "Ignacio Fairbanks"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "Which technician worked invoice INV-20431?",
+     "answers": [
+      [
+       "Marcus Bell"
+      ]
+     ],
+     "where": {
+      "sheet": "Invoice",
+      "row": 9
+     },
+     "same": [
+      "INV-20431"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What is the subtotal before tax on invoice INV-20431?",
+     "answers": [
+      [
+       "$2,877.00",
+       "2,877.00",
+       "2877.00",
+       "2877"
+      ]
+     ],
+     "where": {
+      "sheet": "Invoice",
+      "row": 18,
+      "kind": "formula"
+     },
+     "same": [
+      "INV-20431"
+     ],
+     "mustNot": [
+      "SUM(D12"
+     ],
+     "hard": [
+      "formula"
+     ],
+     "global": false
+    }
+   ],
+   "bytes": 3245
+  },
+  "invoice-saguaro-INV-20977.docx": {
+   "type": "docx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+   "status": "read",
+   "structure": {
+    "pagesRange": [
+     1,
+     2
+    ],
+    "docx": true
+   },
+   "keys": [
+    "INV-20977",
+    "Cecil Montoya",
+    "(602) 555-0169",
+    "Terrance Oyelaran",
+    "Diagnostic and service call",
+    "Square D Gas Valve",
+    "Bradford Gas Valve",
+    "Goodman Igniter",
+    "$3,873.71",
+    "ROC 298114"
+   ],
+   "questions": [
+    {
+     "question": "What is the total due on invoice INV-20977?",
+     "answers": [
+      [
+       "$3,873.71",
+       "3,873.71",
+       "3873.71",
+       "3873.71"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "table"
+     },
+     "same": [
+      "INV-20977"
+     ],
+     "mustNot": [],
+     "hard": [
+      "table",
+      "currency"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is the phone number of customer Cecil Montoya on invoice INV-20977?",
+     "answers": [
+      [
+       "(602) 555-0169",
+       "602-555-0169"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [
+      "Cecil Montoya"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "Who is the technician on invoice INV-20977?",
+     "answers": [
+      [
+       "Terrance Oyelaran"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [
+      "INV-20977"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "When is invoice INV-20977 due?",
+     "answers": [
+      [
+       "2026-05-24",
+       "5/24/2026",
+       "05/24/2026",
+       "24-May-26",
+       "24-May-2026",
+       "May 24, 2026",
+       "May 24, 2026",
+       "May 24, 2026"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [
+      "INV-20977"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What is the unit price of the Square D Gas Valve on invoice INV-20977?",
+     "answers": [
+      [
+       "$412.35",
+       "412.35",
+       "412.35",
+       "412.35"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "table"
+     },
+     "same": [
+      "Square D Gas Valve"
+     ],
+     "mustNot": [],
+     "hard": [
+      "table"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is Saguaro Air & Heating's contractor license number?",
+     "answers": [
+      [
+       "ROC 298114"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "header"
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [
+      "header"
+     ],
+     "global": false
+    },
+    {
+     "question": "What are the payment terms and late fee on the Saguaro Air & Heating invoice INV-20977?",
+     "answers": [
+      [
+       "Net 15"
+      ],
+      [
+       "1.5%"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "footer"
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [
+      "footer",
+      "percent"
+     ],
+     "global": false
+    }
+   ],
+   "bytes": 4294
+  },
+  "joblog-2026.xlsx": {
+   "type": "xlsx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": "read",
+   "structure": {
+    "sheets": [
+     {
+      "name": "Jobs",
+      "state": "visible",
+      "nonEmpty": true,
+      "dataRows": 20
+     },
+     {
+      "name": "Summary",
+      "state": "visible",
+      "nonEmpty": true,
+      "dataRows": 5
+     },
+     {
+      "name": "Rates (internal)",
+      "state": "hidden",
+      "nonEmpty": true,
+      "dataRows": 7
+     }
+    ],
+    "pagesRange": [
+     3,
+     6
+    ]
+   },
+   "keys": [
+    "J-2201",
+    "J-2202",
+    "J-2203",
+    "J-2204",
+    "J-2205",
+    "J-2206",
+    "J-2207",
+    "J-2208",
+    "J-2209",
+    "J-2210",
+    "J-2211",
+    "J-2212",
+    "J-2213",
+    "J-2214",
+    "Residential - Mesa",
+    "Commercial - Chandler",
+    "Gross margin target"
+   ],
+   "mustNotAnywhere": [
+    "SUM(",
+    "COUNTA(",
+    "IF(B3"
+   ],
+   "questions": [
+    {
+     "question": "What was the total for job J-2208?",
+     "answers": [
+      [
+       "$600.77",
+       "600.77",
+       "600.77",
+       "600.77"
+      ]
+     ],
+     "where": {
+      "sheet": "Jobs",
+      "row": 13,
+      "kind": "formula"
+     },
+     "same": [
+      "J-2208"
+     ],
+     "mustNot": [
+      "E13+F"
+     ],
+     "hard": [
+      "formula",
+      "currency"
+     ],
+     "global": false
+    },
+    {
+     "question": "Which group is job J-2206 in?",
+     "answers": [
+      [
+       "Commercial - Chandler"
+      ]
+     ],
+     "where": {
+      "sheet": "Jobs",
+      "row": 11
+     },
+     "same": [
+      "J-2206"
+     ],
+     "mustNot": [],
+     "hard": [
+      "merged-label"
+     ],
+     "global": false
+    },
+    {
+     "question": "What date was job J-2203 done?",
+     "answers": [
+      [
+       "2026-03-08",
+       "3/8/2026",
+       "03/08/2026",
+       "8-Mar-26",
+       "8-Mar-2026",
+       "Mar 8, 2026",
+       "March 8, 2026"
+      ]
+     ],
+     "where": {
+      "sheet": "Jobs",
+      "row": 7
+     },
+     "same": [
+      "J-2203"
+     ],
+     "mustNot": [],
+     "hard": [
+      "serial-date"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is the gross margin target?",
+     "answers": [
+      [
+       "38%",
+       "0.38"
+      ]
+     ],
+     "where": {
+      "sheet": "Summary",
+      "row": 3
+     },
+     "same": [
+      "Gross margin"
+     ],
+     "mustNot": [],
+     "hard": [
+      "percent"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is the grand total billed for the year to date?",
+     "answers": [
+      [
+       "$8,528.16",
+       "8,528.16",
+       "8528.16",
+       "8528.16"
+      ]
+     ],
+     "where": {
+      "sheet": "Jobs",
+      "row": 21,
+      "kind": "formula"
+     },
+     "same": [],
+     "mustNot": [
+      "SUM(G4:G20)"
+     ],
+     "hard": [
+      "formula"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is the internal cost per hour for Dale Whitfield?",
+     "answers": [
+      [
+       "$43.00",
+       "43.00",
+       "43.00",
+       "43"
+      ]
+     ],
+     "where": {
+      "sheet": "Rates (internal)",
+      "row": 5
+     },
+     "same": [
+      "Dale Whitfield"
+     ],
+     "mustNot": [],
+     "hard": [
+      "hidden-sheet"
+     ],
+     "global": false,
+     "markedHidden": true
+    },
+    {
+     "question": "Who was the technician on job J-2208 and what was the labor cost?",
+     "answers": [
+      [
+       "Dale Whitfield"
+      ],
+      [
+       "$172.10",
+       "172.10",
+       "172.10",
+       "172.1"
+      ]
+     ],
+     "where": {
+      "sheet": "Jobs",
+      "row": 13
+     },
+     "same": [
+      "J-2208"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    }
+   ],
+   "bytes": 4873
+  },
+  "large-service-history-20000.xlsx": {
+   "type": "xlsx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": "read",
+   "structure": {
+    "sheets": [
+     {
+      "name": "History",
+      "state": "visible",
+      "nonEmpty": true,
+      "dataRows": 20001
+     }
+    ],
+    "pagesRange": [
+     110,
+     443
+    ],
+    "headerRepeated": [
+     "Record",
+     "Cost"
+    ],
+    "minPages": 150
+   },
+   "keys": [
+    "SH-100000",
+    "SH-100200",
+    "SH-100400",
+    "SH-100600",
+    "SH-100800",
+    "SH-101000",
+    "SH-101200",
+    "SH-101400",
+    "SH-101600",
+    "SH-101800",
+    "SH-102000",
+    "SH-102200",
+    "SH-102400",
+    "SH-102600",
+    "SH-102800",
+    "SH-103000",
+    "SH-103200",
+    "SH-103400",
+    "SH-103600",
+    "SH-103800",
+    "SH-104000",
+    "SH-104200",
+    "SH-104400",
+    "SH-104600",
+    "SH-104800",
+    "SH-105000",
+    "SH-105200",
+    "SH-105400",
+    "SH-105600",
+    "SH-105800",
+    "SH-106000",
+    "SH-106200",
+    "SH-106400",
+    "SH-106600",
+    "SH-106800",
+    "SH-107000",
+    "SH-107200",
+    "SH-107400",
+    "SH-107600",
+    "SH-107800",
+    "SH-108000",
+    "SH-108200",
+    "SH-108400",
+    "SH-108600",
+    "SH-108800",
+    "SH-109000",
+    "SH-109200",
+    "SH-109400",
+    "SH-109600",
+    "SH-109800",
+    "SH-110000",
+    "SH-110200",
+    "SH-110400",
+    "SH-110600",
+    "SH-110800",
+    "SH-111000",
+    "SH-111200",
+    "SH-111400",
+    "SH-111600",
+    "SH-111800",
+    "SH-112000",
+    "SH-112200",
+    "SH-112400",
+    "SH-112600",
+    "SH-112800",
+    "SH-113000",
+    "SH-113200",
+    "SH-113400",
+    "SH-113600",
+    "SH-113800",
+    "SH-114000",
+    "SH-114200",
+    "SH-114400",
+    "SH-114600",
+    "SH-114800",
+    "SH-115000",
+    "SH-115200",
+    "SH-115400",
+    "SH-115600",
+    "SH-115800",
+    "SH-116000",
+    "SH-116200",
+    "SH-116400",
+    "SH-116600",
+    "SH-116800",
+    "SH-117000",
+    "SH-117200",
+    "SH-117400",
+    "SH-117600",
+    "SH-117800",
+    "SH-118000",
+    "SH-118200",
+    "SH-118400",
+    "SH-118600",
+    "SH-118800",
+    "SH-119000",
+    "SH-119200",
+    "SH-119400",
+    "SH-119600",
+    "SH-119800"
+   ],
+   "questions": [
+    {
+     "question": "What did visit SH-119498 cost?",
+     "answers": [
+      [
+       "$587.27",
+       "587.27",
+       "587.27",
+       "587.27"
+      ]
+     ],
+     "where": {
+      "sheet": "History",
+      "row": 19500
+     },
+     "same": [
+      "SH-119498"
+     ],
+     "mustNot": [],
+     "hard": [
+      "far-row",
+      "currency"
+     ],
+     "global": false
+    },
+    {
+     "question": "What did visit SH-109999 cost?",
+     "answers": [
+      [
+       "$1,063.96",
+       "1,063.96",
+       "1063.96",
+       "1063.96"
+      ]
+     ],
+     "where": {
+      "sheet": "History",
+      "row": 10001
+     },
+     "same": [
+      "SH-109999"
+     ],
+     "mustNot": [],
+     "hard": [
+      "far-row",
+      "currency"
+     ],
+     "global": false
+    },
+    {
+     "question": "What did visit SH-119999 cost?",
+     "answers": [
+      [
+       "$856.33",
+       "856.33",
+       "856.33",
+       "856.33"
+      ]
+     ],
+     "where": {
+      "sheet": "History",
+      "row": 20001
+     },
+     "same": [
+      "SH-119999"
+     ],
+     "mustNot": [],
+     "hard": [
+      "last-row",
+      "currency"
+     ],
+     "global": false
+    },
+    {
+     "question": "What did visit SH-100000 cost?",
+     "answers": [
+      [
+       "$181.24",
+       "181.24",
+       "181.24",
+       "181.24"
+      ]
+     ],
+     "where": {
+      "sheet": "History",
+      "row": 2
+     },
+     "same": [
+      "SH-100000"
+     ],
+     "mustNot": [],
+     "hard": [
+      "first-row",
+      "currency"
+     ],
+     "global": false
+    },
+    {
+     "question": "What did visit SH-114442 cost?",
+     "answers": [
+      [
+       "$1,126.37",
+       "1,126.37",
+       "1126.37",
+       "1126.37"
+      ]
+     ],
+     "where": {
+      "sheet": "History",
+      "row": 14444
+     },
+     "same": [
+      "SH-114442"
+     ],
+     "mustNot": [],
+     "hard": [
+      "far-row",
+      "currency"
+     ],
+     "global": false
+    },
+    {
+     "question": "What unit serial number was serviced on record SH-115000?",
+     "answers": [
+      [
+       "2R1782-87202"
+      ]
+     ],
+     "where": {
+      "sheet": "History",
+      "row": 15002
+     },
+     "same": [
+      "SH-115000"
+     ],
+     "mustNot": [],
+     "hard": [
+      "far-row"
+     ],
+     "global": false
+    }
+   ],
+   "bytes": 775080
+  },
+  "large-service-manual-150pages.docx": {
+   "type": "docx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+   "status": "read",
+   "structure": {
+    "pagesRange": [
+     123,
+     194
+    ],
+    "docx": true,
+    "minPages": 100
+   },
+   "keys": [
+    "Technical Service Manual",
+    "The blower wheel set screw torque",
+    "Never exceed a static pressure of",
+    "The factory warranty on the heat"
+   ],
+   "questions": [
+    {
+     "question": "What is the blower wheel set screw torque specification?",
+     "answers": [
+      [
+       "85 inch-pounds"
+      ]
+     ],
+     "where": {
+      "page": 8,
+      "kind": "body"
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [],
+     "global": false,
+     "pageTolerance": 3
+    },
+    {
+     "question": "What static pressure must never be exceeded on the Model D14 air handler?",
+     "answers": [
+      [
+       "0.9 inches water column"
+      ]
+     ],
+     "where": {
+      "page": 80,
+      "kind": "body",
+      "pageHint": "deep"
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [
+      "far-text"
+     ],
+     "global": false,
+     "pageTolerance": 4
+    },
+    {
+     "question": "How long is the factory warranty on the heat exchanger?",
+     "answers": [
+      [
+       "twenty (20) years"
+      ]
+     ],
+     "where": {
+      "page": 147,
+      "kind": "body"
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [
+      "far-text"
+     ],
+     "global": false,
+     "pageTolerance": 5
+    },
+    {
+     "question": "What is the manual called in the page header?",
+     "answers": [
+      [
+       "Technical Service Manual"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "header"
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [
+      "header"
+     ],
+     "global": false,
+     "pageTolerance": 200
+    },
+    {
+     "question": "Is the manual marked for internal use only?",
+     "answers": [
+      [
+       "Internal use only"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "footer"
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [
+      "footer"
+     ],
+     "global": false,
+     "pageTolerance": 200
+    }
+   ],
+   "bytes": 37890
+  },
+  "legacy-named.docx": {
+   "type": "docx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+   "status": "refused",
+   "reason": [
+    "legacy",
+    "mismatch"
+   ],
+   "structure": {},
+   "keys": [],
+   "questions": [],
+   "bytes": 9728
+  },
+  "legacy-old.doc": {
+   "type": "doc",
+   "upload": "reject",
+   "contentType": "application/octet-stream",
+   "status": "refused",
+   "reason": [
+    "legacy"
+   ],
+   "structure": {},
+   "keys": [],
+   "questions": [],
+   "bytes": 9728
+  },
+  "legacy-old.ppt": {
+   "type": "ppt",
+   "upload": "reject",
+   "contentType": "application/octet-stream",
+   "status": "refused",
+   "reason": [
+    "legacy"
+   ],
+   "structure": {},
+   "keys": [],
+   "questions": [],
+   "bytes": 5632
+  },
+  "legacy-old.xls": {
+   "type": "xls",
+   "upload": "reject",
+   "contentType": "application/octet-stream",
+   "status": "refused",
+   "reason": [
+    "legacy"
+   ],
+   "structure": {},
+   "keys": [],
+   "questions": [],
+   "bytes": 5632
+  },
+  "logo.svg": {
+   "type": "svg",
+   "upload": "reject",
+   "contentType": "application/octet-stream",
+   "status": "refused",
+   "reason": [
+    "unsupported"
+   ],
+   "structure": {},
+   "keys": [],
+   "questions": [],
+   "bytes": 200
+  },
+  "macro-hidden-part.xlsx": {
+   "type": "xlsx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": "refused",
+   "reason": [
+    "macro"
+   ],
+   "structure": {},
+   "keys": [],
+   "questions": [],
+   "bytes": 2793
+  },
+  "macro-in-xlsx.xlsx": {
+   "type": "xlsx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": "refused",
+   "reason": [
+    "macro"
+   ],
+   "structure": {},
+   "keys": [],
+   "questions": [],
+   "bytes": 2829
+  },
+  "macro.docm": {
+   "type": "docm",
+   "upload": "reject",
+   "contentType": "application/octet-stream",
+   "status": "refused",
+   "reason": [
+    "macro"
+   ],
+   "structure": {},
+   "keys": [],
+   "questions": [],
+   "bytes": 3246
+  },
+  "macro.xlsm": {
+   "type": "xlsm",
+   "upload": "reject",
+   "contentType": "application/octet-stream",
+   "status": "refused",
+   "reason": [
+    "macro"
+   ],
+   "structure": {},
+   "keys": [],
+   "questions": [],
+   "bytes": 2797
+  },
+  "messy-ar-aging.xlsx": {
+   "type": "xlsx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": "read",
+   "structure": {
+    "sheets": [
+     {
+      "name": "AR",
+      "state": "visible",
+      "nonEmpty": true,
+      "dataRows": 19
+     }
+    ],
+    "pagesRange": [
+     1,
+     3
+    ]
+   },
+   "keys": [
+    "Cactus Flats Apartments LLC",
+    "Ignacio Fairbanks",
+    "Copper Canyon Diner",
+    "Corinne Dunleavy",
+    "Tamsin Escobedo",
+    "Agave Ridge HOA",
+    "Hector Cordero",
+    "Leland Prescott",
+    "Ocotillo Chiropractic",
+    "Beverly Fontaine",
+    "Hattie Zamora",
+    "Barnaby Ballard",
+    "Tomas Tavares",
+    "Barnaby Vasquez"
+   ],
+   "mustNotAnywhere": [
+    "SUM(D7"
+   ],
+   "questions": [
+    {
+     "question": "How much does Corinne Dunleavy owe?",
+     "answers": [
+      [
+       "$703.19",
+       "703.19",
+       "703.19",
+       "703.19"
+      ]
+     ],
+     "where": {
+      "sheet": "AR",
+      "row": 10
+     },
+     "same": [
+      "Corinne Dunleavy"
+     ],
+     "mustNot": [],
+     "hard": [
+      "text-number",
+      "messy"
+     ],
+     "global": false
+    },
+    {
+     "question": "How much does Tamsin Escobedo owe?",
+     "answers": [
+      [
+       "$1,614.75",
+       "1,614.75",
+       "1614.75",
+       "1614.75"
+      ]
+     ],
+     "where": {
+      "sheet": "AR",
+      "row": 11
+     },
+     "same": [
+      "Tamsin Escobedo"
+     ],
+     "mustNot": [],
+     "hard": [
+      "currency",
+      "messy"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is the note on Ocotillo Chiropractic?",
+     "answers": [
+      [
+       "promised check Friday"
+      ]
+     ],
+     "where": {
+      "sheet": "AR",
+      "row": 16,
+      "col": "I"
+     },
+     "same": [
+      "Ocotillo Chiropractic"
+     ],
+     "mustNot": [],
+     "hard": [
+      "odd-cell"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is the invoice number for Leland Prescott?",
+     "answers": [
+      [
+       "05507"
+      ]
+     ],
+     "where": {
+      "sheet": "AR",
+      "row": 15
+     },
+     "same": [
+      "Leland Prescott"
+     ],
+     "mustNot": [],
+     "hard": [
+      "text-number"
+     ],
+     "global": false
+    },
+    {
+     "question": "What date is the invoice for Cactus Flats Apartments LLC?",
+     "answers": [
+      [
+       "2026-01-04",
+       "1/4/2026",
+       "01/04/2026",
+       "4-Jan-26",
+       "4-Jan-2026",
+       "Jan 4, 2026",
+       "January 4, 2026"
+      ]
+     ],
+     "where": {
+      "sheet": "AR",
+      "row": 7
+     },
+     "same": [
+      "Cactus Flats Apartments LLC"
+     ],
+     "mustNot": [],
+     "hard": [
+      "serial-date",
+      "messy"
+     ],
+     "global": false
+    },
+    {
+     "question": "What date is the invoice for Copper Canyon Diner?",
+     "answers": [
+      [
+       "2026-01-16",
+       "1/16/2026",
+       "01/16/2026",
+       "16-Jan-26",
+       "16-Jan-2026",
+       "Jan 16, 2026",
+       "January 16, 2026"
+      ]
+     ],
+     "where": {
+      "sheet": "AR",
+      "row": 9
+     },
+     "same": [
+      "Copper Canyon Diner"
+     ],
+     "mustNot": [],
+     "hard": [
+      "mixed-dates"
+     ],
+     "global": false
+    },
+    {
+     "question": "As of what date is the aging report?",
+     "answers": [
+      [
+       "3/31/2026"
+      ]
+     ],
+     "where": {
+      "sheet": "AR",
+      "row": 3
+     },
+     "same": [
+      "Aging"
+     ],
+     "mustNot": [],
+     "hard": [
+      "title-block"
+     ],
+     "global": false
+    }
+   ],
+   "bytes": 3469
+  },
+  "parts-bins.json": {
+   "type": "json",
+   "upload": "accept",
+   "contentType": "application/json",
+   "status": "read",
+   "structure": {
+    "pagesRange": [
+     1,
+     2
+    ]
+   },
+   "keys": [
+    "JS-700",
+    "JS-701",
+    "JS-702",
+    "JS-703",
+    "JS-704",
+    "JS-705",
+    "JS-706",
+    "JS-707",
+    "JS-708",
+    "JS-709",
+    "JS-710",
+    "JS-711"
+   ],
+   "questions": [
+    {
+     "question": "Which bin holds part JS-705?",
+     "answers": [
+      [
+       "A6-2"
+      ]
+     ],
+     "where": {
+      "page": 1
+     },
+     "same": [
+      "JS-705"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false,
+     "pageTolerance": 1
+    },
+    {
+     "question": "What is the price of part JS-709?",
+     "answers": [
+      [
+       "77.5"
+      ]
+     ],
+     "where": {
+      "page": 1
+     },
+     "same": [
+      "JS-709"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false,
+     "pageTolerance": 1
+    },
+    {
+     "question": "What is part JS-702 called?",
+     "answers": [
+      [
+       "Condenser Fan Motor"
+      ]
+     ],
+     "where": {
+      "page": 1
+     },
+     "same": [
+      "JS-702"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false,
+     "pageTolerance": 1
+    },
+    {
+     "question": "What is part JS-711 called?",
+     "answers": [
+      [
+       "Gas Valve"
+      ]
+     ],
+     "where": {
+      "page": 1
+     },
+     "same": [
+      "JS-711"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false,
+     "pageTolerance": 1
+    },
+    {
+     "question": "Which shop owns this parts list?",
+     "answers": [
+      [
+       "Saguaro Air & Heating"
+      ]
+     ],
+     "where": {
+      "page": 1
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [],
+     "global": false,
+     "pageTolerance": 1
+    }
+   ],
+   "bytes": 1368
+  },
+  "photo-nameplate.jpg": {
+   "type": "jpg",
+   "upload": "accept",
+   "contentType": "image/jpeg",
+   "status": "model-path",
+   "reason": [],
+   "structure": {},
+   "note": "photo: needs the vision model; the harness checks upload + sniff only",
+   "keys": [],
+   "questions": [],
+   "bytes": 134
+  },
+  "picture.bmp": {
+   "type": "bmp",
+   "upload": "reject",
+   "contentType": "application/octet-stream",
+   "status": "refused",
+   "reason": [
+    "unsupported"
+   ],
+   "structure": {},
+   "keys": [],
+   "questions": [],
+   "bytes": 302
+  },
+  "price-updates-one-empty-sheet.xlsx": {
+   "type": "xlsx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": "read",
+   "structure": {
+    "sheets": [
+     {
+      "name": "January",
+      "state": "visible",
+      "nonEmpty": true,
+      "dataRows": 26
+     },
+     {
+      "name": "Blank",
+      "state": "visible",
+      "nonEmpty": false,
+      "dataRows": 0
+     },
+     {
+      "name": "February",
+      "state": "visible",
+      "nonEmpty": true,
+      "dataRows": 26
+     }
+    ],
+    "pagesRange": [
+     2,
+     4
+    ],
+    "emptySheets": [
+     "Blank"
+    ]
+   },
+   "keys": [
+    "JAN-100",
+    "JAN-101",
+    "JAN-102",
+    "JAN-103",
+    "JAN-104",
+    "JAN-105",
+    "JAN-106",
+    "JAN-107",
+    "JAN-108",
+    "JAN-109",
+    "JAN-110",
+    "JAN-111",
+    "JAN-112",
+    "JAN-113",
+    "JAN-114",
+    "JAN-115",
+    "JAN-116",
+    "JAN-117",
+    "JAN-118",
+    "JAN-119",
+    "JAN-120",
+    "JAN-121",
+    "JAN-122",
+    "JAN-123",
+    "JAN-124",
+    "FEB-100",
+    "FEB-101",
+    "FEB-102",
+    "FEB-103",
+    "FEB-104",
+    "FEB-105",
+    "FEB-106",
+    "FEB-107",
+    "FEB-108",
+    "FEB-109",
+    "FEB-110",
+    "FEB-111",
+    "FEB-112",
+    "FEB-113",
+    "FEB-114",
+    "FEB-115",
+    "FEB-116",
+    "FEB-117",
+    "FEB-118",
+    "FEB-119",
+    "FEB-120",
+    "FEB-121",
+    "FEB-122",
+    "FEB-123",
+    "FEB-124"
+   ],
+   "mustNotAnywhere": [
+    "*(1+D"
+   ],
+   "questions": [
+    {
+     "question": "What is the new price of JAN-104?",
+     "answers": [
+      [
+       "$434.40",
+       "434.40",
+       "434.40",
+       "434.4"
+      ]
+     ],
+     "where": {
+      "sheet": "January",
+      "row": 6,
+      "kind": "formula"
+     },
+     "same": [
+      "JAN-104"
+     ],
+     "mustNot": [
+      "*(1+D"
+     ],
+     "hard": [
+      "formula",
+      "currency"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is the old price of JAN-109?",
+     "answers": [
+      [
+       "$512.74",
+       "512.74",
+       "512.74",
+       "512.74"
+      ]
+     ],
+     "where": {
+      "sheet": "January",
+      "row": 11
+     },
+     "same": [
+      "JAN-109"
+     ],
+     "mustNot": [],
+     "hard": [
+      "text-number"
+     ],
+     "global": false
+    },
+    {
+     "question": "What percentage increase applies to FEB-103?",
+     "answers": [
+      [
+       "4%",
+       "0.04"
+      ]
+     ],
+     "where": {
+      "sheet": "February",
+      "row": 5
+     },
+     "same": [
+      "FEB-103"
+     ],
+     "mustNot": [],
+     "hard": [
+      "percent"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is the new price of FEB-120?",
+     "answers": [
+      [
+       "$167.12",
+       "167.12",
+       "167.12",
+       "167.12"
+      ]
+     ],
+     "where": {
+      "sheet": "February",
+      "row": 22
+     },
+     "same": [
+      "FEB-120"
+     ],
+     "mustNot": [],
+     "hard": [
+      "formula"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is the description of FEB-112?",
+     "answers": [
+      [
+       "Capacitor kit"
+      ]
+     ],
+     "where": {
+      "sheet": "February",
+      "row": 14
+     },
+     "same": [
+      "FEB-112"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    }
+   ],
+   "bytes": 5575
+  },
+  "pricelist-electrical.csv": {
+   "type": "csv",
+   "upload": "accept",
+   "contentType": "text/csv",
+   "status": "read",
+   "structure": {
+    "csv": true,
+    "pagesRange": [
+     4,
+     19
+    ],
+    "headerRepeated": [
+     "Item Code",
+     "Supplier"
+    ]
+   },
+   "keys": [
+    "EL-30000",
+    "EL-30130",
+    "EL-30260",
+    "EL-30390",
+    "EL-30520",
+    "EL-30650",
+    "EL-30780",
+    "EL-30910",
+    "EL-31040",
+    "EL-31170",
+    "EL-31300",
+    "EL-31430",
+    "EL-31560",
+    "EL-31690",
+    "EL-31820",
+    "EL-31950",
+    "EL-32080",
+    "EL-32210",
+    "EL-32340",
+    "EL-32470",
+    "EL-32600",
+    "EL-32730",
+    "EL-32860",
+    "EL-32990",
+    "EL-33120",
+    "EL-33250",
+    "EL-33380",
+    "EL-33510",
+    "EL-33640",
+    "EL-33770"
+   ],
+   "questions": [
+    {
+     "question": "What is the price of item EL-32000?",
+     "answers": [
+      [
+       "292.14",
+       "$292.14"
+      ]
+     ],
+     "where": {
+      "row": 402,
+      "kind": "csv-row"
+     },
+     "same": [
+      "EL-32000"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What is the price of item EL-33995?",
+     "answers": [
+      [
+       "130.99",
+       "$130.99"
+      ]
+     ],
+     "where": {
+      "row": 801,
+      "kind": "csv-row"
+     },
+     "same": [
+      "EL-33995"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What is the price of item EL-30050?",
+     "answers": [
+      [
+       "448.66",
+       "$448.66"
+      ]
+     ],
+     "where": {
+      "row": 12,
+      "kind": "csv-row"
+     },
+     "same": [
+      "EL-30050"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "Which supplier sells item EL-30615?",
+     "answers": [
+      [
+       "Canyon Supply"
+      ]
+     ],
+     "where": {
+      "row": 125
+     },
+     "same": [
+      "EL-30615"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What is the description of item EL-33250?",
+     "answers": [
+      [
+       "Breaker 30A, white"
+      ]
+     ],
+     "where": {
+      "row": 652,
+      "hard": [
+       "quoted-comma"
+      ]
+     },
+     "same": [
+      "EL-33250"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    }
+   ],
+   "bytes": 52248
+  },
+  "pricelist-hvac-2026.xlsx": {
+   "type": "xlsx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": "read",
+   "structure": {
+    "sheets": [
+     {
+      "name": "HVAC Parts",
+      "state": "visible",
+      "nonEmpty": true,
+      "dataRows": 2501
+     },
+     {
+      "name": "Labor Rates",
+      "state": "visible",
+      "nonEmpty": true,
+      "dataRows": 6
+     },
+     {
+      "name": "Read Me",
+      "state": "visible",
+      "nonEmpty": true,
+      "dataRows": 3
+     }
+    ],
+    "pagesRange": [
+     14,
+     60
+    ],
+    "headerRepeated": [
+     "Part No",
+     "Contractor Price"
+    ],
+    "minPages": 20
+   },
+   "keys": [
+    "HV-10000",
+    "HV-10287",
+    "HV-10574",
+    "HV-10861",
+    "HV-11148",
+    "HV-11435",
+    "HV-11722",
+    "HV-12009",
+    "HV-12296",
+    "HV-12583",
+    "HV-12870",
+    "HV-13157",
+    "HV-13444",
+    "HV-13731",
+    "HV-14018",
+    "HV-14305",
+    "HV-14592",
+    "HV-14879",
+    "HV-15166",
+    "HV-15453",
+    "HV-15740",
+    "HV-16027",
+    "HV-16314",
+    "HV-16601",
+    "HV-16888",
+    "HV-17175",
+    "HV-17462",
+    "HV-17749",
+    "HV-18036",
+    "HV-18323",
+    "HV-18610",
+    "HV-18897",
+    "HV-19184",
+    "HV-19471",
+    "HV-19758",
+    "HV-20045",
+    "HV-20332",
+    "HV-20619",
+    "HV-20906",
+    "HV-21193",
+    "HV-21480",
+    "HV-21767",
+    "HV-22054",
+    "HV-22341",
+    "HV-22628",
+    "HV-22915",
+    "HV-23202",
+    "HV-23489",
+    "HV-23776",
+    "HV-24063",
+    "HV-24350",
+    "HV-24637",
+    "HV-24924",
+    "HV-25211",
+    "HV-25498",
+    "HV-25785",
+    "HV-26072",
+    "HV-26359",
+    "HV-26646",
+    "HV-26933",
+    "Hourly labor, technician",
+    "Restocking fee"
+   ],
+   "questions": [
+    {
+     "question": "What is the contractor price of part HV-22600?",
+     "answers": [
+      [
+       "$905.56",
+       "905.56",
+       "905.56",
+       "905.56"
+      ]
+     ],
+     "where": {
+      "sheet": "HVAC Parts",
+      "row": 1802
+     },
+     "same": [
+      "HV-22600"
+     ],
+     "mustNot": [],
+     "hard": [
+      "currency",
+      "far-row"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is the contractor price of part HV-10280?",
+     "answers": [
+      [
+       "$582.34",
+       "582.34",
+       "582.34",
+       "582.34"
+      ]
+     ],
+     "where": {
+      "sheet": "HVAC Parts",
+      "row": 42
+     },
+     "same": [
+      "HV-10280"
+     ],
+     "mustNot": [],
+     "hard": [
+      "currency",
+      "table"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is the contractor price of part HV-27493?",
+     "answers": [
+      [
+       "$222.47",
+       "222.47",
+       "222.47",
+       "222.47"
+      ]
+     ],
+     "where": {
+      "sheet": "HVAC Parts",
+      "row": 2501
+     },
+     "same": [
+      "HV-27493"
+     ],
+     "mustNot": [],
+     "hard": [
+      "currency",
+      "far-row"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is the contractor price of part HV-18421?",
+     "answers": [
+      [
+       "$570.61",
+       "570.61",
+       "570.61",
+       "570.61"
+      ]
+     ],
+     "where": {
+      "sheet": "HVAC Parts",
+      "row": 1205
+     },
+     "same": [
+      "HV-18421"
+     ],
+     "mustNot": [],
+     "hard": [
+      "currency",
+      "table"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is the list price and brand of part HV-15439?",
+     "answers": [
+      [
+       "$62.59",
+       "62.59",
+       "62.59",
+       "62.59"
+      ],
+      [
+       "Eaton"
+      ]
+     ],
+     "where": {
+      "sheet": "HVAC Parts",
+      "row": 779
+     },
+     "same": [
+      "HV-15439"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What is our hourly labor rate for a technician?",
+     "answers": [
+      [
+       "$125.00",
+       "125.00",
+       "125.00",
+       "125"
+      ]
+     ],
+     "where": {
+      "sheet": "Labor Rates",
+      "row": 3
+     },
+     "same": [
+      "Hourly labor"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What contractor discount applies to orders over $500?",
+     "answers": [
+      [
+       "15%",
+       "0.15"
+      ]
+     ],
+     "where": {
+      "sheet": "Labor Rates",
+      "row": 6
+     },
+     "same": [
+      "Contractor discount"
+     ],
+     "mustNot": [],
+     "hard": [
+      "percent"
+     ],
+     "global": false
+    },
+    {
+     "question": "When do the new prices take effect?",
+     "answers": [
+      [
+       "April 1, 2026"
+      ]
+     ],
+     "where": {
+      "sheet": "Read Me",
+      "row": 2
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    }
+   ],
+   "bytes": 119756
+  },
+  "pricelist-plumbing-2026.xlsx": {
+   "type": "xlsx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": "read",
+   "structure": {
+    "sheets": [
+     {
+      "name": "Plumbing",
+      "state": "visible",
+      "nonEmpty": true,
+      "dataRows": 1201
+     }
+    ],
+    "pagesRange": [
+     4,
+     18
+    ],
+    "headerRepeated": [
+     "SKU",
+     "Price"
+    ],
+    "minPages": 6
+   },
+   "keys": [
+    "PL-20000",
+    "PL-20090",
+    "PL-20180",
+    "PL-20270",
+    "PL-20360",
+    "PL-20450",
+    "PL-20540",
+    "PL-20630",
+    "PL-20720",
+    "PL-20810",
+    "PL-20900",
+    "PL-20990",
+    "PL-21080",
+    "PL-21170",
+    "PL-21260",
+    "PL-21350",
+    "PL-21440",
+    "PL-21530",
+    "PL-21620",
+    "PL-21710",
+    "PL-21800",
+    "PL-21890",
+    "PL-21980",
+    "PL-22070",
+    "PL-22160",
+    "PL-22250",
+    "PL-22340",
+    "PL-22430",
+    "PL-22520",
+    "PL-22610",
+    "PL-22700",
+    "PL-22790",
+    "PL-22880",
+    "PL-22970",
+    "PL-23060",
+    "PL-23150",
+    "PL-23240",
+    "PL-23330",
+    "PL-23420",
+    "PL-23510"
+   ],
+   "questions": [
+    {
+     "question": "What is the price of SKU PL-21800?",
+     "answers": [
+      [
+       "$677.76",
+       "677.76",
+       "677.76",
+       "677.76"
+      ]
+     ],
+     "where": {
+      "sheet": "Plumbing",
+      "row": 602
+     },
+     "same": [
+      "PL-21800"
+     ],
+     "mustNot": [],
+     "hard": [
+      "currency"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is the price of SKU PL-23597?",
+     "answers": [
+      [
+       "$218.28",
+       "218.28",
+       "218.28",
+       "218.28"
+      ]
+     ],
+     "where": {
+      "sheet": "Plumbing",
+      "row": 1201
+     },
+     "same": [
+      "PL-23597"
+     ],
+     "mustNot": [],
+     "hard": [
+      "currency"
+     ],
+     "global": false
+    },
+    {
+     "question": "What is the price of SKU PL-20015?",
+     "answers": [
+      [
+       "$138.05",
+       "138.05",
+       "138.05",
+       "138.05"
+      ]
+     ],
+     "where": {
+      "sheet": "Plumbing",
+      "row": 7
+     },
+     "same": [
+      "PL-20015"
+     ],
+     "mustNot": [],
+     "hard": [
+      "currency"
+     ],
+     "global": false
+    },
+    {
+     "question": "How many are in stock of SKU PL-22700?",
+     "answers": [
+      [
+       "1"
+      ]
+     ],
+     "where": {
+      "sheet": "Plumbing",
+      "row": 902
+     },
+     "same": [
+      "PL-22700"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What item is SKU PL-20900?",
+     "answers": [
+      [
+       "Water Heater Element 1 in"
+      ]
+     ],
+     "where": {
+      "sheet": "Plumbing",
+      "row": 302
+     },
+     "same": [
+      "PL-20900"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    }
+   ],
+   "bytes": 38214
+  },
+  "quote-Q-2026-114.md": {
+   "type": "md",
+   "upload": "accept",
+   "contentType": "text/markdown",
+   "status": "read",
+   "structure": {
+    "pagesRange": [
+     1,
+     1
+    ]
+   },
+   "keys": [
+    "Q-2026-114",
+    "Corinne Dunleavy"
+   ],
+   "questions": [
+    {
+     "question": "What is the price of the water softener install in quote Q-2026-114?",
+     "answers": [
+      [
+       "$2,215.00"
+      ],
+      [
+       "2,215.00"
+      ]
+     ],
+     "where": {
+      "page": 1
+     },
+     "same": [
+      "Water softener"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "How much is the repipe in quote Q-2026-114?",
+     "answers": [
+      [
+       "$1,840.00"
+      ],
+      [
+       "1,840.00"
+      ]
+     ],
+     "where": {
+      "page": 1
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "Who is quote Q-2026-114 prepared for?",
+     "answers": [
+      [
+       "Corinne Dunleavy"
+      ]
+     ],
+     "where": {
+      "page": 1
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "How long is quote Q-2026-114 valid?",
+     "answers": [
+      [
+       "30 days"
+      ]
+     ],
+     "where": {
+      "page": 1
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What deposit is due on quote Q-2026-114?",
+     "answers": [
+      [
+       "25%"
+      ]
+     ],
+     "where": {
+      "page": 1
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [
+      "percent"
+     ],
+     "global": false
+    }
+   ],
+   "bytes": 236
+  },
+  "renamed-docx-as.pdf": {
+   "type": "pdf",
+   "upload": "accept",
+   "contentType": "application/pdf",
+   "status": "refused",
+   "reason": [
+    "mismatch"
+   ],
+   "structure": {},
+   "keys": [],
+   "questions": [],
+   "bytes": 2961
+  },
+  "renamed-docx-as.xlsx": {
+   "type": "xlsx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": "refused",
+   "reason": [
+    "mismatch"
+   ],
+   "structure": {},
+   "keys": [],
+   "questions": [],
+   "bytes": 2961
+  },
+  "renamed-exe.pdf": {
+   "type": "pdf",
+   "upload": "accept",
+   "contentType": "application/pdf",
+   "status": "refused",
+   "reason": [
+    "mismatch",
+    "unsupported"
+   ],
+   "structure": {},
+   "keys": [],
+   "questions": [],
+   "bytes": 916
+  },
+  "renamed-png-as.docx": {
+   "type": "docx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+   "status": "refused",
+   "reason": [
+    "mismatch"
+   ],
+   "structure": {},
+   "keys": [],
+   "questions": [],
+   "bytes": 70
+  },
+  "renamed-xlsx-as.docx": {
+   "type": "docx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+   "status": "refused",
+   "reason": [
+    "mismatch"
+   ],
+   "structure": {},
+   "keys": [],
+   "questions": [],
+   "bytes": 2479
+  },
+  "scan-ticket.png": {
+   "type": "png",
+   "upload": "accept",
+   "contentType": "image/png",
+   "status": "model-path",
+   "reason": [],
+   "structure": {},
+   "note": "photo: needs the vision model; the harness checks upload + sniff only",
+   "keys": [],
+   "questions": [],
+   "bytes": 70
+  },
+  "scan.tiff": {
+   "type": "tiff",
+   "upload": "reject",
+   "contentType": "application/octet-stream",
+   "status": "refused",
+   "reason": [
+    "unsupported"
+   ],
+   "structure": {},
+   "keys": [],
+   "questions": [],
+   "bytes": 304
+  },
+  "template.dotm": {
+   "type": "dotm",
+   "upload": "reject",
+   "contentType": "application/octet-stream",
+   "status": "refused",
+   "reason": [
+    "macro"
+   ],
+   "structure": {},
+   "keys": [],
+   "questions": [],
+   "bytes": 3246
+  },
+  "ticket-text-T-9012.pdf": {
+   "type": "pdf",
+   "upload": "accept",
+   "contentType": "application/pdf",
+   "status": "read",
+   "structure": {
+    "pagesRange": [
+     1,
+     1
+    ]
+   },
+   "keys": [
+    "T-9012",
+    "Alonzo Holloway",
+    "(520) 555-0185"
+   ],
+   "questions": [
+    {
+     "question": "What is the phone number of the customer on service ticket T-9012?",
+     "answers": [
+      [
+       "(520) 555-0185"
+      ]
+     ],
+     "where": {
+      "page": 1
+     },
+     "same": [
+      "Alonzo Holloway"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "Who was the technician on ticket T-9012?",
+     "answers": [
+      [
+       "Angela Ruiz"
+      ]
+     ],
+     "where": {
+      "page": 1
+     },
+     "same": [
+      "T-9012"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What was the total on ticket T-9012?",
+     "answers": [
+      [
+       "$412.60"
+      ],
+      [
+       "412.60"
+      ]
+     ],
+     "where": {
+      "page": 1
+     },
+     "same": [
+      "T-9012"
+     ],
+     "mustNot": [],
+     "hard": [
+      "currency"
+     ],
+     "global": false
+    },
+    {
+     "question": "What serial number is on ticket T-9012?",
+     "answers": [
+      [
+       "5T4471-20388"
+      ]
+     ],
+     "where": {
+      "page": 1
+     },
+     "same": [
+      "T-9012"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What work was performed on ticket T-9012?",
+     "answers": [
+      [
+       "replaced contactor"
+      ]
+     ],
+     "where": {
+      "page": 1
+     },
+     "same": [
+      "T-9012"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    }
+   ],
+   "bytes": 995
+  },
+  "workorder-WO-3307.docx": {
+   "type": "docx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+   "status": "read",
+   "structure": {
+    "pagesRange": [
+     1,
+     3
+    ],
+    "docx": true
+   },
+   "keys": [
+    "WO-3307",
+    "Copper Canyon Diner",
+    "(480) 555-0129",
+    "Dale Whitfield",
+    "Carrier 24ACC636A003",
+    "8N9208-84957",
+    "Condenser fan not spinning, unit tripping on high pressure.",
+    "Goodman Transformer",
+    "Moen Contactor",
+    "Goodman Pressure Switch"
+   ],
+   "questions": [
+    {
+     "question": "Who is the technician on work order WO-3307?",
+     "answers": [
+      [
+       "Dale Whitfield"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [
+      "WO-3307"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What is the phone number of the customer on work order WO-3307?",
+     "answers": [
+      [
+       "(480) 555-0129"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [
+      "Copper Canyon Diner"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What equipment serial number is on work order WO-3307?",
+     "answers": [
+      [
+       "8N9208-84957"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [
+      "Carrier 24ACC636A003"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What was the reported problem on work order WO-3307?",
+     "answers": [
+      [
+       "Condenser fan not spinning, unit tripping on high pressure."
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [
+      "WO-3307"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What part was used first on work order WO-3307?",
+     "answers": [
+      [
+       "Goodman Transformer"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "table"
+     },
+     "same": [
+      "2"
+     ],
+     "mustNot": [],
+     "hard": [
+      "table"
+     ],
+     "global": false
+    },
+    {
+     "question": "Which technician signed work order WO-3307, and what licence is on it?",
+     "answers": [
+      [
+       "Dale Whitfield"
+      ],
+      [
+       "ROC 298114"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "footer"
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [
+      "footer"
+     ],
+     "global": false
+    }
+   ],
+   "bytes": 4230
+  },
+  "workorder-WO-3312.docx": {
+   "type": "docx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+   "status": "read",
+   "structure": {
+    "pagesRange": [
+     1,
+     3
+    ],
+    "docx": true
+   },
+   "keys": [
+    "WO-3312",
+    "Agave Ridge HOA",
+    "(602) 555-0104",
+    "Sofia Brandt",
+    "Rheem Performance Plus 50 gal water heater",
+    "1N2791-70165",
+    "Water heater leaking at the temperature and pressure relief valve.",
+    "Trane Service Panel",
+    "Goodman Pressure Switch",
+    "Goodman Pressure Switch"
+   ],
+   "questions": [
+    {
+     "question": "Who is the technician on work order WO-3312?",
+     "answers": [
+      [
+       "Sofia Brandt"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [
+      "WO-3312"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What is the phone number of the customer on work order WO-3312?",
+     "answers": [
+      [
+       "(602) 555-0104"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [
+      "Agave Ridge HOA"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What equipment serial number is on work order WO-3312?",
+     "answers": [
+      [
+       "1N2791-70165"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [
+      "Rheem Performance Plus 50 gal water heater"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What was the reported problem on work order WO-3312?",
+     "answers": [
+      [
+       "Water heater leaking at the temperature and pressure relief valve."
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [
+      "WO-3312"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What part was used first on work order WO-3312?",
+     "answers": [
+      [
+       "Trane Service Panel"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "table"
+     },
+     "same": [
+      "1"
+     ],
+     "mustNot": [],
+     "hard": [
+      "table"
+     ],
+     "global": false
+    },
+    {
+     "question": "Which technician signed work order WO-3312, and what licence is on it?",
+     "answers": [
+      [
+       "Sofia Brandt"
+      ],
+      [
+       "ROC 301772"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "footer"
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [
+      "footer"
+     ],
+     "global": false
+    }
+   ],
+   "bytes": 4211
+  },
+  "workorder-WO-3320.docx": {
+   "type": "docx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+   "status": "read",
+   "structure": {
+    "pagesRange": [
+     1,
+     3
+    ],
+    "docx": true
+   },
+   "keys": [
+    "WO-3320",
+    "Beverly Fontaine",
+    "(623) 555-0180",
+    "Terrance Oyelaran",
+    "Square D QO 200A service panel",
+    "7N9711-84807",
+    "Breaker 30A keeps tripping when the dryer starts.",
+    "Eaton Igniter",
+    "Carrier Water Heater Element",
+    "Eaton Wire 10/3"
+   ],
+   "questions": [
+    {
+     "question": "Who is the technician on work order WO-3320?",
+     "answers": [
+      [
+       "Terrance Oyelaran"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [
+      "WO-3320"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What is the phone number of the customer on work order WO-3320?",
+     "answers": [
+      [
+       "(623) 555-0180"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [
+      "Beverly Fontaine"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What equipment serial number is on work order WO-3320?",
+     "answers": [
+      [
+       "7N9711-84807"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [
+      "Square D QO 200A service panel"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What was the reported problem on work order WO-3320?",
+     "answers": [
+      [
+       "Breaker 30A keeps tripping when the dryer starts."
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "body"
+     },
+     "same": [
+      "WO-3320"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What part was used first on work order WO-3320?",
+     "answers": [
+      [
+       "Eaton Igniter"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "table"
+     },
+     "same": [
+      "2"
+     ],
+     "mustNot": [],
+     "hard": [
+      "table"
+     ],
+     "global": false
+    },
+    {
+     "question": "Which technician signed work order WO-3320, and what licence is on it?",
+     "answers": [
+      [
+       "Terrance Oyelaran"
+      ],
+      [
+       "ROC 287456"
+      ]
+     ],
+     "where": {
+      "page": 1,
+      "kind": "footer"
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [
+      "footer"
+     ],
+     "global": false
+    }
+   ],
+   "bytes": 4217
+  },
+  "workorders-open-closed-2026.xlsx": {
+   "type": "xlsx",
+   "upload": "accept",
+   "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": "read",
+   "structure": {
+    "sheets": [
+     {
+      "name": "Work Orders",
+      "state": "visible",
+      "nonEmpty": true,
+      "dataRows": 301
+     }
+    ],
+    "pagesRange": [
+     1,
+     9
+    ],
+    "headerRepeated": [
+     "WO No",
+     "Technician"
+    ]
+   },
+   "keys": [
+    "WO-4000",
+    "WO-4007",
+    "WO-4014",
+    "WO-4021",
+    "WO-4028",
+    "WO-4035",
+    "WO-4042",
+    "WO-4049",
+    "WO-4056",
+    "WO-4063",
+    "WO-4070",
+    "WO-4077",
+    "WO-4084",
+    "WO-4091",
+    "WO-4098",
+    "WO-4105",
+    "WO-4112",
+    "WO-4119",
+    "WO-4126",
+    "WO-4133",
+    "WO-4140",
+    "WO-4147",
+    "WO-4154",
+    "WO-4161",
+    "WO-4168",
+    "WO-4175",
+    "WO-4182",
+    "WO-4189",
+    "WO-4196",
+    "WO-4203",
+    "WO-4210",
+    "WO-4217",
+    "WO-4224",
+    "WO-4231",
+    "WO-4238",
+    "WO-4245",
+    "WO-4252",
+    "WO-4259",
+    "WO-4266",
+    "WO-4273"
+   ],
+   "questions": [
+    {
+     "question": "Who is the technician on work order WO-4150?",
+     "answers": [
+      [
+       "Dale Whitfield"
+      ]
+     ],
+     "where": {
+      "sheet": "Work Orders",
+      "row": 152
+     },
+     "same": [
+      "WO-4150"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What is the status of work order WO-4287?",
+     "answers": [
+      [
+       "Open"
+      ]
+     ],
+     "where": {
+      "sheet": "Work Orders",
+      "row": 289
+     },
+     "same": [
+      "WO-4287"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "What date was work order WO-4040 opened?",
+     "answers": [
+      [
+       "2026-01-25",
+       "1/25/2026",
+       "01/25/2026",
+       "25-Jan-26",
+       "25-Jan-2026",
+       "Jan 25, 2026",
+       "January 25, 2026"
+      ]
+     ],
+     "where": {
+      "sheet": "Work Orders",
+      "row": 42
+     },
+     "same": [
+      "WO-4040"
+     ],
+     "mustNot": [],
+     "hard": [
+      "serial-date"
+     ],
+     "global": false
+    },
+    {
+     "question": "How many hours were estimated for work order WO-4222?",
+     "answers": [
+      [
+       "6.5",
+       "6.5"
+      ]
+     ],
+     "where": {
+      "sheet": "Work Orders",
+      "row": 224
+     },
+     "same": [
+      "WO-4222"
+     ],
+     "mustNot": [],
+     "hard": [],
+     "global": false
+    },
+    {
+     "question": "How many work orders have status Open?",
+     "answers": [],
+     "where": {
+      "sheet": "Work Orders"
+     },
+     "same": [],
+     "mustNot": [],
+     "hard": [],
+     "global": false,
+     "kind": "aggregate",
+     "allOf": [
+      "WO-4000",
+      "WO-4003",
+      "WO-4021",
+      "WO-4031",
+      "WO-4044",
+      "WO-4048",
+      "WO-4057",
+      "WO-4061",
+      "WO-4074",
+      "WO-4080",
+      "WO-4091",
+      "WO-4101",
+      "WO-4112",
+      "WO-4114",
+      "WO-4125",
+      "WO-4130",
+      "WO-4140",
+      "WO-4145",
+      "WO-4149",
+      "WO-4159",
+      "WO-4173",
+      "WO-4185",
+      "WO-4196",
+      "WO-4201",
+      "WO-4215"
+     ],
+     "expectedCount": 68
+    },
+    {
+     "question": "What city is work order WO-4299 in?",
+     "answers": [
+      [
+       "Queen Creek"
+      ]
+     ],
+     "where": {
+      "sheet": "Work Orders",
+      "row": 301
+     },
+     "same": [
+      "WO-4299"
+     ],
+     "mustNot": [],
+     "hard": [
+      "far-row"
+     ],
+     "global": false
+    }
+   ],
+   "bytes": 14313
+  },
+  "zero-byte.docx": {
+   "type": "docx",
+   "upload": "reject",
+   "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+   "status": "refused",
+   "reason": [
+    "empty"
+   ],
+   "structure": {},
+   "note": "a 0-byte file cannot be signed for upload (size must be > 0)",
+   "keys": [],
+   "questions": [],
+   "bytes": 0
+  },
+  "zero-byte.xlsx": {
+   "type": "xlsx",
+   "upload": "reject",
+   "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+   "status": "refused",
+   "reason": [
+    "empty"
+   ],
+   "structure": {},
+   "note": "a 0-byte file cannot be signed for upload",
+   "keys": [],
+   "questions": [],
+   "bytes": 0
+  }
+ }
+}

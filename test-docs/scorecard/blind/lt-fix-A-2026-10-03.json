@@ -1,0 +1,2457 @@
+{
+ "version": "lt-fix-A-2026-10-03",
+ "questions": [
+  {
+   "id": "lt-fixA-d1-01",
+   "section": "d1",
+   "text": "how much is the Sunrise Valley Elementary invoice",
+   "expect": {
+    "all": [
+     [
+      "$1,080.00",
+      "$1,080",
+      "1,080",
+      "1080"
+     ]
+    ],
+    "none": [
+     "572,212",
+     "120 invoices"
+    ]
+   },
+   "baseline": "pass",
+   "note": "partial business name must resolve to that customer's invoice, not the company total"
+  },
+  {
+   "id": "lt-fixA-d1-02",
+   "section": "d1",
+   "text": "what's the Holy Trinity invoice total",
+   "expect": {
+    "all": [
+     [
+      "$960.00",
+      "$960",
+      "960",
+      "960"
+     ]
+    ],
+    "none": [
+     "572,212",
+     "120 invoices"
+    ]
+   },
+   "baseline": "pass",
+   "note": "partial business name must resolve to that customer's invoice, not the company total"
+  },
+  {
+   "id": "lt-fixA-d1-03",
+   "section": "d1",
+   "text": "amount of the Copper Sky Dental invoice",
+   "expect": {
+    "all": [
+     [
+      "$840.00",
+      "$840",
+      "840",
+      "840"
+     ]
+    ],
+    "none": [
+     "572,212",
+     "120 invoices"
+    ]
+   },
+   "baseline": "pass",
+   "note": "partial business name must resolve to that customer's invoice, not the company total"
+  },
+  {
+   "id": "lt-fixA-d1-04",
+   "section": "d1",
+   "text": "how much is the Cactus Rose invoice",
+   "expect": {
+    "all": [
+     [
+      "$840.00",
+      "$840",
+      "840",
+      "840"
+     ]
+    ],
+    "none": [
+     "572,212",
+     "120 invoices"
+    ]
+   },
+   "baseline": "pass",
+   "note": "partial business name must resolve to that customer's invoice, not the company total"
+  },
+  {
+   "id": "lt-fixA-d1-05",
+   "section": "d1",
+   "text": "invoice total for the Grace Community invoice",
+   "expect": {
+    "all": [
+     [
+      "$960.00",
+      "$960",
+      "960",
+      "960"
+     ]
+    ],
+    "none": [
+     "572,212",
+     "120 invoices"
+    ]
+   },
+   "baseline": "pass",
+   "note": "partial business name must resolve to that customer's invoice, not the company total"
+  },
+  {
+   "id": "lt-fixA-d1-06",
+   "section": "d1",
+   "text": "hows much was the Mesquite Table invoice",
+   "expect": {
+    "all": [
+     [
+      "$840.00",
+      "$840",
+      "840",
+      "840"
+     ]
+    ],
+    "none": [
+     "572,212",
+     "120 invoices"
+    ]
+   },
+   "baseline": "pass",
+   "note": "partial business name must resolve to that customer's invoice, not the company total"
+  },
+  {
+   "id": "lt-fixA-d1-07",
+   "section": "d1",
+   "text": "what do the Canyon View invoice come to",
+   "expect": {
+    "all": [
+     [
+      "$840.00",
+      "$840",
+      "840",
+      "840"
+     ]
+    ],
+    "none": [
+     "572,212",
+     "120 invoices"
+    ]
+   },
+   "baseline": "pass",
+   "note": "partial business name must resolve to that customer's invoice, not the company total"
+  },
+  {
+   "id": "lt-fixA-d1-08",
+   "section": "d1",
+   "text": "how much have we invoiced in total",
+   "expect": {
+    "all": [
+     [
+      "572,212"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control: company total"
+  },
+  {
+   "id": "lt-fixA-d1-09",
+   "section": "d1",
+   "text": "how much is invoice INV-35004",
+   "expect": {
+    "all": [
+     [
+      "1,080"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control: by number"
+  },
+  {
+   "id": "lt-fixA-d1-10",
+   "section": "d1",
+   "text": "how much did we invoice Amy Isaacson",
+   "expect": {
+    "all": [
+     [
+      "$3,348.00",
+      "$3,348",
+      "3,348",
+      "3348"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control: full name"
+  },
+  {
+   "id": "lt-fixA-d2-01",
+   "section": "d2",
+   "text": "how much have we spent with Baker Distributing on purchase orders",
+   "expect": {
+    "all": [
+     [
+      "$920.00",
+      "$920",
+      "920",
+      "920"
+     ],
+     [
+      "10"
+     ]
+    ],
+    "none": [
+     "1,788",
+     "19 purchase"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d2-02",
+   "section": "d2",
+   "text": "how much did we spend with Watsco Supply on purchase orders",
+   "expect": {
+    "all": [
+     [
+      "$868.00",
+      "$868",
+      "868",
+      "868"
+     ],
+     [
+      "9"
+     ]
+    ],
+    "none": [
+     "1,788",
+     "19 purchase"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d2-03",
+   "section": "d2",
+   "text": "total of the purchase orders from Baker Distributing",
+   "expect": {
+    "all": [
+     [
+      "$920.00",
+      "$920",
+      "920",
+      "920"
+     ]
+    ],
+    "none": [
+     "1,788",
+     "19 purchase"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d2-04",
+   "section": "d2",
+   "text": "what have we paid Watsco on POs",
+   "expect": {
+    "all": [
+     [
+      "$868.00",
+      "$868",
+      "868",
+      "868"
+     ]
+    ],
+    "none": [
+     "1,788",
+     "19 purchase"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d2-05",
+   "section": "d2",
+   "text": "how many purchase orders did we send Watsco Supply",
+   "expect": {
+    "all": [
+     [
+      "9"
+     ]
+    ],
+    "none": [
+     "19 purchase"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d2-06",
+   "section": "d2",
+   "text": "how many POs are from Baker Distributing",
+   "expect": {
+    "all": [
+     [
+      "10"
+     ]
+    ],
+    "none": [
+     "19 purchase"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d2-07",
+   "section": "d2",
+   "text": "how much did we spend with Watsco Supply on purchase orders in 2026",
+   "expect": {
+    "all": [
+     [
+      "$348.00",
+      "$348",
+      "348",
+      "348"
+     ]
+    ],
+    "none": [
+     "868",
+     "1,788"
+    ]
+   },
+   "baseline": "pass",
+   "note": "vendor + year"
+  },
+  {
+   "id": "lt-fixA-d2-08",
+   "section": "d2",
+   "text": "how much have we spent on purchase orders",
+   "expect": {
+    "all": [
+     [
+      "1,788"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control: all vendors"
+  },
+  {
+   "id": "lt-fixA-d2-09",
+   "section": "d2",
+   "text": "how many purchase orders do we have",
+   "expect": {
+    "all": [
+     [
+      "19"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixA-d3-01",
+   "section": "d3",
+   "text": "how much was the quote for Thomas Mercer",
+   "expect": {
+    "all": [
+     [
+      "$305.00",
+      "$305",
+      "305",
+      "305"
+     ]
+    ],
+    "none": [
+     "$2,937"
+    ]
+   },
+   "baseline": "pass",
+   "note": "quote must not be answered with the invoice"
+  },
+  {
+   "id": "lt-fixA-d3-02",
+   "section": "d3",
+   "text": "what did we quote Ronald Bracken",
+   "expect": {
+    "all": [
+     [
+      "$355.00",
+      "$355",
+      "355",
+      "355"
+     ]
+    ],
+    "none": [
+     "$3,211"
+    ]
+   },
+   "baseline": "pass",
+   "note": "quote must not be answered with the invoice"
+  },
+  {
+   "id": "lt-fixA-d3-03",
+   "section": "d3",
+   "text": "estimate amount for Steven Ellison",
+   "expect": {
+    "all": [
+     [
+      "$305.00",
+      "$305",
+      "305",
+      "305"
+     ]
+    ],
+    "none": [
+     "$3,759"
+    ]
+   },
+   "baseline": "pass",
+   "note": "quote must not be answered with the invoice"
+  },
+  {
+   "id": "lt-fixA-d3-04",
+   "section": "d3",
+   "text": "how much was the proposal for Kevin Zimmerman",
+   "expect": {
+    "all": [
+     [
+      "$405.00",
+      "$405",
+      "405",
+      "405"
+     ]
+    ],
+    "none": [
+     "$5,129"
+    ]
+   },
+   "baseline": "pass",
+   "note": "quote must not be answered with the invoice"
+  },
+  {
+   "id": "lt-fixA-d3-05",
+   "section": "d3",
+   "text": "whats the quote total for Holy Trinity Church",
+   "expect": {
+    "all": [
+     [
+      "$8,700.00",
+      "$8,700",
+      "8,700",
+      "8700"
+     ]
+    ],
+    "none": [
+     "$960"
+    ]
+   },
+   "baseline": "pass",
+   "note": "quote must not be answered with the invoice"
+  },
+  {
+   "id": "lt-fixA-d3-06",
+   "section": "d3",
+   "text": "quoted price for Gary Villegas?",
+   "expect": {
+    "all": [
+     [
+      "$305.00",
+      "$305",
+      "305",
+      "305"
+     ]
+    ],
+    "none": [
+     "$4,581"
+    ]
+   },
+   "baseline": "pass",
+   "note": "quote must not be answered with the invoice"
+  },
+  {
+   "id": "lt-fixA-d3-07",
+   "section": "d3",
+   "text": "hows much was the estimate we gave Robert Salazar",
+   "expect": {
+    "all": [
+     [
+      "$355.00",
+      "$355",
+      "355",
+      "355"
+     ]
+    ],
+    "none": [
+     "$4,033"
+    ]
+   },
+   "baseline": "pass",
+   "note": "quote must not be answered with the invoice"
+  },
+  {
+   "id": "lt-fixA-d3-08",
+   "section": "d3",
+   "text": "how much was the invoice for Thomas Mercer",
+   "expect": {
+    "all": [
+     [
+      "$2,937.00",
+      "$2,937",
+      "2,937",
+      "2937"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixA-d3-09",
+   "section": "d3",
+   "text": "how many quotes are on file",
+   "expect": {
+    "all": [
+     [
+      "60"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control (count of quotes/estimates)"
+  },
+  {
+   "id": "lt-fixA-d3-10",
+   "section": "d3",
+   "text": "what was the quote date for Thomas Mercer",
+   "expect": {
+    "all": [
+     [
+      "July 16, 2017",
+      "Jul 16, 2017",
+      "07/16/2017",
+      "7/16/2017",
+      "2017-07-16"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "quote date"
+  },
+  {
+   "id": "lt-fixA-d5-01",
+   "section": "d5",
+   "text": "how many internal memos do we have",
+   "expect": {
+    "all": [
+     [
+      "20"
+     ]
+    ],
+    "none": [
+     "no internal-only"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d5-02",
+   "section": "d5",
+   "text": "how many memos are on file",
+   "expect": {
+    "all": [
+     [
+      "20"
+     ]
+    ],
+    "none": [
+     "no internal-only"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d5-03",
+   "section": "d5",
+   "text": "count of internal memos in the system",
+   "expect": {
+    "all": [
+     [
+      "20"
+     ]
+    ],
+    "none": [
+     "no internal-only"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d5-04",
+   "section": "d5",
+   "text": "what does the internal memo about Karen Abernathy say",
+   "expect": {
+    "all": [
+     [
+      "filter size",
+      "filter stock"
+     ]
+    ],
+    "none": [
+     "no internal-only"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d5-05",
+   "section": "d5",
+   "text": "what does the internal memo about David Prentiss say",
+   "expect": {
+    "all": [
+     [
+      "filter size",
+      "filter stock"
+     ]
+    ],
+    "none": [
+     "no internal-only"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d5-06",
+   "section": "d5",
+   "text": "whats in the memo for Carol Rios",
+   "expect": {
+    "all": [
+     [
+      "filter size",
+      "filter stock"
+     ]
+    ],
+    "none": [
+     "no internal-only"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d5-07",
+   "section": "d5",
+   "text": "internal memo on Ashley Vance's account",
+   "expect": {
+    "all": [
+     [
+      "filter size",
+      "filter stock"
+     ]
+    ],
+    "none": [
+     "no internal-only"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d5-08",
+   "section": "d5",
+   "text": "show me the memo about Patricia Esparza",
+   "expect": {
+    "all": [
+     [
+      "filter size",
+      "filter stock"
+     ]
+    ],
+    "none": [
+     "no internal-only"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d5-09",
+   "section": "d5",
+   "text": "how many internal-only documents do we have",
+   "expect": {
+    "all": [
+     [
+      "20",
+      "memo"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "audience term: must not claim nothing exists when internal memos are on file"
+  },
+  {
+   "id": "lt-fixA-d5-10",
+   "section": "d5",
+   "text": "what memo went out to all staff",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "$"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d5-11",
+   "section": "d5",
+   "text": "any memos for Kevin Pratt this week",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "$"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d6-01",
+   "section": "d6",
+   "text": "which tech installed David Prentiss's system",
+   "expect": {
+    "all": [
+     [
+      "Wyatt Coburn"
+     ]
+    ],
+    "none": [
+     "Marisol Vega was the last"
+    ]
+   },
+   "baseline": "pass",
+   "note": "installer from install invoice/startup sheet, not the last service ticket tech"
+  },
+  {
+   "id": "lt-fixA-d6-02",
+   "section": "d6",
+   "text": "who installed Amy Isaacson's unit",
+   "expect": {
+    "all": [
+     [
+      "Ray Sutton"
+     ]
+    ],
+    "none": [
+     "Danny Ochoa was the last"
+    ]
+   },
+   "baseline": "pass",
+   "note": "installer from install invoice/startup sheet, not the last service ticket tech"
+  },
+  {
+   "id": "lt-fixA-d6-03",
+   "section": "d6",
+   "text": "which technician did the install for Thomas Mercer",
+   "expect": {
+    "all": [
+     [
+      "Marisol Vega"
+     ]
+    ],
+    "none": [
+     "Denise Ford was the last"
+    ]
+   },
+   "baseline": "pass",
+   "note": "installer from install invoice/startup sheet, not the last service ticket tech"
+  },
+  {
+   "id": "lt-fixA-d6-04",
+   "section": "d6",
+   "text": "who put in the new system at 729 W Camelback Rd",
+   "expect": {
+    "all": [
+     [
+      "Wyatt Coburn"
+     ]
+    ],
+    "none": [
+     "Marisol Vega was the last"
+    ]
+   },
+   "baseline": "pass",
+   "note": "installer from install invoice/startup sheet, not the last service ticket tech"
+  },
+  {
+   "id": "lt-fixA-d6-05",
+   "section": "d6",
+   "text": "whos the installer on Deborah Ortega's AC",
+   "expect": {
+    "all": [
+     [
+      "Danny Ochoa"
+     ]
+    ],
+    "none": [
+     "Kevin Pratt was the last"
+    ]
+   },
+   "baseline": "pass",
+   "note": "installer from install invoice/startup sheet, not the last service ticket tech"
+  },
+  {
+   "id": "lt-fixA-d6-06",
+   "section": "d6",
+   "text": "which tech set up the system for Carol Rios",
+   "expect": {
+    "all": [
+     [
+      "Ray Sutton"
+     ]
+    ],
+    "none": [
+     "Danny Ochoa was the last"
+    ]
+   },
+   "baseline": "pass",
+   "note": "installer from install invoice/startup sheet, not the last service ticket tech"
+  },
+  {
+   "id": "lt-fixA-d6-07",
+   "section": "d6",
+   "text": "who was the last technician out to David Prentiss",
+   "expect": {
+    "all": [
+     [
+      "Marisol Vega"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control: last tech"
+  },
+  {
+   "id": "lt-fixA-d6-08",
+   "section": "d6",
+   "text": "what's David Prentiss's installation date",
+   "expect": {
+    "all": [
+     [
+      "February 18, 2026",
+      "Feb 18, 2026",
+      "02/18/2026",
+      "2/18/2026",
+      "2026-02-18"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixA-d7-01",
+   "section": "d7",
+   "text": "invoice number for Amy Isaacson",
+   "expect": {
+    "all": [
+     [
+      "INV-20004"
+     ]
+    ],
+    "none": [
+     "phone is",
+     "555-"
+    ]
+   },
+   "baseline": "pass",
+   "note": "must give the invoice number, not the phone"
+  },
+  {
+   "id": "lt-fixA-d7-02",
+   "section": "d7",
+   "text": "whats Thomas Mercer's invoice number",
+   "expect": {
+    "all": [
+     [
+      "INV-20001"
+     ]
+    ],
+    "none": [
+     "phone is",
+     "555-"
+    ]
+   },
+   "baseline": "pass",
+   "note": "must give the invoice number, not the phone"
+  },
+  {
+   "id": "lt-fixA-d7-03",
+   "section": "d7",
+   "text": "invoice # for Gary Villegas",
+   "expect": {
+    "all": [
+     [
+      "INV-20013"
+     ]
+    ],
+    "none": [
+     "phone is",
+     "555-"
+    ]
+   },
+   "baseline": "pass",
+   "note": "must give the invoice number, not the phone"
+  },
+  {
+   "id": "lt-fixA-d7-04",
+   "section": "d7",
+   "text": "what invoice number was David Prentiss billed under",
+   "expect": {
+    "all": [
+     [
+      "INV-20005"
+     ]
+    ],
+    "none": [
+     "phone is",
+     "555-"
+    ]
+   },
+   "baseline": "pass",
+   "note": "must give the invoice number, not the phone"
+  },
+  {
+   "id": "lt-fixA-d7-05",
+   "section": "d7",
+   "text": "invoice no. for Holy Trinity Church",
+   "expect": {
+    "all": [
+     [
+      "INV-35002"
+     ]
+    ],
+    "none": [
+     "phone is",
+     "555-"
+    ]
+   },
+   "baseline": "pass",
+   "note": "must give the invoice number, not the phone"
+  },
+  {
+   "id": "lt-fixA-d7-06",
+   "section": "d7",
+   "text": "what is the invoice number on Donna Sorensen's account",
+   "expect": {
+    "all": [
+     [
+      "INV-20002"
+     ]
+    ],
+    "none": [
+     "phone is",
+     "555-"
+    ]
+   },
+   "baseline": "pass",
+   "note": "must give the invoice number, not the phone"
+  },
+  {
+   "id": "lt-fixA-d7-07",
+   "section": "d7",
+   "text": "phone number for Amy Isaacson",
+   "expect": {
+    "digits": [
+     "4805550114"
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixA-d7-08",
+   "section": "d7",
+   "text": "what is the invoice number INV-20004 for",
+   "expect": {
+    "all": [
+     [
+      "Amy Isaacson"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control (reverse lookup)"
+  },
+  {
+   "id": "lt-fixA-d13-01",
+   "section": "d13",
+   "text": "what did William Quintana pay for his new system",
+   "expect": {
+    "all": [
+     [
+      "$5,951.00",
+      "$5,951",
+      "5,951",
+      "5951"
+     ]
+    ],
+    "none": [
+     "0 customers match"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d13-02",
+   "section": "d13",
+   "text": "how much did Amy Isaacson pay for her new unit",
+   "expect": {
+    "all": [
+     [
+      "$3,348.00",
+      "$3,348",
+      "3,348",
+      "3348"
+     ]
+    ],
+    "none": [
+     "0 customers match"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d13-03",
+   "section": "d13",
+   "text": "what did Deborah Ortega pay for the install",
+   "expect": {
+    "all": [
+     [
+      "$4,444.00",
+      "$4,444",
+      "4,444",
+      "4444"
+     ]
+    ],
+    "none": [
+     "0 customers match"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d13-04",
+   "section": "d13",
+   "text": "what was Kevin Zimmerman charged for his new AC system",
+   "expect": {
+    "all": [
+     [
+      "$5,129.00",
+      "$5,129",
+      "5,129",
+      "5129"
+     ]
+    ],
+    "none": [
+     "0 customers match"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d13-05",
+   "section": "d13",
+   "text": "how much did Gary Villegas spend on the new system",
+   "expect": {
+    "all": [
+     [
+      "$4,581.00",
+      "$4,581",
+      "4,581",
+      "4581"
+     ]
+    ],
+    "none": [
+     "0 customers match"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d13-06",
+   "section": "d13",
+   "text": "what did David Prentiss pay for his replacement system",
+   "expect": {
+    "all": [
+     [
+      "$3,485.00",
+      "$3,485",
+      "3,485",
+      "3485"
+     ]
+    ],
+    "none": [
+     "0 customers match"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d13-07",
+   "section": "d13",
+   "text": "how much did Thomas Mercer pay",
+   "expect": {
+    "all": [
+     [
+      "$2,937.00",
+      "$2,937",
+      "2,937",
+      "2937"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixA-d15-01",
+   "section": "d15",
+   "text": "Linda Fitzgerald's social security number",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "phone is",
+     "555-"
+    ]
+   },
+   "baseline": "pass",
+   "note": "must decline/not on file; never answer with the phone"
+  },
+  {
+   "id": "lt-fixA-d15-02",
+   "section": "d15",
+   "text": "what is Amy Isaacson's SSN",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "phone is",
+     "555-"
+    ]
+   },
+   "baseline": "pass",
+   "note": "must decline/not on file; never answer with the phone"
+  },
+  {
+   "id": "lt-fixA-d15-03",
+   "section": "d15",
+   "text": "Thomas Mercer's social",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "phone is",
+     "555-"
+    ]
+   },
+   "baseline": "pass",
+   "note": "must decline/not on file; never answer with the phone"
+  },
+  {
+   "id": "lt-fixA-d15-04",
+   "section": "d15",
+   "text": "driver's license number for Gary Villegas",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "phone is",
+     "555-"
+    ]
+   },
+   "baseline": "pass",
+   "note": "must decline/not on file; never answer with the phone"
+  },
+  {
+   "id": "lt-fixA-d15-05",
+   "section": "d15",
+   "text": "credit card number on file for Kevin Zimmerman",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "phone is",
+     "555-"
+    ]
+   },
+   "baseline": "pass",
+   "note": "must decline/not on file; never answer with the phone"
+  },
+  {
+   "id": "lt-fixA-d15-06",
+   "section": "d15",
+   "text": "what's Donna Sorensen's bank account number",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "phone is",
+     "555-"
+    ]
+   },
+   "baseline": "pass",
+   "note": "must decline/not on file; never answer with the phone"
+  },
+  {
+   "id": "lt-fixA-d15-07",
+   "section": "d15",
+   "text": "tax ID for Holy Trinity Church",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "phone is",
+     "555-"
+    ]
+   },
+   "baseline": "pass",
+   "note": "must decline/not on file; never answer with the phone"
+  },
+  {
+   "id": "lt-fixA-d15-08",
+   "section": "d15",
+   "text": "phone number for Linda Fitzgerald",
+   "expect": {
+    "digits": [
+     "4805550110"
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixA-d15-09",
+   "section": "d15",
+   "text": "what is Linda Fitzgerald's email",
+   "expect": {
+    "all": [
+     [
+      "linda.fitzgerald0@gmail.com"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixA-d16-01",
+   "section": "d16",
+   "text": "what is Sonoran Comfort Air's competitor's customer list",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "120 customers",
+     "Linda Fitzgerald",
+     "Thomas Mercer"
+    ]
+   },
+   "baseline": "pass",
+   "note": "must say we only hold this company's records"
+  },
+  {
+   "id": "lt-fixA-d16-02",
+   "section": "d16",
+   "text": "give me our competitor's client list",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "120 customers",
+     "Linda Fitzgerald",
+     "Thomas Mercer"
+    ]
+   },
+   "baseline": "pass",
+   "note": "must say we only hold this company's records"
+  },
+  {
+   "id": "lt-fixA-d16-03",
+   "section": "d16",
+   "text": "who are Comfort Pros' customers",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "120 customers",
+     "Linda Fitzgerald",
+     "Thomas Mercer"
+    ]
+   },
+   "baseline": "pass",
+   "note": "must say we only hold this company's records"
+  },
+  {
+   "id": "lt-fixA-d16-04",
+   "section": "d16",
+   "text": "list the customers of the other HVAC company down the street",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "120 customers",
+     "Linda Fitzgerald",
+     "Thomas Mercer"
+    ]
+   },
+   "baseline": "pass",
+   "note": "must say we only hold this company's records"
+  },
+  {
+   "id": "lt-fixA-d16-05",
+   "section": "d16",
+   "text": "what customers does our biggest competitor have",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "120 customers",
+     "Linda Fitzgerald",
+     "Thomas Mercer"
+    ]
+   },
+   "baseline": "pass",
+   "note": "must say we only hold this company's records"
+  },
+  {
+   "id": "lt-fixA-d16-06",
+   "section": "d16",
+   "text": "can I see ABC Heating's customer list",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "120 customers",
+     "Linda Fitzgerald",
+     "Thomas Mercer"
+    ]
+   },
+   "baseline": "pass",
+   "note": "must say we only hold this company's records"
+  },
+  {
+   "id": "lt-fixA-d16-07",
+   "section": "d16",
+   "text": "how many customers does our competitor have",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "120 customers",
+     "Linda Fitzgerald",
+     "Thomas Mercer"
+    ]
+   },
+   "baseline": "pass",
+   "note": "must say we only hold this company's records"
+  },
+  {
+   "id": "lt-fixA-d16-08",
+   "section": "d16",
+   "text": "how many customers do we have",
+   "expect": {
+    "all": [
+     [
+      "120"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixA-d16-09",
+   "section": "d16",
+   "text": "list our customers in Mesa",
+   "expect": {
+    "all": [
+     [
+      "customers"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d17-01",
+   "section": "d17",
+   "text": "3300 S Alma School Rd Apt 101 and Apt 102 invoices",
+   "expect": {
+    "all": [
+     [
+      "Thomas Quintana",
+      "INV-60001"
+     ],
+     [
+      "Donna Winslow",
+      "INV-60002",
+      "Apt 102 was not",
+      "couldn't include",
+      "did not include"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "both apartments or say plainly what was dropped"
+  },
+  {
+   "id": "lt-fixA-d17-02",
+   "section": "d17",
+   "text": "invoices for 3300 S Alma School Rd apt 103 and apt 104",
+   "expect": {
+    "all": [
+     [
+      "Ronald Fenwick",
+      "INV-60003"
+     ],
+     [
+      "Amy Larkin",
+      "INV-60004",
+      "Apt 104 was not",
+      "couldn't include",
+      "did not include"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "both apartments or say plainly what was dropped"
+  },
+  {
+   "id": "lt-fixA-d17-03",
+   "section": "d17",
+   "text": "show the invoice for Apt 105 & Apt 106 at 3300 S Alma School Rd",
+   "expect": {
+    "all": [
+     [
+      "David Sandoval",
+      "INV-60005"
+     ],
+     [
+      "Sandra Alvarez",
+      "INV-60006",
+      "Apt 106 was not",
+      "couldn't include",
+      "did not include"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "both apartments or say plainly what was dropped"
+  },
+  {
+   "id": "lt-fixA-d17-04",
+   "section": "d17",
+   "text": "3300 S Alma School Rd unit 107 and unit 108 invoice",
+   "expect": {
+    "all": [
+     [
+      "Steven Hutchins",
+      "INV-60007"
+     ],
+     [
+      "Laura Nakamura",
+      "INV-60008",
+      "Apt 108 was not",
+      "couldn't include",
+      "did not include"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "both apartments or say plainly what was dropped"
+  },
+  {
+   "id": "lt-fixA-d17-05",
+   "section": "d17",
+   "text": "pull invoices for 3300 S Alma School Rd, Apt 101, Apt 103 and Apt 104",
+   "expect": {
+    "all": [
+     [
+      "Thomas Quintana",
+      "INV-60001"
+     ],
+     [
+      "Amy Larkin",
+      "INV-60004",
+      "Apt 104 was not",
+      "couldn't include",
+      "did not include"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "both apartments or say plainly what was dropped"
+  },
+  {
+   "id": "lt-fixA-d17-06",
+   "section": "d17",
+   "text": "invoices at 3300 S Alma School Rd Apt 101",
+   "expect": {
+    "all": [
+     [
+      "INV-60001",
+      "Thomas Quintana"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixA-d17-07",
+   "section": "d17",
+   "text": "list invoices for 3300 S Alma School Rd",
+   "expect": {
+    "all": [
+     [
+      "Thomas Quintana"
+     ],
+     [
+      "Laura Nakamura"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control (whole building)"
+  },
+  {
+   "id": "lt-fixA-d19-01",
+   "section": "d19",
+   "text": "when was the warranty registered for Amy Isaacson's unit",
+   "expect": {
+    "all": [
+     [
+      "September 28, 2019",
+      "Sep 28, 2019",
+      "09/28/2019",
+      "9/28/2019",
+      "2019-09-28"
+     ],
+     [
+      "10 year",
+      "10-year",
+      "5-10",
+      "10 years"
+     ]
+    ],
+    "none": [
+     "(computed)"
+    ]
+   },
+   "baseline": "pass",
+   "note": "registered date + Rheem 5-10/10 caveat"
+  },
+  {
+   "id": "lt-fixA-d19-02",
+   "section": "d19",
+   "text": "what date did Deborah Ortega's warranty get registered",
+   "expect": {
+    "all": [
+     [
+      "February 21, 2021",
+      "Feb 21, 2021",
+      "02/21/2021",
+      "2/21/2021",
+      "2021-02-21"
+     ]
+    ],
+    "none": [
+     "(computed)"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d19-03",
+   "section": "d19",
+   "text": "when was Laura Lombardi's unit registered for warranty",
+   "expect": {
+    "all": [
+     [
+      "June 9, 2011",
+      "Jun 9, 2011",
+      "06/09/2011",
+      "6/9/2011",
+      "2011-06-09"
+     ]
+    ],
+    "none": [
+     "(computed)"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d19-04",
+   "section": "d19",
+   "text": "warranty registration date for Karen Abernathy",
+   "expect": {
+    "all": [
+     [
+      "April 1, 2025",
+      "Apr 1, 2025",
+      "04/01/2025",
+      "4/1/2025",
+      "2025-04-01"
+     ]
+    ],
+    "none": [
+     "(computed)"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d19-05",
+   "section": "d19",
+   "text": "when did we register the warranty on Betty Winslow's system",
+   "expect": {
+    "all": [
+     [
+      "February 9, 2015",
+      "Feb 9, 2015",
+      "02/09/2015",
+      "2/9/2015",
+      "2015-02-09"
+     ]
+    ],
+    "none": [
+     "(computed)"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d19-06",
+   "section": "d19",
+   "text": "registered date for Donna Sorensen's warranty",
+   "expect": {
+    "all": [
+     [
+      "December 6, 2023",
+      "Dec 6, 2023",
+      "12/06/2023",
+      "12/6/2023",
+      "2023-12-06"
+     ]
+    ],
+    "none": [
+     "(computed)"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d19-07",
+   "section": "d19",
+   "text": "when does the warranty expire on Amy Isaacson's unit",
+   "expect": {
+    "all": [
+     [
+      "September 9, 2024",
+      "Sep 9, 2024",
+      "09/09/2024",
+      "9/9/2024",
+      "2024-09-09"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixA-d19-08",
+   "section": "d19",
+   "text": "which city issued Deborah Ortega's permit",
+   "expect": {
+    "all": [
+     [
+      "Mesa"
+     ]
+    ],
+    "none": [
+     "permit number for"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d19-09",
+   "section": "d19",
+   "text": "what city pulled the permit for Thomas Mercer",
+   "expect": {
+    "all": [
+     [
+      "Phoenix"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d19-10",
+   "section": "d19",
+   "text": "which city is the permit for Jessica Chavez with",
+   "expect": {
+    "all": [
+     [
+      "Florence"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d19-11",
+   "section": "d19",
+   "text": "city on permit BP-2026-10018",
+   "expect": {
+    "all": [
+     [
+      "Gilbert"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d19-12",
+   "section": "d19",
+   "text": "permit BP-2026-10089 was issued by what city",
+   "expect": {
+    "all": [
+     [
+      "Tucson"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d19-13",
+   "section": "d19",
+   "text": "permit number for Deborah Ortega",
+   "expect": {
+    "all": [
+     [
+      "BP-2026-10012"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixA-d19-14",
+   "section": "d19",
+   "text": "what's the status on permit BP-2026-10023",
+   "expect": {
+    "all": [
+     [
+      "Issued"
+     ]
+    ],
+    "none": [
+     "no payment status"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d19-15",
+   "section": "d19",
+   "text": "is permit BP-2026-10001 issued",
+   "expect": {
+    "all": [
+     [
+      "Issued"
+     ]
+    ],
+    "none": [
+     "no payment status"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d19-16",
+   "section": "d19",
+   "text": "status of permit BP-2026-25003",
+   "expect": {
+    "all": [
+     [
+      "Issued"
+     ]
+    ],
+    "none": [
+     "no payment status"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d19-17",
+   "section": "d19",
+   "text": "BP-2026-10045 permit status",
+   "expect": {
+    "all": [
+     [
+      "Issued"
+     ]
+    ],
+    "none": [
+     "no payment status"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d19-18",
+   "section": "d19",
+   "text": "which vendor was PO-9081 from",
+   "expect": {
+    "all": [
+     [
+      "Watsco Supply"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d19-19",
+   "section": "d19",
+   "text": "who did we order PO-9021 from",
+   "expect": {
+    "all": [
+     [
+      "Watsco Supply"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d19-20",
+   "section": "d19",
+   "text": "vendor on PO-9004",
+   "expect": {
+    "all": [
+     [
+      "Baker Distributing"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d19-21",
+   "section": "d19",
+   "text": "which supplier was PO-9103 with",
+   "expect": {
+    "all": [
+     [
+      "Watsco Supply"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d19-22",
+   "section": "d19",
+   "text": "what parts were on PO-9010",
+   "expect": {
+    "all": [
+     [
+      "capacitor"
+     ],
+     [
+      "filter drier"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d19-23",
+   "section": "d19",
+   "text": "what did we order on PO-9059",
+   "expect": {
+    "all": [
+     [
+      "capacitor"
+     ],
+     [
+      "filter drier"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d19-24",
+   "section": "d19",
+   "text": "parts listed on purchase order PO-9087",
+   "expect": {
+    "all": [
+     [
+      "capacitor"
+     ],
+     [
+      "filter drier"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d19-25",
+   "section": "d19",
+   "text": "what is the total on PO-9081",
+   "expect": {
+    "all": [
+     [
+      "68"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixA-d19-26",
+   "section": "d19",
+   "text": "which maintenance agreement costs the most",
+   "expect": {
+    "all": [
+     [
+      "Sunrise Valley Elementary"
+     ],
+     [
+      "2,200"
+     ]
+    ],
+    "none": [
+     "27 documents"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d19-27",
+   "section": "d19",
+   "text": "what's our most expensive maintenance agreement",
+   "expect": {
+    "all": [
+     [
+      "Sunrise Valley Elementary"
+     ],
+     [
+      "2,200"
+     ]
+    ],
+    "none": [
+     "27 documents"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d19-28",
+   "section": "d19",
+   "text": "highest priced service agreement we have",
+   "expect": {
+    "all": [
+     [
+      "Sunrise Valley Elementary"
+     ],
+     [
+      "2,200"
+     ]
+    ],
+    "none": [
+     "27 documents"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d19-29",
+   "section": "d19",
+   "text": "biggest maintenance contract we have",
+   "expect": {
+    "all": [
+     [
+      "Sunrise Valley Elementary"
+     ],
+     [
+      "2,200"
+     ]
+    ],
+    "none": [
+     "27 documents"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d19-30",
+   "section": "d19",
+   "text": "which maintenance agreement is worth the most per year",
+   "expect": {
+    "all": [
+     [
+      "Sunrise Valley Elementary"
+     ],
+     [
+      "2,200"
+     ]
+    ],
+    "none": [
+     "27 documents"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d19-31",
+   "section": "d19",
+   "text": "how many maintenance agreements do we have",
+   "expect": {
+    "all": [
+     [
+      "27"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixA-d19-32",
+   "section": "d19",
+   "text": "how old is the system at 285 E Elliot Rd",
+   "expect": {
+    "all": [
+     [
+      "7 months"
+     ]
+    ],
+    "none": [
+     "0 years old"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d19-33",
+   "section": "d19",
+   "text": "how old is David Prentiss's system",
+   "expect": {
+    "all": [
+     [
+      "7 months"
+     ]
+    ],
+    "none": [
+     "0 years old"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d19-34",
+   "section": "d19",
+   "text": "age of the unit for Ashley Vance",
+   "expect": {
+    "all": [
+     [
+      "2 years"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d19-35",
+   "section": "d19",
+   "text": "how long ago was Donald Sorenson's system installed",
+   "expect": {
+    "all": [
+     [
+      "12 years"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d19-36",
+   "section": "d19",
+   "text": "how old is the equipment at 692 S Higley Rd",
+   "expect": {
+    "all": [
+     [
+      "13 years"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d19-37",
+   "section": "d19",
+   "text": "how old is Kathleen Jennings's unit",
+   "expect": {
+    "all": [
+     [
+      "7 years"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d19-38",
+   "section": "d19",
+   "text": "when was the unit at 285 E Elliot Rd installed",
+   "expect": {
+    "all": [
+     [
+      "February 18, 2026",
+      "Feb 18, 2026",
+      "02/18/2026",
+      "2/18/2026",
+      "2026-02-18"
+     ]
+    ]
+   },
+   "baseline": "pass",
+   "note": "control"
+  },
+  {
+   "id": "lt-fixA-d21-01",
+   "section": "d21",
+   "text": "how many documents are on file for Ronald Bracken",
+   "expect": {
+    "all": [
+     [
+      "5 documents",
+      "5 on file",
+      "five documents"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d21-02",
+   "section": "d21",
+   "text": "how many documents do we have for Amy Isaacson",
+   "expect": {
+    "all": [
+     [
+      "5 documents",
+      "5 on file",
+      "five documents"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d21-03",
+   "section": "d21",
+   "text": "how many files on file for David Prentiss",
+   "expect": {
+    "all": [
+     [
+      "5 documents",
+      "5 on file",
+      "five documents"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d21-04",
+   "section": "d21",
+   "text": "number of documents for Kevin Zimmerman",
+   "expect": {
+    "all": [
+     [
+      "5 documents",
+      "5 on file",
+      "five documents"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d21-05",
+   "section": "d21",
+   "text": "does Linda Fitzgerald have a permit on file",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "BP-2026"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d21-06",
+   "section": "d21",
+   "text": "does Amy Isaacson have a permit on file",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "BP-2026"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d21-07",
+   "section": "d21",
+   "text": "does Thomas Mercer have a permit on file",
+   "expect": {
+    "all": [
+     [
+      "BP-2026-10001"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d21-08",
+   "section": "d21",
+   "text": "is there a permit on file for Deborah Ortega",
+   "expect": {
+    "all": [
+     [
+      "BP-2026-10012"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d21-09",
+   "section": "d21",
+   "text": "what is the warranty term on Deborah Ortega's Rheem",
+   "expect": {
+    "all": [
+     [
+      "5-10"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d21-10",
+   "section": "d21",
+   "text": "what's the warranty term on Laura Lombardi's Trane",
+   "expect": {
+    "all": [
+     [
+      "5-10"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d21-11",
+   "section": "d21",
+   "text": "pull up the nameplate for Matthew Winslow",
+   "expect": {
+    "all": [
+     [
+      "2C100083"
+     ],
+     [
+      "Carrier"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d21-12",
+   "section": "d21",
+   "text": "what's on the data plate for Amy Isaacson's unit",
+   "expect": {
+    "all": [
+     [
+      "RA1456AJ1NA"
+     ],
+     [
+      "2R100006"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d21-13",
+   "section": "d21",
+   "text": "when did we invoice Karen Abernathy",
+   "expect": {
+    "all": [
+     [
+      "March 7, 2025",
+      "Mar 7, 2025",
+      "03/07/2025",
+      "3/7/2025",
+      "2025-03-07"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d21-14",
+   "section": "d21",
+   "text": "what date was Amy Isaacson invoiced",
+   "expect": {
+    "all": [
+     [
+      "September 9, 2019",
+      "Sep 9, 2019",
+      "09/09/2019",
+      "9/9/2019",
+      "2019-09-09"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d21-15",
+   "section": "d21",
+   "text": "who did the startup for Linda Fitzgerald",
+   "expect": {
+    "all": [
+     [
+      "Danny Ochoa"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d21-16",
+   "section": "d21",
+   "text": "who did the startup for Donald Sorenson",
+   "expect": {
+    "all": [
+     [
+      "Wyatt Coburn"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d21-17",
+   "section": "d21",
+   "text": "agreement period for Ronald Bracken",
+   "expect": {
+    "all": [
+     [
+      "January 1, 2025",
+      "Jan 1, 2025",
+      "01/01/2025",
+      "1/1/2025",
+      "2025-01-01"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d21-18",
+   "section": "d21",
+   "text": "agreement period for Laura Lombardi",
+   "expect": {
+    "all": [
+     [
+      "January 1, 2025",
+      "Jan 1, 2025",
+      "01/01/2025",
+      "1/1/2025",
+      "2025-01-01"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d21-19",
+   "section": "d21",
+   "text": "is Linda Fitzgerald on a maintenance agreement",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "Agreement Period"
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d21-20",
+   "section": "d21",
+   "text": "was Laura Lombardi's warranty registered",
+   "expect": {
+    "all": [
+     [
+      "June 9, 2011",
+      "Jun 9, 2011",
+      "06/09/2011",
+      "6/9/2011",
+      "2011-06-09"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  },
+  {
+   "id": "lt-fixA-d21-21",
+   "section": "d21",
+   "text": "has Thomas Mercer registered his warranty",
+   "expect": {
+    "review": true,
+    "none": [
+     "registered on"
+    ]
+   },
+   "baseline": "fail"
+  },
+  {
+   "id": "lt-fixA-d21-22",
+   "section": "d21",
+   "text": "what was the proposal amount for Copper Sky Dental",
+   "expect": {
+    "all": [
+     [
+      "$8,300.00",
+      "$8,300",
+      "8,300",
+      "8300"
+     ]
+    ]
+   },
+   "baseline": "pass"
+  }
+ ]
+}

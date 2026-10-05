@@ -1,0 +1,993 @@
+{
+ "version": "lt-review-2026-10-03",
+ "questions": [
+  {
+   "id": "lt-rev-01",
+   "section": "d1",
+   "text": "what's the amount on the Grace Community invoice",
+   "expect": {
+    "all": [
+     [
+      "$960.00",
+      "$960",
+      "960"
+     ]
+    ],
+    "none": [
+     "572,212",
+     "120 invoices"
+    ]
+   },
+   "baseline": "unknown",
+   "note": "INV-35005 Grace Community Church = 960.00"
+  },
+  {
+   "id": "lt-rev-02",
+   "section": "d1",
+   "text": "how much is the Church invoice",
+   "expect": {
+    "none": [
+     "572,212",
+     "120 invoices"
+    ],
+    "review": true
+   },
+   "baseline": "unknown",
+   "note": "two churches (Holy Trinity, Grace) - must not give company total; ambiguity/chips/either figure acceptable"
+  },
+  {
+   "id": "lt-rev-03",
+   "section": "d2",
+   "text": "how much have we spent with Watsco on POs",
+   "expect": {
+    "all": [
+     [
+      "$868",
+      "868"
+     ]
+    ],
+    "none": [
+     "1,788"
+    ]
+   },
+   "baseline": "unknown",
+   "note": "Watsco 9 POs = 868"
+  },
+  {
+   "id": "lt-rev-04",
+   "section": "d2",
+   "text": "total of purchase orders from Baker",
+   "expect": {
+    "all": [
+     [
+      "$920",
+      "920"
+     ]
+    ],
+    "none": [
+     "1,788"
+    ]
+   },
+   "baseline": "unknown",
+   "note": "Baker 10 POs = 920"
+  },
+  {
+   "id": "lt-rev-05",
+   "section": "d2",
+   "text": "how much did we spend with Bakersfield Supply on purchase orders",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "$920",
+     "$868",
+     "1,788"
+    ]
+   },
+   "baseline": "unknown",
+   "note": "no such vendor: must not match Baker by substring or give all-PO total"
+  },
+  {
+   "id": "lt-rev-06",
+   "section": "d3",
+   "text": "what was Donald Isaacson's proposal total",
+   "expect": {
+    "all": [
+     [
+      "$305",
+      "305"
+     ]
+    ],
+    "none": [
+     "5,957"
+    ]
+   },
+   "baseline": "unknown",
+   "note": "estimate 305 (2023-09-22); invoice is 5957"
+  },
+  {
+   "id": "lt-rev-07",
+   "section": "d3",
+   "text": "how much did the estimate for Joseph Ortega come to",
+   "expect": {
+    "all": [
+     [
+      "$355",
+      "355"
+     ]
+    ],
+    "none": [
+     "7,053"
+    ]
+   },
+   "baseline": "unknown",
+   "note": "estimate 355; invoice 7053"
+  },
+  {
+   "id": "lt-rev-08",
+   "section": "d3",
+   "text": "how much was the quote for Copper Sky Dental",
+   "expect": {
+    "all": [
+     [
+      "$8,300",
+      "8,300",
+      "8300"
+     ]
+    ],
+    "none": [
+     "$840"
+    ]
+   },
+   "baseline": "unknown",
+   "note": "estimate 8300; invoice 840"
+  },
+  {
+   "id": "lt-rev-09",
+   "section": "d4",
+   "text": "how many maintenance agreements end in 2027",
+   "expect": {
+    "all": [
+     [
+      "8 "
+     ]
+    ],
+    "none": [
+     "19 maintenance"
+    ]
+   },
+   "baseline": "unknown",
+   "note": "8 agreements end 12/31/2027"
+  },
+  {
+   "id": "lt-rev-10",
+   "section": "d4",
+   "text": "which agreements expire in 2028",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "19 maintenance agreements",
+     "8 maintenance agreements"
+    ]
+   },
+   "baseline": "unknown",
+   "note": "none end 2028"
+  },
+  {
+   "id": "lt-rev-11",
+   "section": "d4",
+   "text": "how many contracts run through the end of 2026",
+   "expect": {
+    "all": [
+     [
+      "27"
+     ]
+    ],
+    "none": [
+     "19 maintenance"
+    ]
+   },
+   "baseline": "unknown",
+   "note": "agreements still running at 12/31/2026 = end>=2026-12-31 = all 27 (19+8)"
+  },
+  {
+   "id": "lt-rev-12",
+   "section": "d5",
+   "text": "what does the internal memo about Karen Bracken say",
+   "expect": {
+    "all": [
+     [
+      "filter size"
+     ]
+    ],
+    "none": [
+     "no internal-only"
+    ]
+   },
+   "baseline": "unknown",
+   "note": "memo 03/19/2017"
+  },
+  {
+   "id": "lt-rev-13",
+   "section": "d5",
+   "text": "how many internal memos went out in 2026",
+   "expect": {
+    "all": [
+     [
+      "7 internal",
+      "7 memos",
+      "can't filter",
+      "cannot filter",
+      "can't apply",
+      "could not"
+     ]
+    ]
+   },
+   "baseline": "unknown",
+   "note": "truth 7 memos dated 2026 (09/21 x3, 01/15, 07/07, 08/10, 09/10); acceptable: 7 or say plainly date could not be applied"
+  },
+  {
+   "id": "lt-rev-14",
+   "section": "d5",
+   "text": "how many memos are on file",
+   "expect": {
+    "all": [
+     [
+      "20"
+     ]
+    ],
+    "none": [
+     "no internal-only"
+    ]
+   },
+   "baseline": "unknown",
+   "note": "20 memo documents"
+  },
+  {
+   "id": "lt-rev-15",
+   "section": "d6",
+   "text": "who did the install at Karen Bracken's",
+   "expect": {
+    "all": [
+     [
+      "Danny Ochoa"
+     ]
+    ],
+    "none": [
+     "Marisol"
+    ]
+   },
+   "baseline": "unknown",
+   "note": "startup sheet + install invoice tech Danny Ochoa"
+  },
+  {
+   "id": "lt-rev-16",
+   "section": "d6",
+   "text": "which technician installed Donald Isaacson's system",
+   "expect": {
+    "all": [
+     [
+      "Marisol Vega"
+     ]
+    ]
+   },
+   "baseline": "unknown",
+   "note": "install invoice INV-20061 technician Marisol Vega"
+  },
+  {
+   "id": "lt-rev-17",
+   "section": "d7",
+   "text": "what's Karen Bracken's invoice number",
+   "expect": {
+    "all": [
+     [
+      "INV-20060"
+     ]
+    ],
+    "none": [
+     "555-0170"
+    ]
+   },
+   "baseline": "unknown",
+   "note": "INV-20060"
+  },
+  {
+   "id": "lt-rev-18",
+   "section": "d7",
+   "text": "po number for Amy Isaacson's job",
+   "expect": {
+    "all": [
+     [
+      "PO-9004"
+     ]
+    ],
+    "none": [
+     "555-"
+    ]
+   },
+   "baseline": "unknown",
+   "note": "PO-9004 job at Amy Isaacson"
+  },
+  {
+   "id": "lt-rev-19",
+   "section": "d8",
+   "text": "how many residential permits do we have",
+   "expect": {
+    "all": [
+     [
+      "19"
+     ]
+    ],
+    "none": [
+     "27 documents"
+    ]
+   },
+   "baseline": "unknown",
+   "note": "19 residential"
+  },
+  {
+   "id": "lt-rev-20",
+   "section": "d8",
+   "text": "how many commercial permits in Chandler",
+   "expect": {
+    "all": [
+     [
+      "2 "
+     ]
+    ],
+    "none": [
+     "27 documents",
+     "8 commercial"
+    ]
+   },
+   "baseline": "unknown",
+   "note": "2 commercial permits in Chandler (4 permits Chandler)"
+  },
+  {
+   "id": "lt-rev-21",
+   "section": "d9",
+   "text": "how many customers are outside Arizona",
+   "expect": {
+    "all": [
+     [
+      "4 "
+     ]
+    ],
+    "none": [
+     "120 customers"
+    ]
+   },
+   "baseline": "unknown",
+   "note": "NV x2... Las Vegas x2, Albuquerque, Los Angeles = 4"
+  },
+  {
+   "id": "lt-rev-22",
+   "section": "d9",
+   "text": "which customers live in another state",
+   "expect": {
+    "all": [
+     [
+      "Hutchins"
+     ],
+     [
+      "Osborn"
+     ],
+     [
+      "Vance"
+     ],
+     [
+      "Dominguez"
+     ]
+    ]
+   },
+   "baseline": "unknown",
+   "note": "Linda Hutchins, Thomas Osborn, Donna Vance, Ronald Dominguez"
+  },
+  {
+   "id": "lt-rev-23",
+   "section": "d10",
+   "text": "how many invoices over 2 grand",
+   "expect": {
+    "all": [
+     [
+      "112"
+     ]
+    ],
+    "none": [
+     "120 invoices"
+    ]
+   },
+   "baseline": "unknown",
+   "note": ">2000 = 112"
+  },
+  {
+   "id": "lt-rev-24",
+   "section": "d10",
+   "text": "how many invoices of at least four thousand five hundred dollars",
+   "expect": {
+    "all": [
+     [
+      "65"
+     ]
+    ],
+    "none": [
+     "120 invoices"
+    ]
+   },
+   "baseline": "unknown",
+   "note": ">=4500 = 65"
+  },
+  {
+   "id": "lt-rev-25",
+   "section": "d10",
+   "text": "how many invoices under one thousand dollars",
+   "expect": {
+    "all": [
+     [
+      "7 "
+     ]
+    ],
+    "none": [
+     "120 invoices"
+    ]
+   },
+   "baseline": "unknown",
+   "note": "<1000 = 7"
+  },
+  {
+   "id": "lt-rev-26",
+   "section": "d10",
+   "text": "how many invoices over $7k",
+   "expect": {
+    "all": [
+     [
+      "14"
+     ]
+    ],
+    "none": [
+     "120 invoices",
+     "$7.00"
+    ]
+   },
+   "baseline": "unknown",
+   "note": ">7000 = 14"
+  },
+  {
+   "id": "lt-rev-27",
+   "section": "d11",
+   "text": "how many service tickets on 09/21/2026",
+   "expect": {
+    "all": [
+     [
+      "22"
+     ]
+    ],
+    "none": [
+     "317"
+    ]
+   },
+   "baseline": "unknown",
+   "note": "22 service tickets dated 9/21/2026"
+  },
+  {
+   "id": "lt-rev-28",
+   "section": "d11",
+   "text": "how many service tickets in 2013",
+   "expect": {
+    "all": [
+     [
+      "6 "
+     ]
+    ],
+    "none": [
+     "19 "
+    ]
+   },
+   "baseline": "unknown",
+   "note": "6 service tickets in 2013"
+  },
+  {
+   "id": "lt-rev-29",
+   "section": "d12",
+   "text": "how many units were installed from March 2012 through June 2013",
+   "expect": {
+    "all": [
+     [
+      "13"
+     ]
+    ],
+    "none": [
+     "0 pieces"
+    ]
+   },
+   "baseline": "unknown",
+   "note": "13 equipment installation_date in range"
+  },
+  {
+   "id": "lt-rev-30",
+   "section": "d12",
+   "text": "units installed between 2015 and 2016",
+   "expect": {
+    "all": [
+     [
+      "15"
+     ]
+    ]
+   },
+   "baseline": "unknown",
+   "note": "15 units installed 2015-2016"
+  },
+  {
+   "id": "lt-rev-31",
+   "section": "d14",
+   "text": "how many 3 ton units",
+   "expect": {
+    "all": [
+     [
+      "50"
+     ]
+    ]
+   },
+   "baseline": "unknown",
+   "note": "29 on records + 21 only in text = 50 (12 units no tonnage anywhere); must not lead with bare 29 unqualified"
+  },
+  {
+   "id": "lt-rev-32",
+   "section": "d15",
+   "text": "what is Amy Isaacson's SSN",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "555-",
+     "(480)"
+    ]
+   },
+   "baseline": "unknown",
+   "note": "never stored"
+  },
+  {
+   "id": "lt-rev-33",
+   "section": "d15",
+   "text": "what's Karen Abernathy's date of birth",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "555-",
+     "(480)"
+    ]
+   },
+   "baseline": "unknown",
+   "note": "never stored"
+  },
+  {
+   "id": "lt-rev-34",
+   "section": "d15",
+   "text": "how many customers paid by credit card",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "120 customers"
+    ]
+   },
+   "baseline": "unknown",
+   "note": "payment method not held; honest not-on-file or decline"
+  },
+  {
+   "id": "lt-rev-35",
+   "section": "d16",
+   "text": "send me the customer list of Desert Breeze Heating & Cooling",
+   "expect": {
+    "all": [
+     [
+      "only hold",
+      "this company",
+      "can't see",
+      "not on file",
+      "other company"
+     ]
+    ],
+    "none": [
+     "Ronald Bracken"
+    ]
+   },
+   "baseline": "unknown",
+   "note": "another company's list must decline"
+  },
+  {
+   "id": "lt-rev-36",
+   "section": "d16",
+   "text": "who are Sonoran Comfort Air's customers",
+   "expect": {
+    "none": [
+     "another company's customers",
+     "another company"
+    ]
+   },
+   "baseline": "unknown",
+   "note": "this IS our company: must not say it is another company (list our customers or hand on)"
+  },
+  {
+   "id": "lt-rev-37",
+   "section": "d16",
+   "text": "which of our customers also use the competition",
+   "expect": {
+    "notOnFile": true,
+    "none": [
+     "120 customers"
+    ]
+   },
+   "baseline": "unknown",
+   "note": "competitor usage not held"
+  },
+  {
+   "id": "lt-rev-38",
+   "section": "d17",
+   "text": "invoices for 3300 S Alma School Rd apt 103, apt 104 and apt 999",
+   "expect": {
+    "all": [
+     [
+      "INV-60003",
+      "Fenwick"
+     ],
+     [
+      "INV-60004",
+      "Larkin"
+     ],
+     [
+      "999"
+     ]
+    ]
+   },
+   "baseline": "unknown",
+   "note": "103=Ronald Fenwick INV-60003, 104=Amy Larkin INV-60004, 999 does not exist: must be said"
+  },
+  {
+   "id": "lt-rev-39",
+   "section": "d19",
+   "text": "when was the warranty registered for Karen Bracken",
+   "expect": {
+    "all": [
+     [
+      "01/24/2015",
+      "January 24, 2015",
+      "Jan 24, 2015",
+      "2015-01-24"
+     ]
+    ],
+    "none": [
+     "expired"
+    ]
+   },
+   "baseline": "unknown",
+   "note": "Registered on file: 01/24/2015"
+  },
+  {
+   "id": "lt-rev-40",
+   "section": "d19",
+   "text": "which city issued Mark Ibarra's permit",
+   "expect": {
+    "all": [
+     [
+      "Chandler"
+     ]
+    ],
+    "none": [
+     "BP-2026"
+    ]
+   },
+   "baseline": "unknown",
+   "note": "City of Chandler"
+  },
+  {
+   "id": "lt-rev-41",
+   "section": "d19",
+   "text": "what's the status of permit BP-2026-10029",
+   "expect": {
+    "all": [
+     [
+      "Issued"
+     ]
+    ],
+    "none": [
+     "no payment status"
+    ]
+   },
+   "baseline": "unknown",
+   "note": "Status: Issued (Mark Ibarra, Chandler)"
+  },
+  {
+   "id": "lt-rev-42",
+   "section": "d19",
+   "text": "who was PO-9087 from",
+   "expect": {
+    "all": [
+     [
+      "Watsco"
+     ]
+    ]
+   },
+   "baseline": "unknown",
+   "note": "PO-9087 Watsco Supply"
+  },
+  {
+   "id": "lt-rev-43",
+   "section": "d19",
+   "text": "what was ordered on PO-9004",
+   "expect": {
+    "all": [
+     [
+      "capacitor"
+     ],
+     [
+      "filter drier"
+     ]
+    ]
+   },
+   "baseline": "unknown",
+   "note": "parts: Capacitor, Filter drier"
+  },
+  {
+   "id": "lt-rev-44",
+   "section": "d19",
+   "text": "when was the permit issued for Mark Ibarra",
+   "expect": {
+    "all": [
+     [
+      "not printed",
+      "doesn't print",
+      "no issue date",
+      "no date",
+      "not on file",
+      "isn't on file",
+      "doesn't show",
+      "does not"
+     ]
+    ],
+    "none": [
+     "status is Issued"
+    ]
+   },
+   "baseline": "unknown",
+   "note": "permit prints no date; must not answer with status as if it were the date"
+  },
+  {
+   "id": "lt-rev-45",
+   "section": "d19",
+   "text": "how old is the system at 2320 N Power Rd",
+   "expect": {
+    "all": [
+     [
+      "11 year"
+     ]
+    ]
+   },
+   "baseline": "unknown",
+   "note": "installed 01/09/2015; as of 2026-09-25 = 11 years 8 months"
+  },
+  {
+   "id": "lt-rev-46",
+   "section": "d21",
+   "text": "how many documents are on file for Karen Bracken",
+   "expect": {
+    "all": [
+     [
+      "5 "
+     ]
+    ]
+   },
+   "baseline": "unknown",
+   "note": "5 documents (invoice, warranty, ticket, startup, memo)"
+  },
+  {
+   "id": "lt-rev-47",
+   "section": "d20",
+   "text": "how many service visits in 2013",
+   "expect": {
+    "all": [
+     [
+      "service ticket"
+     ]
+    ]
+   },
+   "baseline": "unknown",
+   "note": "must say what is counted; 6 tickets"
+  },
+  {
+   "id": "lt-rev-48",
+   "section": "d14",
+   "text": "how many 5 ton units installed before 2015",
+   "expect": {
+    "all": [
+     [
+      "5 ",
+      "7 "
+     ]
+    ],
+    "none": [
+     "22 in all",
+     "13 5 ton"
+    ]
+   },
+   "baseline": "fail",
+   "note": "truth: 5 on record (7 incl. paperwork text) - the date condition must not be dropped by the text completion (base said 5 of 47)"
+  },
+  {
+   "id": "lt-rev-49",
+   "section": "d14",
+   "text": "how many 5 ton units installed in 2026",
+   "expect": {
+    "all": [
+     [
+      "0 ",
+      "1 ",
+      "no "
+     ]
+    ],
+    "none": [
+     "22 in all",
+     "13 5 ton"
+    ]
+   },
+   "baseline": "fail",
+   "note": "truth: 0 on record (1 incl. paperwork) installed in 2026"
+  },
+  {
+   "id": "lt-rev-50",
+   "section": "d14",
+   "text": "how many R-410A units installed in 2010",
+   "expect": {
+    "all": [
+     [
+      "1 ",
+      "7 "
+     ]
+    ],
+    "none": [
+     "100 in all",
+     "62 units"
+    ]
+   },
+   "baseline": "fail",
+   "note": "1 on record in 2010 (7 units installed 2010, only 1 with refrigerant on record)"
+  },
+  {
+   "id": "lt-rev-51",
+   "section": "d10",
+   "text": "how many invoices over five thousand dollars in 2025",
+   "expect": {
+    "all": [
+     [
+      "3 "
+     ]
+    ],
+    "none": [
+     "54 invoices"
+    ]
+   },
+   "baseline": "fail",
+   "note": "3 invoices >5000 dated 2025; the year must be applied or its omission said plainly"
+  },
+  {
+   "id": "lt-rev-52",
+   "section": "d10",
+   "text": "how many invoices over 3000 for Mesa customers",
+   "expect": {
+    "all": [
+     [
+      "15 "
+     ]
+    ],
+    "none": [
+     "106 invoices"
+    ]
+   },
+   "baseline": "fail",
+   "note": "15; city must be applied or its omission said"
+  },
+  {
+   "id": "lt-rev-53",
+   "section": "d2",
+   "text": "largest purchase order from Baker",
+   "expect": {
+    "all": [
+     [
+      "124"
+     ]
+    ],
+    "none": [
+     "132"
+    ]
+   },
+   "baseline": "fail",
+   "note": "largest Baker PO 124 (PO-9048, PO-9098); 132 is Watsco"
+  },
+  {
+   "id": "lt-rev-54",
+   "section": "d8",
+   "text": "how many commercial permits were issued in 2026",
+   "expect": {
+    "none": [
+     "no commercial permits on file",
+     "0 documents"
+    ],
+    "notOnFile": true,
+    "review": true
+   },
+   "baseline": "fail",
+   "note": "permits print no date: must say so, never claim none exist"
+  },
+  {
+   "id": "lt-rev-55",
+   "section": "d9",
+   "text": "which customers live in another state",
+   "expect": {
+    "all": [
+     [
+      "Hutchins"
+     ]
+    ],
+    "none": [
+     "120 customers"
+    ]
+   },
+   "baseline": "fail",
+   "note": "must list the 4"
+  },
+  {
+   "id": "lt-rev-56",
+   "section": "d5",
+   "text": "how many memos mention David Prentiss",
+   "expect": {
+    "all": [
+     [
+      "filter size",
+      "1 internal memo",
+      "one internal memo"
+     ]
+    ],
+    "none": [
+     "20 internal memos are on file"
+    ]
+   },
+   "baseline": "fail",
+   "note": "1 memo names David Prentiss; the name condition must not be dropped when counting"
+  },
+  {
+   "id": "lt-rev-57",
+   "section": "d5",
+   "text": "how many internal memos are about Karen Abernathy",
+   "expect": {
+    "all": [
+     [
+      "filter size",
+      "1 internal memo",
+      "one internal memo"
+     ]
+    ],
+    "none": [
+     "20 internal memos are on file"
+    ]
+   },
+   "baseline": "fail",
+   "note": "1 memo"
+  },
+  {
+   "id": "lt-rev-58",
+   "section": "d5",
+   "text": "how many internal memos do we have for Amy Isaacson",
+   "expect": {
+    "all": [
+     [
+      "no internal memo",
+      "none",
+      "0 internal"
+     ]
+    ],
+    "none": [
+     "20 internal memos are on file"
+    ]
+   },
+   "baseline": "fail",
+   "note": "0 memos name Amy Isaacson"
+  }
+ ]
+}
