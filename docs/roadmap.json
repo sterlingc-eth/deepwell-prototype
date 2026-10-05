@@ -6,6 +6,7 @@
     { "id": "warranty", "title": "Warranty tracking and export", "text": "See which coverage is expiring across every unit and export warranty records any time." },
     { "id": "bulk-upload", "title": "Bulk upload", "text": "Drag in a whole folder or a .zip and every file is read, sorted and filed." },
     { "id": "records-search", "title": "Records search", "text": "Find a customer, address, serial number or date across every document you have sent in." },
+    { "id": "status-page", "title": "Public status page", "text": "See whether DeepWell is up right now, and the history of past incidents, at status.deepwelltechnology.com." },
     { "id": "help-chat", "title": "Help chat", "text": "Ask the help chat how DeepWell works, any time, with answers drawn from our public help articles." }
   ],
   "next": [
@@ -14,7 +15,7 @@
     { "id": "branch-scoping", "title": "Branch scoping", "text": "Limit each person to the records of their own branch or location.", "match": ["branch scoping"] },
     { "id": "callback-analytics", "title": "Callback analytics", "text": "See which technicians and equipment brands generate the most repeat visits.", "match": ["callback analytics"] },
     { "id": "backups-restore", "title": "Backups and per-company restore", "text": "Scheduled off-site backups, with the option to restore a single company.", "match": ["backup", "per-company restore"] },
-    { "id": "status-page-sla", "title": "Public status page and uptime SLA", "text": "A public status page and an uptime commitment with service credits.", "match": ["status page", "uptime sla"] }
+    { "id": "uptime-sla", "title": "Uptime SLA", "text": "An uptime commitment with service credits.", "match": ["uptime sla"] }
   ],
   "later": [
     { "id": "electrical", "title": "Electrical", "text": "Panel schedules, permits and inspections for electrical contractors.", "match": ["electrical"] },

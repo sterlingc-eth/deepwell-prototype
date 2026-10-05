@@ -30,7 +30,7 @@ Solo is ${{solo.monthly}}/month, Team ${{shop.monthly}}/month, Crew ${{crew.mont
 
 ### What is included in every plan?
 ~ every plan includes, included in all plans, what is included, included features, all plans, what do i get, whats included, common features, standard features, features
-Every plan includes unlimited Donovan with sources, white-glove setup by our team, and the ability to export your data anytime. A public status page is listed as coming soon and is not available yet.
+Every plan includes unlimited Donovan with sources, white-glove setup by our team, and the ability to export your data anytime. A public status page is live at status.deepwelltechnology.com.
 
 ### Is there annual pricing or a discount?
 ~ annual, yearly, annual prepay, annual price, annual discount, discount, save money, pay yearly, one month free, prepay, coupon, promo code, cheaper, deal, special offer, non profit discount, discounts, discount for paying up front, pay for the year up front, pay a year up front, pay annually, annual billing, yearly billing, bill annually, pay for a year, annual plan

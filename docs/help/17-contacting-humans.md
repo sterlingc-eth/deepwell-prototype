@@ -35,9 +35,9 @@ Sterling Chapman works with you from your first sample through go-live. Hilton C
 
 ### I need help with something urgent
 ~ urgent, emergency, outage, down, site is down, deepwell is down, service outage, not working, cant access anything, critical issue, broken, is deepwell down, system down, everything is broken, production issue, asap
-Email support@deepwelltechnology.com with what you see and when it started. Urgent-issue response targets are listed for Crew (2 hours) and Fleet (1 hour, 24/7). I can also send it to the team from here. There is no public status page yet, since it is listed as coming soon.
+Email support@deepwelltechnology.com with what you see and when it started. Urgent-issue response targets are listed for Crew (2 hours) and Fleet (1 hour, 24/7). I can also send it to the team from here. You can also check status.deepwelltechnology.com to see whether DeepWell is up right now.
 !handoff:urgent
 
 ### Is there a status page?
 ~ status page, uptime, system status, is it down, uptime sla, service status, downtime, uptime guarantee, 99.9, sla, service level agreement, reliability, status
-A public status page is **coming soon** and isn't available yet, and there is no uptime SLA today. The 99.5% uptime SLA on Fleet is also marked coming soon. If something looks down, email support@deepwelltechnology.com.
+Yes. The public status page is at status.deepwelltechnology.com. It shows whether the website, the app, the phone app and records and answers are up right now, with a history of past incidents. An uptime SLA is **coming soon** and is not in place today, including the 99.5% uptime SLA on Fleet. If something looks down, email support@deepwelltechnology.com.
