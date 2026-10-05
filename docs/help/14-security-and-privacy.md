@@ -4,13 +4,17 @@ title: Security and privacy
 audience: public
 surface: both
 keywords: security, privacy, data, encryption, isolation, tenant, can you see my data, subprocessors, gdpr, soc 2, compliance, ai training, hosting
-updated: 2026-09-29
+updated: 2026-10-05
 ---
 DeepWell describes its real, current controls on the Security & Privacy page and in the Privacy Policy. This article does not round up: it lists what is not done yet, too.
 
+### Is my data secure?
+~ is my data secure, is my data safe, is it safe, safe, secure, is deepwell secure, is it secure, safety, is my data protected, is my data private, privacy, data privacy, how safe is my data, can i trust deepwell with my records, security
+Yes. Your records are stored under your own company's account and kept separate from every other customer's, and the database enforces that separation on every query. Data is encrypted in transit and at rest, and files sit in private storage that opens only through short-lived links. DeepWell staff have no standing access to your account: your admin can grant **support access** for a set time and revoke it at any time, and every access is recorded in your own activity log.
+
 ### Can DeepWell see our data or files?
-~ can you see my data, can deepwell see our data, can you see our files, who can see my data, do you have access to my documents, staff access, do employees see my data, is my data private, privacy, data privacy, who can access my records, can you read my files, is my data safe, is it safe, safe, secure, is deepwell secure, is it secure, safety, is my data protected
-Not by default. Your records live under your company's own account, and the database enforces that isolation for every query. DeepWell staff have no standing access. The only path is **support access** that your admin grants for a set time and can revoke at any time, and every access is recorded in your own activity log.
+~ can you see my data, can deepwell see our data, can you see our files, who can see my data, do you have access to my documents, staff access, do employees see my data, who can access my records, can you read my files
+DeepWell staff have no standing access to your account. Your records live under your company's own account, and the database enforces that isolation for every query. Inside the product, staff can look at your account only through **support access** that your admin grants for a set time and can revoke at any time, or in an emergency that is always logged where your admin can see it. Every access is recorded in your own activity log. The two founders also administer the hosting, database and file-storage accounts.
 
 ### Is my data isolated from other customers?
 ~ isolation, is my data separate, other customers see my data, multi tenant, tenant isolation, shared with other contractors, pooled, mixed with other companies, separated, data separation, row level security, is my data shared, where is my data stored, where is my data, where is data stored, where do you store my data, where is my data hosted, data location, data residency, where are my files stored, hosting, data center
