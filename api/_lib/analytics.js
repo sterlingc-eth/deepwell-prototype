@@ -3914,7 +3914,15 @@ function formatAnalyticsAnswerBase(plan, opts) {
     total = 0, groups = [], rows = [], sum = null, unfilteredTotal = null, broaderGroups = null,
     mostRecentServiceVisit, timeRangeLabel = null,
   } = opts ?? {};
-  const noun = (ENTITY_NOUN[plan.entity] ?? (() => plan.entity))(total);
+  let noun = (ENTITY_NOUN[plan.entity] ?? (() => plan.entity))(total);
+  // R3 loop r38: a bare doc-type count names the type ("27 maintenance agreements"), not "documents".
+  if (plan.entity === 'documents' && plan.op === 'count' && !timeRangeLabel) {
+    const dt = (plan.filters ?? []).filter((f) => f.field === 'documentType');
+    if (dt.length === 1 && dt[0].op === 'eq' && typeof dt[0].value === 'string' && (plan.filters ?? []).length === 1 && dt[0].value !== 'other') {
+      const lbl = String(documentTypeLabel(dt[0].value) ?? '').toLowerCase();
+      if (lbl) noun = `${lbl}${total === 1 ? '' : 's'}`;
+    }
+  }
 
   // R23 (D2, k139): technician head-to-head yes/no — `rows` is already scoped (by plan.filters'
   // `technician in [left, right]`) to just these two people's own visits (dateless-row correction
