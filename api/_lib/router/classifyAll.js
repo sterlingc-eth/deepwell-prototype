@@ -263,7 +263,7 @@ async function classifyAllOnce(question, ctx = {}) {
   };
   const raw = {
     relations: timed("relations", () => classifyRelationsQuestion(question)),
-    deterministic: timed("deterministic", () => classifyDeterministic(question, { overlay })),
+    deterministic: timed("deterministic", () => classifyDeterministic(question, { overlay, tenantVocab })),
     decompose: timed("decompose", () => classifyDecompose(question, { pack })),
     fastPath: timed("fastPath", () => classifyFastPath(question)),
     contactLookup: timed("contactLookup", () => parseContactLookupQuestion(question, { overlay, tenantVocab: ctx.tenantVocab })),
