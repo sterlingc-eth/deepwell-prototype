@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-05T23:36:04.515Z",
-  "count": 763,
+  "generatedAt": "2026-10-06T04:19:50.303Z",
+  "count": 764,
   "questions": [
     {
       "id": "hvac-owner-0069-canonical",
@@ -1236,6 +1236,17 @@
       ],
       "winner": "deterministic",
       "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "hvac-owner-0053-canonical",
+      "category": "technician",
+      "text": "How many jobs did each technician close out this year?",
+      "claimants": [
+        "relations",
+        "analytics"
+      ],
+      "winner": "relations",
+      "reason": "ask.js: `!meta ? classifyRelationsQuestion(question) : null` — gated on meta alone."
     },
     {
       "id": "hvac-bookkeeper-0015-canonical",

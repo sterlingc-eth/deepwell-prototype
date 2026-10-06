@@ -1,0 +1,994 @@
+[
+ {
+  "question": "whats the serial on the RPZ at Pruitt Dental",
+  "kind": "answerable",
+  "expected": [
+   "WT-909-48213"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "who tested the Saguaro Ridge HOA RPZ and when",
+  "kind": "answerable",
+  "expected": [
+   "Marcus Bell",
+   "September 20, 2025"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "Tillman Freight backflow - what kind of device and who makes it",
+  "kind": "answerable",
+  "expected": [
+   "DCVA",
+   "Febco"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "when is Corliss Bakery's backflow test due again",
+  "kind": "answerable",
+  "expected": [
+   "November 19, 2026"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "did Lena Okafor's backflow pass or fail in September, and what date",
+  "kind": "answerable",
+  "expected": [
+   "Fail",
+   "September 27, 2026"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "model of the water heater at 412 Elm",
+  "kind": "answerable",
+  "expected": [
+   "XG50T06EC36U1"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "when did we put in the Rheem at Harlan Moss's",
+  "kind": "answerable",
+  "expected": [
+   "November 12, 2020"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "how many gallons is the heater at Tillman Freight",
+  "kind": "answerable",
+  "expected": [
+   "50"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "Nadine Ferrara water heater warranty expires when",
+  "kind": "answerable",
+  "expected": [
+   "June 18, 2034"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "permit number for the Basalt repipe",
+  "kind": "answerable",
+  "expected": [
+   "PL-26-03300"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "who issued the Peoria permit for Saguaro Ridge",
+  "kind": "answerable",
+  "expected": [
+   "City of Peoria Building Safety"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "did the Chandler repipe rough-in pass? date?",
+  "kind": "answerable",
+  "expected": [
+   "Failed",
+   "February 19, 2026"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "how long was the camera run at the Ridge View clubhouse",
+  "kind": "answerable",
+  "expected": [
+   "212"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "what did the camera find at Elm Street in Tempe",
+  "kind": "answerable",
+  "expected": [
+   "Root intrusion",
+   "Offset joint",
+   "61 ft"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "how much was the Pruitt backflow test invoice",
+  "kind": "answerable",
+  "expected": [
+   "385.00"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "tillman gas line invoice amount and date",
+  "kind": "answerable",
+  "expected": [
+   "5,215.00",
+   "April 29, 2026"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "what did we bill Harlan Moss on INV-3101",
+  "kind": "answerable",
+  "expected": [
+   "1,845.00"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "9/30 ticket at Mesquite Grill, who went and how much was it",
+  "kind": "answerable",
+  "expected": [
+   "Marcus Bell",
+   "389.00"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "what was done on the July ticket at Juniper Court",
+  "kind": "answerable",
+  "expected": [
+   "hose bib",
+   "132.00"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "when is the Pruitt Dental work order scheduled for",
+  "kind": "answerable",
+  "expected": [
+   "October 12, 2026"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "Saguaro quote number and total",
+  "kind": "answerable",
+  "expected": [
+   "Q-2210",
+   "18,400.00"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "what does the Mesquite Grill service agreement cover",
+  "kind": "answerable",
+  "expected": [
+   "backflow",
+   "grease trap"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "how many RPZs do we have on file",
+  "kind": "answerable",
+  "expected": [
+   "5"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "how many of our water heaters are tankless",
+  "kind": "answerable",
+  "expected": [
+   "4"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "Delgado permit number and expiration",
+  "kind": "answerable",
+  "expected": [
+   "PL-26-01107",
+   "October 9, 2026"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "what's Orin Vasquez's dispatch for and which tech",
+  "kind": "answerable",
+  "expected": [
+   "low water pressure",
+   "Rafael Ortiz"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "which jobs did Dale Whitaker install water heaters on",
+  "kind": "answerable",
+  "expected": [
+   "Tillman Freight",
+   "Mesquite Grill",
+   "Pruitt Dental"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "cert number for Tonya Reyes",
+  "kind": "answerable",
+  "expected": [
+   "AZ-BF-18877"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "whats the phone number for Nadine Ferrara",
+  "kind": "unanswerable",
+  "expected": [
+   "not in",
+   "documents"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "what was the permit fee on PL-26-07788",
+  "kind": "unanswerable",
+  "expected": [
+   "not in",
+   "documents"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "does the Tillman Freight water heater have a warranty registration on file",
+  "kind": "unanswerable",
+  "expected": [
+   "not in",
+   "documents"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "what psi was the Saguaro RPZ reading at test",
+  "kind": "unanswerable",
+  "expected": [
+   "not in",
+   "documents"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "what's Rafael's hourly rate",
+  "kind": "unanswerable",
+  "expected": [
+   "not in",
+   "documents"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "is the Harmon Street sewer work up to plumbing code",
+  "kind": "unanswerable",
+  "expected": [],
+  "set": "A"
+ },
+ {
+  "question": "Delgado backflow RPZ - what date was it last tested",
+  "kind": "trap",
+  "expected": [
+   "December 9, 2025"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "when is the Thornbird Apartments backflow test due",
+  "kind": "trap",
+  "expected": [
+   "March"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "what did we bill Nadine Ferrara for the tankless install",
+  "kind": "trap",
+  "expected": [
+   "3,420.50"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "what's PO-7745 for and how much",
+  "kind": "trap",
+  "expected": [
+   "Navien",
+   "1,695.00"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "how much have we invoiced Saguaro Ridge HOA total",
+  "kind": "trap",
+  "expected": [
+   "5,880.25"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "did Rafael already do the low pressure check at 61 Sagebrush Trail",
+  "kind": "trap",
+  "expected": [
+   "October 6, 2026"
+  ],
+  "set": "A"
+ },
+ {
+  "question": "88 harmon st backflow - whos the tester",
+  "kind": "answerable",
+  "expected": [
+   "Marcus Bell"
+  ],
+  "set": "B"
+ },
+ {
+  "question": "what utility is the 3300 granite pkwy backflow filed with",
+  "kind": "answerable",
+  "expected": [
+   "City of Tempe Water Utilities"
+  ],
+  "set": "B"
+ },
+ {
+  "question": "who makes the backflow at 5530 Warehouse Way",
+  "kind": "answerable",
+  "expected": [
+   "Febco"
+  ],
+  "set": "B"
+ },
+ {
+  "question": "2210 cactus wren - when was the RPZ last tested",
+  "kind": "answerable",
+  "expected": [
+   "December 9, 2025"
+  ],
+  "set": "B"
+ },
+ {
+  "question": "Harlans backflow test is due when",
+  "kind": "answerable",
+  "expected": [
+   "October 5, 2026"
+  ],
+  "set": "B"
+ },
+ {
+  "question": "who is the water utility for Nadine Ferrara's backflow",
+  "kind": "answerable",
+  "expected": [
+   "City of Scottsdale Water"
+  ],
+  "set": "B"
+ },
+ {
+  "question": "model number of the heater at 61 Sagebrush Trail",
+  "kind": "answerable",
+  "expected": [
+   "RU199iN"
+  ],
+  "set": "B"
+ },
+ {
+  "question": "Mesquite Grill water heater - brand and gallon size",
+  "kind": "answerable",
+  "expected": [
+   "Rheem",
+   "40"
+  ],
+  "set": "B"
+ },
+ {
+  "question": "when was the Corliss tankless put in",
+  "kind": "answerable",
+  "expected": [
+   "February 11, 2025"
+  ],
+  "set": "B"
+ },
+ {
+  "question": "serial number for the Basalt tankless heater",
+  "kind": "answerable",
+  "expected": [
+   "RH-T2307-2250"
+  ],
+  "set": "B"
+ },
+ {
+  "question": "when was the Okafor water heater installed",
+  "kind": "answerable",
+  "expected": [
+   "March 4, 2016"
+  ],
+  "set": "B"
+ },
+ {
+  "question": "when does Orin Vasquez's heater warranty end",
+  "kind": "answerable",
+  "expected": [
+   "December 20, 2026"
+  ],
+  "set": "B"
+ },
+ {
+  "question": "Pruitt heater warranty end date",
+  "kind": "answerable",
+  "expected": [
+   "December 28, 2026"
+  ],
+  "set": "B"
+ },
+ {
+  "question": "Delgado new heater warranty - registered when",
+  "kind": "answerable",
+  "expected": [
+   "April 28, 2026"
+  ],
+  "set": "B"
+ },
+ {
+  "question": "Corliss bakery permit status and number",
+  "kind": "answerable",
+  "expected": [
+   "Closed",
+   "PL-25-00023"
+  ],
+  "set": "B"
+ },
+ {
+  "question": "when does Tillmans gas line permit run out",
+  "kind": "answerable",
+  "expected": [
+   "September 28, 2026"
+  ],
+  "set": "B"
+ },
+ {
+  "question": "what type of work is permit PL-26-09000",
+  "kind": "answerable",
+  "expected": [
+   "sewer"
+  ],
+  "set": "B"
+ },
+ {
+  "question": "Pruitt Dental sewer permit rough in result and date",
+  "kind": "answerable",
+  "expected": [
+   "Passed",
+   "September 2, 2026"
+  ],
+  "set": "B"
+ },
+ {
+  "question": "what date was the Basalt final inspection",
+  "kind": "answerable",
+  "expected": [
+   "June 23, 2026"
+  ],
+  "set": "B"
+ },
+ {
+  "question": "1907 oak ridge camera report - footage length and what to do",
+  "kind": "answerable",
+  "expected": [
+   "97",
+   "Replace",
+   "52 ft"
+  ],
+  "set": "B"
+ },
+ {
+  "question": "did the Mesquite Grill camera find anything",
+  "kind": "answerable",
+  "expected": [
+   "No defects"
+  ],
+  "set": "B"
+ },
+ {
+  "question": "whos the tech on Ferrara's drain ticket and what's the total",
+  "kind": "answerable",
+  "expected": [
+   "Jenna Pike",
+   "215.00"
+  ],
+  "set": "B"
+ },
+ {
+  "question": "Orin Vasquez 10/1 ticket what got fixed",
+  "kind": "answerable",
+  "expected": [
+   "supply leak",
+   "176.25"
+  ],
+  "set": "B"
+ },
+ {
+  "question": "Harlan Moss Aug 3 service - what was the fix",
+  "kind": "answerable",
+  "expected": [
+   "toilet fill valve",
+   "148.50"
+  ],
+  "set": "B"
+ },
+ {
+  "question": "how many service tickets do we have",
+  "kind": "answerable",
+  "expected": [
+   "5"
+  ],
+  "set": "B"
+ },
+ {
+  "question": "which job got the 75 gallon heater",
+  "kind": "answerable",
+  "expected": [
+   "Delgado Family",
+   "2210 Cactus Wren Way"
+  ],
+  "set": "B"
+ },
+ {
+  "question": "INV-3110 how much and what for",
+  "kind": "answerable",
+  "expected": [
+   "5,215.00",
+   "Gas line extension"
+  ],
+  "set": "B"
+ },
+ {
+  "question": "total billed to Pruitt Dental on the two invoices",
+  "kind": "answerable",
+  "expected": [
+   "997.75"
+  ],
+  "set": "B"
+ },
+ {
+  "question": "who is the property manager at Saguaro Ridge HOA",
+  "kind": "unanswerable",
+  "expected": [
+   "not in",
+   "documents"
+  ],
+  "set": "B"
+ },
+ {
+  "question": "has Lena Okafor's backflow been retested yet",
+  "kind": "unanswerable",
+  "expected": [],
+  "set": "B"
+ },
+ {
+  "question": "was the Mesquite Grill invoice paid",
+  "kind": "unanswerable",
+  "expected": [
+   "not in",
+   "documents"
+  ],
+  "set": "B"
+ },
+ {
+  "question": "how many hours did Marcus Bell spend at Granite Parkway",
+  "kind": "unanswerable",
+  "expected": [
+   "not in",
+   "documents"
+  ],
+  "set": "B"
+ },
+ {
+  "question": "whats the permit fee on PL-26-05530",
+  "kind": "unanswerable",
+  "expected": [
+   "not in",
+   "documents"
+  ],
+  "set": "B"
+ },
+ {
+  "question": "will the Oak Ridge permit pass next time",
+  "kind": "unanswerable",
+  "expected": [],
+  "set": "B"
+ },
+ {
+  "question": "Basalt backflow - what date was it last tested",
+  "kind": "trap",
+  "expected": [
+   "June 27, 2026"
+  ],
+  "set": "B"
+ },
+ {
+  "question": "is there a backflow device on file for Thornbird Apartments",
+  "kind": "trap",
+  "expected": [],
+  "set": "B"
+ },
+ {
+  "question": "who is the Navien from Ferguson on PO-7745 for",
+  "kind": "trap",
+  "expected": [],
+  "set": "B"
+ },
+ {
+  "question": "what tonnage is the Thornbird unit",
+  "kind": "trap",
+  "expected": [],
+  "set": "B"
+ },
+ {
+  "question": "what's Dale supposed to do at Pruitt on 10/12",
+  "kind": "trap",
+  "expected": [
+   "Install two lavatory faucets",
+   "angle stops"
+  ],
+  "set": "B"
+ },
+ {
+  "question": "what did we say to Thornbird in the September letter",
+  "kind": "trap",
+  "expected": [
+   "March"
+  ],
+  "set": "B"
+ },
+ {
+  "question": "how many backflow devices do we have tracked",
+  "kind": "answerable",
+  "expected": [
+   "12"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "how many pvbs",
+  "kind": "answerable",
+  "expected": [
+   "3"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "how many DCVAs are we tracking",
+  "kind": "answerable",
+  "expected": [
+   "4"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "list the backflow assemblies that failed",
+  "kind": "answerable",
+  "expected": [
+   "Okafor",
+   "Saguaro"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "how many backflow certs did Tonya Reyes sign",
+  "kind": "answerable",
+  "expected": [
+   "5"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "Marcus Bells cert number",
+  "kind": "answerable",
+  "expected": [
+   "AZ-BF-20411"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "Dale Whitaker AZ cert #",
+  "kind": "answerable",
+  "expected": [
+   "AZ-BF-22190"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "how many water heaters total on file",
+  "kind": "answerable",
+  "expected": [
+   "10"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "how many gas water heaters",
+  "kind": "answerable",
+  "expected": [
+   "6"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "how many electric water heaters",
+  "kind": "answerable",
+  "expected": [
+   "4"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "how many heaters did Rafael Ortiz install",
+  "kind": "answerable",
+  "expected": [
+   "4"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "which water heater warranties are already expired",
+  "kind": "answerable",
+  "expected": [
+   "Okafor",
+   "Mesquite"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "how many warranty registrations do we have",
+  "kind": "answerable",
+  "expected": [
+   "8"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "how many permits do we have",
+  "kind": "answerable",
+  "expected": [
+   "7"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "how many permits show Open status",
+  "kind": "answerable",
+  "expected": [
+   "4"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "which permit is the expired one",
+  "kind": "answerable",
+  "expected": [
+   "PL-26-05530"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "how many permits are for water heaters",
+  "kind": "answerable",
+  "expected": [
+   "2"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "which customers had a repipe permit",
+  "kind": "answerable",
+  "expected": [
+   "Basalt",
+   "Okafor"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "how many camera inspections found no defects",
+  "kind": "answerable",
+  "expected": [
+   "1"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "how many invoices total",
+  "kind": "answerable",
+  "expected": [
+   "10"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "add up all the service tickets",
+  "kind": "answerable",
+  "expected": [
+   "1,060.75"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "how many drain cleaning tickets",
+  "kind": "answerable",
+  "expected": [
+   "2"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "which customers have a work order",
+  "kind": "answerable",
+  "expected": [
+   "Pruitt",
+   "Basalt",
+   "Delgado"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "what did the 9/30 Mesquite ticket cover",
+  "kind": "answerable",
+  "expected": [
+   "grease line",
+   "grease trap"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "Saguaro clubhouse camera - where was the crack",
+  "kind": "answerable",
+  "expected": [
+   "74 ft",
+   "Cracked clay"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "how long is the Mesquite agreement and when does it start",
+  "kind": "answerable",
+  "expected": [
+   "12 months",
+   "March 1, 2026"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "how many backflow tests did Marcus Bell do",
+  "kind": "answerable",
+  "expected": [
+   "4"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "what tech did the Delgado work order from August",
+  "kind": "answerable",
+  "expected": [
+   "Rafael Ortiz",
+   "pressure reducing valve"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "whats Basalt Brewings phone number",
+  "kind": "unanswerable",
+  "expected": [
+   "not in",
+   "documents"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "how much did the Rheem unit for Basalt cost us",
+  "kind": "unanswerable",
+  "expected": [
+   "not in",
+   "documents"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "who was the inspector on the Harmon Street rough-in",
+  "kind": "unanswerable",
+  "expected": [
+   "not in",
+   "documents"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "what was the gas pressure test result on the Tillman gas line",
+  "kind": "unanswerable",
+  "expected": [
+   "not in",
+   "documents"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "is the Birchwood Lane water heater install up to code",
+  "kind": "unanswerable",
+  "expected": [],
+  "set": "C"
+ },
+ {
+  "question": "when did Saguaro Ridge pay INV-3108",
+  "kind": "unanswerable",
+  "expected": [
+   "not in",
+   "documents"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "what's the largest invoice we have on file",
+  "kind": "trap",
+  "expected": [
+   "5,215.00"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "how much have we ordered from Ferguson",
+  "kind": "trap",
+  "expected": [
+   "1,695.00"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "when was the Thornbird A/C last serviced",
+  "kind": "trap",
+  "expected": [],
+  "set": "C"
+ },
+ {
+  "question": "what does the fax cover sheet say about the job",
+  "kind": "trap",
+  "expected": [],
+  "set": "C"
+ },
+ {
+  "question": "whens the Basalt RPZ retest due",
+  "kind": "trap",
+  "expected": [
+   "June 27, 2027"
+  ],
+  "set": "C"
+ },
+ {
+  "question": "how many sewer permits are open",
+  "kind": "trap",
+  "expected": [
+   "2"
+  ],
+  "set": "C"
+ }
+]

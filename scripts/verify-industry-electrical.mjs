@@ -297,7 +297,7 @@ await H.as('electrical', async (db) => {
 /* 4. other industries: no lane, no electrical records, no electrical wording */
 for (const ind of ['hvac', 'plumbing', 'property']) {
   const p = await H.as(ind, (db) => H.I.packForTenant(db));
-  check(`${ind} has no electrical lane`, (await laneForPack(p)) === null || ind === 'plumbing' || ind === 'property' ? (await laneForPack(p)) === null : false);
+  { const ln = await laneForPack(p); check(`${ind} has no electrical lane`, ln === null || (ind === 'plumbing' && ln.classify?.name !== 'classifyElectrical')); }
 }
 await H.addFixture('plumbing', async (db) => {
   const doc = await db.createDocument({ original_filename: 'pl-permit.pdf', document_type: 'permit', sha256_hash: 'plumbing-permit-1', stage: 'mapped' });

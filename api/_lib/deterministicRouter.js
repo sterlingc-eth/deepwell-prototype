@@ -52,6 +52,7 @@ import { parseCountQualifier, runCountQualifier } from './lookups/countQualifier
 import { parsePersonAmount, runPersonAmount } from './lookups/personAmount.js';
 import { parseTonnageCount, runTonnageCount } from './lookups/tonnageCount.js';
 import { parseBrandUnitCount, runBrandUnitCount } from './lookups/brandUnitCount.js';
+import { parseVocabCount, runVocabCount } from './lookups/vocabCount.js';
 import { parseFieldQuestion, runFieldMatch } from './lookups/fieldMatch.js';
 import { parseDateQualifier, runDateQualifier } from './lookups/dateQualifiers.js';
 import { parseDocWindow, runDocWindow } from './lookups/dateDocWindow.js';
@@ -152,6 +153,9 @@ export function classifyDeterministic(question, opts = {}) {
   // "How many Carrier units" / "R410A systems": count by manufacturer/refrigerant, says what it counted - lookups/brandUnitCount.js.
   const brandQ = parseBrandUnitCount(String(question ?? ''));
   if (brandQ) return { route: 'brandunits', intent: brandQ };
+  // R38: the same count shapes for a brand / city / technician that only THIS tenant's data knows - lookups/vocabCount.js.
+  const vocQ = parseVocabCount(String(question ?? ''), opts?.tenantVocab);
+  if (vocQ) return { route: 'vocabcount', intent: vocQ };
   // Customer x document-type rank / none / have and quote-status counts (customer with most invoices, customers with no quotes, open quotes) - lookups/customerDocRank.js.
   const cdrQ = parseCustomerDocRank(String(question ?? ''));
   if (cdrQ) return { route: 'custdocrank', intent: cdrQ };
@@ -612,6 +616,7 @@ async function runDeterministicCore(db, intent, { today } = {}) {
   if (intent.route === 'countqual') return runCountQualifier(db, intent.intent);
   if (intent.route === 'tonnage') return runTonnageCount(db, intent.intent);
   if (intent.route === 'brandunits') return runBrandUnitCount(db, intent.intent);
+  if (intent.route === 'vocabcount') return runVocabCount(db, intent.intent);
   if (intent.route === 'premise') return runFalsePremise(db, intent.intent);
   if (intent.route === 'aggregate') return runAggregate(db, intent.intent, { today: t });
   if (intent.route === 'comparison') return runComparison(db, intent.intent);

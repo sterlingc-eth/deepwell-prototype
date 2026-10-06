@@ -483,6 +483,10 @@ export function parseContentCountQuestion(question, pack = null) {
     : (JOB_WORD_RE.test(lower) && !DOCUMENT_WORD_RE.test(lower) ? 'jobs' : 'documents');
   const groupBy = CUSTOMERS_HAD_RE.test(lower) ? 'customer' : null;
   const mode = /^\s*how\s+many\b/.test(lower) ? 'count' : 'list';
+  // R38: a bare "how many <noun>" that never says documents/jobs/calls or "mention" asks for a count of THINGS (leases ending in 2026, vendors,
+  // units, backflow preventers), not of pages that contain the word. Counting pages gave confident wrong totals ("2022 documents mention unit").
+  // Leave it to the entity/field counters or the model. Kill switch: DONOVAN_CONTENT_COUNT_STRICT=0.
+  if (mode === 'count' && !scopeMatch && !hasMention && !hasIssue && !hasComplaintsAbout && !hasListJobsWhere && process.env.DONOVAN_CONTENT_COUNT_STRICT !== '0') return null;
   return { terms, scope, groupBy, mode, question: q };
 }
 

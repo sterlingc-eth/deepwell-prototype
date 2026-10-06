@@ -30,6 +30,7 @@ import { classifyDocumentAudience } from "./audience/store.js";
 // R32 (model avoidance): a plain labelled form is a lookup, not reasoning — see modelAvoidance/textExtract.js.
 import { extractFromText } from "./modelAvoidance/textExtract.js";
 import { extractElectrical, missingRequired } from "./industry/electrical/extract.js";
+import { extractPlumbing, missingRequired as missingRequiredPlumbing } from "./industry/plumbing/extract.js";
 import { isDeterministicExtractEnabled } from "./modelAvoidance/switches.js";
 // R33: a REQUIRED field the extraction left empty is looked up on the page by its printed label — see labelFill.js.
 import { planLabelFill } from "./modelAvoidance/labelFill.js";
@@ -103,6 +104,19 @@ function tryElectricalDeterministic(pages, pack) {
   }
 }
 
+/** Plumbing-pack deterministic read (see industry/plumbing/extract.js). Same gates as electrical. Returns {type, toolInput} or null. */
+const PLUMBING_OWN_TYPES = new Set(['backflow-test-certificate', 'sewer-camera-report', 'startup-sheet', 'warranty-registration', 'maintenance-agreement', 'inspection-report', 'permit', 'service-ticket', 'purchase-order', 'dispatch-note', 'invoice', 'work-order', 'proposal-quote']);
+function tryPlumbingDeterministic(pages, pack) {
+  try {
+    const r = extractPlumbing(pages);
+    if (!r || r.confidence < 0.9 || !PLUMBING_OWN_TYPES.has(r.type) || r.fields.length < 3) return null;
+    if (missingRequiredPlumbing(r.type, r.fields, pack).length) return null;
+    return { type: r.type, toolInput: { document_type: r.type, document_type_confidence: r.confidence, fields: r.fields } };
+  } catch {
+    return null;
+  }
+}
+
 export async function extractDocumentFields(ctx, documentId, { userId, documentType, modelAttempts } = {}) {
   // Every documents.id is a uuid; a malformed value survives a bare
   // typeof/truthiness check and only fails once bound against that column,
@@ -161,6 +175,11 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
   const detElec = !det?.accepted && pack?.id === 'electrical' && !documentType && !truncated && isDeterministicExtractEnabled()
     ? tryElectricalDeterministic(selected, pack)
     : null;
+  // 2C: the same for a plumbing company's own paperwork (backflow certificates, sewer camera reports, startup sheets,
+  // warranty registrations, permits, inspections, tickets, invoices...). Never runs for any other industry.
+  const detPlumb = !det?.accepted && !detElec && pack?.id === 'plumbing' && !documentType && !truncated && isDeterministicExtractEnabled()
+    ? tryPlumbingDeterministic(selected, pack)
+    : null;
   let extractMethod = "model";
   let extractModelLabel = EXTRACT_MODEL;
   let toolUse;
@@ -169,6 +188,11 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
     extractModelLabel = "deterministic-text";
     toolUse = { type: "tool_use", input: detElec.toolInput };
     console.log(JSON.stringify({ route: "extract", method: "text", type: detElec.type, fields: detElec.toolInput.fields.length, industry: "electrical" }));
+  } else if (detPlumb) {
+    extractMethod = "text";
+    extractModelLabel = "deterministic-text";
+    toolUse = { type: "tool_use", input: detPlumb.toolInput };
+    console.log(JSON.stringify({ route: "extract", method: "text", type: detPlumb.type, fields: detPlumb.toolInput.fields.length, industry: "plumbing" }));
   } else if (det?.accepted) {
     extractMethod = "text";
     extractModelLabel = "deterministic-text";

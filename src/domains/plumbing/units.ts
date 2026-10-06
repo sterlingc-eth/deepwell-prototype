@@ -15,6 +15,11 @@ const UNIT_SCOPED_FIELDS = new Set([
   'equipment_type',
   'fixture_type',
   'installation_date',
+  'gallons',
+  'fuel_type',
+  'device_size',
+  'device_location',
+  'next_test_due',
 ]);
 
 export interface UnitGroup<F> {

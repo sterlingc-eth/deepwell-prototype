@@ -181,7 +181,7 @@ const KNOWN_FIELD_KIND = {
 };
 function inferFieldKind(key) {
   if (KNOWN_FIELD_KIND[key]) return KNOWN_FIELD_KIND[key];
-  if (/_(?:date|expiry|due)$/.test(key) || key === 'warranty_expires' || key === 'coi_expires') return 'date';
+  if (/_(?:date|expiry|due)$/.test(key) || key === 'warranty_expires' || key === 'coi_expires' || key === 'permit_expires') return 'date';
   return 'text';
 }
 
@@ -203,7 +203,7 @@ function packFieldMeta(pack) {
     key: f.key,
     kind: inferFieldKind(f.key),
     desc: f.description ?? f.label,
-    repeatable: f.key === 'work_performed' || f.key === 'part_number' || f.key === 'correction_items' || f.key === 'policy_expiry',
+    repeatable: f.key === 'work_performed' || f.key === 'part_number' || f.key === 'correction_items' || f.key === 'policy_expiry' || f.key === 'line_findings',
   }));
   const specByKey = new Map(specs.map((s) => [s.key, s]));
   const unitScoped = new Set(pack.fields.filter((f) => f.perUnit).map((f) => f.key));

@@ -148,6 +148,8 @@ check('pending pick: another person -> never applied', dec.decodePendingIndustry
 check('pending pick: stale -> never applied', dec.decodePendingIndustry(dec.encodePendingIndustry('plumbing', 'user_a', nowT), 'user_a', nowT + dec.PENDING_INDUSTRY_MAX_AGE_MS + 1) === null);
 check('pending pick: garbage / no user -> null', dec.decodePendingIndustry('plumbing', 'user_a') === null && dec.decodePendingIndustry(dec.encodePendingIndustry('plumbing', 'u', nowT), null, nowT) === null);
 check('pending hook keeps the pick on 401/429 (clears only on 400/403/404)', /res\.status === 400 \|\| res\.status === 403 \|\| res\.status === 404/.test(src('src/hooks/usePendingIndustry.ts')));
+check('onboarding Continue uses the shared primary button (44px+) and does not promise an in-app industry change', /dw-btn-primary w-full/.test(src('src/screens/OnboardingScreen.tsx')) && !/You can change this later/.test(src('src/screens/OnboardingScreen.tsx')));
+check('attention card button is full width on phone', /dw-btn-secondary w-full sm:w-auto/.test(src('src/components/IndustryAttentionCard.tsx')));
 await H.stop();
 console.log('');
 if (failures) { console.log(`${failures} check(s) FAILED (${passes} passed).`); process.exit(1); }

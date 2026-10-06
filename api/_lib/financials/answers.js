@@ -1108,6 +1108,11 @@ async function documentCount(db, intent, ctx) {
   }
   const [a] = await q(db, `SELECT count(*)::int AS n FROM financials f WHERE ${scope} AND f.currency = 'USD' AND ${inRange}${whoSql}`, [p?.from ?? null, p?.to ?? null, ...whoParams], ctx.hu);
   const forWho = who ? (who.vendor ? ` from ${who.label}` : ` for ${who.label}`) : '';
+  // R38: a business whose invoices are all vendor bills (payable, e.g. property management) has zero RECEIVABLE invoices; saying "none on file" is false there. Decline instead.
+  if ((!a || a.n === 0) && !who && kind !== 'po') {
+    const [pay] = await q(db, `SELECT count(*)::int AS n FROM financials f WHERE f.doc_kind = $1 AND f.direction = 'payable'`, [kind === 'estimate' ? 'estimate' : 'invoice'], ctx.hu);
+    if (pay && pay.n > 0) return null;
+  }
   if (!a || a.n === 0) return baseAnswer(`No ${noun}s are on file${forWho}${p ? ` in ${p.label}` : ''}${who ? '' : ' yet'}.`, [], { confidence: 1, ...zeroCite(`Searched every ${noun} on file${forWho}${p ? ` dated ${p.label}` : ''}; found none.`) });
   const docs = await q(db, `SELECT f.* FROM financials f WHERE ${scope} AND f.currency = 'USD' AND ${inRange}${whoSql} ORDER BY f.doc_date DESC NULLS LAST LIMIT 200`, [p?.from ?? null, p?.to ?? null, ...whoParams], ctx.hu);
   if (who?.vendor && docs[0]?.vendor_name) who.label = docs[0].vendor_name; // the vendor as printed, not as typed ("baker distributing" -> "Baker Distributing")

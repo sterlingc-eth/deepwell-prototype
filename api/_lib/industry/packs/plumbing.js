@@ -10,22 +10,22 @@ const documentTypes = [
   { id: 'work-order', label: 'Work order', definition: 'A dispatched job: address, date, plumber, and what to do — not yet completed.', requires: ['service_address', 'service_date', 'technician'], visitType: true, financial: false },
   { id: 'invoice', label: 'Invoice', definition: 'A bill for work or equipment: a customer, a charge, a total cost.', requires: ['service_address', 'cost'], visitType: true, financial: true },
   { id: 'warranty-registration', label: 'Warranty registration', definition: 'Registers a water heater or fixture with the manufacturer for warranty coverage.', requires: ['serial_number', 'model', 'warranty_expires|warranty_term'], visitType: false, financial: false },
-  { id: 'startup-sheet', label: 'Startup sheet', definition: 'Records commissioning readings for a newly installed water heater or appliance.', requires: ['serial_number', 'service_date'], visitType: true, financial: false },
-  { id: 'permit', label: 'Permit', definition: 'A government or utility permit for plumbing or gas line work, carrying a permit number.', requires: ['service_address', 'permit_number'], visitType: false, financial: false },
+  { id: 'startup-sheet', label: 'Startup sheet', definition: 'Records commissioning readings for a newly installed water heater or appliance. Also used for a water heater installation record (make, model, serial, fuel, size, install date).', requires: ['serial_number', 'service_date|installation_date'], visitType: true, financial: false },
+  { id: 'permit', label: 'Permit', definition: 'A government or utility permit for plumbing or gas line work (water heater, repipe, sewer, gas line), carrying a permit number, issuing agency, issued and expiry dates and a status.', requires: ['service_address', 'permit_number'], visitType: false, financial: false },
   { id: 'nameplate-photo', label: 'Nameplate photo', definition: 'A photo of a water heater or fixture data plate: just serial and model, no service context.', requires: ['serial_number', 'model'], visitType: false, financial: false },
   { id: 'maintenance-agreement', label: 'Maintenance agreement', definition: 'A recurring service contract with a customer and a coverage term.', requires: ['service_address', 'customer_name', 'warranty_term|agreement_term'], visitType: false, financial: true },
   { id: 'service-ticket', label: 'Service ticket', definition: 'A completed service visit: what was found and what was done.', requires: ['service_address', 'service_date', 'work_performed'], visitType: true, financial: false },
   { id: 'dispatch-note', label: 'Dispatch note', definition: 'A short note dispatching a plumber, with little other detail.', requires: ['customer_name|service_address', 'service_date'], visitType: true, financial: false },
   { id: 'proposal-quote', label: 'Proposal / quote', definition: 'A proposed price for work not yet performed.', requires: ['customer_name|service_address', 'cost'], visitType: false, financial: true },
-  { id: 'inspection-report', label: 'Inspection report', definition: 'Findings from inspecting plumbing, a gas line, or a site — rough-in, final, or a gas pressure test.', requires: ['service_address', 'service_date'], visitType: true, financial: false },
-  { id: 'purchase-order', label: 'Purchase order', definition: 'An order placed with a vendor for parts or equipment.', requires: ['vendor|customer_name', 'cost'], visitType: false, financial: true },
+  { id: 'inspection-report', label: 'Inspection report', definition: 'A permit inspection of plumbing or gas work — rough-in, final, pressure test — with the inspection type, date and result as printed.', requires: ['service_address', 'service_date'], visitType: true, financial: false },
+  { id: 'purchase-order', label: 'Purchase order', definition: 'An order placed with a vendor for parts or equipment.', requires: ['invoice_number|part_number|customer_name', 'cost'], visitType: false, financial: true },
   { id: 'equipment-record', label: 'Equipment record', definition: 'Identifies a fixture or appliance with no service or billing context.', requires: ['serial_number|model'], visitType: false, financial: false },
   { id: 'correspondence', label: 'Correspondence', definition: 'A letter or email about a customer or job, not a paperwork form.', requires: ['customer_name'], visitType: false, financial: false },
   { id: 'internal', label: 'Company record', definition: 'Shop-only record with no customer on it at all.', requires: [], visitType: false, financial: false },
   { id: 'other', label: 'Other', definition: 'Does not clearly fit any type above.', requires: [], visitType: true, financial: false },
   // Plumbing-specific, per the expansion brief's "▲" additions:
-  { id: 'backflow-test-certificate', label: 'Backflow test certificate', definition: 'A certified annual/biennial backflow-preventer test result, filed with the water utility.', requires: ['service_address', 'service_date', 'backflow_test_result'], visitType: true, financial: false },
-  { id: 'sewer-camera-report', label: 'Sewer/drain camera report', definition: 'A video-inspection deliverable diagnosing a sewer or drain line, with notes and often a video reference.', requires: ['service_address', 'service_date'], visitType: true, financial: false },
+  { id: 'backflow-test-certificate', label: 'Backflow test certificate', definition: 'A certified annual/biennial backflow-preventer test (RPZ, DCVA, PVB) with the device serial, tester, test date, pass/fail result and next test due, filed with the water utility.', requires: ['service_address', 'service_date', 'backflow_test_result', 'serial_number|device_location'], visitType: true, financial: false },
+  { id: 'sewer-camera-report', label: 'Sewer/drain camera report', definition: 'A video-inspection deliverable diagnosing a sewer or drain line: where it was inspected, the defects found, a recommendation and often a video file reference.', requires: ['service_address', 'service_date', 'line_findings|recommendation'], visitType: true, financial: false },
 ];
 
 const fields = [
@@ -62,15 +62,32 @@ const fields = [
   { key: 'permit_number', label: 'Permit number', perUnit: false, description: 'A government or utility permit number referenced on the document.' },
   { key: 'backflow_test_result', label: 'Backflow test result', perUnit: false, description: 'Pass or fail result of a backflow-preventer test.' },
   { key: 'next_test_due', label: 'Next test due', perUnit: true, description: 'Next backflow test or recurring compliance due date — same shape as warranty_expires, pointed at a recurring compliance date instead of a one-time coverage date.' },
+  { key: 'tester_cert_number', label: 'Tester certification number', perUnit: false, description: 'The backflow tester\'s certification number as printed, e.g. "AZ-BF-20411". Not the device serial.' },
+  { key: 'device_size', label: 'Device size', perUnit: true, description: 'Backflow device or assembly size as printed, e.g. "1 inch", "3/4 inch", "1-1/2 inch".' },
+  { key: 'device_location', label: 'Device location', perUnit: true, description: 'Where the backflow device is installed, as printed, e.g. "front yard by meter", "irrigation main".' },
+  { key: 'water_utility', label: 'Water utility', perUnit: false, description: 'The water utility or purveyor the backflow test is filed or reported to, as printed.' },
+  { key: 'jurisdiction', label: 'Jurisdiction', perUnit: false, description: 'The agency that issued the permit or performed the inspection (city or county building department), as printed.' },
+  { key: 'permit_issued_date', label: 'Permit issued', perUnit: false, description: 'Date the permit was issued.' },
+  { key: 'permit_expires', label: 'Permit expires', perUnit: false, description: 'Date the permit expires.' },
+  { key: 'permit_status', label: 'Permit status', perUnit: false, description: 'Permit status exactly as printed: Open, Final, Expired, Closed.' },
+  { key: 'permit_type', label: 'Permit type', perUnit: false, description: 'Kind of work the permit covers, as printed: water heater, gas line, repipe, sewer, ...' },
+  { key: 'inspection_type', label: 'Inspection type', perUnit: false, description: 'Which inspection this record is, as printed: Rough-in, Final, Pressure test. Leave out when the document lists several inspections.' },
+  { key: 'inspection_result', label: 'Inspection result', perUnit: false, description: 'The inspection result exactly as printed (Passed, Failed, Corrections required, ...). Never judge it. Leave out when the document lists several inspections.' },
+  { key: 'fuel_type', label: 'Fuel type', perUnit: true, description: 'Water heater fuel as printed: gas (natural gas, propane) or electric.' },
+  { key: 'line_location', label: 'Line location', perUnit: false, description: 'Which part of the sewer or drain line was camera inspected, as printed.' },
+  { key: 'line_findings', label: 'Line findings', perUnit: false, description: 'One defect or observation from a camera inspection, e.g. "Root intrusion at 42 ft". Return one field per finding, not a joined list.' },
+  { key: 'recommendation', label: 'Recommendation', perUnit: false, description: 'The recommended action printed on a camera report or inspection.' },
+  { key: 'footage_ref', label: 'Footage reference', perUnit: false, description: 'Video file name or link for the camera footage, as printed.' },
+  { key: 'line_length', label: 'Line length inspected', perUnit: false, description: 'Length of line inspected as printed, e.g. "86 ft".' },
 ];
 
 const brands = ['Rheem', 'A.O. Smith', 'Bradford White', 'Navien', 'Rinnai', 'Kohler', 'Moen', 'American Standard', 'Delta', 'InSinkErator', 'Watts', 'Zurn Wilkins'];
 
 const synonyms = {
-  'water heater': ['water heater', 'water heaters', 'wh', 'hot water heater', 'hot water tank'],
+  'water heater': ['water heater', 'water heaters', 'wh', 'hwh', 'hot water heater', 'hot water tank', 'heater'],
   tankless: ['tankless', 'tankless water heater', 'on-demand water heater', 'on demand water heater'],
-  backflow: ['backflow', 'backflow preventer', 'backflow device', 'rpz', 'rpz device', 'backflow test', 'backflow assembly'],
-  'sewer camera': ['sewer camera', 'drain camera', 'camera inspection', 'video inspection', 'sewer scope'],
+  backflow: ['backflow', 'backflow preventer', 'backflow device', 'backflow assembly', 'backflow test', 'rpz', 'rpz device', 'dcva', 'pvb', 'double check valve', 'pressure vacuum breaker', 'reduced pressure zone', 'cross connection', 'bfp'],
+  'sewer camera': ['sewer camera', 'drain camera', 'camera inspection', 'video inspection', 'sewer scope', 'sewer line inspection', 'camera report', 'cctv'],
   'sump pump': ['sump pump', 'sump pumps'],
   disposal: ['disposal', 'garbage disposal', 'disposer'],
   leak: ['leak', 'leaks', 'leaking', 'leaky'],
@@ -81,8 +98,8 @@ const synonyms = {
   softener: ['softener', 'water softener', 'water softeners'],
 };
 
-const abbreviations = { wh: 'water heater', bf: 'backflow', gpm: 'gallons per minute', tp: 'temperature pressure', po: 'purchase order' };
-const typos = { hetaer: 'heater', backfow: 'backflow', tnakless: 'tankless', drian: 'drain' };
+const abbreviations = { wh: 'water heater', hwh: 'water heater', bf: 'backflow', bfp: 'backflow preventer', rpz: 'reduced pressure zone backflow', dcva: 'double check valve backflow', pvb: 'pressure vacuum breaker backflow', gpm: 'gallons per minute', tp: 'temperature pressure', tpr: 'temperature pressure relief', prv: 'pressure reducing valve', po: 'purchase order', cctv: 'camera inspection' };
+const typos = { hetaer: 'heater', heatr: 'heater', backfow: 'backflow', backflo: 'backflow', bakflow: 'backflow', tnakless: 'tankless', tankles: 'tankless', drian: 'drain', permt: 'permit', prmit: 'permit', warrenty: 'warranty', warrantee: 'warranty', camra: 'camera' };
 
 const personas = [
   {
@@ -116,6 +133,12 @@ const personas = [
       'Which customers had a disposal replaced?',
       'How many startup sheets are on file for tankless water heaters?',
       'What is the average invoice amount for a water heater replacement?',
+      'Which backflow tests are overdue?',
+      'Which backflow tests are due in the next 60 days?',
+      'Which water heater warranties expire in the next 90 days?',
+      'Which permits are still open?',
+      'What did the sewer camera find at 412 Elm St?',
+      'Which RPZ tests are overdue?',
     ],
   },
   {
@@ -128,6 +151,8 @@ const personas = [
       'How many warranty registrations are missing a serial number?',
       'How many permits are still open across all jobs?',
       'How many maintenance agreements do we have?',
+      'Which permits have expired?',
+      'Which backflow devices failed and still need a retest?',
     ],
   },
 ];
@@ -195,6 +220,9 @@ const plumbingPack = {
       { re: '\\bbackflow\\b[^?]*\\b(?:test|tested|testing)\\b[^?]*\\bannual', months: 12 },
       { re: '\\bwater\\s+heater\\b[^?]*\\bflush(?:ed)?\\b[^?]*\\bannual', months: 12 },
       { re: '\\bbiennial\\b|\\bevery\\s+two\\s+years\\b', months: 24 },
+      { re: '\\b(?:rpz|dcva|pvb)\\b[^?]*\\b(?:test|tested|testing)\\b', months: 12 },
+      { re: '\\btankless\\b[^?]*\\bdescal\\w*', months: 12 },
+      { re: '\\banode\\b[^?]*\\b(?:rod|inspect\\w*|replace\\w*)', months: 36 },
     ],
     seasons: { spring: [3, 5], summer: [6, 8], fall: [9, 11], winter: [12, 2] },
   },

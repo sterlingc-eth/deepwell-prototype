@@ -140,7 +140,7 @@ export function OnboardingScreen() {
             </button>
             <fieldset className="flex flex-col gap-3 border-0 p-0 m-0">
               <legend className="text-body text-ink-2 mb-1">
-                What kind of company is this? Donovan uses your industry's own words and paperwork. You can change this later.
+                What kind of company is this? Pick the one you do most: Donovan uses that industry's own words and paperwork. A company uses one industry. If you pick wrong, tell DeepWell support and we'll switch it.
               </legend>
               {INDUSTRY_CHOICES.map((c) => (
                 <label
@@ -172,7 +172,7 @@ export function OnboardingScreen() {
                 }
                 setMode('create');
               }}
-              className="dw-card border-forest-700 px-4 py-3 text-center font-medium text-ink hover:border-forest-900 focus-visible:outline-brass-300"
+              className="dw-btn-primary w-full focus-visible:outline-brass-300"
             >
               Continue
             </button>
