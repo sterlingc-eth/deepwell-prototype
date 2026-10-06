@@ -213,6 +213,13 @@ const FAMILIES = [
   ['techJobsThisYear', new RegExp(`^how many jobs did\\s+(${NAME_RE})\\s+run this year\\??$`, 'i'), (m) => ({ name: m[1].trim() })],
   ['techCustomerCount', new RegExp(`^how many different customers has\\s+(${NAME_RE})\\s+worked for\\??$`, 'i'), (m) => ({ name: m[1].trim() })],
   ['techLastJob', new RegExp(`^when was\\s+(${NAME_RE})'s most recent job\\??$`, 'i'), (m) => ({ name: m[1].trim() })],
+  // R45: field paraphrases of the same four technician facts (kill switch DONOVAN_TECH_PARAPHRASE=0). `loose` = the name may be a
+  // first/last name only; the handler resolves it against the roster and answers only when it matches exactly ONE technician.
+  ...(process.env.DONOVAN_TECH_PARAPHRASE === '0' ? [] : [
+    ['techCustomerCount', new RegExp(`^(?:which|what|how many)\\s+(?:different\\s+)?customers?\\s+(?:did|has|have|does)\\s+(${NAME_RE})\\s+(?:visit|visited|service|serviced|work(?:ed)?\\s+(?:for|on)|see|seen|go(?:ne)?\\s+to|help(?:ed)?|call(?:ed)?\\s+on)\\??$`, 'i'), (m) => ({ name: m[1].trim(), loose: true })],
+    ['techJobsThisYear', new RegExp(`^(?:how many\\s+(?:jobs|calls|visits|tickets)\\s+(?:has|did|does|have)\\s+(${NAME_RE})\\s+(?:do|done|run|work|worked|handle|handled|close|closed|complete|completed)(?:\\s+out)?|(${NAME_RE})(?:'s)?\\s+(?:jobs|calls|visits|tickets))\\s+(?:so far\\s+)?(?:this year|this yr|ytd)\\??$`, 'i'), (m) => ({ name: (m[1] ?? m[2]).trim(), loose: true })],
+    ['techLastJob', new RegExp(`^(?:(${NAME_RE})'s\\s+(?:last|latest|most recent|newest)\\s+(?:job|call|ticket|visit)|when\\s+did\\s+(${NAME_RE})\\s+last\\s+(?:work|go out|run a job|do a job|have a job)|what\\s+(?:was|is)\\s+(${NAME_RE})'s\\s+(?:last|latest|most recent|newest)\\s+(?:job|call|ticket|visit)|what\\s+did\\s+(${NAME_RE})\\s+do\\s+last)\\??$`, 'i'), (m) => ({ name: (m[1] ?? m[2] ?? m[3] ?? m[4]).trim(), loose: true })],
+  ]),
   ['topTechByCustomers', /^which technician has worked for the most different customers\??$/i, () => ({})],
   ['busiestTechYear', /^who'?s\s+(?:is\s+)?our busiest technician this year\??$/i, () => ({})],
   ['busiestTechYear', /^who is our busiest technician this year\??$/i, () => ({})],
@@ -303,6 +310,16 @@ export function classifyRelationsQuestion(question) {
 }
 
 /* ==================================================================== HANDLERS (db) */
+
+
+/** R45: resolve a first/last-name-only technician reference to the ONE full roster name it matches (else null: unknown or ambiguous). */
+async function resolveLooseTech(db, name) {
+  const escapeLikeText = (x) => String(x).replace(/[\\%_]/g, '\\$&');
+  const { rows } = await db.raw(
+    `SELECT DISTINCT t.value AS v FROM extractions t WHERE t.field_key = 'technician' AND t.${TENANT_SQL} AND t.value ILIKE $1 LIMIT 5`,
+    [`%${escapeLikeText(name)}%`]);
+  return rows.length === 1 && rows[0].v ? String(rows[0].v).trim() : null;
+}
 
 const HANDLERS = {
   async repeatVisitUnitsCount(db, { brand, days }, today) {
@@ -949,7 +966,8 @@ const HANDLERS = {
       { records: await documentRecordsFor(db, docIds), total: n, claimedCount: n, basis: `Counted every dated job naming ${name} as the technician.` });
   },
 
-  async techJobsThisYear(db, { name }, today) {
+  async techJobsThisYear(db, { name, loose }, today) {
+    if (loose) { name = await resolveLooseTech(db, name); if (!name) return null; }
     if (!(await technicianNameExists(db, name))) return null;
     const year = todayIso(today).slice(0, 4);
     const rows = await fetchTechnicianJobs(db, name);
@@ -959,7 +977,8 @@ const HANDLERS = {
       { records: await documentRecordsFor(db, docIds), total: n, claimedCount: n, basis: `Counted ${name}'s dated jobs in ${year}.` });
   },
 
-  async techCustomerCount(db, { name }) {
+  async techCustomerCount(db, { name, loose }) {
+    if (loose) { name = await resolveLooseTech(db, name); if (!name) return null; }
     if (!(await technicianNameExists(db, name))) return null;
     const rows = await fetchTechnicianJobs(db, name);
     const docIds = [...new Set(rows.map((r) => r.docId))];
@@ -974,7 +993,8 @@ const HANDLERS = {
       { records: cust.map((c) => customerRecord(c)), total: n, claimedCount: n, basis: `Counted the distinct customers linked to ${name}'s dated jobs.` });
   },
 
-  async techLastJob(db, { name }, today) {
+  async techLastJob(db, { name, loose }, today) {
+    if (loose) { name = await resolveLooseTech(db, name); if (!name) return null; }
     if (!(await technicianNameExists(db, name))) return null;
     const t = todayIso(today);
     const rows = await fetchTechnicianJobs(db, name);

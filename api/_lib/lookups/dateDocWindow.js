@@ -10,6 +10,7 @@
  * Kill switch: DONOVAN_DATE_DOCS=0 (DONOVAN_DATE_QUALIFIERS=0 kills too).   pure: parseDocWindow   db: runDocWindow
  */
 import { attachCitations } from "../citations/records.js";
+import { betweenWithCurrency } from "../amountWords.js";
 import { documentRecordsFor, customerRecordsFor } from "../citations/enrich.js";
 import { TENANT_SQL, answerEnvelope } from "../scope.js";
 import { extractPoints } from "./dateQualifiers.js";
@@ -38,6 +39,7 @@ export function parseDocWindow(question) {
   if (process.env.DONOVAN_DATE_DOCS === "0" || process.env.DONOVAN_DATE_QUALIFIERS === "0") return null;
   const raw = String(question ?? "").replace(/[’`]/g, "'").trim();
   if (!raw || raw.length > 200 || !/\b(?:how\s+many|number\s+of|count\s+of|count)\b/i.test(raw)) return null;
+  if (betweenWithCurrency(raw)) return null; // "between $2000 and $2005" is an amount range, never a year window
   const q = raw.toLowerCase().replace(/[?!]+$/, "").replace(/(\d)\.\s*$/, "$1").trim();
   const hit = KINDS.filter((k) => k[1].test(q));
   if (hit.length !== 1) return null;

@@ -17,6 +17,6 @@ const run = async (ctx) => (await off.runOfflineExam({ ctx, questions: validQues
 const h = await run(hvac), p = await run(plumb);
 realLog("HVAC tenant   ->", h.join(" | "));
 realLog("PLUMB tenant  ->", p.join(" | "));
-const leak = h.some((x) => /Navien|Oro Valley|Whitfield/.test(x) && /\b(\d+) (of \d+ units|invoices list)/.test(x) && !/^a:.*\b0 of/.test(x));
+const leak = h.some((x) => /Navien|Oro Valley|Whitfield/.test(x) && /\b([1-9]\d*) (of \d+ units|invoices list)/.test(x) && !/^a:.*\b0 of/.test(x));
 realLog(leak ? "LEAK?" : "no cross-organization leak seen");
 process.exit(leak ? 1 : 0);

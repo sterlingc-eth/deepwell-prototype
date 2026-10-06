@@ -591,6 +591,13 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
     if (!doc && queue[0]) openDocument(queue[0].id);
   }, [doc, queue, openDocument]);
 
+  // Switching chips must not leave the detail pane on a document the new list
+  // doesn't contain (stale pane): move to the first item of the new list.
+  useEffect(() => {
+    if (doc && queue.length > 0 && !queue.some((d) => d.id === doc.id) && matches(doc, filter, sets) === false) openDocument(queue[0]!.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter]);
+
   // If the selected doc came from a deep link, switch to a filter that shows it
   useEffect(() => {
     if (doc && !matches(doc, filter, sets)) setFilter('all');

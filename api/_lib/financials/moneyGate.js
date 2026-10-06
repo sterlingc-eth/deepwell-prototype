@@ -22,6 +22,17 @@
 import { withTenant as defaultWithTenant } from '../recordsStore.js';
 import { tenantHasFinancialRows } from './store.js';
 import { parseMoneyIntent, runMoneyIntent } from './answers.js';
+import { leftoverWords } from '../router/leftover.js';
+
+/** R39: a plain "how many invoices/quotes/purchase orders" count answers from the document kind, the period and the named subject ONLY. Any other
+ *  non-grammar word the question carried (a person nobody resolved, "did Dana Whitfield do", a negation, ...) was silently dropped and the whole-shop
+ *  count came back as the answer; the lane declines instead (the agent / honest fallback handles it). */
+function countLeftover(question, today) {
+  const sig = (q) => { const i = parseMoneyIntent(q, { today }); return i ? JSON.stringify([i.intent, i.docKindWord ?? null, i.period ?? null, i.subject ?? null]) : null; };
+  const i0 = parseMoneyIntent(question, { today });
+  const bare = Boolean(i0) && !i0.period && !i0.subject; // the whole-shop count: only right when nothing else was asked
+  return leftoverWords(question, sig, { lane: 'money-count', plain: bare, entityKey: 'documents' });
+}
 
 export const MONEY_NO_MATCH_TEXT =
   "I have invoice totals on file, but I couldn't work that particular question out from them. Try asking for a customer's last invoice, invoiced totals for a month or year, open or overdue invoices, or agreement fees.";
@@ -40,6 +51,7 @@ export async function answerMoneyQuestion({ withTenant = defaultWithTenant, ctxA
       if (!(await tenantHasFinancialRows(db))) return { handled: false, hasData: false };
       const intent = parseMoneyIntent(question, { today });
       if (!intent) return { handled: false, hasData: true };
+      if (intent.intent === 'document_count' && countLeftover(question, today).length) return { handled: false, hasData: true, intent: intent.intent };
       const data = await runMoneyIntent(db, intent, { today });
       if (!data) return { handled: false, hasData: true, intent: intent.intent };
       return { handled: true, hasData: true, data, intent: intent.intent };

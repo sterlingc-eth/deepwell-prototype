@@ -53,6 +53,7 @@ import { parsePersonAmount, runPersonAmount } from './lookups/personAmount.js';
 import { parseTonnageCount, runTonnageCount } from './lookups/tonnageCount.js';
 import { parseBrandUnitCount, runBrandUnitCount } from './lookups/brandUnitCount.js';
 import { parseVocabCount, runVocabCount } from './lookups/vocabCount.js';
+import { parseFieldAbsence, runFieldAbsence } from './lookups/fieldAbsence.js';
 import { parseFieldQuestion, runFieldMatch } from './lookups/fieldMatch.js';
 import { parseDateQualifier, runDateQualifier } from './lookups/dateQualifiers.js';
 import { parseDocWindow, runDocWindow } from './lookups/dateDocWindow.js';
@@ -98,7 +99,7 @@ const BRAND_IN_Q = /\b(trane|carrier|goodman|lennox|rheem|york|daikin|mitsubishi
 // Team J: cheap, pack-agnostic gate for compose.js's real (pack-aware) parse — see classifyDeterministic's
 // own comment above. False positives cost one extra bounded DB read and fall through harmlessly; a false
 // negative here just means that phrasing goes down the normal analytics/agent chain instead, same as today.
-const COMPOSE_HINT_RE = /\b(older than \d+\s*years?|no email|more than\s+(?:one|\d+)\s+units?|two or more different brands|expired warrant(?:y|ies)|warrant(?:y|ies)\s+expiring|active warrant(?:y|ies)|maintenance agreement|purchase order|permits?\b|invoiced?|invoice)\b/i;
+const COMPOSE_HINT_RE = /\b(older than \d+\s*years?|no email|more than\s+(?:one|\d+)\s+units?|at least\s+(?:one|two|three|four|five|\d+)\s+units?|(?:one|two|three|four|five|\d+)\s+or\s+more\s+units?|two or more different brands|expired warrant(?:y|ies)|warrant(?:y|ies)\s+expiring|active warrant(?:y|ies)|maintenance agreement|purchase order|permits?\b|invoiced?|invoice)\b/i;
 function looksLikeComposeCandidate(q) {
   return /\bcustomers?\b/i.test(q) && COMPOSE_HINT_RE.test(q);
 }
@@ -212,6 +213,9 @@ export function classifyDeterministic(question, opts = {}) {
   // classifier has no DB for — so this is only a cheap candidate GATE; runDeterministic does the real
   // parse (with pack) and returns null (falls through, same as any other route) when it doesn't hold up.
   if (looksLikeComposeCandidate(q)) return { route: 'compose', question: q };
+  // R39: "how many invoices have no due date" - decided from the organization's own field keys (lookups/fieldAbsence.js).
+  const absentQ = parseFieldAbsence(String(question ?? ''));
+  if (absentQ) return { route: 'fieldabsence', intent: absentQ };
 
   // R32 (loop 4): "what was the last visit at <addr> for" / "what type of service was the latest call at <addr>" / "last service type at <addr>"
   // — the SERVICE TYPE (Repair / Preventive Maintenance / ...) of the most recent visit. Subject extraction reuses the fast path's own
@@ -617,6 +621,7 @@ async function runDeterministicCore(db, intent, { today } = {}) {
   if (intent.route === 'tonnage') return runTonnageCount(db, intent.intent);
   if (intent.route === 'brandunits') return runBrandUnitCount(db, intent.intent);
   if (intent.route === 'vocabcount') return runVocabCount(db, intent.intent);
+  if (intent.route === 'fieldabsence') return runFieldAbsence(db, intent.intent);
   if (intent.route === 'premise') return runFalsePremise(db, intent.intent);
   if (intent.route === 'aggregate') return runAggregate(db, intent.intent, { today: t });
   if (intent.route === 'comparison') return runComparison(db, intent.intent);

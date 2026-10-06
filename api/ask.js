@@ -773,6 +773,8 @@ export default async function handler(req, res) {
   let helpHint = false;
   // R32: a technician-name typo silently corrected in the question text below is announced on the answer ("Showing results for ...").
   let techTypoNote = null;
+  // R39: a misspelled manufacturer the normalizer fixed; announced ONLY on an answer whose text, basis or fact labels name the corrected manufacturer (i.e. whose lane applied that filter)
+  let brandTypoNote = null;
   // R31 3b: this tenant's replaced-document map (api/_lib/supersession.js), loaded once per ask after auth; null until then.
   let supersededMap = null;
   const send = (status, body) => {
@@ -797,6 +799,7 @@ export default async function handler(req, res) {
       } catch (err) { console.error("address conflict check failed, sending answer as computed:", err?.message); }
     }
     if (techTypoNote && body?.data && typeof body.data === "object" && body.data.kind === "answer") decorateWithTypoNote(body.data, techTypoNote);
+    else if (brandTypoNote && body?.data && typeof body.data === "object" && body.data.kind === "answer" && typeof body.data.text === "string" && [body.data.text, body.data.basis, ...(Array.isArray(body.data.facts) ? body.data.facts.map((f) => f?.label) : [])].some((t) => typeof t === "string" && t.toLowerCase().includes(brandTypoNote.resolved.toLowerCase()))) decorateWithTypoNote(body.data, brandTypoNote);
     // R35 brevity: a list sentence that repeats every fact row keeps only its first few names (router/brevity.js).
     if (body?.data && typeof body.data === "object") { try { capInlineNameList(body.data); } catch { /* never block an answer on brevity */ } }
     if (helpHint && body?.data && typeof body.data === "object" && body.data.kind === "no-answer" && !body.data.help) body.data.helpHint = true;
@@ -994,6 +997,26 @@ export default async function handler(req, res) {
         }
       } catch (err) {
         console.error("Tenant name-typo correction failed, using original question:", err?.message);
+      }
+    }
+    // R39: a misspelled MANUFACTURER the question normalizer fixed ("Trnae" -> "Trane") is announced like any other typo correction, so the count is never silently for a different word.
+    if (!meta && tenantVocab && !techTypoNote) {
+      try {
+        const brands = (tenantVocab.brands ?? []).map((b) => String(b));
+        const fix = normalizeQuestionForAnalytics(question).corrections.find((c) => c.from !== c.to && brands.some((b) => b.toLowerCase() === String(c.to).toLowerCase()));
+        // only inside a manufacturer slot, at edit distance 1, with exactly one manufacturer that close: never for a person's name ("customers named Carrie")
+        const fromWord = fix ? String(fix.from).replace(/[^a-z0-9]/gi, "").toLowerCase() : "";
+        const slotCue = fix ? new RegExp(`\\b(?:named|called|name|mr|mrs|ms|miss|dr|by|for|from|with)\\s+${fromWord}\\b`, "i").test(question) && !new RegExp(`\\b(?:made|manufactured|built|produced)\\s+by\\s+${fromWord}\\b`, "i").test(question) : false;
+        const dl1 = (a, b) => { if (a === b) return true; if (Math.abs(a.length - b.length) > 1) return false; let i = 0; while (i < a.length && i < b.length && a[i] === b[i]) i++; const A = a.slice(i), B = b.slice(i);
+          return A.slice(1) === B || A === B.slice(1) || A.slice(1) === B.slice(1) || (A.length >= 2 && B.length >= 2 && A[0] === B[1] && A[1] === B[0] && A.slice(2) === B.slice(2)); };
+        const close = fix ? brands.filter((b) => dl1(fromWord, b.toLowerCase())) : [];
+        if (fix && !slotCue && close.length === 1) {
+          const typed = (question.match(new RegExp(`\\b${String(fix.from).replace(/[^a-z0-9]/gi, "")}\\b`, "i")) ?? [])[0] ?? fix.from;
+          const resolved = brands.find((b) => b.toLowerCase() === String(fix.to).toLowerCase());
+          brandTypoNote = { typed, resolved, text: `Reading "${typed}" as ${resolved}.` };
+        }
+      } catch (err) {
+        console.error("Brand typo note failed:", err?.message);
       }
     }
     // R35 (owner decision 2026-10-01): a nickname ("Tom Mercer") resolves to the ONE person on file it can mean ("Thomas Mercer"),

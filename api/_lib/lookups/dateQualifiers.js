@@ -12,6 +12,7 @@
 import { attachCitations } from "../citations/records.js";
 import { documentRecordsFor, customerRecordsFor } from "../citations/enrich.js";
 import { TENANT_SQL, answerEnvelope } from "../scope.js";
+import { betweenWithCurrency } from "../amountWords.js";
 
 const MON = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
 const MON_ALT = "jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?";
@@ -100,6 +101,7 @@ export function parseDateQualifier(question) {
   if (process.env.DONOVAN_DATE_QUALIFIERS === "0") return null;
   const raw = String(question ?? "").replace(/[’`]/g, "'").trim();
   if (!raw || raw.length > 200 || !/\b(?:how\s+many|number\s+of|count\s+of|count)\b/i.test(raw)) return null;
+  if (betweenWithCurrency(raw)) return null; // an amount range ("between $2000 and $2005") is never a date window
   const q = raw.toLowerCase().replace(/[?!]+$/, "").replace(/(\d)\.\s*$/, "$1").trim();
   const kind = SERVICE_RE.test(q) ? "service" : INSTALL_RE.test(q) ? "install" : INVOICE_RE.test(q) ? "invoice" : null;
   if (!kind) return null;
