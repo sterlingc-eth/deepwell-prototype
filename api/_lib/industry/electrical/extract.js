@@ -14,6 +14,7 @@
  * Only used for companies whose industry pack is electrical; the HVAC path never calls it.
  */
 
+import { boundedLines, newBudget } from '../textBounds.js';
 const MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12, january: 1, february: 2, march: 3, april: 4, june: 6, july: 7, august: 8, september: 9, october: 10, november: 11, december: 12 };
 const pad = (n) => String(n).padStart(2, '0');
 const validYmd = (y, m, d) => {
@@ -126,13 +127,14 @@ function codeEdition(text) {
 
 /** Split page text into trimmed non-empty lines tagged with their page. */
 function toLines(pages) {
-  const out = [];
+  const out = []; const budget = newBudget();
   for (const p of pages ?? []) {
-    for (const raw of String(p.text ?? '').split(/\r?\n/)) {
+    for (const raw of boundedLines(p.text, budget)) {
       const t = raw.replace(/\s+/g, ' ').trim();
       if (t) out.push({ t, page: Number(p.page_no) || 1 });
     }
   }
+  out.cut = budget.cut;
   return out;
 }
 
@@ -234,7 +236,7 @@ export function extractElectrical(pages) {
   }
   // cost on money-bearing documents only
   if (!['invoice', 'proposal-quote'].includes(type)) { const i = fields.findIndex((f) => f.key === 'cost'); if (i >= 0) fields.splice(i, 1); }
-  return { type, confidence: cls.confidence, fields };
+  return { type, confidence: cls.confidence, fields, ...(lines.cut ? { partial: true } : {}) };
 }
 
 /** Required keys for a type, from the electrical pack (a|b = either). */

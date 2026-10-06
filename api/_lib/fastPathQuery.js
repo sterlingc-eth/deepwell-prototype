@@ -930,14 +930,30 @@ async function buildMultiUnitAddressAnswer(db, { intent, units, customer, addres
 
 /** Entry point for ADDRESS_ENTITY_FIELD_INTENTS resolved via a raw street address — see this
  *  section's header for the full decision table. */
-async function runAddressEntityFieldPolicy(db, { intent, subject, raw, today }) {
+async function runAddressEntityFieldPolicy(db, { intent, subject, raw, today, pack }) {
   const addressLabel = String(subject?.address ?? '').replace(/\s+/g, ' ').trim() || 'that address';
   const group = await resolveAddressEntityFieldGroup(db, subject.address);
   // R19 (I1, owner ask (a)/audience adoption): computed once from the question's own text — see
   // isTeamScopedQuestion's own doc comment.
   const teamScoped = isTeamScopedQuestion(raw);
 
-  if (group.kind === 'no-address') return buildAddressFieldDecline({ intent, subject, resolution: { kind: 'no-address' } });
+  if (group.kind === 'no-address') {
+    // Non-HVAC only: a plumbing/electrical/property company files paperwork per address without any equipment record, so "isn't on file" is false when the
+    // address has documents. Say what is missing instead (HVAC keeps the old text).
+    if (pack?.id && pack.id !== 'hvac') {
+      try {
+        const street = String(subject?.address ?? '').split(',')[0].replace(/\s+/g, ' ').trim();
+        if (street.length >= 6) {
+          const { rows } = await db.raw(`SELECT 1 FROM document_pages WHERE ${TENANT_SQL} AND text ~* $1 UNION ALL SELECT 1 FROM extractions WHERE ${TENANT_SQL} AND field_key = 'service_address' AND value ~* $1 LIMIT 1`, [`(^|[^[:alnum:]])${street.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '[[:space:]]+')}([^[:alnum:]]|$)`]); // word boundaries: "12 Elm Street" is not "412 Elm Street"
+          if (rows.length) {
+            const what = WARRANTY_INTENTS.has(intent) ? 'warranty' : (ADDRESS_FIELD_LABEL[intent] ?? 'that');
+            return { kind: 'no-answer', text: `No ${what} is on file for ${addressLabel}. Other paperwork is on file there, but none of it states one.`, facts: [], sources: [], confidence: 0, verifiedCount: 0, unverifiedCount: 0, closest: [], fastIntent: intent };
+          }
+        }
+      } catch { /* fall through to the usual decline */ }
+    }
+    return buildAddressFieldDecline({ intent, subject, resolution: { kind: 'no-address' } });
+  }
   if (group.kind === 'no-unit') return buildAddressFieldDecline({ intent, subject, resolution: { kind: 'no-unit', unit: group.unit } });
   if (group.kind === 'multi-customer') return buildAddressFieldDecline({ intent, subject, resolution: { kind: 'multi-customer', names: group.names } });
 
@@ -1326,7 +1342,7 @@ export function runFastPath(db, fp, opts = {}) {
   return withTypoNote(() => runFastPathCore(db, fp, opts));
 }
 
-async function runFastPathCore(db, fp, { today } = {}) {
+async function runFastPathCore(db, fp, { today, pack } = {}) {
   const { intent, subject, raw } = fp;
   if (intent === 'out_of_domain') return buildOutOfDomainDecline(); // R19 (I1, C8)
   if (REVERSE_LOOKUP_INTENTS.has(intent)) return runReverseLookup(db, intent, subject.reverseValue); // R19 (I1, C1)
@@ -1382,7 +1398,7 @@ async function runFastPathCore(db, fp, { today } = {}) {
   // address branch can return 'ambiguous'/'no-address'/'no-unit' for these intents too, all of
   // which the policy function's own resolver handles itself.
   if (resolution.viaAddress && ADDRESS_ENTITY_FIELD_INTENTS.has(intent)) {
-    return runAddressEntityFieldPolicy(db, { intent, subject, raw, today });
+    return runAddressEntityFieldPolicy(db, { intent, subject, raw, today, pack });
   }
 
   // R32 (loop 2): "is that a Trane out at <addr>" at an address that is NOT on file / has no unit / is shared by several customers

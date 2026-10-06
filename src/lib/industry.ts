@@ -28,9 +28,9 @@ export const PENDING_INDUSTRY_KEY = 'deepwell.pendingIndustry';
 /** The industries a new company can pick, in display order (HVAC first: it is the default). */
 export const INDUSTRY_CHOICES: { id: IndustryId; label: string; blurb: string }[] = [
   { id: 'hvac', label: 'HVAC', blurb: 'Heating and cooling: equipment, warranties, service tickets.' },
-  { id: 'electrical', label: 'Electrical', blurb: 'Permits, inspections, panel schedules, estimates.' },
+  { id: 'electrical', label: 'Electrical', blurb: 'Permits, inspections, panel schedules, licenses, insurance, bonds.' },
   { id: 'plumbing', label: 'Plumbing', blurb: 'Backflow tests, water heaters, permits, service tickets.' },
-  { id: 'property', label: 'Property management', blurb: 'Work orders, vendor contracts, leases, insurance certificates.' },
+  { id: 'property', label: 'Property management', blurb: 'Work orders, vendor insurance, leases, the rent roll, inspections.' },
 ];
 
 export function isIndustryId(v: unknown): v is IndustryId {
@@ -52,11 +52,24 @@ const HVAC_EXAMPLES = [
   'Which warranties expire in the next 12 months?',
 ];
 
+/** What to type in the Ask box, per trade ("an address, a serial number, or a customer name" is the HVAC original). */
+export function lookupHintFor(id: string | null | undefined): string {
+  switch (id) {
+    case 'electrical':
+    case 'plumbing':
+      return 'an address, a permit number, or a customer name';
+    case 'property':
+      return 'a property, a unit, a tenant or a vendor';
+    default:
+      return 'an address, a serial number, or a customer name';
+  }
+}
+
 /** Ask-screen "e.g." questions. HVAC returns the original strings unchanged. */
 export function exampleQuestionsFor(id: string | null | undefined): string[] {
   switch (id) {
     case 'electrical':
-      return ['Which permits are still open?', 'Did 2847 N 24th St pass rough-in?', 'Which insurance certificates expire in the next 60 days?'];
+      return ['Which permits are still open?', 'Did 2847 N 24th St pass rough-in?', 'Which licenses, insurance or bonds expire in the next 60 days?'];
     case 'plumbing':
       return ['Which backflow tests are due in the next 60 days?', 'When was the water heater at 2847 N 24th St installed?', 'Which permits are still open?'];
     case 'property':

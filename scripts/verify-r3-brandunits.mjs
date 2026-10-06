@@ -60,6 +60,32 @@ const c3 = await ask("how many carrier units installed in 2015");
 check("control: dated brand count is not answered as an all-time brand count", !/\bof 132 units are Carrier/.test(c3), c3.slice(0, 200));
 const c4 = await ask("how many invoices");
 check("control: invoice count unchanged", !/units are/.test(c4), c4.slice(0, 200));
+// 2026-10 reviewer: paperwork fallback must be scoped to the unit the page is about (serial >= 4 chars, no other unit's serial, refrigerant on that page).
+{
+  const { runBrandUnitCount } = await import(path.join(ROOT, "api/_lib/lookups/brandUnitCount.js"));
+  const U = (id, sn, rf = "") => ({ id, mfr: "carrier", rf, sn });
+  const mk = (units, pages) => ({ raw: async (sql) => (/FROM entities/.test(sql) ? { rows: units } : /document_pages/.test(sql) ? { rows: pages } : { rows: [] }) });
+  const count = async (units, pages) => { const r = await runBrandUnitCount(mk(units, pages), { brands: [], refrig: "22" }).catch(() => null); return r; };
+  const units = [U("u1", "ab12345"), U("u2", "zz98765")];
+  const two = [{ id: "u1", t: "service ticket ab12345: unit 1 recharged r-22. zz98765: unit 2 no refrigerant work" }, { id: "u2", t: "service ticket ab12345: unit 1 recharged r-22. zz98765: unit 2 no refrigerant work" }];
+  const r1 = await count(units, two);
+  check("paperwork scope: a ticket naming two units' serials counts neither", r1 && /^0 of 2 units are R-22/.test(r1.text) && !/paperwork/.test(r1.text.replace(/in their paperwork/g, "")), r1?.text);
+  const r2 = await count(units, [{ id: "u1", t: "install ab12345 r-22 charge" }, { id: "u2", t: "unit zz98765 checked, no refrigerant work" }]);
+  check("paperwork scope: a page with only this unit's serial and the refrigerant counts that unit only", r2 && /^1 of 2 units are R-22/.test(r2.text) && /1 more say so in their paperwork/.test(r2.text), r2?.text);
+  const r3 = await count(units, [{ id: "u1", t: "unit one recharged r-22 (no serial printed)" }, { id: "u2", t: "serial zz9 r-22" }]);
+  check("paperwork scope: a page without the unit's serial (or with a < 4 char serial) counts nothing", r3 && /^0 of 2 units are R-22/.test(r3.text), r3?.text);
+  const r4 = await count([U("u1", "ab1"), U("u2", "zz98765")], [{ id: "u1", t: "ab1 r-22" }]);
+  check("paperwork scope: serial shorter than 4 chars never matches", r4 && /^0 of 2 units are R-22/.test(r4.text), r4?.text);
+  // P8: whole-token match; a serial needs >= 5 chars AND a digit ("none", "2026" can never match)
+  const r5 = await count([U("u1", "none"), U("u2", "zz98765")], [{ id: "u1", t: "none of the units: r-22 recharge" }]);
+  check("paperwork scope: a serial of letters only (\"none\") never matches", r5 && /^0 of 2 units are R-22/.test(r5.text), r5?.text);
+  const r6 = await count([U("u1", "2026"), U("u2", "zz98765")], [{ id: "u1", t: "visit 2026 r-22 recharge" }]);
+  check("paperwork scope: a four-digit serial (\"2026\") never matches", r6 && /^0 of 2 units are R-22/.test(r6.text), r6?.text);
+  const r7 = await count([U("u1", "ab12345"), U("u2", "zz98765")], [{ id: "u1", t: "install xab123456 r-22 charge" }]);
+  check("paperwork scope: a serial inside a longer token never matches", r7 && /^0 of 2 units are R-22/.test(r7.text), r7?.text);
+  const r8 = await count([U("u1", "ab12345"), U("u2", "zz98765")], [{ id: "u1", t: "install s/n ab12345, r-22 charge" }]);
+  check("paperwork scope: a whole-token serial next to punctuation still matches", r8 && /^1 of 2 units are R-22/.test(r8.text), r8?.text);
+}
 console.error = realErr;
 console.log(`\n${passes} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

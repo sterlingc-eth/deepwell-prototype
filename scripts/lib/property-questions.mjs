@@ -64,7 +64,7 @@ export function buildQuestions(T) {
     q('coi', `${s} COI expiration date`, { must: [long(k.exp)], mustNot: mn, cite: [cv] });
     q('coi', [`Is ${s} insured right now?`, `Do we have a current certificate of insurance for ${s}?`, `is the ${t} still covered on their insurance`][i % 3], { must: [long(k.exp)], mustNot: mn, computed: status(k.exp) ? [status(k.exp)] : [], cite: [cv] });
     if (k.insurer && k.vendor !== VENDORS.iron) q('coi', `Who is ${s}'s insurance carrier?`, { must: [k.insurer], cite: [c(k.file, 'insurer')] });
-    if (k.limit) q('coi', `What is the general liability limit on ${s}'s certificate?`, { must: [money(k.limit)], cite: [c(k.file, 'gl_limit')] });
+    if (k.limit) q('coi', `What is the general liability limit on ${s}'s certificate?`, { must: [money(k.limit).replace(/\.00$/, '')], cite: [c(k.file, 'gl_limit')] });
     if (k.vendor !== VENDORS.iron) q('coi', i % 2 ? `${s} policy number` : `What's the policy number on the ${t}'s COI?`, { must: [k.policy], mustNot: old.map((h) => h.policy), cite: [c(k.file, 'policy_number')] });
     const hasWC = k.covs.includes('Workers Compensation');
     if (k.vendor !== VENDORS.iron) q('coi', `Does ${s} carry workers comp?`, hasWC ? { must: ['workers'], cite: [c(k.file, 'coverage_type')] } : { must: ['no'], computed: ['no'], modelOk: true, cite: [c(k.file, 'coverage_type')], note: 'only the coverages listed on the certificate are known' });

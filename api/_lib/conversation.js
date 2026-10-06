@@ -176,3 +176,24 @@ export function composeFollowup(context, question) {
   const r = resolveFollowup(context, question);
   return { query: r.query, filters: r.filters, isFollowup: r.isFollowup };
 }
+
+/**
+ * A turn that stands on its own inside a chat: a full question (>= 4 words, starts like a question or a command) that refers to nothing said before
+ * (no it/that/them/those/this/these/he/she/his/her/their/there/same/also/too, no "and what about / how about / what about / and the", not "and ..."
+ * or "or ..." leading). Used ONLY to let the industry lane answer the question exactly as it would fresh; a real follow-up keeps skipping the lane.
+ */
+const REF_RE = /\b(?:it|its|that|those|them|they|their|theirs|this(?!\s+(?:week|month|year|quarter|season))|these|he|him|his|she|her|hers|(?<!\bare\s)(?<!\bis\s)there|same|also|too|again|former|latter|above|previous|earlier|prior|other ones?|the others?)\b|\b(?:and|but|or)\s+(?:what|how)\s+about\b|\b(?:what|how)\s+about\b|\b(?:and|but|or|so|then|now)\s+(?:the|for|in|at|with|how|what|which|who|when|where)\b/i;
+const START_RE = /^\s*(?:what|which|who|whom|whose|when|where|how|why|list|show|give|tell|find|are|is|do|does|did|can|could|has|have|any|count)\b/i;
+const RECORD_NOUN_RE = /\b(?:permits?|inspections?|invoices?|work ?orders?|tests?|devices?|heaters?|units?|leases?|documents?|licen[sc]es?|certificates?|coi|cois|bonds?|panels?|tickets?|vendors?|tenants?|customers?|jobs?|sites?|warrant(?:y|ies)|contracts?|properties|buildings?|policies|reports?|records?|files?|quotes?|proposals?|equipment|systems?|backflows?|reviews?)\b/;
+export function isSelfContainedTurn(question) {
+  const q = String(question ?? '').trim();
+  if (!q) return false;
+  if (q.split(/\s+/).length < 4) return false;
+  if (!START_RE.test(q)) return false;
+  if (REF_RE.test(q)) return false;
+  // "How many are RPZ?" / "Which are expiring?" / "Which ones are overdue?": an attribute asked about the previous answer's rows, with no record noun of its own
+  if (/^\s*(?:how many|which|what)\s+ones?\b/i.test(q)) return false;
+  const m = /^\s*(?:how many|which|what)\s+(?:are|is|were|was)\s+(.+)$/i.exec(q);
+  if (m) { const rest = m[1].toLowerCase().replace(/[?.!,]/g, '').split(/\s+/).filter((w) => !/^(?:the|a|an|our|my|any|all|only|just|of|we|you|there|currently|right|now)$/.test(w)); if (rest.length <= 4 && !RECORD_NOUN_RE.test(rest.join(' '))) return false; }
+  return true;
+}

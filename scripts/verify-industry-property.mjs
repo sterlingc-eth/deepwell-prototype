@@ -306,11 +306,11 @@ await H.as('property', async (db) => {
   const dtp = rd('../src/domains/property/documentTypes.ts');
   check('property wording: certificate / rent roll unit / vendor technician, no HVAC "Warranty registration" or "Service ticket" labels', /coi_expires: 'Insurance certificate expires'/.test(dtp) && /rent_roll_row: 'Rent roll unit'/.test(dtp) && /technician: "Vendor's technician"/.test(dtp) && !/label: 'Warranty registration'|label: 'Service ticket'/.test(dtp));
   const onb = rd('../src/screens/OnboardingScreen.tsx');
-  check('industry picker: one-line legend, the "pick wrong" note sits under Continue, cards at least 44px', /Pick the one you do most\.\s*<\/legend>/.test(onb) && onb.indexOf('If you pick wrong') > onb.indexOf('Continue\n') && /min-h-\[44px\]/.test(onb));
+  check('industry picker: one-line legend, the one-trade note sits under Continue, cards at least 44px', /Pick the one you do most\.\s*<\/legend>/.test(onb) && onb.includes('A company uses one trade. You can change it any time in Settings, and nothing you file is lost.') && !onb.includes('If you pick wrong') && onb.indexOf('A company uses one trade.') > onb.indexOf('Continue\n') && /min-h-\[44px\]/.test(onb));
   check('mixed attention lists keep the generic ask', /return 'What needs attention\?'/.test(cardSrc));
   const rb = rd('../src/components/records/RecordsBrowser.tsx');
-  check('records browser: filters panel closed by default on a phone, 44px controls, property hides the warranty view', /max-width: 639px/.test(rb) && /!min-h-\[44px\] sm:!min-h-\[40px\]/.test(rb) && /noWarranties && v\.filters\.warrantyBucket/.test(rb) && /max-sm:min-h-\[44px\]/.test(rb));
-  check('dashboard: all-clear is suppressed when the industry card lists items; card has bottom room for the floating button', /hideAllClear=\{industryAttentionCount > 0\}/.test(dash) && /hideAllClear/.test(rd('../src/components/insights/InsightsCard.tsx')) && /pb-20 sm:pb-4/.test(cardSrc));
+  check('records browser: filters panel closed by default on a phone, 44px controls, property hides the warranty view', /max-width: 639px/.test(rb) && /!min-h-\[44px\] sm:!min-h-\[40px\]/.test(rb) && /\(noWarranties \|\| nonHvac\) && v\.filters\.warrantyBucket/.test(rb) && /max-sm:min-h-\[44px\]/.test(rb));
+  check('dashboard: all-clear is suppressed when the industry card lists items; card has no extra bottom padding under its button (the page already clears the floating button)', /hideAllClear=\{industryAttentionCount > 0\}/.test(dash) && /hideAllClear/.test(rd('../src/components/insights/InsightsCard.tsx')) && !/pb-20/.test(cardSrc) && /dw-card p-4 space-y-2/.test(cardSrc));
   const help = fs.existsSync(new URL('../docs/help/30-property-paperwork.md', import.meta.url));
   check('help article for property paperwork exists', help);
 }
@@ -504,7 +504,7 @@ await H.as('property', async (db) => {
   check('vacancy count with no rent roll: plain wording', txt(vcNo) === "There are no rent rolls on file yet, so I can't count vacant units.", txt(vcNo));
   const okCo = extractProperty([{ page_no: 1, text: 'INVOICE\nInvoice No: INV-9300\nInvoice From: Ok Co\nInvoice Date: 09/01/2026\nTotal: $120.00\n' }], { today: TODAY });
   check('a short company name after "Invoice From:" is read', okCo?.fields.some((x) => x.key === 'vendor' && x.value === 'Ok Co'), JSON.stringify(okCo?.fields.map((x) => [x.key, x.value])));
-  check('card heading: property says "Expiring and overdue", electrical and plumbing keep "Needs attention"', /industry === 'property' \? 'Expiring and overdue' : 'Needs attention'/.test(fs.readFileSync(new URL('../src/components/IndustryAttentionCard.tsx', import.meta.url), 'utf8')));
+  check('card heading: every trade says "Needs attention"', />Needs attention<\/h2>/.test(fs.readFileSync(new URL('../src/components/IndustryAttentionCard.tsx', import.meta.url), 'utf8')));
   // ---- loop 7
   { // card items == Ask-answer items, per category, on ended + upcoming fixtures
     const F7 = [
@@ -742,6 +742,70 @@ await H.as('property', async (db) => {
   }
 }
 
+/* review round: the real handler */
+{
+  const { makeAsk } = await import('./lib/ask-handler.mjs');
+  const ask = await makeAsk(H, 'property');
+  const prior = { turns: [{ question: 'How many invoices do we have?' }] };
+  const fresh = await ask('Which leases end soon?'); const chat = await ask('Which leases end soon?', prior);
+  check('chat: a self-contained question as the second question is answered by the lane exactly like fresh, no model', fresh.modelCalls === 0 && chat.modelCalls === 0 && /leases ending/.test(chat.text) && chat.text === fresh.text, `${fresh.text} | ${chat.text}`);
+  const fol = await ask('and which of those end soon?', prior);
+  check('chat: a real follow-up still skips the lane', !/leases ending within/.test(fol.text));
+  const t = await ask('Who lives in unit 12C and when does the lease end?');
+  check('4c: "who lives in 12C and when does the lease end" is answered (tenant and lease end), not a false zero', /Priya Natarajan/.test(t.text) && /October 31, 2026/.test(t.text) && t.modelCalls === 0 && !/No documents on file mention|0 customers/.test(t.text), t.text);
+  const v = await ask('who is the vendor?', { turns: [{ question: 'Which vendor certificates expire?' }] });
+  check('4c: a bare "who is the vendor?" follow-up is never a false "no documents mention vendor" or a dangling ": ."', !/No documents on file mention|customers? ha(?:s|ve) a document on file mentioning|: \.$/.test(v.text), v.text);
+}
+
+/* review round: pathological input is bounded (one 60,000-char line, MBs of text) and normal documents read the same */
+{
+  const norm = (r) => JSON.stringify(r?.fields?.map((x) => [x.key, x.value]) ?? null);
+  const base = [{ page_no: 1, text: 'RESIDENTIAL LEASE AGREEMENT\nTenant Name: Zed Quill\nUnit: 4B\nProperty: 1 Other St, Mesa AZ\nLease Start Date: 01/01/2026\nLease End Date: 12/31/2026' }];
+  const t0 = Date.now();
+  for (const line of ['Note: ' + 'x '.repeat(29997), 'Result: Passed Next Test Due: 3/4/27 '.repeat(1800).slice(0, 60000), 'Phone: 480 '.repeat(5400).slice(0, 60000), 'a | b '.repeat(10000)]) { extractProperty([{ page_no: 1, text: base[0].text + '\n' + line }]); }
+  const ms = Date.now() - t0;
+  check('extractor: three 60,000-character lines finish in under 200 ms (was 2-9 s)', ms < 200, `${ms} ms`);
+  const withBig = extractProperty([{ page_no: 1, text: base[0].text + '\n' + 'lorem ipsum dolor '.repeat(3400).slice(0, 60000) }]);
+  check('extractor: a document with a 60,000-character line still reads its normal fields identically', norm(withBig) === norm(extractProperty(base)) && withBig != null);
+  const t1 = Date.now(); extractProperty([{ page_no: 1, text: ('Tenant Name: Zed Quill' + '\n').repeat(60000) }]); const ms2 = Date.now() - t1;
+  check('extractor: several MB of text is bounded (under 1.5 s)', ms2 < 1500, `${ms2} ms`);
+
+/* round 3 (reviewer): lane teaching, no HVAC wording, code/legal, partial rent rolls */
+{
+  const { makeAsk } = await import('./lib/ask-handler.mjs');
+  const ask = await makeAsk(H, 'property', { today: '2026-10-06' });
+  const HV = /\bcustomers?\b|pieces of equipment|units match|service visits|no customer, unit, or document|couldn't find a customer|Financials update|not on file for that address|\bequipment type isn't recorded/i;
+  const nl = await ask('Which units have no lease?'); const vac = await ask('Which units are vacant?');
+  check('P3: property "Which units have no lease?" is answered by the vacancy lane (same units as "vacant"), not "No pieces of equipment match that"', nl.modelCalls === 0 && /vacant units on the rent roll/.test(nl.text) && !HV.test(nl.text) && nl.text === vac.text, nl.text);
+  const hn = await ask('How many units have no lease?');
+  check('P3: "How many units have no lease?" (a count the unread rent-roll rows forbid) is never "You have 0 pieces of equipment"', !HV.test(hn.text) && /\d+ vacant units? on the rent roll|can't answer that from your property management records/.test(hn.text), hn.text);
+  const wo = await ask('Which work orders still need to be done?'); const wo2 = await ask('Which work orders are open?');
+  check('P3: "Which work orders still need to be done?" is the open work order list, not "10 documents"', /work orders? open/.test(wo.text) && wo.text === wo2.text && !/\d+ documents/.test(wo.text), wo.text);
+  const nv = await ask('Which work orders have no vendor assigned?'); const nv2 = await ask('How many work orders have no vendor?');
+  check('P3: "have no vendor assigned" lists the work orders with no vendor, not "10 documents"', /^\d+ work orders? with no vendor assigned/.test(nv.text) && !/\d+ documents/.test(nv.text) && /^\d+ work orders? with no vendor assigned\.$/.test(nv2.text) && nv.text.startsWith(nv2.text.replace(/\.$/, ':')), `${nv.text} | ${nv2.text}`);
+  const fi = await ask('Show failed inspections that need a reinspection'); const fi2 = await ask('Show failed inspections');
+  check('P3: "Show failed inspections ..." is answered from the inspections, not "No documents on file mention inspection"', /inspections? need a reinspection/.test(fi.text) && /inspections? failed/.test(fi2.text) && !/No documents on file mention/.test(fi.text + fi2.text), `${fi.text} | ${fi2.text}`);
+  for (const q of ['Which units had a move out inspection?', 'Who are our customers?', 'Which warranties are expiring?']) {
+    const r = await ask(q);
+    check(`P3: property "${q}" carries no HVAC wording and names what property can answer`, !HV.test(r.text) && /work orders, vendor contracts and insurance certificates, leases, the rent roll, inspections and invoices/.test(r.text) && r.modelCalls === 0, r.text);
+  }
+  const cap = await ask('What can you do?');
+  check('P3: "What can you do?" gives a short property capability line', /work orders, vendor contracts and insurance certificates, leases, the rent roll, inspections and invoices/.test(cap.text), cap.text);
+  const cd = await ask('Is the wiring up to code?'); const lg = await ask('Is it legal to evict a tenant?');
+  check('P4: "Is the wiring up to code?" gets the compliance decline (no model); "Is it legal to evict a tenant?" the legal decline, not "No earlier question to go on"', /can't judge whether/.test(cd.text) && cd.modelCalls === 0 && /can't give legal advice/.test(lg.text), `${cd.text} | ${lg.text}`);
+  const ed = await ask('Which invoices are overdue?');
+  check('P3: property invoice answers carry no equipment-type note', !/equipment type isn't recorded/.test(ed.text), ed.text);
+  // P7: a 5,000-row rent roll is cut by the 400,000-character cap and says so (rent_roll_unread), exactly like unreadable rows
+  const rows = []; for (let i = 1; i <= 5000; i++) rows.push(`${1000 + i} | Tenant Number ${i} Longname Holdings | 2025-01-01 | 2026-12-31 | $${1200 + (i % 50)}.00 | Occupied`);
+  const bigText = 'RENT ROLL\nProperty: Big Tower\nAs of: 2026-10-01\nUnit | Tenant | Lease Start | Lease End | Rent | Status\n' + rows.join('\n');
+  const big = extractProperty([{ page_no: 1, text: bigText }], { today: '2026-10-06' });
+  check('P7: a 5,000-row rent roll (> 400,000 characters) is flagged as having rows not read', bigText.length > 400000 && big?.type === 'rent-roll' && big.fields.some((x) => x.key === 'rent_roll_unread' && /unknown number/.test(x.value)), JSON.stringify(big?.fields.filter((x) => x.key === 'rent_roll_unread')));
+  const small = extractProperty([{ page_no: 1, text: 'RENT ROLL\nProperty: Small\nAs of: 2026-10-01\nUnit | Tenant | Lease Start | Lease End | Rent | Status\n' + rows.slice(0, 50).join('\n') }], { today: '2026-10-06' });
+  check('P7: a normal rent roll carries no unread flag', small?.type === 'rent-roll' && !small.fields.some((x) => x.key === 'rent_roll_unread'));
+  const lease = extractProperty([{ page_no: 1, text: 'LEASE AGREEMENT\nTenant: Zed Quill\nUnit: 4B\nLease Start: 01/01/2026\nLease End: 12/31/2026\nMonthly Rent: $1,200\n' + 'lorem ipsum dolor '.repeat(3400).slice(0, 60000) }], { today: '2026-10-06' });
+  check('P7: any other document whose text was cut is reported partial (never silently kept as complete)', !lease || lease.partial === true);
+}
+}
 console.log(failures ? `${failures} FAILED (${passes} passed)` : `${passes} checks passed.`);
 await H.stop?.();
 process.exit(failures ? 1 : 0);

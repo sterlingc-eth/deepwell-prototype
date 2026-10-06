@@ -180,7 +180,7 @@ export function RecordsBrowser({ onOpenDocument }: { onOpenDocument: (id: string
     <div className="space-y-3" data-testid="records-browser">
       {/* Saved views */}
       <div className="flex flex-wrap items-center gap-1.5">
-        {b.builtInViews.filter((v) => !(noWarranties && v.filters.warrantyBucket)).map((v) => (
+        {b.builtInViews.filter((v) => !((noWarranties || nonHvac) && v.filters.warrantyBucket)).map((v) => (
           <button key={v.name} type="button" className={nonHvac ? 'dw-pill-muted max-sm:min-h-[44px]' : 'dw-pill-muted'} onClick={() => b.applyView(v)}>{v.name}</button>
         ))}
         {b.savedViews.map((v) => (

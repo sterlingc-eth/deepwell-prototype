@@ -663,6 +663,8 @@ export async function runPlumbing(db, intent0, { today } = {}) {
   if (k === 'attn_all') {
     if (intent.rest.length || !t0) return null;
     if (resolvePlace(docs, intent.raw).any) return null;
+    // an empty library is not an all-clear: nothing of these kinds is on file yet
+    if (!docs.some((d) => ['backflow-test-certificate', 'warranty-registration', 'startup-sheet', 'equipment-record', 'nameplate-photo', 'permit'].includes(d.type))) return answerEnvelope({ text: 'No backflow tests, water heater warranties or permits are on file yet, so there is nothing to check.', facts: [] });
     const items = attentionItems(docs, t0, 60);
     const by = (c) => items.filter((i) => i.category === c).length;
     const when = (i) => (i.kind === 'failed' ? `failed ${humanDate(i.date)}; needs a retest` : i.kind === 'unreadable' ? 'result unreadable; check the document' : i.days < 0 ? `${i.category === 'backflow' ? 'overdue' : 'expired'} ${humanDate(i.date)} (${dayWord(-i.days)} ago)` : i.days === 0 ? `today, ${humanDate(i.date)}` : `${humanDate(i.date)} (${dayWord(i.days)})`);
@@ -756,7 +758,7 @@ function bfList(scope0, intent, t0, all) {
   void all;
   const badNote = bad.length ? ` ${plural(bad.length, 'device')} ${bad.length === 1 ? 'has' : 'have'} a result that could not be read or that disagrees, so ${bad.length === 1 ? 'it is' : 'they are'} not counted here; check ${bad.length === 1 ? 'that document' : 'those documents'}.` : '';
   facts.push(...bad.slice(0, 10).map((v) => fact(devFactLabel(v), 'result unreadable; check the document', v.current, 'backflow_test_result')));
-  return answerEnvelope({ text: pick.length ? `${head}. Your documents show these dates.${note}${badNote}` : `None. No ${intent.mode === 'failed' ? 'backflow devices are failed and waiting on a retest' : intent.mode === 'overdue' ? 'backflow tests are overdue' : intent.mode === 'today' ? 'backflow tests are due today' : 'backflow tests are due in that window'}${intent.devKind ? ` for ${intent.devKind} devices` : ''}.${note}${badNote}`, facts });
+  return answerEnvelope({ text: pick.length ? `${head}.${note}${badNote}` : `None. No ${intent.mode === 'failed' ? 'backflow devices are failed and waiting on a retest' : intent.mode === 'overdue' ? 'backflow tests are overdue' : intent.mode === 'today' ? 'backflow tests are due today' : 'backflow tests are due in that window'}${intent.devKind ? ` for ${intent.devKind} devices` : ''}.${note}${badNote}`, facts });
 }
 
 function bfDevice(v, attr, t0) {
@@ -879,8 +881,32 @@ function whFact(h, attr, t0) {
 }
 
 /* ---- permits ---- */
-function runPermit(docs, intent, t0) {
-  const permits = permitsModel(docs, t0);
+/** The city a permit names: second part of a "street, City ST zip" address, else "City of X" in the issuing office. */
+function permitCity(p) {
+  const parts = String(p.addrRaw ?? '').split(',');
+  if (parts.length > 1) { const c = norm(parts[1]).replace(/\s+[a-z]{2}(?:\s+\d{5})?$/, '').replace(/\s+\d{5}$/, '').trim(); if (c && !/\d/.test(c)) return c; }
+  const j = /\bcity of ([a-z]+(?: [a-z]+)?)/i.exec(String(f(p.d, 'jurisdiction') ?? '').replace(/\b(?:building|development|permit|planning|safety|services?|department|dept|division|office)\b.*$/i, ''));
+  return j ? norm(j[1]) : null;
+}
+/** A permit list / count scoped to a city the permits themselves name ("Which permits are open in Mesa?"): the city, or null when the question's leftover words are not exactly a known city. */
+function permitCityScope(permits, intent) {
+  if (!['pm_list', 'pm_count'].includes(intent.kind) || !intent.rest?.length) return null;
+  const q = ` ${norm(intent.raw)} `;
+  const cities = [...new Set(permits.map(permitCity).filter(Boolean))].filter((c) => q.includes(` ${c} `)).sort((a, b) => b.length - a.length);
+  if (!cities.length) return null;
+  const ct = new Set(cities[0].split(' '));
+  return intent.rest.every((t) => ct.has(t)) ? cities[0] : null;
+}
+function runPermit(docs, intent0, t0) {
+  let permits = permitsModel(docs, t0);
+  const cityName = permitCityScope(permits, intent0);
+  let intent = intent0;
+  if (cityName) { permits = permits.filter((p) => permitCity(p) === cityName); intent = { ...intent0, rest: [] }; if (!permits.length) return null; }
+  const res = runPermit0(docs, intent, t0, permits);
+  if (cityName && res?.text) { const CN = cityName.replace(/\b[a-z]/g, (c) => c.toUpperCase()); res.text = `${res.text} Only permits in ${CN} were checked.`; }
+  return res;
+}
+function runPermit0(docs, intent, t0, permits) {
   if (!permits.length && intent.kind !== 'pm_insp') return null;
   const pf = (p, key, value, label) => fact(label ?? permitLabel(p), value, p.d, key);
   if (intent.kind === 'pm_count') {
@@ -918,7 +944,7 @@ function runPermit(docs, intent, t0) {
     if (permits.some((p) => p.state === 'other')) return null;
     let sel; let text;
     if (intent.mode === 'open') { sel = permits.filter((p) => p.state === 'open'); text = sel.length ? `${plural(sel.length, 'permit')} open: not finished and not expired by the dates and status printed on the permits. This reflects your documents, not the city's records.` : 'None. No permit on file is open.'; }
-    else if (intent.mode === 'expired') { sel = permits.filter((p) => p.state === 'expired'); text = sel.length ? `${plural(sel.length, 'permit')} expired: past the printed expiry date (or printed as expired) and never finished.` : 'None. No permit on file has expired without being finished.'; }
+    else if (intent.mode === 'expired') { sel = permits.filter((p) => p.state === 'expired'); text = sel.length ? `${plural(sel.length, 'permit')} expired: past the printed expiry date and not finished.` : 'None. No permit on file has expired without being finished.'; }
     else { const end = windowEnd(t0, intent.win); sel = permits.filter((p) => p.state === 'open' && okIso(p.expires) && p.expires >= t0 && p.expires <= end); text = sel.length ? `${plural(sel.length, 'open permit')} ${sel.length === 1 ? 'expires' : 'expire'} within ${windowLabel(intent.win)}.` : `None. No open permit expires within ${windowLabel(intent.win)}.`; }
     const key = intent.mode === 'expiring' || intent.mode === 'expired' ? 'permit_expires' : 'permit_status';
     return answerEnvelope({ text, facts: sel.slice(0, 40).map((p) => { const fk = p.d.fields[key] ? key : 'permit_number'; return pf(p, fk, intent.mode === 'open' ? `${p.status ?? 'open'}${p.expires ? `; expires ${humanDate(p.expires)}` : ''}` : `${p.expires ? `${p.expires < t0 ? 'expired' : 'expires'} ${humanDate(p.expires)}` : p.status}`); }) });
@@ -953,7 +979,7 @@ function runPermit(docs, intent, t0) {
     const date = f(top, 'service_date');
     const facts = insps.slice(0, 6).map(({ i }) => fact(`${f(i, 'inspection_type')}${f(i, 'service_date') ? ` · ${humanDate(f(i, 'service_date'))}` : ''}`, f(i, 'inspection_result'), i, intent.attr === 'date' ? 'service_date' : 'inspection_result'));
     if (intent.attr === 'date') return date ? answerEnvelope({ text: `The ${f(top, 'inspection_type')} inspection was ${humanDate(date)}.`, facts }) : null;
-    return answerEnvelope({ text: `${f(top, 'inspection_type')} inspection${date ? ` on ${humanDate(date)}` : ''}: ${f(top, 'inspection_result')} (newest first).`, facts });
+    return answerEnvelope({ text: `${f(top, 'inspection_type')} inspection${date ? ` on ${humanDate(date)}` : ''}: ${f(top, 'inspection_result')}${insps.length > 1 ? ' (newest first)' : ''}.`, facts });
   }
   return null;
 }

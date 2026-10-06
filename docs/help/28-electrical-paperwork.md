@@ -10,11 +10,11 @@ If your company is set up as Electrical, you can ask about your permits, inspect
 
 ### What electrical questions can Donovan answer?
 ~ electrical questions, which permits are still open, open permits, did it pass rough-in, inspection result, failed inspections, corrections required, permit number, which office issued the permit, main breaker size, panel size, demand load, code edition, license expires, insurance expires, bond expires, tests due
-Ask things like "Which permits are still open?", "Did the job at (an address you have on file) pass rough-in?", "What corrections were required there?", "What is the permit number for that job?", "What size is the main breaker on that panel?" or "Which insurance certificates expire in the next 60 days?" Each answer lists the document and page it was read from.
+Ask things like "Which permits are still open?", "Did the job at (an address you have on file) pass rough-in?", "What corrections were required there?", "What is the permit number for that job?", "What size is the main breaker on that panel?" or "Which licenses, insurance or bonds expire in the next 60 days?" Each answer lists the document and page it was read from. AHJ is the city or county office that issues permits and inspects. A panel schedule lists a panel's breakers and circuits.
 
 ### What does "open permit" mean?
 ~ open permit meaning, permit still open, no final, final inspection missing, permit not closed
-A permit shows as open when your documents contain no passed final inspection and no certificate of completion for it. That reflects the paperwork you have uploaded, not the city's records, so upload the final card or certificate to close it out.
+A permit shows as open when your documents contain no passed final inspection and no certificate of completion for it. That reflects the paperwork you have uploaded, not the city's records, so upload the final card or certificate to close it out. Changing your trade in Settings keeps all documents, but older ones were read under the old trade, so run Re-check all documents with AI on the dashboard to have them read as electrical.
 
 ### Can Donovan tell me if work meets code?
 ~ meets code, code compliant, will it pass, is it legal, what does the nec say, what does code require

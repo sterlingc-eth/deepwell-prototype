@@ -25,7 +25,7 @@ const TENANT = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 export const DECLINE = {
   code: "I can't judge whether work meets code, whether an inspection should have passed, or what the code requires. I can show what your documents say, with the page. Ask me about a specific permit, inspection or document.",
   legal: "I can't give legal advice. I can show what your documents say, with the page.",
-  untracked: "Your company doesn't track that in DeepWell yet, so I can't answer from it.",
+  untracked: "DeepWell doesn't read that kind of paperwork for electrical companies yet. Ask about permits, inspections, panel schedules, licenses, insurance or bonds.",
 };
 
 const STOP = new Set(('a an the of for at on in to is are was were be been do does did has have had how many much what which who whom when where why show list tell give me us we our my your any every all each still now yet ever not no and or with from by about this that these those there their it its into out over under per as than then so if can could would should will shall may might must next last first new old current open closed passed failed fail pass rough roughin final inspection inspections inspector report reports permit permits panel panels job jobs site address account customer customers project projects work done on file number numbers code edition mention mentions say says state states issue issued issues office city county jurisdiction expire expires expired expiring expiration expiry insurance certificate certificates license licenses licence bond bonds contractor load calculation calc demand connected size main breaker breakers amp amps amperage voltage phase volts total count day days week weeks month months year years soon due test tests generator generators correction corrections item items list lists detail details record records document documents doc docs primary also please thanks unresolved outstanding pending overdue upcoming schedules calculations certificates results required haven hasn don finaled finals roughs result issue issued office offices tell').split(/\s+/));
@@ -39,8 +39,12 @@ const placeTokens0 = (q) => toks(q).filter((t) => !STOP.has(t) && !SUFFIX.has(t)
 // A street phrase the person typed is kept word for word ("123 Main St" needs 123 AND main), even where a word is also a common word.
 const placeTokens = (q) => {
   const base = placeTokens0(q);
-  const extra = [...norm(q).matchAll(STREET_RE)].flatMap((m) => m[0].split(' ').filter((t) => t && !/^(?:on|at|in|for|the|of|to|a|an|is|are|any|my|our)$/.test(t) && !new RegExp(`^(?:${STREET_SUF})$`).test(t)));
-  return [...new Set([...base, ...extra])];
+  const ms = [...norm(q).matchAll(STREET_RE)];
+  const extra = ms.flatMap((m) => m[0].split(' ').filter((t) => t && !/^(?:on|at|in|for|the|of|to|a|an|is|are|any|my|our)$/.test(t) && !new RegExp(`^(?:${STREET_SUF})$`).test(t)));
+  // the street type typed ("412 Elm Avenue") is part of the address: kept as a "~ave" marker that matchPlace holds the document's street type to
+  const sufs = ms.map((m) => `~${SUF_CANON[m[0].split(' ').pop()] ?? m[0].split(' ').pop()}`);
+  const lone = [...String(q).matchAll(/\b(\d)\s+[A-Z][a-z]{2,}/g)].map((m) => m[1]); // "8 Harmon": a one-digit street number is part of the address, never dropped (8 is not 88)
+  return [...new Set([...base, ...lone, ...extra, ...sufs])];
 };
 
 const PASS_RE = /\b(?:pass(?:es|ed)?|approved|accepted|satisfactory|complies|complied|ok|okay|no corrections|cleared|released)\b/i;
@@ -124,21 +128,28 @@ export function classifyElectrical(question, { today } = {}) {
   // ---- corrections
   if (/\bcorrections?\b|failed inspections?|failed (?:rough|final)|did not pass|inspections? (?:that )?failed|failed the/.test(q) && /\b(?:show|list|every|which|what|any|how many)\b/.test(q) && !/\b(?:did|does|was|were)\b.*\bpass\b/.test(q)) { if (timeQ || /\b(?:not|never|haven t|hasn t|didn t|without|no)\b.*\b(?:fail\w*|pass\w*)\b/.test(q)) return null; return { kind: 'failed_inspections', place, unresolved: /\b(?:open|outstanding|unresolved|pending|still)\b/.test(q), count: /\bhow many\b/.test(q), stage: /\bfinals?\b/.test(q) && !/\brough/.test(q) ? 'final' : /\brough/.test(q) && !/\bfinals?\b/.test(q) ? 'rough' : null }; }
   // ---- open permits / no final
-  if (/\b(?:open permits?|permits? (?:are |is )?(?:still )?open|still open|unfinaled|no final|without a final|not (?:been )?finaled|haven.?t (?:been )?finaled|(?:issued permit|permit) but no final|never finaled|awaiting final|permits? (?:that )?(?:are )?not closed)\b/.test(q)) return timeQ || /\b(?:expir\w*|older|overdue|stale|aging|past due)\b/.test(q) ? null : { kind: 'open_permits', count: /\bhow many\b/.test(q), place };
+  if (/\b(?:open permits?|permits? (?:are |is )?(?:still )?open|still open|unfinaled|no final|without a final|not (?:been )?finaled|haven.?t (?:been )?finaled|(?:issued permit|permit) but no final|never finaled|awaiting final|permits? (?:that )?(?:are )?not closed)\b/.test(q)) return timeQ || /\b(?:expir\w*|older|overdue|stale|aging|past due)\b/.test(q) ? null : { kind: 'open_permits', count: /\bhow many\b/.test(q), place, q };
   // ---- inspection result at a place
   if (/\b(?:pass|passed|fail|failed|result|results|status|approved|get approved)\b/.test(q) && /\b(?:inspection|rough|final|underground|service)\b/.test(q) || /\bdid\b.*\b(?:pass|fail)\b/.test(q)) {
     const stage = isFinal(q) && isRough(q) ? null : isFinal(q) ? 'final' : isRough(q) ? 'rough' : /\bunderground\b/.test(q) ? 'underground' : null;
     if (place.length) return { kind: 'inspection_result', place, stage };
   }
   // ---- permit number / jurisdiction / edition
+  if (/\bwhen\b.*\bpermit\b.*\b(?:issued|pulled)\b|\bpermit\b.*\bissue date\b|\bissue date\b.*\bpermit\b/.test(q) && place.length) return { kind: 'permit_lookup', place, attr: 'issued' };
   if (/\bpermit number|permit no|permit #|which office issued|who issued|issuing (?:office|authority)|what jurisdiction|which jurisdiction|issued the permit\b/.test(q) && place.length) return { kind: 'permit_lookup', place };
   if (/\b(?:code )?edition\b|\bnec\b|which code/.test(q) && place.length) return { kind: 'code_edition', place };
+  // ---- who is the owner / customer on one permit number (the permit's own paperwork names them)
+  { const pn = /\b([a-z]{1,4}-\d{2}-\d{3,6})\b/i.exec(String(question)); if (pn && /^\s*(?:who|which customer|which owner)\b/.test(q) && /\b(?:owner|customer|client|belongs|pulled|holder)\b/.test(q) && /\bpermit\b/.test(q)) return { kind: 'permit_party', permit: norm(pn[1]) }; }
   // ---- panels
-  if (/\b(?:main breaker|panel|panels|bus rating|service size|amperage|voltage|phase)\b/.test(q) && /\b(?:size|rating|rated|how big|what|list|amperage|voltage|phase|volts?|amps?)\b/.test(q) && place.length && !/\bpermit|inspection\b/.test(q)) return { kind: 'panel_facts', place, list: /\b(?:list|show|every|all)\b/.test(q) };
+  if (/\b(?:main breaker|panel|panels|bus rating|service size|amperage|voltage|phase)\b/.test(q) && /\b(?:size|rating|rated|how big|what|list|amperage|voltage|phase|volts?|amps?)\b/.test(q) && place.filter((t) => t !== 'service').length && !/\bpermit|inspection\b/.test(q)) return { kind: 'panel_facts', place: place.filter((t) => t !== 'service'), list: /\b(?:list|show|every|all)\b/.test(q) };
   // ---- load calculation
   if (/\bload calc|demand load|connected load|service load\b/.test(q) && place.length) return { kind: 'load_calc', place, field: /\bconnected\b/.test(q) && /\bdemand\b/.test(q) ? 'both' : /\bconnected\b/.test(q) ? 'connected_load' : 'demand_load' };
   // ---- counts by document type
   const cm = /\b(?:closed|open|pass\w*|expir\w*|this month|this year|last|since|before|after|overdue|due|not|never|current|valid|fail\w*|reject\w*|correction\w*|re-?inspect\w*|final|rough|underground|temporary|upcoming|scheduled|active)\b/.test(q) ? null : q.match(/\bhow many\b/);
+  // a count/list of permits in a city ("how many permits are in Tempe"): the run step decides whether the word is a city on file; if not, null as before
+  if (/\bpermits?\b/.test(q) && place.length && !/\b(?:expir\w*|overdue|due|fail\w*|not|never|since|before|after|this month|this year|last)\b/.test(q) && (/\bhow many\b/.test(q) || /^(?:which|list|show|what|give)\b/.test(q))) return { kind: 'permit_city', count: /\bhow many\b/.test(q), place, q };
+  // "Do we have a bond on file?": a yes / no on one kind of document, answered as the count of that kind (never a count of every document)
+  if (/^(?:do we|do i|have we|is there|are there)\b.*\b(?:on file|have any|got any|any)\b/.test(q) && !place.length && !/\b(?:expir\w*|overdue|due|open|fail\w*|pass\w*|not|never|since|before|after|this|last|next|valid|current|active|final|rough)\b/.test(q)) for (const [type, re] of KINDS.doctypes) if (re.test(q)) return { kind: 'count_type', type, failed: false };
   if (cm) for (const [type, re] of KINDS.doctypes) if (re.test(q) && !place.length) return { kind: 'count_type', type, failed: /\bfailed\b/.test(q) && type === 'inspection-report' };
   return null;
 }
@@ -184,7 +195,9 @@ const src = (d, k) => ({ documentId: d.id, location: { field: k, page: d.fields[
 const placeText = (d) => `${String(f(d, 'service_address') ?? '').split(',')[0]} ${f(d, 'customer_name') ?? ''} ${d.filename ?? ''}`; // street part only: a city or zip is never a "job"
 function matchPlace(docs, tokens) {
   if (!tokens.length) return [];
-  return docs.filter((d) => { const have = new Set(toks(placeText(d))); return tokens.every((t) => have.has(t)); });
+  const words = tokens.filter((t) => !t.startsWith('~')); const sufs = tokens.filter((t) => t.startsWith('~')).map((t) => t.slice(1));
+  if (!words.length) return [];
+  return docs.filter((d) => { const have = new Set(toks(placeText(d))); if (!words.every((t) => have.has(t))) return false; if (!sufs.length || !f(d, 'service_address')) return true; const st = canonAddr(f(d, 'service_address')).split(' u')[0].split(' '); const ds = SUF_SET.has(st[st.length - 1]) ? st[st.length - 1] : null; return !ds || sufs.includes(ds); });
 }
 const SUF_CANON = { street: 'st', avenue: 'ave', road: 'rd', drive: 'dr', lane: 'ln', court: 'ct', boulevard: 'blvd', circle: 'cir', place: 'pl', parkway: 'pkwy', terrace: 'ter', trail: 'trl', highway: 'hwy' };
 const DIR_CANON = { north: 'n', south: 's', east: 'e', west: 'w' };
@@ -197,6 +210,23 @@ function canonAddr(raw) {
   return `${(i >= 0 ? t.slice(0, i + 1) : t).join(' ')}${unit ? ` u${unit[1]}` : ''}`;
 }
 const addrKey = (d) => canonAddr(f(d, 'service_address'));
+/** The city a document names: the second part of a "street, City ST zip" address, else "City of X" in the issuing office. */
+function cityOf(d) {
+  const parts = String(f(d, 'service_address') ?? '').split(',');
+  if (parts.length > 1) { const c = norm(parts[1]).replace(/\s+[a-z]{2}(?:\s+\d{5})?$/, '').replace(/\s+\d{5}$/, '').trim(); if (c && !/\d/.test(c)) return c; }
+  const j = /\bcity of ([a-z]+(?: [a-z]+)?)/i.exec(String(f(d, 'jurisdiction') ?? '').replace(/\b(?:building|development|permit|planning|safety|services?|department|dept|division|office)\b.*$/i, ''));
+  return j ? norm(j[1]) : null;
+}
+const CITY_GENERIC = new Set(['permit', 'permits', 'open', 'closed', 'final', 'finaled', 'issued', 'city', 'number', 'numbers', 'many', 'issue', 'job', 'jobs', 'site', 'sites']);
+/** The city (known from the documents) a question names, with the question's other place words; null when no known city is named or a street/customer is named too. */
+function cityScope(docs, intent) {
+  const q = ` ${norm(intent.q ?? '')} `;
+  const cities = [...new Set(docs.map(cityOf).filter(Boolean))].filter((c) => q.includes(` ${c} `)).sort((a, b) => b.length - a.length);
+  if (!cities.length) return null;
+  const ct = new Set(cities.flatMap((c) => c.split(' ')));
+  const rest = (intent.place ?? []).filter((t) => !ct.has(t) && !CITY_GENERIC.has(t));
+  return rest.length ? null : cities[0];
+}
 function distinctPlaces(ds) { return [...new Set(ds.map(addrKey).filter(Boolean))]; }
 const fact = (label, value, d, k) => ({ label, value, sources: [src(d, k)] });
 
@@ -221,7 +251,16 @@ export async function runElectrical(db, intent, { today } = {}) {
   if (intent.kind === 'count_type') {
     let ds = docs.filter((d) => d.type === intent.type);
     if (intent.failed) ds = failedDocs(docs);
-    return answerEnvelope({ text: `${ds.length} ${intent.failed ? 'failed ' : ''}${intent.type.replace(/-/g, ' ')} document${ds.length === 1 ? '' : 's'} on file.`, facts: ds.slice(0, 40).map((d) => ({ label: d.filename, value: intent.type.replace(/-/g, ' '), sources: [{ documentId: d.id, location: { field: 'document_type', page: 1 } }] })) });
+    return answerEnvelope({ text: `${ds.length} ${intent.failed ? 'failed ' : ''}${intent.type.replace(/-/g, ' ')} document${ds.length === 1 ? '' : 's'} on file.${ds.length === 0 && !intent.failed ? ` Upload ${/^[aeiou]/i.test(intent.type) ? 'an' : 'a'} ${intent.type.replace(/-/g, ' ')} to see it here.` : ''}`, facts: ds.slice(0, 40).map((d) => ({ label: d.filename, value: intent.type.replace(/-/g, ' '), sources: [{ documentId: d.id, location: { field: 'document_type', page: 1 } }] })) });
+  }
+
+  if (intent.kind === 'permit_city') {
+    const cityName = cityScope(docs, intent);
+    if (!cityName) return null;
+    const byNum = new Map(); for (const d of docs.filter((x) => x.type === 'permit' && f(x, 'permit_number') && cityOf(x) === cityName)) byNum.set(norm(f(d, 'permit_number')), d);
+    const ps = [...byNum.values()]; const CN = cityName.replace(/\b[a-z]/g, (c) => c.toUpperCase());
+    if (!ps.length) return null;
+    return answerEnvelope({ text: `${ps.length} permit${ps.length === 1 ? '' : 's'} on file in ${CN}.`, facts: ps.slice(0, 40).map((d) => fact(`${f(d, 'permit_number')}${f(d, 'service_address') ? ` · ${f(d, 'service_address')}` : ''}`, f(d, 'jurisdiction') ?? 'permit', d, 'permit_number')) });
   }
 
   if (intent.kind === 'open_permits') {
@@ -233,11 +272,14 @@ export async function runElectrical(db, intent, { today } = {}) {
     // one row per permit number: the newest-listed document wins; near-duplicates collapse
     const byNum = new Map(); for (const d of permits) byNum.set(norm(f(d, 'permit_number')), d);
     permits = [...byNum.values()];
-    if (intent.place?.length) { const mp = matchPlace(docs, intent.place); if (distinctPlaces(mp).length > 1) return clarify(mp); const m = new Set(mp.map((d) => d.id)); permits = permits.filter((d) => m.has(d.id)); }
+    const cityName = intent.place?.length ? cityScope(docs, intent) : null;
+    if (cityName) permits = permits.filter((d) => cityOf(d) === cityName);
+    else if (intent.place?.length) { const mp = matchPlace(docs, intent.place); if (distinctPlaces(mp).length > 1) return clarify(mp); const m = new Set(mp.map((d) => d.id)); permits = permits.filter((d) => m.has(d.id)); }
     const open = permits.filter((d) => !finals.has(norm(f(d, 'permit_number'))) && !finalAddrs.has(addrKey(d)));
     if (!permits.length && intent.place?.length) return null;
     const facts = open.slice(0, 40).map((d) => fact(`${f(d, 'permit_number')}${f(d, 'service_address') ? ` · ${f(d, 'service_address')}` : ''}`, f(d, 'permit_expiry') ? `no passed final on file; permit ${t0 && f(d, 'permit_expiry') < t0 ? 'expired' : 'expires'} ${humanDate(f(d, 'permit_expiry'))}` : 'no passed final on file', d, 'permit_number'));
-    return answerEnvelope({ text: open.length ? `${open.length} permit${open.length === 1 ? ' has' : 's have'} no passed final inspection or certificate of completion on file. This reflects your documents, not the city's records.` : (intent.place?.length ? 'That permit has a passed final inspection or certificate of completion on file.' : 'Every permit on file has a passed final inspection or certificate of completion on file.'), facts });
+    if (cityName) { const CN = cityName.replace(/\b[a-z]/g, (c) => c.toUpperCase()); return answerEnvelope({ text: open.length ? `${open.length} of the ${permits.length} permit${permits.length === 1 ? '' : 's'} in ${CN} ${open.length === 1 ? 'has' : 'have'} no passed final inspection or certificate of completion on file. This reflects your documents, not the city's records.` : `None of the ${permits.length} permit${permits.length === 1 ? '' : 's'} in ${CN} ${permits.length === 1 ? 'is' : 'are'} open: each has a passed final inspection or certificate of completion on file.`, facts }); }
+    return answerEnvelope({ text: open.length ? `${open.length} permit${open.length === 1 ? ' has' : 's have'} no passed final inspection or certificate of completion on file. This reflects your documents, not the city's records.` : (intent.place?.length ? 'That permit has a passed final inspection or certificate of completion on file.' : permits.length || docs.some((d) => d.type === 'permit') ? 'Every permit on file has a passed final inspection or certificate of completion.' : 'No permits are on file yet, so there is nothing to list from your records.'), facts });
   }
 
   if (intent.kind === 'inspection_result') {
@@ -254,11 +296,12 @@ export async function runElectrical(db, intent, { today } = {}) {
     const facts = ds.slice(0, 6).map((d) => { const items = (d.all.correction_items ?? []).map((x) => x.value); return fact(`${f(d, 'inspection_type') ?? 'Inspection'} · ${humanDate(f(d, 'service_date'))}`, `${f(d, 'inspection_result') ?? (d.type === 'certificate-of-completion' ? 'certificate of completion' : 'no result written')}${resultClass(f(d, 'inspection_result')) === 'failed' && items.length ? ` — ${items.join('; ')}` : ''}`, d, f(d, 'inspection_result') ? 'inspection_result' : 'service_date'); });
     const top = ds[0];
     const conflict = ds.length > 1 && dates[0] === dates[1] && f(ds[0], 'inspection_result') !== f(ds[1], 'inspection_result');
-    return answerEnvelope({ text: conflict ? `Your documents show different results for the same date; both are listed with their pages.` : `${f(top, 'inspection_type') ?? 'The inspection'} on ${humanDate(f(top, 'service_date'))}: ${f(top, 'inspection_result') ?? (top.type === 'certificate-of-completion' ? 'certificate of completion on file' : 'no result written')} (newest first).`, facts });
+    return answerEnvelope({ text: conflict ? `Your documents show different results for the same date; both are listed with their pages.` : `${f(top, 'inspection_type') ?? 'The inspection'} on ${humanDate(f(top, 'service_date'))}: ${f(top, 'inspection_result') ?? (top.type === 'certificate-of-completion' ? 'certificate of completion on file' : 'no result written')}${ds.length > 1 ? ' (newest first)' : ''}.`, facts });
   }
 
   if (intent.kind === 'failed_inspections') {
     const SUP = (d) => { const keyP = norm(f(d, 'permit_number') ?? ''); const keyA = addrKey(d); const dt = String(f(d, 'service_date') ?? ''); const same = (o) => { const kp = norm(f(o, 'permit_number') ?? ''); return keyP && kp ? keyP === kp : (keyA && addrKey(o) === keyA); }; return docs.some((o) => o.id !== d.id && same(o) && (certClosed(o) || (o.type === 'inspection-report' && resultClass(f(o, 'inspection_result')) === 'passed' && String(f(o, 'service_date') ?? '') >= dt && (isFinal(f(o, 'inspection_type')) || (d.type === 'correction-notice' && stageOf(f(d, 'inspection_type')) === 'other') || (stageOf(f(o, 'inspection_type')) === stageOf(f(d, 'inspection_type')) && stageOf(f(d, 'inspection_type')) !== 'other'))))); };
+    if (!intent.place?.length && !docs.some((d) => d.type === 'inspection-report' || d.type === 'correction-notice')) return answerEnvelope({ text: 'No inspection reports are on file yet, so there is nothing to list from your records.', facts: [] }); // an empty library is not an all-clear
     let ds = failedDocs(docs).filter((d) => !intent.unresolved || !SUP(d)).filter((d) => (!intent.stage || (intent.stage === 'final' ? isFinal(f(d, 'inspection_type')) : isRough(f(d, 'inspection_type')))));
     if (intent.place?.length) { const mp = matchPlace(docs, intent.place); if (distinctPlaces(mp).length > 1) return clarify(mp); const m = new Set(mp.map((d) => d.id)); ds = ds.filter((d) => m.has(d.id)); if (!m.size) return null; }
     const withItems = ds.slice(0, 40).map((d) => {
@@ -268,10 +311,24 @@ export async function runElectrical(db, intent, { today } = {}) {
     return answerEnvelope({ text: ds.length ? `${ds.length} ${intent.unresolved ? 'unresolved ' : ''}failed inspection${ds.length === 1 ? '' : 's'} on file${intent.unresolved ? ' with no later passed inspection' : ''}.` : (intent.unresolved ? 'No unresolved failed inspections on file.' : 'No failed inspections on file.'), facts: withItems });
   }
 
+  if (intent.kind === 'permit_party') {
+    const m = docs.filter((d) => norm(f(d, 'permit_number') ?? '') === intent.permit && (f(d, 'customer_name') || f(d, 'owner_name')));
+    const names = [...new Set(m.map((d) => String(f(d, 'customer_name') ?? f(d, 'owner_name')).trim()).filter(Boolean))];
+    if (names.length !== 1) return null;
+    const d0 = m.find((d) => f(d, 'customer_name')) ?? m[0]; const k = f(d0, 'customer_name') ? 'customer_name' : 'owner_name';
+    return answerEnvelope({ text: `${names[0]} (as written on the permit paperwork for ${m.length === 1 ? 'that permit' : `that permit, ${m.length} documents agree`}).`, facts: [fact(`Customer · ${f(d0, 'permit_number')}`, names[0], d0, k)] });
+  }
+
   if (intent.kind === 'permit_lookup') {
     const m = matchPlace(docs, intent.place).filter((d) => ['permit', 'inspection-report', 'correction-notice'].includes(d.type) && f(d, 'permit_number'));
     if (!m.length) return null;
     if (distinctPlaces(m).length > 1) return clarify(m);
+    if (intent.attr === 'issued') {
+      const dated = m.filter((d) => d.type === 'permit' && okIso(f(d, 'permit_issue_date')));
+      if (!dated.length) return null;
+      const byNo = [...new Map(dated.map((d) => [norm(f(d, 'permit_number')), d])).values()];
+      return answerEnvelope({ text: byNo.length === 1 ? `Permit ${f(byNo[0], 'permit_number')} was issued ${humanDate(f(byNo[0], 'permit_issue_date'))}.` : `${byNo.length} permits on file for that job, with their issue dates.`, facts: byNo.map((d) => fact(`Issued · ${f(d, 'permit_number')}`, humanDate(f(d, 'permit_issue_date')), d, 'permit_issue_date')) });
+    }
     const nums = [...m.reduce((mp, d) => { const k = norm(f(d, 'permit_number')); const cur = mp.get(k); if (!cur || (d.type === 'permit' && cur.type !== 'permit') || (!f(cur, 'jurisdiction') && f(d, 'jurisdiction'))) mp.set(k, d); return mp; }, new Map()).values()];
     const facts = nums.flatMap((d) => [fact(`Permit number · ${f(d, 'service_address') ?? ''}`.trim(), f(d, 'permit_number'), d, 'permit_number'), ...(f(d, 'jurisdiction') ? [fact('Issuing office', f(d, 'jurisdiction'), d, 'jurisdiction')] : [])]);
     return answerEnvelope({ text: nums.length === 1 ? `Permit ${f(nums[0], 'permit_number')}${f(nums[0], 'jurisdiction') ? `, issued by ${f(nums[0], 'jurisdiction')}` : ' (no issuing office is printed on the document)'}.` : `${nums.length} permit numbers on file for that job.`, facts });
@@ -336,9 +393,9 @@ export async function runElectrical(db, intent, { today } = {}) {
     else if (w != null) pick = rows.filter((r) => !okIso(r.date) || daysBetween(t0, r.date) <= w);
     pick = [...pick].sort((a, b) => String(a.date).localeCompare(String(b.date)));
     const facts = pick.slice(0, 40).map((r) => { if (!okIso(r.date)) return fact(r.label, 'date unreadable on the document', r.d, r.key); const dd = daysBetween(t0, r.date); return fact(r.label, `${dd < 0 ? `${isTest ? 'overdue since' : 'expired'} ${humanDate(r.date)} (${-dd} day${-dd === 1 ? '' : 's'} ${isTest ? 'overdue' : 'ago'})` : `${isTest ? 'due' : 'expires'} ${humanDate(r.date)} (${dd} day${dd === 1 ? '' : 's'})`}`, r.d, r.key); });
-    const what = isTest ? 'test' : intent.types.length === 1 ? intent.types[0].replace(/-/g, ' ') : 'credential';
+    const what = isTest ? 'test' : intent.types.length === 1 ? (intent.types[0] === 'certificate-of-insurance' ? 'insurance certificate' : intent.types[0].replace(/-/g, ' ')) : 'license, insurance or bond';
     const win = isTest && intent.overdueOnly ? ' overdue' : isTest ? ` due within ${intent.withinDays} days or overdue` : intent.expiredOnly ? ' already expired' : w != null ? ` expiring within ${w} days or already expired` : '';
-    return answerEnvelope({ text: pick.length ? `${pick.length} ${what}${pick.length === 1 ? '' : 's'}${win}. Your documents show these dates.${intent.types?.includes('certificate-of-insurance') ? ' A renewed policy under a new number may list the old one as expired too.' : ''}` : `None${win}. Your documents show no ${what} in that window.`, facts: w == null && !isTest && !intent.expiredOnly ? facts.length ? facts : rows.slice(0, 40).map((r) => fact(r.label, `expires ${humanDate(r.date)}`, r.d, r.key)) : facts });
+    return answerEnvelope({ text: pick.length ? `${pick.length} ${pick.length === 1 || what !== 'license, insurance or bond' ? what + (pick.length === 1 ? '' : 's') : 'licenses, insurance or bonds'}${win || ' on file'}. Your documents show these dates.${intent.types?.includes('certificate-of-insurance') ? ' A renewed policy under a new number may list the old one as expired too.' : ''}` : `None${win}. Your documents show no ${what} in that window.`, facts: w == null && !isTest && !intent.expiredOnly ? facts.length ? facts : rows.slice(0, 40).map((r) => fact(r.label, `expires ${humanDate(r.date)}`, r.d, r.key)) : facts });
   }
   return null;
 }

@@ -10,6 +10,7 @@ import { deleteShopData, downloadTenantExportJson } from '../services/exportClie
 import { memberDisplayName } from '../core/memberNames';
 import { FollowupsCard } from '../components/FollowupsCard';
 import { PhoneAppCard } from '../components/PhoneAppCard';
+import { IndustrySettingsSection } from '../components/IndustrySettingsSection';
 import { DataExportButtons } from '../components/records/DataExportButtons';
 import { reviewClient, type StaffAccessLogEntry, type SupportAccessGrant } from '../services/reviewClient';
 
@@ -133,7 +134,9 @@ function AccountSettingsCard({ tenantId, shopName }: { tenantId: string | null; 
 
       {open && (
         <div className="space-y-4 pt-1">
-          <div className="space-y-2">
+          <IndustrySettingsSection />
+
+          <div className="space-y-2 pt-2 border-t border-line">
             <h3 className="text-body font-medium text-ink flex items-center gap-2">
               <Bell className="w-4 h-4" aria-hidden="true" /> Notifications
             </h3>

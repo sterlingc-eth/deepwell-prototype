@@ -582,7 +582,7 @@ for (const ind of ['hvac', 'electrical', 'property']) await H.as(ind, async (db)
   check('spaced serial "ABC 123 45" is kept whole', val(spaced, 'serial_number') === 'ABC 123 45', val(spaced, 'serial_number'));
   const rd = (u) => fs.readFileSync(new URL(u, import.meta.url), 'utf8');
   const card = rd('../src/components/IndustryAttentionCard.tsx');
-  check('390px: attention card date never breaks mid-date, button at least 44px', /whitespace-nowrap"> · \{i\.date\}/.test(card) && /min-h-\[44px\]/.test(card));
+  check('390px: attention card date never breaks mid-date, button at least 44px', /whitespace-nowrap"> · \{fmtDate\(i\.date\)\}/.test(card) && /min-h-\[44px\]/.test(card));
   const rb = rd('../src/components/records/RecordsBrowser.tsx');
   check('390px: the records column is phone-width for non-HVAC companies and unchanged for HVAC', /nonHvac \? 'flex-1 min-w-0 space-y-3 max-sm:w-full' : 'flex-1 min-w-0 space-y-3'/.test(rb));
 }
@@ -780,5 +780,78 @@ const PARITY = await (async () => {
   check('two service tickets on the same day: asks which one, never silently picks one', st?.clarify === true && /same day/.test(st.text) && (st.clarifyOptions ?? []).length === 2, st?.text);
 }
 check('the card asks plumbing questions the lane understands', ['Which permits have expired?', 'Which open permits expire in the next 60 days?', 'Which backflow tests, water heater warranties or permits need attention?'].every((x) => clL(x) != null && clL(x).kind !== 'decline'));
+/* review round: the real handler */
+{
+  const { makeAsk } = await import('./lib/ask-handler.mjs');
+  const ask = await makeAsk(H, 'plumbing');
+  const prior = { turns: [{ question: 'How many invoices do we have?' }] };
+  const fresh = await ask('Which backflow tests are overdue?'); const chat = await ask('Which backflow tests are overdue?', prior);
+  check('chat: a self-contained question as the second question is answered by the lane exactly like fresh, no model', fresh.modelCalls === 0 && chat.modelCalls === 0 && /backflow tests overdue/.test(chat.text) && chat.text === fresh.text, `${fresh.text} | ${chat.text}`);
+  const fol = await ask('and which of those are overdue?', prior);
+  check('chat: a real follow-up still skips the lane', !/backflow tests overdue\./.test(fol.text));
+  const w = await ask('When does the water heater warranty at 5530 Warehouse Way expire?');
+  check('4b: no warranty document at an address that has other paperwork says so (not "isn\'t on file")', /No warranty is on file for 5530 Warehouse Way/.test(w.text) && !/isn't on file|no equipment/i.test(w.text) && w.modelCalls === 0, w.text);
+  const w2 = await ask('When does the water heater warranty at 1 Nowhere Lane expire?');
+  check('4b: an address with no paperwork at all says it found nothing for that address, in plumbing words (no HVAC "isn\'t on file — not on file for that address")', /couldn't answer that for 1 Nowhere Lane from your plumbing records/.test(w2.text) && /backflow tests/.test(w2.text) && !/isn't on file/.test(w2.text), w2.text);
+}
+
+/* review round: pathological input is bounded (one 60,000-char line, MBs of text) and normal documents read the same */
+{
+  const norm = (r) => JSON.stringify(r?.fields?.map((x) => [x.key, x.value]) ?? null);
+  const base = [{ page_no: 1, text: 'BACKFLOW TEST CERTIFICATE\nService Address: 5 A St, Mesa AZ\nSerial Number: A1B2C3\nTest Date: 09/01/2026\nResult: Passed' }];
+  const t0 = Date.now();
+  for (const line of ['Note: ' + 'x '.repeat(29997), 'Result: Passed Next Test Due: 3/4/27 '.repeat(1800).slice(0, 60000), 'Phone: 480 '.repeat(5400).slice(0, 60000), 'a | b '.repeat(10000)]) { extractPlumbing([{ page_no: 1, text: base[0].text + '\n' + line }]); }
+  const ms = Date.now() - t0;
+  check('extractor: three 60,000-character lines finish in under 200 ms (was 2-9 s)', ms < 200, `${ms} ms`);
+  const withBig = extractPlumbing([{ page_no: 1, text: base[0].text + '\n' + 'lorem ipsum dolor '.repeat(3400).slice(0, 60000) }]);
+  check('extractor: a document with a 60,000-character line still reads its normal fields identically', norm(withBig) === norm(extractPlumbing(base)) && withBig != null);
+  const t1 = Date.now(); extractPlumbing([{ page_no: 1, text: ('Result: Passed' + '\n').repeat(60000) }]); const ms2 = Date.now() - t1;
+  check('extractor: several MB of text is bounded (under 1.5 s)', ms2 < 1500, `${ms2} ms`);
+
+/* round 3 (reviewer): city scope, street boundaries, no HVAC wording, code/legal, follow-ups, partial reads */
+{
+  const { makeAsk } = await import('./lib/ask-handler.mjs');
+  const ask = await makeAsk(H, 'plumbing');
+  const m1 = await ask('Which permits are open in Mesa?'); const t1 = await ask('how many permits are in Tempe'); const t2 = await ask('How many permits are open in Mesa'); const all = await ask('Which permits are open?');
+  const cityOfFacts = async (r) => H.as('plumbing', async (db) => { const ids = [...new Set((r.data?.facts ?? []).flatMap((x) => (x.sources ?? []).map((y) => y.documentId)))]; const { rows } = await db.raw(`SELECT DISTINCT value FROM extractions WHERE field_key = 'service_address' AND document_id = ANY($1::uuid[])`, [ids]); return rows.map((x) => String(x.value)); });
+  const num = (r) => Number(/^(\d+) permit/.exec(r.text)?.[1] ?? NaN);
+  const mesaAddrs = await cityOfFacts(m1);
+  check('P1: "Which permits are open in Mesa?" answers from the permits (never "No permits issued by the City of Mesa"), only Mesa ones, fewer than all open permits', m1.modelCalls === 0 && !/No permits issued/.test(m1.text) && num(m1) > 0 && num(m1) < num(all) && /Only permits in Mesa were checked/.test(m1.text) && mesaAddrs.length > 0 && mesaAddrs.every((a) => /\bMesa\b/i.test(a)), `${m1.text} | ${mesaAddrs.join(' / ')}`);
+  const tempeAddrs = await cityOfFacts(t1);
+  check('P1: "how many permits are in Tempe" counts only Tempe permits', t1.modelCalls === 0 && num(t1) > 0 && /Tempe were checked/.test(t1.text) && tempeAddrs.every((a) => /\bTempe\b/i.test(a)), `${t1.text} | ${tempeAddrs.join(' / ')}`);
+  check('P1: "How many permits are open in Mesa" gives the same count as the list', num(t2) === num(m1), t2.text);
+  const e1 = await ask('What is the water heater brand at 12 Elm Street?'); const e2 = await ask('What is the water heater brand at 412 Elm Street?');
+  check('P2: "12 Elm Street" is not "412 Elm Street" (no "other paperwork is on file there")', !/Other paperwork is on file there/.test(e1.text) && /isn't on file|couldn't answer|on file for 12 Elm/.test(e1.text) && !/Rheem|Rinnai|made by/.test(e1.text), e1.text);
+  check('P2: the real 412 Elm Street still answers', /412 Elm Street/.test(e2.text) && /made by/.test(e2.text), e2.text);
+  const h8 = await ask('What is the permit number for 8 Harmon Street?');
+  check('P2: "8 Harmon Street" never returns the 88 Harmon Street permit', !/PL-26-07788/.test(h8.text), h8.text);
+  const HV = /\bcustomers?\b|pieces of equipment|units match|service visits|no customer, unit, or document|couldn't find a customer|Financials update|not on file for that address|\bequipment type isn't recorded/i;
+  for (const q of ['Which units are vacant?', 'Who are our customers?', 'Which invoices are overdue?', 'Which jobs have a certificate of completion?', 'How many sites passed final?', 'Do we have any work orders open?', 'How many work orders are open?', 'What is the permit number for 99 Nowhere Road?']) {
+    const r = await ask(q);
+    check(`P3: plumbing "${q}" carries no HVAC wording`, !HV.test(r.text) && r.modelCalls === 0 && /backflow tests, water heaters and their warranties, permits, camera inspections, service tickets and invoices|backflow|permit|work order|invoice/i.test(r.text), r.text);
+  }
+  const cap = await ask('What can you do?');
+  check('P3: "What can you do?" gives a short plumbing capability line', /backflow tests, water heaters and their warranties, permits, camera inspections, service tickets and invoices/.test(cap.text), cap.text);
+  const emp = await makeAsk(H, 'electrical'); // an empty company in this harness
+  const ea = await emp('What needs attention?'); const eb = await emp('Which invoices are overdue?'); const ec = await emp('What is the permit number for 412 Elm Street?');
+  check('P3: an empty company never says "couldn\'t find a customer" / "can\'t total invoice amounts yet"', !HV.test(eb.text) && !HV.test(ec.text), `${eb.text} | ${ec.text}`);
+  const pa = await H.as('hvac', (db) => runPlumbing(db, classifyPlumbingForLane('What needs attention?'), { today: TODAY }));
+  check('P3: a plumbing company with no documents says nothing is on file yet, not "None"', /are on file yet/.test(pa?.text ?? '') && !/^None/.test(pa?.text ?? ''), pa?.text);
+  const lg = await ask('Is it legal to cap a gas line?'); const cd = await ask('Will it pass inspection if I skip the vacuum breaker?');
+  check('P4: plumbing code / legal questions get the decline, not "No earlier question to go on"', /can't give legal advice/.test(lg.text) && /can't judge whether plumbing work meets code/.test(cd.text), `${lg.text} | ${cd.text}`);
+  const prior = { turns: [{ question: 'Which backflow tests are overdue?' }] };
+  const { isSelfContainedTurn: sc } = await import('../api/_lib/conversation.js');
+  check('P5: "How many are RPZ?" is a follow-up, not self-contained; "How many RPZ devices are on file?" is', !sc('How many are RPZ?') && sc('How many RPZ devices are on file?'));
+  const fu = await ask('How many are RPZ?', prior);
+  check('P5: "How many are RPZ?" after an overdue-tests answer is NOT answered as a fresh all-company RPZ count', !/^\d+ RPZ backflow devices on file\.$/.test(fu.text), fu.text);
+  const one = await ask('Did 3300 Granite Parkway pass final inspection?'); const two = await ask('Did 3300 Granite Parkway pass the inspection?');
+  check('P9: a single inspection result is not labelled "(newest first)"; several are', /^Final inspection on June 23, 2026: Passed\.$/.test(one.text) && /newest first/.test(two.text) === ((two.data?.facts ?? []).length > 1), `${one.text} | ${two.text} | ${(two.data?.facts ?? []).length}`);
+  // P7: a text cut by the scan cap marks the document partly read (the deterministic read never keeps half a document)
+  const big = extractPlumbingRaw([{ page_no: 1, text: 'BACKFLOW TEST CERTIFICATE\nService Address: 5 A St, Mesa AZ\nSerial Number: A1B2C3\nTest Date: 09/01/2026\nResult: Passed\n' + 'lorem ipsum dolor '.repeat(3400).slice(0, 60000) }]);
+  const bigAll = extractPlumbingRaw([{ page_no: 1, text: 'BACKFLOW TEST CERTIFICATE\nService Address: 5 A St, Mesa AZ\nResult: Passed\n' + ('Note: lorem ipsum dolor sit amet consectetur adipiscing elit\n').repeat(9000) }]);
+  check('P7: a 60,000-character line or text past the 400,000-character cap flags the plumbing read as partial', big?.partial === true && bigAll?.partial === true);
+  check('P7: a normal document is not flagged', !extractPlumbingRaw([{ page_no: 1, text: 'BACKFLOW TEST CERTIFICATE\nService Address: 5 A St, Mesa AZ\nSerial Number: A1B2C3\nTest Date: 09/01/2026\nResult: Passed' }])?.partial);
+}
+}
 console.log(failures ? `${failures} FAILED (${passes} passed)` : `${passes} checks passed.`);
 process.exit(failures ? 1 : 0);

@@ -474,6 +474,11 @@ export function parseContentCountQuestion(question, pack = null) {
   const hasQuestionShape = QUESTION_SHAPE_RE.test(lower) && !REPLACED_WORD_RE.test(lower) && !TIME_WINDOW_RE.test(lower);
   if (!hasMention && !hasIssue && !hasComplaintsAbout && !hasListJobsWhere && !hasQuestionShape) return null;
 
+  // Non-HVAC only: a bare "who ..." question ("Who is the owner on permit EL-26-03300?", "who is the vendor?") asks about a person on a record, not for the
+  // documents that contain a word. Counting pages for the leftover noun gave "No documents on file mention permit" / "... mention vendor" (a false zero). Leave it
+  // to the industry lane / retrieval. HVAC keeps the old behaviour.
+  if (pack && pack.id !== 'hvac' && hasQuestionShape && !hasMention && !hasIssue && !hasComplaintsAbout && !hasListJobsWhere && /^\s*who\b/.test(lower)) return null;
+
   const terms = extractKnownTerms(lower, pack);
   if (!terms.length) return null;
 
@@ -708,6 +713,14 @@ export async function runContentCount(db, parsed, pack = null) {
   }
 
   /* ------------------------------------------------------------ grouped by customer */
+  if (groupBy === 'customer' && !nCust && pack && pack.id !== 'hvac') {
+    // Non-HVAC: the matching documents are not linked to any customer record, so there is no list to give (never "0 customers have ...: .").
+    return attachCitations({
+      kind: 'answer',
+      text: `${nDocs} ${pluralNoun(noun, nDocs)} on file mention ${termsLabel}, but none is linked to a customer record, so I can't say which customers. Ask about one address or one document type instead.`,
+      facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+    }, { records: [], total: 0, kind: 'searched', basis: `Scanned every document on file for ${termsLabel}; none of the ${nDocs} matches is linked to a customer.` });
+  }
   if (groupBy === 'customer') {
     const names = [...customersById.values()].map((c) => c.name || 'Unnamed customer').sort((a, b) => a.localeCompare(b));
     const shownNames = names.slice(0, 15);

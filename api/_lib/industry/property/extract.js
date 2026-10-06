@@ -17,6 +17,7 @@
  * Only used for companies whose industry pack is property; the HVAC, electrical and plumbing paths never call it.
  */
 import { parseDate as parseDateRaw } from '../plumbing/extract.js';
+import { boundedLines, newBudget } from '../textBounds.js';
 
 // a dotted date with both parts <= 12 (02.03.2027) is day-first in some countries and month-first in others: unreadable, unless a part > 12 settles it
 const parseDate = (s) => { const dm = String(s ?? '').trim().match(/^(\d{1,2})\.(\d{1,2})\.\d{2,4}$/); if (dm && +dm[1] <= 12 && +dm[2] <= 12) return null; const d = parseDateRaw(s); return d && d >= '2000-01-01' && d <= '2060-12-31' ? d : null; };
@@ -232,10 +233,10 @@ const COV_ROW = /^(?:commercial\s+|comm\.?\s+)?(?:general\s+liab(?:ility)?|gen\.
 const HAS_DATE = new RegExp(DATE_RE);
 
 function toLines(pages) {
-  const out = [];
+  const out = []; const budget = newBudget();
   for (const p of pages ?? []) {
     let blank = false;
-    for (const raw of String(p.text ?? '').split(/\r?\n/)) {
+    for (const raw of boundedLines(p.text, budget)) {
       const t = raw.replace(/\s+/g, ' ').trim();
       if (!t) { blank = true; continue; }
       const page = Number(p.page_no) || 1;
@@ -248,6 +249,7 @@ function toLines(pages) {
       blank = false;
     }
   }
+  out.cut = budget.cut;
   return out;
 }
 
@@ -298,9 +300,9 @@ function rrRagged(cells, hdr) {
 }
 function rrRows(pages) {
   const rows = []; const conflicts = new Set(); let unread = 0;
-  let hdr = null;
+  let hdr = null; const budget = newBudget();
   for (const p of pages ?? []) {
-    for (const raw of String(p.text ?? '').split(/\r?\n/)) {
+    for (const raw of boundedLines(p.text, budget)) {
       const t = raw.replace(/[ \u00a0]+$/, '').trim(); if (!t) continue;
       const h = rrHeader(t.replace(/\s{2,}/g, '  '));
       if (h) { hdr = h; continue; }
@@ -327,6 +329,7 @@ function rrRows(pages) {
   unread += conflicts.size;
   const out = [...byUnit.values()].filter((r) => !conflicts.has(r.unit));
   out.unread = unread;
+  out.truncated = budget.cut; // text past the scan cap was never read: the rent roll is incomplete
   return out;
 }
 
@@ -560,7 +563,7 @@ export function extractProperty(pages, opts = {}) {
     const rows = rrRows(pages);
     for (const r of rows) multi.push({ key: 'rent_roll_row', value: r.text, line: { t: r.verbatim, page: r.page }, order: order++ });
     if (!rows.length) return null;
-    if (rows.unread) multi.push({ key: 'rent_roll_unread', value: String(rows.unread), line: { t: `${rows.unread} unit row(s) not read`, page: rows[0].page }, order: order++ });
+    if (rows.unread || rows.truncated) { const nr = rows.truncated ? 'an unknown number of' : String(rows.unread); multi.push({ key: 'rent_roll_unread', value: nr, line: { t: `${nr} unit row(s) not read`, page: rows[0].page }, order: order++ }); }
   }
 
   // ---- build output
@@ -632,7 +635,7 @@ export function extractProperty(pages, opts = {}) {
   if (ok && !ok()) return null;
 
   fieldsOut.sort((a, b) => a._o - b._o);
-  return { type, confidence: cls.confidence, fields: fieldsOut.filter((f) => !f.key.startsWith('_')).map(({ _o, ...f }) => f) };
+  return { type, confidence: cls.confidence, fields: fieldsOut.filter((f) => !f.key.startsWith('_')).map(({ _o, ...f }) => f), ...(lines.cut && type !== RR ? { partial: true } : {}) };
 }
 
 /** Required keys for a type, from the property pack (a|b = either). */

@@ -15,7 +15,7 @@ import { PreflightPill, SamplePromptChips, SamplePromptsPlaceholder, DidYouMeanC
 import { ask, AskApiError } from '../services/answerService';
 import { friendlyErrorMessage } from '../services/httpError';
 import { useAppStore } from '../store/appStore';
-import { exampleQuestionsFor } from '../lib/industry';
+import { exampleQuestionsFor, lookupHintFor } from '../lib/industry';
 
 // TEAM T2 / Round 18 P2: matches api/_lib/conversation.js's own MAX_CONTEXT_TURNS (that module isn't
 // importable into the client bundle — it pulls in server-only deps — so the cap is kept in sync here by
@@ -406,7 +406,7 @@ export function AskScreen() {
                 ) : (
                   // Documents exist (the server just had no ready-made suggestions, or couldn't be reached):
                   // never tell an owner with records that nothing has been added.
-                  <p className="text-ink-3">Type an address, a serial number, or a customer name above.</p>
+                  <p className="text-ink-3">Type {lookupHintFor(industryId)} above.</p>
                 )}
               </>
             )}

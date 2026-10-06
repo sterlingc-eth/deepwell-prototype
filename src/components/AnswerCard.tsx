@@ -1,3 +1,5 @@
+import { lookupHintFor } from '../lib/industry';
+import { useAppStore } from '../store/appStore';
 import { AnswerTrust } from './answer/AnswerTrust';
 import { applyRole, currentRole } from '../core/role';
 import { useMemo, useState } from 'react';
@@ -45,6 +47,7 @@ export interface AnswerCardProps {
  * Embeddable: it depends only on the Answer object and three callbacks.
  */
 export function AnswerCard({ answer: answerIn, question, includeUnverified, onToggleUnverified, onOpenSource, onOpenEntity, onOpenRecord, onAsk }: AnswerCardProps) {
+  const industryId = useAppStore((s) => s.industry?.industry ?? null);
   const docs = useGraph((s) => s.docs);
   // R31 3c: role-aware ordering of the facts (a tech's unit facts first / the office's money first); a no-op with no role.
   const role = useMemo(() => currentRole(false), []);
@@ -223,7 +226,7 @@ export function AnswerCard({ answer: answerIn, question, includeUnverified, onTo
       <div className="px-5 sm:px-6 py-5 space-y-6">
         {isEmpty ? (
           <>
-            <SourceList sources={answer.closest} onOpen={onOpenSource} title="Closest documents" emptyText="No documents look related. Try an address, a serial number, or a customer name." />
+            <SourceList sources={answer.closest} onOpen={onOpenSource} title="Closest documents" emptyText={`No documents look related. Try ${lookupHintFor(industryId)}.`} />
             {panel}
           </>
         ) : (

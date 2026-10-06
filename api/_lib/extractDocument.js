@@ -96,7 +96,7 @@ const ELECTRICAL_OWN_TYPES = new Set(['permit', 'inspection-report', 'correction
 function tryElectricalDeterministic(pages, pack) {
   try {
     const r = extractElectrical(pages);
-    if (!r || r.confidence < 0.9 || !ELECTRICAL_OWN_TYPES.has(r.type) || r.fields.length < 3) return null;
+    if (!r || r.partial || r.confidence < 0.9 || !ELECTRICAL_OWN_TYPES.has(r.type) || r.fields.length < 3) return null;
     if (missingRequired(r.type, r.fields, pack).length) return null;
     if ((r.type === 'inspection-report' || r.type === 'correction-notice') && !r.fields.some((f) => f.key === 'inspection_type')) return null; // an unlabelled stage is read by the model, never left blank
     return { type: r.type, toolInput: { document_type: r.type, document_type_confidence: r.confidence, fields: r.fields } };
@@ -110,7 +110,7 @@ const PLUMBING_OWN_TYPES = new Set(['backflow-test-certificate', 'sewer-camera-r
 function tryPlumbingDeterministic(pages, pack) {
   try {
     const r = extractPlumbing(pages, { today: new Date().toISOString().slice(0, 10) });
-    if (!r || r.confidence < 0.9 || !PLUMBING_OWN_TYPES.has(r.type) || r.fields.length < 3) return null;
+    if (!r || r.partial || r.confidence < 0.9 || !PLUMBING_OWN_TYPES.has(r.type) || r.fields.length < 3) return null;
     if (missingRequiredPlumbing(r.type, r.fields, pack).length) return null;
     return { type: r.type, toolInput: { document_type: r.type, document_type_confidence: r.confidence, fields: r.fields } };
   } catch {
@@ -123,7 +123,7 @@ const PROPERTY_OWN_TYPES = new Set(PROPERTY_TYPES);
 function tryPropertyDeterministic(pages, pack) {
   try {
     const r = extractProperty(pages, { today: new Date().toISOString().slice(0, 10) });
-    if (!r || r.confidence < 0.9 || !PROPERTY_OWN_TYPES.has(r.type) || r.fields.length < 3) return null;
+    if (!r || r.partial || r.confidence < 0.9 || !PROPERTY_OWN_TYPES.has(r.type) || r.fields.length < 3) return null;
     if (missingRequiredProperty(r.type, r.fields, pack).length) return null;
     return { type: r.type, toolInput: { document_type: r.type, document_type_confidence: r.confidence, fields: r.fields } };
   } catch {

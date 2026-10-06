@@ -44,15 +44,49 @@ export function parseBrandUnitCount(question) {
 }
 
 export async function runBrandUnitCount(db, intent) {
-  const { rows: units } = await db.raw(`SELECT id, lower(coalesce(data->>'manufacturer','')) AS mfr, regexp_replace(lower(coalesce(data->>'refrigerant','')), '[^a-z0-9]', '', 'g') AS rf FROM entities WHERE entity_type = 'equipment' AND merged_into IS NULL AND ${TENANT_SQL}`, []);
+  const { rows: units } = await db.raw(`SELECT id, lower(coalesce(data->>'manufacturer','')) AS mfr, regexp_replace(lower(coalesce(data->>'refrigerant','')), '[^a-z0-9]', '', 'g') AS rf, lower(btrim(coalesce(data->>'serial_number',''))) AS sn FROM entities WHERE entity_type = 'equipment' AND merged_into IS NULL AND ${TENANT_SQL}`, []);
   if (!units.length) return null;
   const rf = intent.refrig ? `r${intent.refrig}` : null;
-  const hits = units.filter((u) => (!intent.brands.length || intent.brands.includes(u.mfr)) && (!rf || u.rf === rf));
+  const brandOk = (u) => !intent.brands.length || intent.brands.includes(u.mfr);
+  const recHits = units.filter((u) => brandOk(u) && (!rf || u.rf === rf));
+  // A unit whose own record has no refrigerant but whose filed paperwork states one (e.g. "Install 4 ton Mitsubishi system, R-454B charge") is
+  // counted too and the split is stated, so the total matches what the paperwork says (2026-10 lt-ct-145). Only units with an EMPTY record
+  // refrigerant are looked up, and only the refrigerant the paperwork names (never a different one) counts.
+  let paperHits = []; let paperAny = 0;
+  if (rf) {
+    const empty = units.filter((u) => brandOk(u) && !u.rf);
+    if (empty.length) {
+      const { rows } = await db.raw(
+        `SELECT l.entity_id AS id, lower(p.text) AS t FROM document_entity_links l JOIN document_pages p ON p.document_id = l.document_id
+          WHERE l.entity_id = ANY($1::uuid[]) AND l.${TENANT_SQL} AND p.${TENANT_SQL}`, [empty.map((u) => u.id)]);
+      const named = new Map(); // unit id -> set of refrigerants named on a page that is about THAT unit
+      // A page counts for a unit only when it prints that unit's serial (>= 4 chars) and no other unit's serial, and names the refrigerant itself: a ticket
+      // linked to two units ("Unit 1 recharged R-22. Unit 2 no refrigerant work") says nothing certain about either one.
+      // A usable serial is >= 5 characters with at least one digit, matched as a whole token (never "none" / "2026" / a fragment of a longer word or number).
+      const SN_MIN = 5;
+      const goodSn = (sn) => sn.length >= SN_MIN && /\d/.test(sn);
+      const printsSn = (t, sn) => { const e = sn.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); return new RegExp(`(?<![a-z0-9])${e}(?![a-z0-9])`).test(t); };
+      const byId = new Map(units.map((u) => [u.id, u]));
+      const otherSerials = (u) => [...new Set(units.filter((o) => o.id !== u.id && goodSn(o.sn) && o.sn !== u.sn).map((o) => o.sn))];
+      const othersCache = new Map();
+      for (const r of rows) {
+        const u = byId.get(r.id); const t = String(r.t);
+        if (!u || !goodSn(u.sn) || !printsSn(t, u.sn)) continue;
+        if (!othersCache.has(u.id)) othersCache.set(u.id, otherSerials(u));
+        if (othersCache.get(u.id).some((o) => printsSn(t, o))) continue;
+        for (const m of t.matchAll(/\br[\s-]?(410a|22|454b|407c|134a|32)\b/g)) { if (!named.has(r.id)) named.set(r.id, new Set()); named.get(r.id).add(`r${m[1]}`); }
+      }
+      // only a unit whose paperwork names exactly this refrigerant counts; one naming a different one too is ambiguous and stays uncounted
+      paperHits = empty.filter((u) => { const n = named.get(u.id); return n && n.size === 1 && n.has(rf); });
+      paperAny = empty.filter((u) => named.has(u.id)).length;
+    }
+  }
+  const hits = [...recHits, ...paperHits];
   const pool = intent.brands.length ? units.filter((u) => intent.brands.includes(u.mfr)) : units;
-  const noRf = rf ? pool.filter((u) => !u.rf).length : 0;
+  const noRf = rf ? pool.filter((u) => !u.rf).length - paperAny : 0;
   const bl = intent.brands.map((b) => LABEL[b]).join(" or ");
   const what = [bl, rf ? `R-${intent.refrig.toUpperCase()}` : ""].filter(Boolean).join(" ");
-  const text = `${hits.length} of ${units.length} units are ${what}${intent.brands.length && !rf ? " (by the manufacturer on each unit record)" : ""}.${noRf ? ` ${noRf} ${intent.brands.length ? `${bl} ` : ""}unit${noRf === 1 ? " has" : "s have"} no refrigerant on file, so ${noRf === 1 ? "it isn't" : "they aren't"} counted.` : ""}`;
+  const text = `${hits.length} of ${units.length} units are ${what}${intent.brands.length && !rf ? " (by the manufacturer on each unit record)" : ""}.${paperHits.length ? ` ${recHits.length} say so on the unit record and ${paperHits.length} more say so in their paperwork.` : ""}${noRf ? ` ${noRf} ${intent.brands.length ? `${bl} ` : ""}unit${noRf === 1 ? " has" : "s have"} no refrigerant on file${paperAny ? " or in their paperwork" : ""}, so ${noRf === 1 ? "it isn't" : "they aren't"} counted.` : ""}`;
   return attachCitations(
     answerEnvelope({ text, facts: [{ label: `Units ${what}`, value: String(hits.length), entityIds: hits.slice(0, 20).map((u) => u.id), sources: [] }], extra: { fastIntent: "brand_unit_count" } }),
     { records: await customerRecordsFor(db, hits.map((u) => u.id)), total: hits.length, claimedCount: hits.length,

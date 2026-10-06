@@ -67,6 +67,7 @@ import { answerRelationsQuestion } from "./_lib/relations/questions.js";
 import { runDecompose } from "./_lib/decompose/index.js";
 import { packForTenant } from "./_lib/industry/index.js";
 import { laneForPack } from "./_lib/industry/lanes.js";
+import { guardNonHvac } from "./_lib/industry/nonHvacGuard.js";
 // Round 11 (literature #6/#7): per-tenant vocabulary (brands/models/technicians/customers actually on
 // file, cached per tenant by data-version) — widens normalization's fuzzy-typo correction beyond the
 // generic/pack vocabulary and grounds the analytics planner prompt in what THIS tenant's data contains.
@@ -143,7 +144,7 @@ import { takeScorecardCall } from "./_lib/scorecard/hook.js";
 // takes this exact same path it always has — nothing here changes behavior unless the field is sent.
 import { classifyNonQuestion, nonQuestionAnswer } from "./_lib/modelAvoidance/nonQuestion.js";
 import { isNonQuestionGateEnabled } from "./_lib/modelAvoidance/switches.js";
-import { validateConversationContext, isFollowupContinuation, composeFollowup } from "./_lib/conversation.js";
+import { validateConversationContext, isFollowupContinuation, composeFollowup, isSelfContainedTurn } from "./_lib/conversation.js";
 
 /** Billing gate (handoffs/BILLING_RULES.md): ask stays readable through
  * past-due grace and past-grace alike — only a never-subscribed tenant past
@@ -778,10 +779,15 @@ export default async function handler(req, res) {
   let brandTypoNote = null;
   // R31 3b: this tenant's replaced-document map (api/_lib/supersession.js), loaded once per ask after auth; null until then.
   let supersededMap = null;
+  // Non-HVAC company: set once the pack is known; laneAnswered marks an industry-lane answer, which the central HVAC-wording guard (nonHvacGuard.js) never filters.
+  let guardPack = null; let laneAnswered = false; let guardQuestion = null;
   const send = (status, body) => {
+    if (guardPack && !laneAnswered && body?.data && typeof body.data === "object") {
+      try { const g = guardNonHvac(guardPack, body.data, guardQuestion); if (g) body = { ...body, data: attachCitations(g, { records: [], total: 0, kind: "searched", basis: g.basis }) }; } catch (err) { console.error("non-HVAC guard failed, sending answer as computed:", err?.message); }
+    }
     if (askedText && body?.data && typeof body.data === "object" && body.data.kind === "answer") {
       try {
-        const typeNote = unverifiedTypeNote(askedText, body.data);
+        const typeNote = guardPack ? null : unverifiedTypeNote(askedText, body.data); // the equipment-type note is HVAC wording: never on a non-HVAC company's answer
         if (typeNote) body.data.text = `${body.data.text} ${typeNote}`;
       } catch (err) { console.error("type-premise note failed, sending answer as computed:", err?.message); }
       try {
@@ -906,13 +912,16 @@ export default async function handler(req, res) {
     // TEAM T2: fold a real follow-up into a self-contained question (see the
     // import above) — never throws, never blocks the question on a malformed
     // context, and re-checks the length cap since the composed text is longer.
+    // A turn that is self-contained (no reference to a previous answer, not a bare fragment) is not folded and may use the industry lane exactly as it
+    // would fresh; any real or doubtful follow-up keeps the old behaviour (lane skipped).
+    let selfContainedTurn = false;
     if (conversationContext) {
       try {
         const convo = validateConversationContext(conversationContext);
         if (convo.turns.length && isFollowupContinuation(question, convo)) {
           const composed = composeFollowup(convo, question).query;
           if (composed && composed.length <= MAX_QUESTION) question = composed;
-        }
+        } else if (isSelfContainedTurn(question)) selfContainedTurn = true;
       } catch { /* not a followup — the question is asked exactly as typed */ }
     }
 
@@ -938,12 +947,33 @@ export default async function handler(req, res) {
     }
 
     const ctxArg = { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId };
+    let deferredEarly = null;
     const meta = classifyMetaQuestion(question);
     if (!meta && earlyDeclineEnabled()) {
       const early = classifyEarlyDecline(question, { hasConversation: !!conversationContext });
       let vetoed = false;
       if (early?.kind === "off_domain") { try { vetoed = await withTenant(ctxArg, (db) => triggerMatchesCustomerName(db, early.trigger)); } catch { vetoed = false; } }
-      if (early && !vetoed) return send(200, { success: true, data: buildEarlyDeclineAnswer(early.kind) });
+      // A panel/breaker question is "untracked" for an HVAC company, but a non-HVAC lane (electrical panel schedule) may answer it: ask the lane first and
+      // decline afterwards only if it does not (deferredEarly, below). HVAC (pack hvac) never defers, so its path is unchanged.
+      if (early?.kind === "untracked_component" && !vetoed) {
+        try {
+          const pk = await packForTenant({ withTenant, ctxArg });
+          if (pk?.id && pk.id !== "hvac") { const ln = await laneForPack(pk); if (ln?.classify(question, { today: resolveToday(today) })) { deferredEarly = early; vetoed = true; } }
+        } catch { /* decline as before */ }
+      }
+      // A code / legal question ("Is it legal to splice wires...", "Will it pass inspection if...") reads like a dangling "it" follow-up, but a non-HVAC lane
+      // owns its fixed code/legal decline: let the lane say it; if the lane does not decline, the early decline stands.
+      if (early?.kind === "dangling" && !vetoed) {
+        try {
+          const pk = await packForTenant({ withTenant, ctxArg });
+          if (pk?.id && pk.id !== "hvac") { const ln = await laneForPack(pk); if (ln?.classify(question, { today: resolveToday(today) })?.kind === "decline") { deferredEarly = early; vetoed = true; } }
+        } catch { /* decline as before */ }
+      }
+      if (early && !vetoed) {
+        // a non-HVAC company's off-domain decline ("What can you do?") names its own trade's questions (nonHvacGuard.js); the pack lookup is a cached Map hit
+        if (early.kind === "off_domain") { try { const pk = await packForTenant({ withTenant, ctxArg }); if (pk?.id && pk.id !== "hvac") { guardPack = pk.id; guardQuestion = question; } } catch { /* the plain decline stands */ } }
+        return send(200, { success: true, data: buildEarlyDeclineAnswer(early.kind) });
+      }
     }
     // Never throws (see getActiveOverlay's own doc comment) — safe to await
     // directly with no try/catch here.
@@ -962,6 +992,7 @@ export default async function handler(req, res) {
     // HVAC's. Never throws (packForTenant degrades to the hvac pack on any
     // failure) — safe to await directly with no try/catch here.
     const pack = await timer.time("pack", () => packForTenant({ withTenant, ctxArg }));
+    if (pack?.id && pack.id !== "hvac") { guardPack = pack.id; guardQuestion = question; }
 
     // ---- tenant vocabulary (Round 11, literature #6/#7) --------------------
     // This tenant's own brands/models/technicians/customers actually on file (vocab/tenantVocab.js),
@@ -1129,7 +1160,7 @@ export default async function handler(req, res) {
     // A non-HVAC company's own paperwork questions (open permits, inspection results, expiring licences...) answered from
     // its extractions with a citation per fact. HVAC has no lane (laneForPack -> null), so its path is untouched. null = not
     // sure -> the normal chain carries on; any failure also falls through.
-    if (pack?.id && pack.id !== "hvac" && !conversationContext) {
+    if (pack?.id && pack.id !== "hvac" && (!conversationContext || selfContainedTurn)) {
       try {
         const lane = await laneForPack(pack);
         const laneIntent = lane?.classify(question, { today: todayResolved });
@@ -1145,12 +1176,13 @@ export default async function handler(req, res) {
               }
               return result;
             }));
-          if (laneData) return send(200, { success: true, data: laneData, fast: true });
+          if (laneData) { laneAnswered = true; return send(200, { success: true, data: laneData, fast: true }); }
         }
       } catch (err) {
         console.error("Industry lane failed, falling through:", err?.message);
       }
     }
+    if (deferredEarly) return send(200, { success: true, data: buildEarlyDeclineAnswer(deferredEarly.kind) }); // the lane did not answer: the early decline stands
 
     // ---- Donovan agent fallback (DONOVAN_AGENT, default on) ----------------
     // Tried at most once per request, from three places below: an honest analytics fallback / an
@@ -1532,7 +1564,7 @@ export default async function handler(req, res) {
         // logAction failure here is harmless and non-fatal.
         fastData = await timer.time("fast", () =>
           withTenant(ctxArg, async (db) => {
-            const result = await withCitations(db, runFastPath(db, fastPathIntent, { today: todayResolved })); // TEAM C
+            const result = await withCitations(db, runFastPath(db, fastPathIntent, { today: todayResolved, pack })); // TEAM C
             if (result) {
               const bkStart = Date.now();
               try {

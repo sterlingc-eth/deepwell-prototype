@@ -85,12 +85,12 @@ q('How many failed inspections do we have?', { must: [`${T.failedInsp.filter((f)
 const lic = T.B.lic;
 for (const ph of ['When does our contractor license expire?', 'When is the license due to be renewed?'])
   q(ph, { must: [long(lic.exp)], mustNot: [long(T.B.docs.find((d) => d.filename === 'license-2025.pdf').exp ?? '1900-01-01')].filter((x) => x && !x.startsWith('January 1, 1900')), cite: [['license-2026.pdf', 'license_expiry']] });
-q('Which insurance certificates expire in the next 60 days?', { must: ['2 certificate', 'GL-4410-2291', 'WC-7712-0035'], mustNot: ['GL-5520-1180'] });
-q('Which insurance certificates have already expired?', { must: ['1 certificate', 'GL-4410-2291'], mustNot: ['WC-7712-0035'] });
+q('Which insurance certificates expire in the next 60 days?', { must: ['2 insurance certificates', 'GL-4410-2291', 'WC-7712-0035'], mustNot: ['GL-5520-1180'] });
+q('Which insurance certificates have already expired?', { must: ['1 insurance certificate', 'GL-4410-2291'], mustNot: ['WC-7712-0035'] });
 q('When does our workers comp insurance expire?', { must: ['WC-7712-0035', long(T.B.coi[1].exp)] });
 q('When does the bond expire?', { must: [T.B.bond.n, long(T.B.bond.exp)] });
 q('Which bonds expire in the next 30 days?', { must: ['None'] });
-q('Which licenses, insurance or bonds expire in the next 60 days?', { must: ['4 credential', 'SB-90311', 'ROC-318244', 'WC-7712-0035', 'GL-4410-2291'], mustNot: ['GL-5520-1180'] });
+q('Which licenses, insurance or bonds expire in the next 60 days?', { must: ['4 licenses, insurance or bonds', 'SB-90311', 'ROC-318244', 'WC-7712-0035', 'GL-4410-2291'], mustNot: ['GL-5520-1180'] });
 q('Which tests are due in the next 60 days?', { must: ['2 test', 'Generator', 'Transfer Switch'], mustNot: ['Thermography'] });
 q('Which generator tests are due?', { must: ['Generator', 'October 25, 2026'], mustNot: ['Transfer'] });
 q('Which thermography or transfer switch tests are overdue?', { must: ['Transfer Switch'] });
@@ -155,7 +155,7 @@ check(`blind sets: ${BLIND.length} questions, none answered wrongly (${blindLeft
 const { resultClass } = await import('../api/_lib/industry/electrical/lane.js');
 for (const [r, c] of [['Passed - no re-inspection required', 'passed'], ['Pass, no reinspection needed', 'passed'], ['Re-inspection required', 'failed'], ['Approved pending corrections', 'other'], ['Pass - corrections noted', 'other'], ['Approved w/ comments', 'other'], ['Passed (re-inspection fee due)', 'other'], ['Pass', 'passed'], ['PASS', 'passed'], ['Corrections', 'failed'], ['Needs correction', 'failed'], ['Pass - no corrections required', 'passed'], ['PASSED, no corrections needed', 'passed'], ['Corrections Required', 'failed'], ['Not accepted', 'failed'], ['Not OK', 'failed'], ['Approved with corrections', 'other'], ['Approved', 'passed'], ['Failed', 'failed'], ['Passed', 'passed']]) check(`result "${r}" is ${c}`, resultClass(r) === c);
 const cl = (x) => classifyElectrical(x, { today: TODAY });
-check('open-permits for a named street keeps the street word', JSON.stringify(cl('Open permits at 123 Main St').place) === '["123","main"]');
+check('open-permits for a named street keeps the street word', JSON.stringify(cl('Open permits at 123 Main St').place) === '["123","main","~st"]'); // the typed street type travels as a "~st" marker (P2)
 check('two asks in one sentence go to the normal path', cl('Which permits are open and which licenses expire in 30 days?') === null && cl('Which permits are still open and which inspections failed?') === null);
 check('a relative period we cannot compute goes to the normal path', cl('Which licenses expire next month?') === null);
 check('a renewal question is not declined as a code question', cl('When does my license expire, do I have to renew it?')?.kind === 'credentials');
@@ -340,7 +340,8 @@ await H.as('electrical', async (db) => {
   check('one job spelled three ways is one job (no dead-end "which one")', a1 && !a1.clarify && /EL-26-01010/.test(a1.text), a1?.text);
   const a2 = await runElectrical(db, cl('Is the permit at 10 Oak Street still open?'), { today: TODAY });
   check('the final card spelled "St." closes the permit spelled "Street"', a2 && /has a passed final/.test(a2.text), a2?.text);
-  check('a city alone is not a job', (await runElectrical(db, cl('Which permits are open in Mesa?'), { today: TODAY })) === null);
+  { const cty = await runElectrical(db, cl('Which permits are open in Mesa?'), { today: TODAY });
+    check('a city is a scope, not a job: city-scoped open permits answer for that city and never ask "which job"', cty && !cty.clarify && /in Mesa/.test(cty.text) && /^None of the \d+ permits? in Mesa/.test(cty.text) === (cty.facts.length === 0), cty?.text); }
 });
 {
   const t = extractElectrical([{ page_no: 1, text: 'INSPECTION REPORT\nPermit No: EL-9\nType: Residential\nInspection Type: Final\nResult: Passed\nDate of Inspection: 04/05/2026\nSite Address: 1 A St' }]);
@@ -395,7 +396,88 @@ await H.as('electrical', async (db) => {
   check('two permits at one address never get one headline result', (await runElectrical(db, cl('Did 15 Multi Street pass final?'), { today: TODAY })) === null);
 });
 const askSrc = fs.readFileSync(new URL('../api/ask.js', import.meta.url), 'utf8');
-check('ask.js runs the lane only for a non-HVAC company with no follow-up context', /pack\?\.id && pack\.id !== "hvac" && !conversationContext/.test(askSrc) && /laneForPack\(pack\)/.test(askSrc));
+check('ask.js runs the lane only for a non-HVAC company with no conversation or a self-contained turn', /pack\?\.id && pack\.id !== "hvac" && \(!conversationContext \|\| selfContainedTurn\)/.test(askSrc) && /else if \(isSelfContainedTurn\(question\)\) selfContainedTurn = true/.test(askSrc) && /laneForPack\(pack\)/.test(askSrc));
+/* 9. reviewer round: the real handler (lane inside a chat, honest declines, no false answers) */
+{
+  const { makeAsk } = await import('./lib/ask-handler.mjs');
+  const { isSelfContainedTurn } = await import('../api/_lib/conversation.js');
+  const ask = await makeAsk(H, 'electrical');
+  const prior = { turns: [{ question: 'How many invoices do we have?' }] };
+  const Q1 = 'What is the permit number for 3300 Granite Parkway?';
+  const fresh = await ask(Q1); const chat = await ask(Q1, prior);
+  check('chat: a self-contained question as the second question gets the same deterministic answer as fresh, no model', fresh.modelCalls === 0 && chat.modelCalls === 0 && /EL-26-03300/.test(chat.text) && chat.text === fresh.text, `${fresh.text} | ${chat.text}`);
+  const fol = await ask('and what about that one?', prior);
+  check('chat: a real follow-up still skips the lane (not answered as the permit lookup)', !/EL-26-03300/.test(fol.text));
+  check('chat: reference words / bare fragments are not self-contained, full questions are', !isSelfContainedTurn('what about that one?') && !isSelfContainedTurn('and last year?') && !isSelfContainedTurn('Which of those are open?') && !isSelfContainedTurn('open ones') && !isSelfContainedTurn('Who was the tech for it?') && !isSelfContainedTurn('Which permits expire there?') && isSelfContainedTurn('Which backflow tests are overdue?') && isSelfContainedTurn('Which permits expire this month?') && isSelfContainedTurn('Are there any open permits?'));
+  for (const other of ['plumbing', 'property', 'hvac']) {
+    const a2 = await makeAsk(H, other); const x = await a2(Q1, prior);
+    check(`chat isolation: the ${other} company never sees electrical records in a chat turn`, !/EL-26-03300|Basalt/.test(x.text + JSON.stringify(x.data?.facts ?? [])), x.text);
+  }
+  const br = await ask('What size main breaker is at 3300 Granite Parkway?');
+  check('4a: main breaker at an address is answered from the panel schedule (never "isn\'t tracked")', /600 A/.test(br.text) && !/isn't tracked|nothing on file answers/.test(br.text) && br.modelCalls === 0, br.text);
+  const hv = await ask('What size main breaker is at 99 Nowhere Road?');
+  check('4a: a breaker question the lane cannot answer keeps the old decline', /isn't tracked|nothing on file/.test(hv.text) && hv.modelCalls === 0, hv.text);
+  const ow = await ask('Who is the owner on permit EL-26-03300?');
+  check('4c: "who is the owner on permit X" is answered from the permit paperwork, not a false zero', /Basalt Brewing Co/.test(ow.text) && !/No documents on file mention|0 customers/.test(ow.text) && ow.modelCalls === 0, ow.text);
+  const ow2 = await ask('Who is the owner on permit EL-99-99999?');
+  check('4c: an unknown permit never produces "no documents mention permit" or a dangling ": ."', !/No documents on file mention|customers? ha(?:s|ve) a document on file mentioning|: \.$/.test(ow2.text), ow2.text);
+
+  // ---- round 3 (reviewer) regressions
+  { // P1 permits by city
+    const m1 = await ask('Which permits are open in Mesa?'); const t1 = await ask('how many permits are in Tempe');
+    check('P1: "Which permits are open in Mesa?" answers from the Mesa permit (88 Harmon St), never "No permits issued by the City of Mesa"', m1.modelCalls === 0 && /in Mesa/.test(m1.text) && !/No permits issued/.test(m1.text) && JSON.stringify(m1.data?.facts ?? []).includes('EL-26-07788'), m1.text);
+    check('P1: "how many permits are in Tempe" counts the 2 Tempe permits', t1.modelCalls === 0 && /^2 permits on file in Tempe/.test(t1.text) && JSON.stringify(t1.data?.facts ?? []).includes('EL-26-04412') && JSON.stringify(t1.data?.facts ?? []).includes('EL-26-03300'), t1.text);
+    const u1 = await ask('Which permits are open in Springfield?');
+    check('P1: a city nobody has a permit in is not answered as a count', !/permits? on file in Springfield|in Springfield have no passed final/.test(u1.text), u1.text);
+  }
+  { // P2 street type is part of the address
+    const av = await ask('What is the permit number for 412 Elm Avenue?'); const st = await ask('What is the permit number for 412 Elm Street?'); const sh = await ask('What is the permit number for 412 Elm St?');
+    check('P2: "412 Elm Avenue" never returns the 412 Elm STREET permit', !/EL-26-04412/.test(av.text), av.text);
+    check('P2: "412 Elm Street" / "412 Elm St" still return it', /EL-26-04412/.test(st.text) && /EL-26-04412/.test(sh.text), `${st.text} | ${sh.text}`);
+    const eh = await ask('permit number for 8 Harmon'); const ok = await ask('permit number for 88 Harmon');
+    check('P2: "8 Harmon" is not "88 Harmon" (whole-word street number); "88 Harmon" still resolves', !/EL-26-07788/.test(eh.text) && /EL-26-07788/.test(ok.text), `${eh.text} | ${ok.text}`);
+  }
+  { // P3 no HVAC wording in an electrical company
+    const HV = /\bcustomers?\b|pieces of equipment|units match|service visits|no customer, unit, or document|couldn't find a customer|Financials update|not on file for that address|\bequipment type isn't recorded/i;
+    for (const q of ['Did 61 Sagebrush Trail pass rough-in?', 'What voltage is the service at 740 Birchwood Lane?', 'Which units are vacant?', 'Which warranties are expiring?', 'Which jobs have a certificate of completion?', 'How many sites passed final?', 'Who are our customers?', 'Which invoices are overdue?', 'What is the permit number for 99 Nowhere Road?', 'Show me the invoices for 412 Elm Street']) {
+      const r = await ask(q);
+      check(`P3: electrical "${q}" carries no HVAC wording and says what electrical can answer`, !HV.test(r.text) && /permits, inspections, panel schedules, licenses, insurance certificates and bonds|permit|inspection|panel|\d+ (?:A|V)/i.test(r.text) && r.modelCalls === 0, r.text);
+    }
+    const cap = await ask('What can you do?');
+    check('P3: "What can you do?" gives a short electrical capability line', /permits, inspections, panel schedules, licenses, insurance certificates and bonds/.test(cap.text) && !/customer, address, unit/.test(cap.text), cap.text);
+    const bd = await ask('Do we have a bond on file?');
+    check('P3: "Do we have a bond on file?" counts bonds, not every document', /^1 surety bond document on file/.test(bd.text) && !/43 documents/.test(bd.text), bd.text);
+    const pd = await ask('When was the permit issued for 61 Sagebrush Trail?');
+    check('P3: the permit issue date at an address is answered from the permit', /EL-26-00061 was issued May 18, 2026/.test(pd.text), pd.text);
+    const hc = await makeAsk(H, 'hvac'); const hr = await hc('Who are our customers?');
+    check('P3: HVAC is untouched by the guard (the customers answer keeps its own wording)', !/electrical|permits, inspections/.test(hr.text), hr.text);
+    const emp = await H.as('plumbing', async (db) => ({ failed: await runElectrical(db, cl('Which inspections failed?'), { today: TODAY }), open: await runElectrical(db, cl('Which permits are open?'), { today: TODAY }) }));
+    check('P3: an electrical company with no inspection documents says none are on file yet, not "No failed inspections"', /are on file yet/.test(emp.failed?.text ?? '') && !/^No failed/.test(emp.failed?.text ?? ''), emp.failed?.text);
+  }
+  { // P4 code / legal beat the "it" follow-up resolver
+    const lg = await ask('Is it legal to splice wires in a junction box?'); const cd = await ask('Will it pass inspection if I leave the bonding jumper out?');
+    check('P4: "Is it legal to splice wires ..." gets the legal decline, not "No earlier question to go on"', /can't give legal advice/.test(lg.text) && !/No earlier question/.test(lg.text) && lg.modelCalls === 0, lg.text);
+    check('P4: "Will it pass inspection if I leave the bonding jumper out?" gets the code decline', /can't judge whether work meets code/.test(cd.text) && !/No earlier question/.test(cd.text), cd.text);
+    const dg = await ask('What about it?');
+    check('P4: a real dangling follow-up with no earlier question still gets the old line', /No earlier question/.test(dg.text), dg.text);
+  }
+  { // P5 attribute follow-ups are not self-contained
+    const { isSelfContainedTurn: sc } = await import('../api/_lib/conversation.js');
+    check('P5: "How many are RPZ?" / "Which are expiring?" / "Which ones are overdue?" are follow-ups', !sc('How many are RPZ?') && !sc('Which are expiring soon') && !sc('Which ones are overdue now') && !sc('How many are overdue'));
+    check('P5: full questions with their own noun stay self-contained', sc('What are our open permits') && sc('Which permits are open in Mesa?') && sc('How many are the permits in Tempe') && sc('What is the permit number for 412 Elm Street?'));
+  }
+  { // P7 a cut text flags the electrical read as partial
+    const normal = extractElectrical([{ page_no: 1, text: 'ELECTRICAL PERMIT\nPermit No: EL-9\nSite Address: 1 A St, Mesa AZ\nIssued: 05/01/2026' }]);
+    const cut = extractElectrical([{ page_no: 1, text: 'ELECTRICAL PERMIT\nPermit No: EL-9\nSite Address: 1 A St, Mesa AZ\nIssued: 05/01/2026\n' + 'lorem ipsum dolor '.repeat(3400).slice(0, 60000) }]);
+    const cutAll = extractElectrical([{ page_no: 1, text: 'ELECTRICAL PERMIT\nPermit No: EL-9\nSite Address: 1 A St, Mesa AZ\n' + 'Note: lorem ipsum dolor sit amet consectetur adipiscing elit\n'.repeat(9000) }]);
+    check('P7: a document cut by the line / 400,000-character cap is flagged partial; a normal one is not', normal && !normal.partial && cut?.partial === true && cutAll?.partial === true);
+  }
+  { // P9 "(newest first)" only with more than one result
+    const one = await ask('Did 412 Elm Street pass final?');
+    check('P9: a single inspection result is not labelled "(newest first)"', /^Final on May 1, 2026: Passed\.$/.test(one.text) && !/newest first/.test(one.text), one.text);
+  }
+}
+
 console.log('');
 if (failures) { console.log(`${failures} check(s) FAILED (${passes} passed).`); process.exit(1); }
 console.log(`${passes} checks passed.`);

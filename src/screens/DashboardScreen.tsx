@@ -167,11 +167,10 @@ export function DashboardScreen() {
   const [coveredCollapsed, toggleCovered] = useCollapsed('covered', true);
   const [noWarrantyCollapsed, toggleNoWarranty] = useCollapsed('no-warranty', false);
 
-  // Property companies have no warranty or equipment paperwork: those sections stay out of their dashboard. Electrical and plumbing keep
-  // theirs (panels and water heaters carry warranties) but never read HVAC-style empty-state wording. HVAC is unchanged.
+  // Property, electrical and plumbing companies do not get the HVAC warranty dashboard (their expiries are on the industry attention card). HVAC is unchanged.
   const industryId = useAppStore((s) => s.industry?.industry);
   const [industryAttentionCount, setIndustryAttentionCount] = useState(0);
-  const warrantyFree = industryId === 'property';
+  const warrantyFree = industryId === 'property' || industryId === 'electrical' || industryId === 'plumbing';
   const neutralEmpty = !!industryId && industryId !== 'hvac';
 
   const now = new Date();
@@ -419,7 +418,7 @@ export function DashboardScreen() {
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1>Dashboard</h1>
-            <p className="text-ink-2 mt-1">Every row is a question. Click one and your records answer it.</p>
+            <p className="text-ink-2 mt-1">Every row is a question. {neutralEmpty ? 'Tap or click one' : 'Click one'} and your records answer it.</p>
           </div>
           <button type="button" className="dw-btn-primary" onClick={() => setCurrentScreen('ask')}>
             Ask a question <ArrowRight className="w-4 h-4" aria-hidden="true" />

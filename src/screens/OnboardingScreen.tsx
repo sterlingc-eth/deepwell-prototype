@@ -140,7 +140,7 @@ export function OnboardingScreen() {
             </button>
             <fieldset className="flex flex-col gap-2 sm:gap-3 border-0 p-0 m-0">
               <legend className="text-body text-ink-2 mb-1">
-                What kind of company is this? Pick the one you do most.
+                What kind of work do you do? Pick the one you do most.
               </legend>
               {INDUSTRY_CHOICES.map((c) => (
                 <label
@@ -176,7 +176,7 @@ export function OnboardingScreen() {
             >
               Continue
             </button>
-            <p className="text-caption text-ink-3 -mt-1">A company uses one industry. If you pick wrong, tell DeepWell support and we'll switch it.</p>
+            <p className="text-caption text-ink-3 -mt-1">A company uses one trade. You can change it any time in Settings, and nothing you file is lost.</p>
           </>
         )}
 

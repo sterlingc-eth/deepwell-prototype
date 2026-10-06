@@ -14,6 +14,7 @@
  * Only used for companies whose industry pack is plumbing; the HVAC and electrical paths never call it.
  */
 
+import { boundedLines, newBudget } from '../textBounds.js';
 const MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12, january: 1, february: 2, march: 3, april: 4, june: 6, july: 7, august: 8, september: 9, october: 10, november: 11, december: 12 };
 const pad = (n) => String(n).padStart(2, '0');
 const validYmd = (y, m, d) => {
@@ -266,16 +267,17 @@ function splitColumns(t) {
 
 /** Split page text into trimmed non-empty lines tagged with their page (blank lines remembered). */
 function toLines(pages) {
-  const out = [];
+  const out = []; const budget = newBudget();
   for (const p of pages ?? []) {
     let blank = false;
-    for (const raw of String(p.text ?? '').split(/\r?\n/)) {
+    for (const raw of boundedLines(p.text, budget)) {
       const t = raw.replace(/\s+/g, ' ').trim();
       if (!t) { blank = true; continue; }
       for (const [k, seg] of splitColumns(t).entries()) out.push({ t: seg, page: Number(p.page_no) || 1, blank: k === 0 ? blank : false });
       blank = false;
     }
   }
+  out.cut = budget.cut;
   return out;
 }
 
@@ -452,7 +454,7 @@ export function extractPlumbing(pages, { today } = {}) {
   if (ok && !ok()) return null;
 
   fieldsOut.sort((a, b) => a._o - b._o);
-  return { type, confidence: cls.confidence, fields: fieldsOut.map(({ _o, ...f }) => f) };
+  return { type, confidence: cls.confidence, fields: fieldsOut.map(({ _o, ...f }) => f), ...(lines.cut ? { partial: true } : {}) };
 }
 
 /** Required keys for a type, from the plumbing pack (a|b = either). */

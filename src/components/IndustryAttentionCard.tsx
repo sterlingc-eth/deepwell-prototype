@@ -4,7 +4,10 @@ import { authHeader } from '../services/authToken';
 
 interface Item { kind: 'expired' | 'expiring' | 'overdue' | 'due' | 'unreadable' | 'failed'; category: 'credential' | 'test' | 'backflow' | 'warranty' | 'permit' | 'coi' | 'lease' | 'contract' | 'inspection' | 'invoice' | 'workorder'; label: string; date: string; days: number; note?: string }
 
-const when = (i: Item) => (i.kind === 'overdue' && !i.date ? 'overdue' : i.kind === 'unreadable' ? (i.category === 'backflow' ? 'result unreadable' : 'date unreadable') : i.kind === 'failed' ? (i.days >= 0 ? 'failed' : `failed ${-i.days} day${i.days === -1 ? '' : 's'} ago`) : i.days < 0 ? `${i.kind === 'overdue' ? 'overdue' : 'expired'} ${-i.days} day${i.days === -1 ? '' : 's'} ago` : i.days === 0 ? 'today' : `in ${i.days} day${i.days === 1 ? '' : 's'}`);
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** "2026-09-01" -> "Sep 1, 2026" (anything else is shown as given). */
+const fmtDate = (d: string) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d); return m && MONTHS[Number(m[2]) - 1] ? `${MONTHS[Number(m[2]) - 1]} ${Number(m[3])}, ${m[1]}` : d; };
+const when = (i: Item) => (i.kind === 'overdue' && !i.date ? 'overdue' : i.kind === 'unreadable' ? (i.category === 'backflow' ? 'result unreadable' : 'date unreadable') : i.kind === 'failed' ? (i.days >= 0 ? 'failed' : `failed ${-i.days} day${i.days === -1 ? '' : 's'} ago`) : i.days < 0 ? `${-i.days} day${i.days === -1 ? '' : 's'} ${i.kind === 'overdue' ? 'overdue' : 'expired'}` : i.days === 0 ? 'today' : `in ${i.days} day${i.days === 1 ? '' : 's'}`);
 
 /** Electrical (credentials, tests), plumbing (backflow tests, failed tests, heater warranties, permits) and property management (vendor insurance, leases, vendor contracts, reinspections, overdue invoices, overdue work orders) companies only. Shows nothing for every other industry and on any failure. */
 const ASK: Record<string, (first?: Item, all?: Item[]) => string> = {
@@ -53,18 +56,18 @@ export function IndustryAttentionCard({ onAsk, onCount }: { onAsk?: (q: string) 
   }, [industry]);
   if (!CARD_INDUSTRIES.has(industry) || (items.length === 0 && unread === 0)) return null;
   return (
-    <section aria-labelledby="industry-attention-heading" className="dw-card p-4 pb-20 sm:pb-4 space-y-2">
-      <h2 id="industry-attention-heading" className="text-base font-semibold">{industry === 'property' ? 'Expiring and overdue' : 'Needs attention'}</h2>
+    <section aria-labelledby="industry-attention-heading" className="dw-card p-4 space-y-2">
+      <h2 id="industry-attention-heading" className="text-base font-semibold">Needs attention</h2>
       <ul className="space-y-1">
         {items.slice(0, 8).map((i, n) => (
-          <li key={`${i.label}-${n}`} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 py-1 text-sm">
-            <span className="min-w-0 break-words">{i.label}{i.note ? <span className="text-ink-2"> ({i.note})</span> : null}{i.date ? <span className="text-ink-2 whitespace-nowrap"> · {i.date}</span> : null}</span>
-            <span className={i.kind === 'unreadable' ? 'text-warn-ink' : i.days < 0 ? 'text-bad font-medium' : 'text-ink-2'}>{when(i)}</span>
+          <li key={`${i.label}-${n}`} className="flex flex-col gap-y-0.5 py-1 text-sm sm:flex-row sm:items-baseline sm:justify-between sm:gap-x-3">
+            <span className="min-w-0 break-words">{i.label}{i.note ? <span className="text-ink-2"> ({i.note})</span> : null}{i.date ? <span className="text-ink-2 whitespace-nowrap"> · {fmtDate(i.date)}</span> : null}</span>
+            <span className={`shrink-0 sm:text-right ${i.kind === 'unreadable' ? 'text-warn-ink' : i.days < 0 ? 'text-bad font-medium' : 'text-ink-2'}`}>{when(i)}</span>
           </li>
         ))}
       </ul>
-      {unread > 0 && <p className="text-sm text-warn-ink">{unread} past-due invoice{unread === 1 ? '' : 's'} {unread === 1 ? 'has' : 'have'} a payment status we could not read. Check {unread === 1 ? 'it' : 'them'}.</p>}
-      {items.length > 8 && <p className="text-sm text-ink-2">and {items.length - 8} more</p>}
+      {unread > 0 && <p className="text-sm text-warn-ink">{unread} past-due invoice{unread === 1 ? '' : 's'} {unread === 1 ? 'has' : 'have'} a payment status we could not read. Open {unread === 1 ? 'it' : 'them'} in Records and check the status.</p>}
+      {items.length > 8 && <p className="text-sm text-ink-2">and {items.length - 8} more. Ask Donovan to see them all.</p>}
       {onAsk && <button type="button" className="dw-btn-secondary w-full min-h-[44px] sm:w-auto" onClick={() => onAsk(ASK[industry]?.(items[0], items) ?? '')}>Ask about these</button>}
     </section>
   );
