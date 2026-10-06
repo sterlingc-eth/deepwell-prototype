@@ -74,6 +74,8 @@ const BRAND_WORDS = [
   'trane', 'carrier', 'goodman', 'lennox', 'rheem', 'york', 'daikin', 'mitsubishi',
   'ruud', 'bryant', 'amana', 'american standard', 'heil', 'payne', 'coleman', 'maytag',
 ];
+/** True when `v` is, whole, one of the manufacturer names the planner itself knows (a real brand that simply may not be on file). */
+export const isSystemBrandWord = (v) => BRAND_WORDS.includes(String(v ?? '').trim().toLowerCase());
 const KNOWN_COUNTY_NAMES = [
   ...new Set(
     [...Object.values(zipCounty.azZip3Default), ...Object.values(zipCounty.azZipExceptions)]
@@ -278,6 +280,13 @@ export const FILTER_OPS = ['eq', 'neq', 'contains', 'gt', 'gte', 'lt', 'lte', 'i
 export const WARRANTY_STATUSES = ['active', 'expiring', 'expired', 'unknown', 'covered'];
 export const WARRANTY_COVERED_STATUSES = new Set(['active', 'expiring']);
 export const MAX_LIMIT = 500;
+/**
+ * R39 (the "500" bug). MAX_LIMIT is the cap on a LIST a person is shown (and on plan.limit). It was ALSO the LIMIT on the SQL that fetches the rows the executor
+ * (routes/analytics.js) then filters and counts in JS, and the stated total was `filtered.length` - so every count over more than 500 records came back as
+ * exactly 500 ("You have 500 documents."). The fetch now reads up to SCAN_LIMIT rows (bounded memory), and a result that fills it is TRUNCATED: the executor
+ * then declines instead of printing a number (never a count of a capped list). A bare unfiltered count never needs the rows at all: buildAnalyticsCountSQL
+ * gives its exact COUNT(*). */
+export const SCAN_LIMIT = Math.max(MAX_LIMIT + 1, Math.trunc(Number(process.env.ANALYTICS_SCAN_LIMIT)) || 20000);
 export const DEFAULT_LIMIT = 500;
 /** "who's our biggest customer" (round 4, item 1) — customers RANKED by a
  *  size measure, not filtered/counted. Only meaningful for entity
@@ -2320,7 +2329,7 @@ export function buildAnalyticsSystemPrompt({ extraFewShot, vocabLines } = {}) {
 // "has X but no Y" question answers — a plan or answer cached under the old
 // behavior must never be served again just because its own prompt text
 // happened not to change.
-export const ANALYTICS_VERSION = 'analytics-v9'; // v9 (Team A): dateBasis + code-side age filter + no future service visits
+export const ANALYTICS_VERSION = 'analytics-v10'; // v10 (R39): leftover-condition guard + exact counts past 500 rows (v9 (Team A): dateBasis + code-side age filter + no future service visits)
 export const ANALYTICS_PROMPT_VERSION = createHash('sha256')
   .update(ANALYTICS_VERSION)
   .update(JSON.stringify(ANALYTICS_TOOL))
@@ -3526,6 +3535,18 @@ function pushColumnFilter(where, params, column, filter) {
  */
 export { isTeamScopedQuestion } from './fastPath.js';
 
+/**
+ * R39: the exact COUNT(*) for a BARE plan (no filters, no time window) on customers / equipment / documents - the shapes where fetching rows only to count them
+ * is wasted work and, past SCAN_LIMIT, wrong. Same WHERE (tenant, merged_into, audience) as the row query in buildAnalyticsSQL. Null for any other plan.
+ */
+export function buildAnalyticsCountSQL(plan, { audienceClause = 'TRUE' } = {}) {
+  if (!plan || plan.op !== 'count' || plan.timeRange || (plan.filters ?? []).length || plan.sortBy) return null;
+  if (plan.entity === 'customers') return { sql: `SELECT count(*)::int AS n FROM entities WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT_SQL}`, params: [] };
+  if (plan.entity === 'equipment' || plan.entity === 'warranties') return { sql: `SELECT count(*)::int AS n FROM entities WHERE entity_type = 'equipment' AND merged_into IS NULL AND ${TENANT_SQL}`, params: [] };
+  if (plan.entity === 'documents') return { sql: `SELECT count(*)::int AS n FROM documents d WHERE ${TENANT_SQL} AND (${audienceClause})`, params: [] };
+  return null;
+}
+
 /** @returns {{sql: string, params: any[]}}
  *  @param opts.audienceClause  a WHERE-safe SQL fragment (audienceFilterSql, api/_lib/audience/sql.js)
  *    AND-ed into the `documents`-touching branches below — 'TRUE' (its default) is a no-op, so every
@@ -3533,7 +3554,7 @@ export { isTeamScopedQuestion } from './fastPath.js';
  *    caller (routes/analytics.js) builds this once per request from documentsHaveAudience's own
  *    migration-tolerance probe and isTeamScopedQuestion above — this file stays pure/no-I/O and never
  *    probes the schema itself. */
-export function buildAnalyticsSQL(plan, { audienceClause = 'TRUE' } = {}) {
+export function buildAnalyticsSQL(plan, { audienceClause = 'TRUE', rowLimit = SCAN_LIMIT } = {}) {
   const where = [TENANT_SQL];
   const params = [];
   const columnsFor = SQL_COLUMN[plan.entity === 'warranties' ? 'equipment' : plan.entity] ?? {};
@@ -3575,7 +3596,7 @@ export function buildAnalyticsSQL(plan, { audienceClause = 'TRUE' } = {}) {
               FROM entities
              WHERE entity_type = 'customer' AND merged_into IS NULL AND ${where.join(' AND ')}
              ORDER BY updated_at DESC
-             LIMIT ${MAX_LIMIT}`,
+             LIMIT ${Math.max(1, Math.trunc(Number(rowLimit)) || SCAN_LIMIT)}`,
       params,
     };
   }
@@ -3596,7 +3617,7 @@ export function buildAnalyticsSQL(plan, { audienceClause = 'TRUE' } = {}) {
               FROM entities
              WHERE entity_type = 'equipment' AND merged_into IS NULL AND ${where.join(' AND ')}
              ORDER BY updated_at DESC
-             LIMIT ${MAX_LIMIT}`,
+             LIMIT ${Math.max(1, Math.trunc(Number(rowLimit)) || SCAN_LIMIT)}`,
       params,
     };
   }
@@ -3651,7 +3672,7 @@ export function buildAnalyticsSQL(plan, { audienceClause = 'TRUE' } = {}) {
               FROM documents d
              WHERE ${where.join(' AND ')} AND (${audienceClause})
              ORDER BY d.created_at DESC
-             LIMIT ${MAX_LIMIT}`,
+             LIMIT ${Math.max(1, Math.trunc(Number(rowLimit)) || SCAN_LIMIT)}`,
       params,
     };
   }
@@ -3707,7 +3728,7 @@ export function buildAnalyticsSQL(plan, { audienceClause = 'TRUE' } = {}) {
             FROM extractions x
            WHERE x.field_key = 'service_date' AND ${TENANT_SQL}
            ORDER BY x.value DESC
-           LIMIT ${MAX_LIMIT}`,
+           LIMIT ${Math.max(1, Math.trunc(Number(rowLimit)) || SCAN_LIMIT)}`,
     params: [],
   };
 }
@@ -3914,7 +3935,15 @@ function formatAnalyticsAnswerBase(plan, opts) {
     total = 0, groups = [], rows = [], sum = null, unfilteredTotal = null, broaderGroups = null,
     mostRecentServiceVisit, timeRangeLabel = null,
   } = opts ?? {};
-  const noun = (ENTITY_NOUN[plan.entity] ?? (() => plan.entity))(total);
+  let noun = (ENTITY_NOUN[plan.entity] ?? (() => plan.entity))(total);
+  // R3 loop r38: a bare doc-type count names the type ("27 maintenance agreements"), not "documents".
+  if (plan.entity === 'documents' && plan.op === 'count' && !timeRangeLabel) {
+    const dt = (plan.filters ?? []).filter((f) => f.field === 'documentType');
+    if (dt.length === 1 && dt[0].op === 'eq' && typeof dt[0].value === 'string' && (plan.filters ?? []).length === 1 && dt[0].value !== 'other') {
+      const lbl = String(documentTypeLabel(dt[0].value) ?? '').toLowerCase();
+      if (lbl) noun = `${lbl}${total === 1 ? '' : 's'}`;
+    }
+  }
 
   // R23 (D2, k139): technician head-to-head yes/no — `rows` is already scoped (by plan.filters'
   // `technician in [left, right]`) to just these two people's own visits (dateless-row correction

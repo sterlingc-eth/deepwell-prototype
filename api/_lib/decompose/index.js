@@ -55,7 +55,7 @@ function describeClause(cond) {
     case 'noEmail': return 'have no email on file';
     case 'hasEmail': return 'have an email on file';
     case 'noPhone': return 'have no phone number on file';
-    case 'unitCountGt': return `have more than ${cond.n} unit${cond.n === 1 ? '' : 's'}`;
+    case 'unitCountGt': return cond.atLeast ? `have at least ${cond.atLeast} unit${cond.atLeast === 1 ? '' : 's'}` : `have more than ${cond.n} unit${cond.n === 1 ? '' : 's'}`;
     case 'distinctBrandsGte': return `have units from ${cond.n} or more different brands`;
     case 'technician': return `have been serviced by ${cond.name}`;
     case 'noVisitSinceYear': return `have had no service visit since ${cond.year}`;

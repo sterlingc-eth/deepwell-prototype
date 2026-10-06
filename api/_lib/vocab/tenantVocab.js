@@ -140,9 +140,10 @@ function dedupCi(values) {
  * data-version-keyed entry point every caller should actually use.
  */
 export async function buildTenantVocab(db, pack) {
-  const [brandsRaw, modelsRaw, technicians, customerNames, addresses] = await Promise.all([
+  const [brandsRaw, modelsRaw, equipmentTypesRaw, technicians, customerNames, addresses] = await Promise.all([
     distinctEntityValues(db, 'equipment', 'manufacturer'),
     distinctEntityValues(db, 'equipment', 'model'),
+    distinctEntityValues(db, 'equipment', 'equipment_type'),
     distinctTechnicians(db),
     distinctCustomerNames(db),
     distinctEntityValues(db, 'customer', 'service_address'),
@@ -154,8 +155,12 @@ export async function buildTenantVocab(db, pack) {
   return {
     brands: dedupCi(brandsRaw),
     models: dedupCi(modelsRaw),
+    // R39: the organization's own kinds of equipment ("water heater (tank)", "sump pump"): plain nouns for what is being counted, not names.
+    equipmentTypes: dedupCi(equipmentTypesRaw),
     cities,
     docTypePhrases,
+    // R39: the trade the organization is in ("hvac", "plumbing"): a plain whole-shop count that says "HVAC units" in an HVAC shop names no extra condition
+    industryWords: pack?.id ? [String(pack.id).toLowerCase()] : [],
     technicians: buildNameGlossary(technicians),
     customers: buildNameGlossary(customerNames),
   };

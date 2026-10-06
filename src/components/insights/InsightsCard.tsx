@@ -30,7 +30,7 @@ function chip(insight: Insight): string {
  * function. `onOpenInbox` is optional (desktop-only: the intake/exception
  * queue screen mobile doesn't have its own route into yet).
  */
-export function InsightsCard({ onAsk, onOpenInbox }: { onAsk: (question: string) => void; onOpenInbox?: () => void }) {
+export function InsightsCard({ onAsk, onOpenInbox, hideAllClear }: { onAsk: (question: string) => void; onOpenInbox?: () => void; /** Another card on the page already lists things that need attention: do not also say "all clear". */ hideAllClear?: boolean }) {
   const [state, setState] = useState<{ status: 'loading' | 'ready' | 'error'; items: Insight[] }>({ status: 'loading', items: [] });
   const [openId, setOpenId] = useState<string | null>(null);
 
@@ -54,6 +54,7 @@ export function InsightsCard({ onAsk, onOpenInbox }: { onAsk: (question: string)
   }, []);
 
   if (DEMO_MODE || state.status === 'error') return null;
+  if (hideAllClear && state.status === 'ready' && state.items.length === 0) return null;
 
   const runAction = (insight: Insight) => {
     if (insight.action.href === 'inbox') {

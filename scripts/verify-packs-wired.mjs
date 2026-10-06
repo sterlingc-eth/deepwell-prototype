@@ -149,7 +149,21 @@ check('pending pick: stale -> never applied', dec.decodePendingIndustry(dec.enco
 check('pending pick: garbage / no user -> null', dec.decodePendingIndustry('plumbing', 'user_a') === null && dec.decodePendingIndustry(dec.encodePendingIndustry('plumbing', 'u', nowT), null, nowT) === null);
 check('pending hook keeps the pick on 401/429 (clears only on 400/403/404)', /res\.status === 400 \|\| res\.status === 403 \|\| res\.status === 404/.test(src('src/hooks/usePendingIndustry.ts')));
 check('onboarding Continue uses the shared primary button (44px+) and does not promise an in-app industry change', /dw-btn-primary w-full/.test(src('src/screens/OnboardingScreen.tsx')) && !/You can change this later/.test(src('src/screens/OnboardingScreen.tsx')));
-check('attention card button is full width on phone', /dw-btn-secondary w-full sm:w-auto/.test(src('src/components/IndustryAttentionCard.tsx')));
+check('attention card button is full width on phone', /dw-btn-secondary w-full min-h-\[44px\] sm:w-auto/.test(src('src/components/IndustryAttentionCard.tsx')));
+// 2D: the property deterministic reader is wired for the property pack ONLY, behind the same gates as plumbing / electrical
+const ed = src('api/_lib/extractDocument.js');
+check("property reader runs only for pack.id === 'property' (and never with a caller-fixed documentType)", /const detProp = [^;]*pack\?\.id === 'property' && !documentType && !truncated && isDeterministicExtractEnabled\(\)/.test(ed));
+check('property reader is tried after the HVAC, electrical and plumbing paths', /!det\?\.accepted && !detElec && !detPlumb && pack\?\.id === 'property'/.test(ed));
+check('property reader result is held to the pack\'s own required fields', /missingRequiredProperty\(r\.type, r\.fields, pack\)\.length/.test(ed));
+check('only extractDocument imports the property reader', ['api/_lib/industry/plumbing/extract.js', 'api/_lib/industry/electrical/extract.js', 'api/_lib/extractFields.js'].every((f) => !/industry\/property\/extract/.test(src(f))));
+{
+  const PE = await import('../api/_lib/industry/property/extract.js');
+  const propPack = I.getPack('property');
+  const ownIds = new Set(propPack.documentTypes.map((t) => t.id));
+  check("every document type the property reader can return is a type of the property pack", PE.PROPERTY_TYPES.every((t) => ownIds.has(t)));
+  const hvacPage = [{ page_no: 1, text: 'A/C TUNE-UP SHEET\nSite Address: 1200 Mesa Drive, Mesa AZ\nTonnage: 3' }];
+  check('an HVAC sheet reads as nothing for the property reader', PE.extractProperty(hvacPage) === null);
+}
 await H.stop();
 console.log('');
 if (failures) { console.log(`${failures} check(s) FAILED (${passes} passed).`); process.exit(1); }

@@ -31,8 +31,11 @@ export function parseDate(raw) {
   if ((m = s.match(/^(\d{1,2})[- ]([A-Za-z]{3,9})\.?[- ,]+(\d{4}|\d{2})$/))) { const mo = MONTHS[m[2].toLowerCase()]; return mo ? validYmd(yy(m[3]), mo, +m[1]) : null; }
   if ((m = s.match(/^([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+['\u2019](\d{2})$/))) { const mo = MONTHS[m[1].toLowerCase()]; return mo ? validYmd(yy(m[3]), mo, +m[2]) : null; }
   if ((m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/))) return validYmd(+m[1], +m[2], +m[3]);
-  if ((m = s.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4}|\d{2})$/))) {
-    const a = +m[1]; const b = +m[2]; const y = m[3].length === 2 ? (2000 + +m[3] > 2040 ? 1900 + +m[3] : 2000 + +m[3]) : +m[3];
+  if ((m = s.match(/^(\d{1,2})([/.-])(\d{1,2})\2(\d{4}|\d{2})$/))) {
+    const a = +m[1]; const b = +m[3]; m = [m[0], m[1], m[3], m[4], m[2]];
+    // a dotted date (05.10.2026) is day-first in much of the world and month-first elsewhere: only read it when one reading is impossible
+    if (m[4] === '.' && a <= 12 && b <= 12) return null;
+    const y = m[3].length === 2 ? (2000 + +m[3] > 2040 ? 1900 + +m[3] : 2000 + +m[3]) : +m[3];
     return a > 12 && b <= 12 ? validYmd(y, b, a) : validYmd(y, a, b);
   }
   if ((m = s.match(/^([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})$/))) { const mo = MONTHS[m[1].toLowerCase()]; return mo ? validYmd(+m[3], mo, +m[2]) : null; }
@@ -115,6 +118,9 @@ const LABELS = [
   ['installation_date', `installation date|date installed|install date|installed on|date of installation|installed|in service date|install dt|date in service|date of install|install|date installed on|installed date`, 'date', null, 0],
   ['gallons', `tank size|capacity|gallons|tank capacity|gal|gallon capacity|storage capacity|capacity gal|tank gallons|volume|size|size gallons|gal capacity|capacity gallons`, 'gallons', [WH, WR], 0],
   ['warranty_term', `warranty term|coverage|term of warranty|warranty|warranty period|coverage term|term|warranty length|warranty years|tank warranty|limited warranty|heat exchanger warranty|warranty duration`, 'term', [WR], 0],
+  // a startup sheet that prints its own warranty: only the labels that name the warranty (never a bare "term" / "expires" / "coverage")
+  ['warranty_term', `warranty term|warranty|warranty period|warranty length|warranty years|tank warranty|limited warranty|warranty duration`, 'term', [WH], 0],
+  ['warranty_expires', `warranty expires|warranty end date|warranty expiration|warranty expiry|warranty ends|warranty end|warranty valid until|warranty through|end of warranty|warranty expiration date|warranty expires on`, 'date', [WH], 0],
   ['warranty_registered_date', `date registered|registered on|registration date|date of registration|registered|date warranty registered|reg date|registration`, 'date', [WR], 0],
   ['warranty_expires', `warranty expires|coverage ends|expiration date|warranty end date|expires|expiry|expires on|warranty expiration|warranty expiry|warranty ends|coverage end date|coverage expires|end of warranty|warranty end|valid through|expiration|coverage through|warranty through|warranty valid until|good through|warranty expires on`, 'date', [WR], 0],
   ['agreement_term', `agreement term|term|length of agreement|term of agreement|contract term|contract length|duration|agreement length|term length|plan term|agreement period|contract period|period`, 'term', [AG], 0],
@@ -236,12 +242,16 @@ function splitColumns(t) {
   while (w < words.length) {
     if (!words.slice(from, w).some((x) => /[:#]/.test(x) || x === '=')) { w++; continue; }
     let hit = null;
+    // a free-text value (findings, notes, work...) keeps its own sentences whole: a label-like phrase inside it ("no defects observed") is words of the value, not a new field
+    const curLabel = words.slice(from, w).join(' ').match(/^([A-Za-z][A-Za-z0-9/ .'\-]{0,40}?)\s*[:#]/)?.[1]?.trim() ?? '';
+    const freeText = /^(?:line )?(?:findings?|observations?|defects?(?: (?:observed|found|noted))?|notes?|comments?|remarks|work performed|work description|description|summary|recommendations?|scope(?: of work)?|condition)$/i.test(curLabel);
     for (let e = w; e < Math.min(w + 4, words.length) && !hit; e++) {
       const raw = words.slice(w, e + 1).join(' ');
       const colon = /:$/.test(words[e]); const hash = /^#$|#$/.test(words[e]);
       const cand = raw.replace(/[:#]+$/, '').trim();
       if (!/^[A-Za-z][A-Za-z0-9/#.'\- ]*$/.test(cand) || (e > w && /:$/.test(words[e - 1]))) continue;
-      const known = isKnownLabel(cand);
+      const known = isKnownLabel(cand) && !(freeText && /^(?:defects?(?: (?:observed|found|noted))?|findings?|observations?)$/i.test(cand));
+      if (freeText && !colon && !hash) continue;
       const more = hash && words[e + 1] != null ? true : true;
       if (known && (colon || hash)) hit = { e, label: cand };
       else if (known && !colon && !hash && e > w && e + 1 < words.length && cand.split(' ').length >= 2 && !/^(?:date|type|test date)$/i.test(cand)) hit = { e, label: cand };
@@ -296,7 +306,9 @@ const resultKind = (v) => { const c = resultClass(v); return c === 'other' ? 'ot
 const UNIT_TYPES = new Set([BF, WH, WR]);
 const MONEY_TYPES = new Set([IV, PQ, PO, TK, AG]);
 
-export function extractPlumbing(pages) {
+export function extractPlumbing(pages, { today } = {}) {
+  // `today` (YYYY-MM-DD) is supplied by the caller; the extractor never reads the clock. With no today the future-date plausibility drop is skipped (the storage step's own date check still flags far-future dates).
+  const latest = /^\d{4}-\d{2}-\d{2}$/.test(String(today ?? '')) ? new Date(Date.parse(`${today}T00:00:00Z`) + 31 * 86400000).toISOString().slice(0, 10) : null;
   const lines = toLines(pages);
   if (!lines.length) return null;
   const cls = classify(lines);
@@ -399,7 +411,7 @@ export function extractPlumbing(pages) {
     if (key === 'cost' && !MONEY_TYPES.has(type)) continue;
     if (key === 'cost' && e.rank >= 2 && lines.some((l) => /^(?:sub ?total|tax|sales tax)\b/i.test(l.t))) continue; // a subtotal / tax with no total is not a cost
     if (key === 'service_date' && (type === PM || type === WR)) continue;
-    if (((key === 'service_date' && (type === BF || type === IN || type === CM)) || (key === 'installation_date' && type === WH) || (key === 'warranty_registered_date')) && e.value > new Date(Date.now() + 31 * 86400000).toISOString().slice(0, 10)) continue; // a test / install date in the future is a misread
+    if (((key === 'service_date' && (type === BF || type === IN || type === CM)) || (key === 'installation_date' && type === WH) || (key === 'warranty_registered_date')) && latest && e.value > latest) continue; // a test / install date in the future is a misread
     push(key, e);
   }
   for (const m of multi) { if (m.key === 'line_findings' && type !== CM) continue; if ((m.key === 'part_number') && type === PM) continue; fieldsOut.push({ key: m.key, value: m.value, page_no: m.line.page, verbatim: m.line.t.slice(0, 200), confidence: 0.9, _o: m.order }); }

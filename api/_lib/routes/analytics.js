@@ -67,6 +67,10 @@ import {
   normalizeStateValue,
   matchesAllFilters,
   buildAnalyticsSQL,
+  buildAnalyticsCountSQL,
+  SCAN_LIMIT,
+  isSystemBrandWord,
+  MAX_LIMIT,
   groupRows,
   formatAnalyticsAnswer,
   brandMatches,
@@ -106,10 +110,100 @@ import { overlayFewShotHash } from '../learning/overlay.js';
 // model call — see planAnalyticsQuestion below and detPlan.js's own doc
 // comment for the "never guess" contract.
 import { detectAnalyticsPlan } from '../analytics/detPlan.js';
+import { leftoverWords, leftoverEnabled, domainWordsFromVocab } from '../router/leftover.js';
 
 export const ANALYTICS_MODEL = process.env.ANALYTICS_MODEL || process.env.ASK_MODEL || 'claude-haiku-4-5';
 export function isAnalyticsEnabled(env = process.env) {
   return env?.ASK_ANALYTICS !== '0';
+}
+
+/**
+ * Everything planAnalyticsQuestion does to a raw plan (deterministic or model) AFTER it exists: service-visit override, time-range
+ * reconciliation, age filter, date basis, validation. Split out (R39) so the leftover-condition check can re-run exactly the deterministic
+ * half of the pipeline on a question with one word deleted.
+ */
+/** A plan that reads as the whole-entity total: a plain count with no filter, no time window, no grouping. Such an answer is only right when the question named NO other condition. */
+function isBarePlan(plan) {
+  return Boolean(plan) && plan.op === 'count' && !(plan.filters?.length) && !plan.timeRange && !plan.groupBy && !plan.countDistinct;
+}
+export function finalizePlanInput(rawInput, question, today) {
+  // Live miss (2026-09-21, "which units had service this month"): a
+  // "<units/equipment/customers> <had/got/were> service(d)" / "<did/do> we
+  // service" / "service call(s)" shape forces entity 'serviceVisits' and a
+  // deterministic op, exactly like reconcileTimeRange below forces
+  // timeRange — see resolveServiceVisitsOverride's own doc comment for why
+  // this can never depend on the model choosing the entity correctly.
+  // Filters are dropped when this fires: none of the known phrasings need
+  // one, and a stray model filter for the WRONG entity (customers/
+  // equipment) would otherwise reject the whole plan downstream.
+  const serviceVisitsOverride = resolveServiceVisitsOverride(question);
+  // R32: the override used to drop EVERY filter, silently turning "how many repair/PM visits in the last 90 days" into the
+  // untyped visit count. A service-type qualifier the question names is a real filter on a visit (hasServiceType) and is kept.
+  // Only for a plain count/existence question: a negated or "which/who" question ("which technicians have never logged a
+  // PM visit") is a different relation, and a count would answer it wrongly, so it is left to fail closed as before.
+  const visitTypeQ = String(question ?? '');
+  const visitTypePhrase = serviceVisitsOverride && serviceVisitsOverride.op === 'count'
+    && !/\b(?:never|without|no|not|none|haven'?t|hasn'?t|didn'?t|which|who|whose|each|every|per|by)\b/i.test(visitTypeQ)
+    ? visitTypeQ.match(SERVICE_TYPE_PHRASE_RE) : null;
+  const base = serviceVisitsOverride
+    ? { ...(rawInput ?? {}), ...serviceVisitsOverride, filters: visitTypePhrase ? [{ field: 'hasServiceType', op: 'eq', value: serviceTypeValueOf(visitTypePhrase[1]) }] : [] }
+    : rawInput;
+  // Item 1 (2026-09-21 live miss) + round 5 item 2: a literal month name/
+  // "this month"/"last month" phrase in the QUESTION overrides whatever
+  // timeRange the model filled in, computed deterministically from `today`
+  // — UNLESS the model's own timeRange is well-formed and names a year the
+  // question itself actually wrote out (reconcileTimeRange, analytics.js) —
+  // see that function's own doc comment for why the model's date math is
+  // not trusted by default, and when it is trusted anyway.
+  let input = base ? { ...base, timeRange: reconcileTimeRange(base.timeRange, question, today) } : base;
+  // D4: the year in "which agreements expire in 2026" is the END year (agreementEnd), never a service-date window on the document.
+  if (input?.filters?.some((f) => f?.field === 'agreementEnd')) input = { ...input, timeRange: undefined };
+  // R32: a typed visit filter is only trustworthy on a plain count/existence question; a negated or "which/who/each" question
+  // is a different relation (which technicians NEVER logged a PM visit) that a positive typed count would answer wrongly.
+  if (input?.entity === 'serviceVisits' && input.filters?.some((f) => f.field === 'hasServiceType' || f.field === 'lacksServiceType')
+    && (input.op !== 'count' || /\b(?:never|without|no|not|none|haven'?t|hasn'?t|didn'?t|which|who|whose|each|every|per|by)\b/i.test(String(question ?? '')))) {
+    input = null;
+  }
+  // Team A (2026-09-24): "older/newer than N years" is year arithmetic done in code, not by the model; and a documents
+  // time window is decided by the wording - "added/uploaded/received/scanned/filed" -> upload date (created_at),
+  // "serviced/visited/job/work done" -> service date. Both override whatever the model guessed.
+  if (input) {
+    const age = resolveAgeFilter(question, today);
+    // R21 M2 (Cluster 3, j144 "between X and Y years old"): resolveAgeFilter now returns an ARRAY
+    // of two filters for the between-shape (a single age direction still returns one plain filter
+    // object, unchanged) — spread either shape the same way; installDate replaces installYear as
+    // the age filter's field (day-precise, see resolveAgeFilter's own doc comment), so any stray
+    // installYear the model guessed is stripped here too, never left to double up with the real one.
+    if (age) {
+      const ageFilters = Array.isArray(age) ? age : [age];
+      input = { ...input, filters: [...(input.filters ?? []).filter((f) => f?.field !== 'installYear' && f?.field !== 'installDate'), ...ageFilters] };
+    }
+    const basis = dateBasisOf(question);
+    if (input.entity === 'documents' && basis) input = { ...input, dateBasis: basis };
+  }
+  return validatePlan(input);
+}
+
+/** R39: words the normalizer rewrote INTO a name the organization has (a manufacturer): such a correction is only "explained" when the lane then really filters on it. */
+function nameCorrectionsOf(question, tenantVocab, overlay) {
+  try {
+    const names = new Set((tenantVocab?.brands ?? []).map((b) => String(b).toLowerCase()));
+    return new Set(normalizeQuestion(question, { overlay }).corrections.filter((c) => names.has(String(c.to).toLowerCase())).map((c) => String(c.from).toLowerCase()));
+  } catch { return new Set(); }
+}
+
+/** R39 round 6: the normalizer rewrote a word that sits in a PLACE slot ("customers in Maana") into something that is not a city on file ("Amana"). That is a city typo, not a brand: decline instead of counting it. */
+function brandFixInPlaceSlot(question, tenantVocab, overlay) {
+  try {
+    const cities = new Set((tenantVocab?.cities ?? []).map((b) => String(b).toLowerCase()));
+    return normalizeQuestion(question, { overlay }).corrections.some((c) => c.from !== c.to && String(c.from).length >= 4 && !cities.has(String(c.to).toLowerCase()) && new RegExp(`\\b(?:in|at|near|around|from)\\s+(?:the\\s+)?${String(c.from).replace(/[^a-z0-9]/gi, '')}\\b`, 'i').test(question));
+  } catch { return false; }
+}
+
+/** R39: the deterministic reading of a question as a string (det plan -> same post-processing as a real plan), for leftoverWords(). */
+function detSignature(question, tenantVocab, today) {
+  const raw = detectAnalyticsPlan(question, tenantVocab, today);
+  return JSON.stringify(finalizePlanInput(raw, question, today) ?? null);
 }
 
 /**
@@ -127,7 +221,7 @@ export function isAnalyticsEnabled(env = process.env) {
  * one-line hook that threads the tenant context through once credits are back and this is worth turning
  * on live.
  */
-export async function planAnalyticsQuestion(question, { today, overlay, tenantVocab, withTenant, ctxArg } = {}) {
+export async function planAnalyticsQuestion(question, { today, overlay, tenantVocab, withTenant, ctxArg, originalQuestion } = {}) {
   try {
     // Round 14 (K3): try the deterministic planner FIRST — no model call, no
     // I/O, no cost. Its result (the same {entity, op, groupBy?, filters?,
@@ -136,7 +230,9 @@ export async function planAnalyticsQuestion(question, { today, overlay, tenantVo
     // called when detectAnalyticsPlan returns null (an unrecognized shape —
     // see that file's own "never guess" doc comment).
     let rawInput = detectAnalyticsPlan(question, tenantVocab, today);
+    let fromModel = false;
     if (!rawInput) {
+      fromModel = true;
       // ROUND 20 (J4), task 2: per-tenant daily $ cap for this route, on top of (never instead of)
       // ask.js's own call-count assertModelBudget. Throws ModelBudgetExceededError when exceeded,
       // caught by this function's own outer try/catch below exactly like any other planner failure —
@@ -212,61 +308,12 @@ export async function planAnalyticsQuestion(question, { today, overlay, tenantVo
         }
       }
     }
-    // Live miss (2026-09-21, "which units had service this month"): a
-    // "<units/equipment/customers> <had/got/were> service(d)" / "<did/do> we
-    // service" / "service call(s)" shape forces entity 'serviceVisits' and a
-    // deterministic op, exactly like reconcileTimeRange below forces
-    // timeRange — see resolveServiceVisitsOverride's own doc comment for why
-    // this can never depend on the model choosing the entity correctly.
-    // Filters are dropped when this fires: none of the known phrasings need
-    // one, and a stray model filter for the WRONG entity (customers/
-    // equipment) would otherwise reject the whole plan downstream.
-    const serviceVisitsOverride = resolveServiceVisitsOverride(question);
-    // R32: the override used to drop EVERY filter, silently turning "how many repair/PM visits in the last 90 days" into the
-    // untyped visit count. A service-type qualifier the question names is a real filter on a visit (hasServiceType) and is kept.
-    // Only for a plain count/existence question: a negated or "which/who" question ("which technicians have never logged a
-    // PM visit") is a different relation, and a count would answer it wrongly, so it is left to fail closed as before.
-    const visitTypeQ = String(question ?? '');
-    const visitTypePhrase = serviceVisitsOverride && serviceVisitsOverride.op === 'count'
-      && !/\b(?:never|without|no|not|none|haven'?t|hasn'?t|didn'?t|which|who|whose|each|every|per|by)\b/i.test(visitTypeQ)
-      ? visitTypeQ.match(SERVICE_TYPE_PHRASE_RE) : null;
-    const base = serviceVisitsOverride
-      ? { ...(rawInput ?? {}), ...serviceVisitsOverride, filters: visitTypePhrase ? [{ field: 'hasServiceType', op: 'eq', value: serviceTypeValueOf(visitTypePhrase[1]) }] : [] }
-      : rawInput;
-    // Item 1 (2026-09-21 live miss) + round 5 item 2: a literal month name/
-    // "this month"/"last month" phrase in the QUESTION overrides whatever
-    // timeRange the model filled in, computed deterministically from `today`
-    // — UNLESS the model's own timeRange is well-formed and names a year the
-    // question itself actually wrote out (reconcileTimeRange, analytics.js) —
-    // see that function's own doc comment for why the model's date math is
-    // not trusted by default, and when it is trusted anyway.
-    let input = base ? { ...base, timeRange: reconcileTimeRange(base.timeRange, question, today) } : base;
-    // D4: the year in "which agreements expire in 2026" is the END year (agreementEnd), never a service-date window on the document.
-    if (input?.filters?.some((f) => f?.field === 'agreementEnd')) input = { ...input, timeRange: undefined };
-    // R32: a typed visit filter is only trustworthy on a plain count/existence question; a negated or "which/who/each" question
-    // is a different relation (which technicians NEVER logged a PM visit) that a positive typed count would answer wrongly.
-    if (input?.entity === 'serviceVisits' && input.filters?.some((f) => f.field === 'hasServiceType' || f.field === 'lacksServiceType')
-      && (input.op !== 'count' || /\b(?:never|without|no|not|none|haven'?t|hasn'?t|didn'?t|which|who|whose|each|every|per|by)\b/i.test(String(question ?? '')))) {
-      input = null;
-    }
-    // Team A (2026-09-24): "older/newer than N years" is year arithmetic done in code, not by the model; and a documents
-    // time window is decided by the wording - "added/uploaded/received/scanned/filed" -> upload date (created_at),
-    // "serviced/visited/job/work done" -> service date. Both override whatever the model guessed.
-    if (input) {
-      const age = resolveAgeFilter(question, today);
-      // R21 M2 (Cluster 3, j144 "between X and Y years old"): resolveAgeFilter now returns an ARRAY
-      // of two filters for the between-shape (a single age direction still returns one plain filter
-      // object, unchanged) — spread either shape the same way; installDate replaces installYear as
-      // the age filter's field (day-precise, see resolveAgeFilter's own doc comment), so any stray
-      // installYear the model guessed is stripped here too, never left to double up with the real one.
-      if (age) {
-        const ageFilters = Array.isArray(age) ? age : [age];
-        input = { ...input, filters: [...(input.filters ?? []).filter((f) => f?.field !== 'installYear' && f?.field !== 'installDate'), ...ageFilters] };
-      }
-      const basis = dateBasisOf(question);
-      if (input.entity === 'documents' && basis) input = { ...input, dateBasis: basis };
-    }
-    return validatePlan(input);
+    const plan = finalizePlanInput(rawInput, question, today);
+    if (plan && !fromModel && brandFixInPlaceSlot(originalQuestion ?? question, tenantVocab, overlay)) return null;
+    // R39 leftover-condition check: see the comment at the top of the function.
+    // (a model plan is already checked by validateModelPlan; the service-visit override below it, though, replaces a model plan's filters with its own, so it is checked too)
+    if (plan && (!fromModel || resolveServiceVisitsOverride(question)) && leftoverEnabled() && leftoverWords(originalQuestion ?? question, (q) => detSignature(normalizeQuestion(q, { overlay }).normalized, tenantVocab, today), { lane: 'analytics', domainWords: domainWordsFromVocab(tenantVocab), plain: isBarePlan(plan), entityKey: plan.entity, normalized: normalizeQuestion(originalQuestion ?? question, { overlay }).normalized, nameCorrections: nameCorrectionsOf(originalQuestion ?? question, tenantVocab, overlay) }).length) return null;
+    return plan;
   } catch (err) {
     console.error('Analytics planner failed, falling through:', err?.message);
     return null;
@@ -1182,10 +1229,10 @@ async function queryDocumentsByEquipmentBrand(db, plan, { audienceClause = 'TRUE
        JOIN entities e ON e.id = l.entity_id AND e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.${TENANT_SQL}
       WHERE d.${TENANT_SQL} AND (${audienceClause}) AND e.data->>'manufacturer' ILIKE $1
       ORDER BY d.created_at DESC
-      LIMIT 500`,
+      LIMIT ${SCAN_LIMIT}`,
     [brandFilter.value]
   );
-  return { rows: raw.map((r) => shapeDocumentRow(r, plan.dateBasis)) };
+  return { rows: raw.map((r) => shapeDocumentRow(r, plan.dateBasis)), truncated: raw.length >= SCAN_LIMIT };
 }
 
 /**
@@ -1424,6 +1471,11 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel, au
     plan.entity === 'documents' && (plan.filters ?? []).some((f) => f.field === 'linkedEquipmentBrand');
 
   let rows;
+  // R39: true when a row fetch below filled SCAN_LIMIT (more rows exist than were read): a count of those rows is not the count, so the plan declines.
+  let scanTruncated = false;
+  let knownTechs = null;
+  // R39: the exact COUNT(*) of a bare plan (buildAnalyticsCountSQL), so the stated total never depends on how many rows were read for display.
+  let exactTotal = null;
   // Set only in the serviceVisits branch below, from the SAME already-fetched
   // (and already DESC-by-date-sorted) rows — never a second query — see
   // formatAnalyticsAnswer's own doc comment for how this powers the honest
@@ -1488,8 +1540,11 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel, au
     // (matchesAllFilters([], []) === true) rather than re-filtering.
     ({ rows, unitCount } = await queryCustomersByEquipmentFilter(db, plan, { today }));
   } else if (plan.entity === 'customers') {
-    const { sql, params } = buildAnalyticsSQL(plan, { audienceClause });
+    const countSql = buildAnalyticsCountSQL(plan, { audienceClause });
+    if (countSql) exactTotal = (await db.raw(countSql.sql, countSql.params)).rows[0]?.n ?? null;
+    const { sql, params } = buildAnalyticsSQL(plan, { audienceClause, rowLimit: exactTotal != null ? MAX_LIMIT : SCAN_LIMIT });
     const { rows: raw } = await db.raw(sql, params);
+    if (exactTotal == null && raw.length >= SCAN_LIMIT) scanTruncated = true;
     rows = raw.map((r) => shapeCustomerRow(r));
     // R18 (H1): see attachDuplicateFlag's own doc comment — must run on the full fetched set,
     // before applyEntityFilters (below) narrows it down.
@@ -1504,8 +1559,11 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel, au
     // generic applyEntityFilters pass further down, same as every other cross-doc branch above.
     ({ rows } = await queryEquipmentByServiceTypeCondition(db, plan, { today }));
   } else if (plan.entity === 'equipment' || plan.entity === 'warranties') {
-    const { sql, params } = buildAnalyticsSQL(plan);
+    const countSql = buildAnalyticsCountSQL(plan);
+    if (countSql) exactTotal = (await db.raw(countSql.sql, countSql.params)).rows[0]?.n ?? null;
+    const { sql, params } = buildAnalyticsSQL(plan, { rowLimit: exactTotal != null ? MAX_LIMIT : SCAN_LIMIT });
     const { rows: raw } = await db.raw(sql, params);
+    if (exactTotal == null && raw.length >= SCAN_LIMIT) scanTruncated = true;
     rows = raw.map((r) => shapeEquipmentRow(r, today));
     // R18 (H1): see attachDuplicateFlag's own doc comment.
     attachDuplicateFlag(rows, 'serialNumber', 'isDuplicateSerial');
@@ -1531,10 +1589,13 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel, au
       rows = withRangeFields.filter((r) => withinTimeRange(r, plan.timeRange));
     }
   } else if (hasLinkedEquipmentBrandFilter) {
-    ({ rows } = await queryDocumentsByEquipmentBrand(db, plan, { audienceClause }));
+    { const r = await queryDocumentsByEquipmentBrand(db, plan, { audienceClause }); rows = r.rows; if (r.truncated) scanTruncated = true; }
   } else if (plan.entity === 'documents') {
-    const { sql, params } = buildAnalyticsSQL(plan, { audienceClause });
+    const countSql = buildAnalyticsCountSQL(plan, { audienceClause });
+    if (countSql) exactTotal = (await db.raw(countSql.sql, countSql.params)).rows[0]?.n ?? null;
+    const { sql, params } = buildAnalyticsSQL(plan, { audienceClause, rowLimit: exactTotal != null ? MAX_LIMIT : SCAN_LIMIT });
     const { rows: raw } = await db.raw(sql, params);
+    if (exactTotal == null && raw.length >= SCAN_LIMIT) scanTruncated = true;
     rows = raw.map((r) => shapeDocumentRow(r, plan.dateBasis));
     // Item 5 (100-question persona sample, 2026-09-22): withinTimeRange
     // compares on the row's own `date` (full YYYY-MM-DD) when plan.timeRange
@@ -1558,11 +1619,13 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel, au
       db.raw(
         `SELECT x.document_id, x.value FROM extractions x
           WHERE x.field_key = 'technician' AND tenant_id = (current_setting('app.tenant_id', true))::uuid
-          LIMIT 500`,
+          LIMIT ${SCAN_LIMIT}`,
         []
       ),
     ]);
+    if (dateRows.length >= SCAN_LIMIT || techRows.length >= SCAN_LIMIT) scanTruncated = true;
     const techByDoc = new Map(techRows.map((r) => [r.document_id, r.value]));
+    knownTechs = new Set(techRows.map((r) => String(r.value ?? '').trim().toLowerCase()));
     const allServiceVisitRows = dateRows.map((r) => ({
       id: r.document_id,
       label: r.customer_name || techByDoc.get(r.document_id) || 'Unassigned',
@@ -1675,8 +1738,23 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel, au
     filtersResolved = filtersToApply.map((f) => (f.field === 'state' && f.value === OUT_OF_STATE_HOME ? { ...f, value: homeInfo.state } : f));
     rows = rows.filter((r) => r.state);
   }
+  // R39: rows were cut off at SCAN_LIMIT and no exact COUNT exists for this plan: any number printed from them would be the size of the cut, so decline.
+  if (scanTruncated) return null;
   const filtered = applyEntityFilters(rows, filtersResolved);
-  const total = filtered.length;
+  const total = exactTotal ?? filtered.length;
+  // R39: a zero for a technician the records never name is not "0 visits" ("how many jobs did Ochoa do" for Danny Ochoa): only an exact technician on file may answer zero.
+  if (total === 0 && plan.entity === 'equipment') {
+    // same for a manufacturer the records never name ("Wayne Electric" for the units made by Wayne): only an exact manufacturer on file may answer zero
+    const bf = (plan.filters ?? []).find((f) => f.field === 'brand' && typeof f.value === 'string');
+    if (bf && !isSystemBrandWord(bf.value)) {
+      const { rows: seen } = await db.raw(`SELECT 1 FROM entities WHERE entity_type = 'equipment' AND merged_into IS NULL AND ${TENANT_SQL} AND lower(trim(data->>'manufacturer')) = $1 LIMIT 1`, [bf.value.trim().toLowerCase()]);
+      if (!seen.length) return null;
+    }
+  }
+  if (total === 0 && knownTechs) {
+    const tf = (plan.filters ?? []).find((f) => f.field === 'technician' && typeof f.value === 'string');
+    if (tf && !knownTechs.has(tf.value.trim().toLowerCase())) return null;
+  }
 
   let groups = [];
   if (plan.op === 'groupBy') groups = groupRows(filtered, keyOf(plan.groupBy));
@@ -1729,6 +1807,14 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel, au
     if (groupField) {
       broaderGroups = groupRows(rows, keyOf(groupField));
       unfilteredTotal = rows.length;
+    } else if (plan.op === 'count' && (plan.entity === 'equipment' || plan.entity === 'customers')) {
+      // R39: a zero for a named condition says what it was out of ("0 pieces of equipment (of 438 total)"), never a bare "You have 0 ..." that reads as an empty org.
+      unfilteredTotal = rows.length;
+      // the rows were already narrowed in SQL, so read the entity's own total (a bounded COUNT) to say what the zero is out of
+      if (!unfilteredTotal && (plan.entity === 'equipment' || plan.entity === 'customers')) {
+        const { rows: cnt } = await db.raw(`SELECT count(*)::int AS n FROM entities WHERE entity_type = '${plan.entity === 'equipment' ? 'equipment' : 'customer'}' AND merged_into IS NULL AND ${TENANT_SQL}`, []);
+        unfilteredTotal = cnt[0]?.n ?? 0;
+      }
     }
   } else if (plan.filters?.length) {
     unfilteredTotal = rows.length;
@@ -1996,7 +2082,7 @@ export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today
     // after — that fallback's own model call is the one actually counted
     // for the question (see api/ask.js's own doc comment at its call site),
     // so this file never double-reports one question as two.
-    const plan = await planAnalyticsQuestion(question_n, { today, overlay, tenantVocab, withTenant, ctxArg });
+    const plan = await planAnalyticsQuestion(question_n, { today, overlay, tenantVocab, withTenant, ctxArg, originalQuestion: question });
     if (!plan) return { ...EMPTY, modelCalled: true };
 
     // A1(b): a question that named something specific (a street number, a

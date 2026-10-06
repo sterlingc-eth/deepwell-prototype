@@ -5,6 +5,7 @@ import type { BillingInterval, BillingStatus } from '../services/billingClient';
 import type { IndustryInfo } from '../lib/industry';
 import { DEFAULT_CUSTOMER_FILTERS, type CustomerFilters } from '../core/customerFilters';
 import type { WorkFilterChoice } from '../core/workFilter';
+import { setFieldLabelIndustry } from '../domains/hvac/documentTypes';
 import { ensureDocLoaded } from '../core/entityGraph';
 
 export type Screen =
@@ -424,7 +425,7 @@ export const useAppStore = create<AppState>((set) => ({
   setBillingStatus: (status) => set({ billingStatus: status }),
 
   industry: null,
-  setIndustry: (info) => set({ industry: info }),
+  setIndustry: (info) => { setFieldLabelIndustry(info?.industry); set({ industry: info }); },
 
   bootstrapStatus: 'idle',
   setBootstrapStatus: (status) => set({ bootstrapStatus: status }),

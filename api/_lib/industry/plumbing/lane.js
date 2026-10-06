@@ -79,7 +79,8 @@ async function loadDocs(db) {
        LEFT JOIN extractions x ON x.document_id = d.id AND x.${TENANT}
        LEFT JOIN facets f ON f.id = x.source_facet_id
       WHERE d.${TENANT} AND d.document_type IS NOT NULL
-      ORDER BY d.created_at, d.id, x.created_at, x.id`, []);
+      ORDER BY d.created_at, d.original_filename, d.id, x.created_at, x.field_key, f.page_no NULLS FIRST, COALESCE(x.corrected_value, x.value), x.id`, []);
+  // created_at ties inside one transaction and ids are random, so the tie-breakers are what the rows themselves say (file name, field, page, box on the page, value): the same records always read in the same order
   const map = new Map(); let order = 0;
   for (const r of rows) {
     let d = map.get(r.id);
@@ -93,7 +94,25 @@ async function loadDocs(db) {
       d.fields[r.key] ??= { value: v, page: r.page ?? 1 };
     }
   }
-  return [...map.values()];
+  const out = [...map.values()];
+  // Several values of one field (findings, work performed, part numbers, repeated dates): the store keeps no position, so the printed order is recovered from the page text the
+  // values were read from (first occurrence of each value on its cited page). A value that cannot be found there keeps the stable order above and goes after the ones that can.
+  const multi = out.filter((d) => Object.values(d.all).some((a) => a.length > 1));
+  if (multi.length) {
+    let pages = [];
+    try { ({ rows: pages } = await db.raw(`SELECT p.document_id, p.page_no, p.text FROM document_pages p WHERE p.${TENANT} AND p.document_id = ANY($1::uuid[])`, [multi.map((d) => d.id)])); } catch { pages = []; }
+    const flat = (t) => String(t ?? '').toLowerCase().replace(/\s+/g, ' ');
+    const text = new Map(pages.map((p) => [`${p.document_id}|${p.page_no}`, flat(p.text)]));
+    for (const d of multi) for (const [k, arr] of Object.entries(d.all)) {
+      if (arr.length < 2) continue;
+      const pos = (x) => { const t = text.get(`${d.id}|${x.page}`); const i = t == null ? -1 : t.indexOf(flat(x.value)); return i < 0 ? Infinity : i; };
+      const ranked = arr.map((x, n) => ({ x, n, pg: x.page, ps: pos(x) }));
+      ranked.sort((a, b) => a.pg - b.pg || (a.ps === b.ps ? 0 : a.ps < b.ps ? -1 : 1) || a.n - b.n);
+      d.all[k] = ranked.map((r) => r.x);
+      d.fields[k] = { value: d.all[k][0].value, page: d.all[k][0].page };
+    }
+  }
+  return out;
 }
 const f = (d, k) => d?.fields?.[k]?.value ?? null;
 const src = (d, k, page) => ({ documentId: d.id, location: { field: k, page: page ?? d.fields[k]?.page ?? 1 } });
@@ -144,7 +163,9 @@ const devLabel = (v) => `${v.kind ? `${v.kind} ` : ''}backflow device${v.loc ? `
 const devFactLabel = (v) => `${v.custRaw ? `${v.custRaw} · ` : ''}${v.kind ? `${v.kind} · ` : ''}${String(v.addrRaw).split(',')[0]}${v.loc ? ` · ${v.loc}` : ''}${v.serial ? ` · serial ${v.serial}` : ''}`;
 
 const HEATER_TYPES = new Set(['startup-sheet', 'warranty-registration', 'equipment-record', 'nameplate-photo']);
-const NON_HEATER = /softener|disposal|sump|pump|faucet|toilet|fixture|boiler|furnace|air handler|condenser|backflow|rpz|dcva|pvb|a\/c|valve|tub|shower/i;
+// a record is some other kind of equipment when its OWN equipment / fixture type is filled in and does not say water heater (no list of other trades' equipment)
+const HEATER_WORD = /water heater|\bheater\b|\btank\b|tankless|hot water/i;
+const NON_HEATER = { test: (v) => String(v ?? '').trim() !== '' && !HEATER_WORD.test(String(v)) };
 function waterHeaters(docs) {
   const cand = docs.filter((d) => HEATER_TYPES.has(d.type));
   const groups = []; const bySerial = new Map();
@@ -160,7 +181,7 @@ function waterHeaters(docs) {
   return groups.filter((g) => !g.docs.some((d) => NON_HEATER.test(f(d, 'equipment_type') ?? '') || NON_HEATER.test(f(d, 'fixture_type') ?? '')) && g.docs.some((d) => d.type === 'startup-sheet' || d.type === 'warranty-registration' || /water heater|tank|tankless/i.test(f(d, 'equipment_type') ?? ''))).map((g) => {
     const ordered = [...g.docs].sort((a, b) => PREF.indexOf(a.type) - PREF.indexOf(b.type) || a.order - b.order);
     const get = (k) => { for (const d of ordered) if (f(d, k)) return { d, v: f(d, k) }; return null; };
-    const regs = g.docs.filter((d) => d.type === 'warranty-registration' && f(d, 'warranty_expires'));
+    const regs = g.docs.filter((d) => (d.type === 'warranty-registration' || d.type === 'startup-sheet') && f(d, 'warranty_expires')); // a startup sheet counts only when it prints its own warranty expiry
     const exps = new Set(regs.map((d) => f(d, 'warranty_expires')));
     const reg = [...regs].sort(byDate('warranty_registered_date')).pop() ?? null;
     const typeText = get('equipment_type')?.v ?? '';
@@ -178,9 +199,10 @@ function waterHeaters(docs) {
 }
 const whLabel = (h) => `${h.make ? `${h.make} ` : ''}water heater${h.addrRaw ? ` at ${String(h.addrRaw).split(',')[0]}` : ''}`;
 
-const FINISHED_OK = /^(?:final|finaled|finalled|finalized|final approved|approved final|final approval|final passed|passed final|final inspection passed|final complete|closed|closed out|complete|completed|signed off|cancel+ed|void|voided|withdrawn)$/i;
 const FINISHED_RE = /\b(?:final|finaled|finalled|finalized|closed|complete|completed|signed off|cancel+ed|void|voided|withdrawn)\b/i;
-const NOT_DONE = /\b(?:awaiting|pending|required|ready for|needs?|needed|failed|denied|no|not|pre ?final|before|until|call for|schedule|scheduled|request\w*|due)\b/i;
+const NOT_DONE = /\b(?:awaiting|pending|required|ready for|needs?|needed|fail\w*|denied|rejected|refused|no|not|pre ?final|before|until|call for|schedule|scheduled|request\w*|due|incomplete|unsatisfactory|correction\w*|re ?inspect\w*)\b/i;
+/** A printed status that plainly says the permit is finished ("Passed Final Inspection", "Final OK", "Finaled by City", "Closed (final)", "Complete - Final"): a finished word, and no not-done word and no still-open word. */
+const isFinishedStatus = (st) => { const t = String(st ?? '').replace(/[^A-Za-z ]+/g, ' ').replace(/\s+/g, ' ').trim(); return !!t && FINISHED_RE.test(t) && !NOT_DONE.test(t) && !/\b(?:open|issued|active|in progress|under review|valid|current|expired|lapsed)\b/i.test(t); };
 const OPEN_RE = /\b(?:open|issued|active|pending|in progress|approved|under review|valid|current|inspection pending|awaiting)\b/i;
 const stageOf = (t) => { const s = String(t ?? ''); if (/\bpre[- ]?final\b|\bnot final\b/i.test(s)) return 'prefinal'; if (/\bfinal(?:ed)?\b|sign[- ]?off/i.test(s)) return 'final'; if (/\brough/i.test(s)) return 'rough'; if (/\bunderground\b|\bunder[- ]?slab\b|\btrench/i.test(s)) return 'underground'; if (/\bpressure|gas test/i.test(s)) return 'pressure'; return 'other'; };
 function permitsModel(docs, today) {
@@ -202,7 +224,7 @@ function permitsModel(docs, today) {
     p.insp.sort(byDate('service_date'));
     p.passedFinal = p.insp.some((i) => stageOf(f(i, 'inspection_type')) === 'final' && resultClass(f(i, 'inspection_result')) === 'passed');
     const st = String(p.status ?? '');
-    const finishedByStatus = FINISHED_OK.test(String(st).trim().replace(/[^A-Za-z ]+/g, ' ').replace(/\s+/g, ' ').trim());
+    const finishedByStatus = isFinishedStatus(st);
     if (finishedByStatus || p.passedFinal) p.state = 'finished';
     else if (/\bexpired\b|\blapsed\b/i.test(st)) p.state = 'expired';
     else if (p.expires && okIso(p.expires) && today && p.expires < today) p.state = 'expired';
@@ -215,16 +237,19 @@ function permitsModel(docs, today) {
 const permitLabel = (p) => `Permit ${p.no}${p.addrRaw ? ` · ${String(p.addrRaw).split(',')[0]}` : ''}`;
 
 const NO_DEFECT = /^\s*(?:(?:no|none|nothing)(?:\s+(?:significant\s+|visible\s+)?(?:defects?|issues?|problems?|obstructions?|blockages?|deficienc\w+|damage|roots?|cracks?|findings?))?(?:\s+(?:noted|found|observed|detected|visible|seen))?|line (?:is )?clear|clear|good condition|pipe in good condition)\s*[.!]?\s*$/i; // a plain no-defect statement and nothing else; any finding with a defect word anywhere is a defect
+// a finding is "no defect" only when every sentence in it is a plain no-defect statement
+const isNoDefect = (v) => { const parts = String(v ?? '').split(/(?<=[.!?])\s+/).map((x) => x.trim()).filter(Boolean); return parts.length > 0 && parts.every((x) => NO_DEFECT.test(x)); };
+const endStop = (t) => (/[.!?]$/.test(t) ? t : `${t}.`);
 const kindWord = (n) => ({ ticket: 'service ticket', workorder: 'work order', quote: 'proposal / quote', agreement: 'maintenance agreement', po: 'purchase order', dispatch: 'dispatch note', invoice: 'invoice' }[n] ?? n);
 
 /* ------------------------------------------------------------------ places (addresses and customers named in a question) */
-const GENERIC_NAME = new Set(['group', 'family', 'company', 'apartments', 'apartment', 'services', 'service', 'plumbing', 'water', 'heater', 'building', 'properties', 'property', 'llc', 'inc', 'corp', 'ltd', 'the', 'and', 'construction', 'hoa', 'association', 'office', 'dental', 'restaurant', 'grill', 'bakery', 'market', 'store', 'shop', 'center', 'church', 'school', 'hotel', 'motel']);
+// no fixed list of generic business words: a part of a customer name counts on its own only when it is not the name's last word (the descriptor: Dental, Grill, Apartments...), is unique to one customer, and is not part of an address
 const CORP = new Set(['llc', 'inc', 'corp', 'ltd', 'co', 'company']);
 function placeIndex(docs) {
   const sites = new Map(); const customers = new Map();
   for (const d of docs) {
     const ak = addrKey(d); const ck = custKey(d);
-    if (ak) { let s = sites.get(ak); if (!s) { s = { key: ak, base: baseOf(ak), raw: f(d, 'service_address'), custs: new Set() }; sites.set(ak, s); } if (ck) s.custs.add(ck); }
+    if (ak) { let s = sites.get(ak); if (!s) { s = { key: ak, base: baseOf(ak), raw: f(d, 'service_address'), raws: new Set(), custs: new Set() }; sites.set(ak, s); } s.raws.add(f(d, 'service_address')); if (ck) s.custs.add(ck); }
     if (ck) { let c = customers.get(ck); if (!c) { c = { key: ck, raw: f(d, 'customer_name'), sites: new Set() }; customers.set(ck, c); } if (ak) c.sites.add(ak); }
   }
   return { sites, customers };
@@ -257,8 +282,11 @@ function resolvePlace(docs, rawQ) {
   for (const c of customers.values()) {
     const ct = c.key.split(' ').filter((t) => !CORP.has(t));
     const full = ` ${ct.join(' ')} `;
-    let hit = ct.length > 0 && canonQ.includes(full);
-    if (!hit && ct.length > 1) hit = ct.some((t) => t.length >= 4 && !GENERIC_NAME.has(t) && nameTokCount.get(t) === 1 && !addrToks.has(t) && qTokens.has(t));
+    // a name made only of the lane's own words ("Permit Office") can never be told apart from the question's words: it is not matched by name
+    const allLane = ct.length > 0 && ct.every(laneish);
+    let hit = ct.length > 0 && !allLane && canonQ.includes(full);
+    // one distinctive word of a name counts only when it is not one of the lane's words (never "backflow", "water", "open", "final"...)
+    if (!hit && ct.length > 1) hit = ct.slice(0, -1).some((t) => t.length >= 4 && t !== 'the' && !laneish(t) && nameTokCount.get(t) === 1 && !addrToks.has(t) && qTokens.has(t));
     if (!hit && ct.length === 1) hit = false;
     if (hit) { custHit.add(c.key); c.key.split(' ').forEach((t) => tokens.add(t)); }
   }
@@ -300,7 +328,10 @@ const PM_VOCAB = 'permit permits plumbing gas number numbers office issued issue
 const CAM_VOCAB = 'sewer drain line lines camera cameras video inspection inspections inspected scope scoped report reports find found finding findings defect defects observed observation observations recommendation recommended recommend footage file recording length long run part section feet how many with show problems problem issues issue condition when date material file on record records'.split(' ');
 const SVC_VOCAB = 'service ticket tickets call calls work order orders done performed technician tech plumber assigned scheduled schedule kind type visit last cost total price much amount charge proposal proposals quote quotes estimate agreement agreements maintenance contract term long cover covers covered covering come comes purchase po item items ordered dispatch dispatched going coming sent invoice invoices bill billed bills billing number come total'.split(' ');
 
-const FOREIGN = /\b(?:tonnage|refrigerant|seer|furnace|condenser|compressor|air conditioner|air conditioning|a c|hvac|thermostat|breaker|breakers|panel|panels|nec|amperage|voltage|lease|leases|tenant|tenants|rent roll|btu)\b/;
+/** The lane's own words (and the question words every veto reads). A name is never matched on one of these alone, and a name that contains one is masked out of the question before the question is read. */
+const LANE_TOKENS = new Set([...STOP, ...BF_VOCAB, ...WH_VOCAB, ...PM_VOCAB, ...CAM_VOCAB, ...SVC_VOCAB, ...('expired overdue failed passed final last next first pass fail open closed permit permits water heater test retest re plus no before past due limit sue sued legal legally code also after since not never tank tankless gas electric warranty warranties backflow attention need needs expiring soon upcoming late unpaid paid pending complete completed lease tenant ever average most least top older newer oldest newest initial prior earlier previous original and or but nor none except besides without neither fixed'.split(' '))]);
+const laneish = (t) => LANE_TOKENS.has(t) || /^(?:expir|overdue|fail|pass|retest|warrant|permit|backflow|heater|invoice|inspect|camera|sewer|final|clos|liab|negli|violat|complian)/.test(t);
+// no fixed list of other-trade words: a word the lane does not know and the organization's own records do not contain leaves a residual token, and a residual token always returns null
 const TIME_BLOCK = /\b(?:this|last|next|past|previous|coming)\s+(?:week|month|quarter|year)\b|\b(?:since|before|after|during|between|until|through|ago|yesterday|tomorrow|older|newer|oldest|newest|average|avg|mean|median|most|least|top|biggest|largest|smallest|highest|lowest|cheapest|expensive|compare|compared|trend|than|rank|sum|breakdown|percent|percentage|by city|by month|by year|per month|per year|each month|annually|monthly|weekly)\b|\bin (?:january|february|march|april|may|june|july|august|september|october|november|december|20\d\d)\b|\b20\d\d\b|\blast \d|\bpast \d/;
 
 function windowOf(q) {
@@ -365,7 +396,6 @@ function classifyInner(question, { today } = {}) {
   if (/\b(?:sued?|lawsuit|liable|liability|negligen\w*|legal advice)\b/.test(q) || (/\b(?:legal|legally|illegal)\b/.test(q) && /\b(?:is|are|can|could|do|does|to|allowed|permitted)\b/.test(q))) return { kind: 'decline', which: 'legal' };
   if (/\b(?:meet|meets|meeting|comply|complies|complying|compliant|compliance|violat\w*|up to code|to code|per code)\b/.test(q) && /\b(?:code|ipc|upc|compliance|compliant|violation|violate|violates|violating|regulations?|standard|standards)\b/.test(q) && !/\b(?:which|what|who|when|how many|list|show)\b.*\b(?:permit number|inspection result|result)\b/.test(q)) return { kind: 'decline', which: 'code' };
   if (/\bshould (?:it|that|this|the \w+(?: \w+)?)\b.*\b(?:have )?(?:passed|failed|been (?:approved|rejected))\b|\bshould (?:it|that|this) pass\b|\bwill (?:it|this|that) pass\b/.test(q)) return { kind: 'decline', which: 'code' };
-  if (FOREIGN.test(q)) return null;
   // a question that negates, excludes or asks about "the first / earlier / original" one is not computed here: the normal path reads it
   if (/\b(?:not|no|never|without|except|besides|excluding|neither|nor|none|isnt|arent|wasnt|werent|dont|doesnt|didnt|cant|wont|couldnt|shouldnt|hasnt|havent)\b|\bother than\b/.test(q)) return null;
   if (/\b(?:first|earlier|previous|previously|original|originally|prior|oldest|initial|initially|before that)\b/.test(q)) return null;
@@ -561,21 +591,66 @@ function classifyInner(question, { today } = {}) {
   return null;
 }
 
+/** Pure classification (no records): null when the lane's own vetoes stop the question. */
 export function classifyPlumbing(question, opts = {}) {
   const i = classifyInner(question, opts);
   return i ? { ...i, raw: String(question ?? '') } : null;
+}
+/** What the question router calls: same as classifyPlumbing, except that a question the vetoes stop (or decline), and that has a capitalised name-like word in it,
+ *  is handed to the run step as "maskable": a lane word inside one of this organization's own names ("Plus One Pizza", "Sue Park") must not decide the reading,
+ *  and only the organization's records can say whether it is a name. The run step returns null for it when no name of the organization is found. */
+export function classifyPlumbingForLane(question, opts = {}) {
+  const raw = String(question ?? '');
+  const i = classifyPlumbing(raw, opts);
+  if (i && i.kind !== 'decline') return i;
+  if (raw.length <= 400 && /(?:^|\s)(?:[A-Z][A-Za-z'’.-]+|&)(?=\s|$|[?.,!])/.test(raw.replace(/^\s*\S+\s*/, ''))) return { ...(i ?? {}), kind: i?.kind ?? 'deferred', raw, maskable: true };
+  return i;
 }
 
 /* ------------------------------------------------------------------ run */
 const coverage = (...parts) => { const s = new Set(); for (const p of parts) for (const t of toks(p)) { s.add(t); const c = canonTok(t); s.add(c); if (c === 'st') s.add('street'); } return s; };
 const covers = (rest, cov) => rest.every((t) => cov.has(t) || cov.has(canonTok(t)));
-const placeCov = (place, docs) => { const { sites, customers } = placeIndex(docs); return coverage(...[...place.sites].map((k) => sites.get(k)?.raw ?? ''), ...[...place.sites].map((k) => [...(sites.get(k)?.custs ?? [])].join(' ')), ...[...place.custs].map((k) => customers.get(k)?.raw ?? '')); };
+const placeCov = (place, docs) => { const { sites, customers } = placeIndex(docs); return coverage('entityx', ...[...place.sites].flatMap((k) => [...(sites.get(k)?.raws ?? [])]), ...[...place.sites].map((k) => [...(sites.get(k)?.custs ?? [])].join(' ')), ...[...place.custs].map((k) => customers.get(k)?.raw ?? '')); };
 
-export async function runPlumbing(db, intent, { today } = {}) {
+/** Names from this organization's own records found in the question that contain one of the lane's own words ("Open Air Cafe", "Backflow Pros", "Sue Park", "Smith & Sons"): replaced by a neutral word. */
+function maskNames(raw, docs) {
+  const phr = new Set();
+  for (const d of docs) for (const k of ['customer_name', 'technician', 'vendor', 'manufacturer', 'water_utility', 'jurisdiction', 'service_address']) for (const x of d.all[k] ?? []) {
+    for (const part of String(x.value).split(k === 'service_address' ? /,/ : /\s+(?:and|&)\s+(?=[A-Z])|,\s*/)) {
+      for (const cand of k === 'service_address' ? [part, String(x.value).split(',')[0]] : [part, String(x.value)]) {
+        const t = norm(cand).split(' ').filter(Boolean);
+        const variants = [t, t[0] === 'the' ? t.slice(1) : t, t.filter((w, j) => !(CORP.has(w) && j === t.length - 1))];
+        for (const v of variants) if (v.length && v.join(' ').length >= 3 && v.some(laneish)) phr.add(v.join(' '));
+      }
+    }
+  }
+  let q = norm(raw); let hit = false;
+  for (const ph of [...phr].sort((a, b) => b.length - a.length)) {
+    const re = new RegExp(`(?<![a-z0-9])${ph.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![a-z0-9])`, 'g');
+    if (re.test(q)) { q = q.replace(re, ' entityx '); hit = true; }
+  }
+  return hit ? q.replace(/\s+/g, ' ').trim() : null;
+}
+
+export async function runPlumbing(db, intent0, { today } = {}) {
+  let intent = intent0;
   if (!intent) return null;
-  if (intent.kind === 'decline') return answerEnvelope({ text: DECLINE[intent.which], facts: [], extra: { decline: true, declineKind: intent.which } });
-  const docs = await loadDocs(db);
   const t0 = today && okIso(today) ? today : null;
+  if (intent.kind === 'decline' && !intent.maskable) return answerEnvelope({ text: DECLINE[intent.which], facts: [], extra: { decline: true, declineKind: intent.which } });
+  const docs = await loadDocs(db);
+  {
+    // this organization's names first: the question is read again with them masked out, so a lane word inside a name never sets the mode or trips a veto
+    const maskedQ = maskNames(intent.raw ?? '', docs);
+    if (maskedQ) {
+      const i2 = classifyInner(maskedQ, { today });
+      if (!i2) return null;
+      if (i2.kind === 'decline') return answerEnvelope({ text: DECLINE[i2.which], facts: [], extra: { decline: true, declineKind: i2.which } });
+      // a masked name must be one this lane can place (a customer or job in the records); otherwise the question is not guessed
+      if (!resolvePlace(docs, intent.raw).any) return null;
+      intent = { ...i2, raw: intent.raw }; // the masked name stays in `rest` as one word: only a path that placed this customer / job (placeCov) accepts it, exactly as it accepts the name's own words for a plain-named company
+    } else if (intent.kind === 'decline') return answerEnvelope({ text: DECLINE[intent.which], facts: [], extra: { decline: true, declineKind: intent.which } });
+    else if (intent.kind === 'deferred') return null;
+  }
   const rawQ = intent.raw ?? '';
   void rawQ;
   const k = intent.kind;
@@ -591,7 +666,7 @@ export async function runPlumbing(db, intent, { today } = {}) {
     const items = attentionItems(docs, t0, 60);
     const by = (c) => items.filter((i) => i.category === c).length;
     const when = (i) => (i.kind === 'failed' ? `failed ${humanDate(i.date)}; needs a retest` : i.kind === 'unreadable' ? 'result unreadable; check the document' : i.days < 0 ? `${i.category === 'backflow' ? 'overdue' : 'expired'} ${humanDate(i.date)} (${dayWord(-i.days)} ago)` : i.days === 0 ? `today, ${humanDate(i.date)}` : `${humanDate(i.date)} (${dayWord(i.days)})`);
-    return answerEnvelope({ text: items.length ? `${plural(items.length, 'item')} need attention (within 60 days): ${by('backflow')} backflow, ${by('warranty')} water heater warranty, ${by('permit')} permit.` : 'None. No backflow test, water heater warranty or permit needs attention within 60 days.', facts: items.slice(0, 40).map((i) => ({ label: i.label, value: when(i), sources: [{ documentId: i.documentId, location: { field: i.category === 'permit' ? 'permit_expires' : i.category === 'warranty' ? 'warranty_expires' : i.kind === 'failed' || i.kind === 'unreadable' ? 'backflow_test_result' : 'next_test_due', page: i.page } }] })) });
+    return answerEnvelope({ text: items.length ? `${plural(items.length, 'item')} ${items.length === 1 ? 'needs' : 'need'} attention (within 60 days): ${plural(by('backflow'), 'backflow test')}, ${plural(by('warranty'), 'water heater warranty', 'water heater warranties')}, ${plural(by('permit'), 'permit')}.` : 'None. No backflow test, water heater warranty or permit needs attention within 60 days.', facts: items.slice(0, 40).map((i) => ({ label: i.label, value: when(i), sources: [{ documentId: i.documentId, location: { field: i.category === 'permit' ? 'permit_expires' : i.category === 'warranty' ? 'warranty_expires' : i.kind === 'failed' || i.kind === 'unreadable' ? 'backflow_test_result' : 'next_test_due', page: i.page } }] })) });
   }
   return null;
 }
@@ -737,7 +812,7 @@ function runHeater(docs, intent, t0) {
       return answerEnvelope({ text: `${sel.length} ${pretty ? `${pretty} ` : ''}water heater${sel.length === 1 ? '' : 's'}.`, facts: sel.slice(0, 40).map((h) => whListFact(h, 'equipment_type')) });
     }
     if (intent.versus) { const tk = hs.filter((h) => h.tankless === false).length; const tl = hs.filter((h) => h.tankless === true).length; return answerEnvelope({ text: `${tk} tank water heater${tk === 1 ? '' : 's'} and ${tl} tankless water heater${tl === 1 ? '' : 's'}.`, facts: hs.slice(0, 40).map((h) => whListFact(h, 'equipment_type')) }); }
-    if (intent.expired) return answerEnvelope({ text: `${sel.length} water heater${sel.length === 1 ? '' : 's'} ${sel.length === 1 ? 'has' : 'have'} an expired warranty (by the expiry date on the warranty registration).${hs.filter((h) => !h.reg).length ? ` ${plural(hs.filter((h) => !h.reg).length, 'water heater')} ${hs.filter((h) => !h.reg).length === 1 ? 'has' : 'have'} no warranty record on file.` : ''}`, facts: sel.slice(0, 40).map((h) => whListFact(h, 'warranty_expires', h.reg)) });
+    if (intent.expired) return answerEnvelope({ text: `${sel.length} water heater${sel.length === 1 ? '' : 's'} ${sel.length === 1 ? 'has' : 'have'} an expired warranty (by the expiry date printed on the warranty paperwork).${hs.filter((h) => !h.reg).length ? ` ${plural(hs.filter((h) => !h.reg).length, 'water heater')} ${hs.filter((h) => !h.reg).length === 1 ? 'has' : 'have'} no warranty record on file.` : ''}`, facts: sel.slice(0, 40).map((h) => whListFact(h, 'warranty_expires', h.reg)) });
     const pretty = [fl.tankless ? 'tankless' : null, fl.tank ? 'tank' : null, fl.gas ? 'gas' : null, fl.electric ? 'electric' : null, ...hitMakes].filter(Boolean).join(' ');
     return answerEnvelope({ text: `${sel.length} ${pretty ? `${pretty} ` : ''}water heater${sel.length === 1 ? '' : 's'} on file.`, facts: sel.slice(0, 40).map((h) => whListFact(h, 'equipment_type')) });
   }
@@ -749,9 +824,9 @@ function runHeater(docs, intent, t0) {
     if (!t0 || place.any || byId.length || hitMakes.length) return null;
     if (hs.some((h) => h.regAmbiguous)) return null;
     if (!covers(intent.rest, cov)) return null;
-    if (intent.mode === 'expired') { const sel = hs.filter((h) => h.exp && okIso(h.exp) && h.exp < t0).sort((a, b) => a.exp.localeCompare(b.exp)); return answerEnvelope({ text: sel.length ? `${plural(sel.length, 'water heater warranty', 'water heater warranties')} ${sel.length === 1 ? 'has' : 'have'} expired, by the dates on the warranty registrations. A heater with no registration on file has no warranty date.${hs.filter((h) => !h.reg).length ? ` ${plural(hs.filter((h) => !h.reg).length, 'water heater')} ${hs.filter((h) => !h.reg).length === 1 ? 'has' : 'have'} no warranty record on file.` : ''}` : `None. No water heater warranty on file has expired.${hs.filter((h) => !h.reg).length ? ` ${plural(hs.filter((h) => !h.reg).length, 'water heater')} ${hs.filter((h) => !h.reg).length === 1 ? 'has' : 'have'} no warranty record on file.` : ''}`, facts: sel.slice(0, 40).map((h) => whListFact(h, 'warranty_expires', h.reg, `expired ${humanDate(h.exp)} (${dayWord(-daysBetween(t0, h.exp))} ago)`)) }); }
+    if (intent.mode === 'expired') { const sel = hs.filter((h) => h.exp && okIso(h.exp) && h.exp < t0).sort((a, b) => a.exp.localeCompare(b.exp)); return answerEnvelope({ text: sel.length ? `${plural(sel.length, 'water heater warranty', 'water heater warranties')} ${sel.length === 1 ? 'has' : 'have'} expired, by the dates printed on the warranty paperwork. A heater with no registration on file has no warranty date.${hs.filter((h) => !h.reg).length ? ` ${plural(hs.filter((h) => !h.reg).length, 'water heater')} ${hs.filter((h) => !h.reg).length === 1 ? 'has' : 'have'} no warranty record on file.` : ''}` : (hs.filter((h) => !h.reg).length ? `${plural(hs.filter((h) => !h.reg).length, 'water heater')} ${hs.filter((h) => !h.reg).length === 1 ? 'has' : 'have'} no warranty record on file, so ${hs.filter((h) => !h.reg).length === 1 ? 'its' : 'their'} warranty status is unknown. No water heater warranty on file has expired.` : 'None. No water heater warranty on file has expired.'), facts: sel.slice(0, 40).map((h) => whListFact(h, 'warranty_expires', h.reg, `expired ${humanDate(h.exp)} (${dayWord(-daysBetween(t0, h.exp))} ago)`)) }); }
     const end = windowEnd(t0, intent.win); const sel = hs.filter((h) => h.exp && okIso(h.exp) && h.exp >= t0 && h.exp <= end).sort((a, b) => a.exp.localeCompare(b.exp));
-    return answerEnvelope({ text: sel.length ? `${plural(sel.length, 'water heater warranty', 'water heater warranties')} ${sel.length === 1 ? 'expires' : 'expire'} within ${windowLabel(intent.win)}${intent.win.defaulted ? ' (you gave no period, so this uses 90 days)' : ''}, by the dates on the warranty registrations.` : `None. No water heater warranty on file expires within ${windowLabel(intent.win)}.`, facts: sel.slice(0, 40).map((h) => whListFact(h, 'warranty_expires', h.reg, `expires ${humanDate(h.exp)} (${dayWord(daysBetween(t0, h.exp))})`)) });
+    return answerEnvelope({ text: sel.length ? `${plural(sel.length, 'water heater warranty', 'water heater warranties')} ${sel.length === 1 ? 'expires' : 'expire'} within ${windowLabel(intent.win)}${intent.win.defaulted ? ' (you gave no period, so this uses 90 days)' : ''}, by the dates printed on the warranty paperwork.` : `None. No water heater warranty on file expires within ${windowLabel(intent.win)}.`, facts: sel.slice(0, 40).map((h) => whListFact(h, 'warranty_expires', h.reg, `expires ${humanDate(h.exp)} (${dayWord(daysBetween(t0, h.exp))})`)) });
   }
   // one heater
   let scope = hs;
@@ -794,11 +869,11 @@ function whFact(h, attr, t0) {
   if (attr === 'w_term') { const x = f(h.termReg ?? reg, 'warranty_term'); return x ? answerEnvelope({ text: `The warranty on the ${L} is ${x}.`, facts: [fact(`${L} · warranty term`, x, h.termReg ?? reg, 'warranty_term')] }) : null; }
   if (attr === 'w_registered') { const x = f(reg, 'warranty_registered_date'); return x && okIso(x) ? answerEnvelope({ text: `The warranty on the ${L} was registered ${humanDate(x)}.`, facts: [fact(`${L} · registered`, humanDate(x), reg, 'warranty_registered_date')] }) : null; }
   if (!h.exp || !okIso(h.exp)) return null;
-  if (attr === 'w_expires') return answerEnvelope({ text: `The warranty on the ${L} expires ${t0 && h.exp === t0 ? 'today, ' : ''}${humanDate(h.exp)}, as printed on the warranty registration.`, facts: [fact(`${L} · warranty expires`, humanDate(h.exp), reg, 'warranty_expires')] });
+  if (attr === 'w_expires') return answerEnvelope({ text: `The warranty on the ${L} expires ${t0 && h.exp === t0 ? 'today, ' : ''}${humanDate(h.exp)}, as printed on the ${h.reg.type === 'startup-sheet' ? 'startup sheet' : 'warranty registration'}.`, facts: [fact(`${L} · warranty expires`, humanDate(h.exp), reg, 'warranty_expires')] });
   if (attr === 'w_status') {
     if (!t0) return null;
     const expired = h.exp < t0;
-    return answerEnvelope({ text: expired ? `No. The warranty on the ${L} expired ${humanDate(h.exp)} (${dayWord(-daysBetween(t0, h.exp))} ago).` : `Yes. The warranty on the ${L} runs through ${humanDate(h.exp)} (${dayWord(daysBetween(t0, h.exp))} left), as printed on the warranty registration.`, facts: [fact(`${L} · warranty expires`, humanDate(h.exp), reg, 'warranty_expires')] });
+    return answerEnvelope({ text: expired ? `No. The warranty on the ${L} expired ${humanDate(h.exp)} (${dayWord(-daysBetween(t0, h.exp))} ago).` : `Yes. The warranty on the ${L} runs through ${humanDate(h.exp)} (${dayWord(daysBetween(t0, h.exp))} left), as printed on the ${h.reg.type === 'startup-sheet' ? 'startup sheet' : 'warranty registration'}.`, facts: [fact(`${L} · warranty expires`, humanDate(h.exp), reg, 'warranty_expires')] });
   }
   return null;
 }
@@ -916,7 +991,7 @@ function runCamera(docs, intent) {
     if (intent.rest.length) return null;
     const place = resolvePlace(docs, intent.raw); if (place.any || place.unknown) return null;
     const latest = new Map(); for (const d of [...cams].sort(byDate('service_date'))) latest.set(addrKey(d) || d.id, d);
-    const bad = [...latest.values()].filter((d) => (d.all.line_findings ?? []).some((x) => !NO_DEFECT.test(x.value)));
+    const bad = [...latest.values()].filter((d) => (d.all.line_findings ?? []).some((x) => !isNoDefect(x.value)));
     if ([...latest.values()].some((d) => !(d.all.line_findings ?? []).length)) return null; // a report with no readable findings: the normal path reads it
     return answerEnvelope({ text: bad.length ? `${plural(bad.length, 'sewer line')} with defects noted on the latest camera report.` : 'No sewer line has defects noted on its latest camera report.', facts: bad.slice(0, 40).map((d) => fact(`${String(f(d, 'service_address')).split(',')[0]}${f(d, 'service_date') ? ` · ${humanDate(f(d, 'service_date'))}` : ''}`, (d.all.line_findings ?? []).map((x) => x.value).join('; '), d, 'line_findings', d.all.line_findings[0].page)) });
   }
@@ -929,13 +1004,16 @@ function runCamera(docs, intent) {
   if (!covers(intent.rest, cov)) return null;
   const sites = new Set(sel.map((d) => addrKey(d)));
   if (sites.size > 1) return clarify(sel.map((d) => ({ addr: addrKey(d), addrRaw: f(d, 'service_address'), hint: f(d, 'service_date') ? `inspected ${humanDate(f(d, 'service_date'))}` : f(d, 'footage_ref') ?? '' })), 'job');
-  const d = [...sel].sort(byDate('service_date')).pop();
+  const sortedCam = [...sel].sort(byDate('service_date'));
+  { const topDate = f(sortedCam[sortedCam.length - 1], 'service_date'); const tied = topDate ? sortedCam.filter((x) => f(x, 'service_date') === topDate) : [];
+    if (tied.length > 1) return clarify(tied.map((x) => ({ addr: addrKey(x), addrRaw: f(x, 'service_address'), hint: `camera report ${x.filename}, ${humanDate(topDate)}` })), 'camera report on the same day'); }
+  const d = sortedCam.pop();
   const earlier = sel.length > 1 ? ` (${plural(sel.length - 1, 'earlier report')} also on file)` : '';
   const when = f(d, 'service_date') ? humanDate(f(d, 'service_date')) : null;
   const where = String(f(d, 'service_address')).split(',')[0];
   const one = (nm, key, text) => (f(d, key) ? answerEnvelope({ text: `${text}${earlier}`, facts: [fact(`${where} · ${nm}`, f(d, key), d, key)] }) : null);
   switch (intent.attr) {
-    case 'findings': { const all0 = d.all.line_findings ?? []; const real = all0.filter((x) => !/^\s*(?:none|n\/a|na|nil|-|no (?:other )?(?:findings?|defects?))\.?\s*$/i.test(x.value)); const fs = real.length ? real : all0; if (!fs.length) return null; return answerEnvelope({ text: `Camera inspection at ${where}${when ? ` on ${when}` : ''}: ${fs.map((x) => x.value).join('; ')}.${earlier}`, facts: fs.map((x) => ({ label: `${where} · finding`, value: x.value, sources: [{ documentId: d.id, location: { field: 'line_findings', page: x.page } }] })) }); }
+    case 'findings': { const all0 = d.all.line_findings ?? []; const real = all0.filter((x) => !/^\s*(?:none|n\/a|na|nil|-)\.?\s*$/i.test(x.value) && !isNoDefect(x.value)); const fs = real.length ? real : all0; if (!fs.length) return null; return answerEnvelope({ text: `Camera inspection at ${where}${when ? ` on ${when}` : ''}: ${endStop(fs.map((x) => String(x.value).trim().replace(/[.;]+$/, '')).join('; '))}${earlier}`, facts: fs.map((x) => ({ label: `${where} · finding`, value: x.value, sources: [{ documentId: d.id, location: { field: 'line_findings', page: x.page } }] })) }); }
     case 'date': return when ? one('inspection date', 'service_date', `The sewer line at ${where} was camera inspected ${when}.`) : null;
     case 'recommendation': return one('recommendation', 'recommendation', `Recommendation from the camera inspection at ${where}: ${f(d, 'recommendation')}.`);
     case 'footage': return one('footage file', 'footage_ref', `The footage file for the camera inspection at ${where} is ${f(d, 'footage_ref')}.`);
@@ -998,6 +1076,10 @@ function runService(docs, intent) {
   }
   if (sites.size > 1 && !byNo.length) return clarify(sel.map((d) => ({ addr: addrKey(d), addrRaw: f(d, 'service_address'), hint: f(d, 'invoice_number') ?? (f(d, 'service_date') ? humanDate(f(d, 'service_date')) : '') })), 'job');
   const ordered = [...sel].sort((a, b) => String(f(a, 'service_date') ?? '').localeCompare(String(f(b, 'service_date') ?? '')) || a.order - b.order);
+  { // two or more documents on the latest date: never silently pick one
+    const topDate = f(ordered[ordered.length - 1], 'service_date'); const tied = topDate ? ordered.filter((x) => f(x, 'service_date') === topDate) : [];
+    if (tied.length > 1 && !byNo.length) return clarify(tied.map((x) => ({ addr: addrKey(x), addrRaw: f(x, 'service_address') ?? f(x, 'customer_name') ?? x.filename, hint: `${nm} ${f(x, 'invoice_number') ?? x.filename}, ${humanDate(topDate)}` })), `${nm} on the same day`);
+  }
   const d = ordered[ordered.length - 1];
   const more = ordered.length > 1 ? ` (the latest of ${ordered.length} on file)` : '';
   const where = L(d);

@@ -125,3 +125,14 @@ export function parseThreshold(question) {
   }
   return null;
 }
+
+/** R39 round 5: does the question contain "between <amount> and <amount>" where an end carries a currency marker ($, k, grand, dollars, usd, bucks)? Used ONLY to
+ *  decline: no lane answers an amount range, and a lane that ignores the range would return the whole-shop count or a false zero. A bare pair with no marker
+ *  ("between 2020 and 2025") is not matched and stays whatever it was (a year window). */
+const BTW_AMT = String.raw`(\$\s*)?\d[\d,]*(?:\.\d+)?(\s*(?:k|grand|dollars?|usd|bucks)\b)?`;
+const BTW_RE = new RegExp(String.raw`\bbetween\s+${BTW_AMT}\s+(?:and|to|-)\s+${BTW_AMT}`, 'i');
+export function betweenWithCurrency(question) {
+  const m = BTW_RE.exec(String(question ?? ''));
+  if (!m) return false;
+  return Boolean(m[1] || m[2] || m[3] || m[4]) || /\b(?:dollars?|usd|bucks)\b/i.test(String(question ?? ''));
+}

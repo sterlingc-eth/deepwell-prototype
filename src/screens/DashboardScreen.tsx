@@ -167,6 +167,13 @@ export function DashboardScreen() {
   const [coveredCollapsed, toggleCovered] = useCollapsed('covered', true);
   const [noWarrantyCollapsed, toggleNoWarranty] = useCollapsed('no-warranty', false);
 
+  // Property companies have no warranty or equipment paperwork: those sections stay out of their dashboard. Electrical and plumbing keep
+  // theirs (panels and water heaters carry warranties) but never read HVAC-style empty-state wording. HVAC is unchanged.
+  const industryId = useAppStore((s) => s.industry?.industry);
+  const [industryAttentionCount, setIndustryAttentionCount] = useState(0);
+  const warrantyFree = industryId === 'property';
+  const neutralEmpty = !!industryId && industryId !== 'hvac';
+
   const now = new Date();
   const total = Object.values(graph.docs).length;
 
@@ -421,8 +428,8 @@ export function DashboardScreen() {
 
         {/* Kept at the top, always expanded — the one section the owner asked to never bury (R17 UX audit
             fix #12). R36: it used to sit under ~550px of Data health tiles, i.e. below the fold at 1280x800. */}
-        {!DEMO_MODE && <InsightsCard onAsk={askQuestion} onOpenInbox={() => { setCurrentScreen('ingest'); setInboxTab('needs-person'); }} />}
-        {!DEMO_MODE && <IndustryAttentionCard onAsk={askQuestion} />}
+        {!DEMO_MODE && <InsightsCard hideAllClear={industryAttentionCount > 0} onAsk={askQuestion} onOpenInbox={() => { setCurrentScreen('ingest'); setInboxTab('needs-person'); }} />}
+        {!DEMO_MODE && <IndustryAttentionCard onAsk={askQuestion} onCount={setIndustryAttentionCount} />}
         <DataHealthStrip />
         {!DEMO_MODE && (
           <section aria-labelledby="financials-heading" className="space-y-3">
@@ -439,13 +446,13 @@ export function DashboardScreen() {
           <section aria-labelledby="alerts-heading" className="space-y-3">
             <h2 id="alerts-heading" className="dw-label">Alerts</h2>
             <div className="dw-card p-6 flex flex-wrap items-center justify-between gap-4">
-              <p className="text-ink-2">Your warranty alerts will show up here once you've added a few documents.</p>
+              <p className="text-ink-2">{neutralEmpty ? "Your needs-attention list will show up here once you've added a few documents." : "Your warranty alerts will show up here once you've added a few documents."}</p>
               <button type="button" className="dw-btn-primary shrink-0" onClick={() => { setCurrentScreen('ingest'); setInboxTab('add'); }}>
                 <Upload className="w-4 h-4" aria-hidden="true" /> Add documents
               </button>
             </div>
           </section>
-        ) : !DEMO_MODE && (
+        ) : !DEMO_MODE && !warrantyFree && (
           <section aria-labelledby="alerts-heading" className="space-y-3">
             <SectionHeader id="alerts" title="Alerts" collapsed={alertsCollapsed} onToggle={toggleAlerts} />
             {!alertsCollapsed && (
@@ -626,7 +633,7 @@ export function DashboardScreen() {
           </section>
         )}
 
-        {!DEMO_MODE && (
+        {!DEMO_MODE && !warrantyFree && (
           <section aria-labelledby="outreach-heading" className="space-y-3">
             <SectionHeader
               id="outreach"
@@ -673,6 +680,7 @@ export function DashboardScreen() {
           </section>
         )}
 
+        {!warrantyFree && (
         <section aria-labelledby="expiry-heading" className="space-y-3">
           <SectionHeader
             id="expiry"
@@ -781,7 +789,9 @@ export function DashboardScreen() {
           </div>
           )}
         </section>
+        )}
 
+        {!warrantyFree && (
         <section aria-labelledby="risk-heading" className="space-y-3">
           <SectionHeader id="at-risk" title={`Equipment at risk · ${atRisk.length}`} collapsed={atRiskCollapsed} onToggle={toggleAtRisk} />
           {!atRiskCollapsed && (
@@ -820,6 +830,7 @@ export function DashboardScreen() {
           </ul>
           )}
         </section>
+        )}
       </div>
     </AppShell>
   );

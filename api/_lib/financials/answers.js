@@ -23,7 +23,7 @@
 import { isPoMoneyQuestion, matchVendor, vendorPoEnabled } from '../lookups/vendorPo.js';
 import { resolveCalendarSpan } from '../timeSpans.js';
 import { KNOWN_AZ_CITY_NAMES, KNOWN_US_CITY_NAMES } from '../analytics.js';
-import { parseThreshold } from '../amountWords.js';
+import { parseThreshold, betweenWithCurrency } from '../amountWords.js';
 import { formatMoney } from '../fastPath.js';
 import { resolveContactCandidates, resolveAddressCandidates } from '../contactLookup.js';
 import { extractionsHaveUnitIndex } from '../recordsStore.js';
@@ -374,6 +374,15 @@ function docKindFromWord(w) {
 export function parseMoneyIntent(question, { today }) {
   const q = String(question ?? '').toLowerCase();
   if (!q.trim()) return null;
+  // R39: "how many invoices have no <field> / without <field>" is a missing-field count; none of the readers below applies it (they would answer the paid / open / whole-shop count).
+  if (/^(?:how many|number of|count of)\s+(?:invoices?|bills?)\b/.test(q) && /\b(?:no|without|missing|lacking|lacks?|(?:don'?t|do not|doesn'?t|does not|didn'?t) have)\s+(?:an?\s+|any\s+|the\s+)?[a-z]/.test(q) && !/\b(?:no|missing|lacking|lacks?|without|(?:don'?t|do not|doesn'?t|does not|didn'?t) have)\s+(?:an?\s+|any\s+|the\s+)?totals?\b/.test(q)) return null;
+  // R39: an amount range that could also be read as a year window ("between 2000 and 2500"), "from 2000 to 3000 dollars", or two amount bounds ("over $2,000 and under $3,000")
+  // is not one of the shapes below; none of the readers applies both ends.
+  if (/^(?:how many|number of|count of)\s+(?:invoices?|bills?)\b/.test(q)) {
+    if (betweenWithCurrency(question)) return null; // an amount range is not answered by any reader here (they would return the whole-shop count or a false zero)
+    if (/\bfrom\s+\$?[\d,]+(?:\.\d+)?\s+(?:to|through|until)\s+\$?[\d,]+(?:\.\d+)?\s*(?:dollars?|usd|bucks)\b/.test(q)) return null;
+    if (/\b(?:over|above|more than|greater than|at least|exceeding)\s+\$?\d[^.?]*\b(?:and|but|yet|while)\b[^.?]*\b(?:under|below|less than|fewer than|at most|up to)\s+\$?\d|\b(?:under|below|less than|fewer than|at most|up to)\s+\$?\d[^.?]*\b(?:and|but|yet|while)\b[^.?]*\b(?:over|above|more than|greater than|at least|exceeding)\s+\$?\d/.test(q)) return null;
+  }
   const period = parsePeriod(q, today);
   const subject = extractSubjectPhrase(question);
   // R7: the raw (lowercased) question text, so a handler can tell "how many invoices are unpaid"
@@ -446,7 +455,8 @@ export function parseMoneyIntent(question, { today }) {
       // A date or customer that WAS resolved (period / subject) is applied by thresholdInvoices instead.
       if (process.env.DONOVAN_AMOUNT_WINDOW !== '0') {
         const thM = q.match(THRESHOLD_RE);
-        const rest = thM ? q.replace(thM[0], ' ') : q;
+        const rest0 = thM ? q.replace(thM[0], ' ') : q;
+        const rest = rest0;
         if ((!period && /\b(?:(?:19|20)\d{2}|q[1-4]|quarter|jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|last|this|past|ago|today|yesterday|week|month|year|since|between|before|after|until|during)\b/.test(rest))
           || (!subject && /\b[A-Z][a-z]+\s+[A-Z][a-z]+\b/.test(String(question ?? '').replace(/^\s*\S+\s+/, '')))) return null;
       }
@@ -1325,16 +1335,23 @@ async function thresholdInvoices(db, intent, ctx) {
   // $1 is the first param after the views' own JSON param, which q() prepends - the shared helper numbers ours from $2, so shift.
   const shift = (sql) => sql.replace(/\$(\d)/g, (_, d) => `$${Number(d) + 1}`);
   const rows = await q(db, `SELECT f.* FROM financials f WHERE ${shift(where)} ORDER BY f.total DESC LIMIT 200`, params, ctx.hu);
+  // R39: the count is the SQL COUNT, never the length of the LIMITed list above.
+  const [{ n: nAll }] = await q(db, `SELECT count(*)::int AS n FROM financials f WHERE ${shift(where)}`, params, ctx.hu);
   const [a] = await q(db, `SELECT count(*) FILTER (WHERE f.total IS NULL)::int AS n_no_total FROM financials f WHERE ${INVOICE_SCOPE}`, [], ctx.hu);
+  // R39: how many invoices exist outside this count's population (payable bills, non-USD). An organization with invoices but none receivable-USD never gets a "0".
+  const [pop] = await q(db, `SELECT count(*) FILTER (WHERE ${INVOICE_SCOPE})::int AS n_in, count(*)::int AS n_all FROM financials f WHERE f.doc_kind = 'invoice'`, [], ctx.hu);
+  if (pop && pop.n_in === 0 && pop.n_all > 0) return null;
+  const excluded = pop ? pop.n_all - pop.n_in : 0;
   const dirWord = thresholdInclusive ? (thresholdDir === 'over' ? 'at least' : 'at most') : thresholdDir;
+  const amtText = fmt(String(thresholdAmount));
   const scopeText = `${g?.name ? ` for ${g.name}` : ''}${city ? ` for ${titleCity(city)} customers` : ''}${p ? ` in ${p.label}` : ''}`;
   const note = unapplied.length ? ` I could not also apply ${unapplied.join(' and ')} from your question, so that part is not reflected in this count.` : '';
   // R3 amount-basis loop (DONOVAN_AMOUNT_BASIS=0 turns it off): with no customer / city / period applied, say the count is every invoice on file, any date, paid or unpaid.
-  const basis = process.env.DONOVAN_AMOUNT_BASIS === '0' || scopeText ? '' : ' That counts every invoice on file, any date, paid or unpaid.';
-  const text = `${plural(rows.length, 'invoice')}${scopeText} ${rows.length === 1 ? 'is' : 'are'} ${dirWord} ${fmt(String(thresholdAmount))}.${basis}${note}${exclusionText({ noTotal: a.n_no_total })}`;
+  const basis = process.env.DONOVAN_AMOUNT_BASIS === '0' || scopeText ? '' : (excluded > 0 ? ' That counts receivable invoices in US dollars, any date, paid or unpaid.' : ' That counts every invoice on file, any date, paid or unpaid.');
+  const text = `${plural(nAll, 'invoice')}${scopeText} ${nAll === 1 ? 'is' : 'are'} ${dirWord} ${amtText}.${basis}${note}${exclusionText({ noTotal: a.n_no_total })}`;
   return baseAnswer(text, rows.slice(0, 40).map((r) => invoiceFact(r)), {
-    sources: rows.slice(0, 25).map((r) => docSource(r.document_id, r.total_page)), interpretation: `invoices ${dirWord} ${fmt(String(thresholdAmount))}${scopeText}`,
-    cite: { records: financeRecords(rows), total: rows.length, claimedCount: rows.length, basis: `Counted invoices with a printed total ${dirWord} ${fmt(String(thresholdAmount))}${scopeText}.` },
+    sources: rows.slice(0, 25).map((r) => docSource(r.document_id, r.total_page)), interpretation: `invoices ${dirWord} ${amtText}${scopeText}`,
+    cite: { records: financeRecords(rows), total: nAll, claimedCount: nAll, basis: `Counted invoices with a printed total ${dirWord} ${amtText}${scopeText}.` },
   });
 }
 

@@ -8,6 +8,10 @@
  * either file.
  */
 
+import { FIELD_LABELS as PROPERTY_FIELD_LABELS } from '../property/documentTypes';
+import { FIELD_LABELS as PLUMBING_FIELD_LABELS } from '../plumbing/documentTypes';
+import { FIELD_LABELS as ELECTRICAL_FIELD_LABELS } from '../electrical/documentTypes';
+
 export interface DocumentTypeDef {
   id: string;
   label: string;
@@ -98,7 +102,27 @@ export const FIELD_LABELS: Record<string, string> = {
   warranty_registered_date_unconfirmed: 'Warranty registered (unconfirmed: printed date is in the future)',
 };
 
+// Property-management companies read their records with property wording (set from the company's industry; HVAC and every other
+// industry keep the exact table above).
+// Plumbing and electrical companies get their own plain-word tables (same setter), with plain words (never the raw key) for anything not in the table.
+let labelIndustry = 'hvac';
+export function setFieldLabelIndustry(id: string | null | undefined): void {
+  labelIndustry = id === 'property' || id === 'plumbing' || id === 'electrical' ? id : 'hvac';
+}
+export const isPropertyLabelIndustry = (): boolean => labelIndustry === 'property';
+/** 'property' | 'plumbing' | 'electrical' | 'hvac': which label tables the record screens read right now. */
+export const labelIndustryId = (): string => labelIndustry;
+const prettyKey = (k: string) => { const t = k.replace(/_/g, ' ').trim(); return t ? t[0]!.toUpperCase() + t.slice(1) : k; };
 export function fieldLabel(fieldKey: string): string {
+  if (labelIndustry === 'property') {
+    const base = fieldKey.replace(/_unconfirmed$/, '');
+    return PROPERTY_FIELD_LABELS[fieldKey] ?? (fieldKey !== base && PROPERTY_FIELD_LABELS[base] ? `${PROPERTY_FIELD_LABELS[base]} (unconfirmed: printed date is in the future)` : prettyKey(fieldKey));
+  }
+  if (labelIndustry === 'plumbing' || labelIndustry === 'electrical') {
+    const table = labelIndustry === 'plumbing' ? PLUMBING_FIELD_LABELS : ELECTRICAL_FIELD_LABELS;
+    const base = fieldKey.replace(/_unconfirmed$/, '');
+    return table[fieldKey] ?? (fieldKey !== base && table[base] ? `${table[base]} (unconfirmed: printed date is in the future)` : prettyKey(fieldKey));
+  }
   return FIELD_LABELS[fieldKey] ?? fieldKey;
 }
 

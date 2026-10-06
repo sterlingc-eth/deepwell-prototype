@@ -97,6 +97,7 @@ export function recordTypoResolution(typed, resolved) {
 }
 
 export function typoNoteText(note) {
+  if (note?.text) return String(note.text);
   return `Showing results for ${note.resolved} (you typed "${note.typed}").`;
 }
 

@@ -1,12 +1,10 @@
 import type { Doc, Entity, EntityId } from '../core/types'
 import { customerForDocument } from '../core/customer'
-import { DOCUMENT_TYPES } from '../domains/hvac/documentTypes'
+import { documentTypeLabel } from '../domains/documentTypeLabel'
 import { documentName } from '../core/documentName'
 
-const TYPE_LABELS = new Map(DOCUMENT_TYPES.map((t) => [t.id, t.label]))
-
 export function typeLabel(typeId: string | null): string {
-  return (typeId && TYPE_LABELS.get(typeId)) || 'Document'
+  return documentTypeLabel(typeId) || 'Document'
 }
 
 function str(v: unknown): string {

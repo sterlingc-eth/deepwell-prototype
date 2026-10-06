@@ -178,6 +178,8 @@ const KNOWN_FIELD_KIND = {
   reminder_trigger: 'reminder_trigger',
   cost: 'money', rent_amount: 'money', security_deposit: 'money',
   labor_hours: 'number', amperage: 'text', voltage: 'text', gallons: 'number',
+  // property pack (2D): money and dates that the naming convention below would not catch
+  monthly_amount: 'money', gl_limit: 'money', contract_start: 'date', contract_end: 'date',
 };
 function inferFieldKind(key) {
   if (KNOWN_FIELD_KIND[key]) return KNOWN_FIELD_KIND[key];
@@ -203,7 +205,7 @@ function packFieldMeta(pack) {
     key: f.key,
     kind: inferFieldKind(f.key),
     desc: f.description ?? f.label,
-    repeatable: f.key === 'work_performed' || f.key === 'part_number' || f.key === 'correction_items' || f.key === 'policy_expiry' || f.key === 'line_findings',
+    repeatable: f.key === 'work_performed' || f.key === 'part_number' || f.key === 'correction_items' || f.key === 'policy_expiry' || f.key === 'line_findings' || f.key === 'coverage_type' || f.key === 'deficiency' || f.key === 'rent_roll_row',
   }));
   const specByKey = new Map(specs.map((s) => [s.key, s]));
   const unitScoped = new Set(pack.fields.filter((f) => f.perUnit).map((f) => f.key));

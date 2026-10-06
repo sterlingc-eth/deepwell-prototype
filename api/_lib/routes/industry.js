@@ -5,6 +5,8 @@
  *                                     expiries and tests due within 60 days (read-only, same definitions as the question lane)
  *                                     plumbing: backflow tests overdue / due within 60 days, failed tests needing a retest, water heater
  *                                     warranties expiring within 60 days, permits expiring or expired-open (same definitions as its lane)
+ *                                     property: vendor certificates of insurance, leases, vendor contracts expiring / ended, reinspections due,
+ *                                     overdue invoices (same definitions as its lane)
  *   { op: 'set', industry }        -> same shape, after saving                       owner / admin only, audit-logged
  * Industry lives in tenants.settings (JSONB, no DDL). The write is keyed on the
  * caller's own tenant, so one company can never change another's industry.
@@ -32,11 +34,13 @@ export default async function handler(req, res) {
   try {
     if (op === "attention") {
       const pack = await packForTenant({ withTenant, ctxArg: ctx });
-      if (pack.id !== "electrical" && pack.id !== "plumbing") return handleCors(res, req).status(200).json({ items: [] });
+      if (pack.id !== "electrical" && pack.id !== "plumbing" && pack.id !== "property") return handleCors(res, req).status(200).json({ items: [] });
       const today = resolveToday(typeof body.today === "string" ? body.today : undefined);
       const attention = pack.id === "plumbing"
         ? (await import("../industry/plumbing/lane.js")).plumbingAttention
-        : (await import("../industry/electrical/lane.js")).electricalAttention;
+        : pack.id === "property"
+          ? (await import("../industry/property/lane.js")).propertyAttention
+          : (await import("../industry/electrical/lane.js")).electricalAttention;
       const out = await withTenant(ctx, (store) => attention(store, { today, withinDays: 60 }));
       return handleCors(res, req).status(200).json(out);
     }

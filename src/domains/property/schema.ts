@@ -126,7 +126,7 @@ export const propertySchema: DomainSchema = {
         { key: 'name', label: 'Name', kind: 'text' },
         { key: 'trade', label: 'Trade', kind: 'text' },
         { key: 'phone', label: 'Phone', kind: 'text' },
-        { key: 'coiExpiry', label: 'COI expires', kind: 'date' },
+        { key: 'coiExpiry', label: 'Insurance certificate expires', kind: 'date' },
       ],
     },
     {

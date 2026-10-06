@@ -127,6 +127,17 @@ export function parseCompose(question, pack) {
   // more than one unit / more than N units
   const unitCount = /\bmore than\s+(\d{1,3}|one)\s+units?\b/i.exec(q);
   if (unitCount) conditions.push({ type: 'unitCountGt', n: /^\d+$/.test(unitCount[1]) ? Number(unitCount[1]) : 1 });
+  // R39: "at least 3 units" / "3 or more units" is "more than 2 units" (unit counts are whole numbers)
+  // R39 round 3: only the whole plain shape "customers with at least N units" / "N or more units"; any other qualifier (a year, "in service", a city, a unit
+  // type, ...) is not applied by this reader, so the question is not answered from it.
+  const AT_LEAST_SHAPE = /^\s*(?:(?:how many|number of|count of|do we have any|are there any)\s*)?customers?\s*(?:do we have\s*)?(?:with|have|has|that have|who have)\s+(?:at least\s+(?:\d{1,3}|one|two|three|four|five)|(?:\d{1,3}|one|two|three|four|five)\s+or\s+more)\s+units?\s*[?.!]*\s*$/i;
+  const unitAtLeast = !unitCount && AT_LEAST_SHAPE.test(q) && /\b(?:at least\s+(\d{1,3}|one|two|three|four|five)|(\d{1,3}|one|two|three|four|five)\s+or\s+more)\s+units?\b/i.exec(q);
+  if ((unitCount || /\b(?:at least|or more)\s+(?:\d|one|two|three|four|five)?\s*units?\b|\b(?:\d+|one|two|three|four|five)\s+or\s+more\s+units?\b/i.test(q)) && /\b(?:not|n't|never|fewer|less than|at most|no more|up to|exactly|under|below)\b/i.test(q)) return null;
+  if (unitAtLeast) {
+    const w = (unitAtLeast[1] ?? unitAtLeast[2]).toLowerCase();
+    const n = /^\d+$/.test(w) ? Number(w) : ({ one: 1, two: 2, three: 3, four: 4, five: 5 })[w];
+    if (n >= 1) conditions.push({ type: 'unitCountGt', n: n - 1, atLeast: n });
+  }
 
   // units from two-or-more different brands
   const brandSpread = /\b(two|three|four|\d+)\s+or more\s+different\s+brands\b/i.exec(q);
@@ -170,7 +181,7 @@ function conditionPhrase(cond) {
     case 'lacksDocType': return `have no ${cond.phrase} on file`;
     case 'lacksRecentService': return `haven't had a service visit in the last ${cond.months} months`;
     case 'neverServiced': return 'have never had a service visit on file';
-    case 'unitCountGt': return `have more than ${cond.n} unit${cond.n === 1 ? '' : 's'}`;
+    case 'unitCountGt': return cond.atLeast ? `have at least ${cond.atLeast} unit${cond.atLeast === 1 ? '' : 's'}` : `have more than ${cond.n} unit${cond.n === 1 ? '' : 's'}`;
     case 'distinctBrandsGte': return `have units from ${cond.n} or more different brands`;
     case 'noEmail': return 'have no email on file';
     case 'geoCity': return `have a service address in ${cond.value}`;
@@ -390,7 +401,7 @@ export async function runCompose(db, intent, { today } = {}) {
   const shown = names.slice(0, 40);
   const text = n === 0
     ? `No customers ${sentence}.`
-    : `${n} customer${n === 1 ? '' : 's'} ${sentence}: ${shown.join(', ')}${n > shown.length ? `, and ${n - shown.length} more` : ''}.`;
+    : `${n} customer${n === 1 ? '' : 's'} ${n === 1 ? sentence.replace(/^have\b/, 'has') : sentence}: ${shown.join(', ')}${n > shown.length ? `, and ${n - shown.length} more` : ''}.`;
   // R11 (E6, breadth-connect-119): same fix as relations/questions.js's callbackSet/callbackTechSet —
   // a "which customers..." (list) question's grader treats a NON-EMPTY facts array on a zero-result
   // answer as an invented answer (it wants facts:[] for an honest empty list). One fact PER NAME

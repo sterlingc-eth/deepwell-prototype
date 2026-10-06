@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-06T04:19:50.303Z",
-  "count": 764,
+  "generatedAt": "2026-10-06T12:20:40.911Z",
+  "count": 765,
   "questions": [
     {
       "id": "hvac-owner-0069-canonical",
@@ -1927,22 +1927,24 @@
       "category": "data-quality",
       "text": "How many invoices are missing a total?",
       "claimants": [
+        "deterministic",
         "money",
         "analytics"
       ],
-      "winner": "money",
-      "reason": "ask.js: `!meta && !docLookupIntent && !contentCountIntent && (isMoneyQuestion(...) || isFinancialQuestion(...))`, where docLookupIntent/contentCountIntent are the ALREADY-GATED computed values, not raw claims. Expanded algebraically over raw claims this is: money is excluded only when docLookup or contentCount would ACTUALLY have fired (which itself requires contactLookup to be raw-unclaimed) — money's gate never checks contactLookup or fastPath directly at all. That is exactly why money+relations (relations wins, 0.35 < 0.65 — benign, relations answers with a real document count/comparison, never a fabricated $ figure — see handoffs/MONEY_SAFETY_EXCEPTIONS_2026-09-26.md) and fastPath+money (fastPath wins, 0.5 < 0.65) conflicts both occur silently: money's own 'no fabricated $ figures' guard can be bypassed by any earlier-tried classifier whose shape detector also matches, without money's gate ever being consulted."
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
     },
     {
       "id": "breadth-data-quality-002",
       "category": "data-quality",
       "text": "How many invoices have no due date?",
       "claimants": [
+        "deterministic",
         "money",
         "analytics"
       ],
-      "winner": "money",
-      "reason": "ask.js: `!meta && !docLookupIntent && !contentCountIntent && (isMoneyQuestion(...) || isFinancialQuestion(...))`, where docLookupIntent/contentCountIntent are the ALREADY-GATED computed values, not raw claims. Expanded algebraically over raw claims this is: money is excluded only when docLookup or contentCount would ACTUALLY have fired (which itself requires contactLookup to be raw-unclaimed) — money's gate never checks contactLookup or fastPath directly at all. That is exactly why money+relations (relations wins, 0.35 < 0.65 — benign, relations answers with a real document count/comparison, never a fabricated $ figure — see handoffs/MONEY_SAFETY_EXCEPTIONS_2026-09-26.md) and fastPath+money (fastPath wins, 0.5 < 0.65) conflicts both occur silently: money's own 'no fabricated $ figures' guard can be bypassed by any earlier-tried classifier whose shape detector also matches, without money's gate ever being consulted."
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
     },
     {
       "id": "breadth-data-quality-003",
@@ -3449,6 +3451,17 @@
       "id": "breadth-data-quality-021",
       "category": "data-quality",
       "text": "How many documents have no readable text extracted?",
+      "claimants": [
+        "deterministic",
+        "analytics"
+      ],
+      "winner": "deterministic",
+      "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
+    },
+    {
+      "id": "breadth-existence-023",
+      "category": "existence",
+      "text": "Do we have any customers with three or more units?",
       "claimants": [
         "deterministic",
         "analytics"

@@ -158,6 +158,10 @@ export function CustomersScreen() {
 
   const runCreate = async (confirmDuplicate = false) => {
     if (!draft.name.trim()) return;
+    const em = draft.email?.trim();
+    if (em && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(em)) { setCreateErr('That email address does not look right. Fix it or leave it blank.'); return; }
+    const ph = draft.phone?.trim();
+    if (ph && ph.replace(/\D/g, '').length < 7) { setCreateErr('That phone number looks too short. Fix it or leave it blank.'); return; }
     setCreateBusy(true);
     setCreateErr(null);
     setAddressConflict(null);
@@ -390,11 +394,11 @@ export function CustomersScreen() {
             </div>
             <div>
               <label className="dw-label" htmlFor="new-cust-phone">Phone</label>
-              <input id="new-cust-phone" className="dw-input" value={draft.phone ?? ''} onChange={(e) => setDraft((d) => ({ ...d, phone: e.target.value }))} />
+              <input id="new-cust-phone" type="tel" inputMode="tel" className="dw-input" value={draft.phone ?? ''} onChange={(e) => setDraft((d) => ({ ...d, phone: e.target.value }))} />
             </div>
             <div>
               <label className="dw-label" htmlFor="new-cust-email">Email</label>
-              <input id="new-cust-email" className="dw-input" value={draft.email ?? ''} onChange={(e) => setDraft((d) => ({ ...d, email: e.target.value }))} />
+              <input id="new-cust-email" type="email" inputMode="email" className="dw-input" value={draft.email ?? ''} onChange={(e) => setDraft((d) => ({ ...d, email: e.target.value }))} />
             </div>
           </div>
           <div className="flex items-center gap-2">

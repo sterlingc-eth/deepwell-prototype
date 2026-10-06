@@ -1,0 +1,1108 @@
+[
+ {
+  "question": "who insures Rios Plumbing",
+  "kind": "answerable",
+  "expected": [
+   "Hartford Fire Insurance Company"
+  ],
+  "set": "A",
+  "source": "coi-rios-2026.pdf"
+ },
+ {
+  "question": "when does the Rios Plumbing COI run out",
+  "kind": "answerable",
+  "expected": [
+   "October 26, 2026"
+  ],
+  "set": "A",
+  "source": "coi-rios-2026.pdf"
+ },
+ {
+  "question": "Sun Valley Landscaping's liability policy number",
+  "kind": "answerable",
+  "expected": [
+   "CPP-993011"
+  ],
+  "set": "A",
+  "source": "coi-sun-2026.pdf"
+ },
+ {
+  "question": "whats the general liability limit on Summit Elevator's certificate",
+  "kind": "answerable",
+  "expected": [
+   "3,000,000"
+  ],
+  "set": "A",
+  "source": "coi-summit-2026.pdf"
+ },
+ {
+  "question": "when does Bright Path Janitorial insurance expire",
+  "kind": "answerable",
+  "expected": [
+   "April 24, 2027"
+  ],
+  "set": "A",
+  "source": "coi-bright-2026.pdf"
+ },
+ {
+  "question": "who is renting 4B at Saguaro Ridge",
+  "kind": "answerable",
+  "expected": [
+   "Jordan Ellis"
+  ],
+  "set": "A",
+  "source": "lease-4b.pdf"
+ },
+ {
+  "question": "what's Priya Natarajan's monthly rent",
+  "kind": "answerable",
+  "expected": [
+   "1,625.00"
+  ],
+  "set": "A",
+  "source": "lease-12c.pdf"
+ },
+ {
+  "question": "how much security deposit did Cactus Corner Cafe put down",
+  "kind": "answerable",
+  "expected": [
+   "6,500.00"
+  ],
+  "set": "A",
+  "source": "lease-210.pdf"
+ },
+ {
+  "question": "when does Lamar Whitfield's lease end",
+  "kind": "answerable",
+  "expected": [
+   "July 8, 2027"
+  ],
+  "set": "A",
+  "source": "lease-9d.pdf"
+ },
+ {
+  "question": "deposit on unit 12C",
+  "kind": "answerable",
+  "expected": [
+   "1,000.00"
+  ],
+  "set": "A",
+  "source": "lease-12c.pdf"
+ },
+ {
+  "question": "is 2A at Saguaro rented or empty",
+  "kind": "answerable",
+  "expected": [
+   "Vacant"
+  ],
+  "set": "A",
+  "source": "rentroll-saguaro.pdf"
+ },
+ {
+  "question": "who's in 8B at Palo Verde",
+  "kind": "answerable",
+  "expected": [
+   "Greg Holloway"
+  ],
+  "set": "A",
+  "source": "rentroll-palo-verde.pdf"
+ },
+ {
+  "question": "what is work order WO-20431 for",
+  "kind": "answerable",
+  "expected": [
+   "AC not cooling"
+  ],
+  "set": "A",
+  "source": "wo-7a-hvac.pdf"
+ },
+ {
+  "question": "which vendor has the roof leak job at Copper Canyon",
+  "kind": "answerable",
+  "expected": [
+   "Ironclad Roofing"
+  ],
+  "set": "A",
+  "source": "wo-roof.pdf"
+ },
+ {
+  "question": "what did the 12C make ready cost",
+  "kind": "answerable",
+  "expected": [
+   "1,840.00"
+  ],
+  "set": "A",
+  "source": "wo-12c-turn.pdf"
+ },
+ {
+  "question": "priority on WO-20440",
+  "kind": "answerable",
+  "expected": [
+   "Low"
+  ],
+  "set": "A",
+  "source": "wo-210-door.pdf"
+ },
+ {
+  "question": "monthly fee for the Sun Valley landscaping contract",
+  "kind": "answerable",
+  "expected": [
+   "1,200.00"
+  ],
+  "set": "A",
+  "source": "contract-sun.pdf"
+ },
+ {
+  "question": "when does the Summit Elevator agreement end",
+  "kind": "answerable",
+  "expected": [
+   "September 6, 2027"
+  ],
+  "set": "A",
+  "source": "contract-summit.pdf"
+ },
+ {
+  "question": "does the Bright Path common area janitorial agreement renew by itself",
+  "kind": "answerable",
+  "expected": [
+   "not"
+  ],
+  "set": "A",
+  "source": "contract-bright.pdf"
+ },
+ {
+  "question": "what failed on the Saguaro Ridge fire inspection",
+  "kind": "answerable",
+  "expected": [
+   "Fire extinguisher tag expired in stairwell B",
+   "Emergency light out on third floor"
+  ],
+  "set": "A",
+  "source": "insp-fire-saguaro.pdf (page 2)"
+ },
+ {
+  "question": "when is the Saguaro Ridge fire reinspection",
+  "kind": "answerable",
+  "expected": [
+   "October 16, 2026"
+  ],
+  "set": "A",
+  "source": "insp-fire-saguaro.pdf (page 2)"
+ },
+ {
+  "question": "how did unit 9D look at move in",
+  "kind": "answerable",
+  "expected": [
+   "Satisfactory"
+  ],
+  "set": "A",
+  "source": "movein-9d.pdf"
+ },
+ {
+  "question": "what is the total on INV-5001",
+  "kind": "answerable",
+  "expected": [
+   "285.50"
+  ],
+  "set": "A",
+  "source": "inv-rios-5001.pdf"
+ },
+ {
+  "question": "when is the Rios invoice INV-5001 due",
+  "kind": "answerable",
+  "expected": [
+   "October 24, 2026"
+  ],
+  "set": "A",
+  "source": "inv-rios-5001.pdf"
+ },
+ {
+  "question": "how much is the Ironclad invoice for the roof patch",
+  "kind": "answerable",
+  "expected": [
+   "2,750.00"
+  ],
+  "set": "A",
+  "source": "inv-iron-221.pdf"
+ },
+ {
+  "question": "has Sun Valley been paid for the September landscaping",
+  "kind": "answerable",
+  "expected": [
+   "Overdue"
+  ],
+  "set": "A",
+  "source": "inv-sun-0912.pdf"
+ },
+ {
+  "question": "what is invoice 771 from Apex for",
+  "kind": "answerable",
+  "expected": [
+   "Quarterly pest treatment",
+   "425.00"
+  ],
+  "set": "A",
+  "source": "inv-apex-771.pdf (page 2 for total)"
+ },
+ {
+  "question": "who is the owner of Desert Willow Plaza",
+  "kind": "answerable",
+  "expected": [
+   "Desert Willow Investors LP"
+  ],
+  "set": "A",
+  "source": "lease-210.pdf"
+ },
+ {
+  "question": "when does the Apex Pest Control insurance expire",
+  "kind": "trap",
+  "expected": [
+   "October 6, 2026"
+  ],
+  "set": "A",
+  "source": "coi-apex-2026.pdf (newer) vs coi-apex-2025.pdf (August 22, 2026)"
+ },
+ {
+  "question": "when does the lease on 7A end",
+  "kind": "trap",
+  "expected": [
+   "September 2, 2027"
+  ],
+  "set": "A",
+  "source": "lease-7a-renewal.pdf vs lease-7a.pdf (September 1, 2026)"
+ },
+ {
+  "question": "what's the rent on 7A these days",
+  "kind": "trap",
+  "expected": [
+   "1,420.00"
+  ],
+  "set": "A",
+  "source": "lease-7a-renewal.pdf vs lease-7a.pdf (1,380.00)"
+ },
+ {
+  "question": "policy number on the current Rios certificate",
+  "kind": "trap",
+  "expected": [
+   "GL-4471209"
+  ],
+  "set": "A",
+  "source": "coi-rios-2026.pdf vs coi-rios-2025-old.pdf (GL-3380114)"
+ },
+ {
+  "question": "what do we owe Rios on the 4B faucet invoice",
+  "kind": "trap",
+  "expected": [
+   "285.50"
+  ],
+  "set": "A",
+  "source": "inv-rios-5001.pdf (total includes $12.00 tax; subtotal 273.50)"
+ },
+ {
+  "question": "when does the Ironclad Roofing insurance expire",
+  "kind": "trap",
+  "expected": [
+   "February 3, 2027"
+  ],
+  "set": "A",
+  "source": "coi-dmy-2digit.pdf (renewal) vs coi-iron-2025.pdf (October 5, 2026)"
+ },
+ {
+  "question": "phone number for Jordan Ellis",
+  "kind": "unanswerable",
+  "expected": [
+   "not in",
+   "documents"
+  ],
+  "set": "A",
+  "source": "no tenant contact details in any document"
+ },
+ {
+  "question": "what is the late fee at Palo Verde Villas",
+  "kind": "unanswerable",
+  "expected": [
+   "not in",
+   "documents"
+  ],
+  "set": "A",
+  "source": "no lease terms about late fees"
+ },
+ {
+  "question": "what is the pet policy at Saguaro Ridge",
+  "kind": "unanswerable",
+  "expected": [
+   "not in",
+   "documents"
+  ],
+  "set": "A",
+  "source": "not in any document"
+ },
+ {
+  "question": "when did Summit Elevator last send us an invoice",
+  "kind": "unanswerable",
+  "expected": [
+   "not in",
+   "documents"
+  ],
+  "set": "A",
+  "source": "no Summit invoice on file"
+ },
+ {
+  "question": "how much rent did we collect last month",
+  "kind": "unanswerable",
+  "expected": [
+   "not in",
+   "documents"
+  ],
+  "set": "A",
+  "source": "no payment records"
+ },
+ {
+  "question": "how many bedrooms is unit 4B",
+  "kind": "unanswerable",
+  "expected": [
+   "not in",
+   "documents"
+  ],
+  "set": "A",
+  "source": "not in the lease or rent roll"
+ },
+ {
+  "question": "who is Apex Pest Control insured with",
+  "kind": "answerable",
+  "expected": [
+   "Liberty Mutual Insurance"
+  ],
+  "set": "B",
+  "source": "coi-apex-2026.pdf"
+ },
+ {
+  "question": "Coolwave HVAC general liability policy number",
+  "kind": "answerable",
+  "expected": [
+   "CG-3319047"
+  ],
+  "set": "B",
+  "source": "coi-cool-2026.pdf"
+ },
+ {
+  "question": "what is the workers comp policy number for Coolwave",
+  "kind": "answerable",
+  "expected": [
+   "WC-3319048"
+  ],
+  "set": "B",
+  "source": "coi-cool-2026.pdf (page 2)"
+ },
+ {
+  "question": "Summit Elevator policy period",
+  "kind": "answerable",
+  "expected": [
+   "October 11, 2026"
+  ],
+  "set": "B",
+  "source": "coi-summit-2026.pdf"
+ },
+ {
+  "question": "who is the carrier for Sun Valley",
+  "kind": "answerable",
+  "expected": [
+   "Travelers Indemnity Company"
+  ],
+  "set": "B",
+  "source": "coi-sun-2026.pdf"
+ },
+ {
+  "question": "whats Imani Okoro paying in rent",
+  "kind": "answerable",
+  "expected": [
+   "1,310.00"
+  ],
+  "set": "B",
+  "source": "lease-mtm.pdf"
+ },
+ {
+  "question": "when did Marcus Delgado and Tessa renew",
+  "kind": "answerable",
+  "expected": [
+   "September 2, 2026"
+  ],
+  "set": "B",
+  "source": "lease-7a-renewal.pdf"
+ },
+ {
+  "question": "Rhonda Ashby lease end date",
+  "kind": "answerable",
+  "expected": [
+   "September 30, 2026"
+  ],
+  "set": "B",
+  "source": "lease-3.pdf"
+ },
+ {
+  "question": "who owns Copper Canyon Townhomes",
+  "kind": "answerable",
+  "expected": [
+   "Marquez Family Trust"
+  ],
+  "set": "B",
+  "source": "lease-3.pdf"
+ },
+ {
+  "question": "who is in unit 1 at Copper Canyon",
+  "kind": "answerable",
+  "expected": [
+   "Adaeze Nwosu"
+  ],
+  "set": "B",
+  "source": "rentroll-copper.pdf"
+ },
+ {
+  "question": "how much is the vacant unit at Copper Canyon asking",
+  "kind": "answerable",
+  "expected": [
+   "1,725.00"
+  ],
+  "set": "B",
+  "source": "rentroll-copper.pdf"
+ },
+ {
+  "question": "Hye-jin Park deposit",
+  "kind": "answerable",
+  "expected": [
+   "1,475.00"
+  ],
+  "set": "B",
+  "source": "rentroll-saguaro.pdf"
+ },
+ {
+  "question": "when does Samuel Okafor in 3A have to renew",
+  "kind": "answerable",
+  "expected": [
+   "November 30, 2026"
+  ],
+  "set": "B",
+  "source": "rentroll-saguaro.pdf (page 2)"
+ },
+ {
+  "question": "Nia Thompson move out result",
+  "kind": "answerable",
+  "expected": [
+   "Needs repairs"
+  ],
+  "set": "B",
+  "source": "moveout-7b.pdf"
+ },
+ {
+  "question": "what was damaged in 7B",
+  "kind": "answerable",
+  "expected": [
+   "Carpet stain in living room",
+   "Broken closet door track",
+   "Missing smoke detector cover"
+  ],
+  "set": "B",
+  "source": "moveout-7b.pdf"
+ },
+ {
+  "question": "what is the status of WO-20399",
+  "kind": "answerable",
+  "expected": [
+   "On Hold"
+  ],
+  "set": "B",
+  "source": "wo-roof.pdf"
+ },
+ {
+  "question": "why is the roof job on hold",
+  "kind": "answerable",
+  "expected": [
+   "owner approval"
+  ],
+  "set": "B",
+  "source": "wo-roof.pdf (page 2)"
+ },
+ {
+  "question": "who is coming to treat the ants in 9D and when",
+  "kind": "answerable",
+  "expected": [
+   "Apex Pest Control",
+   "October 10, 2026"
+  ],
+  "set": "B",
+  "source": "wo-9d-pest.pdf"
+ },
+ {
+  "question": "what was the emergency work order at Copper Canyon unit 3",
+  "kind": "answerable",
+  "expected": [
+   "Rekey front door lock"
+  ],
+  "set": "B",
+  "source": "wo-3-lock.pdf"
+ },
+ {
+  "question": "how much was the lock rekey",
+  "kind": "answerable",
+  "expected": [
+   "95.00"
+  ],
+  "set": "B",
+  "source": "wo-3-lock.pdf"
+ },
+ {
+  "question": "Coolwave invoice CW-8802 total",
+  "kind": "answerable",
+  "expected": [
+   "612.75"
+  ],
+  "set": "B",
+  "source": "inv-cool-8802.pdf"
+ },
+ {
+  "question": "when is the Coolwave invoice due",
+  "kind": "answerable",
+  "expected": [
+   "October 28, 2026"
+  ],
+  "set": "B",
+  "source": "inv-cool-8802.pdf"
+ },
+ {
+  "question": "was the Bright Path invoice for 12C paid",
+  "kind": "answerable",
+  "expected": [
+   "Paid"
+  ],
+  "set": "B",
+  "source": "inv-bright-3320.pdf"
+ },
+ {
+  "question": "what is the Apex contract monthly amount",
+  "kind": "answerable",
+  "expected": [
+   "425.00"
+  ],
+  "set": "B",
+  "source": "contract-apex.pdf"
+ },
+ {
+  "question": "when did the Apex pest control contract end",
+  "kind": "answerable",
+  "expected": [
+   "September 1, 2026"
+  ],
+  "set": "B",
+  "source": "contract-apex.pdf"
+ },
+ {
+  "question": "what does Coolwave do for us at Copper Canyon",
+  "kind": "answerable",
+  "expected": [
+   "Semi-annual HVAC preventive maintenance"
+  ],
+  "set": "B",
+  "source": "contract-cool.pdf"
+ },
+ {
+  "question": "when does the Coolwave contract expire",
+  "kind": "answerable",
+  "expected": [
+   "September 26, 2027"
+  ],
+  "set": "B",
+  "source": "contract-cool.pdf"
+ },
+ {
+  "question": "what was the annual inspection result for 12C",
+  "kind": "answerable",
+  "expected": [
+   "Passed"
+  ],
+  "set": "B",
+  "source": "insp-annual-unit-12c.pdf"
+ },
+ {
+  "question": "what is wrong at unit 3 after the annual inspection",
+  "kind": "answerable",
+  "expected": [
+   "GFCI outlet in bathroom does not trip"
+  ],
+  "set": "B",
+  "source": "insp-annual-copper.pdf"
+ },
+ {
+  "question": "how much is Jordan Ellis being offered to renew at",
+  "kind": "answerable",
+  "expected": [
+   "1,495.00"
+  ],
+  "set": "B",
+  "source": "letter-lease-renewal.pdf"
+ },
+ {
+  "question": "what is the rent on unit 3 at Copper Canyon",
+  "kind": "answerable",
+  "expected": [
+   "1,750.00"
+  ],
+  "set": "B",
+  "source": "lease-3.pdf"
+ },
+ {
+  "question": "how much is on purchase order PO-8841",
+  "kind": "answerable",
+  "expected": [
+   "612.00"
+  ],
+  "set": "B",
+  "source": "po-8841.pdf"
+ },
+ {
+  "question": "what is the Rios Plumbing invoice number for the lock rekey",
+  "kind": "trap",
+  "expected": [
+   "INV-5002"
+  ],
+  "set": "B",
+  "source": "inv-rios-5002.pdf (same vendor and dates as INV-5001, different invoice and total 95.00)"
+ },
+ {
+  "question": "is Rios invoice INV-5001 on file twice",
+  "kind": "trap",
+  "expected": [
+   "285.50"
+  ],
+  "set": "B",
+  "source": "inv-rios-5001.pdf and inv-rios-5001-copy.pdf are the same invoice"
+ },
+ {
+  "question": "is the work order for the 4B leak completed or closed",
+  "kind": "trap",
+  "expected": [
+   "Completed",
+   "Closed"
+  ],
+  "set": "B",
+  "source": "wo-4b-leak.pdf (Completed) and wo-4b-leak-v2.pdf (Closed): same WO-20418"
+ },
+ {
+  "question": "what are the old Rios certificate dates",
+  "kind": "trap",
+  "expected": [
+   "October 31, 2025"
+  ],
+  "set": "B",
+  "source": "coi-rios-2025-old.pdf"
+ },
+ {
+  "question": "what was the original 7A lease end",
+  "kind": "trap",
+  "expected": [
+   "September 1, 2026"
+  ],
+  "set": "B",
+  "source": "lease-7a.pdf"
+ },
+ {
+  "question": "what is the permit fee for the Copper Canyon roof",
+  "kind": "unanswerable",
+  "expected": [
+   "not in",
+   "documents"
+  ],
+  "set": "B",
+  "source": "no permit documents"
+ },
+ {
+  "question": "who is the property manager at Palo Verde Villas",
+  "kind": "unanswerable",
+  "expected": [
+   "not in",
+   "documents"
+  ],
+  "set": "B",
+  "source": "not named in any document"
+ },
+ {
+  "question": "Ironclad Roofing GL limit on the old certificate",
+  "kind": "answerable",
+  "expected": [
+   "1,000,000"
+  ],
+  "set": "C",
+  "source": "coi-iron-2025.pdf"
+ },
+ {
+  "question": "Bright Path Janitorial policy number",
+  "kind": "answerable",
+  "expected": [
+   "BP-5530021"
+  ],
+  "set": "C",
+  "source": "coi-bright-2026.pdf"
+ },
+ {
+  "question": "what coverages does Summit Elevator carry",
+  "kind": "answerable",
+  "expected": [
+   "General Liability",
+   "Umbrella"
+  ],
+  "set": "C",
+  "source": "coi-summit-2026.pdf"
+ },
+ {
+  "question": "does Sun Valley have commercial auto",
+  "kind": "answerable",
+  "expected": [
+   "Business Auto",
+   "BA-440192"
+  ],
+  "set": "C",
+  "source": "coi-sun-2026.pdf"
+ },
+ {
+  "question": "Rios Plumbing workers comp",
+  "kind": "answerable",
+  "expected": [
+   "Statutory"
+  ],
+  "set": "C",
+  "source": "coi-rios-2026.pdf"
+ },
+ {
+  "question": "who is the tenant in 9D",
+  "kind": "answerable",
+  "expected": [
+   "Lamar Whitfield"
+  ],
+  "set": "C",
+  "source": "lease-9d.pdf"
+ },
+ {
+  "question": "Cactus Corner Cafe monthly rent",
+  "kind": "answerable",
+  "expected": [
+   "3,250.00"
+  ],
+  "set": "C",
+  "source": "lease-210.pdf (page 2)"
+ },
+ {
+  "question": "when did Cactus Corner Cafe start their lease",
+  "kind": "answerable",
+  "expected": [
+   "August 7, 2026"
+  ],
+  "set": "C",
+  "source": "lease-210.pdf"
+ },
+ {
+  "question": "Jordan Ellis lease start date",
+  "kind": "answerable",
+  "expected": [
+   "March 20, 2026"
+  ],
+  "set": "C",
+  "source": "lease-4b.pdf"
+ },
+ {
+  "question": "rent for Elena Vasquez",
+  "kind": "answerable",
+  "expected": [
+   "1,500.00"
+  ],
+  "set": "C",
+  "source": "rentroll-saguaro.pdf (page 2)"
+ },
+ {
+  "question": "which units at Saguaro Ridge are vacant",
+  "kind": "answerable",
+  "expected": [
+   "2A",
+   "4A"
+  ],
+  "set": "C",
+  "source": "rentroll-saguaro.pdf"
+ },
+ {
+  "question": "vacant unit at Palo Verde",
+  "kind": "answerable",
+  "expected": [
+   "8A"
+  ],
+  "set": "C",
+  "source": "rentroll-palo-verde.pdf"
+ },
+ {
+  "question": "how many units on the Saguaro Ridge rent roll",
+  "kind": "answerable",
+  "expected": [
+   "8"
+  ],
+  "set": "C",
+  "source": "rentroll-saguaro.pdf (page 2: Total units: 8)"
+ },
+ {
+  "question": "who is Greg Holloway and when does his lease end",
+  "kind": "answerable",
+  "expected": [
+   "June 8, 2027"
+  ],
+  "set": "C",
+  "source": "rentroll-palo-verde.pdf"
+ },
+ {
+  "question": "who was the move out at 3B Copper Canyon",
+  "kind": "answerable",
+  "expected": [
+   "Quentin Boyd"
+  ],
+  "set": "C",
+  "source": "moveout-3b.pdf"
+ },
+ {
+  "question": "what were the problems found at move in for 4B",
+  "kind": "answerable",
+  "expected": [
+   "Scuff on hallway wall",
+   "Bedroom blind slat bent"
+  ],
+  "set": "C",
+  "source": "movein-4b.pdf"
+ },
+ {
+  "question": "Desert Willow Plaza fire inspection result",
+  "kind": "answerable",
+  "expected": [
+   "Passed with deficiencies"
+  ],
+  "set": "C",
+  "source": "insp-fire-willow.pdf"
+ },
+ {
+  "question": "what deficiency was noted at Desert Willow fire inspection",
+  "kind": "answerable",
+  "expected": [
+   "Exit sign dim at north door"
+  ],
+  "set": "C",
+  "source": "insp-fire-willow.pdf"
+ },
+ {
+  "question": "when was the reinspection due for Willow Plaza",
+  "kind": "answerable",
+  "expected": [
+   "May 9, 2026"
+  ],
+  "set": "C",
+  "source": "insp-fire-willow.pdf"
+ },
+ {
+  "question": "when is unit 3 annual reinspection",
+  "kind": "answerable",
+  "expected": [
+   "October 27, 2026"
+  ],
+  "set": "C",
+  "source": "insp-annual-copper.pdf"
+ },
+ {
+  "question": "who is assigned to the AC work in 7A",
+  "kind": "answerable",
+  "expected": [
+   "Coolwave HVAC Services LLC"
+  ],
+  "set": "C",
+  "source": "wo-7a-hvac.pdf"
+ },
+ {
+  "question": "when was the leaking faucet fixed in 4B",
+  "kind": "answerable",
+  "expected": [
+   "September 24, 2026"
+  ],
+  "set": "C",
+  "source": "wo-4b-leak.pdf"
+ },
+ {
+  "question": "what was the door closer work order at 210",
+  "kind": "answerable",
+  "expected": [
+   "Adjust suite entry door closer"
+  ],
+  "set": "C",
+  "source": "wo-210-door.pdf"
+ },
+ {
+  "question": "when was the 12C unit made ready",
+  "kind": "answerable",
+  "expected": [
+   "September 6, 2026"
+  ],
+  "set": "C",
+  "source": "wo-12c-turn.pdf"
+ },
+ {
+  "question": "how much was invoiced for the Palo Verde landscaping in September",
+  "kind": "answerable",
+  "expected": [
+   "1,200.00"
+  ],
+  "set": "C",
+  "source": "inv-sun-0912.pdf"
+ },
+ {
+  "question": "what are we billed for Sun Valley",
+  "kind": "answerable",
+  "expected": [
+   "SV-0912"
+  ],
+  "set": "C",
+  "source": "inv-sun-0912.pdf"
+ },
+ {
+  "question": "which invoice has no due date",
+  "kind": "answerable",
+  "expected": [
+   "IR-221"
+  ],
+  "set": "C",
+  "source": "inv-iron-221.pdf"
+ },
+ {
+  "question": "invoice for the rekey of unit 3 paid",
+  "kind": "answerable",
+  "expected": [
+   "Paid"
+  ],
+  "set": "C",
+  "source": "inv-rios-5002.pdf"
+ },
+ {
+  "question": "what janitorial does Bright Path do at Willow Plaza and how much a month",
+  "kind": "answerable",
+  "expected": [
+   "Weekly janitorial service for common areas and lobby",
+   "950.00"
+  ],
+  "set": "C",
+  "source": "contract-bright.pdf"
+ },
+ {
+  "question": "Sun Valley contract end date",
+  "kind": "answerable",
+  "expected": [
+   "December 10, 2026"
+  ],
+  "set": "C",
+  "source": "contract-sun.pdf"
+ },
+ {
+  "question": "do we have auto renew with Summit",
+  "kind": "answerable",
+  "expected": [
+   "automatically renews"
+  ],
+  "set": "C",
+  "source": "contract-summit.pdf (page 2)"
+ },
+ {
+  "question": "Ben Ortiz rent at Desert Willow",
+  "kind": "trap",
+  "expected": [
+   "2,150.00",
+   "2,250.00"
+  ],
+  "set": "C",
+  "source": "rentroll-conflict.pdf lists unit 102 twice with different rents"
+ },
+ {
+  "question": "what is the rent on 5D",
+  "kind": "trap",
+  "expected": [
+   "1,500.00",
+   "1,450.00"
+  ],
+  "set": "C",
+  "source": "lease-rent-conflict.pdf prints Monthly Rent and Base Rent"
+ },
+ {
+  "question": "when does Wanda Pruitt lease end",
+  "kind": "trap",
+  "expected": [
+   "January 14"
+  ],
+  "set": "C",
+  "source": "lease-bad-dates.pdf prints expiration before commencement (flag conflict)"
+ },
+ {
+  "question": "when is the lease on 4B up and what does the letter say",
+  "kind": "trap",
+  "expected": [
+   "March 20, 2027"
+  ],
+  "set": "C",
+  "source": "lease-4b.pdf and letter-lease-renewal.pdf"
+ },
+ {
+  "question": "what is the Rios total on the 4B work order",
+  "kind": "trap",
+  "expected": [
+   "285.50"
+  ],
+  "set": "C",
+  "source": "wo-4b-leak.pdf and wo-4b-leak-v2.pdf are the same work order"
+ },
+ {
+  "question": "what is the electric bill for Saguaro Ridge",
+  "kind": "unanswerable",
+  "expected": [
+   "not in",
+   "documents"
+  ],
+  "set": "C",
+  "source": "no utility bills on file"
+ },
+ {
+  "question": "did Rhonda Ashby renew",
+  "kind": "unanswerable",
+  "expected": [
+   "not in",
+   "documents"
+  ],
+  "set": "C",
+  "source": "no renewal or newer lease for unit 3 on file"
+ },
+ {
+  "question": "what is the elevator inspection result at Saguaro Ridge",
+  "kind": "unanswerable",
+  "expected": [
+   "not in",
+   "documents"
+  ],
+  "set": "C",
+  "source": "no elevator inspection document"
+ },
+ {
+  "question": "security deposit refund for Nia Thompson",
+  "kind": "unanswerable",
+  "expected": [
+   "not in",
+   "documents"
+  ],
+  "set": "C",
+  "source": "no refund record"
+ },
+ {
+  "question": "square footage of the Cactus Corner Cafe space",
+  "kind": "unanswerable",
+  "expected": [
+   "not in",
+   "documents"
+  ],
+  "set": "C",
+  "source": "not in the lease"
+ }
+]

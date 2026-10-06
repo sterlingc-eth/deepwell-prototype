@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useAppStore } from '../../store/appStore';
 import {
   ChevronDown, ChevronRight, Filter as FilterIcon, LayoutGrid, List as ListIcon, Loader2, Save, Search,
   X,
 } from 'lucide-react';
-import { DOCUMENT_TYPES } from '../../domains/hvac/documentTypes';
+import { documentTypeLabel } from '../../domains/documentTypeLabel';
 import { fmtDate, fmtMoney, formatYmd } from '../../core/answer';
 import { StagePill } from '../StagePill';
 import type { PipelineStage } from '../../core/types';
@@ -14,8 +15,7 @@ import {
   type AudienceFilter, type BrowseFacet, type BrowseFilters, type BrowseRow, type GroupBy,
 } from './types';
 
-const DOCUMENT_TYPE_LABEL = new Map(DOCUMENT_TYPES.map((t) => [t.id, t.label]));
-const typeLabel = (id: string | null) => (id ? DOCUMENT_TYPE_LABEL.get(id) ?? id : 'Unclassified');
+const typeLabel = (id: string | null) => (id ? documentTypeLabel(id) ?? id : 'Unclassified');
 
 const GROUP_OPTIONS: { id: GroupBy; label: string }[] = [
   { id: 'none', label: 'No grouping' },
@@ -123,7 +123,18 @@ const CHIP_KEYS: (keyof BrowseFilters)[] = [
 
 export function RecordsBrowser({ onOpenDocument }: { onOpenDocument: (id: string) => void }) {
   const b = useRecordsBrowse();
+  const industryId = useAppStore((s) => s.industry?.industry);
+  const noWarranties = industryId === 'property'; // property companies have no warranty paperwork
+  const nonHvac = !!industryId && industryId !== 'hvac'; // the phone layout below is for other industries only: HVAC (and an unknown industry) keep the original layout and classes
+  // Open on a desktop; collapsed on a phone, where the panel would push the table off the screen.
   const [panelOpen, setPanelOpen] = useState(true);
+  const collapsedOnce = useRef(false);
+  useEffect(() => {
+    // non-HVAC companies on a phone start with the filters panel closed (it would push the table off the screen); once, when the industry is known
+    if (!nonHvac || collapsedOnce.current) return;
+    collapsedOnce.current = true;
+    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 639px)').matches) setPanelOpen(false);
+  }, [nonHvac]);
   const [searchDraft, setSearchDraft] = useState(b.filters.q ?? '');
   const [savingName, setSavingName] = useState<string | null>(null);
   const [activeRow, setActiveRow] = useState(0);
@@ -169,8 +180,8 @@ export function RecordsBrowser({ onOpenDocument }: { onOpenDocument: (id: string
     <div className="space-y-3" data-testid="records-browser">
       {/* Saved views */}
       <div className="flex flex-wrap items-center gap-1.5">
-        {b.builtInViews.map((v) => (
-          <button key={v.name} type="button" className="dw-pill-muted" onClick={() => b.applyView(v)}>{v.name}</button>
+        {b.builtInViews.filter((v) => !(noWarranties && v.filters.warrantyBucket)).map((v) => (
+          <button key={v.name} type="button" className={nonHvac ? 'dw-pill-muted max-sm:min-h-[44px]' : 'dw-pill-muted'} onClick={() => b.applyView(v)}>{v.name}</button>
         ))}
         {b.savedViews.map((v) => (
           <span key={v.id} className="dw-pill-muted inline-flex items-center gap-1">
@@ -201,7 +212,7 @@ export function RecordsBrowser({ onOpenDocument }: { onOpenDocument: (id: string
 
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" className="dw-btn-secondary !min-h-[40px]" aria-pressed={panelOpen} onClick={() => setPanelOpen((p) => !p)}>
+        <button type="button" className={nonHvac ? 'dw-btn-secondary !min-h-[44px] sm:!min-h-[40px]' : 'dw-btn-secondary !min-h-[40px]'} aria-pressed={panelOpen} onClick={() => setPanelOpen((p) => !p)}>
           <FilterIcon className="w-4 h-4" aria-hidden="true" /> Filters{b.activeCount ? ` (${b.activeCount})` : ''}
         </button>
         <div className="relative flex-1 min-w-[200px]">
@@ -239,7 +250,7 @@ export function RecordsBrowser({ onOpenDocument }: { onOpenDocument: (id: string
       {activeChips.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
           {activeChips.map((c) => (
-            <button key={c.key} type="button" className="dw-pill-muted inline-flex items-center gap-1" onClick={() => b.clearFilter(c.key)}>
+            <button key={c.key} type="button" className={nonHvac ? 'dw-pill-muted inline-flex items-center gap-1 max-sm:min-h-[44px]' : 'dw-pill-muted inline-flex items-center gap-1'} onClick={() => b.clearFilter(c.key)}>
               {c.label} <X className="w-3 h-3" aria-hidden="true" />
             </button>
           ))}
@@ -249,12 +260,12 @@ export function RecordsBrowser({ onOpenDocument }: { onOpenDocument: (id: string
 
       {b.error && <p role="alert" className="text-body text-warn-ink dark:text-brass-200">{b.error}</p>}
 
-      <div className="flex items-start gap-4">
+      <div className={nonHvac ? 'flex flex-col sm:flex-row items-start gap-4' : 'flex items-start gap-4'}>
         {panelOpen && (
-          <FacetPanel filters={b.filters} facets={b.facets} onPatch={b.patchFilters} onClose={() => setPanelOpen(false)} />
+          <FacetPanel nonHvac={nonHvac} hideWarranty={noWarranties} filters={b.filters} facets={b.facets} onPatch={b.patchFilters} onClose={() => setPanelOpen(false)} />
         )}
 
-        <div className="flex-1 min-w-0 space-y-3">
+        <div className={nonHvac ? 'flex-1 min-w-0 space-y-3 max-sm:w-full' : 'flex-1 min-w-0 space-y-3'}>
           <p className="text-caption text-ink-3" aria-live="polite">
             {b.loading ? 'Loading…' : `${b.rows.length} of ${b.total} document${b.total === 1 ? '' : 's'} shown`}
           </p>
@@ -418,8 +429,8 @@ function TeamOnlyBadge() {
   );
 }
 
-function FacetSection({ title, options, active, onPick }: {
-  title: string; options: { value: string; label: string; count: number }[]; active?: string; onPick: (v: string | undefined) => void;
+function FacetSection({ nonHvac, title, options, active, onPick }: {
+  nonHvac?: boolean; title: string; options: { value: string; label: string; count: number }[]; active?: string; onPick: (v: string | undefined) => void;
 }) {
   if (options.length === 0) return null;
   return (
@@ -432,7 +443,7 @@ function FacetSection({ title, options, active, onPick }: {
               type="button"
               onClick={() => onPick(active === o.value ? undefined : o.value)}
               aria-pressed={active === o.value}
-              className={`w-full flex items-center justify-between gap-2 px-2 py-1 rounded text-body text-left ${active === o.value ? 'bg-forest-700 text-stone-0 dark:bg-brass-300 dark:text-forest-950' : 'hover:bg-surface-2 text-ink-2'}`}
+              className={`w-full flex items-center justify-between gap-2 px-2 py-1${nonHvac ? ' max-sm:min-h-[44px]' : ''} rounded text-body text-left ${active === o.value ? 'bg-forest-700 text-stone-0 dark:bg-brass-300 dark:text-forest-950' : 'hover:bg-surface-2 text-ink-2'}`}
             >
               <span className="truncate">{o.label}</span>
               <span className="text-caption opacity-70 shrink-0">{o.count}</span>
@@ -444,33 +455,35 @@ function FacetSection({ title, options, active, onPick }: {
   );
 }
 
-function FacetPanel({ filters, facets, onPatch, onClose }: {
-  filters: BrowseFilters; facets: BrowseFacet[]; onPatch: (p: Partial<BrowseFilters>) => void; onClose: () => void;
+function FacetPanel({ nonHvac, hideWarranty, filters, facets, onPatch, onClose }: {
+  nonHvac?: boolean; hideWarranty?: boolean; filters: BrowseFilters; facets: BrowseFacet[]; onPatch: (p: Partial<BrowseFilters>) => void; onClose: () => void;
 }) {
   return (
-    <aside className="w-64 shrink-0 dw-card p-3 space-y-4 max-h-[calc(100vh-14rem)] overflow-y-auto" aria-label="Filters">
+    <aside className={`${nonHvac ? 'w-full sm:w-64' : 'w-64'} shrink-0 dw-card p-3 space-y-4 max-h-[calc(100vh-14rem)] overflow-y-auto`} aria-label="Filters">
       <div className="flex items-center justify-between">
         <p className="font-medium text-ink">Filters</p>
-        <button type="button" aria-label="Hide filters" onClick={onClose} className="text-ink-3 hover:text-ink"><X className="w-4 h-4" aria-hidden="true" /></button>
+        <button type="button" aria-label="Hide filters" onClick={onClose} className={nonHvac ? 'text-ink-3 hover:text-ink max-sm:min-h-[44px] max-sm:min-w-[44px] max-sm:inline-flex max-sm:items-center max-sm:justify-center' : 'text-ink-3 hover:text-ink'}><X className="w-4 h-4" aria-hidden="true" /></button>
       </div>
 
-      <FacetSection title="Type" options={facetOptions(facets, 'documentType').map((o) => ({ ...o, label: typeLabel(o.value) }))} active={filters.documentType} onPick={(v) => onPatch({ documentType: v })} />
+      <FacetSection nonHvac={nonHvac} title="Type" options={facetOptions(facets, 'documentType').map((o) => ({ ...o, label: typeLabel(o.value) }))} active={filters.documentType} onPick={(v) => onPatch({ documentType: v })} />
       <FacetSection
+        nonHvac={nonHvac}
         title="Status"
         options={facetOptions(facets, 'stageBucket').map((o) => ({ ...o, label: STAGE_BUCKET_LABEL[o.value as keyof typeof STAGE_BUCKET_LABEL] ?? o.value }))}
         active={filters.stageBucket}
         onPick={(v) => onPatch({ stageBucket: v as BrowseFilters['stageBucket'] })}
       />
-      <FacetSection
+      {!hideWarranty && <FacetSection
+        nonHvac={nonHvac}
         title="Warranty"
         options={facetOptions(facets, 'warrantyBucket').map((o) => ({ ...o, label: WARRANTY_BUCKET_LABEL[o.value as keyof typeof WARRANTY_BUCKET_LABEL] ?? o.value }))}
         active={filters.warrantyBucket}
         onPick={(v) => onPatch({ warrantyBucket: v as BrowseFilters['warrantyBucket'] })}
-      />
-      <FacetSection title="Customer" options={facetOptions(facets, 'customerId')} active={filters.customerId} onPick={(v) => onPatch({ customerId: v })} />
-      <FacetSection title="Site" options={facetOptions(facets, 'site')} active={filters.site} onPick={(v) => onPatch({ site: v })} />
-      <FacetSection title="Technician" options={facetOptions(facets, 'technician')} active={filters.technician} onPick={(v) => onPatch({ technician: v })} />
-      <FacetSection title="Brand" options={facetOptions(facets, 'brand')} active={filters.brand} onPick={(v) => onPatch({ brand: v })} />
+      />}
+      <FacetSection nonHvac={nonHvac} title="Customer" options={facetOptions(facets, 'customerId')} active={filters.customerId} onPick={(v) => onPatch({ customerId: v })} />
+      <FacetSection nonHvac={nonHvac} title="Site" options={facetOptions(facets, 'site')} active={filters.site} onPick={(v) => onPatch({ site: v })} />
+      <FacetSection nonHvac={nonHvac} title="Technician" options={facetOptions(facets, 'technician')} active={filters.technician} onPick={(v) => onPatch({ technician: v })} />
+      <FacetSection nonHvac={nonHvac} title="Brand" options={facetOptions(facets, 'brand')} active={filters.brand} onPick={(v) => onPatch({ brand: v })} />
 
       <div className="space-y-1">
         <p className="text-caption font-medium text-ink-3 uppercase tracking-wide">Money</p>

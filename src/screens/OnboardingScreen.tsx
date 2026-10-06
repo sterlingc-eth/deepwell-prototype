@@ -76,18 +76,18 @@ export function OnboardingScreen() {
   const redirectTarget = deepLinkRedirectTarget();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#163C2C] to-[#0F2818] flex flex-col items-center justify-center gap-8 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-[#163C2C] to-[#0F2818] flex flex-col items-center justify-center gap-4 sm:gap-8 p-4">
       <div className="dw-rise flex flex-col items-center text-center">
         <h1 className="m-0">
           <Wordmark size="lg" />
         </h1>
-        <p className="text-forest-100 mt-4 text-body-lg">
+        <p className="text-forest-100 mt-2 sm:mt-4 text-body-lg">
           {mode === 'choose' ? "You're signed in — now join or start a company." : 'Almost there.'}
         </p>
       </div>
 
       <div
-        className="dw-rise dw-rise-late w-full max-w-md rounded-lg shadow-xl p-6 sm:p-8 flex flex-col gap-5"
+        className="dw-rise dw-rise-late w-full max-w-md rounded-lg shadow-xl p-4 sm:p-8 flex flex-col gap-3 sm:gap-5"
         style={{ background: PLATE, ...LIGHT_PLATE_TOKENS } as CSSProperties}
       >
         {mode === 'choose' && (
@@ -138,14 +138,14 @@ export function OnboardingScreen() {
               <ArrowLeft className="w-4 h-4" aria-hidden="true" />
               Back
             </button>
-            <fieldset className="flex flex-col gap-3 border-0 p-0 m-0">
+            <fieldset className="flex flex-col gap-2 sm:gap-3 border-0 p-0 m-0">
               <legend className="text-body text-ink-2 mb-1">
-                What kind of company is this? Pick the one you do most: Donovan uses that industry's own words and paperwork. A company uses one industry. If you pick wrong, tell DeepWell support and we'll switch it.
+                What kind of company is this? Pick the one you do most.
               </legend>
               {INDUSTRY_CHOICES.map((c) => (
                 <label
                   key={c.id}
-                  className={`dw-card px-4 py-3 flex items-start gap-3 cursor-pointer ${industry === c.id ? 'border-forest-700' : 'border-line'}`}
+                  className={`dw-card px-4 py-3 min-h-[44px] flex items-start gap-3 cursor-pointer ${industry === c.id ? 'border-forest-700' : 'border-line'}`}
                 >
                   <input
                     type="radio"
@@ -176,6 +176,7 @@ export function OnboardingScreen() {
             >
               Continue
             </button>
+            <p className="text-caption text-ink-3 -mt-1">A company uses one industry. If you pick wrong, tell DeepWell support and we'll switch it.</p>
           </>
         )}
 

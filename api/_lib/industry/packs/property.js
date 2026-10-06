@@ -23,14 +23,14 @@
  */
 
 const documentTypes = [
-  { id: 'work-order', label: 'Work order', definition: 'A unit turn, make-ready or maintenance job: address/unit, date, vendor, and what to do.', requires: ['service_address', 'service_date'], visitType: true, financial: false },
-  { id: 'invoice', label: 'Invoice', definition: 'A bill for work or materials: an owner or vendor, a charge, a total cost.', requires: ['service_address', 'cost'], visitType: true, financial: true },
-  { id: 'warranty-registration', label: 'Warranty registration', definition: 'Registers a per-unit appliance with the manufacturer for warranty coverage.', requires: ['serial_number', 'model', 'warranty_expires|warranty_term'], visitType: false, financial: false },
+  { id: 'work-order', label: 'Work order', definition: 'A unit turn, make-ready or maintenance request/job: property, unit, date opened, vendor, priority, status, completed date, cost and what to do.', requires: ['service_address', 'service_date'], visitType: true, financial: false },
+  { id: 'invoice', label: 'Invoice', definition: 'A vendor bill for work or materials at a property/unit: vendor, invoice number, invoice and due dates, a total cost and paid status.', requires: ['service_address', 'cost'], visitType: true, financial: true },
+  { id: 'warranty-registration', label: 'Appliance warranty', definition: 'Registers a per-unit appliance with the manufacturer for warranty coverage.', requires: ['serial_number', 'model', 'warranty_expires|warranty_term'], visitType: false, financial: false },
   { id: 'permit', label: 'Permit', definition: 'A government/HOA permit or code-compliance filing, carrying a permit number.', requires: ['service_address', 'permit_number'], visitType: false, financial: false },
   { id: 'maintenance-agreement', label: 'Maintenance agreement', definition: 'A recurring vendor service contract covering a property or portfolio.', requires: ['service_address', 'customer_name', 'warranty_term|agreement_term'], visitType: false, financial: true },
-  { id: 'service-ticket', label: 'Service ticket', definition: 'A completed maintenance visit: what was found and what was done.', requires: ['service_address', 'service_date', 'work_performed'], visitType: true, financial: false },
+  { id: 'service-ticket', label: 'Maintenance visit record', definition: 'A completed maintenance visit: what was found and what was done.', requires: ['service_address', 'service_date', 'work_performed'], visitType: true, financial: false },
   { id: 'proposal-quote', label: 'Proposal / quote', definition: 'A proposed price for work not yet performed.', requires: ['customer_name|service_address', 'cost'], visitType: false, financial: true },
-  { id: 'inspection-report', label: 'Inspection report', definition: 'Findings from a code, HOA, or portfolio-compliance inspection.', requires: ['service_address', 'service_date'], visitType: true, financial: false },
+  { id: 'inspection-report', label: 'Inspection report', definition: 'Findings from an annual unit, fire-safety, code, HOA, or portfolio-compliance inspection: the inspection type, date, result as printed, any deficiencies and a reinspection due date.', requires: ['service_address', 'service_date'], visitType: true, financial: false },
   { id: 'purchase-order', label: 'Purchase order', definition: 'An order placed with a vendor for parts or materials.', requires: ['vendor|customer_name', 'cost'], visitType: false, financial: true },
   { id: 'equipment-record', label: 'Appliance record', definition: 'Identifies a per-unit appliance with no service or billing context.', requires: ['serial_number|model'], visitType: false, financial: false },
   { id: 'correspondence', label: 'Correspondence', definition: 'Tenant/owner communication about a unit or property, not a paperwork form.', requires: ['customer_name'], visitType: false, financial: false },
@@ -40,7 +40,10 @@ const documentTypes = [
   { id: 'lease-agreement', label: 'Lease agreement', definition: 'A signed lease between the owner and a tenant for one unit, with a start/end date and rent.', requires: ['service_address', 'tenant_name', 'lease_end_date'], visitType: false, financial: true },
   { id: 'move-in-inspection', label: 'Move-in inspection', definition: 'Condition report filed when a tenant takes possession of a unit.', requires: ['service_address', 'service_date'], visitType: true, financial: false },
   { id: 'move-out-inspection', label: 'Move-out inspection', definition: 'Condition report filed when a tenant vacates a unit, used to settle the security deposit.', requires: ['service_address', 'service_date'], visitType: true, financial: false },
-  { id: 'certificate-of-insurance', label: 'Certificate of insurance', definition: 'A vendor\'s proof-of-insurance filing, with a policy expiration date.', requires: ['vendor', 'coi_expires'], visitType: false, financial: false },
+  { id: 'certificate-of-insurance', label: 'Certificate of insurance', definition: 'A vendor\'s proof-of-insurance filing (COI): the insured vendor, insurer, policy number, coverage types, general liability limit, workers\' compensation and the policy expiration date.', requires: ['vendor', 'coi_expires'], visitType: false, financial: false },
+  // Build 2, stage 2D additions (no DDL: both are plain document types):
+  { id: 'vendor-contract', label: 'Vendor contract', definition: 'A service contract with an outside vendor (landscaping, pest control, elevator, janitorial, ...): the vendor, scope of services, start and end dates, auto-renewal and the monthly amount.', requires: ['vendor', 'contract_start|contract_end'], visitType: false, financial: true },
+  { id: 'rent-roll', label: 'Rent roll / unit list', definition: 'A table of units for one property: unit, tenant, lease dates, rent and occupancy status, one printed row per unit.', requires: ['rent_roll_row'], visitType: false, financial: false },
 ];
 
 const fields = [
@@ -79,7 +82,31 @@ const fields = [
   { key: 'lease_end_date', label: 'Lease end', perUnit: false, description: 'The lease\'s end date, as printed.' },
   { key: 'rent_amount', label: 'Rent amount', perUnit: false, description: 'Monthly rent amount, in dollars, as printed on the lease.' },
   { key: 'security_deposit', label: 'Security deposit', perUnit: false, description: 'Security deposit amount held, in dollars.' },
-  { key: 'coi_expires', label: 'COI expiration', perUnit: false, description: 'The vendor\'s certificate-of-insurance expiration date.' },
+  { key: 'coi_expires', label: 'COI expiration', perUnit: false, description: 'The vendor\'s certificate-of-insurance expiration date. When a certificate lists several policies with different dates, the EARLIEST one (the date coverage first lapses); each is also kept as policy_expiry.' },
+  { key: 'property_name', label: 'Property name', perUnit: false, description: 'The property/community name as printed (e.g. "Saguaro Ridge Apartments"), not its street address.' },
+  { key: 'opened_date', label: 'Opened date', perUnit: false, description: 'Date a work order / maintenance request was opened, submitted or requested, as printed.' },
+  { key: 'work_order_number', label: 'Work order number', perUnit: false, description: 'Work order / maintenance request number as printed.' },
+  { key: 'priority', label: 'Priority', perUnit: false, description: 'Work order priority as printed: Emergency, Urgent, High, Normal, Low, Routine.' },
+  { key: 'completed_date', label: 'Completed date', perUnit: false, description: 'Date a work order was completed or closed, as printed.' },
+  { key: 'invoice_date', label: 'Invoice date', perUnit: false, description: 'The date printed on the invoice.' },
+  { key: 'invoice_due', label: 'Invoice due date', perUnit: false, description: 'Payment due date printed on the invoice. Only a printed date, never computed from "Net 30".' },
+  { key: 'insurer', label: 'Insurer', perUnit: false, description: 'The insurance company on a certificate of insurance.' },
+  { key: 'policy_number', label: 'Policy number', perUnit: false, description: 'The general liability policy number (or the one policy number printed) on a certificate of insurance.' },
+  { key: 'policy_expiry', label: 'Policy expires', perUnit: false, description: 'One policy expiration date per policy listed on a certificate of insurance. Repeatable.' },
+  { key: 'coverage_type', label: 'Coverage type', perUnit: false, description: 'One coverage type per field on a certificate: General Liability, Workers Compensation, Automobile Liability, Umbrella. Repeatable.' },
+  { key: 'gl_limit', label: 'General liability limit', perUnit: false, description: 'Each-occurrence general liability limit in dollars, as printed.' },
+  { key: 'workers_comp', label: 'Workers compensation', perUnit: false, description: 'Workers\' compensation line as printed on a certificate (e.g. "Yes", "Statutory").' },
+  { key: 'contract_scope', label: 'Contract scope', perUnit: false, description: 'The services a vendor contract covers, as printed.' },
+  { key: 'contract_start', label: 'Contract start', perUnit: false, description: 'Vendor contract start/effective date.' },
+  { key: 'contract_end', label: 'Contract end', perUnit: false, description: 'Vendor contract end/expiration date, as printed.' },
+  { key: 'auto_renew', label: 'Auto-renew', perUnit: false, description: 'Whether a vendor contract renews automatically: "yes" or "no" as printed.' },
+  { key: 'monthly_amount', label: 'Monthly amount', perUnit: false, description: 'The monthly fee in a vendor contract, in dollars.' },
+  { key: 'inspection_type', label: 'Inspection type', perUnit: false, description: 'Annual, Fire safety, Move-in, Move-out, Smoke detector, HOA, ... exactly as printed.' },
+  { key: 'inspection_result', label: 'Inspection result', perUnit: false, description: 'The inspection result exactly as printed (Passed, Failed, Pass with deficiencies, ...). Never judge it.' },
+  { key: 'deficiency', label: 'Deficiency', perUnit: false, description: 'One deficiency or item needing correction per field. Repeatable.' },
+  { key: 'reinspection_due', label: 'Reinspection due', perUnit: false, description: 'Date a reinspection is due, as printed.' },
+  { key: 'rent_roll_row', label: 'Rent roll row', perUnit: false, description: 'One printed row of a rent roll / unit list as "unit=4B; tenant=Jane Roe; lease_start=2026-01-01; lease_end=2026-12-31; rent=1450.00; status=Occupied" (only the parts printed, dates ISO). Repeatable.' },
+  { key: 'rent_roll_unread', label: 'Rent roll rows not read', perUnit: false, description: 'How many printed unit rows of a rent roll could not be read with certainty (ragged or conflicting rows). Only present when some rows were skipped, so a list built from the rent roll is known to be incomplete.' },
 ];
 
 const brands = ['Whirlpool', 'GE', 'Samsung', 'LG', 'Rheem', 'Frigidaire', 'Maytag', 'Kenmore'];
@@ -87,20 +114,27 @@ const brands = ['Whirlpool', 'GE', 'Samsung', 'LG', 'Rheem', 'Frigidaire', 'Mayt
 const synonyms = {
   unit: ['unit', 'units', 'apartment', 'apartments', 'suite', 'suites', 'door', 'doors'],
   lease: ['lease', 'leases', 'rental agreement', 'lease agreement'],
-  tenant: ['tenant', 'tenants', 'renter', 'renters', 'resident', 'residents', 'occupant', 'occupants'],
-  vendor: ['vendor', 'vendors', 'contractor', 'contractors'],
-  coi: ['coi', 'certificate of insurance', 'cois', 'proof of insurance', 'insurance certificate'],
+  tenant: ['tenant', 'tenants', 'renter', 'renters', 'resident', 'residents', 'occupant', 'occupants', 'lessee', 'lessees'],
+  landlord: ['landlord', 'landlords', 'owner', 'owners', 'lessor', 'property owner'],
+  vendor: ['vendor', 'vendors', 'contractor', 'contractors', 'subcontractor', 'service provider'],
+  coi: ['coi', 'certificate of insurance', 'cois', 'proof of insurance', 'insurance certificate', 'certificate of liability insurance', 'evidence of insurance', 'acord 25'],
+  'rent roll': ['rent roll', 'rent rolls', 'unit list', 'unit roster', 'unit mix', 'occupancy report'],
+  'vendor contract': ['vendor contract', 'vendor contracts', 'service contract', 'service agreement', 'services agreement'],
+  'auto-renew': ['auto-renew', 'auto renew', 'auto-renews', 'automatic renewal', 'automatically renews', 'evergreen'],
+  inspection: ['inspection', 'inspections', 'annual inspection', 'fire safety inspection', 'fire inspection', 'unit inspection', 'reinspection', 're-inspection'],
+  deficiency: ['deficiency', 'deficiencies', 'violation', 'violations', 'corrections'],
+  invoice: ['invoice', 'invoices', 'bill', 'bills'],
   'move-in': ['move-in', 'move in', 'move-ins', 'moved in'],
   'move-out': ['move-out', 'move out', 'move-outs', 'moved out'],
-  'work order': ['work order', 'work orders', 'maintenance request', 'maintenance requests', 'maintenance ticket', 'maintenance tickets'],
-  'make-ready': ['make-ready', 'make ready', 'turn', 'unit turn', 'turnover'],
+  'work order': ['work order', 'work orders', 'wo', 'wos', 'maintenance request', 'maintenance requests', 'service request', 'service requests', 'maintenance ticket', 'maintenance tickets'],
+  'make-ready': ['make-ready', 'make ready', 'turn', 'unit turn', 'turnover', 'unit turnover'],
   vacant: ['vacant', 'vacancy', 'vacancies', 'empty unit'],
   'security deposit': ['security deposit', 'security deposits', 'deposit', 'deposits'],
   hoa: ['hoa', 'homeowners association', "homeowner's association"],
 };
 
-const abbreviations = { hoa: 'homeowners association', coi: 'certificate of insurance', sqft: 'square feet', mtm: 'month to month' };
-const typos = { tennant: 'tenant', vender: 'vendor', leese: 'lease', appartment: 'apartment' };
+const abbreviations = { hoa: 'homeowners association', coi: 'certificate of insurance', sqft: 'square feet', mtm: 'month to month', wo: 'work order', gl: 'general liability', wc: 'workers compensation', nte: 'not to exceed', cam: 'common area maintenance' };
+const typos = { tennant: 'tenant', vender: 'vendor', leese: 'lease', appartment: 'apartment', lessie: 'lessee', insurence: 'insurance', reinspction: 'reinspection', defficiency: 'deficiency' };
 
 const personas = [
   {
@@ -190,6 +224,12 @@ const examTemplates = [
   { id: 'prop-mentions-eviction', category: 'content', question: 'How many documents mention an eviction?', oracle: 'count_documents_mentioning:eviction', compare: 'number', citationRequired: true },
   { id: 'prop-count-work-orders', category: 'operations', question: 'How many maintenance work orders are on file?', oracle: 'count_documents_by_type:work-order', compare: 'number', citationRequired: false },
   { id: 'prop-count-service-tickets', category: 'operations', question: 'How many service tickets are on file?', oracle: 'count_documents_by_type:service-ticket', compare: 'number', citationRequired: false },
+  { id: 'prop-count-vendor-contracts', category: 'vendor-compliance', question: 'How many vendor contracts are on file?', oracle: 'count_documents_by_type:vendor-contract', compare: 'number', citationRequired: false },
+  { id: 'prop-contracts-ending-60', category: 'vendor-compliance', question: 'How many vendor contracts end in the next 60 days?', oracle: 'count_field_date_within_days:contract_end:60', compare: 'number', citationRequired: true },
+  { id: 'prop-contracts-ended', category: 'vendor-compliance', question: 'How many vendor contracts have already ended?', oracle: 'count_field_date_before_today:contract_end', compare: 'number', citationRequired: true },
+  { id: 'prop-invoices-past-due', category: 'financial', question: 'How many invoices are past their due date?', oracle: 'count_field_date_before_today:invoice_due', compare: 'number', citationRequired: true },
+  { id: 'prop-reinspections-overdue', category: 'inspections', question: 'How many reinspections are overdue?', oracle: 'count_field_date_before_today:reinspection_due', compare: 'number', citationRequired: true },
+  { id: 'prop-count-rent-rolls', category: 'leasing', question: 'How many rent rolls / unit lists are on file?', oracle: 'count_documents_by_type:rent-roll', compare: 'number', citationRequired: false },
   { id: 'prop-count-documents-total', category: 'operations', question: 'How many documents do we have on file in total?', oracle: 'count_documents_total', compare: 'number', citationRequired: false },
   { id: 'prop-avg-labor-hours', category: 'operations', question: 'What is the average labor hours billed across every job?', oracle: 'avg_numeric_field:labor_hours', compare: 'number', citationRequired: false },
 ];
@@ -221,6 +261,8 @@ const propertyPack = {
     coiFieldKey: 'coi_expires',
     coiCadenceMonths: 12,
   },
+  // Stage 2D contract for the question lane / attention list: which stored field answers each "due / expiring / overdue" question.
+  compliance: { coi: 'coi_expires', lease: 'lease_end_date', contract: 'contract_end', reinspection: 'reinspection_due', invoiceDue: 'invoice_due' },
   personas,
   examTemplates,
 };

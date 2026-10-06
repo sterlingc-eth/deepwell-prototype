@@ -31,6 +31,7 @@ import { classifyDocumentAudience } from "./audience/store.js";
 import { extractFromText } from "./modelAvoidance/textExtract.js";
 import { extractElectrical, missingRequired } from "./industry/electrical/extract.js";
 import { extractPlumbing, missingRequired as missingRequiredPlumbing } from "./industry/plumbing/extract.js";
+import { extractProperty, missingRequired as missingRequiredProperty, PROPERTY_TYPES } from "./industry/property/extract.js";
 import { isDeterministicExtractEnabled } from "./modelAvoidance/switches.js";
 // R33: a REQUIRED field the extraction left empty is looked up on the page by its printed label — see labelFill.js.
 import { planLabelFill } from "./modelAvoidance/labelFill.js";
@@ -108,9 +109,22 @@ function tryElectricalDeterministic(pages, pack) {
 const PLUMBING_OWN_TYPES = new Set(['backflow-test-certificate', 'sewer-camera-report', 'startup-sheet', 'warranty-registration', 'maintenance-agreement', 'inspection-report', 'permit', 'service-ticket', 'purchase-order', 'dispatch-note', 'invoice', 'work-order', 'proposal-quote']);
 function tryPlumbingDeterministic(pages, pack) {
   try {
-    const r = extractPlumbing(pages);
+    const r = extractPlumbing(pages, { today: new Date().toISOString().slice(0, 10) });
     if (!r || r.confidence < 0.9 || !PLUMBING_OWN_TYPES.has(r.type) || r.fields.length < 3) return null;
     if (missingRequiredPlumbing(r.type, r.fields, pack).length) return null;
+    return { type: r.type, toolInput: { document_type: r.type, document_type_confidence: r.confidence, fields: r.fields } };
+  } catch {
+    return null;
+  }
+}
+
+/** Property-pack deterministic read (see industry/property/extract.js). Same gates as plumbing. Returns {type, toolInput} or null. */
+const PROPERTY_OWN_TYPES = new Set(PROPERTY_TYPES);
+function tryPropertyDeterministic(pages, pack) {
+  try {
+    const r = extractProperty(pages, { today: new Date().toISOString().slice(0, 10) });
+    if (!r || r.confidence < 0.9 || !PROPERTY_OWN_TYPES.has(r.type) || r.fields.length < 3) return null;
+    if (missingRequiredProperty(r.type, r.fields, pack).length) return null;
     return { type: r.type, toolInput: { document_type: r.type, document_type_confidence: r.confidence, fields: r.fields } };
   } catch {
     return null;
@@ -180,10 +194,20 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
   const detPlumb = !det?.accepted && !detElec && pack?.id === 'plumbing' && !documentType && !truncated && isDeterministicExtractEnabled()
     ? tryPlumbingDeterministic(selected, pack)
     : null;
+  // 2D: the same for a property manager's own paperwork (work orders, vendor invoices, COIs, leases, rent rolls, inspections,
+  // vendor contracts). Never runs for any other industry.
+  const detProp = !det?.accepted && !detElec && !detPlumb && pack?.id === 'property' && !documentType && !truncated && isDeterministicExtractEnabled()
+    ? tryPropertyDeterministic(selected, pack)
+    : null;
   let extractMethod = "model";
   let extractModelLabel = EXTRACT_MODEL;
   let toolUse;
-  if (detElec) {
+  if (detProp) {
+    extractMethod = "text";
+    extractModelLabel = "deterministic-text";
+    toolUse = { type: "tool_use", input: detProp.toolInput };
+    console.log(JSON.stringify({ route: "extract", method: "text", type: detProp.type, fields: detProp.toolInput.fields.length, industry: "property" }));
+  } else if (detElec) {
     extractMethod = "text";
     extractModelLabel = "deterministic-text";
     toolUse = { type: "tool_use", input: detElec.toolInput };

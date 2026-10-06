@@ -64,7 +64,7 @@ export const FIELD_LABELS: Record<string, string> = {
   model: 'Model',
   manufacturer: 'Manufacturer',
   equipment_type: 'Equipment type',
-  fixture_type: 'Fixture/appliance type',
+  fixture_type: 'Fixture type',
   service_address: 'Service address',
   customer_name: 'Customer',
   installation_date: 'Installation date',
@@ -99,6 +99,18 @@ export const FIELD_LABELS: Record<string, string> = {
   permit_number: 'Permit number',
   agreement_term: 'Agreement term',
   vendor: 'Vendor',
+  equipment_id: 'Equipment ID',
+  shop_address: 'Company address',
+  shop_phone: 'Company phone',
+  shop_email: 'Company email',
+  customer_phone: 'Customer phone',
+  customer_email: 'Customer email',
+  warranty_registered_date: 'Warranty registered',
+  service_type: 'Service type',
+  part_number: 'Part number',
+  labor_hours: 'Labor hours',
+  status: 'Status',
+  pipe_material: 'Pipe material',
 };
 
 export function fieldLabel(fieldKey: string): string {

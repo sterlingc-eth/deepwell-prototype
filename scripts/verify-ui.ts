@@ -1219,6 +1219,35 @@ function listFilesRecursive(dir: string): string[] {
   check('not linked to any customer at all -> out of scope once a scope is set', !matchesCustomerScope(unlinked, entities, 'cust-a'));
 }
 
+/* ------------------------------------------------------------------ industry-aware record labels (plumbing, electrical) */
+{
+  const dt = await import('../src/domains/hvac/documentTypes');
+  const tl = await import('../src/domains/documentTypeLabel');
+  const plumbing = (await import('../api/_lib/industry/packs/plumbing.js')).default as { fields: { key: string; label: string }[]; documentTypes: { id: string; label: string }[] };
+  const electrical = (await import('../api/_lib/industry/packs/electrical.js')).default as typeof plumbing;
+  const hvacBefore = dt.FIELD_LABELS.tonnage;
+  for (const [ind, pack] of [['plumbing', plumbing], ['electrical', electrical]] as const) {
+    dt.setFieldLabelIndustry(ind);
+    const raw = pack.fields.filter((f) => /_/.test(f.key) && dt.fieldLabel(f.key) === f.key).map((f) => f.key);
+    check(`${ind}: no record-screen label is a raw snake_case key (${pack.fields.length} pack fields)`, raw.length === 0, raw.join(', '));
+    const off = pack.fields.filter((f) => dt.fieldLabel(f.key).toLowerCase() !== f.label.toLowerCase()).map((f) => `${f.key}: "${dt.fieldLabel(f.key)}" vs pack "${f.label}"`);
+    check(`${ind}: record labels match the pack's own wording`, off.length === 0, off.join('; '));
+    const noType = pack.documentTypes.filter((t) => tl.documentTypeLabel(t.id) !== t.label).map((t) => t.id);
+    check(`${ind}: every document type has its plain label`, noType.length === 0, noType.join(', '));
+    check(`${ind}: an unknown key reads as plain words, never snake_case`, dt.fieldLabel('some_new_field') === 'Some new field' && tl.documentTypeLabel('some-new-thing') === 'Some new thing');
+    check(`${ind}: a parked future date keeps the label plus the unconfirmed note`, /^Service date \(unconfirmed/.test(dt.fieldLabel('service_date_unconfirmed')));
+  }
+  dt.setFieldLabelIndustry('plumbing');
+  check('plumbing labels never borrow the HVAC table: a key only HVAC has reads as plain words', !plumbing.fields.some((f) => f.key === 'tonnage') && dt.fieldLabel('refrigerant') === 'Refrigerant' && dt.fieldLabel('reminder_trigger') === 'Reminder trigger');
+  dt.setFieldLabelIndustry('hvac');
+  check('hvac labels unchanged: table value, raw key for an unknown key, original document labels', dt.fieldLabel('tonnage') === hvacBefore && dt.fieldLabel('service_date') === 'Service date' && dt.fieldLabel('some_new_field') === 'some_new_field' && tl.documentTypeLabel('some-new-thing') === undefined);
+  dt.setFieldLabelIndustry(null);
+  check('no industry set behaves as hvac', dt.fieldLabel('some_new_field') === 'some_new_field');
+  dt.setFieldLabelIndustry('property');
+  check('property labels unchanged by the plumbing / electrical tables', dt.fieldLabel('some_new_field') === 'Some new field' && dt.fieldLabel('serial_number') !== 'serial_number');
+  dt.setFieldLabelIndustry('hvac');
+}
+
 /* ------------------------------------------------------------------ done */
 
 console.log('');

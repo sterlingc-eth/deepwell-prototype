@@ -42,6 +42,19 @@ const SHAPES = [
   new RegExp(String.raw`^(?:tell\s+me\s+about|anything\s+on|any\s+info\s+on|info\s+on|what\s+about)\s+${NAME}\s*$`, "i"),
   new RegExp(String.raw`^(?:is|was)\s+${NAME}\s+(?:a|one\s+of\s+our|our)\s+(?:customer|client|tech|technician|vendor)s?\s*$`, "i"),
 ];
+/** R3 not-on-file: more record-question shapes for a name that exists nowhere (possessive "what is X's phone", "X phone", "how many jobs for X",
+ *  "details on X", "customer X", "owed by X", "when did X last have service"). Same gate as above (name must be absent everywhere). Kill switch DONOVAN_NOTONFILE=0. */
+const NF_FIELD = String.raw`(?:phone(?:\s+number)?|number|cell|e-?mail(?:\s+address)?|address|contact(?:\s+info)?|account|file|history|invoices?|balance)`;
+const NF_SHAPES = [
+  new RegExp(String.raw`^(?:what(?:['’]s|\s+is|\s+was)\s+)?(?:the\s+)?${NAME}['’]s?\s+${NF_FIELD}\s*$`, "i"),
+  new RegExp(String.raw`^${NAME}\s+${NF_FIELD}\s*$`, "i"),
+  new RegExp(String.raw`^(?:how\s+many\s+(?:jobs|visits|invoices|documents|units)|(?:details|info|information|history|records?)|total\s+(?:owed|due))\s+(?:for|on|about|from|by|of)\s+(?:the\s+)?${NAME}\s*$`, "i"),
+  new RegExp(String.raw`^(?:customer|client)\s+${NAME}\s*$`, "i"),
+  new RegExp(String.raw`^when\s+did\s+${NAME}\s+last\s+(?:have|get|had)\s+(?:a\s+)?(?:service|serviced|visit|job)\s*$`, "i"),
+];
+const NF_BAD = /^(?:the|our|my|your|how|what|who|when|where|why|list|show|all|any|every|each|total|customer|customers|client|clients|tech|techs|technician|technicians|unit|units|invoice|invoices|serial|phone|email|address)\b/i;
+const nfEnabled = () => process.env.DONOVAN_NOTONFILE !== "0";
+
 /** R35: the bare "who is X" shapes (the last three above) only take a phrase that reads as a person's name, never a role or a ranking
  *  ("whos our busiest technician", "who is the owner", "who is our best customer" go on to their own routes). */
 const WHO_SHAPES = new Set(SHAPES.slice(-3));
@@ -73,6 +86,13 @@ export function extractNamePhrase(question) {
     const tokens = m[1].split(/\s+/).map((t) => t.replace(/['’]s?$/i, "")).filter((t) => t && !STOP.has(t.toLowerCase()) && !TAIL_WORDS.has(t.toLowerCase()));
     if (!tokens.length || tokens.length > 3) continue;
     return tokens.join(" ");
+  }
+  if (nfEnabled()) for (const re of NF_SHAPES) {
+    const m = re.exec(q);
+    if (!m || NF_BAD.test(m[1].trim())) continue;
+    const parts = m[1].trim().split(/\s+/);
+    if (parts.length < 2 || parts.length > 3 || !parts.every((t) => /^[A-Z][A-Za-z'’-]+$/.test(t))) continue; // capitalised full name only
+    return parts.map((t) => t.replace(/['’]s?$/i, "")).join(" ");
   }
   return null;
 }
