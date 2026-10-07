@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { ingestDocument, recordIngestFailure } from "../readDocument.js";
 import { extractDocumentFields } from "../extractDocument.js";
 import { withTenant } from "../recordsStore.js";
@@ -107,7 +108,10 @@ export async function listUnextractedDocuments(ctx, olderThanMinutes = UNEXTRACT
  * CRON_SECRET fails closed — it authorizes nothing, ever. */
 export function isValidCronAuth(authorizationHeader, secret) {
   if (!secret) return false;
-  return authorizationHeader === `Bearer ${secret}`;
+  if (typeof authorizationHeader !== "string") return false;
+  const a = Buffer.from(authorizationHeader);
+  const b = Buffer.from(`Bearer ${secret}`);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 export default async function handler(req, res) {

@@ -122,6 +122,7 @@ import { answerAddressConflict, softConflictNote } from "./_lib/addressConflict.
 import { capInlineNameList } from "./_lib/router/brevity.js";
 import { resolvePartialNameInQuestion, buildPartialNameClarify } from "./_lib/vocab/partialNames.js";
 import { classifySafety, buildSafetyAnswer, unverifiedTypeNote, normalizeInputText, neutralizeMarkup } from "./_lib/router/safetyGate.js";
+import { normalizeRephrase, typoFixes, applyTypoFixes, rephraseEnabled } from "./_lib/router/rephrase.js";
 import { classifyEarlyDecline, buildEarlyDeclineAnswer, earlyDeclineEnabled, triggerMatchesCustomerName } from "./_lib/router/earlyDecline.js";
 // Round 20 (J1): the general precision guard (THE #1 PROBLEM — false confidence, r19_blind3_clusters.json's
 // F1/F6) — see guard/check.js's own header for what each function checks and why, and the untracked-concept
@@ -884,6 +885,23 @@ export default async function handler(req, res) {
     question = normalizeInputText(question);
     if (!question) return res.status(400).json({ error: "Missing question" });
     askedText = question;
+    if (rephraseEnabled()) { const rp = normalizeRephrase(question); if (rp) question = rp; } // FORGE: same question, different wording -> same answer (plural before an id, role words, "invoice X in total", status-word typos)
+    if (rephraseEnabled()) { // FORGE: a status-word typo is only fixed when no name in THIS org's data contains it (a customer called "Verdue Plumbing" stays itself); if the check fails, no rewrite
+      const fx = typoFixes(question);
+      if (fx.length) {
+        try {
+          const terms = fx.map((f) => `\\m${f.from.replace(/[^A-Za-z]/g, "")}\\M`);
+          const clash = await withTenant({ tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId }, async (db) => {
+            const a = await db.raw(`SELECT 1 FROM entities WHERE merged_into IS NULL AND data::text ~* ANY($1::text[]) LIMIT 1`, [terms]);
+            if (a.rows.length) return true;
+            if (!(await (await import("./_lib/financials/store.js")).financialsTableExists(db))) return false;
+            const b = await db.raw(`SELECT 1 FROM document_financials WHERE coalesce(customer_name,'') || ' ' || coalesce(vendor_name,'') ~* ANY($1::text[]) LIMIT 1`, [terms]);
+            return b.rows.length > 0;
+          });
+          if (!clash) question = applyTypoFixes(question, fx);
+        } catch (e) { if (process.env.FORGE_DEBUG) process.stderr.write("typo-check: " + e.message + "\n"); /* cannot confirm: leave the words exactly as typed */ }
+      }
+    }
     { const rw = rewriteInvoiceTotal(question); if (rw) question = rw; } // "total of invoices in 2012" -> dollar total (kill switch DONOVAN_AMOUNT_NOHOW=0)
 
     // ---- Round 29: how-to questions about the app itself ("how do I invite a tech", "where is billing") -------
@@ -907,6 +925,14 @@ export default async function handler(req, res) {
     // TEAM T2: fold a real follow-up into a self-contained question (see the
     // import above) — never throws, never blocks the question on a malformed
     // context, and re-checks the length cap since the composed text is longer.
+    // FORGE: a context with no usable turns is no conversation; one whose turns resolved no entity cannot answer "this customer"
+    let contextHasEntity = false;
+    if (conversationContext) {
+      try {
+        const cv = validateConversationContext(conversationContext);
+        if (!cv.turns.length) conversationContext = undefined; else contextHasEntity = cv.turns.some((t) => t.resolvedEntities && (Array.isArray(t.resolvedEntities) ? t.resolvedEntities.length : Object.keys(t.resolvedEntities).length));
+      } catch { conversationContext = undefined; }
+    }
     if (conversationContext) {
       try {
         const convo = validateConversationContext(conversationContext);
@@ -942,10 +968,10 @@ export default async function handler(req, res) {
     const meta0 = classifyMetaQuestion(question);
     const meta = meta0 && meta0.kind === 'count' && amountMentioned(question) ? null : meta0; // R40: a count of ALL invoices is never the answer to a question that named an amount
     if (!meta && earlyDeclineEnabled()) {
-      const early = classifyEarlyDecline(question, { hasConversation: !!conversationContext });
+      const early = classifyEarlyDecline(question, { hasConversation: !!conversationContext, contextHasEntity });
       let vetoed = false;
       if (early?.kind === "off_domain") { try { vetoed = await withTenant(ctxArg, (db) => triggerMatchesCustomerName(db, early.trigger)); } catch { vetoed = false; } }
-      if (early && !vetoed) return send(200, { success: true, data: buildEarlyDeclineAnswer(early.kind) });
+      if (early && !vetoed) return send(200, { success: true, data: buildEarlyDeclineAnswer(early.kind, early) });
     }
     // Never throws (see getActiveOverlay's own doc comment) — safe to await
     // directly with no try/catch here.

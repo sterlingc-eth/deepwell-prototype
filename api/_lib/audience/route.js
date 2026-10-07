@@ -69,6 +69,10 @@ export default async function handler(req, res) {
       if (body.audience !== 'customer' && body.audience !== 'internal') {
         return res.status(400).json({ error: "audience must be 'customer' or 'internal'" });
       }
+      // The document must be this company's own: the writes below insert marker rows keyed on the id with no company check of their
+      // own, so another company's (or a made-up) id would plant a row pointing at it (and answer 200 vs a database error).
+      const owned = await withTenant(ctx, (store) => store.raw("SELECT 1 FROM documents WHERE id = $1 AND tenant_id = (current_setting('app.tenant_id', true))::uuid", [body.documentId]));
+      if (!(owned?.rows?.length)) return res.status(404).json({ error: 'Document not found' });
       const result = await withTenant(ctx, (store) =>
         overrideDocumentAudience(
           { query: (sql, p) => store.raw(sql, p) },

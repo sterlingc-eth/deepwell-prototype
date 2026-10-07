@@ -238,6 +238,41 @@ function isDangling(q, raw) {
   return DANGLING_RES.some((re) => re.test(q));
 }
 
+
+/* ---- 3b. FORGE: "this customer / this address / this agreement / this vendor ..." with NO conversation or page context ----
+ * The words point at a record the chat has never been shown. Answering would mean silently picking one (or answering with a total), so ask which.
+ * Typo-tolerant on the noun ("this custmer", "this adress", "this vender"); vetoed by any typed name, digit or street address, and by how-to questions. */
+const THIS_NOUNS = ["customer", "client", "vendor", "supplier", "address", "property", "site", "job", "agreement", "contract", "lease", "tenant", "account", "building", "location", "apartment", "house", "form", "permit", "invoice", "unit"];
+const lev1 = (a, b, max) => { if (Math.abs(a.length - b.length) > max) return false; const d = Array.from({ length: a.length + 1 }, (_, i) => [i]); for (let j = 1; j <= b.length; j++) d[0][j] = j; for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[a.length][b.length] <= max; };
+const nounOf = (w0) => { const w1 = w0.toLowerCase().replace(/'s?$/, ""); for (const w of [w1, w1.replace(/s$/, "")]) { const r = nounOf1(w); if (r) return r; } return null; };
+const nounOf1 = (w) => { if (w.length < 3) return null; const hit = THIS_NOUNS.find((n) => n === w); if (hit) return hit; const near = THIS_NOUNS.filter((n) => w.length >= 5 && n.length >= 5 && lev1(w, n, n.length >= 8 ? 2 : 1)); return near.length === 1 ? near[0] : null; };
+const NOT_CONTEXT_RE = /\bhow\s+(?:do|can|to|would|should)\b|\bwhere\s+(?:do|can)\s+i\b|\b(?:can|could|should|may|am\s+i\s+able\s+to)\s+(?:i|we|you)\b|\b(?:required|requirement|mandatory|legal|allowed|supposed)\b|\b(?:slow|broken|bug|crash\w*|loading|app|website|web\s*site|screen|button|login|log\s*in)\b|\baccount\s+type\b/i;
+const CAL_RE = /\b(?:January|February|March|April|May|June|July|August|September|October|November|December|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|DeepWell|Donovan)\b/g;
+function typedName(raw) { return String(raw ?? "").split(/(?<=[.?!])\s+/).some((sent) => { const rest = sent.replace(/^\s*\S+\s*/, "").replace(CAL_RE, " "); return CAP_NAME_RE.test(rest) && !/^(?:I|I'm|I'll)\b/.test(rest); }); }
+// only a street number / id / amount / long number is a handle on a record; a 4-digit year or a date is not
+const ID_DIGITS_RE = /\$\s?\d|#\s?\d|\b[a-z]{1,5}-\d|\b\d{3,}-\d|\b\d{5,}\b|\b(?!(?:19|20)\d\d\b)\d{3,6}\s+[a-z]/i;
+// words that may follow "this <noun>" without being a (lower-case) name
+const AFTER_OK = new Set("we i you they he she us me my our your their his her there here a an the and or but so is was are were has have had do does did owe owes owed pay pays paid last this that in on at for from to of by with end ends ended expire expires expired still been got get total how when what who why which it its since before after during every each all any not no yet again please pls now today thanks over under between as if than then billed bill bills invoice invoiced invoices order history balance doc docs document documents file files contact phone email number service serviced visit visits jobs job work agreement contract address warranty unpaid open due overdue late renew renews renewal signed sign form forms permit permits payments payment quote quotes estimate estimates cost costs price spent spend amount amounts money equipment unit units ticket tickets notes note year month week quarter".split(" "));
+const BARE_THIS_RE = /^(?:(?:please\s+|pls\s+|ok\s+|okay\s+)?(?:show|open|pull\s+up|explain|tell\s+me\s+about|what(?:'s|s)?\s+(?:is)?|who(?:'s|s)?\s+(?:is)?|why(?:'s|s)?\s+(?:is)?|how(?:'s|s)?\s+(?:is)?|when(?:'s|s)?\s+(?:is)?)\s*)(?:this|these)(?:\s+(?:overdue|late|unpaid|due|open|one|here|for|about))?\s*$/i;
+export function thisNoun(q, raw) {
+  if (!q || q.length > 160 || APP_WORD_RE.test(q) || NOT_CONTEXT_RE.test(q) || ID_DIGITS_RE.test(q) || STREET_RE.test(q) || SPOKEN_NUM_RE.test(q) || BRAND_RE.test(q)) return null;
+  if (typedName(raw)) return null;
+  const w = q.toLowerCase().replace(/[^a-z'\s]/g, " ").split(/\s+/).filter(Boolean);
+  for (let i = 0; i < w.length - 1; i++) {
+    if (w[i] !== "this" && w[i] !== "that") continue;
+    if (/^(?:year|month|week|quarter|day|season|time|morning|afternoon|weekend)(?:'s)?$/.test(w[i + 1])) continue; // "this quarter's vendor payments" is a time span
+    for (const j of [i + 1, i + 2]) {
+      const n = j < w.length ? nounOf(w[j]) : null;
+      if (!n) continue;
+      const nxt = w[j + 1]; // a bare lower-case word right after the noun is probably a typed name ("this customer smith owes ...")
+      if (nxt && !AFTER_OK.has(nxt) && !AFTER_OK.has(nxt.replace(/s$/, "")) && !nounOf(nxt)) return null;
+      return n;
+    }
+  }
+  if (BARE_THIS_RE.test(q.trim())) return "one";
+  return null;
+}
+
 const FILLER_TAIL_RE = /\s+(?:for\s+me|please|pls|thanks|thx|real\s+quick|when\s+you\s+get\s+a\s+sec|asap|right\s+now)\s*[?.!]*$/i;
 const norm = (s) => String(s ?? "").trim().replace(/[?!.]+$/, "").replace(FILLER_TAIL_RE, "").replace(FILLER_TAIL_RE, "").replace(/\s+/g, " ").trim();
 
@@ -247,7 +282,7 @@ const norm = (s) => String(s ?? "").trim().replace(/[?!.]+$/, "").replace(FILLER
  * lexicons plus a customer-name veto are the safe design; open-domain trivia beyond them still defers to the model. */
 
 /** @returns {null | { kind: "off_domain" | "untracked_component" | "dangling", trigger?: string }} */
-export function classifyEarlyDecline(question, { hasConversation = false } = {}) {
+export function classifyEarlyDecline(question, { hasConversation = false, contextHasEntity = false } = {}) {
   const raw = String(question ?? "").trim();
   if (!raw || raw.length > 200) return null;
   const stripped = norm(stripConversationalFrame(raw) ?? raw);
@@ -264,14 +299,16 @@ export function classifyEarlyDecline(question, { hasConversation = false } = {})
       if (isDangling(q, raw)) return { kind: "dangling" };
     }
   }
+  // "this customer / this address ..." needs a record: no conversation at all, or one that never resolved any entity, means ask which (never a company-wide total)
+  if ((!hasConversation || !contextHasEntity) && process.env.DONOVAN_THIS_ASK !== "0") for (const q of [stripped, full]) { const noun = thisNoun(q, raw); if (noun) return { kind: "dangling", noun }; }
   return null;
 }
 
-export function buildDanglingAnswer() {
+export function buildDanglingAnswer(noun) {
   return attachCitations(
     {
       kind: "no-answer",
-      text: "No earlier question to go on. Which customer, address, or job do you mean?", // R35 brevity
+      text: noun ? `Which ${noun} do you mean? I need a name or address to look that up.` : "No earlier question to go on. Which customer, address, or job do you mean?", // R35 brevity
       facts: [], sources: [], confidence: 0, verifiedCount: 0, unverifiedCount: 0, closest: [],
     },
     { records: [], total: 0, kind: "searched", basis: "This refers back to an earlier question, but this chat has none — nothing to search." }
@@ -279,10 +316,10 @@ export function buildDanglingAnswer() {
 }
 
 /** The honest decline for a classifyEarlyDecline() result (reuses the existing out-of-domain / untracked-field builders). */
-export function buildEarlyDeclineAnswer(kind) {
+export function buildEarlyDeclineAnswer(kind, early) {
   if (kind === "off_domain") return buildOutOfDomainAnswer();
   if (kind === "untracked_component") return buildUntrackedFieldAnswer();
-  return buildDanglingAnswer();
+  return buildDanglingAnswer(early?.noun);
 }
 
 export const earlyDeclineEnabled = () => process.env.DONOVAN_EARLY_DECLINE !== "0";
