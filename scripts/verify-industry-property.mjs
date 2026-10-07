@@ -806,6 +806,14 @@ await H.as('property', async (db) => {
   check('P7: any other document whose text was cut is reported partial (never silently kept as complete)', !lease || lease.partial === true);
 }
 }
+{ // loop 3 regressions run in their own process (package.json is shared and not edited by the property team)
+  const { spawnSync } = await import('node:child_process');
+  for (const file of ['property-loop3-regressions.run.mjs', 'property-loop4-regressions.run.mjs', 'property-loop5-regressions.run.mjs', 'property-loop6-regressions.run.mjs']) {
+    const r = spawnSync(process.execPath, [`scripts/lib/${file}`], { encoding: 'utf8' });
+    console.log(String(r.stdout).trim().split('\n').pop());
+    check(`${file} passes`, r.status === 0, String(r.stdout).slice(-600));
+  }
+}
 console.log(failures ? `${failures} FAILED (${passes} passed)` : `${passes} checks passed.`);
 await H.stop?.();
 process.exit(failures ? 1 : 0);

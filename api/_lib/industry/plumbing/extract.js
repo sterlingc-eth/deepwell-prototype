@@ -65,8 +65,8 @@ const TITLES = [
 ];
 const LETTERHEAD = /\d{3}[-.)\s]+\d{3,4}[-.\s]\d{4}|@|www\.|\.com\b|\b(?:llc|inc|corp|co\.)\b|[|•]/i;
 
-function classify(lines) {
-  const first = lines.find((l) => true)?.page;
+function classify(lines, pageNo) {
+  const first = pageNo ?? lines.find((l) => true)?.page;
   const head = lines.filter((l) => l.page === first).slice(0, 8);
   for (let i = 0; i < head.length; i++) {
     const t = head[i].t;
@@ -221,7 +221,8 @@ function readValue(kind, raw, ctx) {
     case 'person': {
       if (/\(([^)]*\b(?:reassign\w*|replac\w*|instead|transfer\w*|cover\w*|substitut\w*|handed|and|with)\b[^)]*)\)/i.test(v) || /\s(?:and|&|\/|with)\s+[A-Z][a-z]+\s+[A-Z]/.test(v)) return null; // two people on one line: no single technician is claimed
       let p = v.replace(/\(.*?\)/g, ' ').replace(/\s+/g, ' ').trim();
-      p = p.split(/[,;]/)[0].replace(/\s+(?:az\s+)?(?:cert\w*|lic\w*|id)\b.*$/i, '').replace(/\s+(?:az|arizona)\s*$/i, '').replace(/\s+[A-Z]{2,3}-[A-Z]{1,3}-?\d+\s*$/, '').trim();
+      p = p.replace(/[,;]?\s+(?:az\s+)?(?:cert\w*|lic\w*|id)\b.*$/i, '').replace(/\s+(?:az|arizona)\s*$/i, '').replace(/\s+[A-Z]{2,3}-[A-Z]{1,3}-?\d+\s*$/, '').trim();
+      if (/[,;\/+]/.test(p)) return null; // several names (or "Last, First") on one line: no single technician is claimed, never the first piece
       return /[A-Za-z]{2}/.test(p) && p.length <= 60 && (p.match(/\d/g) ?? []).length <= 2 && !/^(?:n\/?a|none|unknown|tbd)$/i.test(p) ? p : null;
     }
     case 'name': {
@@ -297,6 +298,7 @@ export function resultClass(r) {
   const t0 = s.replace(/ (?:no|zero) (?:corrections?|re ?inspection|retest|repairs?|further action)(?: (?:required|needed|necessary))?$/, '').replace(/ (?:and )?(?:no|zero) (?:corrections?|re ?inspection|retest)(?: (?:required|needed|necessary))?/g, '').trim();
   const PASS_OK = /^(?:p|pass|passed|passes|passing|ok|okay|satisfactory|approved|accepted|compliant|complies|complied|held|holds|holds pressure|good|test passed|passed test|passed inspection|inspection passed|leak free|no leaks?|no leaks? (?:detected|found|observed|noted)|no signs? of leaks?|free of leaks?|zero leaks?|without leaks?|no failures?|did not fail|never failed|no visible leaks?|pass no corrections?)$/;
   const FAIL_OK = /^(?:f|fail|failed|fails|failure|no pass|not pass|not passed|did not pass|didnt pass|unable to pass|did not hold|didnt hold|not holding|leaks|leaked|leaking|leak|rejected|unsatisfactory|not approved|disapproved|denied|non compliant|noncompliant|test failed|failed test|failed inspection|inspection failed)$/;
+  if (/\bw\/|\bconditions?\b|\bcaveats?\b|\bsee\b|\bnotes?\b|\btemporar\w*|\bprovisional\w*|\bout of service\b|\bper\b/.test(s) || /[*\u2020\u2021]|\([^)]*[A-Za-z]{3}/.test(String(r ?? ''))) return 'other'; // "Pass w/ conditions", "Passed*", "Passed (see note)" are not plain passes
   if (PASS_OK.test(t0)) return 'passed';
   if (FAIL_OK.test(t0)) return 'failed';
   // anything with negation / uncertainty / a partial outcome that is not a known phrase is unclear: the caller never guesses
@@ -321,6 +323,8 @@ export function extractPlumbing(pages, { today } = {}) {
   const cls = classify(lines);
   if (!cls) return null;
   const type = cls.type;
+  // a later page that opens with a DIFFERENT document title (a permit followed by its failed final-inspection card): never stored as one document
+  for (const pn of new Set(lines.map((l) => l.page))) { if (pn === lines[0].page) continue; const c2 = classify(lines, pn); if (c2 && c2.type !== type) return null; }
   const best = new Map(); // key -> {rank, value, line, order}
   const multi = []; // {key,value,line}
   let order = 0;
@@ -401,8 +405,19 @@ export function extractPlumbing(pages, { today } = {}) {
   if (type === BF) {
     // "Retest: Passed 2/10/26" under a failed result is two tests on one page: never stored as one
     for (const l of lines) { const sp = splitLine(l.t); if (sp && /^re ?-?test(?:ed)?(?: (?:result|status|outcome|passed|failed))?$/.test(normLabel(sp.label)) && resultClass(sp.value) !== 'other') return null; }
+    // a retest / repair line with no colon ("Retest passed 03/09/2026", "Repaired and retested - passed") is a second test on the page: never stored as one
+    for (const l of lines) if (/\b(?:re ?-?test(?:ed)?|repaired|after repairs?|re ?-?check(?:ed)?)\b/i.test(l.t) && /\b(?:pass\w*|ok|approved|no leaks?)\b/i.test(l.t) && !/\b(?:required|needed|needs?|recommend\w*|pending|schedul\w*|must|to pass|until|before|prior to|when|once|if)\b/i.test(l.t) && !/^(?:initial|as found|first)\b/i.test(l.t)) return null;
     const res = best.get('backflow_test_result');
     if (res && resultClass(res.value) === 'other') return null; // an unrecognised or mixed result is read by the model, never guessed
+  }
+  if (type === CM) {
+    // findings that run on past the first line (plain continuation lines) or onto a continuation page are not read piecemeal: the model / a person reads the report
+    const isFind = (n) => COMPILED.some((c) => c.key === 'line_findings' && c.re.test(n));
+    for (let i = 0; i < lines.length; i++) {
+      const sp = splitLine(lines[i].t); if (!sp) continue; const n = normLabel(sp.label);
+      if (/\b(?:findings?|observations?|defects?|conditions?)\b.*\bcont/.test(n)) return null;
+      if (isFind(n) && clean(sp.value)) { const nx = lines[i + 1]; if (nx && nx.page === lines[i].page && !nx.blank) { const s2 = splitLine(nx.t); if (!(s2 && isKnownLabel(s2.label)) && !NOISE.test(nx.t) && !/^page \d+/i.test(nx.t)) return null; } }
+    }
   }
   if (UNIT_TYPES.has(type) && (allVals.get('serial_number')?.size ?? 0) > 1) return null; // several devices/units on one document
   // one file holding several documents (a second permit / invoice / ticket number or serial further on): never stored as one document
@@ -421,7 +436,7 @@ export function extractPlumbing(pages, { today } = {}) {
   const LABEL_IN_VALUE = /\b(?:phone|tel|fax|e-?mail|contact|city|contractor|model|serial|ser\.? ?no|make|mfr|brand|size|fuel|address|date of next test|next test due|test date|tester|technician|cert(?:ification)?|permit|invoice)\s*(?:[:#=]|no\b\.?|num\b)/i;
   for (const [key, e] of [...best]) if (key !== 'notes' && key !== 'work_performed' && LABEL_IN_VALUE.test(String(e.value))) best.delete(key);
   for (const [key, e] of best) {
-    if (e.ties > 0) { if (['backflow_test_result', 'inspection_result', 'service_date', 'next_test_due', 'service_address', 'cost'].includes(key)) continue; }
+    if (e.ties > 0) { if (['backflow_test_result', 'inspection_result', 'service_date', 'next_test_due', 'service_address', 'cost', 'permit_status', 'permit_expires', 'permit_issued_date', 'installation_date', 'warranty_expires', 'technician', 'agreement_term', 'line_length', 'footage_ref', 'gallons', 'manufacturer', 'model', 'device_size', 'water_utility', 'fuel_type'].includes(key)) continue; }
     if (key === 'next_test_due' && best.get('service_date') && e.value < best.get('service_date').value) continue; // a next test before the test itself is a misread
     if (key === 'cost' && !MONEY_TYPES.has(type)) continue;
     if (key === 'cost' && e.rank >= 2 && lines.some((l) => /^(?:sub ?total|tax|sales tax)\b/i.test(l.t))) continue; // a subtotal / tax with no total is not a cost
@@ -436,6 +451,10 @@ export function extractPlumbing(pages, { today } = {}) {
     if (key === 'service_date' && (type === PM || type === WR)) continue;
     // a permit whose printed expiry was renewed or extended: the printed date is no longer the end date, so none is kept
     if (key === 'permit_expires' && lines.some((l) => /\b(?:renewed?|renewal|extension|extended|extend(?:s)? to)\b/i.test(l.t))) continue;
+    if (key === 'permit_expires' && lines.some((l) => /\b(?:amended|revised|updated|corrected|new)\b[^:]*\b(?:expir\w*|valid|void|through)\b/i.test(l.t))) continue; // an amended / new expiry printed too: the first date is not the end date
+    if (key === 'next_test_due' && lines.some((l) => /\b(?:amended|revised|updated|corrected|new)\b[^:]*\b(?:due|test date|retest)\b/i.test(l.t))) continue;
+    if (key === 'permit_status' && lines.some((l) => /^(?:date\s+)?(?:finaled|finalled|closed|final date|voided|void|cancell?ed|updated status|new status)\b/i.test(l.t) || /\b(?:voided|cancell?ed|finaled|finalled|closed)\s+(?:on\s+)?\d/i.test(l.t))) continue; // the page prints a finish / void line besides the status: the status alone is not trusted
+    if (key === 'cost' && lines.some((l) => /^(?:revised|amended|corrected|new|updated|adjusted|change order)\b[^:]*\b(?:total|amount|price|cost|due)\b/i.test(l.t))) continue; // a revised total is printed too: no single total is kept
     // a warranty card that says it is NOT registered / registration pending is not an active warranty: no expiry is kept
     if ((key === 'warranty_expires' || key === 'warranty_registered_date') && lines.some((l) => /\b(?:not|un)[- ]?registered\b|registration (?:is )?(?:pending|incomplete|not (?:completed|received|submitted))/i.test(l.t))) continue;
     if (((key === 'service_date' && (type === BF || type === IN || type === CM)) || (key === 'installation_date' && type === WH) || (key === 'warranty_registered_date')) && latest && e.value > latest) continue; // a test / install date in the future is a misread

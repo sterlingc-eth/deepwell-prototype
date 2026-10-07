@@ -484,6 +484,20 @@ check('ask.js runs the lane only for a non-HVAC company with no conversation or 
   await runElectricalRegressions({ H, lane: { classify: classifyElectrical, run: runElectrical }, extract: extractElectrical, check });
 }
 
+/* loop-3 review findings (permit-linked cards, test-due windows, extractor status/dotted/mixed pages, number-less credentials, shared-address finals, mixed results) */
+{
+  const { runElectricalLoop4, runElectricalReviewLoop1, runElectricalReviewLoop2, runElectricalReviewLoop3, runElectricalReviewLoop4, runElectricalReviewLoop5, runElectricalReviewLoop6, runElectricalReviewLoop7 } = await import('./lib/electrical-loop4-regressions.mjs');
+  const L4A = { H, lane: { classify: classifyElectrical, run: runElectrical }, attention: electricalAttention, extract: extractElectrical, check };
+await runElectricalLoop4(L4A);
+await runElectricalReviewLoop1(L4A);
+await runElectricalReviewLoop2(L4A);
+await runElectricalReviewLoop3(L4A);
+await runElectricalReviewLoop4(L4A);
+await runElectricalReviewLoop5(L4A);
+await runElectricalReviewLoop6(L4A);
+await runElectricalReviewLoop7(L4A);
+}
+
 /* CLASS variants (generator style, truth from raw rows; two electrical companies in one database; runs last because it rewrites this company's records) */
 {
   const { runElectricalVariants } = await import('./lib/electrical-variants.mjs');

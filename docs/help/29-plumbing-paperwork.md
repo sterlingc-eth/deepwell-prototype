@@ -10,7 +10,7 @@ If your company is set up as Plumbing, you can ask about your backflow test cert
 
 ### What plumbing questions can Donovan answer?
 ~ plumbing questions, backflow tests due, backflow overdue, which backflow tests failed, which permits are open, sewer camera findings
-Ask things like "Which backflow tests are overdue?", "When is the next backflow test due at (an address you have on file)?", "When does the warranty on the water heater at (address) expire?", "Which permits are open?", "What did the sewer camera find at (address)?" or "What did we bill (customer name) for the water heater replacement?" Each answer lists the document and page it was read from.
+Ask things like "Which backflow tests are overdue?", "When is the next backflow test due at (an address you have on file)?", "When does the warranty on the water heater at (address) expire?", "Which permits are open?", "What did the sewer camera find at (address)?" or "What did we bill (customer name)?" Each answer lists the document and page it was read from. If a question adds a filter that Donovan does not apply exactly (a city, a technician, a month, a time window it cannot apply exactly), it does not guess: it leaves the question to the full answer path.
 
 ### How does Donovan decide a backflow test is overdue?
 ~ backflow overdue, backflow due, retest, failed backflow test, latest test, older certificate

@@ -111,6 +111,7 @@ if (fs.existsSync(blindPath)) {
       const it = classifyPlumbingForLane(x.question, { today: TODAY }); const r = it ? await runPlumbing(db, it, { today: TODAY }) : null;
       const blob = r ? alltext(r).toLowerCase() : ''; let ok;
       const exp = x.expected ?? [];
+      if (process.env.BLINDLOG) console.log('BL', x.set, r && !r.decline && !r.clarify ? 'A' : 'L', x.question);
       if (!r || r.decline === true || r.clarify === true) { st.left++; ok = true; }
       else if (x.kind === 'unanswerable' || exp.length === 0) ok = false;
       else ok = exp.every((e) => blob.includes(String(e).toLowerCase())) && !FOREIGN.test(blob);
@@ -729,9 +730,9 @@ const PARITY = await (async () => {
   ];
   const load = async (key, list) => { const ctx = await org(key); await H.withTenant(ctx, async (db) => { for (const [fn, t, f] of list) await mkDoc(db, fn, t, f, key); const flat = { created_at: '2026-01-01T00:00:00Z' }; await db.raw('UPDATE documents SET created_at = $1', [flat.created_at]); await db.raw('UPDATE extractions SET created_at = $1', [flat.created_at]); }); return ctx; };
   const fwd = await load('org_order_fwd', specs); const rev = await load('org_order_rev', [...specs].reverse().map(([fn, t, f]) => [fn, t, Object.fromEntries(Object.entries(f).reverse().map(([k, v]) => [k, Array.isArray(v) ? [...v].reverse() : v]))]));
-  const oq = ['What did the camera find at 61 Order Way?', 'What did the camera find at 62 Order Way?', 'Which sewer lines have defects?', 'When is the next backflow test due at 63 Order Way?', 'Who tested the backflow device at 63 Order Way?', 'Is the backflow device at 63 Order Way overdue?', 'When is the next backflow test due at 64 Order Way?', 'Which backflow devices failed?', 'Which backflow tests are due in the next 60 days?', 'When does the warranty expire at 65 Order Way?', 'Which water heater warranties expire in the next 120 days?', 'What is the status of the permit at 66 Order Way?', 'Which permits are open?', 'What needs attention?', 'How many backflow devices do we track?', 'How many permits are open?'];
+  const oq = ['What did the camera find at 61 Order Way?', 'What did the camera find at 62 Order Way?', 'Which sewer lines have defects?', 'When is the next backflow test due at 63 Order Way?', 'Who tested the backflow device at 63 Order Way?', 'Is the backflow device at 63 Order Way overdue?', 'When is the next backflow test due at 64 Order Way?', 'Which backflow devices failed?', 'Which backflow tests are due in the next 60 days?', 'When does the warranty expire at 65 Order Way?', 'Which water heater warranties expire in the next 120 days?', 'What is the status of the permit at 66 Order Way?', 'Which permits are open?', 'What needs attention?', 'How many backflow devices do we track?', 'How many permits are open?', 'How many sewer camera reports do we have?', 'How many water heaters do we have?', 'When was the camera inspection at 61 Order Way?', 'When was the camera inspection at 62 Order Way?', 'Which water heater warranties have expired?', 'How many water heaters are out of warranty?'];
   const diff = []; let ans = 0;
-  for (const q of oq) { const a = await askC(fwd, q); const b = await askC(rev, q); if (a) ans++; const sa = JSON.stringify(a && { t: a.text, f: (a.facts ?? []).map((x) => `${x.label}|${x.value}`) }); const sb = JSON.stringify(b && { t: b.text, f: (b.facts ?? []).map((x) => `${x.label}|${x.value}`) }); if (sa !== sb) diff.push(`"${q}"\n      fwd: ${a?.text}\n      rev: ${b?.text}`); }
+  for (const q of oq) { const a = await askC(fwd, q); const b = await askC(rev, q); if (a) ans++; else if (process.env.OQLOG) console.log('OQ-DECLINED', q); const sa = JSON.stringify(a && { t: a.text, f: (a.facts ?? []).map((x) => `${x.label}|${x.value}`) }); const sb = JSON.stringify(b && { t: b.text, f: (b.facts ?? []).map((x) => `${x.label}|${x.value}`) }); if (sa !== sb) diff.push(`"${q}"\n      fwd: ${a?.text}\n      rev: ${b?.text}`); }
   check(`load order: records loaded in reverse (documents and values) give word-for-word the same ${oq.length} answers`, diff.length === 0, diff.slice(0, 4).join('\n      '));
   check(`load order is not vacuous: ${ans} of ${oq.length} questions are actually answered`, ans >= 12, `${ans}`);
   // 5. dotted dates
@@ -858,6 +859,11 @@ check('the card asks plumbing questions the lane understands', ['Which permits h
   const { runPlumbingRegressions } = await import('./lib/plumbing-review-regressions.mjs');
   const { extractPlumbing: exP, resultClass: rc } = await import('../api/_lib/industry/plumbing/extract.js');
   await runPlumbingRegressions({ H, lane: { classify: classifyPlumbingForLane, run: runPlumbing }, extract: exP, resultClass: rc, check });
+}
+{
+  const { runPlumbingRound2 } = await import('./lib/plumbing-round2-regressions.mjs');
+  const { extractPlumbing: exP2, resultClass: rc2 } = await import('../api/_lib/industry/plumbing/extract.js');
+  await runPlumbingRound2({ H, lane: { classify: classifyPlumbingForLane, run: runPlumbing }, extract: exP2, resultClass: rc2, check });
 }
 /* CLASS variants (generator style, truth from raw rows; two plumbing companies in one database; runs last because it rewrites this company's records) */
 {

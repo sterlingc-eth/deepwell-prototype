@@ -25,13 +25,13 @@ import { boundedLines, newBudget } from '../textBounds.js';
 let DATE_ORDER = null; // 'dmy' | 'mdy' | 'mixed' | null (no evidence)
 function scanDateOrder(pages) {
   let dmy = false; let mdy = false;
-  for (const p of pages ?? []) for (const m of String(p?.text ?? '').matchAll(/(?<![\d/.-])(\d{1,2})([/-])(\d{1,2})\2(\d{4})(?![\d/-])/g)) { if (+m[1] > 12 && +m[3] <= 12) dmy = true; else if (+m[3] > 12 && +m[1] <= 12) mdy = true; }
+  for (const p of pages ?? []) for (const m of String(p?.text ?? '').matchAll(/(?<![\d/.-])(\d{1,2})([/-])(\d{1,2})\2(\d{4}|\d{2})(?![\d/-])/g)) { if (+m[1] > 12 && +m[3] <= 12) dmy = true; else if (+m[3] > 12 && +m[1] <= 12) mdy = true; }
   return dmy && mdy ? 'mixed' : dmy ? 'dmy' : mdy ? 'mdy' : null;
 }
 const parseDate = (s) => {
   const str = String(s ?? '').trim();
   const dm = str.match(/^(\d{1,2})\.(\d{1,2})\.\d{2,4}$/); if (dm && +dm[1] <= 12 && +dm[2] <= 12) return null;
-  const sl = str.match(/^(\d{1,2})([/-])(\d{1,2})\2(\d{4})$/);
+  const sl = str.match(/^(\d{1,2})([/-])(\d{1,2})\2(\d{4}|\d{2})$/);
   if (sl && +sl[1] <= 12 && +sl[3] <= 12 && sl[1] !== sl[3]) { if (DATE_ORDER === 'mixed') return null; if (DATE_ORDER === 'dmy') { const d = parseDateRaw(`${sl[3]}${sl[2]}${sl[1]}${sl[2]}${sl[4]}`); return d && d >= '2000-01-01' && d <= '2060-12-31' ? d : null; } }
   const d = parseDateRaw(s); return d && d >= '2000-01-01' && d <= '2060-12-31' ? d : null;
 };
@@ -109,7 +109,7 @@ const LABELS = [
   ['completed_date', `date completed|completed|completed on|completion date|date closed|closed on|closed|date finished|completed date|date resolved|resolved on|date work completed|work completed on|date of completion|closed date|close date`, 'date', [WO], 0],
   ['opened_date', `date opened|opened|opened on|date created|created|created on|date submitted|submitted|submitted on|request date|date requested|requested|requested on|date reported|reported|reported on|open date|opened date|created date|date entered|date received|received`, 'date', [WO], 0],
   ['service_date', `scheduled date|scheduled for|date scheduled|scheduled|service date|date of service|appointment date|appointment|work date|date of work|scheduled service date|scheduled on`, 'date', [WO], 0],
-  ['service_date', `date|dated|wo date|work order date|report date`, 'date', [WO], 3],
+  ['opened_date', `date|dated|wo date|work order date|report date`, 'date', [WO], 3],
   ['invoice_date', `invoice date|date of invoice|date invoiced|billing date|date billed|bill date|invoiced on|invoice dt`, 'date', [IV], 0],
   ['invoice_date', `date|dated|date issued|issue date|issued`, 'date', [IV], 3],
   ['invoice_due', `due date|payment due|payment due date|due|date due|pay by|due by|invoice due|invoice due date|due on|payable by|net due date|pay on or before|payment due by`, 'date', [IV], 0],
@@ -188,6 +188,7 @@ function readValue(kind, raw) {
       const m = v.match(/^(?:usd\s*|us\s*)?\$?\s*(\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)(?![\d/]|[.,]\d)/i); if (!m) return null; const tail = v.slice(m[0].length);
       // a range ("$1,450 - $1,500") or a figure that changes later ("increasing to ...") is not one amount
       if (/^\s*(?:[-\u2013\u2014]|to\b|through\b|or\b)\s*(?:usd\s*)?\$?\s*\d/i.test(tail) || (/\b(?:increas\w*|rais\w*|adjust\w*|escalat\w*|step[- ]?up|thereafter|then|beginning|starting|effective)\b/i.test(tail) && /\d/.test(tail))) return null;
+      if (/^[ \u00a0\u202f\u2009]\d{3}\b|^\s*k\b|^\s*(?:-\s*$|cr\b|credit\b|dr\b)/i.test(tail)) return null; // "1 250.00", "1k", "900.00-", "900.00 CR": never read as a different amount
       const n = m[1].replace(/,/g, ''); return +n > 0 && +n < 1e9 ? n : null; }
     case 'monthly_money': { if (!/\b(?:per month|\/\s*mo(?:nth)?|monthly|a month|each month|\bpm\b)/i.test(v) || /\b(?:annual|annually|per year|\/\s*yr|yearly|quarterly|per quarter)\b/i.test(v)) return null; return readValue('money', v); }
     case 'id': case 'docid': {
@@ -215,7 +216,7 @@ function readValue(kind, raw) {
     case 'itype': return ITYPE.test(v) && !/^\d+$/.test(v) && v.length <= 80 ? v : null;
     case 'iresult': return IRESULT.test(v) ? v : null;
     case 'wc': return /^(?:yes|y|statutory|included|in force|active|carried|covered|no|none|n\/a|not carried|waived|exempt|excluded)\b/i.test(v) && v.length <= 40 ? v : null;
-    case 'yesno': { const y = /^(?:yes|y|true|automatic(?:ally)?(?: renew\w*)?|auto[- ]?renew(?:s|al)?|renews automatically|auto)\b/i.test(v); const n = /^(?:no|n|false|none|manual|does not (?:auto[- ]?)?renew|not automatic(?:ally)?|will not renew|not auto[- ]?renew\w*)\b/i.test(v); return y && !n ? 'yes' : n && !y ? 'no' : null; }
+    case 'yesno': { const y = /^(?:yes|y|true|automatic(?:ally)?(?: renew\w*)?|auto[- ]?renew(?:s|al)?|renews automatically|evergreen|renews? (?:annually|monthly|yearly|each (?:year|month))|annual(?:ly)?|continues?)\b/i.test(v); const n = /^(?:no|n|false|none|manual|does not (?:auto[- ]?)?renew|not automatic(?:ally)?|will not renew|not auto[- ]?renew\w*)\b/i.test(v); return y && !n ? 'yes' : n && !y ? 'no' : null; }
     case 'term': return /\d|year|month/i.test(v) && v.length <= 60 && !RANGE_RE.test(v) ? v : null;
     case 'cov': case 'list': case 'text': default: return v.length > 200 ? v.slice(0, 200) : v;
   }
@@ -317,8 +318,11 @@ function rrRagged(cells, hdr) {
   const texts = rest.filter((x) => !readValue('date', x) && !readValue('money', x));
   if (texts.some((x) => RR_UNREAD_T.test(x))) return null;
   const vacant = texts.find((x) => RR_VACANT.test(x));
-  const status = texts.filter((x) => x !== vacant && /^[A-Za-z][A-Za-z -]{1,24}$/.test(x)).pop();
+  const stCand = texts.filter((x) => x !== vacant && /^[A-Za-z][A-Za-z -]{1,24}$/.test(x));
+  const statusFirst = has('status') && hdr.map.indexOf('status') < hdr.map.indexOf('tenant'); // the column order says which cell is which
+  const status = statusFirst ? stCand[0] : stCand.pop();
   const names = texts.filter((x) => x !== vacant && x !== status);
+  if (names.some((x) => /^(?:occupied|current|month[\s-]*to[\s-]*month|mtm|m2m|notice|pending|future|expired|ended|holdover|model|down|renewed|evicted|vacating|leased|available|unavailable)\b/i.test(x))) return null; // a status word in the tenant slot: never guessed
   if (names.length > 1 || (!vacant && !names.length) || (vacant && names.length)) return null;
   const out = new Array(hdr.n).fill('');
   const put = (k, v) => { const i = hdr.map.indexOf(k); if (i >= 0 && v) out[i] = v; };
@@ -342,9 +346,9 @@ function rrRows(pages) {
       if (h) { hdr = h; continue; }
       if (!hdr || NOISE.test(t)) continue;
       let cells = t.split(RR_SPLIT).map((c) => c.trim()).map((c) => (RR_MTM.test(c) ? 'Month-to-month' : c));
-      const rowLike = /^\d|^[A-Za-z]{1,2}-?\d/.test(cells[0] ?? '') && !/^(?:total|totals)\b/i.test(t);
+      const rowLike = /^\d|^[A-Za-z]{1,3}[- ]?\d/.test(cells[0] ?? '') && !/^(?:total|totals)\b/i.test(t);
       if (hdr.bad) { if (rowLike) unread++; continue; }
-      if (cells.length !== hdr.n && cells.filter((c) => c).length !== hdr.n) { if (cells.length > hdr.n && rowLike) unread++; /* a row with extra cells is counted unread, never silently dropped */ if (cells.length > hdr.n || !/^\d|^[A-Za-z]{1,2}-?\d/.test(cells[0] ?? '')) continue; }
+      if (cells.length !== hdr.n && cells.filter((c) => c).length !== hdr.n) { if (cells.length > hdr.n && rowLike) unread++; /* a row with extra cells is counted unread, never silently dropped */ if (cells.length > hdr.n || !/^\d|^[A-Za-z]{1,3}[- ]?\d/.test(cells[0] ?? '')) continue; }
       if (cells.length !== hdr.n) { const fixed = rrRagged(cells, hdr); if (fixed) cells = fixed; else { if (rowLike) unread++; continue; } } // a short or ragged row is never guessed at (but counted, so the answer layer knows the list is incomplete)
       const unit = readValue('unit', cells[hdr.map.indexOf('unit')]);
       if (!unit || /^(?:total|totals|vacant|occupied)$/i.test(cells[0])) { if (!unit && rowLike) unread++; continue; }
@@ -536,12 +540,13 @@ export function extractProperty(pages, opts = {}) {
 
   // ---- vendor contract: auto-renewal printed as a sentence
   if (type === VC) {
-    const sentences = lines.map((l) => l.t).filter((t) => (/\bauto(?:matic(?:ally)?)?[- ]?renew/i.test(t) || /\bevergreen\b|\bcontinues?\b[^.]{0,30}\buntil terminated\b/i.test(t)) && !splitLine(t)?.label?.match(/^renewal|^auto/i));
+    const sentences = lines.map((l) => l.t).filter((t) => (/\bauto(?:matic(?:ally)?)?[- ]?renew/i.test(t) || /\brenews?\b[^.]{0,30}\b(?:automatically|annually|monthly|yearly|each (?:year|month)|successive)\b|\bwill renew\b|\brenew(?:s|ed)? for successive\b|\bevergreen\b|\bcontinues?\b[^.]{0,30}\buntil terminated\b|\bcontinues?\b[^.]{0,40}\bmonth[- ]to[- ]month\b/i.test(t)) && !splitLine(t)?.label?.match(/^renewal|^auto/i));
     const neg = sentences.some((t) => /\b(?:not|never|no)\s+(?:be\s+)?(?:automatically|auto)[- ]?renew|\bnon[- ]renewing\b/i.test(t));
     const pos = sentences.some((t) => !/\b(?:not|never|no)\s+(?:be\s+)?(?:automatically|auto)[- ]?renew/i.test(t));
     const line = sentences[0] ? lines.find((l) => l.t === sentences[0]) : null;
     if (line && pos !== neg) { const v = pos ? 'yes' : 'no'; if (!best.has('auto_renew')) offer('auto_renew', 1, v, line); else if (best.get('auto_renew').value !== v) best.get('auto_renew').ties += 1; }
     else if (line && pos && neg) best.delete('auto_renew');
+    if (!best.has('auto_renew')) { const hint = lines.find((l) => /\brenew|\bevergreen\b/i.test(l.t) && !/\b(?:not|never|no|non)[- ]\s*(?:be\s+)?(?:automatic\w*[- ]?)?renew/i.test(l.t) && !/\bdoes not renew\b|\bwill not renew\b/i.test(l.t)); if (hint) offer('auto_renew', 0, 'unclear', hint); } // the paper talks about renewing but not in a form that can be read: never "ended"
   }
 
   // ---- a certificate that says a policy was cancelled / lapsed / not renewed is never read as a current certificate
@@ -555,6 +560,8 @@ export function extractProperty(pages, opts = {}) {
       || /^(?:date of )?cancell?ation(?: date)?\s*[:=-]\s*(?:\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}|\d{4}-\d{2}-\d{2}|[A-Za-z]{3,9}\.? \d{1,2},? \d{4})/i.test(t)
       || /\bcancel+ed (?:effective|as of)\s*(?:\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}|\d{4}-\d{2}-\d{2}|[A-Za-z]{3,9}\.? \d{1,2},? \d{4})/i.test(t)
       || /\bnotice of non-?renewal\b|\bnon-?renewed\b|\blapse (?:in|of) coverage\b/i.test(t)
+      || /^(?:commercial\s+)?(?:general\s+liab\w*|gen\.?\s+liab\w*|cgl|gl|workers?\W{0,2}s?\W*comp\w*|wc|auto\w*(?:\s+liab\w*)?|umbrella|excess|professional\s+liab\w*)\b[^\n]*?[:=-]\s*(?:expired|cancel+ed|lapsed|terminated|void)\b/i.test(t) // a coverage line that itself says expired / cancelled
+      || /^(?:commercial\s+)?(?:general\s+liab\w*|gen\.?\s+liab\w*|cgl|gl|workers?\W{0,2}s?\W*comp\w*|wc|auto\w*(?:\s+liab\w*)?|umbrella|excess|professional\s+liab\w*)\b[^\n:]*\bexp\w*[^\n:]*[:=-]\s*(?:n\/?a|none|not applicable|unknown|tbd|pending)\W*$/i.test(t) // a coverage whose expiry is not a date
       || /\b(?:polic(?:y|ies)|coverage|certificate)\b[^.:]{0,40}\b(?:was |has been |been )(?:cancel+ed|terminated|lapsed|rescinded|revoked)\b/i.test(t);
   })) return null;
   // ---- a bare VOID / CANCELLED / SUPERSEDED stamp line (or "Status: Void") makes the document not the live one
@@ -578,7 +585,8 @@ export function extractProperty(pages, opts = {}) {
   if (type === LS) {
     const tl = lines.find((l) => /^(?:(?:lease |tenancy )?status\s*[:=-]\s*)?terminated(?:\s+(?:on|effective|as of)?\s*\d[\d/.-]*)?\W*$/i.test(l.t) || /^(?:lease )?termination date\s*[:=-]\s*\d/i.test(l.t) || /^date of termination\s*[:=-]\s*\d/i.test(l.t));
     const nl = lines.find((l) => /^(?:(?:lease |tenancy )?status\s*[:=-]\s*)?notice (?:to vacate|given)(?:\s*[:=-]?\s*(?:given|received|yes))?(?:\s*(?:on|:)?\s*\d[\d/.-]*)?\W*$/i.test(l.t) && /given|received|yes|\d/i.test(l.t.replace(/notice (?:to vacate|given)/i, '')) || /^(?:move[- ]?out|vacate) date\s*[:=-]\s*\d/i.test(l.t));
-    if (tl) offer('status', -2, 'Terminated', tl);
+    const tl2 = lines.find((l) => /\blease (?:terminated|broken|ended|cancel+ed)\b|\b(?:tenant|resident) (?:vacated|moved out|left|evicted)\b|^unit vacated\b|^(?:lease )?status\s*[:=-]\s*(?:inactive|ended)\b/i.test(l.t.trim()));
+    if (tl || tl2) offer('status', -2, 'Terminated', tl ?? tl2);
     else if (nl) offer('status', -2, 'Notice to vacate', nl);
     else if (!best.has('lease_end_date') && !best.has('status')) {
       const fixedType = lines.some((l) => /^(?:lease type|type|term|lease term|tenancy(?: type)?)\s*[:=]\s*(?:fixed|annual|one year|\d+[\s-]*months?|12)/i.test(l.t));
@@ -631,12 +639,26 @@ export function extractProperty(pages, opts = {}) {
   for (const [key, e] of [...best]) if (key !== 'notes' && key !== 'work_performed' && key !== 'contract_scope' && CLEAN_LABEL_IN_VALUE.test(String(e.value))) best.delete(key);
   for (const [key, e] of best) if (e.ties > 0 && key !== 'notes') best.delete(key);
   const val = (k) => best.get(k)?.value;
+  // ---- text that changes a date or amount under a label this reader does not know is never read as if the old value stood
+  if ((type === VC || type === LS) && lines.some((l) => /\b(?:amend\w*|extend\w*|extension|revised|restated|renewed (?:to|through|until)|rent (?:increase|after|change)|increase[ds]? to|new (?:rent|end date|term)|modif\w+)\b/i.test(l.t) && (new RegExp(DATE_RE, 'i').test(l.t) || /\$\s*\d/.test(l.t)))) return null;
+  // a reinspection result printed as a sentence ("Reinspected 10/02 - PASSED", "all items corrected") is not a labelled field, so the document is not read
+  if (type === IR && lines.some((l) => /\breinspect\w*\b[^.]*\b(?:pass\w*|completed?|cleared|approved)\b|\ball (?:items|deficienc\w*) (?:were |have been )?(?:corrected|cleared|resolved)\b/i.test(l.t))) return null;
+  // a certificate or contract whose own paper says it is not in force is not read as a live one (lapsed, inactive, suspended, expired, terminated)
+  if ((type === COI || type === VC) && lines.some((l) => { const t = l.t.trim(); return /^(?:(?:policy |contract |coverage |certificate |document |agreement )?status\s*[:=-]\s*)(?:lapsed|inactive|suspended|expired|not in force|terminated|ended)\b/i.test(t) || /\b(?:coverage|polic(?:y|ies)|certificate)\b[^.]{0,30}\b(?:not in force|lapsed|suspended|inactive)\b/i.test(t) || /\b(?:was|has been|been|is hereby|now) terminated\b|\bterminated (?:effective|on \d|as of|by mutual)\b|\bnotice of termination (?:given|sent|received)\b|\b(?:contract|agreement) terminated\b|\blapsed \d{1,2}[/.-]\d{1,2}/i.test(t); })) return null;
+  // a lease with a subtenant is not a plain single-resident lease
+  if (type === LS && lines.some((l) => /^(?:sub-?tenants?|sublessee|sublet\w*)\b/i.test(l.t.trim()))) return null;
+  // an inspection marked resolved / closed / passed in a status line
+  if (type === IR && lines.some((l) => /^(?:inspection |report |work )?status\s*[:=-]\s*(?:resolved|closed|complete\w*|corrected|cleared|passed)\b/i.test(l.t.trim()))) return null;
+  // a tenant field that carries a status, a guarantor or a phone number is not a plain resident name
+  if (type === LS && /\b(?:moved out|vacated|evicted|eviction|guarantor|co-?signer|c\/o|former|deceased)\b|\d{3}[-. )]+\d{3,4}[-. ]\d{4}/i.test(String(val('tenant_name') ?? ''))) return null;
+  // a certificate whose policy has not started yet is not a current one
+  if (type === COI && today && eff.length && eff.every((d) => d > today)) return null;
   // pairs that cannot both be right: BOTH dropped
   const dropBoth = (a, b) => { if (val(a) && val(b) && val(b) < val(a)) { best.delete(a); best.delete(b); } };
   dropBoth('lease_start_date', 'lease_end_date'); dropBoth('contract_start', 'contract_end');
   for (const [a, b] of [['invoice_date', 'invoice_due'], ['opened_date', 'completed_date'], ['service_date', 'reinspection_due']]) if (val(a) && val(b) && val(b) < val(a)) best.delete(b);
   if (type === WO && val('service_date') && val('completed_date') && val('completed_date') < val('service_date') && best.get('service_date').rank === 0) best.delete('completed_date');
-  if (type === WO && !best.has('service_date') && best.has('opened_date')) { const o = best.get('opened_date'); best.set('service_date', { ...o, rank: 2, order: order++ }); }
+// (removed: an opened / request date is never the scheduled date)   if (type === WO && !best.has('service_date') && best.has('opened_date')) { const o = best.get('opened_date'); best.set('service_date', { ...o, rank: 2, order: order++ }); }
   // ---- an invoice's cost is accepted only when no OTHER money amount or percentage in the document is attached to adjustment-type wording (credit, discount, deposit, payment, retainage, ...): the printed total is then not what is owed
   if (type === IV && best.has('cost')) {
     const ADJW = /\b(?:less|credits?|discounts?|deposits?|prepaid|prepayments?|payments?|paid|refunds?|retention|retainage|adjustments?|write[- ]?offs?|partial|applied|net due|amount due|balance|prior|previous|courtesy|rebates?|allowances?)\b/i;
