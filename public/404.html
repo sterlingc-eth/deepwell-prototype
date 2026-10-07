@@ -34,12 +34,20 @@ p{color:var(--muted);margin:0;max-width:44ch}
 .btn{display:inline-flex;align-items:center;padding:12px 20px;border-radius:4px;font-weight:600;font-size:.95rem;text-decoration:none;border:1px solid var(--line-strong);color:var(--text);min-height:44px}
 .btn-primary{background:var(--well);color:#fff;border-color:transparent}
 :focus-visible{outline:2px solid var(--brass);outline-offset:3px}
+/* one small friendly motion: the well's rings draw in from the middle, then a single ripple. Still version = finished rings. */
+svg.mark{overflow:visible}svg.mark .rip{opacity:0;transform-box:fill-box;transform-origin:center}
+@media (prefers-reduced-motion:no-preference){
+  svg.mark circle:not(.rip){stroke-dasharray:1 2;animation:rg-draw .6s cubic-bezier(.65,0,.35,1) both;animation-delay:calc(var(--i)*.12s)}
+  svg.mark .rip{animation:rg-rip 1.1s cubic-bezier(.2,.8,.2,1) 1s both}
+  @keyframes rg-draw{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
+  @keyframes rg-rip{0%{opacity:.7;transform:scale(1)}100%{opacity:0;transform:scale(4.6)}}
+}
 </style>
 </head>
 <body>
 <main>
   <div class="box">
-    <svg class="mark" viewBox="0 0 100 100" aria-hidden="true"><g fill="none" stroke="var(--brass)" stroke-width="4"><circle cx="50" cy="50" r="46"/><circle cx="50" cy="50" r="37"/><circle cx="50" cy="50" r="28"/><circle cx="50" cy="50" r="19"/><circle cx="50" cy="50" r="10"/></g></svg>
+    <svg class="mark" viewBox="0 0 100 100" aria-hidden="true"><g fill="none" stroke="var(--brass)" stroke-width="4"><circle pathLength="1" style="--i:4" cx="50" cy="50" r="46"/><circle pathLength="1" style="--i:3" cx="50" cy="50" r="37"/><circle pathLength="1" style="--i:2" cx="50" cy="50" r="28"/><circle pathLength="1" style="--i:1" cx="50" cy="50" r="19"/><circle pathLength="1" style="--i:0" cx="50" cy="50" r="10"/><circle class="rip" cx="50" cy="50" r="10"/></g></svg>
     <div class="eyebrow">404</div>
     <h1>That page went into a filing cabinet somewhere.</h1>
     <p>The page you're looking for doesn't exist or has moved. Try one of these instead.</p>

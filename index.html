@@ -230,7 +230,7 @@ section{padding-block:clamp(36px,5vw,64px);border-top:1px solid var(--line)}
   background:linear-gradient(100deg,transparent,rgba(255,255,255,.22),transparent);
   transform:skewX(-20deg);pointer-events:none;opacity:0}
 .plan.featured.in-view::after{animation:dw-sweep 1.1s ease forwards}
-@keyframes dw-sweep{0%{left:-60%;opacity:.9}70%{opacity:.4}100%{left:120%;opacity:0}}
+@keyframes dw-sweep{0%{transform:translateX(0) skewX(-20deg);opacity:.9}70%{opacity:.4}100%{transform:translateX(500%) skewX(-20deg);opacity:0}}
 .plan .tier{font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
 .plan h3{font-size:1.6rem}
 .plan .for{color:var(--text);font-size:.95rem;font-weight:600;margin:0}
@@ -1259,6 +1259,75 @@ footer{padding-block:10px}
 }
 </style>
 <link rel="stylesheet" href="/support/widget.css">
+<style id="dw-motion">
+/* ======================================================================
+   HOME PAGE MOTION LAYER (2026-10-07). Same system as the inner pages:
+   150 ms state change | 250-500 ms settle | 500-700 ms travel.
+   settle = cubic-bezier(.2,.8,.2,1), travel = cubic-bezier(.65,0,.35,1).
+   Only transform, opacity and stroke-dashoffset are animated. Base markup
+   is the final still state; html.dwm (added by JS) plus no-preference
+   turns the motion on. Reduced motion and JS-off get the still page.
+   ====================================================================== */
+:root{--mo-settle:cubic-bezier(.2,.8,.2,1);--mo-travel:cubic-bezier(.65,0,.35,1)}
+/* still state of the hero micro-scene = finished picture */
+.hero-micro .hm-arrow{stroke-dashoffset:0}
+.hero-micro .hm-doc-g{opacity:.6}
+.hero-micro .hm-ink,.hero-micro .hm-ans-g,.hm-x{transform-box:fill-box;transform-origin:center}
+.hero-micro .hm-ink{transform-origin:left center}
+/* sliding indicator for the question chips + Donovan-is-reading dot */
+.q-list{position:relative}
+.mo-ind{position:absolute;left:0;top:0;width:1px;height:1px;transform-origin:0 0;background:var(--brass);pointer-events:none;opacity:0;z-index:1}
+html.dwm .q[aria-pressed="true"]{box-shadow:none}
+/* 404-style quiet start for the closing icons is JS-gated below */
+@media (prefers-reduced-motion:no-preference){
+  /* shared heading rule: the little brass line in every section eyebrow draws in */
+  html.dwm .sec-head .eyebrow::before{transform-origin:left center;transition:transform .5s var(--mo-travel) .15s}
+  html.dwm .sec-head:not(.in-view) .eyebrow::before{transform:scaleX(0)}
+  /* hero: the paper reads once, the arrow draws, the answer lands, the three steps light in turn */
+  html.dwm .dw-observe:not(.in-view) .hero-micro .hm-arrow{stroke-dashoffset:24}
+  html.dwm .dw-observe:not(.in-view) .hero-micro .hm-ans-g,html.dwm .dw-observe:not(.in-view) .hero-micro .hm-arrow{opacity:0}
+  html.dwm .dw-observe.in-view .hero-micro .hm-ink{animation:mo-line .5s var(--mo-settle) both}
+  html.dwm .dw-observe.in-view .hero-micro .hm-ink:nth-of-type(2){animation-delay:.6s}
+  html.dwm .dw-observe.in-view .hero-micro .hm-ink:nth-of-type(3){animation-delay:.69s}
+  html.dwm .dw-observe.in-view .hero-micro .hm-ink:nth-of-type(4){animation-delay:.78s}
+  html.dwm .dw-observe.in-view .hero-micro .hm-doc-g{animation:mo-doc .5s var(--mo-settle) 1.3s both}
+  html.dwm .dw-observe.in-view .hero-micro .hm-arrow{animation:mo-arrow .6s var(--mo-travel) 1.4s both}
+  html.dwm .dw-observe.in-view .hero-micro .hm-ans-g{animation:mo-land .5s var(--mo-settle) 1.95s both}
+  html.dwm .hero-copy.in-view .hero-steps b{animation:mo-land .5s var(--mo-settle) both}
+  html.dwm .hero-copy.in-view .hero-steps li:nth-child(1) b{animation-delay:.4s}
+  html.dwm .hero-copy.in-view .hero-steps li:nth-child(2) b{animation-delay:.6s}
+  html.dwm .hero-copy.in-view .hero-steps li:nth-child(3) b{animation-delay:.8s}
+  @keyframes mo-line{from{transform:scaleX(0)}}
+  @keyframes mo-doc{from{opacity:1}}
+  @keyframes mo-arrow{from{stroke-dashoffset:24}}
+  @keyframes mo-land{from{opacity:0;transform:scale(.7)}}
+  /* how it works: a dot lands on each step's line when the walkthrough reaches it */
+  .hiw-steps li::after{content:"";position:absolute;left:0;top:-4px;width:7px;height:7px;border-radius:50%;background:var(--brass);transform:scale(0);transition:transform .25s var(--mo-settle)}
+  .hiw-steps li[data-on]::after{transform:scale(1);transition-delay:.4s}
+  /* chips: the brass marker glides to the chosen question */
+  html.dwm .mo-ind{transition:transform .35s var(--mo-travel),opacity .15s}
+  html.dwm .mo-ind.mo-jump{transition:none}
+  /* roadmap: node lights, rail draws to the next stop, items follow in order */
+  @media (min-width:861px){.rm-stage:nth-child(2){--rm-d:.6s}.rm-stage:nth-child(3){--rm-d:1.2s}}
+  html.dwm .rm-stage .rm-node{transition:transform .5s var(--mo-settle) var(--rm-d,0s),opacity .3s ease var(--rm-d,0s)}
+  html.dwm .rm-stage:not(.in-view) .rm-node{transform:scale(.6);opacity:0}
+  html.dwm .rm-stage:not(:last-child)::before{transform-origin:left top;transition:transform .6s var(--mo-travel) calc(var(--rm-d,0s) + .3s)}
+  html.dwm .rm-stage:not(:last-child):not(.in-view)::before{transform:scaleX(0)}
+  html.dwm .rm-items li{transition:opacity .4s ease,transform .4s var(--mo-settle);transition-delay:calc(var(--rm-d,0s) + .3s + var(--i,0)*70ms)}
+  @media (min-width:701px){html.dwm .rm-stage:not(.in-view) .rm-items li{opacity:0;transform:translateY(6px)}}
+  html.dwm .rm-next .rm-node::after{animation-iteration-count:3}
+  @media (min-width:701px) and (max-width:860px){html.dwm .rm-stage:not(:last-child):not(.in-view)::before{transform:scaleY(0)}}
+  /* quiet reveals for a few blocks that had none */
+  html.dwm [data-mo]{transition:opacity .6s var(--mo-settle) var(--mo-d,0s),transform .6s var(--mo-settle) var(--mo-d,0s)}
+  html.dwm [data-mo]:not(.mo-in){opacity:0;transform:translateY(var(--mo-y,14px))}
+  /* FAQ and plan details: answer fades up as it opens */
+  html.dwm .faq-grid details[open]>p,html.dwm .plan-more[open] .plan-more-body{animation:mo-open .3s var(--mo-settle) both}
+  @keyframes mo-open{from{opacity:0;transform:translateY(-6px)}}
+  /* closing rules: each icon is drawn in */
+  html.dwm .principle svg>*{stroke-dasharray:1 2;stroke-dashoffset:0;transition:stroke-dashoffset .8s var(--mo-travel) calc(.3s + var(--pd,0s))}
+  html.dwm .principle:not(.in-view) svg>*{stroke-dashoffset:1}
+}
+</style>
 </head>
 <body>
 
@@ -1342,7 +1411,7 @@ footer{padding-block:10px}
 
 <header class="hero" id="top">
   <div class="wrap">
-    <div class="hero-copy dw-observe">
+    <div class="hero-copy dw-observe dw-once">
       <div class="hero-eyebrow-row">
       <div class="eyebrow">For any business that runs on paperwork</div>
       <svg class="hero-micro" viewBox="0 0 118 36" aria-hidden="true" focusable="false">
@@ -2515,9 +2584,10 @@ footer{padding-block:10px}
     }
     // static center + hairline crosshair
     ctx.beginPath();ctx.arc(cx,cy,R*0.06,0,Math.PI*2);ctx.lineWidth=2;ctx.strokeStyle=base;ctx.stroke();
-    if(!reduce)requestAnimationFrame(frame);
+    raf=(!reduce&&vis)?requestAnimationFrame(frame):0;
   }
-  requestAnimationFrame(frame);
+  let vis=true,raf=requestAnimationFrame(frame);
+  if(!reduce&&'IntersectionObserver' in window)new IntersectionObserver(function(es){vis=es[es.length-1].isIntersecting;if(vis&&!raf)raf=requestAnimationFrame(frame)}).observe(c);
 })();
 
 /* ---- pause/resume decorative animations off-screen ---- */
@@ -2566,8 +2636,9 @@ const DEMO=[
   const main=document.getElementById('demo-main');
   const btns=[...document.querySelectorAll('.q')];
   const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
-  function render(i){
-    const d=DEMO[i];
+  let cur=0;
+  function render(i,quiet){
+    const d=DEMO[i];cur=i;
     btns.forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.i===i)));
     main.classList.remove('demo-reveal');
     main.innerHTML=`
@@ -2576,7 +2647,7 @@ const DEMO=[
       <div class="kv">${d.fields.map(([k,v,cls,label],idx)=>`<div style="--i:${idx}"><span class="k">${k}</span><span class="v">${v}</span>${cls?`<span class="pill ${cls}">${label}</span>`:''}</div>`).join('')}</div>
       <div class="sources">${d.sources.map(([t,n,w],idx)=>`<div class="src" style="--i:${idx}"><span class="ic">${t}</span><span><b>${n}</b> · ${w}</span></div>`).join('')}</div>
       <div class="demo-note">Example records. Names, addresses and figures are illustrative.</div>`;
-    if(!reduceMotion){
+    if(!reduceMotion&&!quiet){
       // force reflow so the class can retrigger the animation on repeat clicks
       void main.offsetWidth;
       main.classList.add('demo-reveal');
@@ -2632,12 +2703,25 @@ const DEMO=[
     const q=input.value.trim();if(!q)return;
     const i=match(q);
     if(i>=0){render(i);return;}
-    btns.forEach(b=>b.setAttribute('aria-pressed','false'));
+    btns.forEach(b=>b.setAttribute('aria-pressed','false'));cur=-1;
     main.innerHTML=`<div class="answer-head"><div class="eyebrow">Answer</div><div class="t">0 sources</div></div>
       <p class="answer">Nothing in the sample records matches "${q.replace(/</g,'&lt;')}". In your own account this would search every document you've uploaded — try one of the questions on the left to see how an answer is built.</p>
       <div class="demo-note">This preview holds a handful of example records. Your account answers from your files.</div>`;
   });
   render(0);
+  /* reserve the height of the tallest sample answer so switching questions never moves the page */
+  function reserve(){
+    if(cur<0||activeIdx>=0)return;
+    const keep=cur,live=main.getAttribute('aria-live');
+    main.removeAttribute('aria-live');main.style.minHeight='';
+    let mx=0;
+    for(let k=0;k<DEMO.length;k++){render(k,true);mx=Math.max(mx,main.offsetHeight);}
+    main.style.minHeight=mx+'px';render(keep,true);
+    if(live)main.setAttribute('aria-live',live);
+  }
+  reserve();
+  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(reserve);
+  let rt;addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(reserve,150)});
 })();
 </script>
 
@@ -3158,6 +3242,43 @@ sync(true);if(mq.addEventListener)mq.addEventListener('change',function(){sync(f
   $('inq-again').addEventListener('click',function(){
     form.reset();clearErrs();sayText('');onCount();t0=0;done.hidden=true;form.hidden=false;f.message.focus();
   });
+})();
+</script>
+<script id="dw-motion-js">
+/* Home page motion layer. Additive and self-guarding: no IntersectionObserver or JS off = the still page. */
+(function(){
+  if(!('IntersectionObserver' in window))return;
+  var d=document.documentElement,$=function(s){return [].slice.call(document.querySelectorAll(s))};
+  d.classList.add('dwm');
+  /* quiet reveals */
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){
+    if(e.isIntersecting){e.target.classList.add('mo-in');io.unobserve(e.target)}
+  })},{threshold:.15});
+  $('.cta-card,.plans-every').forEach(function(el){el.setAttribute('data-mo','');io.observe(el)});
+  $('.what-ask li').forEach(function(el,i){el.setAttribute('data-mo','');el.style.setProperty('--mo-y','6px');el.style.setProperty('--mo-d',(i*70)+'ms');io.observe(el)});
+  /* roadmap items: order index */
+  $('.rm-items').forEach(function(ul){[].slice.call(ul.children).forEach(function(li,i){li.style.setProperty('--i',i)})});
+  /* closing icons: draw-in needs a normalised path length */
+  $('.principle svg').forEach(function(s){[].slice.call(s.children).forEach(function(n,i){n.setAttribute('pathLength','1');n.style.setProperty('--pd',(i*.12)+'s')})});
+  /* sliding marker under/beside the chosen question */
+  var ql=document.querySelector('.q-list');
+  if(ql){
+    var ind=document.createElement('i');ind.className='mo-ind';ind.setAttribute('aria-hidden','true');ql.appendChild(ind);
+    var place=function(jump){
+      var b=ql.querySelector('.q[aria-pressed="true"]');
+      if(!b){ind.style.opacity=0;return}
+      if(jump)ind.classList.add('mo-jump');
+      var row=getComputedStyle(ql).flexDirection==='row',x=b.offsetLeft,y=b.offsetTop,w=b.offsetWidth,h=b.offsetHeight;
+      ind.style.transform=row?'translate('+x+'px,'+(y+h-3)+'px) scale('+w+',3)':'translate('+x+'px,'+y+'px) scale(3,'+h+')';
+      ind.style.opacity=1;
+      if(jump){void ind.offsetWidth;ind.classList.remove('mo-jump')}
+    };
+    new MutationObserver(function(){place(false)}).observe(ql,{attributes:true,attributeFilter:['aria-pressed'],subtree:true});
+    var t;addEventListener('resize',function(){clearTimeout(t);t=setTimeout(function(){place(true)},120)});
+    addEventListener('load',function(){place(true)});
+    if(document.fonts&&document.fonts.ready)document.fonts.ready.then(function(){place(true)});
+    place(true);
+  }
 })();
 </script>
 <script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
