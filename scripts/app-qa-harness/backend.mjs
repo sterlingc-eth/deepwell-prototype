@@ -57,6 +57,7 @@ export async function installBackend(page, opts = {}) {
     const req = route.request();
     const url = new URL(req.url());
     const p = url.pathname;
+    if (p.startsWith('/api/_lib/')) return route.fallback(); // vite-served source modules, not API calls
     let body = {};
     try { body = JSON.parse(req.postData() || '{}'); } catch { /* not json */ }
     const action = body.action || url.searchParams.get('action') || '';

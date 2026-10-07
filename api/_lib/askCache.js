@@ -51,7 +51,7 @@ export const PROMPT_VERSION = createHash("sha256")
   .update(SYSTEM_PROMPT)
   .update(JSON.stringify(ANSWER_TOOL))
   // Cache epoch: bump to drop every cached answer (2026-09-24: answers now carry citation records; history/installer fixes).
-  .update("epoch-2026-09-24")
+  .update("epoch-2026-10-07-r40-grounding")
   .digest("hex")
   .slice(0, 12);
 

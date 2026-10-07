@@ -23,6 +23,7 @@ import { withTenant as defaultWithTenant } from '../recordsStore.js';
 import { tenantHasFinancialRows } from './store.js';
 import { parseMoneyIntent, runMoneyIntent } from './answers.js';
 import { leftoverWords } from '../router/leftover.js';
+import { parseAmountInvoiceQuestion, amountMentioned } from './amountInvoice.js';
 
 /** R39: a plain "how many invoices/quotes/purchase orders" count answers from the document kind, the period and the named subject ONLY. Any other
  *  non-grammar word the question carried (a person nobody resolved, "did Dana Whitfield do", a negation, ...) was silently dropped and the whole-shop
@@ -51,6 +52,8 @@ export async function answerMoneyQuestion({ withTenant = defaultWithTenant, ctxA
       if (!(await tenantHasFinancialRows(db))) return { handled: false, hasData: false };
       const intent = parseMoneyIntent(question, { today });
       if (!intent) return { handled: false, hasData: true };
+      // R40: a question that names an invoice amount is never answered with a shop-wide total / count / last-invoice that ignores the amount.
+      if (intent.intent !== 'threshold_invoices' && amountMentioned(question)) return { handled: false, hasData: true, intent: intent.intent };
       if (intent.intent === 'document_count' && countLeftover(question, today).length) return { handled: false, hasData: true, intent: intent.intent };
       const data = await runMoneyIntent(db, intent, { today });
       if (!data) return { handled: false, hasData: true, intent: intent.intent };
@@ -58,6 +61,26 @@ export async function answerMoneyQuestion({ withTenant = defaultWithTenant, ctxA
     });
   } catch (err) {
     console.error('financials: money answer failed:', err?.name === 'Error' ? 'query error' : err?.name ?? 'error');
+    return { handled: false, hasData: false };
+  }
+}
+
+/**
+ * R40: "the invoice for 3470": decided by the organization's financial rows whose total equals the amount. Never throws; {handled:false} when the question is not
+ * of this exact shape or the organization has no financial rows (the caller then continues down the normal, grounding-gated path).
+ */
+export async function answerAmountInvoiceQuestion({ withTenant = defaultWithTenant, ctxArg, question, today }) {
+  const amt = parseAmountInvoiceQuestion(question);
+  if (!amt) return { handled: false, hasData: false };
+  try {
+    return await withTenant(ctxArg, async (db) => {
+      if (!(await tenantHasFinancialRows(db))) return { handled: false, hasData: false };
+      const data = await runMoneyIntent(db, { intent: 'invoice_by_amount', amountCents: amt.cents, amountBare: amt.bare, raw: String(question).toLowerCase(), rawOriginal: String(question), period: null, subject: null }, { today });
+      if (!data) return { handled: false, hasData: true, intent: 'invoice_by_amount' };
+      return { handled: true, hasData: true, data, intent: 'invoice_by_amount' };
+    });
+  } catch (err) {
+    console.error('financials: amount answer failed:', err?.name === 'Error' ? 'query error' : err?.name ?? 'error');
     return { handled: false, hasData: false };
   }
 }

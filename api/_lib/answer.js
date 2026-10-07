@@ -481,7 +481,7 @@ export function shapeAnswer(raw, allowed, { allowComputed = false, candidates = 
       const sources = (Array.isArray(f.sources) ? f.sources : []).filter((s) =>
         sourceIsGrounded(s, safeAllowed, basis === "computed")
       );
-      return { ...f, basis, sources };
+      return { ...f, basis, modelBasis: f.basis === "computed" ? "computed" : "printed", sources };
     })
     .filter((f) => f.sources.length > 0);
 

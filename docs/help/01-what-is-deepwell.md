@@ -3,7 +3,7 @@ id: what-is-deepwell
 title: What DeepWell is
 audience: public
 surface: both
-keywords: deepwell, what is deepwell, about, company, product, platform, records, documents, paperwork, hvac, field service, founders, sterling, hilton, mesa arizona
+keywords: deepwell, what is deepwell, about, company, product, platform, records, documents, paperwork, hvac, field service, founders, sterling, hilton, alamogordo new mexico
 updated: 2026-09-29
 ---
 DeepWell is a hosted records system for any business that stores documents or paperwork. It reads your invoices, work orders, contracts, forms and photos of documents, links them to the right customer and address, and lets the team ask questions in plain language. Every answer shows its source. Equipment paperwork such as warranties, serial numbers and service tickets is where it understands the most today.
@@ -37,8 +37,8 @@ Invoices, work orders, contracts and agreements, permits, forms, purchase orders
 DeepWell was founded by two brothers. **Hilton Chapman** is a retired Air Force veteran who leads customer relationships and marketing and sets the vision. **Sterling Chapman** has prior Army service and is the engineer behind the platform. He works with you from your first sample through go-live.
 
 ### Where is DeepWell based?
-~ where are you located, location, headquarters, address, where is the company, what state, arizona, mesa, country, us based
-DeepWell Inc. (DeepWell Technology) is based in Mesa, Arizona, USA.
+~ where are you located, location, headquarters, address, where is the company, what state, new mexico, alamogordo, country, us based
+DeepWell Technology LLC is based in Alamogordo, New Mexico, USA.
 
 ### Is there a free demo or sample?
 ~ demo, free demo, sample, sample box, try it, try before, trial run, test it, see it work, proof of concept, send a sample

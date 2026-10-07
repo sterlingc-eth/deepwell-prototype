@@ -34,6 +34,7 @@ import { financeRecords, aggregatedDocRecord } from '../citations/finance.js';
 // JOB COSTING (M3-config/36-job-costing.sql): groups the SAME document_financials rows by job.
 import { computeJobCosts, jobKeyFromQuestionAddress, normalizeJobKey, findJobForAddress } from './jobCosting.js';
 import { parseCents, centsToString } from './normalize.js';
+import { centsToDollars } from './amountInvoice.js';
 
 /* ---------------------------------------------------------------- formatting */
 
@@ -1355,6 +1356,81 @@ async function thresholdInvoices(db, intent, ctx) {
   });
 }
 
+
+/** R40: "the invoice for 3470" - the organization's own financial rows whose printed total EQUALS the named amount decide the answer: exactly one -> answered from it,
+ *  several -> listed, none -> an honest "none on file with that total". Never a near address or customer. A bare whole number is also matched against invoice NUMBERS
+ *  ("invoice for 3470" can name invoice #3470); each listed invoice says which way it matched. A line item equal to the amount is reported as a line item only. */
+async function invoiceByAmount(db, intent, ctx) {
+  const cents = String(intent.amountCents ?? '');
+  if (!/^\d{1,12}$/.test(cents) || Number(cents) === 0) return null;
+  const amount = centsToDollars(cents);
+  const money = fmt(amount);
+  const numeric = intent.amountBare ? String(Number(amount)).replace(/\.0+$/, '') : null; // "3470" for an invoice-number read
+  const kindClause = `f.doc_kind IN ('invoice','credit_memo') AND f.total IS NOT NULL AND (f.total = $2::numeric OR (f.doc_kind = 'credit_memo' AND f.total = -$2::numeric))`;
+  const rows = await q(db,
+    `SELECT f.*, 'total'::text AS matched FROM financials f WHERE ${kindClause} ORDER BY f.doc_date DESC NULLS LAST, f.created_at DESC, f.document_id LIMIT 26`, [amount], ctx.hu);
+  const [{ n: nTotal }] = await q(db, `SELECT count(*)::int AS n FROM financials f WHERE ${kindClause}`, [amount], ctx.hu);
+  let numRows = [];
+  if (numeric && /^\d{1,9}$/.test(numeric)) {
+    numRows = await q(db,
+      `SELECT f.*, 'number'::text AS matched FROM financials f WHERE f.doc_kind = 'invoice' AND f.invoice_number IS NOT NULL
+          AND regexp_replace(lower(f.invoice_number), '[^a-z0-9]', '', 'g') ~ ('^[a-z]{0,4}' || $2 || '$') ORDER BY f.doc_date DESC NULLS LAST LIMIT 10`, [numeric], ctx.hu);
+  }
+  const seen = new Set(rows.map((r) => r.document_id));
+  const all = [...rows, ...numRows.filter((r) => !seen.has(r.document_id))];
+  const [pop] = await q(db, `SELECT count(*) FILTER (WHERE f.doc_kind IN ('invoice','credit_memo') AND f.total IS NOT NULL)::int AS n_priced, count(*) FILTER (WHERE f.doc_kind IN ('invoice','credit_memo') AND f.total IS NULL)::int AS n_unpriced FROM financials f`, [], ctx.hu);
+  let nNoRow = 0;
+  try { const [r0] = await q(db, `SELECT count(*)::int AS n FROM documents d WHERE d.document_type = 'invoice' AND NOT EXISTS (SELECT 1 FROM financials f WHERE f.document_id = d.id)`, [], ctx.hu); nNoRow = r0?.n ?? 0; } catch { return null; }
+  if (!pop || pop.n_priced + pop.n_unpriced + nNoRow === 0) return null; // nothing to check: leave it to the later (grounding-gated) paths
+  const odd = (r) => [r.doc_kind === 'credit_memo' ? (r.total != null && Number(r.total) < 0 ? 'a credit memo' : 'a credit memo') : null, r.direction === 'payable' ? 'a vendor bill' : null, r.currency && r.currency !== 'USD' ? `in ${r.currency}` : null].filter(Boolean);
+  const describe = (r) => {
+    const num = r.invoice_number ? `#${r.invoice_number}` : 'with no printed number';
+    const bits = [r.customer_name ? `for ${r.customer_name}` : null, humanDate(r.doc_date ?? r.invoice_date) ? `dated ${humanDate(r.doc_date ?? r.invoice_date)}` : null].filter(Boolean);
+    const o = odd(r);
+    return `invoice ${num}${bits.length ? ` ${bits.join(', ')}` : ''}${o.length ? ` (${o.join(', ')})` : ''}`;
+  };
+  const factFor = (r) => {
+    const f = invoiceFact(r);
+    if (r.currency && r.currency !== 'USD' && r.total != null) f.value = `${String(r.total)} ${r.currency}`;
+    return r.matched === 'number' ? { ...f, label: `${f.label} (matched the invoice number ${numeric})` } : f;
+  };
+  const nUnread = nNoRow;
+  const noRowNote = nNoRow ? ` ${plural(nNoRow, 'invoice document')} ${nNoRow === 1 ? 'has' : 'have'} no readable total, so ${nNoRow === 1 ? 'it' : 'they'} could not be checked.` : '';
+  const unpricedNote0 = pop.n_unpriced ? ` ${plural(pop.n_unpriced, 'invoice')} ${pop.n_unpriced === 1 ? 'prints' : 'print'} no total, so ${pop.n_unpriced === 1 ? 'it' : 'they'} could not be checked.` : '';
+  const unpricedNote = unpricedNote0 + noRowNote;
+  if (all.length === 0) {
+    // an amount that is a LINE ITEM but no invoice's total is said as exactly that
+    const lines = await q(db,
+      `SELECT l.document_id, l.line_no, l.description, l.amount, l.page_no, f.invoice_number, f.customer_name, f.doc_date, f.filename, f.total
+         FROM invoice_lines l JOIN financials f ON f.document_id = l.document_id
+        WHERE f.doc_kind IN ('invoice','credit_memo') AND l.amount = $2::numeric ORDER BY f.doc_date DESC NULLS LAST LIMIT 6`, [amount], ctx.hu);
+    const basis = `Compared ${money} with the printed total of each of the ${pop.n_priced} invoices that print one; none equals it.`;
+    if (lines.length) {
+      const l0 = lines.map((l) => `${l.invoice_number ? `#${l.invoice_number}` : 'an invoice'}${l.customer_name ? ` (${l.customer_name})` : ''}, whose total is ${l.total == null ? 'not printed' : fmt(l.total)}`);
+      return baseAnswer(`No invoice has a total of ${money}. ${plural(lines.length, 'invoice')} ${lines.length === 1 ? 'has' : 'have'} a line item of ${money} instead: ${l0.join('; ')}.${unpricedNote}`,
+        lines.map((l) => ({ label: `Line item on ${l.invoice_number ? `#${l.invoice_number}` : 'an invoice'}${l.customer_name ? ` · ${l.customer_name}` : ''}`, value: fmt(l.amount), status: 'info', sources: [docSource(l.document_id, l.page_no)] })),
+        { confidence: 1, interpretation: `invoices totaling ${money}`, cite: { records: lines.map((l) => documentRecord({ id: l.document_id, document_type: 'invoice' }, { label: `Invoice${l.invoice_number ? ` #${l.invoice_number}` : ''} · ${l.filename ?? 'document'}`, page: l.page_no ?? undefined })), total: lines.length, basis } });
+    }
+    return baseAnswer(`No invoice ${nUnread ? 'I could read ' : 'on file '}has a total of ${money}.${numeric ? ` None is numbered ${numeric} either.` : ''}${unpricedNote}`, [], { confidence: 1, ...zeroCite(basis) });
+  }
+  const shown = all.slice(0, 25);
+  const nAll = nTotal + numRows.filter((r) => !seen.has(r.document_id)).length;
+  const byTotal = all.filter((r) => r.matched === 'total');
+  const byNumber = all.filter((r) => r.matched === 'number');
+  const numText = (r) => `${describe(r)} is numbered ${numeric}; its total is ${r.total == null ? 'not printed' : fmt(r.total)}`;
+  let text;
+  const plainRows = byTotal.every((r) => r.doc_kind === 'invoice' && r.direction !== 'payable' && (!r.currency || r.currency === 'USD'));
+  const rowTotal = (r) => (r.total == null ? money : r.currency && r.currency !== 'USD' ? `${r.total} ${r.currency}` : fmt(r.total));
+  if (byTotal.length === 1) text = `${describe(byTotal[0]).replace(/^invoice/, 'Invoice')} totals ${rowTotal(byTotal[0])}.`;
+  else if (byTotal.length > 1) text = `${plural(nTotal, 'invoice')} total ${money}: ${byTotal.slice(0, 8).map(describe).join('; ')}${nTotal > 8 ? `; and ${nTotal - 8} more` : ''}.`;
+  else text = `No invoice totals ${money}.`;
+  if (byNumber.length) text += ` ${byTotal.length ? 'Separately, ' : 'But '}${byNumber.map(numText).join('; ')}.`;
+  return baseAnswer(`${text}${unpricedNote}`, shown.map(factFor), {
+    verified: shown.filter((r) => r.verified).length, unverified: shown.filter((r) => !r.verified).length,
+    sources: shown.map((r) => docSource(r.document_id, r.total_page)), interpretation: `invoices totaling ${money}`,
+    cite: { records: financeRecords(shown), total: nAll, claimedCount: nAll, basis: `Matched ${money} against the printed total of the ${pop.n_priced} invoices that print one.` } });
+}
+
 /** "how much have we collected / have customers paid us" = SUM(amount_paid), never SUM(total). */
 async function collectedTotal(db, intent, ctx) {
   const p = intent.period;
@@ -1788,6 +1864,7 @@ async function runMoneyIntentInner(db, intent, { today }) {
     case 'superlative_agreement': return superlativeAgreement(db, intent, ctx);
     case 'payment_status': return paymentStatusCounts(db, intent, ctx);
     case 'threshold_invoices': return thresholdInvoices(db, intent, ctx);
+    case 'invoice_by_amount': return invoiceByAmount(db, intent, ctx);
     case 'collected_total': return collectedTotal(db, intent, ctx);
     case 'sales_tax': return salesTaxTotal(db, intent, ctx);
     case 'quotes_waiting': return quotesWaiting(db, intent, ctx);

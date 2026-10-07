@@ -44,6 +44,8 @@ import { attachCitations, finalizeCitations, unitRecord, documentRecord } from "
 // reaches a route log, never printed raw. See api/_lib/privacy/redact.js's own module doc.
 import { hashForLog } from "./_lib/privacy/redact.js";
 import { checkAnswerClaimsSync } from "./_lib/claims/index.js";
+import { parseAmountInvoiceQuestion, amountMentioned } from "./_lib/financials/amountInvoice.js";
+import { loadGroundingEvidence, loadFinancialRows, applyGrounding } from "./_lib/grounding/gate.js";
 import { attachSentenceCitationsSync } from "./_lib/citations/sentences.js";
 import { annotateSuperseded, getSupersessionMap } from "./_lib/supersession.js";
 import { attachRetrievalCitations } from "./_lib/citations/retrieval.js";
@@ -937,7 +939,8 @@ export default async function handler(req, res) {
     }
 
     const ctxArg = { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId };
-    const meta = classifyMetaQuestion(question);
+    const meta0 = classifyMetaQuestion(question);
+    const meta = meta0 && meta0.kind === 'count' && amountMentioned(question) ? null : meta0; // R40: a count of ALL invoices is never the answer to a question that named an amount
     if (!meta && earlyDeclineEnabled()) {
       const early = classifyEarlyDecline(question, { hasConversation: !!conversationContext });
       let vetoed = false;
@@ -1110,6 +1113,9 @@ export default async function handler(req, res) {
     // that fall all the way through to tryAgent's own call below (route/reasons there stay unchanged).
     logRouteDecision(question, {}, preRouter);
     const customerNumber = extractCustomerNumber(question);
+    // R40: a question that names an invoice amount ("the invoice for 3470") is decided by the organization's own financial rows whose total equals it
+    // (financials/amountInvoice.js). Claimed before every other lane (an address / count / fast-path lane must not read the number as something else).
+    const amountInvoiceIntent = parseAmountInvoiceQuestion(question) ? true : false;
     // Resolved once, reused for both the answer cache key's `today` and the
     // question block the model sees (buildQuestionBlock, below) — was
     // computed twice (inconsistently) before the cache needed it up front.
@@ -1187,7 +1193,7 @@ export default async function handler(req, res) {
         ? (evt) => { try { res.write(`${JSON.stringify({ type: "step", ...evt })}\n`); } catch { /* client may be gone */ } }
         : undefined;
       const qHash = researchV2Enabled ? researchAgentModule.researchQuestionHash(question) : agentModule.agentQuestionHash(question);
-      const promptVersion = researchV2Enabled ? researchAgentModule.RESEARCH_PROMPT_VERSION : agentModule.AGENT_PROMPT_VERSION;
+      const promptVersion = `${researchV2Enabled ? researchAgentModule.RESEARCH_PROMPT_VERSION : agentModule.AGENT_PROMPT_VERSION}-r40`; // R40: -r40 drops every agent answer cached before the grounding gate
       let corpusStamp = null;
       let result = null;
       try {
@@ -1245,7 +1251,22 @@ export default async function handler(req, res) {
         if (recordMiss) recordAskMiss(ctxArg, { question, questionNormalized: normalizedForAnalytics, outcome: MISS_OUTCOMES.AGENT_NO_ANSWER }).catch(() => {});
         return false;
       }
-      const data = result.data;
+      let data = result.data;
+      // R40 GROUNDING GATE on the agent's answer too (agent mode: aggregates over many documents stay legitimate; every id / name / address / date / quantity and every
+      // single-document amount must be on the document its card cites). Fails closed.
+      if (data?.kind === "answer" && process.env.DONOVAN_GROUNDING_GATE !== "0") {
+        try {
+          const ev = await withTenant(ctxArg, async (db) => {
+            const m = await loadGroundingEvidence(db, [...(data.facts ?? []).flatMap((f) => (f.sources ?? []).map((s) => s.documentId)), ...(data.sources ?? []).map((s) => s.documentId)]);
+            await loadFinancialRows(db, m);
+            return m;
+          });
+          data = applyGrounding(data, ev, { question, agent: true });
+        } catch (err) {
+          console.error("grounding gate (agent) failed, withdrawing the answer:", err?.message);
+          data = applyGrounding(data, new Map(), { question, agent: true });
+        }
+      }
       send(200, { success: true, data: agentDebug ? { ...data, debug: agentModule.agentDebugTrace(result) } : data });
       await timer.time("bookkeeping", async () => {
         try {
@@ -1315,7 +1336,7 @@ export default async function handler(req, res) {
     // early — both may answer without it. A fast-path candidate that turns out
     // to have no DB answer (ambiguous subject, no value on file) re-runs
     // retrieval inline below, same fallback shape as the meta-router's own.
-    const retrievalPromise = meta || relationsIntent || detIntent || decomposeIntent || fastPathIntent || contactLookupIntent || docLookupIntent || contentCountIntent || moneyQuestion || analyticsCandidate
+    const retrievalPromise = meta || relationsIntent || detIntent || decomposeIntent || fastPathIntent || contactLookupIntent || docLookupIntent || contentCountIntent || moneyQuestion || analyticsCandidate || amountInvoiceIntent
       ? null
       : retrieveEvidence(ctxArg, question, customerNumber, timer, { today: todayResolved, questionHash, noCache: Boolean(scorecardCall) });
 
@@ -1323,6 +1344,27 @@ export default async function handler(req, res) {
     if (!gate.allowed) {
       if (retrievalPromise) await retrievalPromise; // don't leak an in-flight transaction on the way out
       return send(gate.status, { error: gate.error, url: gate.url, ...(gate.scope ? { scope: gate.scope } : {}) });
+    }
+
+    if (amountInvoiceIntent) {
+      const amountGate = await loadMoneyGateModule();
+      const fin = await timer.time("financials", () => amountGate.answerAmountInvoiceQuestion({ withTenant, ctxArg, question, today: todayResolved }));
+      if (fin.handled) {
+        send(200, { success: true, data: fin.data });
+        await timer.time("bookkeeping", () =>
+          withTenant(ctxArg, (db) => db.logAction({
+            action: "document.queried", resource_type: "question", clerk_user_id: auth.userId,
+            changes: { question_hash: hashQuestion(question), documents: [...new Set((fin.data.sources ?? []).map((x) => x.documentId))], passages: 0, financials: fin.intent },
+          })).catch((err) => console.error("Failed to write document.queried audit row (amount invoice):", err?.message))
+        );
+        return;
+      }
+    }
+
+    if (!amountInvoiceIntent && /\binvoic\w*/i.test(question) && /\b(?:tech(?:nician)?s?|who (?:did|worked|handled|serviced|visited|installed))\b/i.test(question) && amountMentioned(question)) {
+      // R40: a technician/who question that names an amount is not a count of every invoice (and not answerable by amount here)
+      send(200, { success: true, data: { kind: "no-answer", text: "I can't tie a technician to an invoice by its dollar amount. Give me the invoice number or the customer's name and I'll look it up.", facts: [], sources: [], confidence: 0, verifiedCount: 0, unverifiedCount: 0, closest: [] } });
+      return;
     }
 
     // ---- 0. meta-question pre-router (no model, no retrieval) --------------
@@ -2148,7 +2190,24 @@ export default async function handler(req, res) {
       ...mappedPassages.map((p) => ({ documentId: p.documentId })),
       ...mappedExtractions.map((x) => ({ documentId: x.documentId })),
     ];
-    const data = shapeAnswer(toolUse?.input, allowed, { candidates });
+    let data = shapeAnswer(toolUse?.input, allowed, { candidates });
+    // R40 GROUNDING GATE: every amount / number / date / address / name the model stated (headline and each fact card) must be on the document it cites.
+    // A card whose value is not on its cited document is removed; an unsupported headline withdraws the answer (no-answer, never "verified"), after which the
+    // agent below still gets its one shot. Fails closed (an evidence read that fails withdraws the answer too).
+    if (data.kind === "answer" && process.env.DONOVAN_GROUNDING_GATE !== "0") {
+      try {
+        const ev = await withTenant(ctxArg, async (db) => {
+          const m = await loadGroundingEvidence(db, [...data.facts.flatMap((f) => (f.sources ?? []).map((s) => s.documentId)), ...(data.sources ?? []).map((s) => s.documentId)]);
+          await loadFinancialRows(db, m);
+          return m;
+        });
+        data = applyGrounding(data, ev, { question });
+      } catch (err) {
+        console.error("grounding gate failed, withdrawing the answer:", err?.message);
+        data = applyGrounding(data, new Map(), { question });
+      }
+      if (Array.isArray(data.facts)) data.facts = data.facts.map(({ modelBasis, ...rest }) => rest);
+    }
     // TEAM C: label the cited pages and say what the answer was selected from (a no-answer cites what was searched).
     attachRetrievalCitations(data, { passages: mappedPassages, extractions: mappedExtractions });
     // Retrieval+model shaped an honest no-answer: the agent gets one shot (its own answer is

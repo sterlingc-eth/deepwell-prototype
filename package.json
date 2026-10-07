@@ -79,6 +79,7 @@
     "verify:r3-datedocs": "tsx scripts/verify-r3-datedocs.mjs",
     "verify:r33-dates": "tsx scripts/verify-r33-dates.mjs",
     "verify:r39": "node scripts/verify-r39-unknown-name-and-cap.mjs",
+    "verify:r40": "node scripts/verify-r40-grounding.mjs",
     "verify:transcribe": "node scripts/verify-transcribe.mjs",
     "verify:caching": "node scripts/verify-caching.mjs",
     "verify:bulk": "node scripts/verify-bulk.mjs",
