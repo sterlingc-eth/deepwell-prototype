@@ -32,7 +32,7 @@
     "verify:packs-wired": "node scripts/verify-packs-wired.mjs",
     "verify:industry-electrical": "node scripts/verify-industry-electrical.mjs",
     "verify:industry-plumbing": "node scripts/verify-industry-plumbing.mjs",
-    "verify:industry-property": "node scripts/verify-industry-property.mjs",
+    "verify:industry-property": "node scripts/verify-industry-property.mjs && node scripts/lib/property-variants.run.mjs && node scripts/lib/property-review-regressions.run.mjs",
     "verify:office-reader": "tsx scripts/verify-office-reader.mjs",
     "verify:office-uploads": "tsx scripts/verify-office-uploads.mjs",
     "verify:office-files": "tsx scripts/verify-office-files.mjs",

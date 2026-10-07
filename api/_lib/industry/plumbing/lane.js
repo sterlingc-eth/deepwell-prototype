@@ -24,6 +24,7 @@
  */
 import { answerEnvelope } from '../../scope.js';
 import { parseDate, resultClass } from './extract.js';
+import { cleanValue, laneAudienceSql, conflictKeys, anyConflict } from '../records.js';
 export { resultClass };
 
 const TENANT = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
@@ -71,22 +72,37 @@ const baseOf = (k) => k.replace(/ u[a-z0-9-]+$/, '');
 /* ------------------------------------------------------------------ data */
 const DATE_KEY = /_(?:date|expiry|due)$|^(?:warranty_expires|permit_expires)$/;
 /** Every document with its extracted values and the page each value came from (corrected values win). */
+// keys under which one document type's value can also arrive (alias keys), mapped to the lane's own key
+const ALIAS = {
+  'backflow-test-certificate': { result: 'backflow_test_result', test_result: 'backflow_test_result', status: 'backflow_test_result', next_due: 'next_test_due', next_test_date: 'next_test_due', due_date: 'next_test_due', test_date: 'service_date', date_tested: 'service_date' },
+  permit: { expiry: 'permit_expires', expiry_date: 'permit_expires', expiration: 'permit_expires', expiration_date: 'permit_expires', expires: 'permit_expires', status: 'permit_status', issue_date: 'permit_issued_date', issued_date: 'permit_issued_date', issued: 'permit_issued_date' },
+  'inspection-report': { result: 'inspection_result', status: 'inspection_result', outcome: 'inspection_result' },
+  'warranty-registration': { expiry: 'warranty_expires', expiry_date: 'warranty_expires', expiration_date: 'warranty_expires', expires: 'warranty_expires', registered_date: 'warranty_registered_date' },
+};
+// keys that hold ONE value on one document: two different readings of one of them is a conflict the lane declines on
+const SCALARS = ['permit_number', 'permit_status', 'permit_expires', 'permit_issued_date', 'inspection_type', 'inspection_result', 'service_date', 'backflow_test_result', 'warranty_expires', 'warranty_registered_date', 'service_address', 'cost', 'invoice_number'];
 async function loadDocs(db) {
+  const aud = await laneAudienceSql(db, 'd');
   const { rows } = await db.raw(
     `SELECT d.id, d.original_filename AS filename, d.document_type AS type, d.created_at,
-            x.field_key AS key, COALESCE(x.corrected_value, x.value) AS value, f.page_no AS page
+            x.field_key AS key, COALESCE(x.corrected_value, x.value) AS value, x.corrected_value AS corr, f.page_no AS page
        FROM documents d
        LEFT JOIN extractions x ON x.document_id = d.id AND x.${TENANT}
        LEFT JOIN facets f ON f.id = x.source_facet_id
-      WHERE d.${TENANT} AND d.document_type IS NOT NULL
+      WHERE d.${TENANT} AND d.document_type IS NOT NULL AND ${aud}
       ORDER BY d.created_at, d.original_filename, d.id, x.created_at, x.field_key, f.page_no NULLS FIRST, COALESCE(x.corrected_value, x.value), x.id`, []);
   // created_at ties inside one transaction and ids are random, so the tie-breakers are what the rows themselves say (file name, field, page, box on the page, value): the same records always read in the same order
   const map = new Map(); let order = 0;
-  for (const r of rows) {
+  for (const r0 of rows) {
+    const r = { ...r0 };
     let d = map.get(r.id);
     if (!d) { d = { id: r.id, filename: r.filename, type: String(r.type).replace(/_/g, '-'), fields: {}, all: {}, order: order++ }; map.set(r.id, d); }
-    if (r.key && r.value != null && String(r.value).trim() !== '') {
-      let v = String(r.value);
+    const cv = cleanValue(r.value);
+    if (r.key && cv == null && r.corr != null) (d.cleared ??= new Set()).add(ALIAS[d.type]?.[r.key] ?? r.key); // a human cleared this field
+    if (r.key && cv != null) {
+      const key = ALIAS[d.type]?.[r.key] ?? r.key;
+      r.key = key;
+      let v = cv;
       // a model-read date can arrive as printed text; the lane only ever compares real ISO dates
       if (DATE_KEY.test(r.key) && !/^\d{4}-\d{2}-\d{2}$/.test(v)) { const iso = parseDate(v); if (iso) v = iso; }
       if (/_(?:expiry|due)$|^(?:warranty_expires|permit_expires)$/.test(r.key) && /^\d{4}-\d{2}$/.test(v)) { const [yy, mm] = v.split('-').map(Number); v = new Date(Date.UTC(yy, mm, 0)).toISOString().slice(0, 10); } // a month-only expiry runs to the end of that month
@@ -95,6 +111,7 @@ async function loadDocs(db) {
     }
   }
   const out = [...map.values()];
+  for (const d of out) d.conflict = conflictKeys(d, SCALARS);
   // Several values of one field (findings, work performed, part numbers, repeated dates): the store keeps no position, so the printed order is recovered from the page text the
   // values were read from (first occurrence of each value on its cited page). A value that cannot be found there keeps the stable order above and goes after the ones that can.
   const multi = out.filter((d) => Object.values(d.all).some((a) => a.length > 1));
@@ -144,7 +161,7 @@ function backflowDevices(docs) {
     const kindSrc = get('equipment_type');
     return {
       certs: sorted, current, history: sorted.slice(0, -1), status, get,
-      conflict: dateBad || !!prev && f(prev, 'service_date') && f(prev, 'service_date') === f(current, 'service_date') && (resultClass(f(prev, 'backflow_test_result')) !== status || f(prev, 'next_test_due') !== f(current, 'next_test_due')),
+      conflict: dateBad || (!g.certs.some((c) => alnum(f(c, 'serial_number'))) && g.certs.length > 1 && !g.certs.every((c) => norm(f(c, 'device_location') ?? ''))) || !!prev && f(prev, 'service_date') && f(prev, 'service_date') === f(current, 'service_date') && (resultClass(f(prev, 'backflow_test_result')) !== status || f(prev, 'next_test_due') !== f(current, 'next_test_due')),
       kind: devKind(kindSrc?.v), serial: f(current, 'serial_number') ?? get('serial_number')?.v ?? null,
       tested: f(current, 'service_date'), due: status === 'passed' ? f(current, 'next_test_due') : null,
       addr: addrKey(current), addrRaw: f(current, 'service_address') ?? get('service_address')?.v ?? '', cust: custKey(current), custRaw: f(current, 'customer_name') ?? '',
@@ -162,6 +179,17 @@ function backflowDevices(docs) {
 const devLabel = (v) => `${v.kind ? `${v.kind} ` : ''}backflow device${v.loc ? ` (${v.loc})` : ''} at ${String(v.addrRaw).split(',')[0]}`.trim();
 const devFactLabel = (v) => `${v.custRaw ? `${v.custRaw} · ` : ''}${v.kind ? `${v.kind} · ` : ''}${String(v.addrRaw).split(',')[0]}${v.loc ? ` · ${v.loc}` : ''}${v.serial ? ` · serial ${v.serial}` : ''}`;
 
+// "not tankless" / "non-tankless" are tank heaters; text naming both kinds, or both fuels, is not guessed (null)
+function tanklessOf(t) {
+  const x = String(t ?? '').replace(/\b(?:not|non|no|isn'?t|is not)[- ]\s*(?:a\s+)?(?:tankless|on[- ]demand)\b/gi, ' TANKWORD ').replace(/\bwithout\s+(?:a\s+)?tank\b/gi, ' tankless ');
+  const less = /tankless|on[- ]demand/i.test(x); const tank = /\btank\b|storage|TANKWORD/i.test(x);
+  return less && tank ? null : less ? true : tank ? false : null;
+}
+function fuelOf(t) {
+  let x = String(t ?? ''); const bare = x.replace(/\([^)]*\)/g, ' ').trim(); if (bare) x = bare; // "Gas (120V electric ignition)" is a gas heater
+  const el = /electric|\b\d{3}\s*v\b/i.test(x); const gs = /\bgas\b|propane|\blpg?\b|natural|\bng\b/i.test(x);
+  return el && gs ? null : el ? 'electric' : gs ? 'gas' : null;
+}
 const HEATER_TYPES = new Set(['startup-sheet', 'warranty-registration', 'equipment-record', 'nameplate-photo']);
 // a record is some other kind of equipment when its OWN equipment / fixture type is filled in and does not say water heater (no list of other trades' equipment)
 const HEATER_WORD = /water heater|\bheater\b|\btank\b|tankless|hot water/i;
@@ -191,8 +219,8 @@ function waterHeaters(docs) {
     return {
       docs: ordered, get, reg, regAmbiguous: exps.size > 1, exp: exps.size === 1 ? [...exps][0] : null, termReg,
       make: get('manufacturer')?.v ?? '', model: get('model')?.v ?? '', serial: get('serial_number')?.v ?? '',
-      tankless: /tankless|on[- ]demand/i.test(typeText) ? true : /\btank\b|storage/i.test(typeText) ? false : null,
-      fuel: /electric/i.test(fuelText) ? 'electric' : /gas|propane|\blp\b|natural|\bng\b/i.test(fuelText) ? 'gas' : null,
+      tankless: tanklessOf(typeText),
+      fuel: fuelOf(fuelText),
       addr: addrD ? addrKey(addrD) : '', addrRaw: addrD ? f(addrD, 'service_address') : '', cust: norm(get('customer_name')?.v ?? ''), custRaw: get('customer_name')?.v ?? '',
     };
   });
@@ -200,7 +228,7 @@ function waterHeaters(docs) {
 const whLabel = (h) => `${h.make ? `${h.make} ` : ''}water heater${h.addrRaw ? ` at ${String(h.addrRaw).split(',')[0]}` : ''}`;
 
 const FINISHED_RE = /\b(?:final|finaled|finalled|finalized|closed|complete|completed|signed off|cancel+ed|void|voided|withdrawn)\b/i;
-const NOT_DONE = /\b(?:awaiting|pending|required|ready for|needs?|needed|fail\w*|denied|rejected|refused|no|not|pre ?final|before|until|call for|schedule|scheduled|request\w*|due|incomplete|unsatisfactory|correction\w*|re ?inspect\w*)\b/i;
+const NOT_DONE = /\b(?:hold|held|without|awaiting|pending|required|ready for|needs?|needed|fail\w*|denied|rejected|refused|no|not|pre ?final|before|until|call for|schedule|scheduled|request\w*|due|incomplete|unsatisfactory|correction\w*|re ?inspect\w*)\b/i;
 /** A printed status that plainly says the permit is finished ("Passed Final Inspection", "Final OK", "Finaled by City", "Closed (final)", "Complete - Final"): a finished word, and no not-done word and no still-open word. */
 const isFinishedStatus = (st) => { const t = String(st ?? '').replace(/[^A-Za-z ]+/g, ' ').replace(/\s+/g, ' ').trim(); return !!t && FINISHED_RE.test(t) && !NOT_DONE.test(t) && !/\b(?:open|issued|active|in progress|under review|valid|current|expired|lapsed)\b/i.test(t); };
 const OPEN_RE = /\b(?:open|issued|active|pending|in progress|approved|under review|valid|current|inspection pending|awaiting)\b/i;
@@ -226,7 +254,7 @@ function permitsModel(docs, today) {
     const st = String(p.status ?? '');
     const finishedByStatus = isFinishedStatus(st);
     if (finishedByStatus || p.passedFinal) p.state = 'finished';
-    else if (/\bexpired\b|\blapsed\b/i.test(st)) p.state = 'expired';
+    else if (/\bexpired\b|\blapsed\b/i.test(st)) p.state = /\b(?:renew\w*|extend\w*|extension|reinstat\w*|reissu\w*)\b/i.test(st) ? 'other' : 'expired'; // "Expired - Renewed" is not simply expired
     else if (p.expires && okIso(p.expires) && today && p.expires < today) p.state = 'expired';
     else if (!st || OPEN_RE.test(st) || (FINISHED_RE.test(st) && NOT_DONE.test(st))) p.state = 'open'; // "awaiting final", "final required", "failed final" are not finished
     else p.state = 'other';
@@ -290,6 +318,8 @@ function resolvePlace(docs, rawQ) {
     if (!hit && ct.length === 1) hit = false;
     if (hit) { custHit.add(c.key); c.key.split(' ').forEach((t) => tokens.add(t)); }
   }
+  // a matched name that sits inside a longer matched name ("Ace Dental" inside "Ace Dental Group") is the longer name's own words, not a second customer
+  for (const a of [...custHit]) for (const b of custHit) if (a !== b && ` ${b} `.includes(` ${a} `) && b.length > a.length) custHit.delete(a);
   let custSites = new Set();
   for (const ck of custHit) for (const s of customers.get(ck).sites) custSites.add(s);
   const out = { sites: new Set(), custs: custHit, tokens, unknown: false, conflict: false, any: false };
@@ -305,9 +335,15 @@ function resolvePlace(docs, rawQ) {
   for (const ph of phrases) { const cp = ` ${norm(ph).split(' ').map(canonTok).join(' ')} `; if (/\d/.test(ph) && !allBases.some((b) => cp.includes(` ${b} `) || ` ${b} `.includes(cp) || (b.split(' ').length > 2 && cp.includes(` ${b.split(' ').slice(0, -1).join(' ')} `)))) out.unknown = true; }
   void hasNum;
   out.siteList = [...out.sites].map((k) => sites.get(k));
+  // a record with no customer name at a site belongs to the named customer only when nobody else has records there
+  out.sole = new Set([...sites.values()].filter((s) => [...s.custs].every((c) => custHit.has(c))).map((s) => s.key));
   return out;
 }
-const atPlace = (place, item) => (place.sites.size ? place.sites.has(item.addr) : false) || (!place.sites.size && place.custs.has(item.cust));
+// a named customer scopes records to THAT customer (never to other customers at the same address); an address alone scopes to the address
+const atPlace = (place, item) => {
+  if (place.custs.size) { if (item.cust) return place.custs.has(item.cust) && (!place.sites.size || place.sites.has(item.addr) || !item.addr); return !!item.addr && !!place.sole?.has(item.addr) && (!place.sites.size || place.sites.has(item.addr)); }
+  return place.sites.has(item.addr);
+};
 function clarify(items, label) {
   const places = [...new Map(items.map((x) => [`${x.addr}|${x.hint ?? ''}`, `${x.addrRaw}${x.hint ? ` (${x.hint})` : ''}`])).values()].filter(Boolean).slice(0, 6);
   return answerEnvelope({ text: `More than one ${label} matches that. Which one do you mean: ${places.join('; ')}?`, facts: [], extra: { clarify: true, clarifyOptions: places } });
@@ -654,11 +690,30 @@ export async function runPlumbing(db, intent0, { today } = {}) {
   const rawQ = intent.raw ?? '';
   void rawQ;
   const k = intent.kind;
+  // class guards: one single-valued field holding two readings, or a record a count / list would silently drop, is declined, never guessed
+  const ofTypes = (...ts) => docs.filter((d) => ts.includes(d.type));
+  const clash = (ds, keys) => anyConflict(ds, keys);
+  if (k.startsWith('bf_') && clash(ofTypes('backflow-test-certificate'), ['service_date', 'backflow_test_result', 'service_address'])) return null;
+  if (k.startsWith('wh_')) {
+    const hs = ofTypes('startup-sheet', 'warranty-registration', 'equipment-record', 'nameplate-photo');
+    if (clash(hs, ['warranty_expires', 'warranty_registered_date', 'service_address'])) return null;
+    if (hs.some((d) => f(d, 'warranty_expires') && !okIso(f(d, 'warranty_expires')))) return null;
+  }
+  if (k.startsWith('pm_')) {
+    const ps = ofTypes('permit');
+    if (clash([...ps, ...ofTypes('inspection-report')], ['permit_number', 'permit_status', 'permit_expires', 'permit_issued_date', 'inspection_type', 'inspection_result', 'service_date', 'service_address'])) return null;
+    if (ps.some((d) => !f(d, 'permit_number'))) return null;
+    if (ps.some((d) => d.cleared?.has('permit_status'))) return null; // a cleared status is not 'open' by default
+  }
   if (k.startsWith('bf_')) return runBackflow(docs, intent, t0);
   if (k.startsWith('wh_')) return runHeater(docs, intent, t0);
   if (k.startsWith('pm_')) return runPermit(docs, intent, t0);
   if (k.startsWith('cam_')) return runCamera(docs, intent);
-  if (k === 'svc_fact') return runService(docs, intent);
+  if (k === 'svc_fact') {
+    // the company's own name (when the store can tell it): an invoice "billed to" the company itself is a bill FROM a supplier, not a customer invoice
+    let orgName = ''; try { const { rows } = await db.raw(`SELECT name FROM tenants WHERE id = (current_setting('app.tenant_id', true))::uuid`, []); orgName = rows?.[0]?.name ?? ''; } catch { orgName = ''; }
+    return runService(docs, { ...intent, orgName });
+  }
   if (k === 'count_type') return runCountType(docs, intent);
   if (k === 'attn_all') {
     if (intent.rest.length || !t0) return null;
@@ -833,7 +888,7 @@ function runHeater(docs, intent, t0) {
   // one heater
   let scope = hs;
   if (byId.length) { scope = byId; byId.forEach((h) => coverage(h.serial).forEach((t) => cov.add(t))); }
-  else if (place.any) { scope = hs.filter((h) => (place.sites.size ? place.sites.has(h.addr) : place.custs.has(h.cust))); placeCov(place, docs).forEach((t) => cov.add(t)); }
+  else if (place.any) { scope = hs.filter((h) => atPlace(place, h)); placeCov(place, docs).forEach((t) => cov.add(t)); }
   else return null;
   if (!scope.length) return null;
   for (const h of scope) coverage(h.make, h.model, h.serial, h.tankless ? 'tankless' : 'tank').forEach((t) => cov.add(t));
@@ -997,7 +1052,7 @@ function permitFact(sel, attr, t0, pf) {
         if (!t0 && p.state !== 'finished') return null;
         if (p.state === 'other') return null;
         const pr = p.status ? ` (printed status: ${p.status})` : '';
-        const t = p.state === 'finished' ? `${p.no} is ${p.status && FINISHED_RE.test(p.status) ? p.status.toLowerCase() : 'finished (a passed final inspection is on file)'}` : p.state === 'expired' ? `${p.no} has expired${p.expires ? `: the permit expired ${humanDate(p.expires)}` : ''}${pr}` : `${p.no} is open${pr}: no final and not past its expiry date`;
+        const t = p.state === 'finished' ? `${p.no} is ${p.status && FINISHED_RE.test(p.status) ? p.status.toLowerCase() : 'finished (a passed final inspection is on file)'}` : p.state === 'expired' ? `${p.no} has expired${p.expires && okIso(p.expires) && t0 && p.expires >= t0 ? ` (its printed status says expired; the printed expiry date is ${humanDate(p.expires)})` : p.expires ? `: the permit expired ${humanDate(p.expires)}` : ''}${pr}` : `${p.no} is open${pr}: no final and not past its expiry date`;
         return { t, f: p.d.fields.permit_status ? pf(p, 'permit_status', p.state === 'finished' ? (p.status ?? 'finished') : p.state === 'expired' ? 'expired' : (p.status ?? 'open')) : pf(p, 'permit_number', p.state) };
       }
       default: return null;
@@ -1065,6 +1120,19 @@ function runService(docs, intent) {
   else if (place.any) { sel = ofType.filter((d) => atPlace(place, { addr: addrKey(d), cust: custKey(d) })); placeCov(place, docs).forEach((t) => cov.add(t)); }
   else return null;
   if (!sel.length) return null;
+  if (anyConflict(sel, ['cost', 'invoice_number', 'service_date', 'service_address'])) return null;
+  { const CORPW = new Set(['llc', 'inc', 'co', 'corp', 'ltd', 'company', 'the', 'and']); const ot = toks(intent.orgName).filter((t) => !CORPW.has(t)).join(' ');
+    if (ot.length >= 4 && sel.some((d) => { const ct = toks(f(d, 'customer_name') ?? '').filter((t) => !CORPW.has(t)).join(' '); return ct && (` ${ct} `.includes(` ${ot} `) || ` ${ot} `.includes(` ${ct} `)); })) return null; }
+  if (intent.attr === 'cost' || intent.doc === 'invoice' || intent.doc === 'po') {
+    // money: a plain US-dollar amount only. Credits, negatives, other currencies, vendor bills (payable) and voided papers are not a receivable total
+    const MONEY_OK = /^\$?\s?\d+(?:,\d{3})*(?:\.\d{1,2})?$/; const MONEY_BAD = /\b(?:payable|vendor|supplier|credit|refund|void|cancel+ed|cad|eur|gbp|mxn|usd?\s*to)\b|[€£]|\bcr\b/i;
+    for (const d of sel) {
+      const c = f(d, 'cost'); if (c && !MONEY_OK.test(c)) return null;
+      if (MONEY_BAD.test(`${f(d, 'status') ?? ''} ${f(d, 'notes') ?? ''} ${f(d, 'service_type') ?? ''}`)) return null;
+    }
+    const nos = sel.map((d) => alnum(f(d, 'invoice_number'))).filter(Boolean);
+    if (new Set(nos).size !== nos.length && !byNo.length) return null; // the same invoice twice: a total would count it twice
+  }
   if (!place.any || byNo.length) { /* id-keyed */ }
   const nm = kindWord(intent.doc);
   // an invoice question that names a job: narrow by the described work

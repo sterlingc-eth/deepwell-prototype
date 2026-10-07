@@ -170,6 +170,7 @@ const normLabel = (s) => {
   return fixed.replace(/[^a-z0-9/ ]+/g, ' ').replace(/\s+/g, ' ').trim();
 };
 const COMPILED = LABELS.map(([key, src, kind, types, rank = 0, multi = false]) => ({ key, re: new RegExp(`^(?:${src})$`, 'i'), kind, types, rank, multi }));
+const PRICE_ONLY = /^\$\s*\d[\d,]*(?:\.\d{1,2})?$|^\d[\d,]*\.\d{2}$/; // a price ("$50.00") is never a part number
 const AGENCY_WORDS = /\b(?:city|county|town|township|village|department|dept|building|division|office|authority|state|board|district|development|services|planning|safety|public works|utilities|bureau|municipal)\b/i;
 
 const clean = (v) => String(v ?? '').replace(/\s+/g, ' ').replace(/^[\s:–—-]+|[\s;,]+$/g, '').trim();
@@ -191,7 +192,9 @@ function readValue(kind, raw, ctx) {
   if (!v) return null;
   switch (kind) {
     case 'date': { const m = v.replace(/^(?:mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)[a-z]*\.?,?\s+/i, '').match(new RegExp('^' + DATE_RE)); return m ? parseDate(m[1]) : null; }
-    case 'money': { const m = v.match(/\$?\s*([\d]{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)/); return m ? m[1].replace(/,/g, '') : null; }
+    // money: the WHOLE value must be one plain US-dollar amount. A sign, parentheses, CR / credit, another currency, comma-decimals, spaced or mis-grouped digits,
+    // a range ("$100 - $200") or words ("Net 30") are not read as a number at all (the model / a person reads the page)
+    case 'money': { if (/^\s*[-\u2013\u2014\u2212]\s*\$?\s*\d/.test(String(raw ?? ''))) return null; const m = v.match(/^\$?\s?(\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)\s*(?:usd|us\$|u\.s\. dollars)?\.?$/i); return m && (/[$,.]/.test(v) || /usd|us\$/i.test(v)) ? m[1].replace(/,/g, '') : null; } // a bare number with no $ or decimals ("Total: 2026", "Total: 400") is not read as dollars
     case 'hours': { if (/\$|\d,\d{3}|^\d+\.\d{2}$/.test(v)) return null; { const hm = v.match(/^(\d+(?:\.\d+)?)\s*(?:h|hr|hrs|hours?)\b\s*(?:and\s*)?(\d{1,2})\s*(?:m|min|mins|minutes?)\b/i); if (hm && +hm[2] < 60) return String(Math.round((+hm[1] + +hm[2] / 60) * 100) / 100); const mm = v.match(/^(\d{1,3})\s*(?:m|min|mins|minutes?)\b/i); if (mm) return String(Math.round(+mm[1] / 60 * 100) / 100); if (/^\d+(?:\.\d+)?\s*(?:h|hr|hrs|hours?)?\s+\d/i.test(v)) return null; } const m = v.match(/^(\d+(?:\.\d+)?)\s*(?:h|hr|hrs|hours?)?\b/i); return m ? m[1] : null; }
     case 'id': case 'docid': {
       const m = v.match(/^((?:[A-Za-z]{1,2}\s+(?=\d))?[A-Za-z0-9][A-Za-z0-9\-./]{2,}(?:\s+(?=[A-Za-z0-9\-./]*\d)[A-Za-z0-9\-./]+){0,2})/);
@@ -213,14 +216,16 @@ function readValue(kind, raw, ctx) {
     case 'fuel': return /\b(?:gas|propane|lp|lpg|natural|ng|electric|electricity|solar|oil|heat pump|hybrid)\b/i.test(v) ? v.slice(0, 40) : null;
     case 'stage': return /\b(?:rough|final|pressure|test|underground|top[- ]?out|under[- ]?slab|gas|water service|sewer|cover|meter|drain|waste|vent|preliminary|re-?inspection|backflow|sleeve|set|dwv|temporary|trench|slab)\b/i.test(v) && !/^\d+$/.test(v) ? v.slice(0, 80) : null;
     case 'agency': return v.length > 100 ? v.slice(0, 100) : (/[A-Za-z]{3}/.test(v) ? v : null);
-    case 'term': return /\d|year|month|lifetime|life/i.test(v) ? v.slice(0, 80) : null;
+    case 'term': return /^\d{1,4}$/.test(v) ? null : /\d|year|month|lifetime|life/i.test(v) ? v.slice(0, 80) : null; // a bare "1" or "2026" is not a length
     case 'material': return /\b(?:pex|copper|cast iron|pvc|abs|clay|vcp|orangeburg|galvanized|cpvc|hdpe|concrete|ductile|steel|brass|lead)\b/i.test(v) ? v.slice(0, 60) : null;
     case 'person': {
+      if (/\(([^)]*\b(?:reassign\w*|replac\w*|instead|transfer\w*|cover\w*|substitut\w*|handed|and|with)\b[^)]*)\)/i.test(v) || /\s(?:and|&|\/|with)\s+[A-Z][a-z]+\s+[A-Z]/.test(v)) return null; // two people on one line: no single technician is claimed
       let p = v.replace(/\(.*?\)/g, ' ').replace(/\s+/g, ' ').trim();
       p = p.split(/[,;]/)[0].replace(/\s+(?:az\s+)?(?:cert\w*|lic\w*|id)\b.*$/i, '').replace(/\s+(?:az|arizona)\s*$/i, '').replace(/\s+[A-Z]{2,3}-[A-Z]{1,3}-?\d+\s*$/, '').trim();
       return /[A-Za-z]{2}/.test(p) && p.length <= 60 && (p.match(/\d/g) ?? []).length <= 2 && !/^(?:n\/?a|none|unknown|tbd)$/i.test(p) ? p : null;
     }
     case 'name': {
+      if (/:\s*$/.test(v) || isKnownLabel(v.replace(/[:\s]+$/, ''))) return null; // a printed label ("Ship To:") is never a name
       if (!/[A-Za-z]{2}/.test(v) || v.length > 80 || GENERIC_IDLIKE.test(v)) return null;
       return /^\d+\s+\w+/.test(v) && STREET.test(v) ? null : v;
     }
@@ -295,7 +300,7 @@ export function resultClass(r) {
   if (PASS_OK.test(t0)) return 'passed';
   if (FAIL_OK.test(t0)) return 'failed';
   // anything with negation / uncertainty / a partial outcome that is not a known phrase is unclear: the caller never guesses
-  if (/\b(?:hasnt|havent|couldnt|shouldnt|wouldnt|cannot|cant|wont|not yet|yet to|non|un\w+|not$|partial\w*|not good|no good|not cleared|conditional\w*|pending|unknown|tbd|incomplete|corrections?|re ?inspect\w*|re ?test\w*|then|but|with|if|after|before|awaiting|waiting|hold for|review)\b/.test(t0)) return 'other';
+  if (/\b(?:hasnt|havent|couldnt|shouldnt|wouldnt|cannot|cant|wont|not yet|yet to|non|un\w+|not$|partial\w*|not good|no good|not cleared|conditional\w*|pending|unknown|tbd|incomplete|corrections?|re ?inspect\w*|re ?test\w*|then|but|with|if|after|before|awaiting|waiting|hold for|review|repair\w*|replac\w*|needs?|needed|required|subject|fix\w*|recommend\w*|monitor\w*|however|except|concern\w*)\b/.test(t0)) return 'other';
   const neg = /\b(?:did not|didnt|does not|doesnt|do not|dont|not|never|no|failed to|fail to|isnt|wasnt)\s+\w+/;
   if (neg.test(t0)) return 'other';
   const fail = /\b(?:fail\w*|reject\w*|disapproved|denied|leak\w*|defective)\b/.test(t0);
@@ -363,7 +368,7 @@ export function extractPlumbing(pages, { today } = {}) {
             if ((sp2 && isKnownLabel(sp2.label)) || NOISE.test(lines[j].t) || lines[j].t.length > 140) break;
             items.push({ text: clean(lines[j].t), line: lines[j] }); j++;
           }
-          if (items.length) { for (const it of items) for (const part of it.text.split(/\s*;\s*/)) if (clean(part).length >= 2) { seeVal(c.key, part); offer(c.key, c.rank, clean(part), it.line, true); } used = true; consumed = items.length; i += consumed; }
+          if (items.length) { for (const it of items) for (const part of it.text.split(/\s*;\s*/)) if (clean(part).length >= 2 && !(c.key === 'part_number' && PRICE_ONLY.test(clean(part)))) { seeVal(c.key, part); offer(c.key, c.rank, clean(part), it.line, true); } used = true; consumed = items.length; i += consumed; }
           break;
         }
         // value on the next line
@@ -374,7 +379,7 @@ export function extractPlumbing(pages, { today } = {}) {
         raw = nx.t; srcLine = nx;
       }
       if (c.multi) {
-        for (const part of clean(raw).split(/\s*;\s*/)) if (clean(part).length >= 2) { seeVal(c.key, part); offer(c.key, c.rank, c.kind === 'list' ? clean(part) : readValue(c.kind, part), srcLine, true); }
+        for (const part of clean(raw).split(/\s*;\s*/)) if (clean(part).length >= 2 && !(c.key === 'part_number' && PRICE_ONLY.test(clean(part)))) { seeVal(c.key, part); offer(c.key, c.rank, c.kind === 'list' ? clean(part) : readValue(c.kind, part), srcLine, true); }
         used = true; break;
       }
       let v = readValue(c.kind, raw, { type, label: n });
@@ -383,6 +388,7 @@ export function extractPlumbing(pages, { today } = {}) {
       if (c.key === 'inspection_type' && /^(?:inspection|insp|type)$/.test(n) && !/[A-Za-z]/.test(v)) continue;
       if (c.key === 'recommendation' && v.length < 3) continue;
       if (c.key === 'cost' && !/\d/.test(v)) continue;
+      if (c.key === 'part_number' && /^\$?\s*\d[\d,]*(?:\.\d{1,2})?$/.test(v) && /\$|\./.test(v)) continue; // "Parts: $50.00" is a price, not a part number
       // a tester's certification printed inside the tester line
       if (c.key === 'technician' && type === BF) { const cm = clean(raw).match(/\bcert\w*\s*(?:no\.?|number|#)?\s*[:\-]?\s*([A-Z0-9][A-Z0-9-]{4,})/i); if (cm) offer('tester_cert_number', 1, cm[1], srcLine); }
       seeVal(c.key, v);
@@ -399,6 +405,13 @@ export function extractPlumbing(pages, { today } = {}) {
     if (res && resultClass(res.value) === 'other') return null; // an unrecognised or mixed result is read by the model, never guessed
   }
   if (UNIT_TYPES.has(type) && (allVals.get('serial_number')?.size ?? 0) > 1) return null; // several devices/units on one document
+  // one file holding several documents (a second permit / invoice / ticket number or serial further on): never stored as one document
+  for (const k of ['permit_number', 'invoice_number', 'serial_number']) if ((allVals.get(k)?.size ?? 0) > 1 && !(k === 'permit_number' && (type === IN || type === BF))) return null;
+  { const firsts = new Map(); for (const l of lines) if (!firsts.has(l.page)) firsts.set(l.page, String(l.t).toLowerCase().replace(/[^a-z]+/g, ' ').trim());
+    const titles = [...firsts.values()]; // the same title at the top of two pages with two different service addresses: two documents in one file
+    if (titles.length > 1 && new Set(titles).size < titles.length && (allVals.get('service_address')?.size ?? 0) > 1) return null; } // two different service addresses on one file: several documents
+  // a two-column header row ("Serial Number:      Manufacturer:") with its values on the next line is not read by position: the model / a person reads it
+  if ((pages ?? []).some((pg) => String(pg.text ?? '').split(/\r?\n/).some((raw) => { const parts = raw.trim().split(/\s{2,}/); return parts.length >= 2 && parts.every((x) => /:\s*$/.test(x) && isKnownLabel(x.replace(/:\s*$/, ''))); }))) return null;
   if (type === IN || type === PM) {
     if ((allVals.get('inspection_type')?.size ?? 0) > 1 || (allVals.get('inspection_result')?.size ?? 0) > 1) return null; // a card listing several inspections
   }
@@ -412,7 +425,19 @@ export function extractPlumbing(pages, { today } = {}) {
     if (key === 'next_test_due' && best.get('service_date') && e.value < best.get('service_date').value) continue; // a next test before the test itself is a misread
     if (key === 'cost' && !MONEY_TYPES.has(type)) continue;
     if (key === 'cost' && e.rank >= 2 && lines.some((l) => /^(?:sub ?total|tax|sales tax)\b/i.test(l.t))) continue; // a subtotal / tax with no total is not a cost
+    // "Amount Due" / "Amount" / "Fee" is not the invoice total when the paper shows a payment, deposit, credit or a zero balance (paid in full)
+    if (key === 'cost' && e.rank >= 2 && (Number(e.value) === 0 || lines.some((l) => /\b(?:paid in full|paid|deposit|payment received|previous balance|credit|discount|adjustment|refund|balance forward)\b/i.test(l.t)))) continue;
+    // a vendor bill (what the company OWES a supplier) is not an ordinary customer invoice: no total is kept, so no lane can add it to what customers were billed
+    if (key === 'cost' && type !== AG && type !== PO && lines.some((l) => /^(?:invoice|bill)?\s*from\s*[:\-]|^(?:invoice|bill)\s+from\s+\S|\bremit(?:tance)?\b[^.]{0,40}\bto\b|\bvendor\b|\bsupplier\b|\bpayable\b|\bpay(?:ment)? to\b|^sold by\b|^seller\b|^buyer\b|\bship from\b/i.test(l.t))) continue;
+    // a voided / cancelled invoice is not a bill: no total is kept
+    if (key === 'cost' && type === IV && lines.some((l) => /\b(?:void|voided|cancell?ed)\b/i.test(l.t) && !/\bvoid (?:after|if|where|unless)\b/i.test(l.t))) continue;
+    // "Previous Balance" / "Balance Forward" on the page: the printed total includes money from earlier bills, so it is not this job's amount
+    if (key === 'cost' && lines.some((l) => /^(?:previous|prior|past due|old)\s+balance\b|^balance (?:forward|brought forward)\b|^carried forward\b/i.test(l.t))) continue;
     if (key === 'service_date' && (type === PM || type === WR)) continue;
+    // a permit whose printed expiry was renewed or extended: the printed date is no longer the end date, so none is kept
+    if (key === 'permit_expires' && lines.some((l) => /\b(?:renewed?|renewal|extension|extended|extend(?:s)? to)\b/i.test(l.t))) continue;
+    // a warranty card that says it is NOT registered / registration pending is not an active warranty: no expiry is kept
+    if ((key === 'warranty_expires' || key === 'warranty_registered_date') && lines.some((l) => /\b(?:not|un)[- ]?registered\b|registration (?:is )?(?:pending|incomplete|not (?:completed|received|submitted))/i.test(l.t))) continue;
     if (((key === 'service_date' && (type === BF || type === IN || type === CM)) || (key === 'installation_date' && type === WH) || (key === 'warranty_registered_date')) && latest && e.value > latest) continue; // a test / install date in the future is a misread
     push(key, e);
   }

@@ -26,6 +26,8 @@
  */
 import { answerEnvelope } from '../../scope.js';
 import { parseDate } from '../plumbing/extract.js';
+import { leftoverWords, leftoverEnabled } from '../../router/leftover.js';
+import { financialsTableExists } from '../../financials/store.js';
 
 const TENANT = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 
@@ -44,9 +46,14 @@ const addDays = (iso, n) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 864000
 const addMonths = (iso, n) => { const [y, m, d] = iso.split('-').map(Number); const t = new Date(Date.UTC(y, m - 1 + n, 1)); const dim = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 0)).getUTCDate(); return new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), Math.min(d, dim))).toISOString().slice(0, 10); };
 const MONTHS_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const humanDate = (iso) => { const m = String(iso ?? '').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? `${MONTHS_LONG[+m[2] - 1]} ${+m[3]}, ${m[1]}` : String(iso ?? ''); };
-const num = (v) => { const n = Number(String(v ?? '').replace(/[$,]/g, '')); return Number.isFinite(n) && String(v ?? '').trim() !== '' ? n : null; };
+// a plain decimal only ("1e3", "0x10", "12 USD", "1.200,00" are never numbers); "(150.00)" and "-150.00" are negative
+const num = (v) => { const t = String(v ?? '').trim().replace(/^\$/, ''); const neg = /^\(.*\)$/.test(t) ? t.slice(1, -1).trim().replace(/^\$/, '') : t; if (!/^-?\d{1,3}(?:,\d{3})*(?:\.\d+)?$|^-?\d+(?:\.\d+)?$/.test(neg)) return null; const n = Number(neg.replace(/,/g, '')); return Number.isFinite(n) ? (neg === t ? n : -Math.abs(n)) : null; };
+const cents = (n) => Math.round(n * 100);
+const sumMoney = (arr) => arr.reduce((s, x) => s + cents(x), 0) / 100;
 const money = (v) => { const n = num(v); return n == null ? String(v ?? '') : `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`; };
 const moneyWhole = (v) => money(v).replace(/\.00$/, '');
+/** the possessive of a name: Ladle Foods' , Ava Chen's */
+const ap = (n) => (/s$/i.test(String(n).trim()) ? "'" : "'s");
 const agree = (n, head) => (n === 1 ? head.replace(/^(need|have|renew)\b/, (m) => ({ need: 'needs', have: 'has', renew: 'renews' })[m]) : head);
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const invNo = (n) => { const t = String(n ?? '').trim(); return t.startsWith('#') ? t : `#${t}`; };
@@ -75,11 +82,23 @@ function addrBase(raw) {
 
 /* ------------------------------------------------------------------ data */
 const DATE_KEY = /^(?:coi_expires|policy_expiry|lease_start_date|lease_end_date|contract_start|contract_end|invoice_date|invoice_due|reinspection_due|opened_date|completed_date|service_date)$/;
-const LATE_KEY = /^(?:coi_expires|policy_expiry|lease_end_date|contract_end|invoice_due|reinspection_due)$/;
-/** Every document with its extracted values and the page each value came from (corrected values win). */
+/** keys that legitimately repeat inside one document (a property's name and address are merged into one property by the place model, so two spellings never conflict); every other key is single-valued, and two different values for it are a conflict (never a guess) */
+const MULTI_KEYS = new Set(['property_name', 'service_address', 'policy_expiry', 'coverage_type', 'work_performed', 'deficiency', 'rent_roll_row', 'rent_roll_unread', 'notes', 'technician', 'part_number', 'contract_scope']);
+const MONEY_KEY = /^(?:cost|rent_amount|security_deposit|monthly_amount|gl_limit)$/;
+/** a value with every kind of invisible / unusual space taken out; placeholders ("N/A", "-", "TBD") are an empty value, not a value */
+const cleanVal = (s) => String(s).replace(/[​-‍⁠᠎]/g, '').replace(/[\s\u0085]+/g, ' ').trim();
+const PLACEHOLDER = /^(?:n\/?a|none|null|nil|tbd|tba|unknown|undefined|not (?:available|applicable|provided|stated)|[-–—.?]+)$/i;
+/** two readings of one single-valued field that cannot both be right */
+const canonVal = (k, v) => (MONEY_KEY.test(k) ? String(num(v) ?? v) : DATE_KEY.test(k) ? v : k === 'unit_number' ? alnum(v) : k === 'vendor' ? vendorKey(v) : k === 'service_address' ? addrBase(v) : norm(v) || v);
+/** Documents carrying a status that says the record is not the live one (cancelled, voided, superseded, a draft...) */
+const DEAD = /\b(?:cancel+ed|void(?:ed)?|superseded|rescinded|revoked|withdrawn|replaced|draft|unsigned)\b/i;
+/** Types that carry the same facts as a lane's own types, but that the lane does not read: a list or count over the lane's types alone would silently miss them */
+const ALIAS_TYPES = { 'vendor-contract': ['maintenance-agreement'], 'work-order': ['service-ticket'], 'certificate-of-insurance': [], invoice: [], 'lease-agreement': [], 'rent-roll': [], 'inspection-report': [], 'move-in-inspection': [], 'move-out-inspection': [] };
+/** Every document with its extracted values and the page each value came from (corrected values win; an emptied correction means cleared). Internal (team-only) documents never feed an answer. */
 async function loadDocs(db) {
   const { rows } = await db.raw(
     `SELECT d.id, d.original_filename AS filename, d.document_type AS type, d.created_at,
+            COALESCE(to_jsonb(d)->>'audience', 'customer') AS audience,
             x.field_key AS key, COALESCE(x.corrected_value, x.value) AS value, f.page_no AS page
        FROM documents d
        LEFT JOIN extractions x ON x.document_id = d.id AND x.${TENANT}
@@ -89,16 +108,35 @@ async function loadDocs(db) {
   const map = new Map(); let order = 0;
   for (const r of rows) {
     let d = map.get(r.id);
-    if (!d) { d = { id: r.id, filename: r.filename, type: r.type ? String(r.type).replace(/_/g, '-') : '', fields: {}, all: {}, order: order++ }; map.set(r.id, d); }
-    if (r.key && r.value != null && String(r.value).trim() !== '') {
-      let v = String(r.value);
-      if (DATE_KEY.test(r.key) && !/^\d{4}-\d{2}-\d{2}$/.test(v)) { const iso = parseDate(v); if (iso) v = iso; }
-      if (LATE_KEY.test(r.key) && /^\d{4}-\d{2}$/.test(v)) { const [yy, mm] = v.split('-').map(Number); v = new Date(Date.UTC(yy, mm, 0)).toISOString().slice(0, 10); }
+    if (!d) { d = { id: r.id, filename: r.filename, type: r.type ? String(r.type).replace(/_/g, '-') : '', fields: {}, all: {}, order: order++, internal: String(r.audience ?? 'customer') === 'internal', conflicted: [] }; map.set(r.id, d); }
+    if (r.key === '_audience') { if (cleanVal(r.value ?? '') === 'internal') d.internal = true; continue; }
+    if (r.key && r.value != null && cleanVal(r.value) !== '' && !PLACEHOLDER.test(cleanVal(r.value))) {
+      let v = cleanVal(r.value);
+      if (DATE_KEY.test(r.key) && !/^\d{4}-\d{2}-\d{2}$/.test(v) && !/^(?:\d{4}|\d{4}[-/.]\d{1,2}|\d{1,2}[-/.]\d{4}|[A-Za-z]{3,9}\.?,?\s+\d{4})$/.test(v)) { const iso = parseDate(v); if (iso) v = iso; }
       (d.all[r.key] ??= []).push({ value: v, page: r.page ?? 1 });
       d.fields[r.key] ??= { value: v, page: r.page ?? 1 };
     }
   }
-  return [...map.values()];
+  const out = [...map.values()].filter((d) => !d.internal);
+  for (const d of out) {
+    // the same fact under another key: a certificate with only per-policy expiry dates is read by its earliest; a work order numbered under the invoice-number key
+    if (d.type === 'certificate-of-insurance' && !d.fields.coi_expires) { const ds = (d.all.policy_expiry ?? []).filter((x) => /^\d{4}-\d{2}-\d{2}$/.test(x.value)).sort((a, b) => a.value.localeCompare(b.value)); if (ds.length) { d.all.coi_expires = [ds[0]]; d.fields.coi_expires = ds[0]; } }
+    if (d.type === 'work-order' && !d.fields.work_order_number && d.fields.invoice_number) { d.all.work_order_number = [d.fields.invoice_number]; d.fields.work_order_number = d.fields.invoice_number; }
+    for (const [k, list] of Object.entries(d.all)) if (!MULTI_KEYS.has(k) && new Set(list.map((x) => canonVal(k, x.value))).size > 1) d.conflicted.push(k);
+  }
+  return out;
+}
+async function loadAll(db) { const docs = await loadDocs(db); docs.fin = await loadFin(db); return docs; }
+/** Second table: money facts from document_financials (receivable / payable, currency, credit memo, partial payments), human corrections applied (an emptied correction means cleared). */
+async function loadFin(db) {
+  const fin = new Map();
+  try {
+    if (!(await financialsTableExists(db))) return fin;
+    const eff = (col) => `(CASE WHEN f.corrections ? '${col}' THEN NULLIF(f.corrections->>'${col}', '') ELSE f.${col}::text END)`;
+    const { rows } = await db.raw(`SELECT f.document_id, f.doc_kind, f.direction, f.currency, ${eff('total')} AS total, ${eff('amount_paid')} AS paid, ${eff('balance_due')} AS balance, ${eff('status')} AS status, ${eff('due_date')} AS due, ${eff('invoice_number')} AS invoice_number, ${['total', 'status', 'due_date', 'amount_paid', 'balance_due'].map((c) => `(f.corrections ? '${c}' AND NULLIF(f.corrections->>'${c}', '') IS NULL) AS clr_${c}`).join(', ')} FROM document_financials f WHERE f.${TENANT}`, []);
+    for (const r of rows) if (r.document_id && r.doc_kind) fin.set(r.document_id, { kind: r.doc_kind, direction: r.direction, currency: String(r.currency ?? 'USD').trim().toUpperCase() || 'USD', total: num(r.total), paid: num(r.paid), balance: num(r.balance), status: r.status ? String(r.status).toLowerCase() : null, due: r.due ? String(r.due).slice(0, 10) : null, no: r.invoice_number, cleared: { total: !!r.clr_total, status: !!r.clr_status, due: !!r.clr_due_date, paid: !!r.clr_amount_paid, balance: !!r.clr_balance_due } });
+  } catch { /* the table is optional */ }
+  return fin;
 }
 const f = (d, k) => d?.fields?.[k]?.value ?? null;
 const src = (d, k, page) => ({ documentId: d.id, location: { field: k, page: page ?? d.fields?.[k]?.page ?? 1 } });
@@ -122,11 +160,21 @@ const vendorKey = (s) => {
 /** A looser reading (plural / possessive "s" folded): two different strict keys with one loose key MAY be one vendor, so nothing is declared about them. */
 const looseKey = (k) => k.split(' ').map((x) => (x.length >= 4 && x.endsWith('s') && !x.endsWith('ss') ? x.slice(0, -1) : x)).join(' ');
 const ambigCache = new WeakMap();
+const lev = (a, b) => { const m = a.length; const n = b.length; if (Math.abs(m - n) > 2) return 3; let prev = Array.from({ length: n + 1 }, (_, j) => j); for (let i = 1; i <= m; i++) { const cur = [i]; for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); prev = cur; } return prev[n]; };
+/** Two different vendor keys that may still be one company: a one-or-two letter difference (misspelling), or one name is the other plus extra words ("Rios Plumbing" / "Rios Plumbing and Heating") */
+const nearVendor = (a, b) => {
+  if (a === b) return false;
+  if (a.length >= 5 && b.length >= 5 && lev(a, b) <= (Math.min(a.length, b.length) >= 9 ? 2 : 1)) return true;
+  const ta = a.split(' '); const tb = b.split(' '); const [sh, lo] = ta.length <= tb.length ? [ta, tb] : [tb, ta];
+  return sh.length < lo.length && sh.every((t) => lo.includes(t));
+};
 function ambiguousVendors(docs) {
   if (ambigCache.has(docs)) return ambigCache.get(docs);
   const by = new Map();
   for (const d of docs) { const v = f(d, 'vendor'); if (!v) continue; const k = vendorKey(v); const l = looseKey(k); (by.get(l) ?? by.set(l, new Set()).get(l)).add(k); }
   const out = new Set(); for (const set of by.values()) if (set.size > 1) for (const k of set) out.add(k);
+  const keys = [...new Set(docs.map((d) => f(d, 'vendor')).filter(Boolean).map(vendorKey))];
+  for (let i = 0; i < keys.length; i++) for (let j = i + 1; j < keys.length; j++) if (nearVendor(keys[i], keys[j])) { out.add(keys[i]); out.add(keys[j]); }
   ambigCache.set(docs, out); return out;
 }
 
@@ -136,8 +184,11 @@ function placeModel(docs) {
   const find = (x) => { while (parent.get(x) !== x) { parent.set(x, parent.get(parent.get(x))); x = parent.get(x); } return x; };
   const add = (x) => { if (!parent.has(x)) parent.set(x, x); return x; };
   const union = (a, b) => { const ra = find(add(a)); const rb = find(add(b)); if (ra !== rb) parent.set(ra, rb); };
+  // an address field holding only a name ("Maple Court", no digit) is the property's name, not a second place
+  const nameOf = (d) => f(d, 'property_name') ?? (f(d, 'service_address') && !/\d/.test(f(d, 'service_address')) ? f(d, 'service_address') : null);
+  const addrOf = (d) => (f(d, 'service_address') && /\d/.test(f(d, 'service_address')) ? f(d, 'service_address') : null);
   const keysOf = (d) => {
-    const nm = f(d, 'property_name'); const ak = addrBase(f(d, 'service_address'));
+    const nm = nameOf(d); const ak = addrBase(addrOf(d));
     return { n: nm ? `n:${norm(nm)}` : null, a: ak ? `a:${ak}` : null };
   };
   for (const d of docs) { const { n, a } = keysOf(d); if (n) add(n); if (a) add(a); if (n && a) union(n, a); }
@@ -146,8 +197,8 @@ function placeModel(docs) {
     const { n, a } = keysOf(d); const k = n ?? a; if (!k) continue;
     const root = find(k);
     let g = groups.get(root); if (!g) { g = { id: root, names: new Map(), addrs: new Map() }; groups.set(root, g); }
-    if (n) g.names.set(norm(f(d, 'property_name')), f(d, 'property_name'));
-    if (a) { g.addrs.set(addrBase(f(d, 'service_address')), String(f(d, 'service_address')).split(',')[0].trim()); const cityRaw = String(f(d, 'service_address')).split(',')[1]; const city = norm(String(cityRaw ?? '').replace(/\b[A-Z]{2}\b.*$/, '')); if (city) { (g.cities ??= new Set()).add(city); if (!g.cityDoc) { g.cityDoc = d; g.cityRaw = String(cityRaw).trim(); } } }
+    if (n) g.names.set(norm(nameOf(d)), nameOf(d));
+    if (a) { g.addrs.set(addrBase(addrOf(d)), String(addrOf(d)).split(',')[0].trim()); const cityRaw = String(addrOf(d)).split(',')[1]; const city = norm(String(cityRaw ?? '').replace(/\b[A-Z]{2}\b.*$/, '')); if (city) { (g.cities ??= new Set()).add(city); if (!g.cityDoc) { g.cityDoc = d; g.cityRaw = String(cityRaw).trim(); } } }
     if (n && a) g.both ??= d;
   }
   for (const g of groups.values()) { g.name = [...g.names.values()][0] ?? ''; g.addr = [...g.addrs.values()][0] ?? ''; g.label = g.name || g.addr; }
@@ -161,13 +212,15 @@ function resolve(docs, M, rawQ, q, t0) {
   const canonQ = ` ${norm(rawQ).split(' ').map(canonTok).join(' ')} `;
   const out = { props: new Set(), vendors: new Set(), units: new Set(), tokens: new Set(), unknown: false, unitUnknown: false, any: false };
   // properties
+  // a street name inside a typed address ("14 Maple St") is the address, never a property whose name shares the word
+  const qn = q.replace(new RegExp(`(?<!\\b(?:unit|apt|apartment|suite|ste|number|no|order|invoice)\\s+#?)\\b\\d{1,6}\\s+(?:(?!(?:at|in|of|for|the|and|or|on|is|are)\\b)[a-z0-9]+\\s+){0,3}(?:${STREET_SUF})\\b`, 'g'), ' ');
   for (const g of M.groups.values()) {
     let hit = false;
     for (const nm of g.names.keys()) {
       const full = nm; const dist = nm.split(' ').filter((t) => !GENERIC_PLACE.has(t)).join(' ');
-      if (wordIn(q, full) || (dist && wordIn(q, dist))) { hit = true; (dist || full).split(' ').forEach((t) => out.tokens.add(t)); full.split(' ').forEach((t) => out.tokens.add(t)); }
+      if (wordIn(qn, full) || (dist && wordIn(qn, dist))) { hit = true; (dist || full).split(' ').forEach((t) => out.tokens.add(t)); full.split(' ').forEach((t) => out.tokens.add(t)); }
     }
-    if (!hit) { const dist = [...g.names.keys()].flatMap((nm) => nm.split(' ').filter((t) => !GENERIC_PLACE.has(t))); const others = [...M.groups.values()].filter((o) => o !== g).flatMap((o) => [...o.names.keys(), ...o.addrs.keys()].flatMap((nm) => nm.split(' '))); const vtoks = new Set(docs.flatMap((d) => (f(d, 'vendor') ? toks(f(d, 'vendor')) : []))); for (const t of dist) if (t.length >= 5 && !others.includes(t) && !vtoks.has(t) && wordIn(q, t)) { hit = true; out.tokens.add(t); } }
+    if (!hit) { const dist = [...g.names.keys()].flatMap((nm) => nm.split(' ').filter((t) => !GENERIC_PLACE.has(t))); const others = [...M.groups.values()].filter((o) => o !== g).flatMap((o) => [...o.names.keys(), ...o.addrs.keys()].flatMap((nm) => nm.split(' '))); const vtoks = new Set(docs.flatMap((d) => (f(d, 'vendor') ? toks(f(d, 'vendor')) : []))); for (const t of dist) if (t.length >= 5 && !others.includes(t) && !vtoks.has(t) && wordIn(qn, t)) { hit = true; out.tokens.add(t); } }
     for (const b of g.addrs.keys()) if (b && (canonQ.includes(` ${b} `) || (b.split(' ').length > 2 && /^\d/.test(b) && canonQ.includes(` ${b.split(' ').slice(0, -1).join(' ')} `)))) { hit = true; b.split(' ').forEach((t) => { out.tokens.add(t); if (t === 'st') out.tokens.add('street'); }); }
     for (const city of g.cities ?? []) if (new RegExp(`\\b${city} (?:property|properties|apartments|complex|community|location|building)\\b`).test(q)) { hit = true; out.tokens.add(city); }
     if (hit) out.props.add(g.id);
@@ -301,15 +354,28 @@ function currentUnits(recs, t0) {
     // a lease that names a tenant while the rent roll says the unit is vacant (or names someone else) is two stories: neither is chosen
     const conflictVacant = !!(lease && rollLatest?.vacant);
     const conflictTenant = (rolls.length > 1 && diff(rolls, (r) => norm(r.tenant))) || !!(lease && rollLatest?.tenant && lease.tenant && !sameName(lease.tenant, rollLatest.tenant)) || conflictVacant || (sameStart.length > 1 && diff(sameStart, (r) => norm(r.tenant)));
-    const conflict = conflictEnd || conflictRent || conflictTenant;
-    units.push({ key, prop: list[0].prop ?? (list.find((r) => r.prop)?.prop ?? null), unit: list[0].unit, unitRaw: cur.unitRaw, list, lease, roll: rollLatest, cur, future, futureOnly, renewal, newLease, terminated: !!cur.term, conflict, conflictEnd, conflictRent, conflictTenant, conflictVacant, tenant: cur.tenant, end: cur.end, start: cur.start, rent: cur.rent, dep: cur.dep, status: cur.status, mtm: !!cur.mtm, vacant: !lease && !!rollLatest?.vacant });
+    // a record whose status says cancelled / void / superseded / draft: which lease is the live one is not decided here
+    const deadRec = list.some((r) => DEAD.test(String(r.status ?? '')));
+    const conflict = conflictEnd || conflictRent || conflictTenant || deadRec;
+    units.push({ deadRec, key, prop: list[0].prop ?? (list.find((r) => r.prop)?.prop ?? null), unit: list[0].unit, unitRaw: cur.unitRaw, list, lease, roll: rollLatest, cur, future, futureOnly, renewal, newLease, terminated: !!cur.term, conflict, conflictEnd: conflictEnd || deadRec, conflictRent: conflictRent || deadRec, conflictTenant: conflictTenant || deadRec, conflictVacant, tenant: cur.tenant, end: cur.end, start: cur.start, rent: cur.rent, dep: cur.dep, status: cur.status, mtm: !!cur.mtm, vacant: !lease && !!rollLatest?.vacant });
   }
   return units;
 }
-const sameName = (a, b) => { if (norm(a) && norm(a) === norm(b)) return true; const x = new Set(toks(a).filter((t) => t.length >= 3)); if (toks(b).some((t) => t.length >= 3 && x.has(t))) return true; const y = new Set(toks(a)); return toks(b).filter((t) => y.has(t)).length >= 2; };
+/** Two tenant names are the same person only when they agree on first and last name (middle names / initials may differ), or are written identically; sharing one common word ("John Smith" / "John Doe") never makes them one. Joint names ("A and B") match when any one person matches. */
+const personParts = (nm) => String(nm ?? '').split(/\s+(?:and|&)\s+|\s*[;/]\s*/i).map((x) => toks(x.replace(/^([^,]+),\s*([^,]+)$/, '$2 $1'))).filter((t) => t.length);
+const sameName = (a, b) => {
+  if (norm(a) && norm(a) === norm(b)) return true;
+  for (const x of personParts(a)) for (const y of personParts(b)) {
+    if (x.join(' ') === y.join(' ')) return true;
+    if (x.length >= 2 && y.length >= 2 && x[0] === y[0] && x[x.length - 1] === y[y.length - 1]) return true;
+  }
+  return false;
+};
 
 /* work orders / invoices / contracts / inspections / COIs */
-const WO_DONE = /^(?:completed?|closed|closed out|resolved|cancel+ed|done|finished|void|voided)$/i;
+const WO_DONE = /^(?:completed?|closed|closed out|resolved|done|finished)$/i;
+/** a cancelled / voided work order was never done and is no longer open: it is neither */
+const WO_CANCELLED = /^(?:cancel+ed|canceled|void|voided)$/i;
 const WO_OPEN = /^(?:open|opened|in progress|scheduled|on hold|pending|assigned|new|waiting|started|dispatched|awaiting parts|waiting on parts|approved|in process|requested)$/i;
 const statusText = (s) => String(s ?? '').trim().replace(/[^A-Za-z ]+/g, ' ').replace(/\s+/g, ' ').trim();
 function workOrders(docs, M) {
@@ -321,36 +387,56 @@ function workOrders(docs, M) {
   return [...byNo.values()].map((list) => {
     const d = lastBy(list, () => '');
     const st = statusText(f(d, 'status'));
-    const cls = (x) => (WO_DONE.test(statusText(f(x, 'status'))) ? 'done' : WO_OPEN.test(statusText(f(x, 'status'))) ? 'open' : 'other');
+    const cls = (x) => (WO_CANCELLED.test(statusText(f(x, 'status'))) ? 'cancelled' : WO_DONE.test(statusText(f(x, 'status'))) ? 'done' : WO_OPEN.test(statusText(f(x, 'status'))) ? 'open' : 'other');
     const classes = new Set(list.map(cls));
     let state = cls(d);
     if (classes.size > 1) state = 'other'; // copies disagree about open / closed
     if (state === 'open' && f(d, 'completed_date')) state = 'other';
-    if (state === 'done' && st && /^cancel/i.test(st)) state = 'done';
     const sched = f(d, 'service_date') && f(d, 'service_date') !== f(d, 'opened_date') ? f(d, 'service_date') : null;
     return { d, list, no: f(d, 'work_order_number'), state, status: f(d, 'status'), prop: M.propOf(d), unit: alnum(f(d, 'unit_number')), unitRaw: f(d, 'unit_number'), vendor: f(d, 'vendor'), opened: f(d, 'opened_date'), sched, completed: f(d, 'completed_date'), work: (d.all.work_performed ?? []).map((x) => x.value).join('; '), cost: f(d, 'cost') };
   });
 }
 const INV_UNPAID = /\b(?:unpaid|open|due|overdue|outstanding|pending|past due|balance due|not paid|partial\w*|invoiced|sent)\b/i;
 const INV_PAID = /^(?:paid|paid in full|settled|closed|payment received|paid check|paid ach)$/i;
+const INV_VOID = /^(?:void|voided|cancel+ed|canceled|written off|write off|reversed|superseded|credited)$/i;
+const FIN_STATUS = { paid: 'Paid', unpaid: 'Unpaid', partial: 'Partial payment' };
 function invoices(docs, M, today) {
+  const fin = docs.fin ?? new Map();
   const byKey = new Map(); let solo = 0;
   for (const d of docs.filter((x) => x.type === 'invoice' && Object.keys(x.fields).length)) { const no = alnum(f(d, 'invoice_number')); const k = no ? `${vendorKey(f(d, 'vendor') ?? '')}|${no}` : `solo${solo++}`; (byKey.get(k) ?? byKey.set(k, []).get(k)).push(d); }
+  /** one document's invoice facts: its own extraction, completed (never overridden) by its financial record; where both speak and differ, `clash` */
+  const facts = (x) => {
+    const fr = fin.get(x.id) ?? null;
+    const own = { cost: num(f(x, 'cost')), status: statusText(f(x, 'status')), due: f(x, 'invoice_due') };
+    const frSt = fr?.status && FIN_STATUS[fr.status] ? FIN_STATUS[fr.status] : '';
+    const stCls = (t) => (INV_VOID.test(t) ? 'void' : INV_PAID.test(t) ? 'paid' : /\bpartial/i.test(t) ? 'partial' : /\bunpaid\b|\bnot paid\b/i.test(t) || (INV_UNPAID.test(t) && !/\bpaid\b/i.test(t)) ? 'unpaid' : t ? 'other' : '');
+    const clash = !!fr && ((fr.cleared?.total && own.cost != null) || (fr.cleared?.due && own.due) || (fr.cleared?.status && own.status) || (own.cost != null && fr.total != null && cents(own.cost) !== cents(fr.total)) || (own.due && fr.due && okIso(own.due) && own.due !== fr.due) || (own.status && frSt && stCls(own.status) !== stCls(frSt) && stCls(own.status) !== 'other' && !(stCls(own.status) === 'unpaid' && stCls(frSt) === 'partial')));
+    return { fr, cost: own.cost ?? fr?.total ?? null, status: own.status || frSt, due: own.due ?? fr?.due ?? null, clash };
+  };
   return [...byKey.values()].map((list) => {
     const d = lastBy(list, () => '');
-    const sig = (x) => `${num(f(x, 'cost'))}|${statusText(f(x, 'status')).toLowerCase()}|${f(x, 'invoice_due')}`;
-    const conflict = new Set(list.map(sig)).size > 1;
-    const st = statusText(f(d, 'status'));
-    const cls = INV_PAID.test(st) ? 'paid' : /\bunpaid\b|\bnot paid\b/i.test(st) || (INV_UNPAID.test(st) && !/\bpaid\b/i.test(st)) ? 'unpaid' : 'other';
-    const due = f(d, 'invoice_due');
+    const x = facts(d);
+    const sig = (y) => { const z = facts(y); return `${z.cost}|${statusText(z.status).toLowerCase()}|${z.due}|${z.fr?.direction ?? ''}|${z.fr?.currency ?? ''}`; };
+    const conflict = new Set(list.map(sig)).size > 1 || list.some((y) => facts(y).clash) || list.some((y) => y.conflicted.some((k) => ['cost', 'status', 'invoice_due', 'invoice_number', 'vendor'].includes(k)));
+    const st = statusText(x.status);
+    const partial = /\bpartial/i.test(st) || (x.fr?.paid != null && x.fr.paid > 0 && x.fr.balance != null && x.fr.balance > 0);
+    const cls = INV_VOID.test(st) ? 'void' : INV_PAID.test(st) ? 'paid' : partial || /\bunpaid\b|\bnot paid\b/i.test(st) || (INV_UNPAID.test(st) && !/\bpaid\b/i.test(st)) ? 'unpaid' : 'other';
+    const due = x.due;
     const overdue = cls === 'unpaid' && (/\boverdue\b|\bpast due\b/i.test(st) || (okIso(due) && today && due < today));
-    return { d, list, conflict, no: f(d, 'invoice_number'), vendor: f(d, 'vendor'), cls, overdue, due, date: f(d, 'invoice_date'), cost: num(f(d, 'cost')), prop: M.propOf(d), unit: alnum(f(d, 'unit_number')), unitRaw: f(d, 'unit_number'), status: f(d, 'status') };
+    const cost = x.cost;
+    const currency = x.fr?.currency ?? 'USD';
+    const credit = x.fr?.kind === 'credit_memo' || (cost != null && cost < 0);
+    // what is still owed: the printed total for an unpaid invoice, the balance for a partly paid one (unknown when the balance is not on file)
+    const owed = cls !== 'unpaid' ? 0 : partial ? (x.fr?.balance ?? null) : cost;
+    return { d, list, conflict, no: f(d, 'invoice_number'), vendor: f(d, 'vendor'), cls, partial, overdue, due, date: f(d, 'invoice_date'), cost, currency, credit, owed, receivable: x.fr?.direction === 'receivable', prop: M.propOf(d), unit: alnum(f(d, 'unit_number')), unitRaw: f(d, 'unit_number'), status: x.status || f(d, 'status') };
   });
 }
+/** an amount as printed: dollars for USD, the code for any other currency (never a dollar sign on euros) */
+const moneyOf = (v, amt = v.cost) => (v.currency && v.currency !== 'USD' ? `${money(amt).replace(/^\$/, '')} ${v.currency}` : money(amt));
 function contracts(docs, M) {
   const seen = new Map();
   for (const d of docs.filter((x) => x.type === 'vendor-contract' && Object.keys(x.fields).length)) { const k = `${vendorKey(f(d, 'vendor') ?? '')}|${norm(f(d, 'contract_scope') ?? '')}|${f(d, 'contract_start')}|${f(d, 'contract_end')}`; seen.set(k, d); }
-  return [...seen.values()].map((d) => ({ d, vendor: f(d, 'vendor'), vk: vendorKey(f(d, 'vendor') ?? ''), scope: f(d, 'contract_scope'), start: f(d, 'contract_start'), end: f(d, 'contract_end'), auto: f(d, 'auto_renew') ? String(f(d, 'auto_renew')).toLowerCase() : null, monthly: num(f(d, 'monthly_amount')), prop: M.propOf(d) }));
+  return [...seen.values()].map((d) => ({ d, dead: DEAD.test(String(f(d, 'status') ?? '')) || /\bterminated\b/i.test(String(f(d, 'status') ?? '')), vendor: f(d, 'vendor'), vk: vendorKey(f(d, 'vendor') ?? ''), scope: f(d, 'contract_scope'), start: f(d, 'contract_start'), end: f(d, 'contract_end'), auto: f(d, 'auto_renew') ? String(f(d, 'auto_renew')).toLowerCase() : null, monthly: num(f(d, 'monthly_amount')), prop: M.propOf(d) }));
 }
 const INSP_TYPES = new Set(['inspection-report', 'move-in-inspection', 'move-out-inspection']);
 function inspections(docs, M) {
@@ -375,9 +461,11 @@ function cois(docs) {
   const byV = new Map();
   for (const d of docs.filter((x) => x.type === 'certificate-of-insurance' && f(x, 'vendor'))) { const k = vendorKey(f(d, 'vendor')); (byV.get(k) ?? byV.set(k, []).get(k)).push(d); }
   return [...byV.entries()].map(([k, list]) => {
+    // a certificate whose status says cancelled / void / superseded is not a live one; which certificate IS live is then not decided here (`dead`)
+    const dead = list.some((d) => DEAD.test(String(f(d, 'status') ?? '')) || /\bterminated\b/i.test(String(f(d, 'status') ?? '')));
     const dated = list.filter((d) => okIso(f(d, 'coi_expires')));
     const cur = dated.length ? lastBy(dated, (d) => f(d, 'coi_expires')) : null;
-    return { key: k, vendor: f(list[0], 'vendor'), cur, exp: cur ? f(cur, 'coi_expires') : null, docs: list, undated: list.filter((d) => !okIso(f(d, 'coi_expires'))) };
+    return { key: k, vendor: f(list[0], 'vendor'), cur, exp: cur ? f(cur, 'coi_expires') : null, docs: list, dead, undated: list.filter((d) => !okIso(f(d, 'coi_expires'))) };
   });
 }
 const allVendors = (docs) => { const m = new Map(); for (const d of docs) { const v = f(d, 'vendor'); if (v && ['certificate-of-insurance', 'invoice', 'work-order', 'vendor-contract'].includes(d.type) && !m.has(vendorKey(v))) m.set(vendorKey(v), v); } return m; };
@@ -437,6 +525,10 @@ function classifyInner(question, { today } = {}) {
   if (/\b(?:meet|meets|meeting|comply|complies|complying|compliant|(?:in|out of) compliance|satisfy|satisfies|adequate|sufficient|enough)\b/.test(q) && /\b(?:requirements?|requirement|required|code|law|laws|standard|standards|policy|coverage|insurance|coi|contract|lease|inspection|regulations?|minimums?)\b/.test(q)) return { kind: 'decline', which: 'compliance' };
   if (/\b(?:up to code|to code|per code|code compliant|(?:building|electrical|fire|safety|housing) code)\b/.test(q)) return { kind: 'decline', which: 'compliance' };
   if (/\bshould (?:we|i|it|they|the)\b.*\b(?:renew|terminate|cancel|fire|drop|evict|raise|lower|hire|replace|pay|approve|reject|keep)\b/.test(q)) return { kind: 'decline', which: 'compliance' };
+  // money owed TO the company (receivable) is not in the payable invoices this lane reads: never answered from them
+  if (/\bowe[sd]?\s+(?:to\s+)?(?:us|me|our\b)|\bowed to (?:us|me|the (?:owner|company|landlord))\b|\b(?:we|i)(?:\s+are|\s+am|'re|re)?\s+owed\b|\bwho owes\b|\breceivables?\b|\bowe (?:the )?(?:landlord|owner|company)\b/.test(q)) return null;
+  // a building / block / unit given only as a letter ("building A", "the A building"): the lane cannot place it, so it is never ignored
+  if (/\b(?:building|bldg|block|lot|section|wing|phase|tower|zone|complex|annex)\s+#?[a-z]\b/.test(q) || /(?:^|\s)(?:building|bldg|block|lot|section|wing|phase|tower|zone|complex|property|unit|apt|suite)\s+#?[A-Z]\b/.test(raw) || /\S\s[A-Z]\s+(?:building|bldg|property|block|tower|complex|wing|section|lot)\b/.test(raw)) return null;
   // idiom for "has none": handled before the negation gate
   const noCoi = /\bvendors?\b.*\b(?:with no|without|missing|lacking|no)\b.*\bcoi\b|\bwhich vendors? (?:do not|dont|does not|doesnt|have not|havent|has not|hasnt|have no|has no)\b.*\bcoi\b|\bwho (?:has|have) no coi\b|\bno coi on file\b|\bmissing (?:a )?coi\b|\bcoi (?:is |are )?missing\b|\bvendors? (?:with|that have) no (?:insurance|coi)\b|\bwhich vendors? (?:have|has) no\b.*\bcoi\b|\bwithout (?:a )?coi\b/.test(q);
   if (noCoi) {
@@ -454,7 +546,9 @@ function classifyInner(question, { today } = {}) {
     if (one && /^(?:which|what|show|list|how many)\b/.test(q) && /\bunits?\b/.test(q) && /\b(?:(?:have|has) no lease|without (?:a )?lease|not leased|unleased|(?:dont|doesnt) have a lease)\b/.test(q)) return { kind: 'vacant_list', count: /\bhow many\b/.test(q), rest: rest(q.replace(/\bhow many\b/, ' '), [...VOCAB.vacant, 'no', 'lease', 'leases', 'without', 'not', 'leased', 'unleased', 'have', 'has', 'a', 'dont', 'doesnt', 'which', 'what', 'show', 'list']) };
     if (one && /^(?:which|what|show|list|how many)\b/.test(q) && /\bwork orders?\b/.test(q) && /\b(?:(?:have|has) no (?:vendor|contractor)(?: assigned)?|without (?:a )?(?:vendor|contractor)(?: assigned)?|(?:vendor|contractor) not (?:yet )?assigned|unassigned|not (?:yet )?assigned)\b/.test(q)) return { kind: 'wo_list', mode: 'novendor', count: /\bhow many\b/.test(q), rest: rest(q.replace(/\bhow many\b/, ' '), [...VOCAB.wo, 'no', 'vendor', 'contractor', 'without', 'unassigned', 'assigned', 'not', 'yet', 'have', 'has', 'a', 'which', 'what', 'show', 'list']) }; }
   // negation / exclusion / "first, earlier" asks are read by the normal path
-  if (/\b(?:not|no|never|without|except|besides|excluding|neither|nor|none|isnt|arent|wasnt|werent|dont|doesnt|didnt|cant|wont|couldnt|shouldnt|hasnt|havent|hadnt)\b|\bother than\b/.test(q)) return null;
+  if (/\b(?:not|no|never|without|except|besides|excluding|neither|nor|none|non|nobody|nothing|nowhere|aint|isnt|arent|wasnt|werent|dont|doesnt|didnt|cant|wont|couldnt|shouldnt|hasnt|havent|hadnt|lacks?|lacking|missing|minus)\b|\b(?:other than|all but|apart from|aside from|rather than|instead of|but not)\b/.test(q)) return null;
+  // a split ("per property", "by vendor", "for each unit", "grouped") asks for a table, not one number
+  if (/\b(?:per|grouped|group|split|separately|individually|breakdown|broken down|respectively)\b|\bby (?:property|unit|vendor|tenant|building|type|kind|status|month|year|city|category)\b|\bfor each\b|\beach (?:property|unit|vendor|tenant|building|type|kind|status)\b/.test(q)) return null;
   if (/\b(?:first|earlier|previous|previously|original|originally|prior|oldest|initial|initially|before that|old|older|renewed|history|historical)\b/.test(q)) return null;
   if (TIME_BLOCK.test(q.replace(new RegExp(`\\b\\d{1,6}\\s+(?:[a-z0-9]+\\s+){0,3}(?:${STREET_SUF})\\b`, 'g'), ' ').replace(/\bin (?:the )?next \d{1,3} (?:days?|weeks?|months?)\b|\bnext \d{1,3} (?:days?|weeks?|months?)\b|\bwithin (?:the )?next \d{1,3} (?:days?|weeks?|months?)\b/g, ' '))) return null;
   if (/\b(?:and then|as well as|plus|also)\b|\b(?:and|but)\s+(?:which|what|how many|who)\b/.test(q)) return null;
@@ -480,14 +574,18 @@ function classifyInner(question, { today } = {}) {
   if (!topic && (/\bneed\w*\s+(?:my |our |your )?(?:attention|a look|action)\b|\bwhats due\b|\bwhat is due\b|\bdue soon\b|\bcoming due\b|\bcoming up\b|\bexpiring soon\b|\bwhat should i (?:look at|check|follow up)\b|\bany(?:thing)? (?:expiring|overdue|due)\b|\bwhat (?:s|is) (?:expiring|overdue|late)\b|\bwhat needs\b/.test(q))) {
     const r = rest(q, VOCAB.attn);
     const only = /\b(?:overdue|late)\b/.test(q) && !/\b(?:attention|due soon|coming due|expiring|expired|expire|soon|needs?)\b/.test(q) ? 'overdue' : null;
-    return { kind: 'attn_all', win: win?.n ? win : null, only, rest: r };
+    return { kind: 'attn_all', win: win?.n ? win : null, only, expiring: /\bexpir\w*\b/.test(q) && !/\b(?:attention|due|needs?|overdue|late)\b/.test(q), rest: r };
   }
   if (!topic && /\baddress (?:of|for)\b/.test(q) && !how && !win) return { kind: 'prop_addr', rest: rest(q, ['address', 'property', 'properties', 'apartments', 'building']) };
   if (!topic) return null;
 
+  // "how many tenants / vendors / units ..." counts people or things, never the documents a lane counts: for every topic but the vacancy list, that is a different number
+  if (how && topic !== 'vacant' && topic !== 'unit' && /\bhow many (?:different |distinct |unique |separate )?(?:vendors?|contractors?|companies|tenants?|residents?|renters?|units?|apartments?|properties|buildings?|owners?|people|insurers?|carriers?)\b(?! (?:contracts?|agreements?|coi|cois|certificates?|insurance|invoices?|bills?|leases?|work orders?|inspections?|reports?|rent rolls?|documents?|files?|records?|paperwork|compliance))/.test(q)) return null;
   /* ---- counts of documents on file */
-  if (how && ['coi', 'lease', 'wo', 'inv', 'contract', 'vacant', 'insp'].includes(topic) && !/\b(?:expir\w*|overdue|unpaid|open|completed|closed|failed|vacant|month to month|late|due|soon|upcoming|past|current|active|ending)\b/.test(q)) {
+  if (how && ['coi', 'lease', 'wo', 'inv', 'contract', 'vacant', 'insp'].includes(topic) && !/\b(?:expir\w*|overdue|unpaid|open|completed|closed|failed|vacant|month to month|late|due|soon|upcoming|past|current|active|ending|end|ends|ended)\b/.test(q)) {
     const ts = COUNT_TYPES.filter(([, re]) => re.test(q));
+    // "how many vendors / tenants / units ..." counts people or things, not documents: a document count would be a different number
+    if (/\bhow many (?:different |distinct |unique |separate )?(?:vendors?|contractors?|companies|tenants?|residents?|units?|apartments?|properties|buildings?|owners?|people|insurers?|carriers?|pages?)\b(?! (?:contracts?|agreements?|coi|cois|certificates?|insurance|invoices?|bills?|leases?|work orders?|inspections?|reports?|rent rolls?|documents?|files?|records?|paperwork|compliance))/.test(q)) return null;
     if (ts.length === 1 && /\b(?:on file|do we have|have we got|we have)\b/.test(q)) return { kind: 'count_type', type: ts[0][0], noun: ts[0][2], nouns: ts[0][3], hoa: /\bhoa\b/.test(q), rest: rest(qw, [...VOCAB.coi, ...VOCAB.lease, ...VOCAB.wo, ...VOCAB.inv, ...VOCAB.contract, ...VOCAB.insp, 'compliance', 'report', 'reports', 'rent', 'roll', 'rolls', 'we', 'have']) };
     return null;
   }
@@ -685,7 +783,8 @@ function maskEntities(raw, docs) {
   return hit ? q.replace(/\s+/g, ' ').trim() : null;
 }
 // masking is only needed when a name contains one of the lane's own words; other names cannot change the reading
-const LANE_WORDS_IN = (ph) => ph.split(' ').some((w) => LANE_WORDS.has(w));
+const JUDGE_WORD = /^(?:evict\w*|sue|sued|suing|lawsuit|liable|liability|negligen\w*|legal|legally|illegal|fair|housing|discriminat\w*|meet|meets|meeting|comply|complies|complying|compliant|compliance|satisfy|satisfies|adequate|sufficient|enough|code|requirements?|standards?|law|laws|policy|should|renew|terminate|cancel|fire|drop|raise|lower|hire|replace|pay|approve|reject|keep)$/;
+const LANE_WORDS_IN = (ph) => ph.split(' ').some((w) => LANE_WORDS.has(w) || JUDGE_WORD.test(w));
 /** A count is never a bare total when some documents on file could not be classified at all: they would be missing from it. */
 export async function runProperty(db, intent, opts = {}) {
   const meta = {};
@@ -695,20 +794,56 @@ export async function runProperty(db, intent, opts = {}) {
     const un = meta.untyped;
     env.text = `${env.text} This only counts invoices that were read into your records; ${plural(un.length, 'other document')} on file ${un.length === 1 ? 'is' : 'are'} not typed and may include invoices (${un.slice(0, 5).map((d) => d.filename).join(', ')}).`;
     env.facts = [...(env.facts ?? []), ...un.slice(0, 10).map((d) => ({ label: `${d.filename} · not typed`, value: 'check the document', sources: [{ documentId: d.id, location: { field: 'document_type', page: 1 } }] }))];
-  } else if (env && !env.clarify && !env.decline && meta.untyped?.length && (intent?.count || intent?.kind === 'count_type')) {
+  } else if (env && !env.clarify && !env.decline && meta.untyped?.length && (intent?.count || /^(?:count_type|attn_all|coi_missing)$|_list$/.test(String(intent?.kind)))) {
     const un = meta.untyped;
     env.text = `${env.text} ${plural(un.length, 'other document')} on file could not be read or classified (${un.slice(0, 5).map((d) => d.filename).join(', ')}), so ${un.length === 1 ? 'it is' : 'they are'} not in this count.`;
     env.facts = [...(env.facts ?? []), ...un.slice(0, 10).map((d) => ({ label: `${d.filename} · not readable`, value: 'check the document', sources: [{ documentId: d.id, location: { field: 'document_type', page: 1 } }] }))];
   }
   return env;
 }
+const INSP_ALL = ['inspection-report', 'move-in-inspection', 'move-out-inspection'];
+/** the fields an answer of this kind reads: only a disagreement inside one of these stops the answer */
+function critKeys(k, intent) {
+  const COI = ['vendor', 'coi_expires', 'status']; const LS = ['unit_number', 'lease_start_date', 'lease_end_date', 'status']; const LSF = [...LS, 'tenant_name', 'rent_amount', 'security_deposit'];
+  const WO = ['work_order_number', 'status', 'service_date', 'vendor', 'unit_number', 'completed_date', 'opened_date']; const VC = ['vendor', 'contract_start', 'contract_end', 'auto_renew', 'status']; const IN = ['unit_number', 'service_date', 'inspection_result', 'reinspection_due', 'inspection_type'];
+  const IV = ['cost', 'status', 'invoice_due', 'invoice_number', 'vendor'];
+  if (k === 'count_type') return ['vendor', 'unit_number'];
+  if (k.startsWith('coi_')) return COI; if (k === 'lease_list' || k === 'vacant_list') return LS; if (k === 'unit_fact') return LSF;
+  if (k.startsWith('wo_')) return WO; if (k.startsWith('contract_')) return VC; if (k.startsWith('insp_')) return IN; if (k.startsWith('inv_')) return IV;
+  if (k === 'attn_all') return [...new Set([...COI, ...LS, ...WO, ...VC, ...IN, ...IV])];
+  void intent; return [];
+}
+/** the document types an answer of this kind reads */
+function topicTypes(k, intent) {
+  if (k === 'count_type') return [intent.type];
+  if (k.startsWith('coi_')) return ['certificate-of-insurance'];
+  if (k === 'lease_list' || k === 'vacant_list' || k === 'unit_fact') return ['lease-agreement', 'rent-roll'];
+  if (k.startsWith('wo_')) return ['work-order'];
+  if (k.startsWith('contract_')) return ['vendor-contract'];
+  if (k.startsWith('insp_')) return INSP_ALL;
+  if (k.startsWith('inv_')) return ['invoice'];
+  if (k === 'attn_all') return ['certificate-of-insurance', 'lease-agreement', 'rent-roll', 'vendor-contract', ...INSP_ALL, 'invoice', 'work-order'];
+  return [];
+}
 async function runPropertyInner(db, intent0, { today } = {}, meta = {}) {
   let intent = intent0;
   if (!intent) return null;
-  if (intent.kind === 'decline') return answerEnvelope({ text: DECLINE[intent.which], facts: [], extra: { decline: true, declineKind: intent.which } });
-  const docs = await loadDocs(db);
+  let docs = null;
+  if (intent.kind === 'decline') {
+    const refuse = () => answerEnvelope({ text: DECLINE[intent.which], facts: [], extra: { decline: true, declineKind: intent.which } });
+    // a judgement word that is part of this organization's own record names ("Sue Hill", "Fair Housing Plumbing") is a name, not a judgement: the question is read again with those names masked
+    docs = await loadAll(db);
+    const mq = maskEntities(intent.raw ?? '', docs);
+    const i2 = mq ? classifyInner(mq, { today }) : null;
+    if (!i2 || i2.kind === 'decline') return refuse();
+    intent = { ...i2, raw: intent.raw };
+  }
+  docs ??= await loadAll(db);
   meta.untyped = docs.filter((d) => !d.type || /^(?:other|unknown|unclassified)$/.test(d.type));
   const t0 = today && okIso(today) ? today : null;
+  // a spelling fix the lane applies to the question ("expird" -> "expired") must never be applied inside one of this organization's own names
+  { const changed = norm(intent.raw ?? '').split(' ').filter((w) => TYPOS[w] && TYPOS[w] !== w);
+    if (changed.length) { const nameToks = new Set(docs.flatMap((d) => ['vendor', 'tenant_name', 'property_name'].flatMap((k) => (d.all[k] ?? []).flatMap((x) => norm(x.value).split(' '))))); if (changed.some((w) => nameToks.has(w))) return null; } }
   // entity names first: the question is read again with this organization's names masked out, so a status word inside a name never sets the mode
   const maskedQ = maskEntities(intent.raw ?? '', docs);
   if (maskedQ) { const i2 = classifyInner(maskedQ, { today }); if (!i2 || i2.kind === 'decline') return null; intent = { ...i2, raw: intent.raw }; }
@@ -718,6 +853,24 @@ async function runPropertyInner(db, intent0, { today } = {}, meta = {}) {
   const ctx = { docs, M, R, t0, intent };
   const k0 = intent.kind;
   if (R.unknown || R.unitUnknown || R.units.size > 1) return null;
+  // a tenant, work order number or invoice number the question names narrows a fact lookup only; a list or count that ignored it would answer for everyone
+  if (!/^(?:unit_fact|wo_fact|inv_fact|coi_vendor|contract_vendor|insp_fact|insp_defs|prop_addr)$/.test(k0) && (R.tenantKeys?.size || R.woNums?.size || R.invNos?.size)) return null;
+  // a vendor whose name may be another vendor's (a misspelling, or the same name with more words) is never counted or listed as if it were exact
+  { const amb = ambiguousVendors(docs); if ([...R.vendors].some((v) => amb.has(v))) return null; }
+  // records that disagree with themselves, and kinds of document this lane does not read but that carry the same facts: never answered over
+  { const types = topicTypes(k0, intent); const rel = (d) => !R.any || (R.vendors.size && f(d, 'vendor') && R.vendors.has(vendorKey(f(d, 'vendor')))) || (R.props.size && M.propOf(d) && R.props.has(M.propOf(d))) || (R.units.size && f(d, 'unit_number') && R.units.has(alnum(f(d, 'unit_number')))) || (!f(d, 'vendor') && !M.propOf(d) && !f(d, 'unit_number'));
+    const ck = critKeys(k0, intent);
+    if (docs.some((d) => types.includes(d.type) && d.conflicted.some((x) => ck.includes(x)) && rel(d))) return null;
+    if (types.some((t) => (ALIAS_TYPES[t] ?? []).length) && docs.some((d) => types.some((t) => (ALIAS_TYPES[t] ?? []).includes(d.type)) && Object.keys(d.fields).length && rel(d))) return null; }
+  // a lease with no unit number cannot be placed in the unit view: any answer that reads leases declines rather than silently leaving it out
+  if (/^(?:lease_list|vacant_list|unit_fact|attn_all)$/.test(k0) && docs.some((d) => d.type === 'lease-agreement' && Object.keys(d.fields).length && !f(d, 'unit_number') && (!R.props.size || !M.propOf(d) || R.props.has(M.propOf(d))))) return null;
+  // the leftover-condition check: any word the lane's reading did not use that is not one of this organization's own names declines
+  if (/_list$|_total$|^count_type$|^attn_all$|^coi_missing$/.test(k0) && leftoverEnabled()) {
+    const sig = (qq) => { const i = classifyProperty(qq, { today }); return i ? JSON.stringify([i.kind, i.mode, i.attr, !!i.count, i.win?.n ?? null, i.win?.unit ?? null, i.stat ?? null, i.only ?? null, !!i.current, i.type ?? null, !!i.hoa]) : null; };
+    const kt = k0.startsWith('insp_') ? new Set(inspKindWords(inspections(docs, M))) : new Set(); // this organization's own inspection kinds
+    const lw = leftoverWords(intent.raw ?? '', sig, { lane: 'property', domainWords: LANE_WORDS }).filter((w) => !norm(w).split(' ').every((t) => R.tokens.has(t) || R.tokens.has(canonTok(t)) || kt.has(t) || t === 'entityx'));
+    if (lw.length) return null;
+  }
   // anything in the question we could not place (a vendor, property or word we do not know) is never guessed
   const kindToks = k0.startsWith('insp_') ? new Set(inspKindWords(inspections(docs, M))) : new Set();
   const covered = (r) => r.every((t) => CORP.has(t) || kindToks.has(t) || R.tokens.has(t) || R.tokens.has(canonTok(t)) || /^(?:unit|apt|apartment|suite)$/.test(t) || (R.units.size && [...R.units].some((u) => alnum(t) === u)));
@@ -751,9 +904,38 @@ const scopeProp = (R, prop) => !R.props.size || R.props.has(prop);
 const scopeVendor = (R, v) => !R.vendors.size || R.vendors.has(vendorKey(v ?? ''));
 const scopeUnit = (R, u) => !R.units.size || R.units.has(u);
 
-function runCountType({ docs, intent }) {
-  const ds = docs.filter((d) => d.type === intent.type && (!intent.hoa || /\bhoa\b/i.test(`${f(d, 'inspection_type') ?? ''} ${d.filename}`)));
-  return answerEnvelope({ text: `${ds.length} ${ds.length === 1 ? intent.noun : (intent.nouns ?? `${intent.noun}s`)} on file${intent.hoa ? ' for HOA compliance (an inspection type that says HOA)' : ''}.`, facts: ds.slice(0, 40).map((d) => ({ label: d.filename, value: intent.noun, sources: [{ documentId: d.id, location: { field: 'document_type', page: 1 } }] })) });
+/** which scopes a document count can honour, per type: a property / vendor / unit the question names must be on the documents being counted, or the count declines */
+const COUNT_SCOPES = { 'certificate-of-insurance': ['vendors'], 'lease-agreement': ['props', 'units'], 'work-order': ['props', 'units', 'vendors'], invoice: ['props', 'units', 'vendors'], 'vendor-contract': ['props', 'vendors'], 'inspection-report': ['props', 'units'], 'rent-roll': ['props'] };
+function runCountType({ docs, M, R, intent }) {
+  if (R.tenantKeys?.size || R.woNums?.size || R.invNos?.size) return null;
+  const allow = COUNT_SCOPES[intent.type] ?? [];
+  if ((R.props.size && !allow.includes('props')) || (R.vendors.size && !allow.includes('vendors')) || (R.units.size && !allow.includes('units'))) return null;
+  let ds = docs.filter((d) => d.type === intent.type && (!intent.hoa || /\bhoa\b/i.test(`${f(d, 'inspection_type') ?? ''} ${d.filename}`)));
+  const scoped = R.props.size || R.vendors.size || R.units.size;
+  let unplaced = [];
+  if (scoped) {
+    unplaced = ds.filter((d) => (R.props.size && !M.propOf(d)) || (R.vendors.size && !f(d, 'vendor')) || (R.units.size && !f(d, 'unit_number')));
+    ds = ds.filter((d) => (!R.props.size || R.props.has(M.propOf(d))) && (!R.vendors.size || R.vendors.has(vendorKey(f(d, 'vendor') ?? ''))) && (!R.units.size || R.units.has(alnum(f(d, 'unit_number')))));
+  }
+  const scopeTxt = scoped ? ` ${[R.props.size ? `at ${[...R.props].map((p) => propLabel(M, p)).join(', ')}` : '', R.units.size ? `for unit ${[...R.units][0]}` : '', R.vendors.size ? `from ${R.vendorNames.join(', ')}` : ''].filter(Boolean).join(' ')}` : '';
+  // documents are not units / vendors: say how many of each the documents cover, when that differs
+  let covers = '';
+  const by = { 'lease-agreement': [(d) => `${M.propOf(d) ?? ''}|${alnum(f(d, 'unit_number'))}`, (d) => !!f(d, 'unit_number'), 'unit'], 'certificate-of-insurance': [(d) => vendorKey(f(d, 'vendor') ?? ''), (d) => !!f(d, 'vendor'), 'vendor'], 'vendor-contract': [(d) => vendorKey(f(d, 'vendor') ?? ''), (d) => !!f(d, 'vendor'), 'vendor'] }[intent.type];
+  if (by && ds.length && ds.every(by[1])) { const n = new Set(ds.map(by[0])).size; if (n !== ds.length) covers = ` These are documents, not ${by[2]}s: they cover ${plural(n, by[2])}.`; }
+  // invoices: a re-sent copy is the same invoice; an invoice you issued (receivable) or a void one is not a vendor bill
+  if (intent.type === 'invoice' && ds.length) {
+    const groups = invoices(docs, M, null).filter((v) => v.list.some((d) => ds.includes(d)));
+    const distinct = groups.length; const recvN = groups.filter((v) => v.receivable).length; const voidN = groups.filter((v) => v.cls === 'void').length;
+    if (distinct !== ds.length) covers += ` These are documents: they are ${plural(distinct, 'distinct invoice')} (a re-sent copy is the same invoice).`;
+    if (recvN || voidN) covers += ` ${[recvN ? `${recvN} ${recvN === 1 ? 'was' : 'were'} issued by you (money owed to you)` : '', voidN ? `${voidN} ${voidN === 1 ? 'is' : 'are'} void or cancelled` : ''].filter(Boolean).join(' and ')}.`;
+  }
+  // work orders: one number filed twice is one work order
+  if (intent.type === 'work-order' && ds.length) {
+    const groups = workOrders(docs, M).filter((w) => w.list.some((d) => ds.includes(d)));
+    if (groups.length !== ds.length) covers += ` These are documents: they are ${plural(groups.length, 'distinct work order')} (a number filed twice is one work order).`;
+  }
+  const un = unplaced.length ? ` ${plural(unplaced.length, 'document')} on file ${unplaced.length === 1 ? 'has' : 'have'} no readable ${R.props.size ? 'property' : R.vendors.size ? 'vendor' : 'unit'}, so ${unplaced.length === 1 ? 'it is' : 'they are'} not counted here.` : '';
+  return answerEnvelope({ text: `${ds.length} ${ds.length === 1 ? intent.noun : (intent.nouns ?? `${intent.noun}s`)} on file${scopeTxt}${intent.hoa ? ' for HOA compliance (an inspection type that says HOA)' : ''}.${covers}${un}`, facts: ds.slice(0, 40).map((d) => ({ label: d.filename, value: intent.noun, sources: [{ documentId: d.id, location: { field: 'document_type', page: 1 } }] })) });
 }
 
 /** Documents of these types that came in with no readable values at all: lists are built without them, and the answer says so. */
@@ -776,6 +958,7 @@ function runCoi({ docs, M, R, t0, intent }) {
   if (k === 'coi_missing') {
     if (R.props.size || R.units.size) return null;
     if ([...allVendors(docs).keys()].some((key) => amb.has(key) && (!R.vendors.size || R.vendors.has(key)))) return null;
+    if (list.some((c) => c.dead && (!R.vendors.size || R.vendors.has(c.key)))) return null; // a cancelled / void certificate: which one is live is not decided
     const have = new Set(list.map((c) => c.key));
     const vs = [...allVendors(docs)].filter(([key]) => !have.has(key) && (!R.vendors.size || R.vendors.has(key)));
     const srcDoc = (key) => docs.find((d) => d.fields.vendor && vendorKey(f(d, 'vendor')) === key && ['invoice', 'work-order', 'vendor-contract'].includes(d.type));
@@ -795,7 +978,8 @@ function runCoi({ docs, M, R, t0, intent }) {
   if (k === 'coi_list') {
     if (R.props.size || R.units.size) return null;
     const pool = list.filter((c) => !R.vendors.size || R.vendors.has(c.key));
-    if (pool.some((c) => amb.has(c.key))) return null;
+    if (pool.some((c) => amb.has(c.key) || c.dead)) return null;
+    if (R.vendors.size && !pool.length) return null; // the named vendor has no certificate on file: not "none expiring"
     let sel; let head;
     if (intent.mode === 'expired') { sel = pool.filter((c) => c.exp && c.exp < t0); head = 'expired'; } else if (intent.mode === 'attn') { const end = windowEnd(t0, { n: 60, unit: 'day' }); sel = pool.filter((c) => c.exp && c.exp <= end); head = 'expired or expiring within 60 days'; } else if (intent.mode === 'today') { sel = pool.filter((c) => c.exp === t0); head = 'expiring today'; } else { const end = windowEnd(t0, intent.win); sel = pool.filter((c) => c.exp && c.exp >= t0 && c.exp <= end); head = `expiring within ${windowLabel(intent.win)}`; }
     sel.sort((a, b) => a.exp.localeCompare(b.exp));
@@ -809,7 +993,7 @@ function runCoi({ docs, M, R, t0, intent }) {
   // one vendor
   if (R.vendors.size !== 1 || R.props.size || R.units.size) return null;
   const c = list.find((x) => R.vendors.has(x.key));
-  if (!c || amb.has(c.key)) return null;
+  if (!c || amb.has(c.key) || c.dead) return null;
   if (!c.cur) return null; // only certificates with no readable expiry: never guessed
   const live = c.exp >= t0;
   const dd = daysBetween(t0, c.exp);
@@ -817,21 +1001,21 @@ function runCoi({ docs, M, R, t0, intent }) {
   const a = intent.attr;
   if (a === 'workers') {
     const d = c.cur; const has = (d.all.coverage_type ?? []).some((x) => /workers/i.test(x.value)) || !!f(d, 'workers_comp');
-    return answerEnvelope({ text: has ? `Yes. Workers compensation is listed on ${c.vendor}'s certificate of insurance.` : `Workers compensation is not listed on ${c.vendor}'s certificate of insurance.`, facts: [factM(`${c.vendor} · coverage`, (d.all.coverage_type ?? []).map((x) => x.value).join(', ') || 'none listed', d, ['coverage_type', 'workers_comp', 'vendor'])] });
+    return answerEnvelope({ text: has ? `Yes. Workers compensation is listed on ${c.vendor}${ap(c.vendor)} certificate of insurance.` : `Workers compensation is not listed on ${c.vendor}${ap(c.vendor)} certificate of insurance.`, facts: [factM(`${c.vendor} · coverage`, (d.all.coverage_type ?? []).map((x) => x.value).join(', ') || 'none listed', d, ['coverage_type', 'workers_comp', 'vendor'])] });
   }
   if (a === 'insurer' || a === 'limit' || a === 'policy' || a === 'coverage') {
     const d = c.cur; const key = a === 'insurer' ? 'insurer' : a === 'limit' ? 'gl_limit' : a === 'policy' ? 'policy_number' : 'coverage_type';
     const vals = (d.all[key] ?? []).map((x) => x.value); if (!vals.length) return null;
     const v = a === 'limit' ? moneyWhole(vals[0]) : vals.join(', ');
     const lbl = { insurer: 'insurer', limit: 'general liability limit', policy: 'policy number', coverage: 'coverage' }[a];
-    const text = a === 'insurer' ? `${c.vendor} is insured with ${v}.` : a === 'limit' ? `The general liability limit on ${c.vendor}'s certificate is ${v}.` : a === 'policy' ? `The policy number on ${c.vendor}'s certificate is ${v}.` : `${c.vendor}'s certificate shows ${v}.`;
+    const text = a === 'insurer' ? `${c.vendor} is insured with ${v}.` : a === 'limit' ? `The general liability limit on ${c.vendor}${ap(c.vendor)} certificate is ${v}.` : a === 'policy' ? `The policy number on ${c.vendor}${ap(c.vendor)} certificate is ${v}.` : `${c.vendor}${ap(c.vendor)} certificate shows ${v}.`;
     return answerEnvelope({ text, facts: [fact(`${c.vendor} · ${lbl}`, v, d, key)] });
   }
   const pdates = [...new Set((c.cur.all.policy_expiry ?? []).map((x) => x.value).filter(okIso))].sort();
   const spread = pdates.length > 1 ? ` Its policies expire on different dates (${pdates.map(humanDate).join('; ')}); the date above is the earliest, when coverage first lapses.` : '';
   const text = (intent.attr === 'when'
-    ? `${c.vendor}'s certificate of insurance ${when}.`
-    : live ? `Yes. ${c.vendor}'s certificate of insurance is current; it ${when}.` : `No. ${c.vendor}'s certificate of insurance ${when}.`) + spread;
+    ? `${c.vendor}${ap(c.vendor)} certificate of insurance ${when}.`
+    : live ? `Yes. ${c.vendor}${ap(c.vendor)} certificate of insurance is current; it ${when}.` : `No. ${c.vendor}${ap(c.vendor)} certificate of insurance ${when}.`) + spread;
   return answerEnvelope({ text, facts: [factM(`${c.vendor} · certificate expires`, humanDate(c.exp), c.cur, ['coi_expires', 'vendor'])] });
 }
 
@@ -860,7 +1044,7 @@ function runUnits({ docs, M, R, t0, intent }) {
       if (!L || (a !== 'start' && a !== 'end') || !t0) return null;
       const v = a === 'start' ? L.start : L.end; if (!okIso(v) || v <= t0 && a === 'start') return null;
       if (a === 'end' && L.mtm) return null;
-      return answerEnvelope({ text: `${L.tenant ? `${L.tenant}'s lease` : 'The lease'} for ${where} ${v > t0 ? (a === 'start' ? 'starts' : 'ends') : 'ended'} ${humanDate(v)}; that lease is not in effect yet.`, facts: [{ label: `${where} · lease ${a} (future lease)`, value: humanDate(v), sources: [src(L.d, a === 'start' ? 'lease_start_date' : 'lease_end_date')] }] });
+      return answerEnvelope({ text: `${L.tenant ? `${L.tenant}${ap(L.tenant)} lease` : 'The lease'} for ${where} ${v > t0 ? (a === 'start' ? 'starts' : 'ends') : 'ended'} ${humanDate(v)}; that lease is not in effect yet.`, facts: [{ label: `${where} · lease ${a} (future lease)`, value: humanDate(v), sources: [src(L.d, a === 'start' ? 'lease_start_date' : 'lease_end_date')] }] });
     }
     if (a === 'start' && u.future.length) return null; // the current lease or the coming one?
     if (u.terminated) return null; // terminated / notice to vacate / move-out date: not a running lease, the normal path reads it
@@ -868,7 +1052,7 @@ function runUnits({ docs, M, R, t0, intent }) {
     if (a === 'mtm') {
       if (u.vacant || !u.cur) return null;
       const known = u.mtm || okIso(u.end); if (!known) return null;
-      return answerEnvelope({ text: u.mtm ? `Yes. ${u.tenant ? `${u.tenant}'s` : `The`} lease for ${where} is month-to-month.` : `No. ${u.tenant ? `${u.tenant}'s` : `The`} lease for ${where} is not month-to-month; it ${t0 && u.end < t0 ? 'ended' : 'ends'} ${humanDate(u.end)}.`, facts: [fct(u, u.mtm ? 'status' : 'lease_end_date', `${where} · ${u.mtm ? 'status' : 'lease end'}`, u.mtm ? u.status : humanDate(u.end))] });
+      return answerEnvelope({ text: u.mtm ? `Yes. ${u.tenant ? `${u.tenant}${ap(u.tenant)}` : `The`} lease for ${where} is month-to-month.` : `No. ${u.tenant ? `${u.tenant}${ap(u.tenant)}` : `The`} lease for ${where} is not month-to-month; it ${t0 && u.end < t0 ? 'ended' : 'ends'} ${humanDate(u.end)}.`, facts: [fct(u, u.mtm ? 'status' : 'lease_end_date', `${where} · ${u.mtm ? 'status' : 'lease end'}`, u.mtm ? u.status : humanDate(u.end))] });
     }
     if (a === 'occupancy') {
       if (!u.roll) return null;
@@ -928,6 +1112,7 @@ function runUnits({ docs, M, R, t0, intent }) {
     else { const end = windowEnd(t0, intent.win); sel = pool.filter((u) => !u.mtm && okIso(u.end) && u.end >= t0 && u.end <= end); head = `ending within ${windowLabel(intent.win)}`; }
     if (intent.mode !== 'attn') sel = sel.filter((u) => !clash.includes(u) && !renewed.includes(u));
     sel.sort((a, b) => (a.end ?? '').localeCompare(b.end ?? '') || a.unitRaw.localeCompare(b.unitRaw, undefined, { numeric: true }));
+    head = agree(sel.length, head);
     const facts = sel.slice(0, 40).map((u) => ({ label: `${unitWhere(M, u)}${u.tenant ? ` · ${u.tenant}` : ''}`, value: mkv(u), sources: curSrc(u, [u.mtm ? 'status' : 'lease_end_date', 'tenant_name', 'unit_number']) }));
     const noun = intent.mode === 'mtm' ? 'month-to-month lease' : 'lease';
     const noteParts = [];
@@ -958,7 +1143,7 @@ function runWorkOrders({ docs, M, R, t0, intent }) {
   if (mode === 'all') { sel = pool; head = 'on file'; }
   else if (mode === 'status') { sel = pool.filter((w) => statusText(w.status).toLowerCase() === intent.stat); head = intent.stat === 'on hold' ? 'on hold' : ''; }
   else if (mode === 'open') { sel = pool.filter((w) => w.state === 'open'); head = 'open'; }
-  else if (mode === 'novendor') { sel = pool.filter((w) => !w.vendor); head = 'with no vendor assigned'; }
+  else if (mode === 'novendor') { sel = pool.filter((w) => !w.vendor && w.state !== 'cancelled'); head = 'with no vendor assigned'; }
   else if (mode === 'done') { sel = pool.filter((w) => w.state === 'done'); head = 'completed or closed'; }
   else { sel = pool.filter((w) => w.state === 'open' && okIso(w.sched) && w.sched < t0); head = 'overdue (open, and the scheduled date has passed)'; }
   sel.sort((a, b) => String(a.opened ?? '').localeCompare(String(b.opened ?? '')));
@@ -969,10 +1154,14 @@ function runWorkOrders({ docs, M, R, t0, intent }) {
   const statLead = mode === 'status' && intent.stat !== 'on hold' ? `${intent.stat} ` : '';
   const cnt = (n) => `${n} ${statLead}work order${n === 1 ? '' : 's'}`;
   const openNote = mode === 'open' ? ' That includes work orders that are on hold or scheduled.' : '';
+  const canc = ['open', 'done', 'overdue', 'novendor'].includes(mode) ? pool.filter((w) => w.state === 'cancelled') : [];
+  const cancNote = canc.length ? ` ${plural(canc.length, 'cancelled work order')} ${canc.length === 1 ? 'is' : 'are'} not counted.` : '';
+  const dupN = sel.filter((w) => w.list.length > 1).length;
+  const dupNote = dupN ? ` These are distinct work orders (by number): ${dupN === 1 ? 'one appears' : `${dupN} appear`} on more than one document and ${dupN === 1 ? 'is' : 'are'} counted once.` : '';
   const noProp = R.props.size ? all.filter((w) => !w.prop && scopeVendor(R, w.vendor) && scopeUnit(R, w.unit)) : [];
   const pn = noProp.length ? ` ${plural(noProp.length, 'work order')} on file ${noProp.length === 1 ? 'has' : 'have'} no property, so ${noProp.length === 1 ? 'it is' : 'they are'} not counted for a property (${noProp.slice(0, 5).map((w) => w.no ?? 'unnumbered').join(', ')}).` : '';
-  if (intent.count) return answerEnvelope({ text: `${cnt(sel.length)}${head ? ` ${head}` : ''}${scopeTxt ? ` ${scopeTxt}` : ''}.${openNote}${pn}`, facts });
-  return answerEnvelope({ text: sel.length ? `${cnt(sel.length)}${head ? ` ${head}` : ''}${scopeTxt ? ` ${scopeTxt}` : ''}: ${sel.map((w) => `${w.no ?? 'work order'}${w.unitRaw && !unitNamed ? ` (unit ${w.unitRaw})` : ''} ${mode === 'status' ? '' : w.status ?? ''}`.trim()).join('; ')}.${openNote}${pn}` : `None. No ${statLead}${noun}s${head ? ` are ${head}` : ''}${scopeTxt ? ` ${scopeTxt}` : ''}.${pn}`, facts });
+  if (intent.count) return answerEnvelope({ text: `${cnt(sel.length)}${head ? ` ${head}` : ''}${scopeTxt ? ` ${scopeTxt}` : ''}.${openNote}${cancNote}${dupNote}${pn}`, facts });
+  return answerEnvelope({ text: sel.length ? `${cnt(sel.length)}${head ? ` ${head}` : ''}${scopeTxt ? ` ${scopeTxt}` : ''}: ${sel.map((w) => `${w.no ?? 'work order'}${w.unitRaw && !unitNamed ? ` (unit ${w.unitRaw})` : ''} ${mode === 'status' ? '' : w.status ?? ''}`.trim()).join('; ')}.${openNote}${cancNote}${dupNote}${pn}` : `None. No ${statLead}${noun}s${head ? ` are ${head}` : ''}${scopeTxt ? ` ${scopeTxt}` : ''}.${cancNote}${pn}`, facts });
 }
 
 function runWoFact({ docs, M, R, intent }) {
@@ -1018,7 +1207,7 @@ function runContracts({ docs, M, R, t0, intent }) {
   if (k === 'contract_vendor') {
     if (R.vendors.size !== 1 || R.props.size || R.units.size) return null;
     const cs = all.filter((c) => R.vendors.has(c.vk));
-    if (!cs.length) return null;
+    if (!cs.length || cs.some((c) => c.dead)) return null;
     const a = intent.attr;
     const facts = []; const lines = [];
     for (const c of cs) {
@@ -1035,6 +1224,8 @@ function runContracts({ docs, M, R, t0, intent }) {
   if (!t0 || R.units.size || R.vendors.size && false) return null;
   const pool = all.filter((c) => scopeProp(R, c.prop) && scopeVendor(R, c.vendor));
   if (R.props.size && pool.some((c) => !c.prop)) return null;
+  if (pool.some((c) => c.dead)) return null; // a cancelled / terminated / superseded contract: which one is live is not decided
+  if (R.vendors.size && !pool.length) return null; // the named vendor has no contract on file: not "none ending"
   const noEnd = pool.filter((c) => !okIso(c.end));
   const mode = intent.mode; let sel; let head;
   if (mode === 'autorenewing') { if (pool.some((c) => !c.auto)) return null; sel = pool.filter((c) => /^(?:yes|y|true)/.test(c.auto)); head = agree(sel.length, 'renew automatically'); sel.sort((a, b) => String(a.end ?? '').localeCompare(String(b.end ?? ''))); const fs0 = sel.slice(0, 40).map((c) => factM(`${c.vendor}${c.scope ? ` · ${c.scope}` : ''}`, `auto-renew yes${okIso(c.end) ? ` · ends ${humanDate(c.end)}` : ''}`, c.d, ['auto_renew', 'contract_end', 'vendor'])); return answerEnvelope({ text: intent.count ? `${plural(sel.length, 'vendor contract')} ${head}.` : sel.length ? `${plural(sel.length, 'vendor contract')} ${head}: ${sel.map((c) => `${c.vendor}${okIso(c.end) ? ` (${humanDate(c.end)})` : ''}`).join('; ')}.` : `None. No vendor contracts ${head}.`, facts: fs0 }); }
@@ -1042,6 +1233,7 @@ function runContracts({ docs, M, R, t0, intent }) {
   else if (mode === 'attn') { sel = pool.filter((c) => okIso(c.end) && Math.abs(daysBetween(t0, c.end)) <= 60); head = 'need attention'; }
   else { const end = windowEnd(t0, intent.win); const inWin = pool.filter((c) => okIso(c.end) && c.end >= t0 && c.end <= end); sel = mode === 'autorenew' ? inWin.filter((c) => /^(?:yes|y|true)/.test(c.auto ?? '')) : inWin; head = mode === 'autorenew' ? `ending and renewing automatically within ${windowLabel(intent.win)}` : `ending within ${windowLabel(intent.win)}`; if (mode === 'autorenew' && inWin.some((c) => !c.auto)) return null; }
   sel.sort((a, b) => a.end.localeCompare(b.end));
+  head = agree(sel.length, head);
   const note = noEnd.length ? ` ${plural(noEnd.length, 'contract')} on file ${noEnd.length === 1 ? 'has' : 'have'} no end date, so ${noEnd.length === 1 ? 'it' : 'they'} can't be checked.` : '';
   const facts = sel.slice(0, 40).map((c) => factM(`${c.vendor}${c.scope ? ` · ${c.scope}` : ''}`, `${c.end < t0 ? 'ended' : 'ends'} ${humanDate(c.end)}${c.auto ? ` · auto-renew ${/^(?:yes|y|true)/.test(c.auto) ? 'yes' : 'no'}` : ''}${c.monthly != null ? ` · ${money(c.monthly)} a month` : ''}`, c.d, ['contract_end', 'vendor', 'auto_renew', 'monthly_amount']));
   if (intent.count) return answerEnvelope({ text: `${plural(sel.length, 'vendor contract')} ${head}.${note}`, facts });
@@ -1107,50 +1299,60 @@ function runInspections({ docs, M, R, t0, intent }) {
 
 /* ---- invoices ---- */
 function runInvoices({ docs, M, R, t0, intent }) {
-  const all = invoices(docs, M, t0);
+  const all0 = invoices(docs, M, t0);
+  // an invoice YOU issued (money owed to you) is not a vendor bill: never owed, overdue or spent by this company
+  const all = all0.filter((v) => !v.receivable);
   if (R.units.size && !R.props.size) { const ps = new Set(all.filter((v) => R.units.has(v.unit)).map((v) => v.prop)); const up = new Set(unitModel(docs, M).filter((r) => R.units.has(r.unit)).map((r) => r.prop)); if (new Set([...ps, ...up]).size > 1) return clarifyEnv([...new Set([...ps, ...up])].map((p) => propLabel(M, p) || 'an unnamed property'), `unit ${[...R.units][0]}`); }
-  const pool = all.filter((v) => scopeProp(R, v.prop) && scopeVendor(R, v.vendor) && scopeUnit(R, v.unit));
-  if (R.vendors.size && !all.some((v) => R.vendors.has(vendorKey(v.vendor ?? '')))) return null;
-  if (pool.some((v) => v.conflict)) return null;
+  const inScope = (v) => scopeProp(R, v.prop) && scopeVendor(R, v.vendor) && scopeUnit(R, v.unit);
+  const pool = all.filter(inScope);
+  const recv = all0.filter((v) => v.receivable && inScope(v));
+  const recvNote = recv.length && intent.kind !== 'inv_fact' ? ` ${plural(recv.length, 'invoice')} you issued (money owed to you) ${recv.length === 1 ? 'is' : 'are'} not included.` : '';
+  if (R.vendors.size && !all0.some((v) => R.vendors.has(vendorKey(v.vendor ?? '')))) return null;
+  if (pool.some((v) => v.conflict) || recv.some((v) => v.conflict)) return null;
   // a credit memo (negative invoice) changes what is owed and spent: totals and owed / overdue lists go to the normal path rather than silently ignoring it
-  if (pool.some((v) => v.cost != null && v.cost < 0) && intent.kind !== 'inv_fact' && !(intent.kind === 'inv_list' && intent.mode === 'all')) return null;
+  if (pool.some((v) => v.credit) && intent.kind !== 'inv_fact' && !(intent.kind === 'inv_list' && intent.mode === 'all')) return null;
   const k = intent.kind;
   const scopeTxt = [R.props.size ? `at ${[...R.props].map((p) => propLabel(M, p)).join(', ')}` : '', R.units.size ? `for unit ${pool[0]?.unitRaw ?? [...R.units][0]}` : '', R.vendors.size ? `from ${R.vendorNames.join(', ')}` : ''].filter(Boolean).join(' ');
-  const iFact = (v) => factM(`${v.no ? `Invoice ${invNo(v.no)}` : 'Invoice'}${v.vendor ? ` · ${v.vendor}` : ''}${v.unitRaw ? ` · unit ${v.unitRaw}` : ''}${propLabel(M, v.prop) ? ` · ${propLabel(M, v.prop)}` : ''}`, `${v.cost != null ? money(v.cost) : 'amount unreadable'}${v.status ? ` · ${v.status}` : ''}${okIso(v.due) ? ` · due ${humanDate(v.due)}` : ''}`, v.list, ['invoice_number', 'cost', 'status', 'invoice_due', 'vendor']);
+  const iFact = (v) => factM(`${v.no ? `Invoice ${invNo(v.no)}` : 'Invoice'}${v.vendor ? ` · ${v.vendor}` : ''}${v.unitRaw ? ` · unit ${v.unitRaw}` : ''}${propLabel(M, v.prop) ? ` · ${propLabel(M, v.prop)}` : ''}`, `${v.cost != null ? moneyOf(v) : 'amount unreadable'}${v.status ? ` · ${v.status}` : ''}${okIso(v.due) ? ` · due ${humanDate(v.due)}` : ''}`, v.list, ['invoice_number', 'cost', 'status', 'invoice_due', 'vendor']);
   if (k === 'inv_fact') {
     if (R.invNos.size !== 1) return null;
-    const v = all.find((x) => R.invNos.has(alnum(x.no)) && (!R.vendors.size || R.vendors.has(vendorKey(x.vendor ?? ''))));
-    if (!v || v.conflict || all.filter((x) => alnum(x.no) === alnum(v.no)).length > 1 && !R.vendors.size) return null;
+    const v = all0.find((x) => R.invNos.has(alnum(x.no)) && (!R.vendors.size || R.vendors.has(vendorKey(x.vendor ?? ''))));
+    if (!v || v.conflict || all0.filter((x) => alnum(x.no) === alnum(v.no)).length > 1 && !R.vendors.size) return null;
     const a = intent.attr; const nm = `invoice ${invNo(v.no)}${v.vendor ? ` from ${v.vendor}` : ''}`;
     const F = (label, value, keys) => factM(`Invoice ${invNo(v.no)}${v.vendor ? ` · ${v.vendor}` : ''} · ${label}`, value, v.list, keys);
-    if (a === 'amount') { if (v.cost == null) return null; return answerEnvelope({ text: `The total on ${nm} is ${money(v.cost)}.`, facts: [F('total', money(v.cost), ['cost', 'invoice_number'])] }); }
+    if (a === 'amount') { if (v.cost == null) return null; return answerEnvelope({ text: `The total on ${nm} is ${moneyOf(v)}.`, facts: [F('total', moneyOf(v), ['cost', 'invoice_number'])] }); }
     if (a === 'status') { if (!v.status) return null; return answerEnvelope({ text: `${nm[0].toUpperCase()}${nm.slice(1)} is marked ${v.status}${v.overdue ? ' and is past its due date' : ''}.`, facts: [F('status', v.status, ['status', 'invoice_due', 'invoice_number'])] }); }
     if (a === 'due') { if (!okIso(v.due)) return null; return answerEnvelope({ text: `${nm[0].toUpperCase()}${nm.slice(1)} is due ${humanDate(v.due)}.`, facts: [F('due date', humanDate(v.due), ['invoice_due', 'invoice_number'])] }); }
     if (a === 'date') { if (!okIso(v.date)) return null; return answerEnvelope({ text: `${nm[0].toUpperCase()}${nm.slice(1)} is dated ${humanDate(v.date)}.`, facts: [F('invoice date', humanDate(v.date), ['invoice_date', 'invoice_number'])] }); }
     if (a === 'vendor') { if (!v.vendor) return null; return answerEnvelope({ text: `Invoice ${invNo(v.no)} is from ${v.vendor}.`, facts: [F('vendor', v.vendor, ['vendor', 'invoice_number'])] }); }
     if (a === 'prop') { const pl = propLabel(M, v.prop); if (!pl) return null; return answerEnvelope({ text: `Invoice ${invNo(v.no)} is for ${pl}${v.unitRaw ? `, unit ${v.unitRaw}` : ''}.`, facts: [F('property', pl, ['property_name', 'service_address', 'unit_number', 'invoice_number'])] }); }
     const work = (v.d.all.work_performed ?? []).map((x) => x.value); if (!work.length) return null;
-    return answerEnvelope({ text: `Invoice ${invNo(v.no)}${v.vendor ? ` from ${v.vendor}` : ''} is for: ${work.join('; ')}${v.cost != null ? `; total ${money(v.cost)}` : ''}.`, facts: [F('work', work.join('; '), ['work_performed', 'invoice_number']), ...(v.cost != null ? [F('total', money(v.cost), ['cost', 'invoice_number'])] : [])] });
+    return answerEnvelope({ text: `Invoice ${invNo(v.no)}${v.vendor ? ` from ${v.vendor}` : ''} is for: ${work.join('; ')}${v.cost != null ? `; total ${moneyOf(v)}` : ''}.`, facts: [F('work', work.join('; '), ['work_performed', 'invoice_number']), ...(v.cost != null ? [F('total', moneyOf(v), ['cost', 'invoice_number'])] : [])] });
   }
   if (k === 'inv_total') {
-    if (intent.mode === 'unpaid') {
-      if (pool.some((v) => v.cls === 'other') || R.units.size) return null;
-      const un = pool.filter((v) => v.cls === 'unpaid'); if (un.some((v) => v.cost == null)) return null;
-      const sum = un.reduce((x, v) => x + v.cost, 0);
-      return answerEnvelope({ text: `${money(sum)} across ${plural(un.length, 'unpaid invoice')}${scopeTxt ? ` ${scopeTxt}` : ''}.`, facts: un.slice(0, 40).map((v) => iFact(v)) });
-    }
     if (R.units.size) return null;
-    if (pool.some((v) => v.cost == null)) return null;
-    if (R.props.size || R.vendors.size) {
-      const sum = pool.reduce((s, v) => s + v.cost, 0);
-      if (!pool.length) return null;
-      return answerEnvelope({ text: `${money(sum)} across ${plural(pool.length, 'invoice')} ${scopeTxt} (a copy of the same invoice counts once).`, facts: pool.slice(0, 40).map((v) => iFact(v)) });
+    if (pool.some((v) => v.cls === 'other')) return null;
+    if (pool.some((v) => v.currency !== 'USD')) return null; // totals are never added across currencies
+    const voids = pool.filter((v) => v.cls === 'void');
+    const voidNote = voids.length ? ` ${plural(voids.length, 'void or cancelled invoice')} ${voids.length === 1 ? 'is' : 'are'} not counted.` : '';
+    if (intent.mode === 'unpaid') {
+      const un = pool.filter((v) => v.cls === 'unpaid'); if (un.some((v) => v.owed == null)) return null;
+      const sum = sumMoney(un.map((v) => v.owed));
+      const part = un.filter((v) => v.partial);
+      return answerEnvelope({ text: `${money(sum)} across ${plural(un.length, 'unpaid invoice')}${scopeTxt ? ` ${scopeTxt}` : ''}${part.length ? ` (${plural(part.length, 'partly paid invoice')} counted at the balance still due)` : ''}.${voidNote}${recvNote}`, facts: un.slice(0, 40).map((v) => iFact(v)) });
     }
-    const by = new Map(); for (const v of pool) by.set(v.prop, (by.get(v.prop) ?? 0) + v.cost);
+    const live = pool.filter((v) => v.cls !== 'void');
+    if (live.some((v) => v.cost == null)) return null;
+    if (R.props.size || R.vendors.size) {
+      const sum = sumMoney(live.map((v) => v.cost));
+      if (!live.length) return null;
+      return answerEnvelope({ text: `${money(sum)} across ${plural(live.length, 'invoice')} ${scopeTxt} (a copy of the same invoice counts once).${voidNote}${recvNote}`, facts: live.slice(0, 40).map((v) => iFact(v)) });
+    }
+    const by = new Map(); for (const v of live) by.set(v.prop, [...(by.get(v.prop) ?? []), v.cost]);
     if (by.has(null)) return null;
     const rows = [...by.entries()].sort((a, b) => propLabel(M, a[0]).localeCompare(propLabel(M, b[0])));
-    const total = pool.reduce((s, v) => s + v.cost, 0);
-    return answerEnvelope({ text: `${money(total)} invoiced in total: ${rows.map(([p, s]) => `${propLabel(M, p)} ${money(s)}`).join('; ')} (a copy of the same invoice counts once).`, facts: pool.slice(0, 40).map((v) => iFact(v)) });
+    const total = sumMoney(live.map((v) => v.cost));
+    return answerEnvelope({ text: `${money(total)} invoiced in total: ${rows.map(([p, arr]) => `${propLabel(M, p)} ${money(sumMoney(arr))}`).join('; ')} (a copy of the same invoice counts once).${voidNote}${recvNote}`, facts: live.slice(0, 40).map((v) => iFact(v)) });
   }
   if (pool.some((v) => v.cls === 'other')) return null;
   let sel; let head; const mode = intent.mode;
@@ -1161,9 +1363,9 @@ function runInvoices({ docs, M, R, t0, intent }) {
   else sel.sort((a, b) => String(a.date ?? '').localeCompare(String(b.date ?? '')));
   const facts = sel.slice(0, 40).map((v) => iFact(v));
   const noun = 'invoice';
-  const line = (v) => `${R.vendors.size ? '' : (v.vendor ?? 'invoice')} ${v.no ? invNo(v.no) : ''} ${v.cost != null ? money(v.cost) : ''}`.replace(/\s+/g, ' ').trim();
-  if (intent.count) return answerEnvelope({ text: `${plural(sel.length, noun)} ${head}${scopeTxt ? ` ${scopeTxt}` : ''}.`, facts });
-  return answerEnvelope({ text: sel.length ? `${plural(sel.length, noun)} ${head}${scopeTxt ? ` ${scopeTxt}` : ''}: ${sel.slice(0, 10).map(line).join('; ')}${sel.length > 10 ? `; and ${sel.length - 10} more` : ''}.` : `None. No ${noun}s ${head}${scopeTxt ? ` ${scopeTxt}` : ''}.`, facts });
+  const line = (v) => `${R.vendors.size ? '' : (v.vendor ?? 'invoice')} ${v.no ? invNo(v.no) : ''} ${v.cost != null ? moneyOf(v) : ''}`.replace(/\s+/g, ' ').trim();
+  if (intent.count) return answerEnvelope({ text: `${plural(sel.length, noun)} ${head}${scopeTxt ? ` ${scopeTxt}` : ''}.${recvNote}`, facts });
+  return answerEnvelope({ text: sel.length ? `${plural(sel.length, noun)} ${head}${scopeTxt ? ` ${scopeTxt}` : ''}: ${sel.slice(0, 10).map(line).join('; ')}${sel.length > 10 ? `; and ${sel.length - 10} more` : ''}.${recvNote}` : `None. No ${noun}s ${head}${scopeTxt ? ` ${scopeTxt}` : ''}.${recvNote}`, facts });
 }
 
 /* ------------------------------------------------------------------ attention list */
@@ -1172,10 +1374,11 @@ function attentionItems(docs, today, withinDays) {
   const items = []; const props = M.groups;
   const push = (i) => items.push(i);
   const amb = ambiguousVendors(docs);
+  const dis = (d) => (d?.conflicted?.length ? ' (values disagree, check the document)' : '');
   for (const c of cois(docs)) {
-    if (!c.exp || amb.has(c.key)) continue;
+    if (!c.exp || amb.has(c.key) || c.dead) continue;
     const dd = daysBetween(today, c.exp);
-    if (dd <= withinDays) push({ kind: dd < 0 ? 'expired' : 'expiring', category: 'coi', label: `${c.vendor} · certificate of insurance`, date: c.exp, days: dd, documentId: c.cur.id, page: c.cur.fields.coi_expires?.page ?? 1 });
+    if (dd <= withinDays) push({ kind: dd < 0 ? 'expired' : 'expiring', category: 'coi', label: `${c.vendor} · certificate of insurance${dis(c.cur)}`, date: c.exp, days: dd, documentId: c.cur.id, page: c.cur.fields.coi_expires?.page ?? 1 });
   }
   const units = currentUnits(unitModel(docs, M), today);
   for (const u of units) {
@@ -1183,13 +1386,13 @@ function attentionItems(docs, today, withinDays) {
     if (u.future.length && u.end < today) continue; // already re-leased
     const dd = daysBetween(today, u.end);
     if (dd > withinDays || dd < -withinDays) continue;
-    push({ kind: dd < 0 ? 'expired' : 'expiring', category: 'lease', label: `Lease · ${unitWhere(M, u)}${u.tenant ? ` · ${u.tenant}` : ''}`, date: u.end, days: dd, documentId: u.cur.d.id, page: u.cur.page(u.cur.src === 'roll' ? '' : 'lease_end_date') });
+    push({ kind: dd < 0 ? 'expired' : 'expiring', category: 'lease', label: `Lease · ${unitWhere(M, u)}${u.tenant ? ` · ${u.tenant}` : ''}${dis(u.cur.d)}`, date: u.end, days: dd, documentId: u.cur.d.id, page: u.cur.page(u.cur.src === 'roll' ? '' : 'lease_end_date') });
   }
   for (const c of contracts(docs, M)) {
-    if (!okIso(c.end)) continue;
+    if (!okIso(c.end) || c.dead) continue;
     const dd = daysBetween(today, c.end);
     if (dd > withinDays || dd < -withinDays) continue;
-    push({ kind: dd < 0 ? 'expired' : 'expiring', category: 'contract', label: `${c.vendor} contract${c.scope ? ` · ${c.scope}` : ''}`, date: c.end, days: dd, documentId: c.d.id, page: c.d.fields.contract_end?.page ?? 1, note: /^(?:yes|y|true)/.test(c.auto ?? '') ? 'renews automatically' : undefined });
+    push({ kind: dd < 0 ? 'expired' : 'expiring', category: 'contract', label: `${c.vendor} contract${c.scope ? ` · ${c.scope}` : ''}${dis(c.d)}`, date: c.end, days: dd, documentId: c.d.id, page: c.d.fields.contract_end?.page ?? 1, note: /^(?:yes|y|true)/.test(c.auto ?? '') ? 'renews automatically' : undefined });
   }
   for (const i of inspections(docs, M)) {
     if (!i.needsRe) continue;
@@ -1197,9 +1400,11 @@ function attentionItems(docs, today, withinDays) {
     if (dd <= withinDays) push({ kind: dd < 0 ? 'overdue' : 'due', category: 'inspection', label: `Reinspection · ${inspLabel(i, props)}`, date: i.reinspect, days: dd, documentId: i.d.id, page: i.d.fields.reinspection_due?.page ?? 1 });
   }
   for (const v of invoices(docs, M, today)) {
-    if (!v.overdue || v.conflict) continue;
+    if (v.receivable) continue;
+    if (v.conflict) { push({ kind: 'unreadable', category: 'invoice', label: `Invoice ${v.no ? invNo(v.no) : ''} · ${v.vendor ?? ''} `.replace(/\s+/g, ' '), date: '', days: 0, documentId: v.d.id, page: 1 }); continue; }
+    if (!v.overdue) continue;
     const dd = okIso(v.due) ? Math.min(-1, daysBetween(today, v.due)) : -1;
-    push({ kind: 'overdue', category: 'invoice', label: `Invoice ${v.no ? invNo(v.no) : ''} · ${v.vendor ?? ''}${v.cost != null ? ` · ${money(v.cost)}` : ''}`.replace(/\s+/g, ' '), date: okIso(v.due) ? v.due : '', days: dd, documentId: v.d.id, page: v.d.fields.invoice_due?.page ?? v.d.fields.status?.page ?? 1 });
+    push({ kind: 'overdue', category: 'invoice', label: `Invoice ${v.no ? invNo(v.no) : ''} · ${v.vendor ?? ''}${v.cost != null ? ` · ${moneyOf(v)}` : ''}`.replace(/\s+/g, ' '), date: okIso(v.due) ? v.due : '', days: dd, documentId: v.d.id, page: v.d.fields.invoice_due?.page ?? v.d.fields.status?.page ?? 1 });
   }
   for (const w of workOrders(docs, M)) {
     if (w.state !== 'open' || !okIso(w.sched) || w.sched >= today) continue;
@@ -1211,30 +1416,33 @@ function attentionItems(docs, today, withinDays) {
 /** Past-due invoices whose payment status could not be read: not listed as overdue, but counted (a plain number, safe in JSON). */
 const unreadableWorkOrders = (docs, today) => workOrders(docs, placeModel(docs)).filter((w) => w.state === 'other' && okIso(w.sched) && w.sched < today).length;
 const leasesWithoutEnd = (docs, today) => { const M = placeModel(docs); return currentUnits(unitModel(docs, M), today).filter((u) => !u.vacant && !u.futureOnly && !u.terminated && !u.mtm && !okIso(u.end) && !u.conflictEnd).length; };
-const unreadableInvoices = (docs, today) => invoices(docs, placeModel(docs), today).filter((v) => v.cls === 'other' && okIso(v.due) && v.due < today).length;
+const unreadableInvoices = (docs, today) => invoices(docs, placeModel(docs), today).filter((v) => v.cls === 'other' && !v.receivable && okIso(v.due) && v.due < today).length;
 function runAttnAll({ docs, t0, R, intent }) {
   if (!t0 || R.any) return null;
   const withinDays = intent.win?.unit === 'day' ? intent.win.n : intent.win ? Math.round(daysBetween(t0, windowEnd(t0, intent.win))) : 60;
-  const all0 = attentionItems(docs, t0, withinDays);
+  const allItems = attentionItems(docs, t0, withinDays);
+  const all0 = allItems.filter((i) => i.kind !== 'unreadable'); const nDisagree = allItems.length - all0.length;
   const items = intent.only === 'overdue' ? all0.filter((i) => i.kind === 'overdue') : all0;
   const expiredOther = intent.only === 'overdue' ? all0.length - items.length : 0;
   const by = (c) => items.filter((i) => i.category === c).length;
   const nUnread = unreadableInvoices(docs, t0);
   const unread = nUnread ? ` Also, ${plural(nUnread, 'invoice')} past the due date ${nUnread === 1 ? 'has' : 'have'} a payment status that could not be read, so ${nUnread === 1 ? 'it is' : 'they are'} not listed here.` : '';
   const nNoEnd = leasesWithoutEnd(docs, t0); const nWo = unreadableWorkOrders(docs, t0);
-  const unread2 = unread + (nWo ? ` ${plural(nWo, 'work order')} ${nWo === 1 ? 'has' : 'have'} an unreadable status and a scheduled date that has passed, so ${nWo === 1 ? 'it is' : 'they are'} not listed here.` : '') + (nNoEnd ? ` ${plural(nNoEnd, 'lease')} ${nNoEnd === 1 ? 'has' : 'have'} a missing or unreadable end date, so ${nNoEnd === 1 ? 'it' : 'they'} can't be checked for expiry.` : '');
+  const unread2 = unread + (nDisagree ? ` ${plural(nDisagree, 'invoice')} ${nDisagree === 1 ? 'has' : 'have'} records that disagree about the amount, status or due date, so ${nDisagree === 1 ? 'it is' : 'they are'} not listed here; check ${nDisagree === 1 ? 'it' : 'them'}.` : '') + (nWo ? ` ${plural(nWo, 'work order')} ${nWo === 1 ? 'has' : 'have'} an unreadable status and a scheduled date that has passed, so ${nWo === 1 ? 'it is' : 'they are'} not listed here.` : '') + (nNoEnd ? ` ${plural(nNoEnd, 'lease')} ${nNoEnd === 1 ? 'has' : 'have'} a missing or unreadable end date, so ${nNoEnd === 1 ? 'it' : 'they'} can't be checked for expiry.` : '');
+  const lateN = intent.expiring ? items.filter((i) => i.days < 0 || i.kind === 'overdue' || i.kind === 'failed').length : 0;
+  const lateNote = lateN ? ` Note: ${lateN} of these ${lateN === 1 ? 'is' : 'are'} already expired or overdue rather than still to come.` : '';
   const when = (i) => (i.days < 0 ? `${i.kind === 'overdue' ? 'overdue' : 'expired'} ${i.date ? humanDate(i.date) : ''}${i.date ? ` (${dayWord(-i.days)} ago)` : ''}`.trim() : i.days === 0 ? `today, ${humanDate(i.date)}` : `${humanDate(i.date)} (${dayWord(i.days)})`);
   if (intent.only === 'overdue') {
     const oth = expiredOther ? ` (${plural(expiredOther, 'other item')} on the attention list ${expiredOther === 1 ? 'is' : 'are'} expired or expiring rather than overdue; ask "What needs attention?" for all of them.)` : '';
     return answerEnvelope({ text: items.length ? `${plural(items.length, 'item')} ${items.length === 1 ? 'is' : 'are'} overdue: ${[[by('workorder'), 'overdue work order', 'overdue work orders'], [by('inspection'), 'reinspection', 'reinspections'], [by('invoice'), 'overdue invoice', 'overdue invoices']].filter((x) => x[0]).map((x) => plural(x[0], x[1], x[2])).join(', ')}.${oth}${unread2}` : `None. No invoice, work order or reinspection is overdue.${oth}${unread2}`, facts: items.slice(0, 40).map((i) => ({ label: i.label, value: when(i), sources: [{ documentId: i.documentId, location: { field: ({ inspection: 'reinspection_due', invoice: 'invoice_due', workorder: 'service_date' })[i.category] ?? 'document_type', page: i.page } }] })) });
   }
   return answerEnvelope({
-    text: items.length ? `${plural(items.length, 'item')} ${items.length === 1 ? 'needs' : 'need'} attention (within ${dayWord(withinDays)}): ${[[by('coi'), 'vendor certificate of insurance', 'vendor certificates of insurance'], [by('lease'), 'lease', 'leases'], [by('contract'), 'vendor contract', 'vendor contracts'], [by('inspection'), 'reinspection', 'reinspections'], [by('invoice'), 'overdue invoice', 'overdue invoices'], [by('workorder'), 'overdue work order', 'overdue work orders']].filter((x) => x[0]).map((x) => plural(x[0], x[1], x[2])).join(', ')}.${unread2}` : `None. No vendor certificate, lease, vendor contract, reinspection, invoice or work order needs attention within ${dayWord(withinDays)}.${unread2}`,
+    text: items.length ? `${plural(items.length, 'item')} ${items.length === 1 ? 'needs' : 'need'} attention (within ${dayWord(withinDays)}): ${[[by('coi'), 'vendor certificate of insurance', 'vendor certificates of insurance'], [by('lease'), 'lease', 'leases'], [by('contract'), 'vendor contract', 'vendor contracts'], [by('inspection'), 'reinspection', 'reinspections'], [by('invoice'), 'overdue invoice', 'overdue invoices'], [by('workorder'), 'overdue work order', 'overdue work orders']].filter((x) => x[0]).map((x) => plural(x[0], x[1], x[2])).join(', ')}.${lateNote}${unread2}` : `None. No vendor certificate, lease, vendor contract, reinspection, invoice or work order needs attention within ${dayWord(withinDays)}.${unread2}`,
     facts: items.slice(0, 40).map((i) => ({ label: i.label, value: when(i), sources: [{ documentId: i.documentId, location: { field: ({ coi: 'coi_expires', lease: 'lease_end_date', contract: 'contract_end', inspection: 'reinspection_due', invoice: 'invoice_due', workorder: 'service_date' })[i.category], page: i.page } }] })),
   });
 }
 export async function propertyAttention(db, { today, withinDays = 60 } = {}) {
   if (!today) return { items: [], unreadableInvoices: 0, leasesWithoutEnd: 0, unreadableWorkOrders: 0 };
-  const docs = await loadDocs(db);
+  const docs = await loadAll(db);
   return { items: attentionItems(docs, today, withinDays), unreadableInvoices: unreadableInvoices(docs, today), leasesWithoutEnd: leasesWithoutEnd(docs, today), unreadableWorkOrders: unreadableWorkOrders(docs, today) };
 }

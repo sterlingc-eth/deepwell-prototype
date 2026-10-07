@@ -478,6 +478,23 @@ check('ask.js runs the lane only for a non-HVAC company with no conversation or 
   }
 }
 
+/* review regressions (classes found by the independent plumbing review, applied to electrical) */
+{
+  const { runElectricalRegressions } = await import('./lib/electrical-review-regressions.mjs');
+  await runElectricalRegressions({ H, lane: { classify: classifyElectrical, run: runElectrical }, extract: extractElectrical, check });
+}
+
+/* CLASS variants (generator style, truth from raw rows; two electrical companies in one database; runs last because it rewrites this company's records) */
+{
+  const { runElectricalVariants } = await import('./lib/electrical-variants.mjs');
+  const lines = [];
+  const vs = await runElectricalVariants({ H, lane: { classify: classifyElectrical, run: runElectrical }, log: (m) => lines.push(m) });
+  let ans = 0; let dec = 0; let bad = 0;
+  for (const [cls, v] of Object.entries(vs)) { ans += v.answered; dec += v.declined; bad += v.wrong; check(`class variants "${cls}": 0 wrong (${v.answered} answered, ${v.declined} declined)`, v.wrong === 0, lines.filter((l) => l.includes(`[${cls}]`)).slice(0, 3).join(' | ')); }
+  console.log(`class variants: ${ans + dec + bad} questions, ${ans} answered right, ${dec} declined, ${bad} wrong`);
+  check('class variants answer a real share (not everything declined)', ans >= 0.3 * (ans + dec + bad), `${ans}/${ans + dec + bad}`);
+}
+
 console.log('');
 if (failures) { console.log(`${failures} check(s) FAILED (${passes} passed).`); process.exit(1); }
 console.log(`${passes} checks passed.`);

@@ -853,5 +853,22 @@ check('the card asks plumbing questions the lane understands', ['Which permits h
   check('P7: a normal document is not flagged', !extractPlumbingRaw([{ page_no: 1, text: 'BACKFLOW TEST CERTIFICATE\nService Address: 5 A St, Mesa AZ\nSerial Number: A1B2C3\nTest Date: 09/01/2026\nResult: Passed' }])?.partial);
 }
 }
+/* review regressions (one per finding of the independent plumbing review) */
+{
+  const { runPlumbingRegressions } = await import('./lib/plumbing-review-regressions.mjs');
+  const { extractPlumbing: exP, resultClass: rc } = await import('../api/_lib/industry/plumbing/extract.js');
+  await runPlumbingRegressions({ H, lane: { classify: classifyPlumbingForLane, run: runPlumbing }, extract: exP, resultClass: rc, check });
+}
+/* CLASS variants (generator style, truth from raw rows; two plumbing companies in one database; runs last because it rewrites this company's records) */
+{
+  const { runPlumbingVariants } = await import('./lib/plumbing-variants.mjs');
+  const lines = [];
+  const vs = await runPlumbingVariants({ H, lane: { classify: classifyPlumbingForLane, run: runPlumbing }, log: (m) => lines.push(m) });
+  let ans = 0; let dec = 0; let bad = 0;
+  for (const [cls, v] of Object.entries(vs)) { ans += v.answered; dec += v.declined; bad += v.wrong; check(`class variants "${cls}": 0 wrong (${v.answered} answered, ${v.declined} declined)`, v.wrong === 0, lines.filter((l) => l.includes(`[${cls}]`)).slice(0, 3).join(' | ')); }
+  console.log(`class variants: ${ans + dec + bad} questions, ${ans} answered right, ${dec} declined, ${bad} wrong`);
+  check('class variants answer a real share (not everything declined)', ans >= 0.3 * (ans + dec + bad), `${ans}/${ans + dec + bad}`);
+}
+
 console.log(failures ? `${failures} FAILED (${passes} passed)` : `${passes} checks passed.`);
 process.exit(failures ? 1 : 0);

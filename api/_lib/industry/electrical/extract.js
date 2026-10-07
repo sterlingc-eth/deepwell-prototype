@@ -105,7 +105,8 @@ function readValue(kind, raw) {
   const v = clean(raw);
   if (!v) return null;
   if (kind === 'date') { const m = v.match(new RegExp('^' + DATE_RE)); return m ? parseDate(m[1]) : null; }
-  if (kind === 'money') { const m = v.match(/\$?\s*([\d]{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)/); return m ? m[1].replace(/,/g, '') : null; }
+  // money: the WHOLE value must be one plain US-dollar amount (no sign, parentheses, CR / credit, other currency, comma-decimals, spaced digits, range or words)
+  if (kind === 'money') { if (/^\s*[-\u2013\u2014\u2212]\s*\$?\s*\d/.test(String(raw ?? ''))) return null; const m = v.match(/^\$?\s?(\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)\s*(?:usd|us\$|u\.s\. dollars)?\.?$/i); return m && (/[$,.]/.test(v) || /usd|us\$/i.test(v)) ? m[1].replace(/,/g, '') : null; }
   if (kind === 'load') { const m = v.match(/([\d,]*\.?\d+)\s*(kva|kw|amps?|a\b|va)/i); return m ? `${m[1]} ${m[2].toLowerCase().replace(/^amps?$|^a$/, 'A').replace('kva', 'kVA').replace('kw', 'kW').replace(/^va$/, 'VA')}` : null; }
   if (kind === 'id') { const m = v.match(/^([A-Za-z0-9][A-Za-z0-9\-./]{2,}(?:\s+(?=[A-Za-z0-9\-./]*\d)[A-Za-z0-9\-./]+){0,2})/); const id = m ? m[1].replace(/[.,;]+$/, '') : null; return id && /\d/.test(id) ? id : null; }
   return v.length > 160 ? v.slice(0, 160) : v;
@@ -145,9 +146,11 @@ export function extractElectrical(pages) {
   if (!cls) return null;
   const type = cls.type;
   const allowed = TYPE_KEYS[type] ? new Set(TYPE_KEYS[type]) : null;
-  const fields = []; const seen = new Map();
+  const fields = []; const seen = new Map(); const distinct = new Map();
   const push = (key, value, line, confidence = 0.95, multi = false) => {
     if (value == null || value === '') return;
+    if (key === 'customer_name' && (/:\s*$/.test(String(value)) || /^(?:ship to|bill to|sold to|customer|owner|client|address|phone|date)\s*:?$/i.test(String(value)))) return; // a printed label is never a name
+    if (!multi) { if (!distinct.has(key)) distinct.set(key, new Set()); distinct.get(key).add(String(value).toLowerCase()); }
     if (!multi && seen.has(key)) return;
     seen.set(key, true);
     fields.push({ key, value, page_no: line.page, verbatim: line.t.slice(0, 200), confidence });
@@ -234,6 +237,18 @@ export function extractElectrical(pages) {
     const m = t?.t.match(/\b(rough[- ]?in|final|underground|service|cover|temporary|meter)\b/i);
     if (m) push('inspection_type', m[1].replace(/^rough in$/i, 'Rough-in').replace(/^./, (c) => c.toUpperCase()), t, 0.85);
   }
+  // one file holding several documents (a second permit / invoice number further on) is never stored as one
+  for (const k of ['permit_number', 'invoice_number']) if ((distinct.get(k)?.size ?? 0) > 1) return null;
+  // a total that is not the customer's invoice total: paid in full / deposit / credit papers, and vendor bills (what the company owes a supplier)
+  { const ci = fields.findIndex((f) => f.key === 'cost');
+    if (ci >= 0) {
+      const t = lines.map((l) => l.t);
+      const paid = t.some((x) => /\b(?:paid in full|deposit|payment received|previous balance|credit|discount|refund|balance forward)\b/i.test(x)) && (Number(fields[ci].value) === 0 || t.some((x) => /^(?:amount due|balance due|amount)\s*[:=]/i.test(x)) && !t.some((x) => /^(?:grand total|invoice total|total|total amount|total price|estimate total)\s*[:=]/i.test(x)));
+      const vendor = t.some((x) => /^(?:invoice|bill)?\s*from\s*[:\-]|^(?:invoice|bill)\s+from\s+\S|\bremit(?:tance)?\b[^.]{0,40}\bto\b|\bvendor\b|\bsupplier\b|\bpayable\b|\bpay(?:ment)? to\b|^sold by\b|^seller\b|^buyer\b|\bship from\b/i.test(x));
+      const voided = type === 'invoice' && t.some((x) => /\b(?:void|voided|cancell?ed)\b/i.test(x) && !/\bvoid (?:after|if|where|unless)\b/i.test(x));
+      const carried = t.some((x) => /^(?:previous|prior|past due|old)\s+balance\b|^balance (?:forward|brought forward)\b|^carried forward\b/i.test(x));
+      if (paid || vendor || voided || carried) fields.splice(ci, 1);
+    } }
   // cost on money-bearing documents only
   if (!['invoice', 'proposal-quote'].includes(type)) { const i = fields.findIndex((f) => f.key === 'cost'); if (i >= 0) fields.splice(i, 1); }
   return { type, confidence: cls.confidence, fields, ...(lines.cut ? { partial: true } : {}) };

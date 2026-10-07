@@ -20,7 +20,21 @@ import { parseDate as parseDateRaw } from '../plumbing/extract.js';
 import { boundedLines, newBudget } from '../textBounds.js';
 
 // a dotted date with both parts <= 12 (02.03.2027) is day-first in some countries and month-first in others: unreadable, unless a part > 12 settles it
-const parseDate = (s) => { const dm = String(s ?? '').trim().match(/^(\d{1,2})\.(\d{1,2})\.\d{2,4}$/); if (dm && +dm[1] <= 12 && +dm[2] <= 12) return null; const d = parseDateRaw(s); return d && d >= '2000-01-01' && d <= '2060-12-31' ? d : null; };
+// the order of an all-numeric slash date is settled by the whole document: one date with a first part > 12 (13/01/2026) proves day-first, one with a second part > 12 proves month-first;
+// both in one document (or neither) leaves an ambiguous date (both parts <= 12) read month-first only when nothing says otherwise, and unreadable when the document contradicts itself
+let DATE_ORDER = null; // 'dmy' | 'mdy' | 'mixed' | null (no evidence)
+function scanDateOrder(pages) {
+  let dmy = false; let mdy = false;
+  for (const p of pages ?? []) for (const m of String(p?.text ?? '').matchAll(/(?<![\d/.-])(\d{1,2})([/-])(\d{1,2})\2(\d{4})(?![\d/-])/g)) { if (+m[1] > 12 && +m[3] <= 12) dmy = true; else if (+m[3] > 12 && +m[1] <= 12) mdy = true; }
+  return dmy && mdy ? 'mixed' : dmy ? 'dmy' : mdy ? 'mdy' : null;
+}
+const parseDate = (s) => {
+  const str = String(s ?? '').trim();
+  const dm = str.match(/^(\d{1,2})\.(\d{1,2})\.\d{2,4}$/); if (dm && +dm[1] <= 12 && +dm[2] <= 12) return null;
+  const sl = str.match(/^(\d{1,2})([/-])(\d{1,2})\2(\d{4})$/);
+  if (sl && +sl[1] <= 12 && +sl[3] <= 12 && sl[1] !== sl[3]) { if (DATE_ORDER === 'mixed') return null; if (DATE_ORDER === 'dmy') { const d = parseDateRaw(`${sl[3]}${sl[2]}${sl[1]}${sl[2]}${sl[4]}`); return d && d >= '2000-01-01' && d <= '2060-12-31' ? d : null; } }
+  const d = parseDateRaw(s); return d && d >= '2000-01-01' && d <= '2060-12-31' ? d : null;
+};
 const DATE_RE = '(\\d{8}(?!\\d)|\\d{1,2}-[A-Za-z]{3,9}\\.?-\\d{2,4}(?!\\d)|[A-Za-z]{3,9}\\.?\\s+\\d{1,2}(?:st|nd|rd|th)?,?\\s+[\'\u2019]\\d{2}|\\d{4}-\\d{1,2}-\\d{1,2}|\\d{1,2}[/.-]\\d{1,2}[/.-]\\d{4}|\\d{1,2}[/.-]\\d{1,2}[/.-]\\d{2}(?!\\d)|[A-Za-z]{3,9}\\.?\\s+\\d{1,2}(?:st|nd|rd|th)?,?\\s+\\d{4}|\\d{1,2}(?:st|nd|rd|th)?\\s+[A-Za-z]{3,9}\\.?,?\\s+\\d{4})';
 const RANGE_RE = new RegExp(`^${DATE_RE}\\s*(?:to|through|thru|until|[-\u2013\u2014]|and)\\s*${DATE_RE}`, 'i');
 
@@ -74,7 +88,7 @@ const LABELS = [
   ['property_name', `property name|community name|community|building name|property|apartment community|complex|complex name|development|project name|name of property`, 'pname', [WO, IV, LS, MI, MO, IR, RR, VC], 0],
   ['unit_number', `unit${NUM}|unit number|apt${NUM}|apartment${NUM}|apartment number|suite${NUM}|suite number|unit apt|apt unit|space${NUM}|unit/apt|apt/unit|unit or apartment|unit #`, 'unit', [WO, IV, LS, MI, MO, IR], 0],
   ['customer_name', `owner|property owner|owner name|landlord|landlord name|lessor|lessor name|owner/landlord|landlord/owner|owner of record|owner entity|owning entity|name of owner|owners name|landlords name|name of landlord`, 'name', [WO, IV, LS, MI, MO, IR, RR, VC], 0],
-  ['tenant_name', `tenants?(?: names?)?|resident(?: name)?|residents?|lessees?(?: names?)?|occupants?(?: name)?|renter(?: name)?|tenant/resident|resident/tenant|name of (?:tenant|resident)|tenants name|residents name|lessees name|occupant name|primary tenant|primary resident|tenant names?`, 'name', [LS, MI, MO, IR, WO], 0],
+  ['tenant_name', `tenants?(?: names?)?|resident(?: name)?|residents?|lessees?(?: names?)?|occupants?(?: name)?|renter(?: name)?|tenant/resident|resident/tenant|name of (?:tenant|resident)|tenants name|residents name|lessees name|occupant name|primary tenant|primary resident|tenant names?|co[- ]?tenants?|co[- ]?residents?|co[- ]?applicants?|co[- ]?lessees?|co[- ]?occupants?|additional (?:tenants?|residents?|occupants?)|second (?:tenant|resident)|joint tenants?`, 'name', [LS, MI, MO, IR, WO], 0],
   ['vendor', `vendor(?: name)?|contractor(?: name)?|subcontractor|vendor/contractor|contractor/vendor|service provider|supplier|vendor company|name of (?:vendor|contractor)|insured|insured name|named insured|name of insured|insureds name|invoice from|remit to|pay to|billed by|vendor assigned|assigned vendor|assigned contractor|performed by vendor`, 'name', [IV, COI, VC, WO], 0],
   ['vendor', `assigned to|assigned company`, 'company', [WO], 1],
   ['insurer', `insurer(?: [a-f])?|insurer name|insurance company|insurance carrier|carrier|underwriter|company affording coverage|insurers? affording coverage|insurance provider|insurer name a|carrier name`, 'name', [COI], 0],
@@ -167,14 +181,21 @@ function readValue(kind, raw) {
   switch (kind) {
     case 'date': { const m = v.replace(/^(?:mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)[a-z]*\.?,?\s+/i, '').match(new RegExp('^' + DATE_RE)); return m ? parseDate(m[1]) : null; }
     case 'range': { const m = v.match(RANGE_RE); if (!m) return null; const a = parseDate(m[1]); const b = parseDate(m[2]); return a && b ? { a, b } : null; }
-    case 'money': { const m = v.match(/^(?:usd\s*)?\$?\s*(\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)(?![\d/])/i); if (!m) return null; const n = m[1].replace(/,/g, ''); return +n > 0 && +n < 1e9 ? n : null; }
+    case 'money': {
+      // another currency is never read as dollars; a weekly / yearly / hourly figure is never read as the monthly or total amount; "1.200,00" is never read as 1
+      if (/\b(?:eur|euros?|gbp|pounds?|cad|aud|mxn|pesos?|chf|jpy|yen|cny|rmb|inr|rupees?|nzd|sgd|hkd|brl|zar|sek|nok|dkk|pln)\b|[\u20ac\u00a3\u00a5\u20b9\u20a9\u20bd]|\b(?:c|ca|can|a|au|mx|nz|hk|s|r)\$/i.test(v)) return null;
+      if (/\b(?:per|a|each)\s*(?:hr|hour|week|wk|year|yr|day|sq\.?\s*ft|sf|quarter|annum)\b|\/\s*(?:hr|hour|week|wk|year|yr|day|sf|sq)\b|\b(?:weekly|bi-?weekly|semi-?monthly|annual(?:ly)?|yearly|daily|quarterly|hourly)\b/i.test(v)) return null;
+      const m = v.match(/^(?:usd\s*|us\s*)?\$?\s*(\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)(?![\d/]|[.,]\d)/i); if (!m) return null; const tail = v.slice(m[0].length);
+      // a range ("$1,450 - $1,500") or a figure that changes later ("increasing to ...") is not one amount
+      if (/^\s*(?:[-\u2013\u2014]|to\b|through\b|or\b)\s*(?:usd\s*)?\$?\s*\d/i.test(tail) || (/\b(?:increas\w*|rais\w*|adjust\w*|escalat\w*|step[- ]?up|thereafter|then|beginning|starting|effective)\b/i.test(tail) && /\d/.test(tail))) return null;
+      const n = m[1].replace(/,/g, ''); return +n > 0 && +n < 1e9 ? n : null; }
     case 'monthly_money': { if (!/\b(?:per month|\/\s*mo(?:nth)?|monthly|a month|each month|\bpm\b)/i.test(v) || /\b(?:annual|annually|per year|\/\s*yr|yearly|quarterly|per quarter)\b/i.test(v)) return null; return readValue('money', v); }
     case 'id': case 'docid': {
       const m = v.match(kind === 'docid' ? /^((?:[A-Za-z]{1,3}\s+(?=\d))?[A-Za-z0-9][A-Za-z0-9\-./]{1,}(?:\s+(?=[A-Za-z0-9\-./]*\d)[A-Za-z0-9\-./]+){0,1})/ : /^((?:[A-Za-z]{1,3}\s+(?=\d))?[A-Za-z0-9][A-Za-z0-9\-./]{2,}(?:\s+(?=[A-Za-z0-9\-./]*\d)[A-Za-z0-9\-./]+){0,1})/);
       const id = m ? m[1].replace(/[.,;]+$/, '') : null;
       return id && /\d/.test(id) ? id : null;
     }
-    case 'unit': { const m = v.replace(/^(?:unit|apt\.?|apartment|suite|ste\.?|#)\s*#?\s*/i, '').match(/^([A-Za-z0-9][A-Za-z0-9-]{0,9})(?:\s|$|,)/); return m && (/\d/.test(m[1]) || m[1].length <= 2) && !/^(?:n\/?a|tbd)$/i.test(m[1]) ? m[1] : null; }
+    case 'unit': { const m = v.replace(/^(?:unit|apt\.?|apartment|suite|ste\.?|#)\s*#?\s*/i, '').match(/^([A-Za-z0-9][A-Za-z0-9-]{0,9})(?:\s*\((?:[^()]{1,30})\))?\s*$/); return m && (/\d/.test(m[1]) || m[1].length <= 2) && !/^(?:n\/?a|tbd)$/i.test(m[1]) ? m[1] : null; }
     case 'name': case 'pname': {
       let x = v.replace(/\s*[,\u2013\u2014-]\s*\d+\s+\w+.*$/, '');
       if (kind === 'pname' && /^\d/.test(x)) return null;
@@ -190,7 +211,7 @@ function readValue(kind, raw) {
     case 'priority': return /^(?:emergency|urgent|high|medium|med|normal|low|routine|critical|standard|asap|p[1-4]|priority \d)$/i.test(v) ? v : null;
     case 'wostatus': return /^(?:open|opened|new|assigned|scheduled|in[- ]?progress|pending|completed|complete|closed|cancell?ed|on hold|waiting(?: on [a-z ]+)?|resolved|dispatched|approved|awaiting approval|submitted|done)$/i.test(v) ? v : null;
     case 'paystatus': return /^(?:paid|unpaid|open|overdue|past due|due|partial|partially paid|partial payment|void|voided|pending|paid in full|outstanding|current|not paid)$/i.test(v) ? v : null;
-    case 'lsstatus': return /^(?:active|current|expired|month[- ]to[- ]month|mtm|renewed|terminated|pending|holdover|hold over|notice given|notice to vacate|vacant|occupied|future|upcoming|ended|in effect|signed|draft|unsigned)$/i.test(v) || /^(?:terminated|notice to vacate(?: given)?|notice given)\b/i.test(v) ? v : null;
+    case 'lsstatus': return /^(?:active|current|expired|month[- ]to[- ]month|mtm|renewed|terminated|pending|holdover|hold over|notice given|notice to vacate|vacant|occupied|future|upcoming|ended|in effect|signed|draft|unsigned|cancell?ed|void(?:ed)?|superseded|rescinded|replaced)$/i.test(v) || /^(?:terminated|notice to vacate(?: given)?|notice given)\b/i.test(v) ? v : null;
     case 'itype': return ITYPE.test(v) && !/^\d+$/.test(v) && v.length <= 80 ? v : null;
     case 'iresult': return IRESULT.test(v) ? v : null;
     case 'wc': return /^(?:yes|y|statutory|included|in force|active|carried|covered|no|none|n\/a|not carried|waived|exempt|excluded)\b/i.test(v) && v.length <= 40 ? v : null;
@@ -232,11 +253,14 @@ function splitColumns(t) {
 const COV_ROW = /^(?:commercial\s+|comm\.?\s+)?(?:general\s+liab(?:ility)?|gen\.?\s+liab(?:ility)?|cgl|gl)\b|^(?:workers?\W{0,2}s?\W*comp(?:ensation)?(?:\s*(?:&|and)\s*employers\W{0,2}\s*liability)?|wc)\b|^(?:business\s+|commercial\s+|hired\s+(?:and|&)\s+non-?owned\s+)?auto(?:mobile)?(?:\s+liability)?\b|^(?:umbrella|excess)(?:\s+liability|\s+liab)?\b|^professional\s+liability\b/i;
 const HAS_DATE = new RegExp(DATE_RE);
 
+/** zero-width and other invisible characters are nothing; the Unicode next-line is a space */
+const invisible = (t) => String(t ?? '').replace(/[\u200b-\u200d\u2060\u180e\ufeff]/g, '').replace(/\u0085/g, ' ');
 function toLines(pages) {
   const out = []; const budget = newBudget();
   for (const p of pages ?? []) {
     let blank = false;
-    for (const raw of boundedLines(p.text, budget)) {
+    for (const raw0 of boundedLines(p.text, budget)) {
+      const raw = invisible(raw0);
       const t = raw.replace(/\s+/g, ' ').trim();
       if (!t) { blank = true; continue; }
       const page = Number(p.page_no) || 1;
@@ -262,7 +286,8 @@ const RR_COLS = [
   ['tenant', /^(?:tenant|tenant name|resident|resident name|lessee|occupant|name|tenants)$/],
   ['start', /^(?:lease start|lease from|start|start date|lease begin|move in|move-in|move in date|lease start date|begin date|commence)$/],
   ['end', /^(?:lease end|lease to|end|end date|expires|lease expires|lease expiration|lease end date|expiration|lease thru|expiry)$/],
-  ['rent', /^(?:rent|monthly rent|current rent|rent amount|base rent|market rent|lease rent|contract rent)$/],
+  ['rent', /^(?:rent|monthly rent|current rent|rent amount|base rent|lease rent|contract rent)$/],
+  ['mkt', /^(?:market rent|asking rent|market|asking|list rent|listed rent|asking price)$/],
   ['deposit', /^(?:deposit|security deposit|sec dep|sec deposit|deposit held)$/],
   ['status', /^(?:status|occupancy|occupancy status|lease status|unit status)$/],
 ];
@@ -272,9 +297,16 @@ function rrHeader(t) {
   if (cells.length < 3) return null;
   const map = cells.map((c) => RR_COLS.find(([, re]) => re.test(rrNorm(c)))?.[0] ?? null);
   if (map[0] !== 'unit' || map.filter(Boolean).length < Math.max(3, cells.length - 1)) return null;
-  const seen = new Set(map.filter(Boolean)); if (seen.size !== map.filter(Boolean).length) return null;
+  const seen = new Set(map.filter(Boolean));
+  // two columns that both look like a rent (Market Rent / Actual Rent, Current Rent / Previous Rent): which one is "the rent" is never guessed, the rows are counted unread
+  const rentLike = cells.filter((c, i) => (map[i] === 'rent' || map[i] === 'mkt' || (!map[i] && /\b(?:rent|rate|charge|charges|payment|balance|amount|price|fee)\b/i.test(c))));
+  if (seen.size !== map.filter(Boolean).length || rentLike.length > 1) return { n: cells.length, map, bad: true };
   return { n: cells.length, map };
 }
+const RR_VACANT = /^\(?\s*(?:vacant|vacancy|available|empty|unoccupied|vacant unit|unit vacant|-|\u2014|\u2013|n\/?a|none)\s*\)?$/i;
+// a tenant cell that names no tenant and is not plainly "vacant" (a model unit, a unit that is down, an office...): the row is not read
+const RR_UNREAD_T = /^\(?\s*(?:model(?: unit)?|down(?: unit)?|unit down|office|storage|admin|employee(?: unit)?|owner(?: occupied)?|manager(?:'?s)?(?: unit)?|maintenance|tbd|unassigned|reserved|not available|n\/?a tbd)\s*\)?$/i;
+const RR_MTM = /^(?:mtm|m2m|m-t-m|month[\s-]*to[\s-]*month)$/i;
 /** A row with blank cells (whitespace-aligned tables print nothing for an empty cell): place each printed cell by what it is, only when no choice is left; otherwise null (never guessed). */
 function rrRagged(cells, hdr) {
   const c = cells.filter(Boolean);
@@ -283,7 +315,8 @@ function rrRagged(cells, hdr) {
   const rest = c.slice(1);
   const dates = rest.filter((x) => readValue('date', x)); const monies = rest.filter((x) => !readValue('date', x) && readValue('money', x));
   const texts = rest.filter((x) => !readValue('date', x) && !readValue('money', x));
-  const vacant = texts.find((x) => /^(?:vacant|vacancy|-|\u2014|n\/a|none|empty|model|down)$/i.test(x));
+  if (texts.some((x) => RR_UNREAD_T.test(x))) return null;
+  const vacant = texts.find((x) => RR_VACANT.test(x));
   const status = texts.filter((x) => x !== vacant && /^[A-Za-z][A-Za-z -]{1,24}$/.test(x)).pop();
   const names = texts.filter((x) => x !== vacant && x !== status);
   if (names.length > 1 || (!vacant && !names.length) || (vacant && names.length)) return null;
@@ -302,24 +335,41 @@ function rrRows(pages) {
   const rows = []; const conflicts = new Set(); let unread = 0;
   let hdr = null; const budget = newBudget();
   for (const p of pages ?? []) {
-    for (const raw of boundedLines(p.text, budget)) {
+    for (const raw0 of boundedLines(p.text, budget)) {
+      const raw = invisible(raw0);
       const t = raw.replace(/[ \u00a0]+$/, '').trim(); if (!t) continue;
       const h = rrHeader(t.replace(/\s{2,}/g, '  '));
       if (h) { hdr = h; continue; }
       if (!hdr || NOISE.test(t)) continue;
-      let cells = t.split(RR_SPLIT).map((c) => c.trim());
-      if (cells.length !== hdr.n && cells.filter((c) => c).length !== hdr.n) { if (cells.length > hdr.n && /^\d|^[A-Za-z]{1,2}-?\d/.test(cells[0] ?? '') && !/^(?:total|totals)\b/i.test(t)) unread++; /* a row with extra cells is counted unread, never silently dropped */ if (cells.length > hdr.n || !/^\d|^[A-Za-z]{1,2}-?\d/.test(cells[0] ?? '')) continue; }
-      if (cells.length !== hdr.n) { const fixed = rrRagged(cells, hdr); if (fixed) cells = fixed; else { if (/^\d|^[A-Za-z]{1,2}-?\d/.test(cells[0] ?? '') && !/^(?:total|totals)\b/i.test(t)) unread++; continue; } } // a short or ragged row is never guessed at (but counted, so the answer layer knows the list is incomplete)
+      let cells = t.split(RR_SPLIT).map((c) => c.trim()).map((c) => (RR_MTM.test(c) ? 'Month-to-month' : c));
+      const rowLike = /^\d|^[A-Za-z]{1,2}-?\d/.test(cells[0] ?? '') && !/^(?:total|totals)\b/i.test(t);
+      if (hdr.bad) { if (rowLike) unread++; continue; }
+      if (cells.length !== hdr.n && cells.filter((c) => c).length !== hdr.n) { if (cells.length > hdr.n && rowLike) unread++; /* a row with extra cells is counted unread, never silently dropped */ if (cells.length > hdr.n || !/^\d|^[A-Za-z]{1,2}-?\d/.test(cells[0] ?? '')) continue; }
+      if (cells.length !== hdr.n) { const fixed = rrRagged(cells, hdr); if (fixed) cells = fixed; else { if (rowLike) unread++; continue; } } // a short or ragged row is never guessed at (but counted, so the answer layer knows the list is incomplete)
       const unit = readValue('unit', cells[hdr.map.indexOf('unit')]);
-      if (!unit || /^(?:total|totals|vacant|occupied)$/i.test(cells[0])) continue;
-      const parts = [`unit=${unit}`]; const rec = { unit };
+      if (!unit || /^(?:total|totals|vacant|occupied)$/i.test(cells[0])) { if (!unit && rowLike) unread++; continue; }
+      const parts = [`unit=${unit}`]; const rec = { unit }; let bad = false; let mkt = null; let tenantCell = '';
+      const EMPTYC = /^(?:-|\u2014|\u2013|n\/?a|none|tbd|\?)?$/i;
       hdr.map.forEach((k, i) => {
-        const c = cells[i]; if (!k || k === 'unit' || !c) return;
-        if (k === 'tenant') { if (/^(?:vacant|vacancy|-|\u2014|n\/a|none|empty|model|down)$/i.test(c)) { rec.vacant = true; return; } const nm = readValue('name', c); if (nm) { parts.push(`tenant=${nm}`); rec.tenant = nm; } }
-        else if (k === 'start' || k === 'end') { const d = readValue('date', c); if (d) { parts.push(`lease_${k}=${d}`); rec[k] = d; } }
-        else if (k === 'rent' || k === 'deposit') { const m = readValue('money', c); if (m) { parts.push(`${k === 'rent' ? 'rent' : 'deposit'}=${(+m).toFixed(2)}`); rec[k] = m; } }
-        else if (k === 'status') { const s = c.replace(/\s+/g, ' ').trim(); if (/^[A-Za-z][A-Za-z -]{1,24}$/.test(s)) { parts.push(`status=${s}`); rec.status = s; } }
+        const c = cells[i]; if (!k || k === 'unit') return;
+        if (k === 'tenant') tenantCell = c ?? '';
+        if (!c || EMPTYC.test(c) && k !== 'tenant') return;
+        if (k === 'tenant') { if (RR_VACANT.test(c)) { rec.vacant = true; return; } if (RR_UNREAD_T.test(c)) { bad = true; return; } const nm = readValue('name', c); if (nm) { parts.push(`tenant=${nm}`); rec.tenant = nm; } else bad = true; }
+        else if (k === 'end' && /^month-to-month$/i.test(c)) rec.mtm = true;
+        else if (k === 'start' || k === 'end') { const d = readValue('date', c); if (d) { parts.push(`lease_${k}=${d}`); rec[k] = d; } else bad = true; }
+        else if (k === 'rent' || k === 'deposit') { const m = readValue('money', c); if (m) { parts.push(`${k === 'rent' ? 'rent' : 'deposit'}=${(+m).toFixed(2)}`); rec[k] = m; } else bad = true; }
+        else if (k === 'mkt') { const m = readValue('money', c); if (m) mkt = m; else bad = true; }
+        else if (k === 'status') { const st = c.replace(/\s+/g, ' ').trim(); if (/^[A-Za-z][A-Za-z -]{1,24}$/.test(st)) { parts.push(`status=${st}`); rec.status = st; } else bad = true; }
       });
+      // an asking (market) rent is only ever the listed rent of a vacant unit, and only when the roll has no rent column of its own
+      if (mkt && !hdr.map.includes('rent') && rec.vacant) { parts.push(`rent=${(+mkt).toFixed(2)}`); rec.rent = mkt; }
+      const stVac = /\b(?:vacant|available|empty|unoccupied)\b/i.test(rec.status ?? '');
+      if (!rec.tenant && !rec.vacant && !stVac && hdr.map.includes('tenant') && !rec.mtm) bad = true; // an empty tenant cell on a row that does not say vacant: whose unit is it?
+      if (rec.tenant && (rec.vacant || stVac)) bad = true; // a named tenant on a unit marked vacant
+      if (rec.vacant && rec.status && !stVac) bad = true; // "Vacant" tenant but a status that says something else
+      if (bad) { unread++; continue; }
+      if ((rec.vacant || stVac) && !rec.status) parts.push('status=Vacant');
+      if (rec.mtm) { const i = parts.findIndex((x) => x.startsWith('status=')); if (i < 0) parts.push('status=Month-to-month'); else if (!/month/i.test(parts[i])) parts[i] = `${parts[i]} month-to-month`; }
       if (rec.start && rec.end && rec.end < rec.start) { for (const k of ['start', 'end']) { const i = parts.findIndex((x) => x.startsWith(`lease_${k}=`)); if (i >= 0) parts.splice(i, 1); } }
       rows.push({ unit, text: parts.join('; '), page: Number(p.page_no) || 1, verbatim: t.slice(0, 200) });
     }
@@ -339,6 +389,7 @@ const CLEAN_LABEL_IN_VALUE = /\b(?:phone|tel|fax|e-?mail|contact|city|invoice|po
 export function extractProperty(pages, opts = {}) {
   // `today` (YYYY-MM-DD) comes from the caller; the extractor never reads the clock. Without it the future-date plausibility drop is skipped.
   const today = /^\d{4}-\d{2}-\d{2}$/.test(String(opts.today ?? '')) ? opts.today : null;
+  DATE_ORDER = scanDateOrder(pages);
   const lines = toLines(pages);
   if (!lines.length) return null;
   // a credit memo is a document that says so in its own title (first lines); a mention in body text ("no credit memo has been issued") never changes a sign
@@ -506,6 +557,14 @@ export function extractProperty(pages, opts = {}) {
       || /\bnotice of non-?renewal\b|\bnon-?renewed\b|\blapse (?:in|of) coverage\b/i.test(t)
       || /\b(?:polic(?:y|ies)|coverage|certificate)\b[^.:]{0,40}\b(?:was |has been |been )(?:cancel+ed|terminated|lapsed|rescinded|revoked)\b/i.test(t);
   })) return null;
+  // ---- a bare VOID / CANCELLED / SUPERSEDED stamp line (or "Status: Void") makes the document not the live one
+  { const sl = lines.slice(0, 60).find((l) => /^(?:(?:document |invoice |work order |lease |contract |agreement |record )?status\s*[:=-]\s*)?(?:void(?:ed)?|cancel+ed|superseded|rescinded|revoked|replaced)(?:\s+(?:on|effective|as of)?\s*[\d/.-]{6,10})?\W*$/i.test(l.t.trim()));
+    if (sl) {
+      const word = (sl.t.match(/(void(?:ed)?|cancel+ed|superseded|rescinded|revoked|replaced)/i)?.[1] ?? 'void');
+      const canon = /^cancel/i.test(word) ? 'Cancelled' : /^void/i.test(word) ? 'Void' : word[0].toUpperCase() + word.slice(1).toLowerCase();
+      if (type === VC) return null; // no status field exists for a contract: a voided contract is not read as a live one
+      if ([IV, WO, LS].includes(type)) best.set('status', { rank: -5, value: canon, line: sl, order: order++, ties: 0 });
+    } }
   // ---- invoice status from the money lines when no status is printed and the lines agree
   if (type === IV && !best.has('status')) {
     const amt = (re) => { const l = lines.find((x) => re.test(x.t)); const m = l?.t.match(/[:=]?\s*\$?\s*(\d[\d,]*(?:\.\d{1,2})?)\s*$/); return l && m ? { v: +m[1].replace(/,/g, ''), line: l } : null; };

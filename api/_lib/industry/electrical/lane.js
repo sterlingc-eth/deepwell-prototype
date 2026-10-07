@@ -19,6 +19,7 @@
  */
 import { answerEnvelope } from '../../scope.js';
 import { parseDate } from './extract.js';
+import { cleanValue, laneAudienceSql, conflictKeys } from '../records.js';
 
 const TENANT = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 
@@ -159,29 +160,45 @@ const certClosed = (d) => d.type === 'certificate-of-completion' && !/\b(?:void|
 const isFailedDoc = (d) => d.type === 'correction-notice' || (d.type === 'inspection-report' && resultClass(f(d, 'inspection_result')) === 'failed');
 /* ------------------------------------------------------------------ data */
 /** Every document with its extracted values and the page each value came from (corrected values win). */
+/** Keys other readers may store a lane field under (a model-read document, an older import): read as the lane's own key, per document type. */
+const ALIAS = {
+  inspection_result: { types: ['inspection-report', 'correction-notice', 'certificate-of-completion'], from: ['status', 'result', 'inspection_status', 'outcome', 'inspection_outcome'] },
+  license_expiry: { types: ['contractor-license'], from: ['expiry', 'expires', 'expiration', 'expiry_date', 'expiration_date', 'license_expires', 'valid_through'] },
+  policy_expiry: { types: ['certificate-of-insurance'], from: ['expiry', 'expires', 'expiration', 'expiry_date', 'expiration_date', 'policy_expires', 'valid_through'] },
+  bond_expiry: { types: ['surety-bond'], from: ['expiry', 'expires', 'expiration', 'expiry_date', 'expiration_date', 'bond_expires', 'valid_through'] },
+  next_test_due: { types: ['test-report'], from: ['next_due', 'due_date', 'next_test_date', 'retest_date'] },
+};
+const aliasOf = (type, key) => { for (const [canon, a] of Object.entries(ALIAS)) if (a.types.includes(type) && a.from.includes(key)) return canon; return null; };
+/** Keys that hold ONE value per document (two different readings of one is a conflict, never "the first"). A certificate listing several coverages keeps several policy numbers and expiries. */
+const SCALARS = ['permit_number', 'inspection_type', 'inspection_result', 'service_date', 'license_number', 'license_expiry', 'bond_number', 'bond_expiry', 'permit_expiry', 'permit_issue_date', 'next_test_due', 'service_address'];
 async function loadDocs(db) {
+  const aud = await laneAudienceSql(db, 'd');
   const { rows } = await db.raw(
     `SELECT d.id, d.original_filename AS filename, d.document_type AS type, d.created_at,
             x.field_key AS key, COALESCE(x.corrected_value, x.value) AS value, f.page_no AS page
        FROM documents d
        LEFT JOIN extractions x ON x.document_id = d.id AND x.${TENANT}
        LEFT JOIN facets f ON f.id = x.source_facet_id
-      WHERE d.${TENANT} AND d.document_type IS NOT NULL
+      WHERE d.${TENANT} AND d.document_type IS NOT NULL AND ${aud}
       ORDER BY d.created_at, d.id, x.created_at, x.id`, []);
   const map = new Map();
   for (const r of rows) {
     let d = map.get(r.id);
     if (!d) { d = { id: r.id, filename: r.filename, type: String(r.type).replace(/_/g, '-'), fields: {}, all: {} }; map.set(r.id, d); }
-    if (r.key && r.value != null && String(r.value).trim() !== '') {
+    const cv = cleanValue(r.value);
+    if (r.key && cv != null) {
+      let key = r.key; const al = aliasOf(d.type, key); if (al) key = al; // a value stored under an alias counts as the lane's own field
+      let v = cv;
       // a model-read date can arrive as printed text; the lane only ever compares real ISO dates
-      if (/_(?:date|expiry|due)$/.test(r.key) && !/^\d{4}-\d{2}-\d{2}$/.test(String(r.value))) { const iso = parseDate(r.value); if (iso) r.value = iso; }
-      if (/_(?:expiry|due)$/.test(r.key) && /^\d{4}-\d{2}$/.test(String(r.value))) { const [yy, mm] = String(r.value).split('-').map(Number); r.value = new Date(Date.UTC(yy, mm, 0)).toISOString().slice(0, 10); } // a month-only expiry runs to the end of that month
-      (d.all[r.key] ??= []).push({ value: String(r.value), page: r.page ?? 1 });
-      d.fields[r.key] ??= { value: String(r.value), page: r.page ?? 1 };
+      if (/_(?:date|expiry|due)$/.test(key) && !/^\d{4}-\d{2}-\d{2}$/.test(v)) { const iso = parseDate(v); if (iso) v = iso; }
+      if (/_(?:expiry|due)$/.test(key) && /^\d{4}-\d{2}$/.test(v)) { const [yy, mm] = v.split('-').map(Number); v = new Date(Date.UTC(yy, mm, 0)).toISOString().slice(0, 10); } // a month-only expiry runs to the end of that month
+      (d.all[key] ??= []).push({ value: v, page: r.page ?? 1 });
+      d.fields[key] ??= { value: v, page: r.page ?? 1 };
     }
   }
   const out = [...map.values()];
   for (const d of out) {
+    d.conflict = conflictKeys(d, d.type === 'certificate-of-insurance' ? SCALARS.filter((k) => k !== 'policy_expiry') : SCALARS);
     // a certificate listing several coverages: the EARLIEST expiry decides, and it is said so
     const ex = [...new Map((d.all.policy_expiry ?? []).filter((x) => /^\d{4}-\d{2}-\d{2}$/.test(x.value)).map((x) => [x.value, x])).values()].sort((a, b) => a.value.localeCompare(b.value));
     if (d.type === 'certificate-of-insurance' && ex.length > 1) { d.fields.policy_expiry = ex[0]; d.multi = true; }
@@ -197,7 +214,13 @@ function matchPlace(docs, tokens) {
   if (!tokens.length) return [];
   const words = tokens.filter((t) => !t.startsWith('~')); const sufs = tokens.filter((t) => t.startsWith('~')).map((t) => t.slice(1));
   if (!words.length) return [];
-  return docs.filter((d) => { const have = new Set(toks(placeText(d))); if (!words.every((t) => have.has(t))) return false; if (!sufs.length || !f(d, 'service_address')) return true; const st = canonAddr(f(d, 'service_address')).split(' u')[0].split(' '); const ds = SUF_SET.has(st[st.length - 1]) ? st[st.length - 1] : null; return !ds || sufs.includes(ds); });
+  const hit = docs.filter((d) => { const have = new Set(toks(placeText(d))); if (!words.every((t) => have.has(t))) return false; if (!sufs.length || !f(d, 'service_address')) return true; const st = canonAddr(f(d, 'service_address')).split(' u')[0].split(' '); const ds = SUF_SET.has(st[st.length - 1]) ? st[st.length - 1] : null; return !ds || sufs.includes(ds); });
+  // a name that is a word-prefix of a longer customer name ("Ace Dental" inside "Ace Dental Group"): documents of the exact name only
+  const custSet = (d) => new Set(toks(f(d, 'customer_name') ?? ''));
+  const wset = new Set(words);
+  const exact = hit.filter((d) => { const c = custSet(d); return c.size === wset.size && [...c].every((t) => wset.has(t)); });
+  if (exact.length && exact.length < hit.length && hit.filter((d) => !exact.includes(d)).every((d) => { const c = custSet(d); return c.size > wset.size && words.every((t) => c.has(t)); })) return exact;
+  return hit;
 }
 const SUF_CANON = { street: 'st', avenue: 'ave', road: 'rd', drive: 'dr', lane: 'ln', court: 'ct', boulevard: 'blvd', circle: 'cir', place: 'pl', parkway: 'pkwy', terrace: 'ter', trail: 'trl', highway: 'hwy' };
 const DIR_CANON = { north: 'n', south: 's', east: 'e', west: 'w' };
@@ -247,6 +270,34 @@ export async function runElectrical(db, intent, { today } = {}) {
     if (unk.some((d) => !scope || scope.has(d.id))) return null;
   }
   const t0 = today && /^\d{4}-\d{2}-\d{2}$/.test(today) ? today : null;
+  // Class guards (records.js): two readings of one single-valued field, or a credential with no readable date, on the records this answer rests on -> the normal path reads them.
+  {
+    const GUARD = {
+      open_permits: [['permit', 'inspection-report', 'certificate-of-completion', 'correction-notice'], ['permit_number', 'inspection_type', 'inspection_result', 'service_address']],
+      inspection_result: [['inspection-report', 'certificate-of-completion', 'correction-notice'], ['permit_number', 'inspection_type', 'inspection_result', 'service_date']],
+      failed_inspections: [['inspection-report', 'correction-notice'], ['permit_number', 'inspection_type', 'inspection_result', 'service_date', 'service_address']],
+      permit_lookup: [['permit', 'inspection-report', 'correction-notice'], ['permit_number', 'permit_issue_date']],
+      permit_city: [['permit'], ['permit_number', 'service_address']],
+      tests_due: [['test-report'], ['next_test_due', 'service_date', 'service_address']],
+    };
+    const g = GUARD[intent.kind];
+    if (g) {
+      const mp = intent.place?.length && intent.kind !== 'tests_due' ? matchPlace(docs, intent.place) : [];
+      const scope = mp.length ? new Set(mp.map((d) => d.id)) : null;
+      if (docs.some((d) => g[0].includes(d.type) && (!scope || scope.has(d.id)) && g[1].some((k) => d.conflict?.has(k)))) return null;
+    }
+    if (['open_permits', 'permit_city'].includes(intent.kind) && docs.some((d) => d.type === 'permit' && !f(d, 'permit_number'))) return null; // a permit paper with no readable number cannot be counted as open or closed
+    if (intent.kind === 'tests_due' && latestTests(docs).some((d) => f(d, 'next_test_due') && !okIso(f(d, 'next_test_due')))) return null;
+    if (intent.kind === 'credentials') {
+      const dk = { 'contractor-license': ['license_expiry', 'license_number'], 'certificate-of-insurance': ['policy_expiry', 'policy_number'], 'surety-bond': ['bond_expiry', 'bond_number'] };
+      for (const type of intent.types) {
+        const [dateK, numK] = dk[type]; const ofType = docs.filter((x) => x.type === type);
+        if (ofType.some((d) => d.conflict?.has(dateK) || d.conflict?.has(numK))) return null;
+        // a credential whose date cannot be read is never left out of the list (it may be the newest paper for its number): the normal path reads it
+        if (ofType.some((d) => !okIso(f(d, dateK)))) return null; // (a date printed as a year, 2-digit year or words is not guessed either)
+      }
+    }
+  }
 
   if (intent.kind === 'count_type') {
     let ds = docs.filter((d) => d.type === intent.type);
@@ -395,7 +446,8 @@ export async function runElectrical(db, intent, { today } = {}) {
     const facts = pick.slice(0, 40).map((r) => { if (!okIso(r.date)) return fact(r.label, 'date unreadable on the document', r.d, r.key); const dd = daysBetween(t0, r.date); return fact(r.label, `${dd < 0 ? `${isTest ? 'overdue since' : 'expired'} ${humanDate(r.date)} (${-dd} day${-dd === 1 ? '' : 's'} ${isTest ? 'overdue' : 'ago'})` : `${isTest ? 'due' : 'expires'} ${humanDate(r.date)} (${dd} day${dd === 1 ? '' : 's'})`}`, r.d, r.key); });
     const what = isTest ? 'test' : intent.types.length === 1 ? (intent.types[0] === 'certificate-of-insurance' ? 'insurance certificate' : intent.types[0].replace(/-/g, ' ')) : 'license, insurance or bond';
     const win = isTest && intent.overdueOnly ? ' overdue' : isTest ? ` due within ${intent.withinDays} days or overdue` : intent.expiredOnly ? ' already expired' : w != null ? ` expiring within ${w} days or already expired` : '';
-    return answerEnvelope({ text: pick.length ? `${pick.length} ${pick.length === 1 || what !== 'license, insurance or bond' ? what + (pick.length === 1 ? '' : 's') : 'licenses, insurance or bonds'}${win || ' on file'}. Your documents show these dates.${intent.types?.includes('certificate-of-insurance') ? ' A renewed policy under a new number may list the old one as expired too.' : ''}` : `None${win}. Your documents show no ${what} in that window.`, facts: w == null && !isTest && !intent.expiredOnly ? facts.length ? facts : rows.slice(0, 40).map((r) => fact(r.label, `expires ${humanDate(r.date)}`, r.d, r.key)) : facts });
+    const noDue = isTest ? latestTests(docs).filter((d) => !f(d, 'next_test_due')).length : 0; const tail = noDue ? ` ${noDue} test${noDue === 1 ? '' : 's'} on file ${noDue === 1 ? 'has' : 'have'} no next-test date printed, so ${noDue === 1 ? 'it is' : 'they are'} not counted.` : '';
+    return answerEnvelope({ text: (pick.length ? `${pick.length} ${pick.length === 1 || what !== 'license, insurance or bond' ? what + (pick.length === 1 ? '' : 's') : 'licenses, insurance or bonds'}${win || ' on file'}. Your documents show these dates.${intent.types?.includes('certificate-of-insurance') ? ' A renewed policy under a new number may list the old one as expired too.' : ''}` : `None${win}. Your documents show no ${what} in that window.`) + tail, facts: w == null && !isTest && !intent.expiredOnly ? facts.length ? facts : rows.slice(0, 40).map((r) => fact(r.label, `expires ${humanDate(r.date)}`, r.d, r.key)) : facts });
   }
   return null;
 }

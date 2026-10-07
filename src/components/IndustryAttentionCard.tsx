@@ -7,7 +7,7 @@ interface Item { kind: 'expired' | 'expiring' | 'overdue' | 'due' | 'unreadable'
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 /** "2026-09-01" -> "Sep 1, 2026" (anything else is shown as given). */
 const fmtDate = (d: string) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d); return m && MONTHS[Number(m[2]) - 1] ? `${MONTHS[Number(m[2]) - 1]} ${Number(m[3])}, ${m[1]}` : d; };
-const when = (i: Item) => (i.kind === 'overdue' && !i.date ? 'overdue' : i.kind === 'unreadable' ? (i.category === 'backflow' ? 'result unreadable' : 'date unreadable') : i.kind === 'failed' ? (i.days >= 0 ? 'failed' : `failed ${-i.days} day${i.days === -1 ? '' : 's'} ago`) : i.days < 0 ? `${-i.days} day${i.days === -1 ? '' : 's'} ${i.kind === 'overdue' ? 'overdue' : 'expired'}` : i.days === 0 ? 'today' : `in ${i.days} day${i.days === 1 ? '' : 's'}`);
+const when = (i: Item) => (i.kind === 'overdue' && !i.date ? 'overdue' : i.kind === 'unreadable' ? (i.category === 'backflow' ? 'result unreadable' : i.category === 'invoice' ? 'records disagree' : 'date unreadable') : i.kind === 'failed' ? (i.days >= 0 ? 'failed' : `failed ${-i.days} day${i.days === -1 ? '' : 's'} ago`) : i.days < 0 ? `${-i.days} day${i.days === -1 ? '' : 's'} ${i.kind === 'overdue' ? 'overdue' : 'expired'}` : i.days === 0 ? 'today' : `in ${i.days} day${i.days === 1 ? '' : 's'}`);
 
 /** Electrical (credentials, tests), plumbing (backflow tests, failed tests, heater warranties, permits) and property management (vendor insurance, leases, vendor contracts, reinspections, overdue invoices, overdue work orders) companies only. Shows nothing for every other industry and on any failure. */
 const ASK: Record<string, (first?: Item, all?: Item[]) => string> = {
