@@ -462,8 +462,8 @@ const leaksApp = (body, meta) => byId.get(meta.faqId)?.audience === 'app' || APP
   check('widget.js <= 14 KB', statSync(path.join(ROOT, 'public/support/widget.js')).size <= 14 * 1024, String(statSync(path.join(ROOT, 'public/support/widget.js')).size));
   const wjs = rd('public/support/widget.js');
   check('widget.js: no eval / Function() / inline handlers / third-party hosts / innerHTML', !/\beval\(|new Function|\.innerHTML|onclick=|https?:\/\/(?!deepwelltechnology\.com|www\.w3\.org\/2000\/svg)[a-z]/.test(wjs.replace(/https?:\/\/\[/g, '')), '');
-  const pages = ['public/security.html', 'public/terms.html', 'public/privacy.html', 'public/industries/electrical.html', 'public/industries/hvac.html', 'public/industries/plumbing.html', 'public/industries/property-management.html', 'public/get/index.html'];
-  check('widget tags present on all 8 public pages', pages.every((p) => rd(p).includes('href="/support/widget.css"') && rd(p).includes('<script defer src="/support/widget.js"></script>')));
+  const pages = ['public/security.html', 'public/terms.html', 'public/privacy.html', 'public/industries/electrical.html', 'public/industries/hvac.html', 'public/industries/plumbing.html', 'public/industries/property-management.html', 'public/industries/any-business.html', 'public/industries/contractors.html', 'public/industries/offices.html', 'public/industries/nonprofits.html', 'public/get/index.html'];
+  check('widget tags present on all 12 public pages', pages.every((p) => rd(p).includes('href="/support/widget.css"') && rd(p).includes('<script defer src="/support/widget.js"></script>')));
 }
 
 console.log(`\n${pass} passed, ${fail} failed.`);

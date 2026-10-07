@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="DeepWell for contractors: contracts, permits, purchase orders, invoices and inspection reports, filed by customer and address, with every answer showing the page it came from.">
+<meta property="og:title" content="Contractors — DeepWell Technology">
+<meta property="og:description" content="DeepWell for contractors: contracts, permits, purchase orders, invoices and inspection reports, filed by customer and address, with every answer showing the page it came from.">
+<meta property="og:image" content="https://deepwelltechnology.com/og-image.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:site_name" content="DeepWell Technology">
+<meta property="og:url" content="https://deepwelltechnology.com/industries/contractors.html">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Contractors — DeepWell Technology">
+<meta name="twitter:description" content="DeepWell for contractors: contracts, permits, purchase orders, invoices and inspection reports, filed by customer and address, with every answer showing the page it came from.">
+<meta name="twitter:image" content="https://deepwelltechnology.com/og-image.jpg">
+<link rel="canonical" href="https://deepwelltechnology.com/industries/contractors.html">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#0B1613">
+<title>Contractors — DeepWell Technology</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --well:#163C2C; --navy:#123D6B; --brass:#B98A4E; --ink:#0B1613;
+  --ground:#EEF2EE; --surface:#FFFFFF; --surface-2:#E2E9E4; --text:#0F1F19;
+  --muted:#4F6259; --faint:#576A62; --line:rgba(22,60,44,.18);
+  --line-strong:rgba(22,60,44,.38); --brass-text:#8E6530;
+  --shadow:0 20px 50px -30px rgba(11,22,19,.45);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#0B1613; --surface:#10201A; --surface-2:#152A22; --text:#E6EEE9;
+    --muted:#A9BBB2; --faint:#7B9286; --line:rgba(230,238,233,.14);
+    --line-strong:rgba(230,238,233,.32); --brass-text:#D8AE6E;
+    --shadow:0 20px 50px -30px rgba(0,0,0,.8);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark; --ground:#0B1613; --surface:#10201A; --surface-2:#152A22;
+  --text:#E6EEE9; --muted:#A9BBB2; --faint:#7B9286; --line:rgba(230,238,233,.14);
+  --line-strong:rgba(230,238,233,.32); --brass-text:#D8AE6E;
+  --shadow:0 20px 50px -30px rgba(0,0,0,.8);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--text);font-family:"IBM Plex Sans",-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+h1,h2{font-family:"Newsreader",Georgia,serif;font-weight:500;line-height:1.12;letter-spacing:-.01em;margin:0}
+h1{font-size:clamp(2rem,4.4vw,2.9rem)}
+h2{font-size:1.3rem;margin-bottom:6px}
+p{margin:0}
+a{color:inherit}
+.wrap{max-width:820px;margin:0 auto;padding-inline:clamp(16px,4vw,40px)}
+.eyebrow{font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);display:flex;align-items:center;gap:12px}
+.eyebrow::before{content:"";width:22px;height:1px;background:var(--brass)}
+.lede{font-size:1.1rem;color:var(--muted);max-width:62ch}
+:focus-visible{outline:2px solid var(--brass);outline-offset:3px}
+
+/* nav — same markup/classes as index.html so this is one design system,
+   not a lookalike. Links point back to sections on the main site since
+   this page has none of its own. */
+.nav{position:sticky;top:0;z-index:20;backdrop-filter:blur(12px);
+  background:color-mix(in srgb,var(--ground) 82%,transparent);border-bottom:1px solid var(--line);
+  --ground:#F4F7F4;--surface:#FFFFFF;--surface-2:#E2E9E4;--text:#0F1F19;--muted:#4F6259;--faint:#576A62;
+  --line:rgba(22,60,44,.18);--line-strong:rgba(22,60,44,.38);--well:#0D3827;
+  color:var(--text);background:#F4F7F4}
+.nav .wrap{display:flex;align-items:center;justify-content:space-between;height:68px;gap:24px}
+.brand{display:flex;align-items:center;gap:12px;text-decoration:none}
+.brand .mark{width:34px;height:34px}
+.brand .word{display:flex;flex-direction:column;gap:4px;font-family:"Newsreader",serif;font-weight:600;font-size:1.45rem;letter-spacing:-.01em;line-height:1}
+.brand .word small{font-family:"IBM Plex Mono",monospace;font-weight:500;font-size:.56rem;letter-spacing:.3em;text-transform:uppercase;color:var(--faint);padding-left:.1em}
+.brand .word b{color:#04315A;font-weight:600}
+.brand .word i{font-style:normal;color:var(--well)}
+.navlinks{display:flex;align-items:center;gap:28px;font-size:.92rem;font-weight:500;position:relative}
+.navlinks a{text-decoration:none;color:var(--muted)}
+.navlinks a:hover{color:var(--text)}
+.navlinks a[aria-current="page"]{color:var(--text)}
+.navcta{display:flex;align-items:center;gap:12px}
+@media (max-width:760px){.navlinks{display:none}}
+@media (max-width:520px){.navcta .btn-primary{display:none}}
+.btn{display:inline-flex;align-items:center;gap:10px;padding:12px 20px;border-radius:4px;font-weight:600;font-size:.95rem;text-decoration:none;border:1px solid transparent;transition:transform .2s ease,background .2s ease;min-height:44px}
+.btn-primary{background:var(--well);color:#fff}
+.btn-primary:hover{background:var(--navy);transform:translateY(-1px)}
+.btn-ghost{border-color:var(--line-strong);color:var(--text);background:transparent}
+.btn-ghost:hover{background:var(--surface)}
+
+/* Industries nav dropdown — copied from index.html verbatim (see that
+   file's labeled CSS block); kept in sync by hand until there's a shared
+   stylesheet. */
+.nav-dropdown{position:relative}
+.nav-dropdown-toggle{display:inline-flex;align-items:center;gap:5px;font:inherit;font-size:.92rem;
+  font-weight:500;color:var(--muted);background:none;border:0;padding:0;cursor:pointer}
+.nav-dropdown-toggle:hover,.nav-dropdown.open .nav-dropdown-toggle{color:var(--text)}
+.nav-dropdown-caret{flex:none;transition:transform .2s ease}
+.nav-dropdown.open .nav-dropdown-caret{transform:rotate(180deg)}
+.nav-dropdown-menu{position:absolute;top:calc(100% + 18px);left:50%;min-width:250px;
+  transform:translateX(-50%) translateY(-6px);background:var(--surface);border:1px solid var(--line);
+  border-radius:10px;box-shadow:var(--shadow);padding:8px;opacity:0;visibility:hidden;pointer-events:none;
+  transition:opacity .18s ease,transform .18s ease;z-index:30}
+.nav-dropdown.open .nav-dropdown-menu{opacity:1;visibility:visible;pointer-events:auto;
+  transform:translateX(-50%) translateY(0)}
+.nav-dropdown-menu a{display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:9px 12px;border-radius:6px;font-size:.88rem;font-weight:500;color:var(--text);text-decoration:none}
+.nav-dropdown-menu a:hover,.nav-dropdown-menu a:focus-visible{background:var(--surface-2)}
+.nav-dropdown-menu .tag{flex:none;font-family:"IBM Plex Mono",monospace;font-size:.64rem;
+  letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:20px}
+.nav-dropdown-menu .tag.live{color:#0D3827;background:color-mix(in srgb,#0D3827 16%,transparent)}
+.nav-dropdown-menu .tag.soon{color:#7A5326;background:color-mix(in srgb,var(--brass) 18%,transparent)}
+.nav-dropdown-menu{width:max-content;max-width:min(340px,calc(100vw - 32px))}
+.navlinks .nav-dropdown-menu a,.nav.menu-open .navlinks .nav-dropdown-menu a{flex-direction:column;align-items:flex-start;justify-content:center;gap:1px;white-space:normal;text-align:left}
+.nav.menu-open .nav-dropdown-menu{max-width:none}
+.nav-dropdown-menu .dd-t{font-size:.9rem;font-weight:600;line-height:1.3;color:var(--text)}
+.nav-dropdown-menu .dd-d{font-size:.8rem;font-weight:400;line-height:1.35;color:var(--muted)}
+.nav-dropdown-menu .dd-group{font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:8px 12px 4px}
+.nav-dropdown-menu .dd-group:not(:first-child){margin-top:6px;padding-top:12px;border-top:1px solid var(--line)}
+
+main{padding-block:clamp(36px,7vw,64px)}
+.hero-block{display:flex;flex-direction:column;gap:18px;padding-bottom:36px;border-bottom:1px solid var(--line);margin-bottom:36px}
+.status-pill{display:inline-flex;align-self:flex-start;align-items:center;gap:6px;font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:20px}
+.status-pill.live{color:#9DC4B2;background:color-mix(in srgb,#9DC4B2 16%,transparent)}
+.status-pill.soon{color:var(--brass-text);background:color-mix(in srgb,var(--brass) 18%,transparent)}
+.card-list{display:grid;gap:16px;margin:20px 0 44px}
+.card{border:1px solid var(--line);border-radius:10px;padding:20px 22px;background:var(--surface)}
+.card h2{font-size:1.05rem;margin-bottom:6px}
+.card p{color:var(--muted);font-size:.94rem}
+.card .tag{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:.64rem;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:20px;margin-bottom:8px}
+.card.today .tag{color:#9DC4B2;background:color-mix(in srgb,#9DC4B2 14%,transparent)}
+.card.soon .tag{color:var(--brass-text);background:color-mix(in srgb,var(--brass) 16%,transparent)}
+.cta{border:1px solid var(--line-strong);border-radius:12px;padding:28px 30px;background:var(--surface);
+  display:flex;flex-direction:column;gap:14px}
+.cta h2{font-size:1.2rem}
+.cta p{color:var(--muted)}
+.cta-row{display:flex;gap:12px;flex-wrap:wrap}
+.back-home{display:inline-flex;gap:8px;align-items:center;font-size:.88rem;color:var(--muted);text-decoration:none;margin-top:28px}
+.back-home:hover{color:var(--text)}
+
+footer{border-top:1px solid var(--line);padding-block:28px;font-size:.84rem;color:var(--faint)}
+footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+footer .wrap>div:last-child{display:flex;flex-wrap:wrap;gap:8px 18px;min-width:0}
+footer a{color:var(--muted);text-decoration:none}
+footer a:hover{color:var(--text)}
+.nav .wrap{max-width:1080px}
+/* limit-test 2026-10-03: header never wraps; phone menu reachable */
+.navlinks a,.nav-dropdown-toggle,.navcta .btn{white-space:nowrap}
+@media (max-width:760px){.navlinks{display:flex;gap:0}.navlinks>a{display:none}.navlinks .nav-dropdown-menu{position:fixed;left:16px;right:16px;top:76px;width:auto;max-width:none;min-width:0;transform:none!important}.nav-dropdown-toggle,.navcta .btn{min-height:44px}}
+
+/* ── new industry pages (any-business, contractors, offices, nonprofits) ──
+   Layout helpers and one shared motion system. Three durations, two easings,
+   one distance scale. Everything is visible without JavaScript: the hidden
+   "before" states only apply once the page has added .mo to <html>, which it
+   does only when motion is welcome. Only transform, opacity, clip-path and
+   stroke-dashoffset are animated. */
+/* same tokens as the motion system on who.html and the other industry pages */
+:root{--sm-fast:150ms;--sm-med:250ms;--sm-scene:600ms;--sm-settle:cubic-bezier(.2,.8,.2,1);--sm-travel:cubic-bezier(.65,0,.35,1);--sm-d1:6px;--sm-d2:14px;--sm-d3:28px;--sm-stagger:90ms}
+h3{font-family:"Newsreader",Georgia,serif;font-weight:500;font-size:1.05rem;line-height:1.2;margin:0 0 6px}
+.np-h{margin:0 0 14px}
+.np-fig{position:relative;margin:0;border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden;aspect-ratio:16/10;width:100%}
+.np-fig>svg{display:block;width:100%;height:100%}
+.hero-block .np-fig{margin-top:6px}
+.card .np-fig{background:var(--ground);margin-bottom:16px}
+@media (max-width:699px){.card .np-fig{width:auto;margin:-20px -22px 16px;border-width:0 0 1px;border-radius:9px 9px 0 0}}
+@media (min-width:700px){.np-fig{max-width:600px;margin-inline:auto}.np-ask{max-width:600px;margin-inline:auto}.np-ask .np-fig{max-width:none}}
+.np-fig text{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:10.5px;letter-spacing:.02em;fill:#4F6259}
+.np-fig .t-lg{font-family:"IBM Plex Sans",-apple-system,"Segoe UI",sans-serif;font-size:13px;font-weight:600;letter-spacing:0;fill:var(--text)}
+.np-fig .t-on{fill:var(--muted)}
+.np-fig .t-br{fill:var(--brass-text)}
+.np-fig .pp{fill:#F4F7F4;stroke:rgba(11,22,19,.28);stroke-width:1}
+.np-fig .ln{stroke:#C3D0C9;stroke-width:3;stroke-linecap:round;fill:none}
+.np-fig .ln-b{stroke:var(--brass);stroke-width:3;stroke-linecap:round;fill:none}
+.np-fig .st{fill:none;stroke:var(--line-strong);stroke-width:1.2;stroke-linecap:round;stroke-linejoin:round}
+.np-fig .st-b{fill:none;stroke:var(--brass);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.np-fig .st-g{fill:none;stroke:#9DC4B2;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.np-fig .bx{fill:var(--surface-2);stroke:var(--line-strong);stroke-width:1}
+.np-fig .bx-b{fill:color-mix(in srgb,var(--brass) 16%,var(--surface));stroke:var(--brass);stroke-width:1}
+.np-fig .well{fill:var(--well)}
+.np-flow{position:relative}
+.np-flow::before{content:"";position:absolute;left:-9px;top:0;bottom:0;width:2px;border-radius:2px;background:var(--brass);opacity:.55;transform-origin:50% 0}
+@media (min-width:900px){.np-flow::before{left:-18px}}
+.np-ask{margin:0 0 18px;border:1px solid var(--line-strong);border-radius:12px;background:var(--surface);padding:16px;display:grid;gap:12px}
+.np-q{display:flex;align-items:center;gap:10px;min-height:48px;padding:10px 14px;border:1px solid var(--line-strong);border-radius:24px;background:var(--ground)}
+.np-q svg{flex:none;width:22px;height:22px;color:var(--brass-text)}
+.np-q p{font-family:"Newsreader",Georgia,serif;font-size:1.06rem;line-height:1.3;color:var(--text)}
+.np-a{border-left:2px solid var(--brass);padding:2px 0 2px 14px;display:grid;gap:8px}
+.np-a>p:first-child{color:var(--text);font-size:1rem}
+.np-src{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:.86rem;color:var(--muted)}
+.np-src b{font-family:"IBM Plex Mono",monospace;font-weight:500;font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:var(--brass-text);padding:2px 8px;border-radius:20px;background:color-mix(in srgb,var(--brass) 16%,transparent)}
+.np-ask figcaption,.np-cap{font-family:"IBM Plex Mono",monospace;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+.np-asks{list-style:none;margin:0 0 14px;padding:0;display:grid;gap:10px}
+.np-asks li{font-family:"Newsreader",Georgia,serif;font-size:1.08rem;line-height:1.35;padding-left:14px;border-left:2px solid var(--brass)}
+.np-note{font-size:.9rem;color:var(--brass-text);margin-bottom:44px}
+.np-chips{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.np-chips li{font-size:.84rem;padding:3px 10px;border:1px solid var(--line-strong);border-radius:20px;color:var(--text)}
+.back-home{min-height:44px}
+footer a{display:inline-flex;align-items:center;min-height:44px}
+
+/* motion */
+.np-fig .a{transform-box:fill-box;transform-origin:50% 50%}
+.a-draw{stroke-dasharray:1;stroke-dashoffset:0}
+.a-sweep{opacity:0}
+.mo .a{--dl:calc(var(--i,0)*var(--sm-stagger));transition:transform var(--sm-scene) var(--sm-settle) var(--dl),opacity var(--sm-med) var(--sm-settle) var(--dl),stroke-dashoffset var(--sm-scene) var(--sm-travel) var(--dl),clip-path var(--sm-scene) var(--sm-travel) var(--dl)}
+.mo .np-scene:not(.in) .a-up{opacity:0;transform:translateY(var(--sm-d2))}
+.mo .np-scene:not(.in) .a-fade{opacity:0}
+.mo .np-scene:not(.in) .a-pop{opacity:0;transform:scale(.9)}
+.mo .np-scene:not(.in) .a-from{opacity:0;transform:translate(var(--tx,0),var(--ty,0)) rotate(var(--r,0deg))}
+.mo .np-scene:not(.in) .a-draw{stroke-dashoffset:1}
+.mo .np-scene:not(.in) .a-type{clip-path:inset(0 100% 0 0)}
+.mo .np-scene:not(.in) .a-grow{transform:scaleX(0)}
+.mo .np-scene.in .a-sweep{animation:np-sweep var(--sm-scene) var(--sm-travel) calc(var(--i,0)*var(--sm-stagger)) 2 alternate both}
+@keyframes np-sweep{0%{opacity:0;transform:translateY(0)}20%{opacity:1}80%{opacity:1}100%{opacity:0;transform:translateY(var(--sweep,90px))}}
+@keyframes np-spine{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+@media (prefers-reduced-motion:no-preference){
+  @supports (animation-timeline:view()){
+    .np-flow::before{animation:np-spine linear both;animation-timeline:view();animation-range:entry 20% cover 70%}
+  }
+  @supports not (animation-timeline:view()){
+    .mo .np-flow::before{transition:transform var(--sm-scene) var(--sm-settle)}
+    .mo .np-flow:not(.in)::before{transform:scaleY(0)}
+  }
+}
+@media (prefers-reduced-motion:reduce){
+  .a,.np-flow::before{transition:none!important;animation:none!important}
+}
+@media print{.a,.np-flow::before{opacity:1!important;transform:none!important;clip-path:none!important;stroke-dashoffset:0!important;animation:none!important;transition:none!important}.a-sweep{display:none}}
+.np-fig .t-don{font-family:"Newsreader",Georgia,serif;font-size:14px;letter-spacing:0;fill:#fff;paint-order:stroke;stroke:#163C2C;stroke-width:4px;stroke-linejoin:round}
+</style>
+<link rel="stylesheet" href="/support/widget.css">
+</head>
+<body>
+<script>(function(){var d=document.documentElement;try{if('IntersectionObserver' in window&&!window.matchMedia('(prefers-reduced-motion: reduce)').matches){d.classList.add('mo');setTimeout(function(){if(!window.__npReady)d.classList.remove('mo')},2500)}}catch(e){}})();</script>
+<nav class="nav" aria-label="Primary">
+  <div class="wrap">
+    <a class="brand" href="/" aria-label="DeepWell Technology home">
+      <svg class="mark" viewBox="0 0 100 100" aria-hidden="true"><g fill="none" stroke="var(--well)" stroke-width="4"><circle cx="50" cy="50" r="10"/><circle cx="50" cy="50" r="19"/><circle cx="50" cy="50" r="28"/><circle cx="50" cy="50" r="37"/><circle cx="50" cy="50" r="46"/></g></svg>
+      <span class="word"><span class="name"><b>Deep</b><i>Well</i></span><small>Technology</small></span>
+    </a>
+    <div class="navlinks">
+      <a href="/#how-it-works">How it works</a>
+      <a href="/#demo">Try it</a>
+      <div class="nav-dropdown">
+        <button type="button" class="nav-dropdown-toggle" aria-haspopup="true" aria-expanded="false" aria-controls="industriesMenu">
+          Who it&rsquo;s for
+          <svg class="nav-dropdown-caret" width="10" height="6" viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="nav-dropdown-menu" id="industriesMenu" role="menu" aria-label="Who it's for">
+          <div class="dd-group" role="presentation">By role</div>
+          <a role="menuitem" href="/who.html#office"><span class="dd-t">Office staff</span><span class="dd-d">Answer a caller with the original page in hand.</span></a>
+          <a role="menuitem" href="/who.html#field"><span class="dd-t">People in the field</span><span class="dd-d">Look things up and scan paperwork from a phone.</span></a>
+          <a role="menuitem" href="/who.html#owners"><span class="dd-t">Owners</span><span class="dd-d">See which warranties and agreements are expiring.</span></a>
+          <div class="dd-group" role="presentation">By industry</div>
+          <a role="menuitem" href="/who.html#industries"><span class="dd-t">Every industry, one app</span><span class="dd-d">See how Donovan fits your kind of business.</span></a>
+          <a role="menuitem" href="/who.html#hvac"><span class="dd-t">HVAC</span><span class="dd-d">Warranties, serial numbers and service tickets.</span></a>
+          <a role="menuitem" href="/who.html#electrical"><span class="dd-t">Electrical and plumbing</span><span class="dd-d">Permits, inspections and work orders.</span></a>
+          <a role="menuitem" href="/who.html#property"><span class="dd-t">Property management</span><span class="dd-d">Work orders, vendor contracts and invoices.</span></a>
+        </div>
+      </div>
+      <a href="/#plans">Pricing</a>
+      <a href="/#team">Founders</a>
+    </div>
+    <div class="navcta">
+      <a class="btn btn-ghost" href="/app/">Log in</a>
+      <a class="btn btn-primary" href="/app/?plan=solo&interval=month">Start free trial</a>
+    </div>
+  </div>
+</nav>
+<main class="wrap">
+  <div class="hero-block">
+    <div class="eyebrow">Who it&rsquo;s for · Contractors</div>
+    <span class="status-pill live">Available today</span>
+    <h1>Jobs, permits and invoices in one place.</h1>
+    <p class="lede">Contracts, permits, purchase orders, invoices and inspection reports are filed by customer and address. People in the field can scan paperwork from a phone, and anyone on the team can ask Donovan, DeepWell&rsquo;s assistant, and get the answer with the original page attached.</p>
+    <figure class="np-fig np-scene" role="img" aria-label="Drawing: a job-site plan draws itself, then the paperwork for the job gathers in one folder for 12 Main St.">
+      <svg viewBox="0 0 360 225" aria-hidden="true" focusable="false">
+        <path class="a a-draw" pathLength="1" style="--i:0;stroke:var(--brass);stroke-opacity:.2;stroke-width:.6;fill:none" d="M14 14H346 M14 38H346 M14 62H346 M14 86H346 M14 110H346 M14 134H346 M14 158H346 M14 182H346 M14 206H346"/>
+        <path class="a a-draw" pathLength="1" style="--i:1;stroke:var(--brass);stroke-opacity:.2;stroke-width:.6;fill:none" d="M14 14V211 M38 14V211 M62 14V211 M86 14V211 M110 14V211 M134 14V211 M158 14V211 M182 14V211 M206 14V211 M230 14V211 M254 14V211 M278 14V211 M302 14V211 M326 14V211"/>
+        <path class="st-b a a-draw" pathLength="1" style="--i:2" d="M34 62h134v118H34z"/>
+        <path class="st-b a a-draw" pathLength="1" style="--i:3" d="M34 112h50M104 112h64M98 112v68M98 146h70M98 62v22"/>
+        <path class="st-b a a-draw" pathLength="1" style="--i:4" d="M34 42h134M34 37v10M168 37v10"/>
+        <path class="st-b a a-draw" pathLength="1" style="--i:5" d="M22 62v118M17 62h10M17 180h10"/>
+        <g class="a a-up" style="--i:6"><rect class="pp" x="200" y="20" width="98" height="80" rx="3"/><text x="208" y="31">CONTRACT</text></g>
+        <g class="a a-up" style="--i:7"><rect class="pp" x="200" y="35" width="98" height="80" rx="3"/><text x="208" y="46">PERMIT</text></g>
+        <g class="a a-up" style="--i:8"><rect class="pp" x="200" y="50" width="98" height="80" rx="3"/><text x="208" y="61">PO</text></g>
+        <g class="a a-up" style="--i:9"><rect class="pp" x="200" y="65" width="98" height="80" rx="3"/><text x="208" y="76">INVOICE</text></g>
+        <g class="a a-up" style="--i:10"><rect class="pp" x="200" y="80" width="98" height="80" rx="3"/><text x="208" y="91">INSPECTION</text></g>
+        <g class="a a-up" style="--i:11"><path class="bx-b" d="M196 114a6 6 0 0 1 6-6h96l8-10h26a6 6 0 0 1 6 6v90a6 6 0 0 1-6 6H202a6 6 0 0 1-6-6z"/><text class="t-br" x="210" y="136">ADDRESS</text><text class="t-lg" x="210" y="154">12 Main St</text><path class="ln" d="M210 174h90M210 186h60"/></g>
+      </svg>
+    </figure>
+  </div>
+
+  <h2 class="np-h">What DeepWell does today</h2>
+  <div class="card-list np-flow">
+    <div class="card today">
+      <figure class="np-fig np-scene" role="img" aria-label="Drawing: a contract, a permit, a purchase order, an invoice and an inspection report, each read in turn.">
+        <svg viewBox="0 0 360 225" aria-hidden="true" focusable="false">
+          <g class="a a-up" style="--i:0"><rect class="pp" x="18" y="18" width="104" height="90" rx="4"/><text x="28" y="35">CONTRACT</text><path class="ln" d="M28 75h74M28 87h56"/></g><path class="ln-b a a-draw" pathLength="1" style="--i:1" d="M28 42h60"/>
+          <g class="a a-up" style="--i:2"><rect class="pp" x="128" y="18" width="104" height="90" rx="4"/><text x="138" y="35">PERMIT</text><path class="ln" d="M138 75h74M138 87h56"/></g><path class="ln-b a a-draw" pathLength="1" style="--i:3" d="M138 42h60"/>
+          <g class="a a-up" style="--i:4"><rect class="pp" x="238" y="18" width="104" height="90" rx="4"/><text x="248" y="35">PURCHASE</text><text x="248" y="45">ORDER</text><path class="ln" d="M248 80h74M248 92h56"/></g><path class="ln-b a a-draw" pathLength="1" style="--i:5" d="M248 52h60"/>
+          <g class="a a-up" style="--i:6"><rect class="pp" x="73" y="118" width="104" height="90" rx="4"/><text x="83" y="135">INVOICE</text><path class="ln" d="M83 175h74M83 187h56"/></g><path class="ln-b a a-draw" pathLength="1" style="--i:7" d="M83 142h60"/>
+          <g class="a a-up" style="--i:8"><rect class="pp" x="183" y="118" width="104" height="90" rx="4"/><text x="193" y="135">INSPECTION</text><text x="193" y="145">REPORT</text><path class="ln" d="M193 180h74M193 192h56"/></g><path class="ln-b a a-draw" pathLength="1" style="--i:9" d="M193 152h60"/>
+        </svg>
+      </figure>
+      <span class="tag">Works today</span>
+      <h3>Reads the paperwork behind every job</h3>
+      <p>Contracts, permits, purchase orders, invoices and inspection reports, in whatever format they&rsquo;re in. Handwriting and rough scans are fine.</p>
+    </div>
+    <div class="card today">
+      <figure class="np-fig np-scene" role="img" aria-label="Drawing: the contract, the permit and the inspection report for 12 Main St are filed together under the customer and the address.">
+        <svg viewBox="0 0 360 225" aria-hidden="true" focusable="false">
+          <g class="a a-pop" style="--i:0"><path class="bx" d="M18 34a6 6 0 0 1 6-6h28l8 10h82a6 6 0 0 1 6 6v146H18z"/><rect class="pp" x="30" y="46" width="108" height="70" rx="3"/><path class="ln" d="M42 62h60M42 74h44"/><path class="bx-b" d="M18 90a6 6 0 0 1 6-6h120a6 6 0 0 1 6 6v100a6 6 0 0 1-6 6H24a6 6 0 0 1-6-6z"/><text class="t-br" x="30" y="112">ADDRESS</text><text class="t-lg" x="30" y="128">12 Main St</text><text class="t-br" x="30" y="156">CUSTOMER</text><text class="t-lg" x="30" y="172">Delgado, M.</text></g>
+          <path class="st-b a a-draw" pathLength="1" style="--i:2" d="M152 50h6M152 112h6M152 174h6"/>
+          <g class="a a-from" style="--i:3;--tx:60px;--ty:0px;--r:0deg"><rect class="bx" x="160" y="28" width="184" height="44" rx="6"/><text class="t-lg" x="171" y="54">Contract</text></g><path class="st-g a a-draw" pathLength="1" style="--i:5" d="M321 50l5 5 9-10"/>
+          <g class="a a-from" style="--i:5;--tx:60px;--ty:0px;--r:0deg"><rect class="bx" x="160" y="90" width="184" height="44" rx="6"/><text class="t-lg" x="171" y="116">Permit BP-2025-0417</text></g><path class="st-g a a-draw" pathLength="1" style="--i:7" d="M321 112l5 5 9-10"/>
+          <g class="a a-from" style="--i:7;--tx:60px;--ty:0px;--r:0deg"><rect class="bx" x="160" y="152" width="184" height="44" rx="6"/><text class="t-lg" x="171" y="178">Inspection report</text></g><path class="st-g a a-draw" pathLength="1" style="--i:9" d="M321 174l5 5 9-10"/>
+        </svg>
+      </figure>
+      <span class="tag">Works today</span>
+      <h3>Files each page under the customer and the address</h3>
+      <p>DeepWell pulls out the names, addresses, dates, amounts and document numbers, so the contract, the permit and the invoices for one address are found together. The original page is kept.</p>
+    </div>
+    <div class="card today">
+      <figure class="np-fig np-scene" role="img" aria-label="Drawing: a phone scans a page with no signal, saves it, and uploads it when the signal returns.">
+        <svg viewBox="0 0 360 225" aria-hidden="true" focusable="false">
+          <g class="a a-pop" style="--i:0"><rect class="bx" x="30" y="17" width="84" height="190" rx="12"/><circle class="st" cx="72" cy="176" r="10"/></g>
+          <g class="a a-up" style="--i:1"><rect class="pp" x="42" y="42" width="60" height="96" rx="3"/><path class="ln" d="M50 76h42M50 90h30M50 104h38"/><path class="ln-b" d="M50 58h44"/></g>
+          <rect class="a a-sweep" style="--i:2;--sweep:90px" x="42" y="44" width="60" height="2.5" fill="#B98A4E"/>
+          <path class="st-b a a-draw" pathLength="1" style="--i:4" d="M120 73h14"/>
+          <g class="a a-up" style="--i:5"><rect class="bx" x="140" y="41" width="206" height="64" rx="8"/><text class="t-lg" x="152" y="63">SAVED ON PHONE</text></g>
+          <g class="a a-fade" style="--i:6"><rect x="152" y="88" width="4" height="4" rx="1" class="st" fill="none"/><rect x="159" y="85" width="4" height="7" rx="1" class="st" fill="none"/><rect x="166" y="82" width="4" height="10" rx="1" class="st" fill="none"/><rect x="173" y="79" width="4" height="13" rx="1" class="st" fill="none"/><text class="t-br" x="186" y="91">NO SIGNAL</text></g>
+          <g class="a a-up" style="--i:9"><rect class="bx-b" x="140" y="119" width="206" height="64" rx="8"/><text class="t-lg" x="152" y="141">UPLOADED</text></g>
+          <path class="st-g a a-draw" pathLength="1" style="--i:12" d="M226 136l5 5 9-10"/>
+          <g class="a a-fade" style="--i:11"><rect x="152" y="166" width="4" height="4" rx="1" style="fill:#9DC4B2"/><rect x="159" y="163" width="4" height="7" rx="1" style="fill:#9DC4B2"/><rect x="166" y="160" width="4" height="10" rx="1" style="fill:#9DC4B2"/><rect x="173" y="157" width="4" height="13" rx="1" style="fill:#9DC4B2"/><text class="t-br" x="186" y="169">SIGNAL BACK</text></g>
+        </svg>
+      </figure>
+      <span class="tag">Works today</span>
+      <h3>Scan from the job site</h3>
+      <p>Scan paperwork on your phone, even with no signal. The scan is saved on the phone and uploads by itself when the signal returns.</p>
+    </div>
+  </div>
+
+  <h2 class="np-h">Ask Donovan</h2>
+  <figure class="np-ask np-scene">
+    <div class="np-q"><svg viewBox="0 0 100 100" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="7"><circle cx="50" cy="50" r="12"/><circle cx="50" cy="50" r="28"/><circle cx="50" cy="50" r="44"/></g></svg><p class="a a-type" style="--i:1">Show me the signed permit for 12 Main.</p></div>
+    <div class="np-a a a-fade" style="--i:9">
+      <p>Building permit BP-2025-0417 for 12 Main St, issued 8 Apr 2025 and signed off after the final inspection on 2 Jun 2025.</p>
+      <p class="np-src"><b>Source</b> Permit BP-2025-0417 · 2 pages</p>
+    </div>
+    <figcaption>Example from sample records</figcaption>
+  </figure>
+  <ul class="np-asks">
+    <li>Show me the signed permit for 12 Main.</li>
+    <li>What&rsquo;s still unpaid on the Henderson invoices?</li>
+    <li>When does the Smith contract end?</li>
+  </ul>
+  <p class="np-note">Available today on every plan.</p>
+
+  <div class="cta">
+    <h2>See it on your own jobs</h2>
+    <p>Ask Donovan a sample question now, or see how the phone app works. Solo has a 30-day free trial: card required, cancel anytime. Setup by our team is included with every plan.</p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="/#demo">Try a question</a>
+      <a class="btn btn-ghost" href="/get">Get the phone app</a>
+    </div>
+  </div>
+
+  <a class="back-home" href="/who.html">&larr; Back to Who it&rsquo;s for</a>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>© 2026 DeepWell Technology · Knowledge Builds Business.</div>
+    <div><a href="/#how-it-works">How it works</a><a href="/#plans">Plans</a><a href="/#team">Founders</a><a href="/#contact">Contact</a><a href="/security.html">Security</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a><a href="https://status.deepwelltechnology.com">Status</a></div>
+  </div>
+</footer>
+<script>
+(function () {
+  var dd = document.querySelector('.nav-dropdown');
+  if (!dd) return;
+  var toggle = dd.querySelector('.nav-dropdown-toggle');
+  var menu = dd.querySelector('.nav-dropdown-menu');
+  if (!toggle || !menu) return;
+  var items = Array.prototype.slice.call(menu.querySelectorAll('a'));
+
+  function isOpen() { return dd.classList.contains('open'); }
+  function open() {
+    dd.classList.add('open');
+    toggle.setAttribute('aria-expanded', 'true');
+  }
+  function close(focusToggle) {
+    dd.classList.remove('open');
+    toggle.setAttribute('aria-expanded', 'false');
+    if (focusToggle) toggle.focus();
+  }
+
+  toggle.addEventListener('click', function (e) {
+    e.stopPropagation();
+    if (isOpen()) { close(false); } else { open(); }
+  });
+
+  toggle.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      open();
+      if (items[0]) items[0].focus();
+    } else if (e.key === 'Escape' && isOpen()) {
+      close(true);
+    }
+  });
+
+  menu.addEventListener('keydown', function (e) {
+    var i = items.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      var next = items[(i + 1) % items.length];
+      if (next) next.focus();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      var prev = items[(i - 1 + items.length) % items.length];
+      if (prev) prev.focus();
+    } else if (e.key === 'Escape') {
+      close(true);
+    } else if (e.key === 'Tab') {
+      setTimeout(function () {
+        if (!dd.contains(document.activeElement)) close(false);
+      }, 0);
+    }
+  });
+
+  document.addEventListener('click', function (e) {
+    if (!dd.contains(e.target)) close(false);
+  });
+  document.addEventListener('focusin', function (e) {
+    if (!dd.contains(e.target)) close(false);
+  });
+})();
+</script>
+<script>
+/* Scene reveal for the industry pages: each .np-scene gets .in once, the
+   first time it is on screen. No scroll handlers, no loops. */
+(function () {
+  var d = document.documentElement;
+  window.__npReady = true;
+  if (!d.classList.contains('mo')) return;
+  try {
+    var scenes = document.querySelectorAll('.np-scene');
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+      });
+    }, { threshold: 0.25 });
+    Array.prototype.forEach.call(scenes, function (s) { io.observe(s); });
+    /* the brass line beside the cards is tall, so it counts as seen as soon as any of it shows */
+    var flow = document.querySelectorAll('.np-flow');
+    var io2 = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { e.target.classList.add('in'); io2.unobserve(e.target); }
+      });
+    }, { threshold: 0 });
+    Array.prototype.forEach.call(flow, function (f) { io2.observe(f); });
+    /* if the visitor turns on reduced motion later, show everything at once */
+    try {
+      var mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+      var off = function () { if (mq.matches) d.classList.remove('mo'); };
+      if (mq.addEventListener) mq.addEventListener('change', off); else if (mq.addListener) mq.addListener(off);
+    } catch (e) {}
+  } catch (err) { d.classList.remove('mo'); }
+})();
+</script>
+<script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
+<script defer src="/_vercel/insights/script.js"></script>
+<script defer src="/support/widget.js"></script>
+</body>
+</html>

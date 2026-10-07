@@ -204,7 +204,7 @@ for (const c of combos) {
 }
 
 // every page that carries the widget loads it cleanly (desktop light)
-for (const p of ['/security.html', '/terms.html', '/privacy.html', '/industries/hvac.html', '/industries/electrical.html', '/industries/plumbing.html', '/industries/property-management.html', '/get/']) {
+for (const p of ['/security.html', '/terms.html', '/privacy.html', '/industries/hvac.html', '/industries/electrical.html', '/industries/plumbing.html', '/industries/property-management.html', '/industries/any-business.html', '/industries/contractors.html', '/industries/offices.html', '/industries/nonprofits.html', '/get/']) {
   const { ctx, page, errors } = await newPage({ width: 1440, height: 900 }, 'light');
   await page.goto(`${BASE}${p}`, { waitUntil: 'load' });
   const ok = await page.waitForSelector('.dwh-launcher', { timeout: 4000 }).then(() => true, () => false);

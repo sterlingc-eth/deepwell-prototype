@@ -182,7 +182,51 @@ footer a:hover{color:var(--text)}
 @media (max-width:760px){.navlinks{display:flex;gap:0}.navlinks>a{display:none}.navlinks .nav-dropdown-menu{position:fixed;left:16px;right:16px;top:76px;width:auto;max-width:none;min-width:0;transform:none!important}.nav-dropdown-toggle,.navcta .btn{min-height:44px}}
 .who-link{display:inline-flex;align-items:center;min-height:44px}
 @media (max-width:480px){.web-node{min-height:44px}}
-</style>
+<!--SM-->/* ===== SM web: DeepWell shared motion system tokens (see other pages) ===== */
+:root{--sm-fast:150ms;--sm-med:250ms;--sm-scene:600ms;--sm-settle:cubic-bezier(.2,.8,.2,1);--sm-travel:cubic-bezier(.65,0,.35,1);--sm-d1:6px;--sm-d2:14px;--sm-d3:28px}
+.web-node{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px}
+.web-node .em{flex:none;width:18px;height:18px}
+.web-spoke line{stroke-dasharray:1;transition:stroke .2s ease,stroke-width .2s ease,opacity var(--sm-med) ease}
+.web-ring polygon,.em-any .e1{stroke-dasharray:1}
+.web-pulse .pk{fill:var(--brass);opacity:0}
+.web:has(.web-spoke line.on) .web-spoke line:not(.on),.web.wm-hot .web-spoke line:not(.hot){opacity:.4}
+.web-spoke line.hot{stroke:var(--brass)}
+.web-node:is(:focus-visible){outline:2px solid var(--brass);outline-offset:3px}
+@media (max-width:480px){.web-node .em{width:14px;height:14px}.web-node{gap:3px;padding-inline:7px}}
+@media (max-width:339px){.web-node .em{display:none}}
+@media (prefers-reduced-motion:no-preference){
+@keyframes wm-hub{from{transform:translate(-50%,-50%) scale(.6);opacity:0}to{transform:translate(-50%,-50%) scale(1);opacity:1}}
+@keyframes wm-land{from{transform:translate(-50%,-50%) scale(.85);opacity:0}to{transform:translate(-50%,-50%) scale(1);opacity:1}}
+@keyframes wm-dr{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
+@keyframes wm-pk{0%{transform:translate(var(--dx),var(--dy));opacity:0}8%{opacity:.9}46%{transform:translate(0,0);opacity:.9}50%{transform:translate(0,0);opacity:0}54%{transform:translate(0,0);opacity:.9}92%{opacity:.9}100%{transform:translate(var(--dx),var(--dy));opacity:0}}
+@keyframes wm-spin{to{transform:rotate(360deg)}}
+@keyframes wm-flip{0%{transform:translateY(0)}50%{transform:translateY(6px)}100%{transform:translateY(0)}}
+@keyframes wm-fall{0%{transform:translateY(-6px);opacity:0}60%{opacity:1}100%{transform:translateY(0);opacity:1}}
+@keyframes wm-wig{0%{transform:rotate(0)}30%{transform:rotate(-28deg)}65%{transform:rotate(14deg)}100%{transform:rotate(0)}}
+@keyframes wm-swing{0%{transform:rotate(0)}35%{transform:rotate(-30deg)}70%{transform:rotate(10deg)}100%{transform:rotate(0)}}
+@keyframes wm-drawer{0%{transform:translateY(0)}50%{transform:translateY(-4px)}100%{transform:translateY(0)}}
+@keyframes wm-beat{0%{transform:scale(1)}30%{transform:scale(1.22)}60%{transform:scale(.95)}100%{transform:scale(1)}}
+@keyframes wm-line{0%{stroke-dashoffset:0}10%{stroke-dashoffset:1}100%{stroke-dashoffset:0}}
+.wm .web-hub{animation:wm-hub var(--sm-scene) var(--sm-settle) 0ms both paused}
+.wm .web-ring polygon{animation:wm-dr var(--sm-scene) var(--sm-travel) calc(var(--ri)*150ms + 150ms) both paused}
+.wm .web-ring polygon:nth-child(1){--ri:0}.wm .web-ring polygon:nth-child(2){--ri:1}.wm .web-ring polygon:nth-child(3){--ri:2}
+.wm .web-spoke line{animation:wm-dr 500ms var(--sm-travel) calc(var(--si)*90ms + 600ms) both paused}
+.wm .web-spoke line:nth-child(1){--si:0}.wm .web-spoke line:nth-child(2){--si:1}.wm .web-spoke line:nth-child(3){--si:2}.wm .web-spoke line:nth-child(4){--si:3}.wm .web-spoke line:nth-child(5){--si:4}.wm .web-spoke line:nth-child(6){--si:5}.wm .web-spoke line:nth-child(7){--si:6}.wm .web-spoke line:nth-child(8){--si:7}
+.wm .web-node{animation:wm-land var(--sm-med) var(--sm-settle) calc(var(--i)*90ms + 900ms) both paused}
+.wm .web.wm-in :is(.web-hub,.web-ring polygon,.web-spoke line,.web-node){animation-play-state:running}
+.wm .web-pulse .pk{animation:wm-pk 9s linear calc(var(--i)*1100ms + 2700ms) infinite paused}
+.wm .web.wm-in.wm-live .pk{animation-play-state:running}
+.web-node:is(:hover,:focus-visible,[aria-pressed="true"]) .em-hvac .e1{animation:wm-spin var(--sm-scene) var(--sm-travel) both}
+.web-node:is(:hover,:focus-visible,[aria-pressed="true"]) .em-electrical .e1{animation:wm-flip var(--sm-scene) var(--sm-travel) both}
+.web-node:is(:hover,:focus-visible,[aria-pressed="true"]) .em-plumbing .e1{animation:wm-fall var(--sm-scene) var(--sm-settle) both}
+.web-node:is(:hover,:focus-visible,[aria-pressed="true"]) .em-property .e1{animation:wm-wig var(--sm-scene) var(--sm-travel) both}
+.web-node:is(:hover,:focus-visible,[aria-pressed="true"]) .em-contractors .e1{animation:wm-swing var(--sm-scene) var(--sm-travel) both;transform-origin:5px 20px}
+.web-node:is(:hover,:focus-visible,[aria-pressed="true"]) .em-offices .e1{animation:wm-drawer var(--sm-scene) var(--sm-travel) both}
+.web-node:is(:hover,:focus-visible,[aria-pressed="true"]) .em-nonprofits .e1{animation:wm-beat var(--sm-scene) var(--sm-settle) both}
+.web-node:is(:hover,:focus-visible,[aria-pressed="true"]) .em-any .e1{animation:wm-line var(--sm-scene) var(--sm-travel) both}
+}
+.e1.tb,.em .tb{transform-box:fill-box;transform-origin:center}
+.em-electrical .e1,.em-plumbing .e1,.em-offices .e1{transform-box:fill-box}<!--/SM--></style>
 <link rel="stylesheet" href="/support/widget.css">
 </head>
 <body>
@@ -232,33 +276,34 @@ footer a:hover{color:var(--text)}
     <div class="web" id="web">
       <svg viewBox="0 0 100 100" aria-hidden="true" focusable="false">
         <g class="web-ring">
-          <polygon points="50,10 78.3,21.7 90,50 78.3,78.3 50,90 21.7,78.3 10,50 21.7,21.7"/>
-          <polygon points="50,24 68.4,31.6 76,50 68.4,68.4 50,76 31.6,68.4 24,50 31.6,31.6"/>
-          <polygon points="50,37 59.2,40.8 63,50 59.2,59.2 50,63 40.8,59.2 37,50 40.8,40.8"/>
+          <polygon pathLength="1" points="50,10 78.3,21.7 90,50 78.3,78.3 50,90 21.7,78.3 10,50 21.7,21.7"/>
+          <polygon pathLength="1" points="50,24 68.4,31.6 76,50 68.4,68.4 50,76 31.6,68.4 24,50 31.6,31.6"/>
+          <polygon pathLength="1" points="50,37 59.2,40.8 63,50 59.2,59.2 50,63 40.8,59.2 37,50 40.8,40.8"/>
         </g>
         <g class="web-spoke">
-          <line data-k="any" x1="50" y1="50" x2="50" y2="10"/>
-          <line data-k="hvac" x1="50" y1="50" x2="78.3" y2="21.7"/>
-          <line data-k="electrical" x1="50" y1="50" x2="90" y2="50"/>
-          <line data-k="plumbing" x1="50" y1="50" x2="78.3" y2="78.3"/>
-          <line data-k="property" x1="50" y1="50" x2="50" y2="90"/>
-          <line data-k="contractors" x1="50" y1="50" x2="21.7" y2="78.3"/>
-          <line data-k="offices" x1="50" y1="50" x2="10" y2="50"/>
-          <line data-k="nonprofits" x1="50" y1="50" x2="21.7" y2="21.7"/>
+          <line pathLength="1" data-k="any" x1="50" y1="50" x2="50" y2="10"/>
+          <line pathLength="1" data-k="hvac" x1="50" y1="50" x2="78.3" y2="21.7"/>
+          <line pathLength="1" data-k="electrical" x1="50" y1="50" x2="90" y2="50"/>
+          <line pathLength="1" data-k="plumbing" x1="50" y1="50" x2="78.3" y2="78.3"/>
+          <line pathLength="1" data-k="property" x1="50" y1="50" x2="50" y2="90"/>
+          <line pathLength="1" data-k="contractors" x1="50" y1="50" x2="21.7" y2="78.3"/>
+          <line pathLength="1" data-k="offices" x1="50" y1="50" x2="10" y2="50"/>
+          <line pathLength="1" data-k="nonprofits" x1="50" y1="50" x2="21.7" y2="21.7"/>
         </g>
+        <g class="web-pulse"><circle class="pk" r="1.1" cx="50" cy="50" style="--dx:0.0px;--dy:-40.0px;--i:0"/><circle class="pk" r="1.1" cx="50" cy="50" style="--dx:28.3px;--dy:-28.3px;--i:1"/><circle class="pk" r="1.1" cx="50" cy="50" style="--dx:40.0px;--dy:0.0px;--i:2"/><circle class="pk" r="1.1" cx="50" cy="50" style="--dx:28.3px;--dy:28.3px;--i:3"/><circle class="pk" r="1.1" cx="50" cy="50" style="--dx:0.0px;--dy:40.0px;--i:4"/><circle class="pk" r="1.1" cx="50" cy="50" style="--dx:-28.3px;--dy:28.3px;--i:5"/><circle class="pk" r="1.1" cx="50" cy="50" style="--dx:-40.0px;--dy:0.0px;--i:6"/><circle class="pk" r="1.1" cx="50" cy="50" style="--dx:-28.3px;--dy:-28.3px;--i:7"/></g>
       </svg>
       <div class="web-hub" aria-hidden="true">
         <svg viewBox="0 0 100 100"><g fill="none" stroke="currentColor" stroke-width="5"><circle cx="50" cy="50" r="12"/><circle cx="50" cy="50" r="26"/><circle cx="50" cy="50" r="40"/></g></svg>
         <b>Donovan</b>
       </div>
-      <button type="button" class="web-node" data-k="any" style="--x:50%;--y:10%">Any business</button>
-      <button type="button" class="web-node" data-k="hvac" style="--x:78.3%;--y:21.7%">HVAC</button>
-      <button type="button" class="web-node" data-k="electrical" style="--x:90%;--y:50%">Electrical</button>
-      <button type="button" class="web-node" data-k="plumbing" style="--x:78.3%;--y:78.3%">Plumbing</button>
-      <button type="button" class="web-node" data-k="property" style="--x:50%;--y:90%">Property management</button>
-      <button type="button" class="web-node" data-k="contractors" style="--x:21.7%;--y:78.3%">Contractors</button>
-      <button type="button" class="web-node" data-k="offices" style="--x:10%;--y:50%">Offices</button>
-      <button type="button" class="web-node" data-k="nonprofits" style="--x:21.7%;--y:21.7%">Nonprofits</button>
+      <button type="button" class="web-node" data-k="any" style="--x:50%;--y:10%;--i:0"><!--SM--><svg class="em em-any" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path class="e1" pathLength="1" d="M9 12h6M9 16h6"/></svg><!--/SM-->Any business</button>
+      <button type="button" class="web-node" data-k="hvac" style="--x:78.3%;--y:21.7%;--i:1"><!--SM--><svg class="em em-hvac" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><g class="e1 tb"><path d="M12 12c0-4 1-6 3-6 2 0 2 3-3 6zM12 12c3 3 3 5 1 6-2 1-4-1-1-6zM12 12c-4-1-6-.5-6.5 1.5S8 15 12 12z"/></g><circle cx="12" cy="12" r="1.2"/></svg><!--/SM-->HVAC</button>
+      <button type="button" class="web-node" data-k="electrical" style="--x:90%;--y:50%;--i:2"><!--SM--><svg class="em em-electrical" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3" width="12" height="18" rx="2"/><g class="e1"><rect x="10" y="6" width="4" height="6" rx="1" fill="currentColor"/></g><path d="M9 17h6"/></svg><!--/SM-->Electrical</button>
+      <button type="button" class="web-node" data-k="plumbing" style="--x:78.3%;--y:78.3%;--i:3"><!--SM--><svg class="em em-plumbing" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h8M7 5v3"/><g class="e1"><path d="M12 11c2.5 3 4 5 4 7a4 4 0 0 1-8 0c0-2 1.500-4 4-7z"/></g></svg><!--/SM-->Plumbing</button>
+      <button type="button" class="web-node" data-k="property" style="--x:50%;--y:90%;--i:4"><!--SM--><svg class="em em-property" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><g class="e1 tb"><circle cx="8" cy="12" r="4"/><path d="M12 12h9M18 12v4M21 12v3"/></g></svg><!--/SM-->Property management</button>
+      <button type="button" class="web-node" data-k="contractors" style="--x:21.7%;--y:78.3%;--i:5"><!--SM--><svg class="em em-contractors" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><g class="e1 tb"><path d="M5 20L14 11"/><path d="M12 5l4-2 5 5-2 4-3-1-4-4z"/></g></svg><!--/SM-->Contractors</button>
+      <button type="button" class="web-node" data-k="offices" style="--x:10%;--y:50%;--i:6"><!--SM--><svg class="em em-offices" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M4 12h16"/><g class="e1"><rect x="7" y="14.500" width="10" height="4" rx="1"/></g><path d="M10 7h4"/></svg><!--/SM-->Offices</button>
+      <button type="button" class="web-node" data-k="nonprofits" style="--x:21.7%;--y:21.7%;--i:7"><!--SM--><svg class="em em-nonprofits" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><g class="e1 tb"><path d="M12 20S4 15 4 9.500A4.500 4.500 0 0 1 12 7a4.500 4.500 0 0 1 8 2.500C20 15 12 20 12 20z"/></g></svg><!--/SM-->Nonprofits</button>
     </div>
 
     <div class="who-panel" id="who-panel" aria-live="polite">
@@ -375,14 +420,14 @@ footer a:hover{color:var(--text)}
 <script>
 (function(){
   var D={
-    any:{e:"Any business",t:"If you keep paperwork, it works.",b:"Invoices, contracts, permits, forms, correspondence and photos of documents go in as they are. DeepWell files them by customer and address and answers questions with the original page attached.",d:["Invoices","Contracts","Permits","Forms","Photos of documents"],a:["What did we pay Acme Supply in March?","Show me the signed permit for 12 Main.","When does the Smith contract end?"],n:"Available today on every plan.",c:["Try a question","/#demo"],c2:["See pricing","/#plans"]},
+    any:{e:"Any business",t:"If you keep paperwork, it works.",b:"Invoices, contracts, permits, forms, correspondence and photos of documents go in as they are. DeepWell files them by customer and address and answers questions with the original page attached.",d:["Invoices","Contracts","Permits","Forms","Photos of documents"],a:["What did we pay Acme Supply in March?","Show me the signed permit for 12 Main.","When does the Smith contract end?"],n:"Available today on every plan.",c:["See the any-business page","/industries/any-business.html"],c2:["Try a question","/#demo"]},
     hvac:{e:"HVAC",t:"Where DeepWell goes deepest today.",b:"Warranty cards, startup sheets, service tickets and nameplate photos are linked to the customer and the unit by serial. DeepWell watches every expiry and can prepare a warranty claim packet.",d:["Warranty cards","Service tickets","Nameplate photos","Startup sheets","Invoices"],a:["Is the furnace at 3247 Elm still under warranty?","Which units expire in the next 90 days?","When did we last service this address?"],n:"Equipment and warranty tracking is live.",c:["See the HVAC page","/industries/hvac.html"],c2:["Try a question","/#demo"]},
     electrical:{e:"Electrical",t:"Upload your electrical paperwork today.",b:"Work orders, invoices, permits and inspection reports can be uploaded today. DeepWell reads them and files them by customer and address, using the same general-purpose reading it uses for every business. Electrical-specific equipment fields and warranty rules are not live yet.",d:["Permits","Inspection reports","Work orders","Warranty paperwork","Invoices"],a:["Show me the permit for 12 Main.","Which inspection reports do we have for this address?","What's still unpaid on the Henderson invoices?"],n:"General document reading works today. Electrical-specific features such as panel schedules are not live and have no dates.",c:["See the electrical page","/industries/electrical.html"],c2:["Try a question","/#demo"]},
     plumbing:{e:"Plumbing",t:"Upload your plumbing paperwork today.",b:"Service tickets, invoices and permits can be uploaded today and are filed by customer and address. Plumbing-specific equipment and warranty rules are not live yet.",d:["Service tickets","Permits","Warranty paperwork","Invoices","Photos of documents"],a:["Which documents do we have for this address?","Show me the permit for 12 Main.","What did we invoice this customer last year?"],n:"General document reading works today. Plumbing-specific features such as backflow-test tracking are not live and have no dates.",c:["See the plumbing page","/industries/plumbing.html"],c2:["Try a question","/#demo"]},
     property:{e:"Property management",t:"Every address, every document.",b:"Work orders, vendor contracts, invoices, permits and inspection reports are read today and filed by property address, so anyone on the team can find the page they need.",d:["Work orders","Vendor contracts","Invoices","Permits","Inspection reports"],a:["Which documents do we have for 3247 Elm?","When does the vendor agreement end?","What did we pay Acme Supply in March?"],n:"General document reading works today. Property-specific features such as leases and unit tracking are not live and have no dates.",c:["See the property management page","/industries/property-management.html"],c2:["Try a question","/#demo"]},
-    contractors:{e:"Contractors",t:"Jobs, permits and invoices in one place.",b:"Contracts, permits, purchase orders, invoices and inspection reports are filed by customer and address. People in the field can scan paperwork from a phone.",d:["Contracts","Permits","Purchase orders","Invoices","Inspection reports"],a:["Show me the signed permit for 12 Main.","What's still unpaid on the Henderson invoices?","When does the Smith contract end?"],n:"Available today on every plan.",c:["Try a question","/#demo"],c2:["Get the phone app","/get"]},
-    offices:{e:"Offices",t:"Stop digging through the cabinet.",b:"Vendor contracts, agreements, invoices, forms and correspondence are read and filed, so the person who answers the phone can find the page in seconds.",d:["Agreements","Vendor contracts","Invoices","Forms","Correspondence"],a:["When does the Okafor agreement end?","What did we pay Acme Supply in March?","Which documents do we have for this customer?"],n:"Available today on every plan.",c:["Try a question","/#demo"],c2:["See pricing","/#plans"]},
-    nonprofits:{e:"Nonprofits",t:"Your records, answerable by anyone on the team.",b:"Agreements, invoices, forms and correspondence are read and filed by name and address, with every answer showing the page it came from.",d:["Agreements","Invoices","Forms","Correspondence","Photos of documents"],a:["When does this agreement end?","What did we pay this vendor in March?","Show me the signed form for this address."],n:"Available today on every plan.",c:["Try a question","/#demo"],c2:["See pricing","/#plans"]}
+    contractors:{e:"Contractors",t:"Jobs, permits and invoices in one place.",b:"Contracts, permits, purchase orders, invoices and inspection reports are filed by customer and address. People in the field can scan paperwork from a phone.",d:["Contracts","Permits","Purchase orders","Invoices","Inspection reports"],a:["Show me the signed permit for 12 Main.","What's still unpaid on the Henderson invoices?","When does the Smith contract end?"],n:"Available today on every plan.",c:["See the contractors page","/industries/contractors.html"],c2:["Try a question","/#demo"]},
+    offices:{e:"Offices",t:"Stop digging through the cabinet.",b:"Vendor contracts, agreements, invoices, forms and correspondence are read and filed, so the person who answers the phone can find the page in seconds.",d:["Agreements","Vendor contracts","Invoices","Forms","Correspondence"],a:["When does the Okafor agreement end?","What did we pay Acme Supply in March?","Which documents do we have for this customer?"],n:"Available today on every plan.",c:["See the offices page","/industries/offices.html"],c2:["Try a question","/#demo"]},
+    nonprofits:{e:"Nonprofits",t:"Your records, answerable by anyone on the team.",b:"Agreements, invoices, forms and correspondence are read and filed by name and address, with every answer showing the page it came from.",d:["Agreements","Invoices","Forms","Correspondence","Photos of documents"],a:["When does this agreement end?","What did we pay this vendor in March?","Show me the signed form for this address."],n:"Available today on every plan.",c:["See the nonprofits page","/industries/nonprofits.html"],c2:["Try a question","/#demo"]}
   };
   var nodes=document.querySelectorAll('.web-node'),lines=document.querySelectorAll('.web-spoke line');
   function $(id){return document.getElementById(id)}
@@ -408,5 +453,19 @@ footer a:hover{color:var(--text)}
 <script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
 <script defer src="/_vercel/insights/script.js"></script>
 <script defer src="/support/widget.js"></script>
-</body>
+<!--SM--><script>(function(){
+  var web=document.getElementById('web');if(!web)return;
+  var nodes=web.querySelectorAll('.web-node'),lines=web.querySelectorAll('.web-spoke line');
+  function hot(k,on){lines.forEach(function(l){l.classList.toggle('hot',on&&l.dataset.k===k)});web.classList.toggle('wm-hot',on)}
+  nodes.forEach(function(n){var k=n.dataset.k;
+    n.addEventListener('mouseenter',function(){hot(k,true)});n.addEventListener('mouseleave',function(){hot(k,false)});
+    n.addEventListener('focus',function(){hot(k,true)});n.addEventListener('blur',function(){hot(k,false)});});
+  if(!('IntersectionObserver' in window)||!window.matchMedia||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  document.documentElement.classList.add('wm');
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){
+    if(e.isIntersecting)web.classList.add('wm-in');
+    web.classList.toggle('wm-live',e.isIntersecting);
+  })},{threshold:.3});
+  io.observe(web);
+})();</script><!--/SM--></body>
 </html>

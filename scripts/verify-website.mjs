@@ -90,6 +90,8 @@ const PAGES = [
   '/get', '/expense-tracker.html',
   '/industries/hvac.html', '/industries/electrical.html',
   '/industries/plumbing.html', '/industries/property-management.html',
+  '/industries/any-business.html', '/industries/contractors.html',
+  '/industries/offices.html', '/industries/nonprofits.html',
 ];
 // Machine-readable resources: checked for reachability/validity, not layout.
 const RESOURCES = ['/sitemap.xml', '/robots.txt', '/site.webmanifest'];

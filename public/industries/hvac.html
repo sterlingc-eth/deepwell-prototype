@@ -149,7 +149,65 @@ footer a:hover{color:var(--text)}
 @media (max-width:760px){.navlinks{display:flex;gap:0}.navlinks>a{display:none}.navlinks .nav-dropdown-menu{position:fixed;left:16px;right:16px;top:76px;width:auto;max-width:none;min-width:0;transform:none!important}.nav-dropdown-toggle,.navcta .btn{min-height:44px}}
 </style>
 <link rel="stylesheet" href="/support/widget.css">
-</head>
+<!--SM--><style>/* ===== DeepWell shared motion system (one for all five pages) =====
+ durations: --sm-fast 150ms (state change) | --sm-med 250ms (settle/stamp) | --sm-scene 500-700ms (scene change/travel)
+ easings:   --sm-settle (landings)  | --sm-travel (movement between places)
+ distance:  --sm-d1 6px | --sm-d2 14px | --sm-d3 28px
+ Only transform, opacity, clip-path, stroke-dashoffset are ever animated.
+ Base markup = FINAL still state. Motion is added only when JS sets html.sm-s (scroll-driven) or html.sm-t (timed) AND reduced-motion is not requested. */
+:root{--sm-fast:150ms;--sm-med:250ms;--sm-scene:600ms;--sm-settle:cubic-bezier(.2,.8,.2,1);--sm-travel:cubic-bezier(.65,0,.35,1);--sm-d1:6px;--sm-d2:14px;--sm-d3:28px;--sm-brass:#B98A4E;--sm-mint:#9DC4B2;--sm-navy:#123D6B;--sm-green:#163C2C;--sm-ink:#0B1613;--sm-panel:#10201A}
+.sm-sc{display:block;position:relative;max-width:560px;width:100%;margin:28px auto;aspect-ratio:8/5;border:1px solid var(--line);border-radius:12px;background:var(--sm-panel);overflow:hidden;contain:layout paint;pointer-events:none;-webkit-user-select:none;user-select:none;view-timeline-name:--sc;view-timeline-axis:block}
+.card-list>.sm-sc{grid-column:1/-1;margin:4px auto}
+.sm-sc>svg{display:block;width:100%;height:100%}
+.sm-amb{position:absolute;inset:0;overflow:hidden;pointer-events:none;opacity:.2;contain:layout paint}
+.sm-amb>svg{position:absolute;right:0;top:0;width:100%;height:100%}
+.hero-block,.cta{position:relative}
+.hero-block>*:not(.sm-amb),.cta>*:not(.sm-amb){position:relative}
+.cta{overflow:hidden}
+.sm-amb.sm-close{opacity:.28}
+.tb{transform-box:fill-box;transform-origin:center}
+.dr{stroke-dasharray:1}
+@media (max-width:600px){.sm-amb{opacity:.14}.sm-amb.sm-close{opacity:.2}}
+@media (prefers-reduced-motion:no-preference){
+@keyframes sm-in{from{transform:var(--t0,none);opacity:var(--o0,1)}to{transform:var(--t1,none);opacity:var(--o1,1)}}
+@keyframes sm-dr{from{stroke-dashoffset:var(--s0,1)}to{stroke-dashoffset:var(--s1,0)}}
+@keyframes sm-wp{from{clip-path:var(--c0,inset(0 100% 0 0))}to{clip-path:inset(0 0 0 0)}}
+@keyframes sm-spin{to{transform:rotate(360deg)}}
+@keyframes sm-float{0%{transform:translateY(0);opacity:0}30%{opacity:1}100%{transform:translateY(calc(var(--sm-d3)*-1));opacity:0}}
+@keyframes sm-breathe{0%,100%{transform:scale(1);opacity:var(--ol,.8)}50%{transform:scale(1.015);opacity:1}}
+@keyframes sm-blink{0%,70%,100%{opacity:1}85%{opacity:.25}}
+/* one-shot scene beats. Authors: class "a" (+ "dr" stroke draw, "wp" wipe, "tr" travel easing), vars --d start ms, --u duration ms (150/250/500/600/700), --t0/--o0 start state */
+.sm-t .a{animation:sm-in calc(var(--u,250)*1ms) var(--e,var(--sm-settle)) calc(var(--d,0)*1ms) both paused}
+.sm-t .a.dr{animation-name:sm-dr}
+.sm-t .a.wp{animation-name:sm-wp}
+.sm-t .a.tr{--e:var(--sm-travel)}
+.sm-t .sm-in .a,.sm-t .sm-in.a{animation-play-state:running}
+/* loops: only while on screen (JS toggles .sm-live) */
+.sm-t .lp,.sm-s .lp{animation:var(--lk,sm-spin) var(--per,18s) var(--le,linear) calc(var(--ld,0)*1ms) infinite paused}
+.sm-live .lp{animation-play-state:running}
+@supports (animation-timeline:view()){
+.sm-s .a{--r0:calc(10% + var(--d,0)*.008%);animation:sm-in linear both;animation-timeline:--sc;animation-range:cover var(--r0) cover calc(var(--r0) + var(--u,250)*.008%)}
+.sm-s .a.dr{animation-name:sm-dr}
+.sm-s .a.wp{animation-name:sm-wp}
+}
+}
+.sm-amb.sm-close{-webkit-mask-image:linear-gradient(to right,transparent 30%,#000 90%);mask-image:linear-gradient(to right,transparent 30%,#000 90%)}
+@media (max-width:600px){.sm-amb.sm-close{opacity:.12}}
+
+@media (prefers-reduced-motion:no-preference){
+@keyframes hv-scan{0%{transform:translateY(0);opacity:0}6%{opacity:1}25%{transform:translateY(70px)}46%{transform:translateY(70px)}92%{opacity:1}100%{transform:translateY(274px);opacity:0}}
+@keyframes hv-lift{0%{transform:translateY(0);opacity:0}30%{opacity:1}100%{transform:translateY(-14px);opacity:0}}
+@keyframes hv-pu{0%,100%{transform:scale(1)}50%{transform:scale(1.25)}}
+.sm-t .hv-scan,.sm-t .hv-lift{animation:var(--k) calc(var(--u)*1ms) linear calc(var(--d)*1ms) both paused}
+.sm-t .hv-scan{--k:hv-scan}.sm-t .hv-lift{--k:hv-lift;animation-timing-function:var(--sm-travel)}
+.sm-t .hv-pu{animation:hv-pu calc(var(--u)*2ms) ease-in-out calc(var(--d)*1ms) 2 both paused}
+.sm-t .sm-in .hv-scan,.sm-t .sm-in .hv-lift,.sm-t .sm-in .hv-pu{animation-play-state:running}
+@supports (animation-timeline:view()){
+.sm-s .hv-scan,.sm-s .hv-lift,.sm-s .hv-pu{--r0:calc(10% + var(--d,0)*.008%);animation:var(--k) linear both;animation-timeline:--sc;animation-range:cover var(--r0) cover calc(var(--r0) + var(--u,250)*.008%)}
+.sm-s .hv-scan{--k:hv-scan}.sm-s .hv-lift{--k:hv-lift}.sm-s .hv-pu{--k:hv-pu}
+}
+}
+</style><!--/SM--></head>
 <body>
 <nav class="nav" aria-label="Primary">
   <div class="wrap">
@@ -187,14 +245,20 @@ footer a:hover{color:var(--text)}
   </div>
 </nav>
 <main class="wrap">
-  <div class="hero-block">
+  <div class="hero-block"><!--SM--><div class="sm-amb" data-sm="loop" aria-hidden="true"><svg viewBox="0 0 640 400" preserveAspectRatio="xMaxYMid meet" focusable="false"><g fill="none" stroke="var(--sm-mint)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M312.6 244.5A170 170 0 1 1 647.4 244.5" stroke-width="2.5"/><path d="M306.7 245.6L292.9 248M306.7 184.4L298.8 183M327.6 127L320.7 123M366.9 80.2L361.7 74M419.8 49.6L417.1 42.1M480 39L480 25M540.2 49.6L542.9 42.1M593.1 80.2L598.3 74M632.4 127L639.3 123M653.3 184.4L661.2 183M653.3 245.6L667.1 248" stroke-opacity=".6"/><g transform="translate(372 120) scale(1.1)"><rect x="0" y="0" width="200" height="170" rx="12" fill="var(--sm-ink)" fill-opacity=".5" stroke-width="2.5"/>
+<path d="M14 170v8h32v-8M154 170v8h32v-8" stroke-width="2.5"/>
+<g transform="translate(100 72)"><g class="lp tb" style="--per:18s" fill="var(--sm-mint)" fill-opacity=".16" stroke-width="1.5"><circle r="50" fill="none" stroke="none"/><path d="M0-8C8-22 28-34 46-24C40-8 22-2 6 4Z" transform="rotate(0)"/><path d="M0-8C8-22 28-34 46-24C40-8 22-2 6 4Z" transform="rotate(72)"/><path d="M0-8C8-22 28-34 46-24C40-8 22-2 6 4Z" transform="rotate(144)"/><path d="M0-8C8-22 28-34 46-24C40-8 22-2 6 4Z" transform="rotate(216)"/><path d="M0-8C8-22 28-34 46-24C40-8 22-2 6 4Z" transform="rotate(288)"/><circle r="9" fill-opacity=".4"/></g>
+<g stroke-width="1.75"><circle r="60" stroke-width="2.5"/><circle r="44" stroke-opacity=".6"/><circle r="28" stroke-opacity=".6"/><path d="M0,-14 L0,-58M0,14L0,58"/><path d="M7,-12.1 L29,-50.2M-7,12.1L-29,50.2"/><path d="M12.1,-7 L50.2,-29M-12.1,7L-50.2,29"/><path d="M14,0 L58,0M-14,0L-58,0"/><path d="M12.1,7 L50.2,29M-12.1,-7L-50.2,-29"/><path d="M7,12.1 L29,50.2M-7,-12.1L-29,-50.2"/></g></g>
+<path d="M20 142H128M20 152H128M20 162H128" stroke-width="2" stroke-opacity=".7"/>
+<rect x="146" y="138" width="40" height="26" rx="4" stroke-width="2" stroke-opacity=".7"/>
+<path d="M200 96h16M200 112h16" stroke-width="2" stroke-opacity=".6"/></g><path class="lp" style="--lk:sm-float;--per:6s;--ld:0" stroke-opacity=".7" d="M440 110c-8-12 8-22 0-34s8-22 0-34"/><path class="lp" style="--lk:sm-float;--per:6s;--ld:1980" stroke-opacity=".7" d="M482 104c-8-12 8-22 0-34s8-22 0-34"/><path class="lp" style="--lk:sm-float;--per:6s;--ld:3960" stroke-opacity=".7" d="M524 110c-8-12 8-22 0-34s8-22 0-34"/></g></svg></div><!--/SM-->
     <div class="eyebrow">Who it&rsquo;s for · HVAC</div>
     <span class="status-pill live">Live today</span>
     <h1>Built first for HVAC contractors — live today</h1>
     <p class="lede">HVAC is the trade DeepWell was built first for and the one it runs end to end today: work orders, invoices, warranty registrations, permits, startup sheets, service tickets and nameplate photos, each linked to the customer and the equipment it belongs to. DeepWell works for any business with paperwork; this is where it goes deepest.</p>
   </div>
 
-  <h2 style="margin-bottom:14px">What DeepWell does today</h2>
+  <!--SM--><div class="sm-sc" data-sm="once" aria-hidden="true"><svg viewBox="0 0 640 400" focusable="false"><g fill="none" stroke="var(--sm-mint)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><defs><path id="hv-sq" d="M0 0L7 -9L14 6L21 -6L28 10L35 -10L42 4L49 -4L56 9L63 -8L70 7L77 -5L84 9L91 -10L98 5L105 -7L112 8L119 -9L126 6L133 -6L140 10L147 -8L154 4" stroke-width="2.5"/></defs><g class="a tr" style="--d:0;--u:500;--t0:translateX(28px);--o0:0"><rect x="24" y="56" width="226" height="288" rx="14" fill="var(--sm-ink)" stroke-opacity=".6"/><rect x="34" y="66" width="206" height="268" rx="8" stroke-opacity=".18"/><circle cx="46" cy="80" r="4.5" fill="var(--sm-mint)" fill-opacity=".5" stroke="none"/><circle cx="228" cy="80" r="4.5" fill="var(--sm-mint)" fill-opacity=".5" stroke="none"/><circle cx="46" cy="320" r="4.5" fill="var(--sm-mint)" fill-opacity=".5" stroke="none"/><circle cx="228" cy="320" r="4.5" fill="var(--sm-mint)" fill-opacity=".5" stroke="none"/><rect x="60" y="80" width="120" height="8" rx="4" fill="var(--sm-mint)" fill-opacity=".35" stroke="none"/><rect x="48" y="108" width="178" height="36" rx="7" stroke-opacity=".5"/><use href="#hv-sq" x="58" y="126" stroke-opacity=".6" stroke-width="2.5"/><rect x="52" y="160" width="56" height="5" rx="2.5" fill="var(--sm-mint)" fill-opacity=".3" stroke="none"/><rect x="52" y="200" width="70" height="5" rx="2.5" fill="var(--sm-mint)" fill-opacity=".3" stroke="none"/><rect x="52" y="240" width="48" height="5" rx="2.5" fill="var(--sm-mint)" fill-opacity=".3" stroke="none"/><rect x="52" y="280" width="62" height="5" rx="2.5" fill="var(--sm-mint)" fill-opacity=".3" stroke="none"/></g><g class="a" style="--d:1440;--u:150;--o0:0.15"><rect x="52" y="170" width="174" height="18" rx="9" fill="var(--sm-mint)" fill-opacity=".5" stroke="none"/></g><g class="a" style="--d:1620;--u:150;--o0:0.15"><rect x="52" y="210" width="124" height="18" rx="9" fill="var(--sm-mint)" fill-opacity=".3" stroke="none"/><circle cx="68" cy="219" r="3.5" fill="var(--sm-mint)"/></g><g class="a" style="--d:1800;--u:150;--o0:0.15"><rect x="52" y="250" width="154" height="18" rx="9" fill="var(--sm-mint)" fill-opacity=".5" stroke="none"/></g><g class="a" style="--d:1980;--u:150;--o0:0.15"><rect x="52" y="290" width="104" height="18" rx="9" fill="var(--sm-mint)" fill-opacity=".5" stroke="none"/></g><g class="a" style="--d:1260;--u:150;--o0:0"><use href="#hv-sq" x="58" y="126" stroke="var(--sm-brass)" stroke-width="3"/></g><g class="hv-scan" style="--d:720;--u:700" opacity="0"><rect x="30" y="38" width="214" height="18" fill="var(--sm-brass)" fill-opacity=".14" stroke="none"/><path d="M30 57H244" stroke="var(--sm-brass)" stroke-width="3"/></g><g class="hv-lift" style="--d:2070;--u:500" opacity="0"><use href="#hv-sq" x="58" y="126" stroke="var(--sm-brass)" stroke-width="3"/></g><g class="a tr" style="--d:1890;--u:500;--t0:translateY(28px);--o0:0"><rect x="300" y="56" width="160" height="144" rx="10" fill="var(--sm-navy)" stroke-opacity=".5"/><rect x="316" y="72" width="84" height="8" rx="4" fill="var(--sm-mint)" fill-opacity=".5" stroke="none"/><rect x="316" y="94" width="128" height="30" rx="5" stroke-opacity=".5" stroke-dasharray="4 4"/><rect x="316" y="140" width="56" height="5" rx="2.5" fill="var(--sm-mint)" fill-opacity=".3" stroke="none"/><rect x="316" y="154" width="40" height="5" rx="2.5" fill="var(--sm-mint)" fill-opacity=".3" stroke="none"/></g><g class="a" style="--d:2430;--u:250;--t0:translateY(14px);--o0:0"><g transform="translate(320 112) scale(.8)"><use href="#hv-sq" stroke="var(--sm-brass)" stroke-width="3"/></g></g><g class="a tb" style="--d:2700;--u:250;--t0:scale(.96);--o0:0"><rect x="384" y="150" width="66" height="38" rx="6" fill="var(--sm-brass)" fill-opacity=".16" stroke="var(--sm-brass)" stroke-width="3"/><path d="M398 169l8 8 16-14" stroke="var(--sm-brass)" stroke-width="3"/></g><g class="a tr" style="--d:2250;--u:500;--t0:translateY(14px);--o0:0"><rect x="300" y="224" width="160" height="120" rx="8" fill="var(--sm-navy)" fill-opacity=".45" stroke-opacity=".3"/><rect x="316" y="240" width="70" height="7" rx="3.5" fill="var(--sm-mint)" fill-opacity=".3" stroke="none"/><path d="M316 276H444M316 294H430M316 312H410M316 330H380" stroke-opacity=".22" stroke-width="3"/></g><g class="a" style="--d:3150;--u:250;--o0:0"><g transform="translate(358 258) scale(.6)"><use href="#hv-sq" stroke="var(--sm-brass)" stroke-width="3"/></g></g><path class="a dr tr" pathLength="1" style="--d:2970;--u:500;--s0:1;--s1:0" stroke="var(--sm-brass)" stroke-width="2" d="M226 126H275M275 108V266M275 108H300M275 266H300"/><circle cx="275" cy="108" r="3.5" fill="var(--sm-brass)" stroke="none"/><circle cx="275" cy="266" r="3.5" fill="var(--sm-brass)" stroke="none"/><g class="a tr" style="--d:2700;--u:500;--t0:translateY(14px);--o0:0"><path d="M500 330V152a8 8 0 0 1 8-8H538l12 12H612a8 8 0 0 1 8 8V330Z" fill="var(--sm-green)" fill-opacity=".7"/><path d="M512 156H530" stroke="var(--sm-brass)" stroke-width="3"/></g><g class="a tb tr" style="--d:3240;--u:700;--t0:translateY(-28px) scale(1.5);--o0:0"><rect x="514" y="152" width="92" height="52" rx="4" fill="var(--sm-navy)" stroke-opacity=".5"/><rect x="520" y="160" width="92" height="52" rx="4" fill="var(--sm-navy)" stroke-opacity=".5" transform="translate(-6 -6)"/><path d="M526 168h40M526 180h56" stroke-opacity=".3" stroke-width="3"/><circle cx="592" cy="166" r="4" fill="var(--sm-brass)" stroke="none"/></g><g class="a tr" style="--d:2700;--u:500;--t0:translateY(14px);--o0:0"><rect x="500" y="190" width="120" height="140" rx="8" fill="var(--sm-panel)"/><path d="M530 272L560 244L590 272M538 266V300H582V266M553 300V282H567V300" stroke-width="2.5"/></g></g></svg></div><!--/SM--><h2 style="margin-bottom:14px">What DeepWell does today</h2>
   <div class="card-list">
     <div class="card today">
       <span class="tag">Works today</span>
@@ -213,7 +277,7 @@ footer a:hover{color:var(--text)}
     </div>
   </div>
 
-  <h2 style="margin-bottom:14px">Also on the roadmap for HVAC</h2>
+  <!--SM--><div class="sm-sc" data-sm="once" aria-hidden="true"><svg viewBox="0 0 640 400" focusable="false"><g fill="none" stroke="var(--sm-mint)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><g class="a" style="--d:0;--u:250;--t0:translateY(14px);--o0:0"><rect x="28" y="34" width="250" height="60" rx="14" fill="var(--sm-navy)" stroke-opacity=".4"/><path d="M44 94l-10 14 26-14" fill="var(--sm-navy)" stroke-opacity=".4"/><rect x="48" y="52" width="170" height="8" rx="4" fill="var(--sm-mint)" fill-opacity=".6" stroke="none"/><rect x="48" y="70" width="110" height="8" rx="4" fill="var(--sm-mint)" fill-opacity=".35" stroke="none"/></g><g class="hv-pu tb" style="--d:270;--u:150"><circle cx="310" cy="64" r="9" fill="var(--sm-mint)" stroke="none"/><circle cx="310" cy="64" r="15" stroke-opacity=".3"/></g><rect class="a wp" style="--d:900;--u:500" x="28" y="140" width="360" height="20" rx="10" fill="var(--sm-mint)" fill-opacity=".5" stroke="none"/><rect class="a wp" style="--d:990;--u:500" x="28" y="182" width="340" height="20" rx="10" fill="var(--sm-mint)" fill-opacity=".5" stroke="none"/><rect class="a wp" style="--d:1080;--u:500" x="28" y="224" width="372" height="20" rx="10" fill="var(--sm-mint)" fill-opacity=".5" stroke="none"/><rect class="a wp" style="--d:1170;--u:500" x="28" y="266" width="210" height="20" rx="10" fill="var(--sm-mint)" fill-opacity=".5" stroke="none"/><path d="M28 336h0" stroke="none"/><rect x="28" y="322" width="360" height="40" rx="20" stroke-opacity=".3"/><rect x="50" y="339" width="120" height="6" rx="3" fill="var(--sm-mint)" fill-opacity=".2" stroke="none"/><circle cx="366" cy="342" r="8" fill="var(--sm-mint)" fill-opacity=".35" stroke="none"/><g class="a tr" style="--d:1980;--u:500;--t0:translateX(14px);--o0:0"><rect x="420" y="108" width="192" height="244" rx="12" fill="var(--sm-ink)" stroke-opacity=".6"/><rect x="429" y="117" width="174" height="226" rx="6" stroke-opacity=".18"/><circle cx="436" cy="124" r="4" fill="var(--sm-mint)" fill-opacity=".5" stroke="none"/><circle cx="596" cy="124" r="4" fill="var(--sm-mint)" fill-opacity=".5" stroke="none"/><circle cx="436" cy="336" r="4" fill="var(--sm-mint)" fill-opacity=".5" stroke="none"/><circle cx="596" cy="336" r="4" fill="var(--sm-mint)" fill-opacity=".5" stroke="none"/><rect x="448" y="122" width="80" height="7" rx="3.5" fill="var(--sm-mint)" fill-opacity=".4" stroke="none"/><rect x="448" y="302" width="100" height="6" rx="3" fill="var(--sm-mint)" fill-opacity=".2" stroke="none"/><rect x="444" y="146" width="130" height="8" rx="4" fill="var(--sm-mint)" fill-opacity="0.28" stroke="none"/><rect x="444" y="174" width="100" height="8" rx="4" fill="var(--sm-mint)" fill-opacity="0.28" stroke="none"/><rect x="444" y="202" width="140" height="8" rx="4" fill="var(--sm-mint)" fill-opacity="0" stroke="none"/><rect x="444" y="230" width="90" height="8" rx="4" fill="var(--sm-mint)" fill-opacity="0.28" stroke="none"/><rect x="444" y="258" width="120" height="8" rx="4" fill="var(--sm-mint)" fill-opacity="0.28" stroke="none"/></g><g class="a" style="--d:2490;--u:250;--o0:0"><rect x="430" y="198" width="170" height="18" rx="4" fill="var(--sm-brass)" fill-opacity=".14" stroke="none"/><path d="M432 198V216" stroke="var(--sm-brass)" stroke-width="3"/><rect x="444" y="202" width="140" height="8" rx="4" fill="var(--sm-brass)" stroke="none"/></g><path class="a wp" style="--d:1890;--u:250" d="M28 207H412" stroke="var(--sm-brass)" stroke-width="3"/></g></svg></div><!--/SM--><h2 style="margin-bottom:14px">Also on the roadmap for HVAC</h2>
   <div class="card-list">
     <div class="card soon">
       <span class="tag">Coming for HVAC</span>
@@ -227,7 +291,19 @@ footer a:hover{color:var(--text)}
     </div>
   </div>
 
-  <div class="cta">
+  <!--SM--><div class="sm-sc" data-sm="once" aria-hidden="true"><svg viewBox="0 0 640 400" focusable="false"><g fill="none" stroke="var(--sm-mint)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><defs><g id="hv-ic"><rect x="0" y="0" width="200" height="170" rx="12" fill="var(--sm-ink)" fill-opacity=".5" stroke-width="5"/>
+<path d="M14 170v8h32v-8M154 170v8h32v-8" stroke-width="5"/>
+<g transform="translate(100 72)"><g fill="var(--sm-mint)" fill-opacity=".16" stroke-width="3"><circle r="50" fill="none" stroke="none"/><path d="M0-8C8-22 28-34 46-24C40-8 22-2 6 4Z" transform="rotate(0)"/><path d="M0-8C8-22 28-34 46-24C40-8 22-2 6 4Z" transform="rotate(72)"/><path d="M0-8C8-22 28-34 46-24C40-8 22-2 6 4Z" transform="rotate(144)"/><path d="M0-8C8-22 28-34 46-24C40-8 22-2 6 4Z" transform="rotate(216)"/><path d="M0-8C8-22 28-34 46-24C40-8 22-2 6 4Z" transform="rotate(288)"/><circle r="9" fill-opacity=".4"/></g>
+<g stroke-width="3.5"><circle r="60" stroke-width="5"/><circle r="44" stroke-opacity=".6"/><circle r="28" stroke-opacity=".6"/><path d="M0,-14 L0,-58M0,14L0,58"/><path d="M7,-12.1 L29,-50.2M-7,12.1L-29,50.2"/><path d="M12.1,-7 L50.2,-29M-12.1,7L-50.2,29"/><path d="M14,0 L58,0M-14,0L-58,0"/><path d="M12.1,7 L50.2,29M-12.1,-7L-50.2,-29"/><path d="M7,12.1 L29,50.2M-7,-12.1L-29,-50.2"/></g></g>
+<path d="M20 142H128M20 152H128M20 162H128" stroke-width="4" stroke-opacity=".7"/>
+<rect x="146" y="138" width="40" height="26" rx="4" stroke-width="4" stroke-opacity=".7"/>
+<path d="M200 96h16M200 112h16" stroke-width="4" stroke-opacity=".6"/></g></defs><g class="a tr" style="--d:0;--u:500;--t0:translateY(14px);--o0:0"><rect x="22" y="32" width="188" height="190" rx="12" fill="var(--sm-green)" fill-opacity=".55" stroke-opacity=".5"/><g transform="translate(60 50) scale(.56)"><use href="#hv-ic"/></g><rect x="38" y="182" width="96" height="8" rx="4" fill="var(--sm-mint)" fill-opacity=".14" stroke="none"/><rect class="a wp" style="--d:600;--u:500" x="38" y="182" width="81.6" height="8" rx="4" fill="var(--sm-mint)" fill-opacity="0.55" stroke="none"/><path d="M172 170A16 16 0 1 1 172 202A16 16 0 1 1 172 170" stroke-opacity=".5" stroke-width="3"/><path d="M165 187l5 5 9-10" stroke-opacity=".7" stroke-width="2.5"/></g><g class="a tr" style="--d:180;--u:500;--t0:translateY(14px);--o0:0"><rect x="226" y="32" width="188" height="190" rx="12" fill="var(--sm-green)" fill-opacity=".55" stroke-opacity=".5"/><g transform="translate(264 50) scale(.56)"><use href="#hv-ic"/></g><rect x="242" y="182" width="96" height="8" rx="4" fill="var(--sm-mint)" fill-opacity=".14" stroke="none"/><rect class="a wp" style="--d:780;--u:500" x="242" y="182" width="67.2" height="8" rx="4" fill="var(--sm-mint)" fill-opacity="0.55" stroke="none"/><path d="M376 170A16 16 0 1 1 376 202A16 16 0 1 1 376 170" stroke-opacity=".5" stroke-width="3"/><path d="M369 187l5 5 9-10" stroke-opacity=".7" stroke-width="2.5"/></g><g class="a tr" style="--d:360;--u:500;--t0:translateY(14px);--o0:0"><rect x="430" y="32" width="188" height="190" rx="12" fill="var(--sm-green)" fill-opacity=".55" stroke-opacity=".5"/><g transform="translate(468 50) scale(.56)"><use href="#hv-ic"/></g><rect x="446" y="182" width="96" height="8" rx="4" fill="var(--sm-mint)" fill-opacity=".14" stroke="none"/><rect class="a wp" style="--d:960;--u:500" x="446" y="182" width="28.8" height="8" rx="4" fill="var(--sm-brass)" fill-opacity="0.8" stroke="none"/><path d="M580 170A16 16 0 1 1 580 202A16 16 0 1 1 580 170" stroke-opacity=".25" stroke-width="4"/><path class="a dr tr" pathLength="1" stroke-dashoffset=".2" style="--d:1080;--u:700;--s0:1;--s1:.2" d="M580 170A16 16 0 1 1 580 202A16 16 0 1 1 580 170" stroke="var(--sm-brass)" stroke-width="4"/></g><g class="a" style="--d:1830;--u:250;--o0:0"><rect x="431" y="32" width="188" height="190" rx="12" fill="var(--sm-brass)" fill-opacity=".12" stroke="none"/><path d="M431 46V208" stroke="var(--sm-brass)" stroke-width="4"/></g><rect x="22" y="270" width="378" height="56" rx="28" fill="var(--sm-navy)" fill-opacity=".6" stroke-opacity=".35"/><rect x="56" y="288" width="200" height="8" rx="4" fill="var(--sm-mint)" fill-opacity=".5" stroke="none"/><rect x="56" y="304" width="130" height="6" rx="3" fill="var(--sm-mint)" fill-opacity=".25" stroke="none"/><g class="a" style="--d:2280;--u:250;--t0:translateX(-6px);--o0:1"><circle cx="372" cy="298" r="10" fill="var(--sm-mint)" stroke="none"/><circle cx="372" cy="298" r="16" stroke-opacity=".3"/></g><rect x="438" y="250" width="172" height="114" rx="10" fill="var(--sm-panel)" stroke-opacity=".45"/><path d="M482 242V258M566 242V258" stroke-width="3"/><path d="M438 282H610" stroke-opacity=".3"/><circle cx="466" cy="308" r="4" fill="var(--sm-mint)" fill-opacity=".35" stroke="none"/><circle cx="502" cy="308" r="4" fill="var(--sm-mint)" fill-opacity=".35" stroke="none"/><circle cx="538" cy="308" r="4" fill="var(--sm-mint)" fill-opacity=".35" stroke="none"/><circle cx="574" cy="308" r="4" fill="var(--sm-mint)" fill-opacity=".35" stroke="none"/><circle cx="466" cy="330" r="4" fill="var(--sm-mint)" fill-opacity=".35" stroke="none"/><circle cx="502" cy="330" r="4" fill="var(--sm-mint)" fill-opacity=".35" stroke="none"/><circle cx="574" cy="330" r="4" fill="var(--sm-mint)" fill-opacity=".35" stroke="none"/><circle cx="466" cy="352" r="4" fill="var(--sm-mint)" fill-opacity=".35" stroke="none"/><circle cx="502" cy="352" r="4" fill="var(--sm-mint)" fill-opacity=".35" stroke="none"/><circle cx="538" cy="352" r="4" fill="var(--sm-mint)" fill-opacity=".35" stroke="none"/><circle cx="574" cy="352" r="4" fill="var(--sm-mint)" fill-opacity=".35" stroke="none"/><circle cx="538" cy="330" r="10" stroke-opacity=".5"/><circle cx="462" cy="268" r="4" fill="var(--sm-mint)" fill-opacity=".8"/><g class="a" style="--d:2010;--u:250;--o0:0"><rect x="438" y="250" width="172" height="114" rx="10" stroke="var(--sm-brass)" stroke-width="3"/><path d="M438 250H610V282H438Z" fill="var(--sm-brass)" fill-opacity=".16" stroke="none"/><circle cx="538" cy="330" r="10" stroke="var(--sm-brass)" stroke-width="3"/></g></g></svg></div><!--/SM--><div class="cta"><!--SM--><div class="sm-amb sm-close" data-sm="loop" aria-hidden="true"><svg viewBox="0 0 640 400" focusable="false"><g fill="none" stroke="var(--sm-mint)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M152.6 244.5A170 170 0 1 1 487.4 244.5" stroke-width="2.5"/><path d="M146.7 245.6L132.9 248M146.7 184.4L138.8 183M167.6 127L160.7 123M206.9 80.2L201.7 74M259.8 49.6L257.1 42.1M320 39L320 25M380.2 49.6L382.9 42.1M433.1 80.2L438.3 74M472.4 127L479.3 123M493.3 184.4L501.2 183M493.3 245.6L507.1 248" stroke-opacity=".6"/><path d="M424.1 90.9L444.7 66.4" stroke="var(--sm-brass)" stroke-width="5"/><circle cx="417.7" cy="98.6" r="4" fill="var(--sm-brass)" stroke="none"/><g class="lp tb" style="--lk:sm-breathe;--per:6s;--ol:.85"><g transform="translate(220 128) scale(1)"><rect x="0" y="0" width="200" height="170" rx="12" fill="var(--sm-ink)" fill-opacity=".5" stroke-width="2.5"/>
+<path d="M14 170v8h32v-8M154 170v8h32v-8" stroke-width="2.5"/>
+<g transform="translate(100 72)"><g class="lp tb" style="--per:40s" fill="var(--sm-mint)" fill-opacity=".16" stroke-width="1.5"><circle r="50" fill="none" stroke="none"/><path d="M0-8C8-22 28-34 46-24C40-8 22-2 6 4Z" transform="rotate(0)"/><path d="M0-8C8-22 28-34 46-24C40-8 22-2 6 4Z" transform="rotate(72)"/><path d="M0-8C8-22 28-34 46-24C40-8 22-2 6 4Z" transform="rotate(144)"/><path d="M0-8C8-22 28-34 46-24C40-8 22-2 6 4Z" transform="rotate(216)"/><path d="M0-8C8-22 28-34 46-24C40-8 22-2 6 4Z" transform="rotate(288)"/><circle r="9" fill-opacity=".4"/></g>
+<g stroke-width="1.75"><circle r="60" stroke-width="2.5"/><circle r="44" stroke-opacity=".6"/><circle r="28" stroke-opacity=".6"/><path d="M0,-14 L0,-58M0,14L0,58"/><path d="M7,-12.1 L29,-50.2M-7,12.1L-29,50.2"/><path d="M12.1,-7 L50.2,-29M-12.1,7L-50.2,29"/><path d="M14,0 L58,0M-14,0L-58,0"/><path d="M12.1,7 L50.2,29M-12.1,-7L-50.2,-29"/><path d="M7,12.1 L29,50.2M-7,-12.1L-29,-50.2"/></g></g>
+<path d="M20 142H128M20 152H128M20 162H128" stroke-width="2" stroke-opacity=".7"/>
+<rect x="146" y="138" width="40" height="26" rx="4" stroke-width="2" stroke-opacity=".7"/>
+<path d="M200 96h16M200 112h16" stroke-width="2" stroke-opacity=".6"/></g></g></g></svg></div><!--/SM-->
       <h2>See it on real records</h2>
       <p>HVAC is where DeepWell is deepest today, and it works for any business with paperwork. Your own documents, answered with citations. Start a free trial or log in to your account.</p>
       <div class="cta-row">
@@ -309,5 +385,22 @@ footer a:hover{color:var(--text)}
 <script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
 <script defer src="/_vercel/insights/script.js"></script>
 <script defer src="/support/widget.js"></script>
-</body>
+<!--SM--><script>(function(){
+  var d=document.documentElement;
+  if(!('IntersectionObserver' in window)||!window.matchMedia||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  var sd=!!(window.CSS&&CSS.supports&&CSS.supports('animation-timeline: view()'));
+  d.classList.add(sd?'sm-s':'sm-t');
+  var once=document.querySelectorAll('[data-sm="once"]'),loops=document.querySelectorAll('[data-sm="loop"]');
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){
+    e.target.classList.toggle('sm-live',e.isIntersecting);
+  })},{threshold:0});
+  Array.prototype.forEach.call(loops,function(n){io.observe(n)});
+  if(!sd){
+    var io2=new IntersectionObserver(function(es){es.forEach(function(e){
+      if(e.isIntersecting){e.target.classList.add('sm-in');io2.unobserve(e.target)}
+    })},{threshold:.35});
+    Array.prototype.forEach.call(once,function(n){io2.observe(n)});
+  }
+})();
+</script><!--/SM--></body>
 </html>

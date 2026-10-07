@@ -242,7 +242,7 @@ const quiet = async (fn) => {
   eq('pricing: page allowances unchanged', rows('New pages / month'), ['750', '2,000', '5,000', '10,000']);
 
   const stale = /unlimited logins|donovan usage allowance|usage allowance|asks per month|Donovan usage \/ month|per technician|1 technician|2[–-]4 technicians|5[–-]10 technicians/i;
-  const scanned = ['index.html', 'public/terms.html', 'public/get/index.html', 'public/industries/hvac.html', 'public/industries/electrical.html', 'public/industries/plumbing.html', 'public/industries/property-management.html', 'docs/SECURITY.md', 'README.md',
+  const scanned = ['index.html', 'public/terms.html', 'public/get/index.html', 'public/industries/hvac.html', 'public/industries/electrical.html', 'public/industries/plumbing.html', 'public/industries/property-management.html', 'public/industries/any-business.html', 'public/industries/contractors.html', 'public/industries/offices.html', 'public/industries/nonprofits.html', 'docs/SECURITY.md', 'README.md',
     'src/screens/BillingScreen.tsx', 'src/screens/TeamScreen.tsx', 'src/services/billingClient.ts', 'src/services/teamClient.ts', 'src/screens/AskScreen.tsx'];
   check('no stale plan claim anywhere in public/, index.html, terms, docs or the billing/team screens', scanned.every((f) => !stale.test(read(f))), scanned.filter((f) => stale.test(read(f))).join(', '));
   const team = read('src/screens/TeamScreen.tsx');
