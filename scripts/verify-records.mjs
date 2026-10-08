@@ -65,7 +65,9 @@ section("parser", async () => {
     ["is carol rios's unit still under warranty", ["warranty_status"]], ["who installed the trane at 5 main st", ["installer"]], ["whose unit has serial CA657005", ["customer_name", "serial_number"]],
   ];
   for (const [q, want] of cases) { const p = P.parseRecordsQuestion(q, {}); const got = p.facts.filter((f) => want.includes(f) || true); check(`parser: "${q}" -> ${want.join("+")}`, want.every((w) => got.includes(w)) && got.length <= want.length + 1, `${p.facts} / aside=${p.stepAside}`); }
-  const asides = ["how many invoices did carol rios have", "who has the most invoices", "average invoice for carol rios", "what work did we do for carol rios last quarter please", "how do i mark an invoice as paid"];
+  const asides = ["how many invoices did carol rios have", "who has the most invoices", "average invoice for carol rios", "what work did we do for carol rios last quarter please"];
+  // R3 (intended change): help / how-to wording is a SOFT veto (flagged, not stepped aside by the reader); the lane still steps aside when no single customer or document number is named
+  { const q = "how do i mark an invoice as paid"; const p = P.parseRecordsQuestion(q, {}); check(`parser: "${q}" is flagged as how-to`, p.softVeto === true, `${p.stepAside}`); const r = await h.ask("A", q); check(`lane: "${q}" has no subject, so no records-lane answer`, r.debug?.laneDetail !== "records-lane", r.text.slice(0, 160)); }
   for (const q of asides) { const p = P.parseRecordsQuestion(q, {}); check(`parser steps aside: "${q}"`, Boolean(p.stepAside) || !p.facts.length, `${p.facts} / ${p.stepAside}`); }
   const { restoreNameCase } = await import("../api/_lib/records/nameCase.js");
   const vocab = { customers: { phrases: ["Thomas Mercer", "Carol Rios"] }, technicians: { phrases: ["Danny Ochoa"] } };
@@ -253,7 +255,10 @@ section("switch-and-order", async () => {
   // fail-safe order: a question with no stored fact that fits is not answered by the records lane; the model path runs and its lie never reaches the user
   const q2 = "what did the customer say about the noise at Carol Rios's house";
   const r2 = await h.ask("A", q2);
-  check("no stored fact fits: the records lane steps aside", !(r2.debug?.laneDetail === "records-lane"), r2.text.slice(0, 160));
+  // R3 (intended change): a resolved customer whose question names no stored fact now gets "everything on file" from the stored rows (late phase, no model), never a decline
+  check("no stored fact fits: a resolved customer gets the stored record, no model call", r2.calls === 0 && /^Here is everything on file for Carol Rios/.test(r2.text), r2.text.slice(0, 160));
+  const r2b = await h.ask("A", "what did the customer say about the noise at Zorp Quillfeather's house");
+  check("no stored fact fits and no subject: the records lane steps aside", !(r2b.debug?.laneDetail === "records-lane"), r2b.text.slice(0, 160));
   check("a lying model answer is not shown", !r2.shown.includes("Zebediah Crane owes"), r2.text.slice(0, 160));
   const r3 = await h.ask("A", "labor charge on invoice INV-99999");
   check("an unknown document number is not answered with another document's fact", !/\$\d/.test(r3.text) || /no |not |can'?t|couldn'?t|don'?t/i.test(r3.text), r3.text.slice(0, 160));
@@ -394,7 +399,7 @@ section("r2-regressions", async () => {
   const lm = await h.ask("A", `what'd we bill for labor on ${ivNum}`);
   check("r2: a labor-money question on a golden-style invoice is not answered with the total as the labor", !/labor[^.]*:\s*\$/i.test(lm.text) && !/^Invoice [^ ]+ was \$/i.test(lm.text), lm.text);
   // an invented fact word that no lane reads: never the customer / total
-  for (const q of [`${ivNum} what colour was the van`, `${ivNum} did they tip`, `${ivNum} weather that day`]) { const r = await h.ask("A", q); check(`r2: unread words with a document number never get the total/customer "${q}"`, !/\$\d/.test(r.text) && !r.shown.includes(nameOf(linda)) || /not stored|can'?t|couldn'?t|nothing/i.test(r.text), r.text.slice(0, 200)); }
+  for (const q of [`${ivNum} what colour was the van`, `${ivNum} did they tip`, `${ivNum} weather that day`]) { const r = await h.ask("A", q); check(`r2: unread words with a document number never get the total/customer "${q}"`, !/\$\d/.test(r.text) && !r.shown.includes(nameOf(linda)) || /not stored|can'?t|couldn'?t|nothing/i.test(r.text) || /^Here is everything on file for Invoice/.test(r.text), r.text.slice(0, 200)); } // R3 (intended change): in the late phase a resolved document gets the labelled stored-record answer instead of a decline
   // quotes: never presented as what a job cost
   for (const [q, c, quote] of [["how much did the delgado job run", [barb, marcus], ["$8,421.00", "$9,633.00"]], ["how much did marcus delgado cost us", [marcus], ["$9,633.00"]], ["what did we charge barbara delgado", [barb], ["$8,421.00"]], ["total for barbara delgado", [barb], ["$8,421.00"]]]) {
     const r = await h.ask("A", q);
@@ -415,6 +420,57 @@ section("r2-regressions", async () => {
   // directory paraphrases point at real directory words
   const D2 = await import("../api/_lib/records/directory.js");
   for (const w of D2.PARAPHRASE_FACT_TARGETS) check(`r2 directory: paraphrase target "${w}" is a directory phrase`, D2.PHRASES.some(([p]) => p === w), w);
+});
+
+/* ============================================================================================ 9. never decline a resolved subject (late phase) */
+section("r3-stored-record", async () => {
+  const linda = custA("Linda Fitzgerald"), marcus = custA("Marcus Delgado");
+  const inv = T.customerDocs(ixA, linda.id).map((id) => ixA.docs.get(id)).find((d) => ixA.fin.get(d.id)?.doc_kind === "invoice" && ixA.fin.get(d.id)?.invoice_number);
+  const num = ixA.fin.get(inv.id).invoice_number; const total = T.money(ixA.fin.get(inv.id).total);
+  const techs = T.docFactValues(ixA, inv.id, "technician");
+  const hasNotes = T.docFactValues(ixA, inv.id, "notes").length > 0;
+  // a document by number, wordings the fact list does not know: everything stored on it, led by a plain sentence
+  for (const q of [`describe the job on ${num}`, `${num} what was that job`, `which employee did ${num.toLowerCase()}`, `time logged on ${num}`, `what did ${num} come to`, `mention everything for ${num}`, `labor portion of ${num}`]) {
+    const r = await h.ask("A", q);
+    check(`r3 doc "${q}": a stored-record answer, no model`, r.kind === "answer" && r.calls === 0 && /^Here is everything on file for/i.test(r.text) && r.shown.includes(num), r.text.slice(0, 200));
+    check(`r3 doc "${q}": values only from the rows`, techs.every((t) => r.shown.includes(t)) && r.shown.includes(total), r.text.slice(0, 200));
+  }
+  const rl = await h.ask("A", `labor portion of ${num}`);
+  check("r3: a labor money question says whether a separate labor charge is stored (the total is never passed off as labor)", /does not record a separate labor charge|Labor charge: \$/i.test(rl.text), rl.text.slice(0, 260));
+  // yes/no about a stored (or not stored) fact on a document
+  const ry = await h.ask("A", `did the tech leave any notes on ${num}`);
+  check("r3 yes/no: notes on a document are answered from the rows", hasNotes ? /notes/i.test(ry.text) && ry.kind === "answer" : /not stored/i.test(ry.text) && ry.kind === "answer", ry.text.slice(0, 240));
+  const rn = await h.ask("A", `was there a note on ${num}`);
+  check("r3 yes/no: single fact is answered Yes/No", hasNotes ? /^Yes/.test(rn.text) : /^No/.test(rn.text), rn.text.slice(0, 200));
+  // a customer by full name: their documents newest first with details
+  for (const q of [`${linda.data.customer_name.toLowerCase()} service history`, `what have we done at ${linda.data.customer_name}'s`, `remind me what we did for ${linda.data.customer_name}`, `anything noted about ${linda.data.customer_name}'s last service`]) {
+    const r = await h.ask("A", q);
+    check(`r3 customer "${q}": stored-record answer or an exact one, never a decline`, r.kind === "answer" && r.calls === 0 && r.shown.includes(linda.data.customer_name), r.text.slice(0, 200));
+    check(`r3 customer "${q}": no other customer's name`, !r.shown.includes(marcus.data.customer_name), r.text.slice(0, 200));
+  }
+  const rs = await h.ask("A", `${linda.data.customer_name.toLowerCase()} service history`);
+  check("r3 customer: leads with the plain sentence and is newest first", /^Here is everything on file for/.test(rs.text) && /newest first/.test(rs.text), rs.text.slice(0, 200));
+  // exclusions stay declines (never a stored-record answer for another subject)
+  for (const q of [`describe the job on INV-99999`, `how many jobs did we do for ${linda.data.customer_name}`, `average labor hours for ${linda.data.customer_name}`, `what did we do for ${linda.data.customer_name} in 2019 and not 2020`, `staff notes on ${linda.data.customer_name}`]) {
+    const r = await h.ask("A", q);
+    check(`r3 exclusion "${q}": not a stored-record answer`, !/^Here is everything on file for/i.test(r.text), r.text.slice(0, 200));
+  }
+  // R3b (intended change): two customers named are each answered separately and labelled (no merged answer, no one invoice line each)
+  const r2c = await h.ask("A", `what did we do for ${linda.data.customer_name} and ${marcus.data.customer_name}`);
+  check("r3b two customers: each answered separately", r2c.kind === "answer" && /answered separately/.test(r2c.text) && r2c.shown.includes(linda.data.customer_name) && r2c.shown.includes(marcus.data.customer_name) && !/'s invoice is #/.test(r2c.text), r2c.text.slice(0, 240));
+  // R3b: a name with no billing word is not read by the invoice look-up lane
+  for (const q of [`what's the history with ${linda.data.customer_name}`, `${linda.data.customer_name} past jobs`]) { const r = await h.ask("A", q); check(`r3b "${q}": the customer's stored record, not an invoice line`, r.kind === "answer" && !/^[^.]*'s invoice is #/.test(r.text) && r.calls === 0, r.text.slice(0, 200)); }
+  // R3b: compare / which-customer about ONE document number is a look at that document
+  for (const q of [`${num} belongs to which customer`, `labor vs total on ${num}`]) { const r = await h.ask("A", q); check(`r3b "${q}": answered from the stored record, no field-name decline`, r.kind === "answer" && r.shown.includes(num) && !/couldn't match/.test(r.text), r.text.slice(0, 220)); }
+  const rcu = await h.ask("A", `${num} belongs to which customer`); check("r3b: the customer of a document is stated", new RegExp(`is for ${linda.data.customer_name}`).test(rcu.text), rcu.text.slice(0, 160));
+  const rno = await h.ask("A", "describe the job on INV-99999");
+  check("r3: an unknown number never shows another document", !/Linda|Marcus/.test(rno.shown), rno.text.slice(0, 200));
+  // org isolation
+  const rb = await h.ask("B", `describe the job on ${num}`);
+  check("r3 isolation: org B never sees org A's document", !rb.shown.includes(nameOf(linda)), rb.text.slice(0, 200));
+  // last-job question where the newest document lacks the fact: honest about the newest, and the newest that has it is added, dated and labelled
+  const rr = await h.ask("A", `remarks on the last visit to ${linda.data.customer_name}`);
+  check("r3 rule 3: the newest document that carries the fact is added and labelled", /not stored on it/i.test(rr.text) && /newest document that does carry it is/i.test(rr.text), rr.text.slice(0, 300));
 });
 
 /* ============================================================================================ run */

@@ -12,7 +12,7 @@ import { parseRecordsQuestion, findFacts, tokensOf, MAY_HAVE_WINDOW, alnum, STOP
 import { FACTS, factById } from "./directory.js";
 import * as store from "./store.js";
 import { nameTokens, tokenSame } from "../lookups/nameMatch.js";
-import { isNonNameWord } from "../lookups/commonWords.js";
+import { isNonNameWord, isGivenName, isRealWordOrName } from "../lookups/commonWords.js";
 import { attachCitations, documentRecord, customerRecord, unitRecord } from "../citations/records.js";
 
 export const CAP = 5;
@@ -201,8 +201,20 @@ function answerForDocs({ docs: allDocs, bundle, factsWanted, who, order, all, sc
     if (!withObs.some((x) => x.d.document_id === t.d.document_id)) {
       const names = wanted.map((f) => f.label.toLowerCase()).join(" / "); addRec(t.d, null);
       const have = storedLabels(t.d, bundle, wanted.map((f) => f.id));
-      return envelope({ text: clean(`${label}, the ${order === "oldest" ? "oldest" : "newest"} one is ${docTitle(t.d, bundle)}${humanDate(t.date) ? `, ${humanDate(t.date)}` : ""}: ${names} is not stored on it.${have.length ? ` What is stored on it: ${have.join(", ")}.` : ""}${asideNote()}`),
-        cards, sources: [sourceOf(t.d, null)], records, total: 1, basis: `Read the stored record of ${docTitle(t.d, bundle)}; ${names} is not stored on it.` });
+      // the newest (or oldest) document that DOES carry the fact is added, dated and labelled as its own document (never as the asked-for document's value)
+      const alt = (order === "oldest" ? [...withObs].reverse() : withObs).find((x) => cand.includes(x)) ?? (order === "oldest" ? withObs[withObs.length - 1] : withObs[0]);
+      const altBits = [], altSources = [];
+      for (const { f, o } of alt.obs) {
+        if (!o.length) continue;
+        const vals = o.slice(0, f.multi ? 6 : 1).map((y) => showValue(f, y.value));
+        altBits.push(`${f.label.toLowerCase()}: ${vals.join("; ")}`);
+        for (const y of o.slice(0, f.multi ? 6 : 1)) altSources.push(sourceOf(alt.d, y.page));
+        cards.push({ label: `${f.label} · ${docTitle(alt.d, bundle)}${humanDate(alt.date) ? ` · ${humanDate(alt.date)}` : ""}`, value: vals.join("; "), status: "ok", sources: [sourceOf(alt.d, o[0].page)] });
+      }
+      addRec(alt.d, alt.obs.flatMap((y) => y.o)[0]?.page ?? null);
+      const altText = ` The ${order === "oldest" ? "oldest" : "newest"} document that does carry it is ${docTitle(alt.d, bundle)}${humanDate(alt.date) ? `, ${humanDate(alt.date)}` : ""} (that document's own value, not the ${order === "oldest" ? "oldest" : "newest"} one's): ${altBits.join("; ")}.`;
+      return envelope({ text: clean(`${label}, the ${order === "oldest" ? "oldest" : "newest"} one is ${docTitle(t.d, bundle)}${humanDate(t.date) ? `, ${humanDate(t.date)}` : ""}: ${names} is not stored on it.${have.length ? ` What is stored on it: ${have.join(", ")}.` : ""}${altText}${asideNote()}`),
+        cards, sources: [sourceOf(t.d, null), ...altSources], records, total: 1 + 1, basis: `Read the stored record of ${docTitle(t.d, bundle)}; ${names} is not stored on it. Also read ${docTitle(alt.d, bundle)}, the ${order === "oldest" ? "oldest" : "newest"} document that has it.` });
     }
   }
   if (!withObs.length) {
@@ -254,17 +266,41 @@ function entityText(c, key) { return clean(c[key]); }
 
 /* ---------------------------------------------------------------------------------------------- lane */
 
-export async function runRecordsLane(db, question, { today, phase = "early", customers = null } = {}) {
+/** skips that mean "the subject was found but the question's facts could not be read": in the late phase these end in a stored-record answer, never a decline */
+const SUBJECT_FOUND_SKIPS = new Set(["no-fact", "no-fact-after-name", "no-fact-after-subject", "unread-words-with-document-number", "unread-words-with-customer", "summary-nothing", "pointless", "customer-of-a-document-owned-by-older-lane", "yes-no-question", "unresolved-name-words", "whole-card-owned-by-older-lane", "several-customers-named"]);
+const EXISTENCE_ASK = /\b(?:any|anything|there|have|has|had|got|on file|recorded|stored|listed)\b/;
+
+export async function runRecordsLane(db, question, opts = {}) {
   if (!recordsFirstEnabled()) return null;
+  const phase = opts.phase ?? "early";
+  const state = {};
+  const r = await runCore(db, question, opts, state);
+  if (phase !== "late") return r;
+  if (r?.data?.kind === "answer" && state.yesNo) {
+    // a yes/no question about a stored fact: say yes or no from the rows (only when the question asks whether it exists; a value check just gets the stored values)
+    const has = (r.data.facts ?? []).length > 0;
+    if (state.yesNo.existence && state.yesNo.n === 1) r.data.text = has ? `Yes: ${r.data.text}` : `No. ${r.data.text}`;
+  }
+  if (r?.skip && SUBJECT_FOUND_SKIPS.has(r.skip)) {
+    try { const f = await storedRecordFallback(db, question, opts); if (f) return f; } catch (err) { console.error("Records fallback failed:", err?.message); }
+  }
+  return r;
+}
+
+async function runCore(db, question, { today, phase = "early", customers = null } = {}, state = {}) {
   let periodFn = null;
   const lower = String(question ?? "").toLowerCase();
   if (MAY_HAVE_WINDOW.test(lower)) { try { periodFn = (await import("../financials/answers.js")).parsePeriod; } catch { periodFn = null; } }
   const p = parseRecordsQuestion(question, { today, parsePeriodFn: periodFn });
   if (p.stepAside) return { skip: p.stepAside };
+  if (p.softVeto && phase !== "late") return { skip: "aggregate-or-howto" };
   p.serials = p.serials.filter((sn) => !p.docNumbers.some((d) => d.alnum === sn));
   if (!p.facts.length && !p.summary && !(p.docNumbers.length && /\bstatus\b/.test(p.text))) return { skip: "no-fact" };
   // a yes/no question ("do we have a maintenance agreement on file for ...", "is the technician Ray?") is answered yes or no by the older lanes, never with a list of values
-  if (/^(?:do|does|did|is|are|was|were|has|have|had|can|could|will|would|should)\s/.test(p.text) && !/^(?:can|could|would|will) (?:you|u) /.test(p.text)) return { skip: "yes-no-question" };
+  if (/^(?:do|does|did|is|are|was|were|has|have|had|can|could|will|would|should)\s/.test(p.text) && !/^(?:can|could|would|will) (?:you|u) /.test(p.text)) {
+    if (phase !== "late") return { skip: "yes-no-question" };
+    state.yesNo = { existence: EXISTENCE_ASK.test(p.text) };
+  }
   if (/\b(?:isnt|isn t|is not|arent|not|never|no longer|except|without|other than|besides|excluding|instead of)\b/.test(p.text)) return { skip: "negation" };
   if (p.facts.some((id) => factById(id)?.elsewhere)) return { skip: "owned-by-older-lane" };
   if (phase === "early" && !p.docNumbers.length && p.facts.some((id) => LATE_ONLY.has(id))) return { skip: "late-only-fact" };
@@ -301,6 +337,7 @@ export async function runRecordsLane(db, question, { today, phase = "early", cus
   // "name of the guy who handled it" asks for the technician; the word "name" alone is not the customer
   if (factIds.includes("technician") && factIds.includes("customer_name") && !/\b(?:customer|whose|owner|billed|bill to|client|homeowner)\b/.test(p.text)) factIds = factIds.filter((id) => id !== "customer_name");
   if (!factIds.length && !p.summary) return { skip: "no-fact-after-name" };
+  if (state.yesNo) state.yesNo.n = factIds.length;
   if (p.summary && /\b(?:dispatch|proposal|quote|estimate|permit|agreement|warranty|startup|start up|inspection|purchase order|nameplate|correspondence|memo|email)\b/.test(p.text) && !p.docNumbers.length) return { skip: "summary-of-a-document-type" };
   if (phase === "early" && !codes.length && factIds.some((id) => LATE_ONLY.has(id))) return { skip: "late-only-fact" };
   // customer-record and unit facts (address, phone, serial, refrigerant ...) are answered by the older lanes when they claim the question; this lane only takes them after those lanes declined
@@ -531,4 +568,131 @@ function answerSummary({ scope, docs, bundle, factIds, customerRec, order, win }
     if (inv) { const t = observe(factById("total"), inv.d, bundle)[0]; text += ` The newest invoice on file is ${docTitle(inv.d, bundle)}, ${humanDate(inv.date)}, total ${fmtMoney(t.value)}.`; sources.push(sourceOf(inv.d, t.page)); cards.push({ label: `Total · ${docTitle(inv.d, bundle)}`, value: fmtMoney(t.value), status: "ok", sources: [sourceOf(inv.d, t.page)] }); const r2 = documentRecord({ id: inv.d.document_id, document_type: "invoice", original_filename: inv.d.filename }, { label: docTitle(inv.d, bundle), sublabel: humanDate(inv.date), page: t.page }); if (r2) records.push(r2); }
   }
   return envelope({ text: clean(text), cards, sources, records: [customerRec, ...records].filter(Boolean), total: records.length + (customerRec ? 1 : 0), basis: `Assembled from the stored fields of ${docTitle(d, bundle)}${win ? ` (${win.label})` : ""}; each part is cited to its document and page.` });
+}
+
+
+/* ---------------------------------------------------------------------------------------------- stored-record fallback (late phase) */
+
+const FALLBACK_SKIP_WORDS = /\b(?:isnt|isn t|is not|arent|not|never|no longer|except|without|other than|besides|excluding|instead of)\b/;
+/** every fact that is stored on one document, in directory order (the facts a person can ask a document for; plumbing and the document's own number / customer are in its heading) */
+const DOC_DUMP_SKIP = new Set(["customer_name", "invoice_number", "doc_kind", "direction", "equipment_list", "po_number", "vendor_name"]);
+const CUSTOMER_DUMP = ["service_type", "work_performed", "technician", "labor_hours", "notes", "total"];
+
+/**
+ * LATE PHASE ONLY, after the older lanes declined: the question named exactly one subject (a document number, a unit serial or a customer's full name) but its wording
+ * did not name a fact this lane can read. Instead of declining, show what is stored about that subject (values only from stored rows, each cited). Steps aside (null)
+ * for anything that is not a single resolved subject: aggregates, time windows, negation, restricted wording, several or partial names, a number that does not exist.
+ */
+async function storedRecordFallback(db, question, { today, customers = null } = {}) {
+  const p = parseRecordsQuestion(question, { today });
+  if (p.stepAside || FALLBACK_SKIP_WORDS.test(p.text)) return null;
+  if (p.window) return null;
+  if (!p.docNumbers.length && /\b(?:worst|best|longest|shortest|fastest|slowest|better|worse|compar\w*|difference|rank\w*|sort\w*|trend\w*|total of|sum)\b/.test(p.text)) return null; // a ranking or comparison is not "everything on file"
+  if (/\b(?:arriv\w*|what time|gate code|eta|on ?site)\b|\btech(?:nician)?s?\s+(?:phone|email|number|address|cell)\b/.test(p.text)) return null;
+  if (/\b(?:staff|internal|private|confidential|secret|hidden|admin|office only|owner only)\b/.test(p.text)) return null;
+  if (/\b(?:bills?|vendors?|suppliers?)\b/.test(p.text) && !p.docNumbers.length) return null;
+  if (/\b(?:warranty|agreement|expire\w*|due|balance|owe\w*|paid|unpaid|overdue)\b/.test(p.text) && !p.docNumbers.length && !p.serials.length) return null; // money state / coverage across a customer's documents belongs to the older lanes
+  p.serials = p.serials.filter((sn) => !p.docNumbers.some((d) => d.alnum === sn));
+  const cust = customers ?? await store.loadCustomers(db);
+  const codes = [...p.docNumbers];
+  for (const s of p.serials) if (!codes.some((c) => c.alnum === s)) codes.push({ raw: s, alnum: s, digits: s.replace(/\D/g, ""), prefixed: true });
+  const nameSkip = new Set(); p.tokens.forEach((t, i) => { if (codes.some((c) => c.alnum === alnum(t))) nameSkip.add(i); });
+  const nm = matchCustomers(p.tokens, cust, nameSkip);
+  if (nm.kind === "partial") return null;
+  const several = nm.kind === "full" && nm.hits.length > 1;
+  if (several && (codes.length || nm.hits.length > 3 || new Set(nm.hits.map((h) => h.c.id)).size !== nm.hits.length || nm.hits.some((h) => cust.filter((c) => c.name === h.c.name).length > 1))) return null;
+  const named = nm.kind === "full" && !several ? nm.hits[0] : null;
+  // a second person in the question: a given name, a surname or any customer's name word that is not part of the one resolved name; a capitalised word that is not a fact word; or two names joined by a conjunction
+  const nameIdx = new Set(several ? nm.hits.flatMap((h) => h.idx) : named ? named.idx : []);
+  const f2 = findFacts(p.tokens, { exclude: new Set([...nameIdx, ...nameSkip]) });
+  const onFile = new Set(cust.flatMap((c) => nameTokens(c.name)));
+  const unused = p.tokens.filter((t, i) => !nameIdx.has(i) && !nameSkip.has(i) && !f2.used[i] && /^[a-z]{3,}$/.test(t) && !STOP.has(t) && !RESIDUAL_OK.test(t) && !FILLER.test(t));
+  const usedWords = new Set(p.tokens.filter((_, i) => f2.used[i] || nameIdx.has(i)));
+  const rawWords = String(question ?? "").match(/[A-Za-z][A-Za-z'’-]*/g) ?? [];
+  const suspects = [
+    ...unused.filter((t) => onFile.has(t) || isGivenName(t) || (isRealWordOrName(t) && !isNonNameWord(t))),
+    ...rawWords.slice(1).filter((w) => /^[A-Z][a-z]{2,}$/.test(w) && !usedWords.has(w.toLowerCase()) && !STOP.has(w.toLowerCase()) && !RESIDUAL_OK.test(w.toLowerCase()) && !FILLER.test(w.toLowerCase()) && ![...(several ? nm.hits : named ? [named] : [])].some((h) => nameTokens(h.c.name).includes(w.toLowerCase()))).map((w) => w.toLowerCase()),
+  ];
+  if ((named || several) && /\b(?:and|or|plus|both)\b|&/.test(p.text) && unused.length) return null;
+
+  let docHits = codes.length ? await store.docsByNumber(db, codes) : [];
+  const unitHits = p.serials.length ? await store.unitsBySerial(db, p.serials) : [];
+  if (codes.length && !docHits.length && !unitHits.length) return null; // a number that is not on file stays an honest not-found elsewhere, never another record
+  if (docHits.length) {
+    const ids = [...new Set(docHits.map((d) => d.document_id))];
+    if (ids.length !== 1) return null;
+    const d = docHits[0];
+    if (named && d.customer_id !== named.c.id) return null;
+    const cr = d.customer_id ? cust.find((c) => c.id === d.customer_id) : null;
+    const bundle = await store.loadBundle(db, [d.document_id]);
+    // a name in the question that is a value stored on this very document (a technician being checked) is not a second customer
+    const hay = bundle.facts.map((f) => String(f.value ?? "")).join(" ").toLowerCase();
+    if (suspects.some((t) => onFile.has(t) && !hay.includes(t))) return null; // another customer's name word; a person's name that is not on file is just a word in the question
+    return documentDump(d, bundle, cr, p);
+  }
+  if (suspects.length) return null;
+  if (unitHits.length) {
+    if (unitHits.length > 1) return null;
+    const u = unitHits[0]; const c = cust.find((x) => x.id === u.customer_id);
+    const docs = await store.docsForUnit(db, u.id);
+    const what = clean([u.data?.manufacturer, u.data?.model, u.data?.tonnage].filter(Boolean).join(" ")) || "equipment";
+    return docListDump({ docs, db, label: `unit ${u.data?.serial_number ?? ""}${c ? ` (${c.name})` : ""}`.trim(), intro: `Unit on file: ${what}${u.data?.serial_number ? `, serial ${u.data.serial_number}` : ""}.`, customer: c, unit: u });
+  }
+  if (named) return docListDump({ docs: await store.docsForCustomer(db, named.c.id), db, label: named.c.name, customer: named.c });
+  if (several) {
+    // two or three customers named: each one's stored record, separately and labelled (never merged, never one invoice line for each)
+    const outs = [];
+    for (const h of nm.hits) { const o = await docListDump({ docs: await store.docsForCustomer(db, h.c.id), db, label: h.c.name, customer: h.c }); if (!o?.data) return null; outs.push(o.data); }
+    const merged = { ...outs[0], text: clean(`You named ${outs.length} customers, so each one is answered separately. ${outs.map((d) => d.text).join(" ")}`), facts: outs.flatMap((d) => d.facts ?? []), sources: outs.flatMap((d) => d.sources ?? []), recordsLane: true };
+    return { data: attachCitations(merged, { records: outs.flatMap((d) => d.records ?? []), total: outs.reduce((a, d) => a + (d.recordsTotal ?? 0), 0), basis: "Several customers were named; each is answered separately from its own stored records." }), lane: "records", detail: "stored-record-customers" };
+  }
+  return null;
+}
+
+function factsOnDoc(doc, bundle, ids = null) {
+  return FACTS.filter((f) => !f.hidden && !f.viewOf && (ids ? ids.includes(f.id) : !DOC_DUMP_SKIP.has(f.id) && f.belongs !== "customer") && observe(f, doc, bundle).length).map((f) => f.id);
+}
+
+function documentDump(d, bundle, customer, p) {
+  const askText = p.text;
+  const ids = factsOnDoc(d, bundle);
+  const customerRec = customer ? customerRecord({ id: customer.id, name: customer.name, service_address: customer.address }) : null;
+  const head = docHead(d, bundle);
+  if (!ids.length) {
+    const rec = documentRecord({ id: d.document_id, document_type: d.document_type, original_filename: d.filename }, { label: docTitle(d, bundle) });
+    return { data: envelope({ text: `Here is everything on file for ${head}: nothing beyond its heading is stored on it.`, cards: [], sources: [sourceOf(d, null)], records: [customerRec, rec].filter(Boolean), basis: `Read the stored record of ${docTitle(d, bundle)}; no facts are stored on it.` }), lane: "records", detail: "stored-record-document" };
+  }
+  const base = answerForDocs({ docs: [d], bundle, factsWanted: ids, who: null, order: null, all: true, askText, scopeLabel: `Here is everything on file for ${head}`, customerRec });
+  base.text = clean(base.text.replace(" — ", ": "));
+  if (p.facts.includes("customer_name") && d.customer_name) base.text = clean(`${docTitle(d, bundle).replace(/^./, (c) => c.toUpperCase())} is for ${d.customer_name}. ${base.text}`);
+  // a fact the question named that is not stored on this document is said plainly (a yes/no question gets the plain yes / no first)
+  const asked = p.facts.map(factById).filter((f) => f && !f.elsewhere && f.belongs !== "customer" && !DOC_DUMP_SKIP.has(f.id));
+  const absent = asked.filter((f) => !observe(f, d, bundle).length && f.id !== "labor_charge" && f.id !== "parts_charge");
+  const yn = /^(?:do|does|did|is|are|was|were|has|have|had|can|could|will|would|should)\s/.test(p.text);
+  if (absent.length && absent.length === asked.length && yn) base.text = clean(`No, ${absent.map((f) => f.label.toLowerCase()).join(" and ")} ${absent.length === 1 ? "is" : "are"} not stored on ${docTitle(d, bundle)}. ${base.text}`);
+  else if (absent.length) base.text = clean(`${base.text} Not stored on it: ${absent.map((f) => f.label.toLowerCase()).join(", ")}.`);
+  else if (yn && asked.length && EXISTENCE_ASK.test(p.text)) base.text = `Yes: ${base.text}`;
+  // a labor / parts money question is never answered with the total: say whether a separate charge is stored
+  for (const [word, id] of [["labor|labour", "labor_charge"], ["parts?", "parts_charge"]]) {
+    if (new RegExp(`\\b(?:${word})\\b`).test(askText) && !ids.includes(id)) base.text = clean(`${base.text} ${notStoredText(factById(id), d, bundle, null)}`);
+  }
+  return { data: base, lane: "records", detail: "stored-record-document" };
+}
+
+async function docListDump({ docs, db, label, intro = "", customer, unit = null }) {
+  const customerRec = customer ? customerRecord({ id: customer.id, name: customer.name, service_address: customer.address }) : null;
+  if (!docs.length) return { data: envelope({ text: `${label} is on file, but no stored document is linked to it yet.`, cards: [], sources: [], records: [customerRec].filter(Boolean), total: 1, basis: "Checked the documents linked to this record; none." }), lane: "records", detail: "stored-record-no-documents" };
+  const bundle = await store.loadBundle(db, docs.map((x) => x.document_id));
+  const dated = docs.map((x) => ({ d: x, date: docDate(x, bundle) })).sort((a, b) => (b.date ?? "").localeCompare(a.date ?? "") || String(b.d.created_at).localeCompare(String(a.d.created_at)));
+  const withFacts = dated.map((x) => ({ ...x, ids: factsOnDoc(x.d, bundle, CUSTOMER_DUMP) })).filter((x) => x.ids.length);
+  const shown = withFacts.slice(0, CAP); const more = withFacts.length - shown.length;
+  const cards = [], sources = [], records = [];
+  const pieces = [];
+  for (const x of shown) {
+    const one = answerForDocs({ docs: [x.d], bundle, factsWanted: x.ids, who: label, order: null, all: true, askText: "", scopeLabel: `${docTitle(x.d, bundle)}${humanDate(x.date) ? `, ${humanDate(x.date)}` : ""}`, customerRec: null });
+    pieces.push(one.text); cards.push(...(one.facts ?? [])); sources.push(...(one.sources ?? [])); records.push(...(one.records ?? []));
+  }
+  const none = dated.length - withFacts.length;
+  const text = clean(`Here is everything on file for ${label}:${intro ? ` ${intro}` : ""} ${plural(withFacts.length, "document")} with details, newest first. ${pieces.map((x) => x.replace(/^./, (c) => c.toUpperCase())).join(" ")}${more > 0 ? ` And ${more} more.` : ""}${!withFacts.length ? ` ${plural(dated.length, "document")} on file, none with work, technician, hours, notes or total stored.` : ""}${withFacts.length && none ? ` ${plural(none, "other document")} on file carry none of these.` : ""}`);
+  return { data: envelope({ text, cards: cards.slice(0, 12), sources, records: [customerRec, ...records].filter(Boolean), total: dated.length + (customerRec ? 1 : 0), basis: `Listed the stored details of the ${plural(shown.length, "newest document")} for ${label}; each value is cited to its document and page.` }), lane: "records", detail: unit ? "stored-record-unit" : "stored-record-customer" };
 }

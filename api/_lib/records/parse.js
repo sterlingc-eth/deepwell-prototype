@@ -79,8 +79,11 @@ const VETO = new RegExp([
   "\\bcompare\\b", "\\bversus\\b", "\\bvs\\b", "\\bmore than\\b", "\\bless than\\b", "\\bover \\$?\\d", "\\bunder \\$?\\d", "\\bat least\\b", "\\bwhich customers?\\b", "\\bwhich (?:technician|tech)s?\\b.*\\b(?:most|least|more|fewer)\\b",
   "\\bwho (?:has|have|had)\\b", "\\ball (?:of )?(?:our|the|my) (?:customers|invoices|jobs)\\b", "\\bevery customer\\b", "\\ball customers\\b", "\\bin total\\b", "\\ball together\\b", "\\bcombined\\b", "\\bsum of\\b",
   "\\bper (?:month|year|visit|week)\\b", "\\bpercent", "\\bpercentage\\b", "\\bgrand total\\b.*\\ball\\b", "\\bshop wide\\b", "\\bcompany wide\\b", "\\bour (?:best|worst)\\b", "\\bgrowth\\b", "\\btrend\\b", "\\brevenue\\b", "\\bprofit\\b",
-  "\\bhow (?:do|can|should|would) (?:i|we|you)\\b", "\\bwhere (?:do|can) i\\b", "\\bhow to\\b", "\\bdoes it work\\b", "\\bwhy\\b", "\\bpredict\\b", "\\bforecast\\b", "\\bremind me\\b", "\\bremember\\b",
+  "\\bwhy\\b", "\\bpredict\\b", "\\bforecast\\b",
 ].join("|"), "i");
+/** help / how-to / "remind me" wording: not an aggregate, so it only blocks when no single customer or document number is named (the lane decides, and only after the older lanes in the late phase) */
+const SINGLE_DOC_OK = /\b(?:compare|versus|vs|which customers?)\b/g;
+const SOFT_VETO = /\bhow (?:do|can|should|would) (?:i|we|you)\b|\bwhere (?:do|can) i\b|\bhow to\b|\bdoes it work\b|\bremind me\b|\bremember\b/i;
 const TIME_STEP_ASIDE = /\b(?:(?:last|past|previous|prior|next|this|coming)\s+(?:\d+\s+|few\s+|couple\s+(?:of\s+)?)?(?:days?|weeks?|months?|quarters?|years?|spring|summer|fall|autumn|winter)|quarter(?:ly)?|q[1-4]|since|before|after|between|until|till|yesterday|today|tonight|tomorrow|ago|(?<!most )recent(?:ly)?|lately|ytd|year to date|month to date|mtd|on or after|from \d)\b/;
 const SUMMARY = /\b(?:summar(?:y|ize)|recap|rundown|run down|overview|give me (?:the )?(?:details|rundown|story)|details? (?:of|on|for|about)|everything (?:about|on|for))\b|\btell me about (?:the )?(?:last |latest |most recent )?(?:job|visit|service|call|invoice|ticket|permit|work order|wo|inv|po)\b|\bwhat happened (?:on|at|during|with|in) (?:the )?(?:last |latest |most recent )?(?:visit|job|service|call|ticket|appointment)\b|\bwhat happened (?:on|at|with) /;
 const ORDER_NEWEST = /\b(?:latest|last|most recent|newest|current|recent)\b/;
@@ -104,7 +107,8 @@ export function parseRecordsQuestion(question, { today = null, parsePeriodFn = n
   const tokens = tokensOf(text);
   const out = { text, tokens, facts: [], summary: false, docNumbers: [], serials: [], address: null, order: null, all: false, window: null, stepAside: null };
   if (!tokens.length || tokens.length > 40) { out.stepAside = "length"; return out; }
-  if (VETO.test(text)) { out.stepAside = "aggregate-or-howto"; return out; }
+  const vetoed = VETO.test(text);
+  out.softVeto = SOFT_VETO.test(text);
 
   // document numbers FIRST (they contain letters + digits that must not be read as words)
   const nums = [];
@@ -118,6 +122,11 @@ export function parseRecordsQuestion(question, { today = null, parsePeriodFn = n
     nums.push({ raw, alnum: alnum(raw), digits: digitsOnly(raw), prefixed: false });
   }
   out.docNumbers = nums;
+  // compare / versus / "which customer" about ONE document number is not an aggregate across customers: it is a look at that one document (flagged soft, like how-to wording)
+  if (vetoed) {
+    if (new Set(nums.map((n) => n.digits)).size === 1 && !VETO.test(text.replace(SINGLE_DOC_OK, " "))) out.softVeto = true;
+    else { out.stepAside = "aggregate-or-howto"; return out; }
+  }
   // equipment serials: letters+digits, 6+ characters, not a document number shape
   for (const t of tokens) { const a = alnum(t); if (a.length >= 6 && /\d/.test(a) && /[A-Z]/.test(a) && !out.serials.includes(a)) out.serials.push(a); }
   // a street address: house number + street words + suffix

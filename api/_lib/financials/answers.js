@@ -20,7 +20,7 @@
  *
  * parseMoneyIntent is pure (unit-tested with no DB). runMoneyIntent touches `db`.
  */
-import { nameVerdict, clarifyText, denialText, nameTokens, tokenSame } from '../lookups/nameMatch.js';
+import { nameVerdict, clarifyText, denialText, nameTokens, tokenSame, withinOne } from '../lookups/nameMatch.js';
 import { countSubject, repairKnownTypos } from '../understanding/understand.js';
 import { isPoMoneyQuestion, matchVendor, vendorPoEnabled } from '../lookups/vendorPo.js';
 import { resolveCalendarSpan } from '../timeSpans.js';
@@ -1743,6 +1743,18 @@ async function docsInWindow(db, intent, ctx) {
 async function customerDocs(db, intent, ctx) {
   let name = String(intent.subject ?? '').trim().replace(/^(?:mr|mrs|ms|miss|mx|dr|mister)\.?\s+(?=\S)/i, '');
   if (!name) return null;
+  // The invoice look-up answers only words it read. A question with no billing word whose other words are not just the name and plain look-up glue
+  // ("history with X", "X past jobs", "what did we do for X and Y") asks something this lane did not read, so it steps aside (the records-first lane then gives the customer's stored record).
+  const rawQ = String(intent.rawOriginal ?? intent.raw ?? '');
+  const typoBilling = rawQ.toLowerCase().split(/[^a-z]+/).some((t) => t.length >= 3 && ['bill', 'bills', 'invoice', 'invoices', 'billed', 'invoiced'].some((w) => withinOne(t, w)));
+  if (rawQ && !typoBilling && !/\b(?:invoices?|invoiced|invoicing|inv|bills?|billed|billing|charge[sd]?|charging|owes?|owed|paid|pay|pays|paying|payments?|costs?|totals?|amounts?|balance|due|receivables?|payables?|sent|send|spent|spend|worth|revenue|sales?|price[sd]?|fees?|dollars?|money)\b|\$/i.test(rawQ)) {
+    const glue = /^(?:look|lookup|up|find|show|me|pull|get|give|tell|what|whats|the|a|an|of|for|on|about|is|are|was|were|we|our|us|you|my|i|it|please|pls|can|could|would|hey|hi|where|wheres|who|whos|how|to|from|with|at|by|and|or|this|that|these|those|there|here|has|have|had|been|be|any|all|just|also|now|then|so|if|s|mr|mrs|ms|miss|dr|account|customer|client|compare|compared|comparison|versus|vs|between|since|before|after|during|until|till|in|year|years|month|months|quarter)$/;
+    const rest = rawQ.toLowerCase().split(name.toLowerCase()).join(' ').replace(/[^a-z\s]/g, ' ').split(/\s+/).filter(Boolean);
+    const nameToks = new Set(name.toLowerCase().split(/\s+/));
+    const rw = rawQ.split(/\s+/);
+    rw.forEach((w, i) => { if (/^[A-Z][a-z]{2,}/.test(w) && (i > 0 || /^[A-Z][a-z]{2,}/.test(rw[1] ?? ''))) nameToks.add(w.toLowerCase().replace(/[^a-z]/g, '')); }); // a capitalised word is part of a name
+    if (rest.some((t) => !glue.test(t) && !nameToks.has(t))) return null;
+  }
   const note = (intent.readNotes ?? []).length ? ` (${intent.readNotes.join('; ')})` : '';
   const isoOk = (v) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
   const wFrom = isoOk(intent.window?.from); const wTo = isoOk(intent.window?.to);

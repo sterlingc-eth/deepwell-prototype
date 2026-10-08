@@ -1593,6 +1593,8 @@ export default async function handler(req, res) {
       }
       console.log(JSON.stringify({ route: "ask", det_route: detIntent.route, det_kind: detIntent.kind ?? null, det_hit: Boolean(detData) }));
       if (detData) {
+        // a document-number look-up that could not read the wording ("I don't have that stored for Invoice ...") gets one late records-first try: the stored record of that document beats a decline
+        if (detIntent.route === "docnumber" && detData.kind === "no-answer" && await tryRecordsFirst("late")) return;
         return send(200, { success: true, data: detData });
       }
     }
