@@ -83,6 +83,7 @@
     "verify:forge-promises": "node scripts/verify-forge-promises.mjs",
     "verify:forge-rephrase": "node scripts/verify-forge-rephrase.mjs",
     "verify:forge-context": "node scripts/verify-forge-context.mjs",
+    "verify:r41u": "node scripts/verify-r41u.mjs",
     "verify:transcribe": "node scripts/verify-transcribe.mjs",
     "verify:caching": "node scripts/verify-caching.mjs",
     "verify:bulk": "node scripts/verify-bulk.mjs",

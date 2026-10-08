@@ -6,6 +6,7 @@
  * Kill switch: DONOVAN_PAID_LOOKUP=0.
  * pure: parsePaidQuestion     db: runPaidLookup
  */
+import { denyOr } from "./nameMatch.js";
 import { attachCitations } from "../citations/records.js";
 import { documentRecordsFor } from "../citations/enrich.js";
 import { TENANT_SQL, answerEnvelope } from "../scope.js";
@@ -71,10 +72,10 @@ export async function runPaidLookup(db, intent) {
       const nn = norm(n), nw = nn.split(" ");
       if (lev(c, nn) <= 2 || nn.includes(c) || c.includes(nn) || cw.some((w) => w.length >= 4 && nw.some((x) => x === w || lev(w, x) <= 1))) return null;
     }
-    return attachCitations(
+    return denyOr(db, cand, attachCitations(
       { kind: "no-answer", text: `${cand} is not on file as a customer, so I have no invoices to total for them.`, facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [] },
       { records: [], total: 0, kind: "searched", basis: `Looked for a customer named ${cand}; none on file.` }
-    );
+    ));
   }
   const key = keep[0];
   const display = hits.find((n) => norm(n) === key);

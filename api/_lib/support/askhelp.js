@@ -151,7 +151,21 @@ export function helpGate(question) {
   if (/\bpassword\b/.test(q) && (/\b(email|gmail|yahoo|outlook|wifi|wi-fi|router|account|computer|windows|bank)\s+password\b/.test(q) || !/\b(forgot|forgotten|reset|sign ?in|log ?in|login|deepwell|donovan)\b/.test(q) || /\b(my|the) account\b/.test(q))) return false;
   for (const re of RECORDS_VETO) if (re.test(q)) return false;
   if (hasProperNoun(raw)) return false;
+  if (isBusinessDocumentQuestion(q)) return false; // R41U A1: inside the app a question about the BUSINESS'S OWN documents wins over a help article
   return true;
+}
+
+// R41U A1: "wheres the invoice for 3470", "the bill from a vendor", "whats the biggest invoice", "wheres george garrison invoice" ask about the business's own
+// documents, never about the DeepWell subscription bill. The help route keeps only the questions that are about the app itself (a how-to that names DeepWell, the
+// plan, billing screens, seats ...): "how do I see my DeepWell invoices" and "where do I change my plan" are untouched.
+const DOC_NOUN_RE = /\b(?:invoices?|bills?|receipts?|contracts?|agreements?|permits?|certificates?|purchase orders?|statements?)\b/;
+const SELF_RE = /\b(?:deepwell|donovan|subscription|my plan|our plan|the plan|change (?:my|our|the) plan|payment methods?|credit card|card on file|manage billing|billing (?:page|screen|tab|portal|email|info|information|history|address|settings?)|seats?|upgrade|downgrade|cancel|trial|stripe|my deepwell)\b/;
+const SPECIFIC_RE = /\$\s?\d|\b\d{3,}\b|\b(?:customers?|clients?|vendors?|suppliers?|tenants?|donors?|adopters?|landlords?)\b|\b(?:latest|newest|biggest|largest|smallest|highest|lowest|most recent|last|overdue|unpaid|outstanding|past due)\b/;
+const NAMED_DOC_RE = /\b(?:wheres|whats|where is|what is|show me|find me|find|pull up|get me|hows)\s+(?:the\s+)?(?!my\b|our\b|a\b|an\b|this\b|that\b|the\b|deepwell\b|donovan\b|billing\b|payment\b|subscription\b|plan\b)[a-z]{2,}(?:\s+[a-z]{2,}){0,2}s?\s+(?:invoices?|bills?|receipts?|contracts?|permits?|certificates?)\b/;
+export function isBusinessDocumentQuestion(normalized) {
+  const q = String(normalized ?? '');
+  if (!DOC_NOUN_RE.test(q) || SELF_RE.test(q)) return false;
+  return SPECIFIC_RE.test(q) || NAMED_DOC_RE.test(q);
 }
 
 function cleanForAsk(entry) {

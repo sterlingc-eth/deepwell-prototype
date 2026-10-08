@@ -40,6 +40,7 @@
  * pure: classifyConnect2
  * db:   HANDLERS (run inside relations/questions.js's own withTenant transaction — see its answerRelationsQuestion)
  */
+import { nameVerdict, clarifyText } from '../lookups/nameMatch.js';
 import { TENANT_SQL, todayIso, humanDate, isoDate, docTypeAliases } from '../scope.js';
 import { attachCitations, customerRecord, unitRecord } from '../citations/records.js';
 import { documentRecordsFor } from '../citations/enrich.js';
@@ -422,6 +423,8 @@ export const HANDLERS = {
     // ("500 documents — showing 200, and 300 more.") for a customer name that
     // isn't on file at all. An honest, cited decline is terminal instead.
     if (!cands.length) {
+      const nv = await nameVerdict(db, name);
+      if (!nv.deny) return finish(clarifyText(name, nv), [], { records: [], total: 0, kind: 'searched', basis: `Records share part of "${name}", so nothing was compared until you pick one.` });
       return finish(`No customer or business named ${name} is on file, so I can't compare their documents against our records.`, [],
         { records: [], total: 0, kind: 'searched', basis: `Looked for a customer or business named ${name}; none found.` });
     }

@@ -108,7 +108,7 @@ async function docDetails(db, documentId) {
   );
   let fin = null;
   try {
-    const { rows } = await db.raw(`SELECT total, invoice_date::text AS invoice_date, customer_name, status, balance_due, amount_paid FROM document_financials WHERE document_id = $1 AND ${TENANT_SQL} LIMIT 1`, [documentId]);
+    const { rows } = await db.raw(`SELECT total, invoice_date::text AS invoice_date, customer_name, status, balance_due, amount_paid, doc_kind, direction FROM document_financials WHERE document_id = $1 AND ${TENANT_SQL} LIMIT 1`, [documentId]);
     fin = rows[0] ?? null;
   } catch { fin = null; }
   const dateRaw = fin?.invoice_date || get("invoice_date")[0] || get("service_date")[0] || null;
@@ -119,12 +119,20 @@ async function docDetails(db, documentId) {
     work: get("work_performed").slice(0, 3),
     technician: get("technician")[0] ?? null,
     status: fin?.status && !/^unknown$/i.test(String(fin.status)) ? String(fin.status) : null,
+    docKind: fin?.doc_kind ?? null, direction: fin?.direction ?? null,
     balance: fin?.balance_due != null && Number.isFinite(Number(fin.balance_due)) ? Number(fin.balance_due) : null,
   };
 }
 
 const money = (n) => `$${Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const TYPE_LABEL = { invoice: "Invoice", "work-order": "Work order", "purchase-order": "Purchase order", permit: "Permit", "service-ticket": "Service ticket", "proposal-quote": "Quote" };
+// a document is called what it IS: a PO is a purchase order, a credit memo a credit memo, a payable invoice a bill (never "Invoice")
+function trueLabel(documentType, kindWord, det) {
+  if (det.docKind === "po") return "Purchase order";
+  if (det.docKind === "credit_memo") return "Credit memo";
+  if (det.docKind === "invoice" && det.direction === "payable") return "Bill";
+  return TYPE_LABEL[documentType] ?? cap(kindWord);
+}
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /** @returns an /api/ask data object, or null (nothing typed matches and the question was not clearly about a numbered document). */
@@ -163,7 +171,8 @@ export async function runDocNumberLookup(db, intent) {
   }
   const d = docs[0];
   const det = await docDetails(db, d.document_id);
-  const label = `${TYPE_LABEL[d.document_type] ?? cap(intent.kind)} ${d.number}`;
+  const tl = trueLabel(d.document_type, intent.kind, det);
+  const label = `${tl} ${d.number}`;
   const who = det.customers.map((c) => c.customer_name).filter(Boolean).join(" and ") || null;
   const when = det.date ? humanDate(det.date) : null;
   const src = [{ documentId: d.document_id, location: { field: d.field_key } }];
@@ -174,6 +183,26 @@ export async function runDocNumberLookup(db, intent) {
       { records: await documentRecordsFor(db, [d.document_id]), total: 1, kind: "searched", basis: `Read ${label}; it prints no paid / unpaid status or balance due.` }
     );
   }
+  // a bare number that is also the TOTAL of invoices: say so (and honour a customer name typed in the question), never let a PO stand in for "the invoice"
+  let alsoTotal = "";
+  const notInvoice = tl !== "Invoice";
+  if (intent.digitsOnly && /^\d{3,}$/.test(intent.typed) && ["invoice", "bill", "document"].includes(intent.kind)) {
+    try {
+      const { rows } = await db.raw(
+        `SELECT document_id, customer_name, total, invoice_date::text AS invoice_date FROM document_financials
+          WHERE doc_kind = 'invoice' AND direction = 'receivable' AND total = $1::numeric AND document_id <> $2 AND ${TENANT_SQL} ORDER BY invoice_date, document_id LIMIT 8`,
+        [Number(intent.typed), d.document_id]
+      );
+      const lowQ = intent.question.toLowerCase();
+      const named = rows.filter((r) => r.customer_name && lowQ.includes(String(r.customer_name).toLowerCase()));
+      const use = named.length ? named : rows;
+      if (use.length) {
+        const list = use.slice(0, 5).map((r) => `${r.customer_name ?? "unnamed"} (${r.invoice_date ? humanDate(r.invoice_date.slice(0, 10)) : "undated"})`).join(", ");
+        alsoTotal = ` ${use.length === 1 ? "One invoice has" : `${use.length} invoices have`} a total of ${money(Number(intent.typed))}: ${list}. Which did you mean?`;
+      }
+    } catch { alsoTotal = ""; }
+  }
+  if (notInvoice && ["invoice", "bill"].includes(intent.kind)) alsoTotal = ` It is not an invoice.${alsoTotal}`;
   let text;
   switch (intent.focus) {
     case "status":
@@ -190,6 +219,7 @@ export async function runDocNumberLookup(db, intent) {
     default:
       text = `${label}: ${[who, det.total != null ? money(det.total) : null, when].filter(Boolean).join(", ") || "on file"}.`;
   }
+  text += alsoTotal;
   const facts = [
     { label: "Document", value: label, sources: src },
     ...(who ? [{ label: "Customer", value: who, sources: src }] : []),

@@ -10,6 +10,7 @@
  * Wired into api/ask.js AFTER the meta-router and fast path, BEFORE
  * retrieval — see handoffs/DONOVAN_ANALYTICS_A_2026-09-21.md.
  */
+import { countSubject } from '../understanding/understand.js';
 import Anthropic from '@anthropic-ai/sdk';
 import { getApiKey, MODEL_TIMEOUT_MS, withBackoff } from '../claude.js';
 // ROUND 20 (J4, credit-return readiness) — both added ONLY for planAnalyticsQuestion's own model-call
@@ -738,7 +739,7 @@ async function queryCustomersByEquipmentFilter(db, plan, { today } = {}) {
   // executeAnalyticsPlan's own second applyEntityFilters pass over what this
   // function returns (see that idempotent-pass comment further down).
   const filtered = applyEntityFilters(unitRows, equipmentFilters);
-  if (!filtered.length) return { rows: [], unfilteredCustomerIds: [], unitCount: 0 };
+  if (!filtered.length) return { rows: [], unfilteredCustomerIds: [], unitCount: 0, unitCustomerIds: [] };
 
   const customerIds = [...new Set(filtered.map((r) => r.customerId))];
   const { rows: custRaw } = await db.raw(
@@ -775,7 +776,7 @@ async function queryCustomersByEquipmentFilter(db, plan, { today } = {}) {
       warrantyStatus: unit.warrantyStatus,
     });
   }
-  return { rows, unitCount: filtered.length };
+  return { rows, unitCount: filtered.length, unitCustomerIds: filtered.map((r) => r.customerId) };
 }
 
 /**
@@ -1742,6 +1743,12 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel, au
   if (scanTruncated) return null;
   const filtered = applyEntityFilters(rows, filtersResolved);
   const total = exactTotal ?? filtered.length;
+  // E2 A4: count the UNITS that belong to the customers that survived every filter (geo included), never the pre-geo unit total.
+  if (plan.countUnits && plan.entity === 'customers' && plan.op === 'count') {
+    const keep = new Set(filtered.map((r) => r.id));
+    const eq = await queryCustomersByEquipmentFilter(db, plan, { today });
+    unitCount = eq.unitCustomerIds.filter((id) => keep.has(id)).length;
+  }
   // R39: a zero for a technician the records never name is not "0 visits" ("how many jobs did Ochoa do" for Danny Ochoa): only an exact technician on file may answer zero.
   if (total === 0 && plan.entity === 'equipment') {
     // same for a manufacturer the records never name ("Wayne Electric" for the units made by Wayne): only an exact manufacturer on file may answer zero
@@ -1880,6 +1887,19 @@ export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel, au
       }
       if (notes.length) answered.text = `${answered.text.replace(/\s+$/, '')} Note: ${notes.join('; ')}.`;
     }
+  }
+  // E2 A7: an expiry window ("which units expire in the next 90 days") is computed from the stored warranty end dates against today. Units with no end date on file can be neither
+  // counted nor ruled out, so the answer says how many were not checked, and when NO unit has a date it declines instead of reporting a confident zero.
+  if (answered && typeof answered.text === 'string' && (plan.entity === 'equipment' || plan.entity === 'warranties') && (plan.filters ?? []).some((f) => f.field === 'warrantyExpires')) {
+    const { rows: cnt } = await db.raw(
+      `SELECT count(*)::int AS total, count(*) FILTER (WHERE COALESCE(data->'warranty'->>'expires', '') = '')::int AS missing
+         FROM entities WHERE entity_type = 'equipment' AND merged_into IS NULL AND ${TENANT_SQL}`, []);
+    const { total: unitsTotal, missing } = cnt[0] ?? {};
+    if (unitsTotal > 0 && missing === unitsTotal) {
+      return attachCitations({ kind: 'no-answer', text: `I can't tell which units expire in that window: none of your units has a warranty end date on file.`, facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [] },
+        { records: [], total: 0, kind: 'searched', basis: `Checked the warranty end date of ${unitsTotal} units; none has one recorded.` });
+    }
+    if (missing > 0) answered.text = `${answered.text.replace(/\s+$/, '')} Note: ${missing} unit${missing === 1 ? ' has' : 's have'} no warranty end date on file, so ${missing === 1 ? 'it' : 'they'} could not be checked.`;
   }
   if (homeState && answered && typeof answered.text === 'string' && plan.op !== 'groupBy' && (plan.entity === 'customers')) {
     // D9: say what "out of state" meant, so the number is never read as something else.
@@ -2128,6 +2148,8 @@ export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today
     // customer-scoped and a team-scoped question that happen to build the identical entity/op/filters
     // plan never share a Tier-2 cache row — see that function's own doc comment.
     planWithOverrides = { ...planWithOverrides, teamScoped: isTeamScopedQuestion(question_n) };
+    // E2 A4: a unit count ("how many units do we manage in Mesa") is not the customer count of the same plan.
+    if (planWithOverrides.entity === 'customers' && planWithOverrides.op === 'count' && countSubject(question_n)?.subject === 'units') planWithOverrides = { ...planWithOverrides, countUnits: true };
 
     // ---- Tier 2: the plan itself, checked once the plan is known ----------
     // Two different phrasings that resolve to the identical plan reuse one

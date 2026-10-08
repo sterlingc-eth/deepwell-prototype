@@ -109,7 +109,7 @@ check("typo e2e +: 'Sanrda Wyckoff' resolves with the visible note", /^Showing r
 a = await ask("what is the phone number for Thomas Mercr");
 check("typo e2e +: 'Thomas Mercr' resolves to Thomas Mercer (not Laura Mercer)", /Showing results for Thomas Mercer/.test(a.text) && !/Laura/.test(a.text), a.text);
 a = await ask('what is the phone number for "Sanrda Wyckoff"');
-check("typo e2e -: quoted-as-typed gives the honest decline, never a resolved answer", /I don't have a customer named/i.test(a.text) && !/Showing results for/.test(a.text), a.text);
+check("typo e2e -: quoted-as-typed gives the honest decline, never a resolved answer", /I couldn't (?:match|find)/i.test(a.text) && !/Showing results for/.test(a.text), a.text);
 for (const nm of ["Bo Ray", "Ann Lee", "Mark Rose", "Emily Whitford", "Wyckof Sandr"]) {
   a = await ask(`what is the phone number for ${nm}`);
   check(`typo e2e -: "${nm}" is never auto-resolved`, !/Showing results for/.test(a.text), a.text);

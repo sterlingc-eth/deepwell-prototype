@@ -2388,6 +2388,8 @@ function canonicalPlanString(plan) {
     // audience-filtered) answer. Never set by the model — see routes/analytics.js's own
     // isTeamScopedQuestion call site, the same code-side-only convention as superlative/countDistinct.
     teamScoped: plan?.teamScoped ?? null,
+    // E2 A4: "how many units in Mesa" and "how many customers in Mesa" build the same customers/count/city plan but count different things.
+    ...(plan?.countUnits ? { countUnits: true } : {}),
   });
 }
 
@@ -4033,7 +4035,9 @@ function formatAnalyticsAnswerBase(plan, opts) {
   // of a bare "0". ----
   if (total === 0 && plan.filters?.length && broaderGroups?.length) {
     const named = broaderGroups.slice(0, 4).map((g) => `${g.key} (${g.count})`).join(', ');
-    const text = `0 ${noun} match that — your ${plan.entity} are in ${named}${broaderGroups.length > 4 ? ', and others' : ''}.`;
+    const text = plan.countUnits
+      ? `0 units match that — your units' customers are in ${named}${broaderGroups.length > 4 ? ', and others' : ''}.`
+      : `0 ${noun} match that — your ${plan.entity} are in ${named}${broaderGroups.length > 4 ? ', and others' : ''}.`;
     return { kind: 'answer', text, facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [] };
   }
 
@@ -4063,6 +4067,15 @@ function formatAnalyticsAnswerBase(plan, opts) {
     return { kind: 'answer', text, facts, sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [] };
   }
 
+  // E2 A4: the question counts UNITS (not the customers they belong to): say which thing was counted, and how many customers it spans.
+  if (plan.op === 'count' && plan.countUnits && plan.entity === 'customers' && opts?.unitCount != null) {
+    const n = opts.unitCount;
+    const where = unitScopePhrase(plan.filters);
+    const text = n === 0
+      ? `No units are on file ${where || 'at those customers'} (${total} customer${total === 1 ? '' : 's'} matched, none with a unit on file).`
+      : `You have ${n} unit${n === 1 ? '' : 's'}${where ? ` ${where}` : ''}, at ${total} customer${total === 1 ? '' : 's'} (counted units, not customers).`;
+    return { kind: 'answer', text, facts: [{ label: 'Units', value: String(n), sources: [] }], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [] };
+  }
   if (plan.op === 'count') {
     const of = unfilteredTotal != null && unfilteredTotal !== total ? ` (of ${unfilteredTotal} total)` : '';
     // Item 1: "N jobs in August 2026" style, once there's a real single-month
@@ -4248,4 +4261,19 @@ export function warrantyStatusOf(warranty, today) {
  */
 export function registrationActionNeededOf(warranty, today) {
   return alertTier(warranty, today) === 'unregistered-window-closing';
+}
+
+
+/** "in Mesa" / "in Maricopa County" / "in AZ" / "in zip 85201" / "made by Trane": the scope words of a unit count, built from the plan's own filters. */
+export function unitScopePhrase(filters) {
+  const bits = [];
+  for (const f of filters ?? []) {
+    if (f.op !== 'eq') continue;
+    if (f.field === 'city') bits.push(`in ${f.value}`);
+    else if (f.field === 'county') bits.push(`in ${String(f.value).replace(/ county$/i, '')} County`);
+    else if (f.field === 'state') bits.push(`in ${String(f.value).length <= 2 ? String(f.value).toUpperCase() : f.value}`);
+    else if (f.field === 'zip') bits.push(`in zip ${f.value}`);
+    else if (f.field === 'brand') bits.push(`made by ${f.value}`);
+  }
+  return bits.join(' ');
 }

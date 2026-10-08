@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-07T07:49:59.102Z",
-  "count": 765,
+  "generatedAt": "2026-10-08T03:17:43.466Z",
+  "count": 742,
   "questions": [
     {
       "id": "hvac-owner-0069-canonical",
@@ -5717,6 +5717,28 @@
       "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
     },
     {
+      "id": "i020",
+      "category": "field-phrasing-3",
+      "text": "how many purchase orders have we cut to Baker Distributing",
+      "claimants": [
+        "money",
+        "analytics"
+      ],
+      "winner": "money",
+      "reason": "ask.js: `!meta && !docLookupIntent && !contentCountIntent && (isMoneyQuestion(...) || isFinancialQuestion(...))`, where docLookupIntent/contentCountIntent are the ALREADY-GATED computed values, not raw claims. Expanded algebraically over raw claims this is: money is excluded only when docLookup or contentCount would ACTUALLY have fired (which itself requires contactLookup to be raw-unclaimed) — money's gate never checks contactLookup or fastPath directly at all. That is exactly why money+relations (relations wins, 0.35 < 0.65 — benign, relations answers with a real document count/comparison, never a fabricated $ figure — see handoffs/MONEY_SAFETY_EXCEPTIONS_2026-09-26.md) and fastPath+money (fastPath wins, 0.5 < 0.65) conflicts both occur silently: money's own 'no fabricated $ figures' guard can be bypassed by any earlier-tried classifier whose shape detector also matches, without money's gate ever being consulted."
+    },
+    {
+      "id": "i021",
+      "category": "field-phrasing-3",
+      "text": "how many purchase orders have we cut to Watsco Supply",
+      "claimants": [
+        "money",
+        "analytics"
+      ],
+      "winner": "money",
+      "reason": "ask.js: `!meta && !docLookupIntent && !contentCountIntent && (isMoneyQuestion(...) || isFinancialQuestion(...))`, where docLookupIntent/contentCountIntent are the ALREADY-GATED computed values, not raw claims. Expanded algebraically over raw claims this is: money is excluded only when docLookup or contentCount would ACTUALLY have fired (which itself requires contactLookup to be raw-unclaimed) — money's gate never checks contactLookup or fastPath directly at all. That is exactly why money+relations (relations wins, 0.35 < 0.65 — benign, relations answers with a real document count/comparison, never a fabricated $ figure — see handoffs/MONEY_SAFETY_EXCEPTIONS_2026-09-26.md) and fastPath+money (fastPath wins, 0.5 < 0.65) conflicts both occur silently: money's own 'no fabricated $ figures' guard can be bypassed by any earlier-tried classifier whose shape detector also matches, without money's gate ever being consulted."
+    },
+    {
       "id": "i024",
       "category": "field-phrasing-3",
       "text": "how many inspection reports do we have on file",
@@ -6335,64 +6357,9 @@
       "reason": "ask.js: `!meta ? classifyDeterministic(question, {overlay}) : null` — gated on meta alone."
     },
     {
-      "id": "j001",
-      "category": "field-phrasing-4",
-      "text": "how many Carrier units in Tempe have had a preventive maintenance visit since the start of last year",
-      "claimants": [
-        "decompose",
-        "analytics"
-      ],
-      "winner": "decompose",
-      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
-    },
-    {
-      "id": "j002",
-      "category": "field-phrasing-4",
-      "text": "how many Carrier systems in Mesa needed a repair since the start of last year",
-      "claimants": [
-        "decompose",
-        "analytics"
-      ],
-      "winner": "decompose",
-      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
-    },
-    {
       "id": "j003",
       "category": "field-phrasing-4",
       "text": "since the start of last year, how many Carrier units in Scottsdale needed a repair",
-      "claimants": [
-        "decompose",
-        "analytics"
-      ],
-      "winner": "decompose",
-      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
-    },
-    {
-      "id": "j004",
-      "category": "field-phrasing-4",
-      "text": "how many Lennox systems in Scottsdale have needed a repair since last January",
-      "claimants": [
-        "decompose",
-        "analytics"
-      ],
-      "winner": "decompose",
-      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
-    },
-    {
-      "id": "j005",
-      "category": "field-phrasing-4",
-      "text": "how many Lennox units in Peoria have had a maintenance tune-up since the start of last year",
-      "claimants": [
-        "decompose",
-        "analytics"
-      ],
-      "winner": "decompose",
-      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
-    },
-    {
-      "id": "j006",
-      "category": "field-phrasing-4",
-      "text": "how many York units in Phoenix have needed a repair since last January",
       "claimants": [
         "decompose",
         "analytics"
@@ -6412,75 +6379,9 @@
       "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
     },
     {
-      "id": "j008",
-      "category": "field-phrasing-4",
-      "text": "how many Goodman systems in Phoenix have needed a repair since the start of last year",
-      "claimants": [
-        "decompose",
-        "analytics"
-      ],
-      "winner": "decompose",
-      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
-    },
-    {
-      "id": "j009",
-      "category": "field-phrasing-4",
-      "text": "how many Goodman units in Mesa have had a repair call since last January",
-      "claimants": [
-        "decompose",
-        "analytics"
-      ],
-      "winner": "decompose",
-      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
-    },
-    {
-      "id": "j010",
-      "category": "field-phrasing-4",
-      "text": "how many Goodman systems in Tucson needed a repair since the start of last year",
-      "claimants": [
-        "decompose",
-        "analytics"
-      ],
-      "winner": "decompose",
-      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
-    },
-    {
       "id": "j011",
       "category": "field-phrasing-4",
       "text": "since last January, how many Goodman customers in Casa Grande got a preventive maintenance visit",
-      "claimants": [
-        "decompose",
-        "analytics"
-      ],
-      "winner": "decompose",
-      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
-    },
-    {
-      "id": "j012",
-      "category": "field-phrasing-4",
-      "text": "how many Rheem units in Chandler have needed a repair since the start of last year",
-      "claimants": [
-        "decompose",
-        "analytics"
-      ],
-      "winner": "decompose",
-      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
-    },
-    {
-      "id": "j013",
-      "category": "field-phrasing-4",
-      "text": "how many Rheem systems in Mesa have had a repair call since last January",
-      "claimants": [
-        "decompose",
-        "analytics"
-      ],
-      "winner": "decompose",
-      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
-    },
-    {
-      "id": "j014",
-      "category": "field-phrasing-4",
-      "text": "how many Rheem units in Gilbert needed a repair since the start of last year",
       "claimants": [
         "decompose",
         "analytics"
@@ -6500,86 +6401,9 @@
       "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
     },
     {
-      "id": "j016",
-      "category": "field-phrasing-4",
-      "text": "how many Daikin systems in Tempe have needed a repair since the start of last year",
-      "claimants": [
-        "decompose",
-        "analytics"
-      ],
-      "winner": "decompose",
-      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
-    },
-    {
-      "id": "j017",
-      "category": "field-phrasing-4",
-      "text": "how many Daikin units in Glendale have had a repair call since last January",
-      "claimants": [
-        "decompose",
-        "analytics"
-      ],
-      "winner": "decompose",
-      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
-    },
-    {
-      "id": "j018",
-      "category": "field-phrasing-4",
-      "text": "how many Daikin systems in Tucson needed a repair since the start of last year",
-      "claimants": [
-        "decompose",
-        "analytics"
-      ],
-      "winner": "decompose",
-      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
-    },
-    {
-      "id": "j019",
-      "category": "field-phrasing-4",
-      "text": "how many Mitsubishi units in Chandler have needed a repair since last January",
-      "claimants": [
-        "decompose",
-        "analytics"
-      ],
-      "winner": "decompose",
-      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
-    },
-    {
-      "id": "j020",
-      "category": "field-phrasing-4",
-      "text": "how many Mitsubishi systems in Mesa have had a preventive maintenance visit since the start of last year",
-      "claimants": [
-        "decompose",
-        "analytics"
-      ],
-      "winner": "decompose",
-      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
-    },
-    {
       "id": "j021",
       "category": "field-phrasing-4",
       "text": "since last January, how many Mitsubishi customers in Tucson needed a repair",
-      "claimants": [
-        "decompose",
-        "analytics"
-      ],
-      "winner": "decompose",
-      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
-    },
-    {
-      "id": "j022",
-      "category": "field-phrasing-4",
-      "text": "how many Mitsubishi units in Tucson have had a maintenance tune-up since the start of last year",
-      "claimants": [
-        "decompose",
-        "analytics"
-      ],
-      "winner": "decompose",
-      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
-    },
-    {
-      "id": "j023",
-      "category": "field-phrasing-4",
-      "text": "how many Trane systems in Phoenix have needed a repair since the start of last year",
       "claimants": [
         "decompose",
         "analytics"
@@ -6599,31 +6423,9 @@
       "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
     },
     {
-      "id": "j025",
-      "category": "field-phrasing-4",
-      "text": "how many Carrier units in Phoenix have needed a repair since the start of last year",
-      "claimants": [
-        "decompose",
-        "analytics"
-      ],
-      "winner": "decompose",
-      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
-    },
-    {
       "id": "j026",
       "category": "field-phrasing-4",
       "text": "since last January, how many Carrier customers in Phoenix got a preventive maintenance visit",
-      "claimants": [
-        "decompose",
-        "analytics"
-      ],
-      "winner": "decompose",
-      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
-    },
-    {
-      "id": "j027",
-      "category": "field-phrasing-4",
-      "text": "how many Lennox systems in Phoenix needed a repair since the start of last year",
       "claimants": [
         "decompose",
         "analytics"
@@ -6643,28 +6445,6 @@
       "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
     },
     {
-      "id": "j029",
-      "category": "field-phrasing-4",
-      "text": "how many York units in Phoenix have had a preventive maintenance visit since the start of last year",
-      "claimants": [
-        "decompose",
-        "analytics"
-      ],
-      "winner": "decompose",
-      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
-    },
-    {
-      "id": "j030",
-      "category": "field-phrasing-4",
-      "text": "how many York systems in Chandler needed a repair since last January",
-      "claimants": [
-        "decompose",
-        "analytics"
-      ],
-      "winner": "decompose",
-      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
-    },
-    {
       "id": "j031",
       "category": "field-phrasing-4",
       "text": "since the start of last year, how many Goodman customers in Phoenix got a maintenance tune-up",
@@ -6676,42 +6456,9 @@
       "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
     },
     {
-      "id": "j032",
-      "category": "field-phrasing-4",
-      "text": "how many Goodman units in Chandler have needed a repair since last January",
-      "claimants": [
-        "decompose",
-        "analytics"
-      ],
-      "winner": "decompose",
-      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
-    },
-    {
-      "id": "j033",
-      "category": "field-phrasing-4",
-      "text": "how many Rheem systems in Phoenix needed a repair since the start of last year",
-      "claimants": [
-        "decompose",
-        "analytics"
-      ],
-      "winner": "decompose",
-      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
-    },
-    {
       "id": "j034",
       "category": "field-phrasing-4",
       "text": "since last January, how many Rheem customers in Phoenix got a maintenance tune-up",
-      "claimants": [
-        "decompose",
-        "analytics"
-      ],
-      "winner": "decompose",
-      "reason": "ask.js: `!meta && !contactLookupIntent && !docLookupIntent && !contentCountIntent ? classifyDecompose(...) : null`, where those three are THEMSELVES already gated on each other (docLookup needs !contactLookup, contentCount needs !contactLookup && !docLookup) — collapses to: none of contactLookup/docLookup/contentCount raw-claimed the question at all."
-    },
-    {
-      "id": "j035",
-      "category": "field-phrasing-4",
-      "text": "how many Daikin units in Phoenix have needed a repair since the start of last year",
       "claimants": [
         "decompose",
         "analytics"

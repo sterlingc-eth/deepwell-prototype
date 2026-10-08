@@ -1,3 +1,4 @@
+import { questionNamesEntity } from "./_lib/lookups/nameMatch.js";
 import { armResponseDeadline } from "./_lib/util/deadline.js";
 import { resolveToday } from "./_lib/util/localDate.js";
 import crypto from "node:crypto";
@@ -45,6 +46,9 @@ import { attachCitations, finalizeCitations, unitRecord, documentRecord } from "
 import { hashForLog } from "./_lib/privacy/redact.js";
 import { checkAnswerClaimsSync } from "./_lib/claims/index.js";
 import { parseAmountInvoiceQuestion, amountMentioned } from "./_lib/financials/amountInvoice.js";
+import { namedMoneyShape } from "./_lib/lookups/namedMoney.js";
+import { understandQuestion } from "./_lib/understanding/understand.js";
+import { docLaneFromUnderstanding } from "./_lib/understanding/route.js";
 import { loadGroundingEvidence, loadFinancialRows, applyGrounding } from "./_lib/grounding/gate.js";
 import { attachSentenceCitationsSync } from "./_lib/citations/sentences.js";
 import { annotateSuperseded, getSupersessionMap } from "./_lib/supersession.js";
@@ -158,6 +162,27 @@ async function checkAskGate(auth) {
   } catch (err) {
     console.error("billing gate failed open (checkAskGate):", err?.message);
     return { allowed: true };
+  }
+}
+
+/**
+ * A9: post-response bookkeeping (audit row, usage counter, cache write) runs AFTER a model call that can take many seconds.
+ * Every transaction in this route is already short and no model call runs inside one (scripts/lib/r41u-sec-e2-a9.mjs asserts
+ * that for every route), but a pooled connection that sat idle through the model call can be dropped by the server/pooler, and
+ * the first statement of the new transaction then fails with "Connection terminated". That transaction rolled back whole, so
+ * re-running it once on a fresh connection is safe (the audit row is never written twice) and is what keeps the row from being lost.
+ */
+function isConnectionDropError(err) {
+  const m = `${err?.code ?? ""} ${err?.message ?? ""}`;
+  return /ECONNRESET|EPIPE|ETIMEDOUT|57P01|57P02|57P03|08006|08003|08000|connection terminated|connection error|Client has encountered a connection error|timeout exceeded when trying to connect/i.test(m);
+}
+async function withTenantRetry(ctxArg, fn) {
+  try {
+    return await withTenant(ctxArg, fn);
+  } catch (err) {
+    if (!isConnectionDropError(err)) throw err;
+    console.error("bookkeeping connection dropped, retrying once on a fresh connection:", err?.message);
+    return await withTenant(ctxArg, fn);
   }
 }
 
@@ -606,9 +631,19 @@ async function runMetaQuestion(db, meta) {
     const counted = await metaCount(db, meta.target);
     const n = counted ? counted.n : await countFor(db, meta.target);
     const label = COUNT_LABEL[meta.target];
+    // R41U E4: "how many invoices" must agree with "how many customer invoices": when some documents typed as invoices are purchase orders / credit memos / vendor bills, say so.
+    let invText = null;
+    if (meta.target === "invoices" && n > 0) {
+      try {
+        const { invoiceKindCounts } = await import("./_lib/financials/answers.js");
+        const fk = await invoiceKindCounts(db);
+        const other = fk ? fk.other : 0;
+        if (other > 0 && fk.inv + other === n) invText = `You have ${n} documents typed as invoices: ${n - other} customer invoice${n - other === 1 ? "" : "s"} and ${other} other (purchase orders, credit memos or vendor bills).`;
+      } catch { /* no financial rows: keep the plain count */ }
+    }
     const answer = {
       kind: "answer",
-      text: `You have ${n} ${label}.`,
+      text: invText ?? `You have ${n} ${label}.`,
       facts: [{ label: label[0].toUpperCase() + label.slice(1), value: String(n), sources: [] }],
       sources: [], confidence: 1, verifiedCount: 1, unverifiedCount: 0, closest: [],
     };
@@ -781,6 +816,10 @@ export default async function handler(req, res) {
   // R31 3b: this tenant's replaced-document map (api/_lib/supersession.js), loaded once per ask after auth; null until then.
   let supersededMap = null;
   const send = (status, body) => {
+    // R2: an answer with no text and no cards is never sent (a clear decline instead)
+    if (body?.success && body.data && typeof body.data === "object" && (body.data.kind === "answer" || body.data.kind === "no-answer") && !String(body.data.text ?? "").trim() && !(Array.isArray(body.data.facts) && body.data.facts.length)) {
+      body = { ...body, data: { ...body.data, kind: "no-answer", text: "I couldn't find an answer to that in your records. Try naming the customer, the document or an amount.", facts: [], sources: body.data.sources ?? [], confidence: 0 } };
+    }
     if (askedText && body?.data && typeof body.data === "object" && body.data.kind === "answer") {
       try {
         const typeNote = unverifiedTypeNote(askedText, body.data);
@@ -909,7 +948,7 @@ export default async function handler(req, res) {
     // records questions out: a cheap regex gate (how-to shape + app vocabulary + no serial/address/person/date/
     // "who did"/"how many jobs" signal) and, only when it passes, a strict FAQ match (lazy-imported). Anything else,
     // including every scorecard question and every API-key call, continues to the normal pipeline untouched.
-    if (!scorecardCall && !auth.viaKey && helpGate(question)) {
+    if ((!scorecardCall || process.env.ASK_HELPGATE_IN_SCORECARD === "1") && !auth.viaKey && helpGate(question)) { // ASK_HELPGATE_IN_SCORECARD=1 is test-only: runs the help gate in the offline harness
       helpHint = true;
       try {
         const help = await answerHowTo(question);
@@ -970,7 +1009,7 @@ export default async function handler(req, res) {
     if (!meta && earlyDeclineEnabled()) {
       const early = classifyEarlyDecline(question, { hasConversation: !!conversationContext, contextHasEntity });
       let vetoed = false;
-      if (early?.kind === "off_domain") { try { vetoed = await withTenant(ctxArg, (db) => triggerMatchesCustomerName(db, early.trigger)); } catch { vetoed = false; } }
+      if (early?.kind === "off_domain") { try { vetoed = await withTenant(ctxArg, async (db) => (await triggerMatchesCustomerName(db, early.trigger)) || (await questionNamesEntity(db, question))); } catch { vetoed = false; } }
       if (early && !vetoed) return send(200, { success: true, data: buildEarlyDeclineAnswer(early.kind, early) });
     }
     // Never throws (see getActiveOverlay's own doc comment) — safe to await
@@ -1141,7 +1180,10 @@ export default async function handler(req, res) {
     const customerNumber = extractCustomerNumber(question);
     // R40: a question that names an invoice amount ("the invoice for 3470") is decided by the organization's own financial rows whose total equals it
     // (financials/amountInvoice.js). Claimed before every other lane (an address / count / fast-path lane must not read the number as something else).
-    const amountInvoiceIntent = parseAmountInvoiceQuestion(question) ? true : false;
+    // R41U: one shared reading of the question (understanding/understand.js) feeds this lane too: "the bill for 3470 from a vendor", "who did we bill 3086.00", "the latest invoice from a customer".
+    let understood = null;
+    try { understood = understandQuestion(question, { today: resolveToday(today), rescueNames: tenantVocab?.customers?.phrases ?? null, conversation: (() => { try { return validateConversationContext(conversationContext).turns; } catch { return null; } })() }); } catch { understood = null; }
+    const amountInvoiceIntent = (parseAmountInvoiceQuestion(question) || (understood && docLaneFromUnderstanding(understood, question))) ? true : false;
     // Resolved once, reused for both the answer cache key's `today` and the
     // question block the model sees (buildQuestionBlock, below) — was
     // computed twice (inconsistently) before the cache needed it up front.
@@ -1277,26 +1319,28 @@ export default async function handler(req, res) {
         if (recordMiss) recordAskMiss(ctxArg, { question, questionNormalized: normalizedForAnalytics, outcome: MISS_OUTCOMES.AGENT_NO_ANSWER }).catch(() => {});
         return false;
       }
-      let data = result.data;
+      const { _gate: gateCtx, ...dataNoCtx } = result.data ?? {}; // run context for the gate (documents retrieved when none is cited); never sent
+      let data = result.data ? dataNoCtx : result.data;
       // R40 GROUNDING GATE on the agent's answer too (agent mode: aggregates over many documents stay legitimate; every id / name / address / date / quantity and every
       // single-document amount must be on the document its card cites). Fails closed.
       if (data?.kind === "answer" && process.env.DONOVAN_GROUNDING_GATE !== "0") {
         try {
-          const ev = await withTenant(ctxArg, async (db) => {
-            const m = await loadGroundingEvidence(db, [...(data.facts ?? []).flatMap((f) => (f.sources ?? []).map((s) => s.documentId)), ...(data.sources ?? []).map((s) => s.documentId)]);
+          const ev = await withTenantRetry(ctxArg, async (db) => {
+            const cited = [...(data.facts ?? []).flatMap((f) => (f.sources ?? []).map((s) => s.documentId)), ...(data.sources ?? []).map((s) => s.documentId)];
+            const m = await loadGroundingEvidence(db, cited.length ? cited : (gateCtx?.docIds ?? []));
             await loadFinancialRows(db, m);
             return m;
           });
-          data = applyGrounding(data, ev, { question, agent: true });
+          data = applyGrounding(data, ev, { question, agent: true, today: todayResolved, agentRows: gateCtx?.rows === true });
         } catch (err) {
           console.error("grounding gate (agent) failed, withdrawing the answer:", err?.message);
-          data = applyGrounding(data, new Map(), { question, agent: true });
+          data = applyGrounding(data, new Map(), { question, agent: true, today: todayResolved, evidenceFailed: true });
         }
       }
       send(200, { success: true, data: agentDebug ? { ...data, debug: agentModule.agentDebugTrace(result) } : data });
       await timer.time("bookkeeping", async () => {
         try {
-          await withTenant(ctxArg, async (db) => {
+          await withTenantRetry(ctxArg, async (db) => {
             try {
               await db.logAction({
                 action: "document.queried", resource_type: "question", clerk_user_id: auth.userId,
@@ -1374,7 +1418,7 @@ export default async function handler(req, res) {
 
     if (amountInvoiceIntent) {
       const amountGate = await loadMoneyGateModule();
-      const fin = await timer.time("financials", () => amountGate.answerAmountInvoiceQuestion({ withTenant, ctxArg, question, today: todayResolved }));
+      const fin = await timer.time("financials", () => amountGate.answerAmountInvoiceQuestion({ withTenant, ctxArg, question, today: todayResolved, understanding: understood }));
       if (fin.handled) {
         send(200, { success: true, data: fin.data });
         await timer.time("bookkeeping", () =>
@@ -1800,6 +1844,21 @@ export default async function handler(req, res) {
       } catch { /* best-effort: fall through to the normal path */ }
     }
 
+    // ---- 0.64b R3 named-customer money lookups: runs only where another lane would have declined ("<name> - how much", "look up <name>", a flipped or misspelled name) ----
+    const tryNamedMoney = async () => {
+      if (!namedMoneyShape(question)) return false;
+      try {
+        const mg = await loadMoneyGateModule();
+        const nf = await timer.time("financials", () => mg.answerNamedMoneyQuestion({ withTenant, ctxArg, question, today: todayResolved }));
+        if (!nf.handled) return false;
+        send(200, { success: true, data: nf.data });
+        await timer.time("bookkeeping", () =>
+          withTenant(ctxArg, (db) => db.logAction({ action: "document.queried", resource_type: "question", clerk_user_id: auth.userId, changes: { question_hash: hashQuestion(question), documents: [...new Set((nf.data.sources ?? []).map((x) => x.documentId))], passages: 0, financials: nf.intent } }))
+            .catch((err) => console.error("Failed to write document.queried audit row (named money):", err?.message)));
+        return true;
+      } catch { return false; }
+    };
+
     // ---- 0.65 money gate (no model, no DB, no cache) -----------------------
     // "What's the total dollar amount of our open invoices?" — the honest
     // "not built yet" answer, always, never a fabricated dollar figure. See
@@ -1823,6 +1882,7 @@ export default async function handler(req, res) {
         );
         return;
       }
+      if (await tryNamedMoney()) return;
       if (fin.hasData && (await tryAgent())) return;
       const data = fin.hasData ? moneyGateModule.moneyNoMatchAnswer() : moneyFallbackAnswer();
       send(200, { success: true, data });
@@ -1839,6 +1899,8 @@ export default async function handler(req, res) {
       );
       return;
     }
+
+    if (!moneyQuestion && (await tryNamedMoney())) return;
 
     // ---- 0.7 analytics pre-router (ONE Haiku tool-use call, before retrieval) --
     // "how many customers in Arizona", "list customers in Gilbert", "which
@@ -1924,7 +1986,7 @@ export default async function handler(req, res) {
         send(200, { success: true, data: applyExistenceShape(data, question) });
         await timer.time("bookkeeping", async () => {
           try {
-            await withTenant(ctxArg, async (db) => {
+            await withTenantRetry(ctxArg, async (db) => {
               try {
                 await db.logAction({
                   action: "document.queried",
@@ -2222,15 +2284,15 @@ export default async function handler(req, res) {
     // agent below still gets its one shot. Fails closed (an evidence read that fails withdraws the answer too).
     if (data.kind === "answer" && process.env.DONOVAN_GROUNDING_GATE !== "0") {
       try {
-        const ev = await withTenant(ctxArg, async (db) => {
+        const ev = await withTenantRetry(ctxArg, async (db) => {
           const m = await loadGroundingEvidence(db, [...data.facts.flatMap((f) => (f.sources ?? []).map((s) => s.documentId)), ...(data.sources ?? []).map((s) => s.documentId)]);
           await loadFinancialRows(db, m);
           return m;
         });
-        data = applyGrounding(data, ev, { question });
+        data = applyGrounding(data, ev, { question, today: todayResolved });
       } catch (err) {
         console.error("grounding gate failed, withdrawing the answer:", err?.message);
-        data = applyGrounding(data, new Map(), { question });
+        data = applyGrounding(data, new Map(), { question, today: todayResolved, evidenceFailed: true });
       }
       if (Array.isArray(data.facts)) data.facts = data.facts.map(({ modelBasis, ...rest }) => rest);
     }
@@ -2309,7 +2371,7 @@ export default async function handler(req, res) {
     // response is already sent; nothing here is on the customer's clock.
     await timer.time("bookkeeping", async () => {
       try {
-        await withTenant(ctxArg, async (db) => {
+        await withTenantRetry(ctxArg, async (db) => {
           try {
             await db.logAction({
               action: "document.queried",

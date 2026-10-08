@@ -20,6 +20,8 @@
  *
  * parseMoneyIntent is pure (unit-tested with no DB). runMoneyIntent touches `db`.
  */
+import { nameVerdict, clarifyText, denialText, nameTokens, tokenSame } from '../lookups/nameMatch.js';
+import { countSubject, repairKnownTypos } from '../understanding/understand.js';
 import { isPoMoneyQuestion, matchVendor, vendorPoEnabled } from '../lookups/vendorPo.js';
 import { resolveCalendarSpan } from '../timeSpans.js';
 import { KNOWN_AZ_CITY_NAMES, KNOWN_US_CITY_NAMES } from '../analytics.js';
@@ -222,7 +224,9 @@ export function extractSubjectPhrase(question) {
   for (const re of tries) {
     const m = q.match(re);
     if (!m) continue;
-    const p = usablePhrase(m[1]);
+    let p = usablePhrase(m[1]);
+    // R2: a capitalised first name that is also a stop word ("Bill Paye", "Will Owens") is part of the name, not trimmed away
+    if (p) { const rw = String(m[1]).trim().split(/\s+/); const pw = p.split(' '); if (rw.length === pw.length + 1 && /^[A-Z]/.test(rw[0]) && /^[A-Z]/.test(rw[1] ?? '') && rw.slice(1).join(' ').toLowerCase().replace(/[^a-z0-9'.\s-]/g, '') === p) p = `${rw[0].toLowerCase().replace(/[^a-z'.-]/g, '')} ${p}`; }
     if (p) return p;
   }
   return null;
@@ -255,7 +259,7 @@ const RE = {
   // no present-tense form, so this phrasing fell through to the generic total-invoiced handler.
   agreementFees: /\b(?:(?:maintenance|service)\s+(?:agreements?|contracts?|plans?)\b[^?]*\b(?:fees?|revenue|income|collected|worth|total|sales|bring(?:s)? in|brought in|pay|billed|invoiced|charged)\b|(?:fees?|revenue|income)\b[^?]*\b(?:maintenance|service)\s+(?:agreements?|contracts?|plans?)\b|agreement\s+(?:fees?|revenue))/i,
   quoteVsInvoice: /\b(?:over|under|above|below|more than|less than)\s+(?:the\s+)?(?:quote|quoted|estimate|estimated|proposal)\b|\b(?:quote|quoted|estimate|estimated|proposal)\b[^?]*\b(?:invoice|invoiced|billed|final|actual|came in|over|under)\b|\b(?:invoice|invoiced|billed)\b[^?]*\b(?:quote|quoted|estimate|estimated|proposal)\b/i,
-  payables: /\b(?:we owe|do we owe|our (?:open |unpaid )?(?:bills|payables)|payables?|vendor bills?|bills (?:we|to) (?:owe|pay)|unpaid bills|open bills|owe (?:our )?(?:vendors?|suppliers?))\b/i,
+  payables: /\b(?:we owe|do we owe|our (?:open |unpaid )?(?:bills|payables)|payables?|vendor bills?|bills (?:we|to) (?:owe|pay)|unpaid bills|open bills|owe (?:our )?(?:vendors?|suppliers?)|owed to (?:our |the |all )?(?:vendors?|suppliers?))\b/i,
   spend: /\b(?:how much (?:did|have) we (?:spend|spent|pay|paid)|(?:total )?(?:spend|spending)|spent (?:with|on|at))\b/i,
   aging: /\b(?:aging|ageing|aged|receivables? aging)\b|\baccounts? receivable\b/i,
   overdue: /\b(?:overdue|past due|late (?:invoices?|payments?))\b/i,
@@ -325,7 +329,7 @@ function detectRevenueYearComparison(q, today) {
  * (RE.totalInvoiced only fires on a money WORD - "how many invoices do we have on file" has
  * none). Each is deterministic and cited exactly like its siblings above.
  */
-const DOC_COUNT_RE = /\b(?:how many|number of|count of)\s+(invoices?|quotes?|estimates?|proposals?|purchase orders?|pos)\b(?!.*\b(?:overdue|past due|paid|unpaid|open|outstanding|over\s*\$|under\s*\$|more than|less than|verify|unverified|missing|no total|without a total|no printed total)\b)/i;
+const DOC_COUNT_RE = /\b(?:how many|number of|count of)\s+(invoices?|quotes?|estimates?|proposals?|purchase orders?|pos|credit\s*-?\s*memos?)\b(?!.*\b(?:overdue|past due|paid|unpaid|open|outstanding|over\s*\$|under\s*\$|more than|less than|verify|unverified|missing|no total|without a total|no printed total)\b)/i;
 // R11 (breadth-data-quality-001, "How many invoices are missing a total?"): a data-quality
 // question about a MISSING field, not a count of documents - without this DOC_COUNT_RE would
 // otherwise catch it (it names "invoices" and "how many") and answer with the total document
@@ -364,6 +368,7 @@ const JOB_MARGIN_WORD_RE = /\bmargin\b|\bprofit(?:able)?\b|\bgross\s+profit\b/i;
 function docKindFromWord(w) {
   const s = String(w ?? '').toLowerCase();
   if (/purchase order|^pos$/.test(s)) return { kind: 'po', noun: 'purchase order' };
+  if (/credit\s*-?\s*memo/.test(s)) return { kind: 'credit_memo', noun: 'credit memo' };
   if (/quote|estimate|proposal/.test(s)) return { kind: 'estimate', noun: 'quote' };
   return { kind: 'invoice', noun: 'invoice' };
 }
@@ -372,7 +377,15 @@ function docKindFromWord(w) {
  * @returns {{intent: string, period: object|null, subject: string|null}|null}  null when the
  *   question is not a money shape this file answers (caller falls through to the agent).
  */
+export function dropRoleBeforeInvoices(question) {
+  const fixed = repairKnownTypos(question);
+  const cs = countSubject(fixed);
+  if (cs?.subject === 'invoice') question = fixed;
+  return cs?.subject === 'invoice' ? String(question).replace(/\b(?:customer|client)s?'?\s+(?=invoices?\b)/gi, '') : question;
+}
 export function parseMoneyIntent(question, { today }) {
+  // E2 A4: "how many customer invoices do we have" counts INVOICES: customer/client is a role word (invoices we sent), never the thing counted or a name.
+  question = dropRoleBeforeInvoices(question);
   const q = String(question ?? '').toLowerCase();
   if (!q.trim()) return null;
   // R39: "how many invoices have no <field> / without <field>" is a missing-field count; none of the readers below applies it (they would answer the paid / open / whole-shop count).
@@ -425,6 +438,16 @@ export function parseMoneyIntent(question, { today }) {
   // name -> the existing per-customer comparison; no name -> the new shop-WIDE quote-vs-invoice
   // total (quoteVsInvoiceTotal, below).
   if (RE.quoteVsInvoice.test(q)) return subject ? mk('quote_vs_invoice') : mk('quote_vs_invoice_total', { subject: null });
+  // R2: "what do we owe" / "what do we owe Adams Supply" / "total owed to Adams Supply": the vendor bills, never the customers' open invoices
+  {
+    const om = q.match(/\b(?:what|how much)\s+(?:do|did|will)\s+we\s+(?:still\s+)?owe(?!\s+us)\b(.*)$/) ?? q.match(/\b(?:total\s+)?(?:amount\s+)?(?:still\s+)?owed\s+to\s+(.+)$/);
+    if (om && !/\bowe us\b|\bowes us\b/.test(q)) {
+      let rest = String(om[1] ?? '').replace(/[?!.]+$/, '').replace(/\b(?:our|the|all|any|every)\b/g, ' ').replace(/\b(?:vendors?|suppliers?|anyone|anybody|everyone|everybody|in total|altogether|right now|today|currently|still|overall|in all|total)\b/g, ' ').replace(/^\s*(?:to|for)\s+/, '').replace(/\s+/g, ' ').trim();
+      const nameLike = rest && usablePhrase(rest) ? rest : null;
+      const vendorWord = /\b(?:vendors?|suppliers?)\b/.test(String(om[1] ?? ''));
+      if ((!rest && !vendorWord) || nameLike) return mk('owed_vendor', { subject: nameLike ?? null });
+    }
+  }
   if (RE.payables.test(q) && !/\bowe us\b|\bowes us\b/.test(q)) return mk('payables_open', { subject: null });
   // "which customer owes us the most" / "who has an overdue balance" - a per-customer
   // ranking, never the global open-invoices dollar sum RE.open below would otherwise give.
@@ -529,6 +552,13 @@ async function q(db, sql, params = [], hasUnitIndex) {
   return (await db.raw(`WITH ${views} ${sql}`, [JSON.stringify({ c: [], e: [] }), ...params])).rows;
 }
 
+/** R41U E4: how many of the documents typed as invoices are customer invoices (receivable) vs other kinds; null when there are no financial rows. */
+export async function invoiceKindCounts(db) {
+  const hu = await extractionsHaveUnitIndex(db);
+  const [r] = await q(db, `SELECT count(*) FILTER (WHERE f.doc_kind = 'invoice' AND f.direction = 'receivable')::int AS inv, count(*) FILTER (WHERE f.doc_kind IN ('po','credit_memo') OR (f.doc_kind = 'invoice' AND f.direction = 'payable'))::int AS other, count(*)::int AS tot FROM financials f`, [], hu);
+  return r && r.tot > 0 ? { inv: r.inv, other: r.other, tot: r.tot } : null;
+}
+
 /** Resolve a subject phrase to customers: {ids:[...], names:[...], candidates:[...]}. */
 async function resolveSubject(db, phrase) {
   if (!phrase) return null;
@@ -545,7 +575,19 @@ async function resolveSubject(db, phrase) {
     );
     rows = like.rows;
   }
-  return rows.map((r) => ({ id: r.id, name: r.customer_name ?? r.name ?? 'Unnamed customer', address: r.service_address ?? null }));
+  let mapped = rows.map((r) => ({ id: r.id, name: r.customer_name ?? r.name ?? 'Unnamed customer', address: r.service_address ?? null }));
+  // R3: customers that hold every asked word (any order) beat fuzzy neighbours ("Bracken Ronald" is Ronald Bracken, not every Ronald)
+  if (!/^\d/.test(phrase) && mapped.length > 1) {
+    const at = nameTokens(phrase).filter((t) => !/^\d+$/.test(t));
+    if (at.length >= 2) { const keep = mapped.filter((c) => { const ct = nameTokens(c.name); return at.every((t) => ct.some((x) => tokenSame(t, x) === 'exact')); }); if (keep.length && keep.length < mapped.length) mapped = keep; }
+  }
+  // R2: a full name (or a surname) that matches some customers EXACTLY, word for word, beats the fuzzy neighbours ("Bill Paye" is not also "Rich Pay")
+  if (!/^\d/.test(phrase) && mapped.length > 1 && (String(phrase).toLowerCase().match(/[a-z]+/g) ?? []).length >= 2) {
+    const pt = String(phrase).toLowerCase().replace(/['’]s\b/g, '').match(/[a-z]+/g) ?? [];
+    const exactTok = pt.length ? mapped.filter((c) => { const nt = String(c.name).toLowerCase().match(/[a-z]+/g) ?? []; return pt.every((t) => nt.includes(t)); }) : [];
+    if (exactTok.length && exactTok.length < mapped.length) return exactTok;
+  }
+  return mapped;
 }
 
 function baseAnswer(text, facts, { verified = 0, unverified = 0, sources = [], confidence = 1, interpretation, cite } = {}) {
@@ -597,11 +639,64 @@ async function foreignCount(db, hu) {
 
 /* ------------------------------------------------------------------ handlers */
 
+/** R3: a vendor that is on file but has no vendor bills (only other documents): said plainly, never denied, never "did you mean" itself */
+function vendorNote(name, note = '') {
+  return baseAnswer(`${name} is a vendor on file, but I have no vendor bills from ${name} (only other documents such as purchase orders), so there is no bill or amount owed to report.${note}`, [], { confidence: 1, ...zeroCite(`Looked for vendor bills from ${name}; none are on file.`) });
+}
+
+/** R3 denial rule: entities that share a name token with what was asked are listed (never denied, never guessed). */
+function nameClarify(raw, v, note = '', what = '') {
+  const ents = [...v.full, ...v.partial].slice(0, 6);
+  const custs = ents.filter((e) => e.type === 'customer');
+  const names = [...new Set(ents.map((e) => e.name))];
+  const a = baseAnswer(`${clarifyText(raw, v, what)}${note}`, [], { confidence: 1, ...(custs.length ? { cite: { records: custs.map((c) => customerRecord({ id: c.id, name: c.name, address: null })), total: custs.length, basis: `Several records share part of "${String(raw).trim()}"; nothing was looked up until you pick one.` } } : zeroCite(`Looked for records sharing part of "${String(raw).trim()}".`)) });
+  // same shape as the other deterministic clarify replies (lookups/clarify.js): not an answer, tap-one chips
+  return { ...a, kind: 'no-answer', clarify: true, clarifyReason: 'name-share', didYouMean: names.slice(0, 3).map((n) => ({ text: `latest invoice for ${n}` })) };
+}
+
+/** R3: payment / due-date question about a name several customers share: no figure, the matching customers are named */
+function namedPayMulti(intent) {
+  const names = [...new Set(intent.__names)].slice(0, 6);
+  const a = baseAnswer(`I can't tell what ${intent.__asked} owes or when anything is due: these invoices don't record payments or due dates. Customers with that name: ${names.join(', ')}.`, [], { confidence: 1, ...zeroCite(`Looked for payment status and due dates for customers named ${intent.__asked}; none is recorded.`) });
+  return { ...a, kind: 'no-answer' };
+}
+
+/** R3: "what does X owe / balance / amount due / when is X's invoice due": payment status and due dates are not recorded, so no figure is offered as an answer; the decline says what IS on file. */
+async function namedPayDecline(db, intent, ctx) {
+  const name = String(intent.subject);
+  const g = await subjectGate(db, { subject: name, __forced: intent.__forced });
+  if (g?.answer) return g.answer;
+  if (!g || g.unresolved) return null;
+  const [{ n, k }] = await q(db, `SELECT count(*)::int AS n, count(*) FILTER (WHERE f.status IN ('paid','unpaid','partial'))::int AS k FROM financials f WHERE ${LAST_INVOICE_WHERE} AND f.customer_id = ANY($2::uuid[])`, [g.ids], ctx.hu);
+  if (k > 0) return null; // payment status IS recorded for this customer: the status lanes answer, this honest decline does not apply
+  const has = n ? `${g.name} has ${plural(n, 'invoice')} on file; ask for "${g.name} invoice" to see ${n === 1 ? 'it' : 'them'}.` : `No invoice with financial details is on file for ${g.name}.`;
+  const a = baseAnswer(`I can't tell what ${g.name} owes or when anything is due: these invoices don't record payments or due dates. ${has}`, [], { confidence: 1, ...zeroCite(`Looked for payment status and due dates on ${g.name}'s invoices; none is recorded.`) });
+  return { ...a, kind: 'no-answer' };
+}
+
 async function subjectGate(db, intent) {
   // returns {ids, name} | {answer} | {unresolved:true} | null(no subject)
   if (!intent.subject) return null;
-  const cands = await resolveSubject(db, intent.subject);
+  if (intent.__forced) return intent.__forced; // E2 A7: one look-alike customer at a time (see splitLookAlikes)
+  let cands = await resolveSubject(db, intent.subject);
   if (!cands.length) return { unresolved: true };
+  // R3: a look-alike found only by fuzzy matching ("Carlos Rios" -> Carol Rios, "Holy Cross Church" -> Holy Trinity Church, "Unit 104" -> a church) is never answered as the person asked for.
+  // Candidates that hold every asked word exactly are kept; with none, a candidate that shares no whole word is dropped, and what is left is offered ("Did you mean") instead of answered.
+  if (!/^\d/.test(String(intent.subject))) {
+    const at = nameTokens(intent.subject).filter((t) => !/^\d+$/.test(t));
+    if (at.length >= 2) {
+      const exactAll = (c) => { const ct = nameTokens(c.name); return at.every((t) => ct.some((x) => tokenSame(t, x) === 'exact')); };
+      const keep = cands.filter(exactAll);
+      if (keep.length) cands = keep;
+      else {
+        const sharing = cands.filter((c) => nameTokens(c.name).some((x) => at.some((t) => tokenSame(t, x) === 'exact')));
+        const near = sharing.length ? sharing : cands.filter((c) => nameTokens(c.name).some((x) => at.some((t) => tokenSame(t, x))));
+        if (!near.length) return { unresolved: true };
+        const names = [...new Set(near.map((c) => c.name))].slice(0, 5);
+        return { answer: baseAnswer(`I couldn't match "${String(intent.subject).trim()}" exactly. ${names.length > 1 ? `Which one did you mean: ${names.join(', ')}?` : `Did you mean ${names[0]}?`} Ask again with that name and I'll answer.`, [], { confidence: 0.5, ...zeroCite(`No customer holds every word of "${String(intent.subject).trim()}"; the closest are ${names.join(', ')}, so nothing was answered as exact.`) }) };
+      }
+    }
+  }
   // R11 fix (verify-financials.mjs "two customers match (Tom Hill, Tim Hall)"): the golden-tenant
   // Mercer fix below only makes sense when every candidate LITERALLY shares the asked-for name
   // (a same-surname match, found via resolveContactCandidates' own exact-substring "contains"
@@ -634,6 +729,11 @@ async function subjectGate(db, intent) {
 }
 
 async function lastInvoice(db, intent, ctx) {
+  // R41U E4: "last bill from Zenith Gas": the word bill is the vendor (payables) side, never the customer-invoice lookup.
+  if (!intent.__forced && intent.subject && /\bbills?\b/i.test(String(intent.rawOriginal ?? intent.raw ?? '')) && !/\binvoices?\b/i.test(String(intent.rawOriginal ?? intent.raw ?? ''))) {
+    const vb = await customerDocs(db, { subject: intent.subject, direction: 'out', declineByName: false, viaLast: true, readNotes: [], window: null }, ctx);
+    if (vb) return vb;
+  }
   const g = await subjectGate(db, intent);
   if (!g || g.unresolved) return null;
   if (g.answer) return g.answer;
@@ -804,6 +904,12 @@ async function receivables(db, intent, ctx, direction = 'receivable') {
   const who = g ? ` for ${g.name}` : '';
   const noun = direction === 'receivable' ? 'invoice' : 'bill';
   const excl = exclusionText({ noTotal: a.n_open_no_amount, unknownStatus: direction === 'receivable' ? a.n_unknown : 0, noun });
+  if (a.n_open === 0 && direction === 'payable') {
+    // R2: say plainly that there are no vendor bills when none is on file (purchase orders are not bills)
+    const [vb] = await q(db, `SELECT count(*)::int AS n FROM financials f WHERE f.direction = 'payable' AND f.doc_kind = 'invoice'`, [], ctx.hu);
+    const [po] = await q(db, `SELECT count(*)::int AS n FROM financials f WHERE f.doc_kind = 'po'`, [], ctx.hu);
+    if (!vb.n) return baseAnswer(`There are no vendor bills on file, so nothing is recorded as owed.${po.n ? ` (${plural(po.n, 'purchase order')} ${po.n === 1 ? "isn't a bill" : "aren't bills"}, so ${po.n === 1 ? 'it was' : 'they were'} not counted.)` : ''}`, [], { confidence: 1, ...zeroCite('Searched the vendor bills; there are none on file.') });
+  }
   if (a.n_open === 0) {
     // R35 brevity: "No open invoices — none is marked unpaid. Note: 120 show no payment status, so they aren't counted."
     return baseAnswer(`No open ${noun}s${who}${direction === 'receivable' ? ' — none is marked unpaid or partly paid' : ''}.${excl}`, [], { confidence: 1, ...zeroCite(`Searched every ${direction === 'receivable' ? 'customer invoice' : 'vendor bill'}${who}; none are marked unpaid or partly paid with an amount left.`) });
@@ -1098,7 +1204,7 @@ async function avgAgreementFee(db, intent, ctx) {
 async function documentCount(db, intent, ctx) {
   const { kind, noun } = docKindFromWord(intent.docKindWord);
   const p = intent.period;
-  const scope = kind === 'po' ? `f.doc_kind = 'po'` : kind === 'estimate' ? `f.doc_kind = 'estimate' AND f.direction = 'receivable'` : `f.doc_kind = 'invoice' AND f.direction = 'receivable'`;
+  const scope = kind === 'po' ? `f.doc_kind = 'po'` : kind === 'credit_memo' ? `f.doc_kind = 'credit_memo'` : kind === 'estimate' ? `f.doc_kind = 'estimate' AND f.direction = 'receivable'` : `f.doc_kind = 'invoice' AND f.direction = 'receivable'`;
   const inRange = `(($2::date IS NULL AND $3::date IS NULL) OR (f.doc_date >= COALESCE($2::date, '0001-01-01') AND f.doc_date <= COALESCE($3::date, '9999-12-31')))`;
   // R32b: "how many invoices for Rebecca Montoya" / "how many purchase orders from Baker Distributing" - a named customer (invoices, quotes) or vendor
   // (purchase orders) scopes the count. An unresolvable name never falls back to the shop-wide figure (that was a confident wrong answer).
@@ -1120,11 +1226,12 @@ async function documentCount(db, intent, ctx) {
   const [a] = await q(db, `SELECT count(*)::int AS n FROM financials f WHERE ${scope} AND f.currency = 'USD' AND ${inRange}${whoSql}`, [p?.from ?? null, p?.to ?? null, ...whoParams], ctx.hu);
   const forWho = who ? (who.vendor ? ` from ${who.label}` : ` for ${who.label}`) : '';
   // R38: a business whose invoices are all vendor bills (payable, e.g. property management) has zero RECEIVABLE invoices; saying "none on file" is false there. Decline instead.
-  if ((!a || a.n === 0) && !who && kind !== 'po') {
-    const [pay] = await q(db, `SELECT count(*)::int AS n FROM financials f WHERE f.doc_kind = $1 AND f.direction = 'payable'`, [kind === 'estimate' ? 'estimate' : 'invoice'], ctx.hu);
-    if (pay && pay.n > 0) return null;
+  if ((!a || a.n === 0) && !who && kind !== 'po' && kind !== 'credit_memo') {
+    const [pay] = await q(db, `SELECT count(*)::int AS n FROM financials f WHERE f.doc_kind = $2 AND f.direction = 'payable'`, [kind === 'estimate' ? 'estimate' : 'invoice'], ctx.hu);
+    const [anyRecv] = p ? await q(db, `SELECT count(*)::int AS n FROM financials f WHERE ${scope}`, [], ctx.hu) : [{ n: 0 }];
+    if (pay && pay.n > 0 && !(anyRecv?.n > 0)) return null; // R41U E4: only when the shop has no receivable invoices at all (a quiet year is a plain zero)
   }
-  if (!a || a.n === 0) return baseAnswer(`No ${noun}s are on file${forWho}${p ? ` in ${p.label}` : ''}${who ? '' : ' yet'}.`, [], { confidence: 1, ...zeroCite(`Searched every ${noun} on file${forWho}${p ? ` dated ${p.label}` : ''}; found none.`) });
+  if (!a || a.n === 0) return baseAnswer(`No ${noun}s are on file${forWho}${p ? ` in ${p.label}` : ''}${who || p ? '' : ' yet'}.`, [], { confidence: 1, ...zeroCite(`Searched every ${noun} on file${forWho}${p ? ` dated ${p.label}` : ''}; found none.`) });
   const docs = await q(db, `SELECT f.* FROM financials f WHERE ${scope} AND f.currency = 'USD' AND ${inRange}${whoSql} ORDER BY f.doc_date DESC NULLS LAST LIMIT 200`, [p?.from ?? null, p?.to ?? null, ...whoParams], ctx.hu);
   if (who?.vendor && docs[0]?.vendor_name) who.label = docs[0].vendor_name; // the vendor as printed, not as typed ("baker distributing" -> "Baker Distributing")
   const text = who ? (who.vendor ? `We have ${plural(a.n, noun)} from ${who.label} on file${p ? ` in ${p.label}` : ''}.` : `${who.label} has ${plural(a.n, noun)} on file${p ? ` in ${p.label}` : ''}.`) : `We have ${plural(a.n, noun)} on file${p ? ` in ${p.label}` : ''}.`;
@@ -1366,28 +1473,48 @@ async function invoiceByAmount(db, intent, ctx) {
   const amount = centsToDollars(cents);
   const money = fmt(amount);
   const numeric = intent.amountBare ? String(Number(amount)).replace(/\.0+$/, '') : null; // "3470" for an invoice-number read
-  const kindClause = `f.doc_kind IN ('invoice','credit_memo') AND f.total IS NOT NULL AND (f.total = $2::numeric OR (f.doc_kind = 'credit_memo' AND f.total = -$2::numeric))`;
-  const rows = await q(db,
+  // R41U: the shared reading may name a side of the books (customer -> receivable invoices we sent; vendor/supplier -> payable bills we received) and a date window.
+  const dirSql = intent.direction === 'in' ? ` AND f.direction = 'receivable'` : intent.direction === 'out' ? ` AND f.direction = 'payable'` : '';
+  const isoOk = (v) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
+  const w = intent.window; const wFrom = isoOk(w?.from); const wTo = isoOk(w?.to);
+  const winSql = `${wFrom ? ` AND f.doc_date >= '${wFrom}'::date` : ''}${wTo ? ` AND f.doc_date <= '${wTo}'::date` : ''}`;
+  const noun = intent.direction === 'out' || intent.docNoun === 'bill' && intent.direction !== 'in' ? 'bill' : 'invoice';
+  const Noun = noun === 'bill' ? 'Bill' : 'Invoice';
+  const who = (r) => (r.direction === 'payable' ? (r.vendor_name || r.customer_name) : r.customer_name);
+  const note = (intent.readNotes ?? []).length ? ` (${intent.readNotes.join('; ')})` : '';
+  const winText = w?.label ? (/^(?:in|since|before|after|between|from|on|during|by|until)\b/i.test(w.label) ? ` ${w.label}` : /^(?:last|this|past|next|previous|yesterday|today)\b/i.test(w.label) ? ` dated ${w.label}` : ` in ${w.label}`) : '';
+  const today = ctx.today ? String(ctx.today).slice(0, 10) : null;
+  const kindClause = `f.doc_kind IN ('invoice','credit_memo') AND f.total IS NOT NULL AND (f.total = $2::numeric OR (f.doc_kind = 'credit_memo' AND f.total = -$2::numeric))${dirSql}${winSql}`;
+  // R2: "#1234 from a donor" is the NUMBER as typed (never a dollar reading of it)
+  const rows = intent.numberOnly ? [] : await q(db,
     `SELECT f.*, 'total'::text AS matched FROM financials f WHERE ${kindClause} ORDER BY f.doc_date DESC NULLS LAST, f.created_at DESC, f.document_id LIMIT 26`, [amount], ctx.hu);
-  const [{ n: nTotal }] = await q(db, `SELECT count(*)::int AS n FROM financials f WHERE ${kindClause}`, [amount], ctx.hu);
+  const [{ n: nTotal }] = intent.numberOnly ? [{ n: 0 }] : await q(db, `SELECT count(*)::int AS n FROM financials f WHERE ${kindClause}`, [amount], ctx.hu);
   let numRows = [];
   if (numeric && /^\d{1,9}$/.test(numeric)) {
     numRows = await q(db,
-      `SELECT f.*, 'number'::text AS matched FROM financials f WHERE f.doc_kind = 'invoice' AND f.invoice_number IS NOT NULL
+      `SELECT f.*, 'number'::text AS matched FROM financials f WHERE f.doc_kind = 'invoice' AND f.invoice_number IS NOT NULL${dirSql}${winSql}
           AND regexp_replace(lower(f.invoice_number), '[^a-z0-9]', '', 'g') ~ ('^[a-z]{0,4}' || $2 || '$') ORDER BY f.doc_date DESC NULLS LAST LIMIT 10`, [numeric], ctx.hu);
   }
   const seen = new Set(rows.map((r) => r.document_id));
   const all = [...rows, ...numRows.filter((r) => !seen.has(r.document_id))];
-  const [pop] = await q(db, `SELECT count(*) FILTER (WHERE f.doc_kind IN ('invoice','credit_memo') AND f.total IS NOT NULL)::int AS n_priced, count(*) FILTER (WHERE f.doc_kind IN ('invoice','credit_memo') AND f.total IS NULL)::int AS n_unpriced FROM financials f`, [], ctx.hu);
+  const [pop] = await q(db, `SELECT count(*) FILTER (WHERE f.doc_kind IN ('invoice','credit_memo') AND f.total IS NOT NULL)::int AS n_priced, count(*) FILTER (WHERE f.doc_kind IN ('invoice','credit_memo') AND f.total IS NULL)::int AS n_unpriced FROM financials f WHERE true${dirSql}`, [], ctx.hu);
   let nNoRow = 0;
-  try { const [r0] = await q(db, `SELECT count(*)::int AS n FROM documents d WHERE d.document_type = 'invoice' AND NOT EXISTS (SELECT 1 FROM financials f WHERE f.document_id = d.id)`, [], ctx.hu); nNoRow = r0?.n ?? 0; } catch { return null; }
-  if (!pop || pop.n_priced + pop.n_unpriced + nNoRow === 0) return null; // nothing to check: leave it to the later (grounding-gated) paths
-  const odd = (r) => [r.doc_kind === 'credit_memo' ? (r.total != null && Number(r.total) < 0 ? 'a credit memo' : 'a credit memo') : null, r.direction === 'payable' ? 'a vendor bill' : null, r.currency && r.currency !== 'USD' ? `in ${r.currency}` : null].filter(Boolean);
+  try { const [r0] = await q(db, `SELECT count(*)::int AS n FROM documents d WHERE d.document_type = 'invoice' AND NOT EXISTS (SELECT 1 FROM financials f WHERE f.document_id = d.id)`, [], ctx.hu); nNoRow = intent.direction ? 0 : r0?.n ?? 0; } catch { return null; }
+  if (!pop || pop.n_priced + pop.n_unpriced + nNoRow === 0) {
+    // R41U: the shop has none on that side of the books at all: say so (never "nothing matches" about a side that is simply empty)
+    if (intent.direction) {
+      const [anyRow] = await q(db, `SELECT count(*)::int AS n FROM financials f WHERE f.doc_kind IN ('invoice','credit_memo')`, [], ctx.hu);
+      if (anyRow?.n) return baseAnswer(`There are no ${intent.direction === 'out' ? 'vendor bills (invoices we received)' : 'customer invoices (invoices we sent)'} in your records, so no ${noun} has a total of ${money}.${note}`, [], { confidence: 1, ...zeroCite(`Looked for ${intent.direction === 'out' ? 'payable' : 'receivable'} invoices; there are none on file.`) });
+    }
+    return null; // nothing to check: leave it to the later (grounding-gated) paths
+  }
+  const odd = (r) => [r.doc_kind === 'credit_memo' ? 'a credit memo' : null, r.direction === 'payable' && !intent.direction ? 'a vendor bill' : null, r.currency && r.currency !== 'USD' ? `in ${r.currency}` : null, today && (r.doc_date ?? r.invoice_date) && ymdOf(r.doc_date ?? r.invoice_date) > today ? 'dated in the future' : null].filter(Boolean);
   const describe = (r) => {
     const num = r.invoice_number ? `#${r.invoice_number}` : 'with no printed number';
-    const bits = [r.customer_name ? `for ${r.customer_name}` : null, humanDate(r.doc_date ?? r.invoice_date) ? `dated ${humanDate(r.doc_date ?? r.invoice_date)}` : null].filter(Boolean);
+    const nm = who(r);
+    const bits = [nm ? `${r.direction === 'payable' && intent.direction ? 'from' : 'for'} ${nm}` : null, humanDate(r.doc_date ?? r.invoice_date) ? `dated ${humanDate(r.doc_date ?? r.invoice_date)}` : null].filter(Boolean);
     const o = odd(r);
-    return `invoice ${num}${bits.length ? ` ${bits.join(', ')}` : ''}${o.length ? ` (${o.join(', ')})` : ''}`;
+    return `${r.direction === 'payable' && intent.direction ? 'bill' : 'invoice'} ${num}${bits.length ? ` ${bits.join(', ')}` : ''}${o.length ? ` (${o.join(', ')})` : ''}`;
   };
   const factFor = (r) => {
     const f = invoiceFact(r);
@@ -1396,22 +1523,32 @@ async function invoiceByAmount(db, intent, ctx) {
   };
   const nUnread = nNoRow;
   const noRowNote = nNoRow ? ` ${plural(nNoRow, 'invoice document')} ${nNoRow === 1 ? 'has' : 'have'} no readable total, so ${nNoRow === 1 ? 'it' : 'they'} could not be checked.` : '';
-  const unpricedNote0 = pop.n_unpriced ? ` ${plural(pop.n_unpriced, 'invoice')} ${pop.n_unpriced === 1 ? 'prints' : 'print'} no total, so ${pop.n_unpriced === 1 ? 'it' : 'they'} could not be checked.` : '';
+  const unpricedNote0 = pop.n_unpriced ? ` ${plural(pop.n_unpriced, noun)} ${pop.n_unpriced === 1 ? 'prints' : 'print'} no total, so ${pop.n_unpriced === 1 ? 'it' : 'they'} could not be checked.` : '';
   const unpricedNote = unpricedNote0 + noRowNote;
   if (all.length === 0) {
     // an amount that is a LINE ITEM but no invoice's total is said as exactly that
     const lines = await q(db,
-      `SELECT l.document_id, l.line_no, l.description, l.amount, l.page_no, f.invoice_number, f.customer_name, f.doc_date, f.filename, f.total
+      `SELECT l.document_id, l.line_no, l.description, l.amount, l.page_no, f.invoice_number, f.customer_name, f.vendor_name, f.direction, f.doc_date, f.filename, f.total
          FROM invoice_lines l JOIN financials f ON f.document_id = l.document_id
-        WHERE f.doc_kind IN ('invoice','credit_memo') AND l.amount = $2::numeric ORDER BY f.doc_date DESC NULLS LAST LIMIT 6`, [amount], ctx.hu);
-    const basis = `Compared ${money} with the printed total of each of the ${pop.n_priced} invoices that print one; none equals it.`;
+        WHERE f.doc_kind IN ('invoice','credit_memo') AND l.amount = $2::numeric${dirSql}${winSql} ORDER BY f.doc_date DESC NULLS LAST LIMIT 6`, [amount], ctx.hu);
+    const basis = `Compared ${money} with the printed total of each of the ${pop.n_priced} ${noun === 'bill' ? 'vendor bills' : 'invoices'} that print one${winText ? ` dated${winText}` : ''}; none equals it.`;
     if (lines.length) {
-      const l0 = lines.map((l) => `${l.invoice_number ? `#${l.invoice_number}` : 'an invoice'}${l.customer_name ? ` (${l.customer_name})` : ''}, whose total is ${l.total == null ? 'not printed' : fmt(l.total)}`);
-      return baseAnswer(`No invoice has a total of ${money}. ${plural(lines.length, 'invoice')} ${lines.length === 1 ? 'has' : 'have'} a line item of ${money} instead: ${l0.join('; ')}.${unpricedNote}`,
-        lines.map((l) => ({ label: `Line item on ${l.invoice_number ? `#${l.invoice_number}` : 'an invoice'}${l.customer_name ? ` · ${l.customer_name}` : ''}`, value: fmt(l.amount), status: 'info', sources: [docSource(l.document_id, l.page_no)] })),
-        { confidence: 1, interpretation: `invoices totaling ${money}`, cite: { records: lines.map((l) => documentRecord({ id: l.document_id, document_type: 'invoice' }, { label: `Invoice${l.invoice_number ? ` #${l.invoice_number}` : ''} · ${l.filename ?? 'document'}`, page: l.page_no ?? undefined })), total: lines.length, basis } });
+      const l0 = lines.map((l) => `${l.invoice_number ? `#${l.invoice_number}` : `a${noun === 'invoice' ? 'n' : ''} ${noun}`}${who(l) ? ` (${who(l)})` : ''}, whose total is ${l.total == null ? 'not printed' : fmt(l.total)}`);
+      return baseAnswer(`No ${noun} has a total of ${money}${winText}. ${plural(lines.length, noun)} ${lines.length === 1 ? 'has' : 'have'} a line item of ${money} instead: ${l0.join('; ')}.${unpricedNote}${note}`,
+        lines.map((l) => ({ label: `Line item on ${l.invoice_number ? `#${l.invoice_number}` : `a${noun === 'invoice' ? 'n' : ''} ${noun}`}${who(l) ? ` · ${who(l)}` : ''}`, value: fmt(l.amount), status: 'info', sources: [docSource(l.document_id, l.page_no)] })),
+        { confidence: 1, interpretation: `${noun === 'bill' ? 'bills' : 'invoices'} totaling ${money}`, cite: { records: lines.map((l) => documentRecord({ id: l.document_id, document_type: 'invoice' }, { label: `Invoice${l.invoice_number ? ` #${l.invoice_number}` : ''} · ${l.filename ?? 'document'}`, page: l.page_no ?? undefined })), total: lines.length, basis } });
     }
-    return baseAnswer(`No invoice ${nUnread ? 'I could read ' : 'on file '}has a total of ${money}.${numeric ? ` None is numbered ${numeric} either.` : ''}${unpricedNote}`, [], { confidence: 1, ...zeroCite(basis) });
+    if (intent.numberOnly && numeric) {
+      // the number may exist on the OTHER side of the books ("#1234 from a landlord" when 1234 is a tenant's invoice): say so, never "not found" flat
+      let other = '';
+      if (intent.direction) {
+        const od = intent.direction === 'out' ? 'receivable' : 'payable';
+        const oRows = await q(db, `SELECT f.* FROM financials f WHERE f.doc_kind = 'invoice' AND f.direction = '${od}' AND f.invoice_number IS NOT NULL AND regexp_replace(lower(f.invoice_number), '[^a-z0-9]', '', 'g') ~ ('^[a-z]{0,4}' || $2 || '$') ORDER BY f.doc_date DESC NULLS LAST LIMIT 3`, [numeric], ctx.hu);
+        if (oRows.length) other = ` ${oRows.length === 1 ? 'One' : plural(oRows.length, 'document')} numbered ${numeric} ${oRows.length === 1 ? 'is' : 'are'} on the other side of the books (${od === 'receivable' ? 'an invoice we sent' : 'a bill we received'}): ${oRows.map((r) => `#${r.invoice_number}${who(r) ? ` ${od === 'receivable' ? 'for' : 'from'} ${who(r)}` : ''}`).join('; ')}. Ask for it by name if that is the one you mean.`;
+      }
+      return baseAnswer(`No ${noun} numbered ${numeric} is on file${winText}.${other}${unpricedNote}${note}`, [], { confidence: 1, ...zeroCite(`Compared ${numeric} with the number printed on every ${noun === 'bill' ? 'vendor bill' : 'invoice'}; none matches.`) });
+    }
+    return baseAnswer(`No ${noun} ${nUnread ? 'I could read ' : 'on file '}has a total of ${money}${winText}.${numeric ? ` None is numbered ${numeric} either.` : ''}${unpricedNote}${note}`, [], { confidence: 1, ...zeroCite(basis) });
   }
   const shown = all.slice(0, 25);
   const nAll = nTotal + numRows.filter((r) => !seen.has(r.document_id)).length;
@@ -1419,16 +1556,302 @@ async function invoiceByAmount(db, intent, ctx) {
   const byNumber = all.filter((r) => r.matched === 'number');
   const numText = (r) => `${describe(r)} is numbered ${numeric}; its total is ${r.total == null ? 'not printed' : fmt(r.total)}`;
   let text;
-  const plainRows = byTotal.every((r) => r.doc_kind === 'invoice' && r.direction !== 'payable' && (!r.currency || r.currency === 'USD'));
   const rowTotal = (r) => (r.total == null ? money : r.currency && r.currency !== 'USD' ? `${r.total} ${r.currency}` : fmt(r.total));
-  if (byTotal.length === 1) text = `${describe(byTotal[0]).replace(/^invoice/, 'Invoice')} totals ${rowTotal(byTotal[0])}.`;
-  else if (byTotal.length > 1) text = `${plural(nTotal, 'invoice')} total ${money}: ${byTotal.slice(0, 8).map(describe).join('; ')}${nTotal > 8 ? `; and ${nTotal - 8} more` : ''}.`;
-  else text = `No invoice totals ${money}.`;
-  if (byNumber.length) text += ` ${byTotal.length ? 'Separately, ' : 'But '}${byNumber.map(numText).join('; ')}.`;
-  return baseAnswer(`${text}${unpricedNote}`, shown.map(factFor), {
+  const lead = (d) => (d.startsWith('bill') ? 'Bill' : 'Invoice') + d.replace(/^(?:bill|invoice)/, '');
+  if (byTotal.length === 1) text = `${lead(describe(byTotal[0]))} totals ${rowTotal(byTotal[0])}.`;
+  else if (byTotal.length > 1) text = `${plural(nTotal, noun)} total ${money}: ${byTotal.slice(0, 8).map(describe).join('; ')}${nTotal > 8 ? `; and ${nTotal - 8} more` : ''}.`;
+  else text = `No ${noun} totals ${money}.`;
+  void Noun;
+  // R2: a number asked with a role word ("invoice 1234 from a donor") that only matches a printed NUMBER reads as the plain answer, not as a "But ..." aside
+  if (!byTotal.length && byNumber.length && (intent.numberOnly || intent.role)) text = byNumber.length === 1 ? `${lead(describe(byNumber[0]))} totals ${rowTotal(byNumber[0])}.` : `${plural(byNumber.length, noun)} ${plural(byNumber.length, 'is', 'are').replace(/^\d+ /, '')} numbered ${numeric}: ${byNumber.slice(0, 8).map((r) => `${describe(r)}, ${rowTotal(r)}`).join('; ')}.`;
+  else if (byNumber.length) text += ` ${byTotal.length ? 'Separately, ' : 'But '}${byNumber.map(numText).join('; ')}.`;
+  return baseAnswer(`${text}${unpricedNote}${note}`, shown.map(factFor), {
     verified: shown.filter((r) => r.verified).length, unverified: shown.filter((r) => !r.verified).length,
-    sources: shown.map((r) => docSource(r.document_id, r.total_page)), interpretation: `invoices totaling ${money}`,
-    cite: { records: financeRecords(shown), total: nAll, claimedCount: nAll, basis: `Matched ${money} against the printed total of the ${pop.n_priced} invoices that print one.` } });
+    sources: shown.map((r) => docSource(r.document_id, r.total_page)), interpretation: intent.numberOnly ? `${noun === 'bill' ? 'bills' : 'invoices'} numbered ${numeric}` : `${noun === 'bill' ? 'bills' : 'invoices'} totaling ${money}`,
+    cite: { records: financeRecords(shown), total: nAll, claimedCount: nAll, basis: `Matched ${money} against the printed total of the ${pop.n_priced} ${noun === 'bill' ? 'vendor bills' : 'invoices'} that print one.` } });
+}
+
+/**
+ * R41U A5: "the latest invoice from a customer" / "the biggest bill from a supplier": ONE sentence with who, which document, when and how much.
+ * customer -> receivable invoices (we sent); vendor/supplier -> payable bills (we received). A purchase order is NOT a bill. Future-dated documents are left out and said.
+ */
+async function docExtreme(db, intent, ctx) {
+  const bill = intent.direction === 'out' || (intent.docNoun === 'bill' && intent.direction !== 'in');
+  const noun = bill ? 'bill' : 'invoice';
+  const dirSql = bill ? `f.direction = 'payable'` : `f.direction = 'receivable'`;
+  const isoOk = (v) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
+  const wFrom = isoOk(intent.window?.from); const wTo = isoOk(intent.window?.to);
+  const winSql = `${wFrom ? ` AND f.doc_date >= '${wFrom}'::date` : ''}${wTo ? ` AND f.doc_date <= '${wTo}'::date` : ''}`;
+  const today = String(ctx.today ?? '').slice(0, 10);
+  const note = (intent.readNotes ?? []).length ? ` (${intent.readNotes.join('; ')})` : '';
+  const scope = `${dirSql} AND f.doc_kind = 'invoice' AND f.currency = 'USD'${winSql}`;
+  const [c] = await q(db, `SELECT count(*)::int AS n_all, count(*) FILTER (WHERE f.total IS NOT NULL)::int AS n_priced, count(*) FILTER (WHERE f.doc_date IS NULL)::int AS n_undated, count(*) FILTER (WHERE f.doc_date > $2::date)::int AS n_future FROM financials f WHERE ${scope}`, [today || null], ctx.hu);
+  const [po] = bill ? await q(db, `SELECT count(*)::int AS n FROM financials f WHERE f.doc_kind = 'po'`, [], ctx.hu) : [{ n: 0 }];
+  const poNote = po.n ? ` (${plural(po.n, 'purchase order')} ${po.n === 1 ? "isn't a bill" : "aren't bills"}, so ${po.n === 1 ? 'it was' : 'they were'} not counted.)` : '';
+  const which = intent.order === 'latest' ? 'latest' : intent.order === 'min' ? 'smallest' : 'biggest';
+  if (!c.n_all) {
+    const [other] = await q(db, `SELECT count(*)::int AS n FROM financials f WHERE f.doc_kind IN ('invoice','credit_memo')`, [], ctx.hu);
+    return baseAnswer(bill
+      ? `There are no vendor bills in your records, so I can't name a ${which} one${other.n ? ` (the ${plural(other.n, 'invoice')} on file ${other.n === 1 ? 'is' : 'are'} ones you sent to customers)` : ''}.${poNote}${note}`
+      : `There are no customer invoices in your records, so I can't name a ${which} one.${note}`, [], { confidence: 1, ...zeroCite(`Looked for ${bill ? 'payable' : 'receivable'} invoices; there are none on file.`) });
+  }
+  const order = intent.order === 'latest' ? 'f.doc_date DESC, f.created_at DESC, f.document_id' : intent.order === 'min' ? 'f.total ASC, f.doc_date DESC NULLS LAST, f.document_id' : 'f.total DESC, f.doc_date DESC NULLS LAST, f.document_id';
+  const need = intent.order === 'latest' ? 'f.doc_date IS NOT NULL' : 'f.total IS NOT NULL';
+  const notFuture = today ? ` AND (f.doc_date IS NULL OR f.doc_date <= '${today}'::date)` : '';
+  const rows = await q(db, `SELECT f.* FROM financials f WHERE ${scope} AND ${need}${notFuture} ORDER BY ${order} LIMIT 12`, [], ctx.hu);
+  const futureNote = c.n_future ? ` I left out ${plural(c.n_future, `${noun} dated after today`, `${noun}s dated after today`)}.` : '';
+  if (!rows.length) {
+    return baseAnswer(`None of the ${bill ? 'vendor bills' : 'customer invoices'} on file ${intent.order === 'latest' ? 'has a printed date' : 'prints a total'} I can use, so I can't name the ${which} one.${futureNote}${poNote}${note}`, [], { confidence: 1, ...zeroCite(`Looked at every ${bill ? 'vendor bill' : 'customer invoice'}; none can be ranked.`) });
+  }
+  const r = rows[0];
+  const key = (x) => (intent.order === 'latest' ? String(x.doc_date).slice(0, 10) : String(Number(x.total)));
+  const tied = rows.filter((x) => key(x) === key(r));
+  const name = (x) => (x.direction === 'payable' ? (x.vendor_name || x.customer_name) : x.customer_name);
+  const one = (x, withNoun = true) => `${withNoun ? `${bill ? 'bill' : 'invoice'} ` : ''}${x.invoice_number ? `#${x.invoice_number}` : 'with no printed number'}${name(x) ? ` ${bill ? 'from' : 'to'} ${name(x)}` : ''}${humanDate(x.doc_date) ? `, dated ${humanDate(x.doc_date)}` : ''}${x.total == null ? ', with no printed total' : `, for ${fmt(x.total)}`}`;
+  let text;
+  if (tied.length > 1) text = `${plural(tied.length, noun)} tie for the ${which} ${noun} ${bill ? 'we received' : 'we sent'}${intent.order === 'latest' ? ` (both dated ${humanDate(r.doc_date)})` : ` (${fmt(r.total)} each)`}: ${tied.slice(0, 5).map(one).join('; ')}.`;
+  else text = `The ${which} ${noun} ${bill ? 'we received' : 'we sent'} is ${one(r, false)}.`;
+  const undatedNote = intent.order === 'latest' && c.n_undated ? ` ${plural(c.n_undated, noun)} ha${c.n_undated === 1 ? 's' : 've'} no printed date and ${c.n_undated === 1 ? 'was' : 'were'} not considered.` : '';
+  const unpricedNote = intent.order !== 'latest' && c.n_all > c.n_priced ? ` ${plural(c.n_all - c.n_priced, noun)} print${c.n_all - c.n_priced === 1 ? 's' : ''} no total and ${c.n_all - c.n_priced === 1 ? 'was' : 'were'} not ranked.` : '';
+  return baseAnswer(`${text}${futureNote}${undatedNote}${unpricedNote}${poNote}${note}`, tied.slice(0, 5).map((x) => invoiceFact(x, `${which[0].toUpperCase()}${which.slice(1)} ${noun}`)), {
+    sources: tied.slice(0, 5).map((x) => docSource(x.document_id, x.total_page)), interpretation: `${which} ${noun}`,
+    cite: { records: financeRecords(tied.slice(0, 5)), total: tied.length, claimedCount: tied.length, basis: `Took the ${which === 'latest' ? 'most recently dated' : which === 'smallest' ? 'lowest-total' : 'highest-total'} ${bill ? 'vendor bill (payable invoice)' : 'customer invoice'} of the ${c.n_all} on file (USD${bill ? '; purchase orders are not bills' : ''}).` },
+  });
+}
+
+/** R2: "how many vendor bills do we have": counted from the payable rows (a purchase order is not a bill). Never the model. */
+async function docCount(db, intent, ctx) {
+  const note = (intent.readNotes ?? []).length ? ` (${intent.readNotes.join('; ')})` : '';
+  const rows = await q(db, `SELECT f.* FROM financials f WHERE f.direction = 'payable' AND f.doc_kind = 'invoice' ORDER BY f.doc_date DESC NULLS LAST, f.document_id LIMIT 12`, [], ctx.hu);
+  const [{ n }] = await q(db, `SELECT count(*)::int AS n FROM financials f WHERE f.direction = 'payable' AND f.doc_kind = 'invoice'`, [], ctx.hu);
+  const [po] = await q(db, `SELECT count(*)::int AS n FROM financials f WHERE f.doc_kind = 'po'`, [], ctx.hu);
+  const poNote = po.n ? ` (${plural(po.n, 'purchase order')} ${po.n === 1 ? "isn't a bill" : "aren't bills"}, so ${po.n === 1 ? 'it was' : 'they were'} not counted.)` : '';
+  if (!n) return baseAnswer(`There are no vendor bills in your records.${poNote}${note}`, [], { confidence: 1, ...zeroCite('Counted the payable invoices (vendor bills); there are none on file.') });
+  return baseAnswer(`You have ${plural(n, 'vendor bill')} on file.${poNote}${note}`, rows.slice(0, 6).map((x) => invoiceFact(x)), {
+    sources: rows.slice(0, 6).map((x) => docSource(x.document_id, x.total_page)), interpretation: 'vendor bills',
+    cite: { records: financeRecords(rows), total: n, claimedCount: n, basis: 'Counted the payable invoices (vendor bills) on file; purchase orders are not bills.' } });
+}
+
+/** R2: "bills over 5000 from vendors" / "vendor bills between 2000 and 5000": counted from the payable rows (a purchase order is not a bill; a bill with no printed total cannot be compared and is said). */
+async function billThreshold(db, intent, ctx) {
+  const scope = `f.direction = 'payable' AND f.doc_kind = 'invoice'`;
+  const lo = intent.between ? intent.between[0] : null; const hi = intent.between ? intent.between[1] : null;
+  const cmp = intent.between ? `f.total >= $2::numeric AND f.total <= $3::numeric` : `f.total ${intent.dir === 'over' ? (intent.inclusive ? '>=' : '>') : (intent.inclusive ? '<=' : '<')} $2::numeric`;
+  const params = intent.between ? [lo, hi] : [intent.amount];
+  const rows = await q(db, `SELECT f.* FROM financials f WHERE ${scope} AND f.total IS NOT NULL AND ${cmp} ORDER BY f.total DESC, f.doc_date DESC NULLS LAST LIMIT 8`, params, ctx.hu);
+  const [c] = await q(db, `SELECT count(*) FILTER (WHERE f.total IS NOT NULL AND ${cmp})::int AS n, count(*)::int AS n_all, count(*) FILTER (WHERE f.total IS NULL)::int AS n_unpriced FROM financials f WHERE ${scope}`, params, ctx.hu);
+  const note = (intent.readNotes ?? []).length ? ` (${intent.readNotes.join('; ')})` : '';
+  const what = intent.between ? `between ${fmt(String(lo))} and ${fmt(String(hi))}` : `${intent.inclusive ? (intent.dir === 'over' ? 'at least' : 'at most') : intent.dir} ${fmt(String(intent.amount))}`;
+  if (!c.n_all) return baseAnswer(`There are no vendor bills in your records, so none is ${what}.${note}`, [], { confidence: 1, ...zeroCite('Looked for payable invoices (vendor bills); there are none on file.') });
+  const unp = c.n_unpriced ? ` ${plural(c.n_unpriced, 'bill')} print${c.n_unpriced === 1 ? 's' : ''} no total and could not be compared.` : '';
+  const nm = (x) => x.vendor_name || x.customer_name;
+  if (!c.n) return baseAnswer(`No vendor bill is ${what} (${plural(c.n_all, 'bill')} checked).${unp}${note}`, [], { confidence: 1, ...zeroCite(`Compared the printed total of every vendor bill with ${what}; none qualifies.`) });
+  return baseAnswer(`${plural(c.n, 'vendor bill')} ${c.n === 1 ? 'is' : 'are'} ${what}: ${rows.map((x) => `${x.invoice_number ? `#${x.invoice_number}` : 'no printed number'}${nm(x) ? ` from ${nm(x)}` : ''}${humanDate(x.doc_date) ? `, ${humanDate(x.doc_date)}` : ''}, ${fmt(x.total)}`).join('; ')}${c.n > rows.length ? `; and ${c.n - rows.length} more` : ''}.${unp}${note}`, rows.map((x) => invoiceFact(x)), {
+    sources: rows.map((x) => docSource(x.document_id, x.total_page)), interpretation: `vendor bills ${what}`,
+    cite: { records: financeRecords(rows), total: c.n, claimedCount: c.n, basis: `Counted the vendor bills (payable invoices) with a printed total ${what}.` } });
+}
+
+/**
+ * R2: "what do we owe vendors" / "total owed to Adams Supply" / "what do we owe": from the vendor bills (payable rows). A bill with no recorded payment status is never "not owed":
+ * the answer says how many bills are on file, their total, and that without a payment status it cannot tell what is still owed. A customer is not a vendor.
+ */
+async function owedVendor(db, intent, ctx) {
+  const subj = intent.subject ? String(intent.subject).trim() : '';
+  const toks = subj.toLowerCase().split(/\s+/).filter((t) => t.length > 1).slice(0, 4);
+  const conds = toks.map((_, i) => `(f.vendor_name ILIKE $${i + 2} OR f.customer_name ILIKE $${i + 2})`).join(' AND ');
+  const scope = `f.direction = 'payable' AND f.doc_kind = 'invoice'${toks.length ? ` AND ${conds}` : ''}`;
+  const params = toks.map((t) => `%${t.replace(/[%_\\]/g, ' ')}%`);
+  const [a] = await q(db, `SELECT count(*)::int AS n, COALESCE(sum(f.total), 0) AS total, count(*) FILTER (WHERE f.status IN ('unpaid','partial'))::int AS n_open, COALESCE(sum(f.open_balance) FILTER (WHERE f.status IN ('unpaid','partial')), 0) AS open_total, count(*) FILTER (WHERE f.status = 'unknown')::int AS n_unknown, count(*) FILTER (WHERE f.status = 'paid')::int AS n_paid FROM financials f WHERE ${scope}`, params, ctx.hu);
+  const rows = await q(db, `SELECT f.* FROM financials f WHERE ${scope} ORDER BY f.doc_date DESC NULLS LAST, f.document_id LIMIT 6`, params, ctx.hu);
+  const note = (intent.readNotes ?? []).length ? ` (${intent.readNotes.join('; ')})` : '';
+  if (!a.n) {
+    if (subj) {
+      const cands = await resolveSubject(db, subj).catch(() => []);
+      if (cands && cands.length) { const nmz = [...new Set(cands.map((c) => c.name))].slice(0, 3).join(' and '); return baseAnswer(`${nmz} ${cands.length > 1 ? 'are customers' : 'is a customer'}, not a vendor: there are no vendor bills for ${cands.length > 1 ? 'them' : 'them'}, so nothing we owe ${cands.length > 1 ? 'them' : 'them'}. (Invoices we sent a customer are money owed to us.)${note}`, [], { confidence: 1, ...zeroCite(`Searched the vendor bills for ${subj}; none, and ${nmz} is on file as a customer.`) }); }
+      const v = await nameVerdict(db, subj);
+      if (!v.deny) {
+        if (v.canonical && !intent.__nameRetry) return owedVendor(db, { ...intent, subject: v.canonical, __nameRetry: true }, ctx);
+        if (v.canonical && v.type === 'vendor') return vendorNote(v.canonical, note);
+        return nameClarify(subj, v, note);
+      }
+      return baseAnswer(`${denialText({ name: subj, scope: 'vendor', tail: "so I can't say what we owe them." })}${note}`, [], { confidence: 1, ...zeroCite(`Searched the vendor bill names for ${subj}; no match.`) });
+    }
+    return baseAnswer(`There are no vendor bills in your records, so nothing is recorded as owed.${note}`, [], { confidence: 1, ...zeroCite('Looked for payable invoices (vendor bills); there are none on file.') });
+  }
+  if (intent.fromPayables && a.n_open > 0 && !subj) return receivables(db, { ...intent, intent: 'payables_open' }, ctx, 'payable');
+  const who = rows[0]?.vendor_name || rows[0]?.customer_name;
+  const label = subj ? `${who ?? subj}` : 'vendors';
+  const total = fmt(String(a.total));
+  let text;
+  if (a.n_open > 0) text = `${plural(a.n_open, 'bill')} from ${label} ${a.n_open === 1 ? 'is' : 'are'} open, ${fmt(String(a.open_total))} still owed${a.n_unknown ? `; ${plural(a.n_unknown, 'other bill')} ${a.n_unknown === 1 ? 'has' : 'have'} no payment status recorded` : ''}.`;
+  else if (a.n_unknown === a.n) text = `${plural(a.n, 'vendor bill')} ${subj ? `from ${label} ` : ''}${a.n === 1 ? 'is' : 'are'} on file (${total} in all), but no payment status is recorded on ${a.n === 1 ? 'it' : 'them'}, so I can't tell what is still owed.`;
+  else text = `${plural(a.n, 'vendor bill')} ${subj ? `from ${label} ` : ''}${a.n === 1 ? 'is' : 'are'} on file (${total} in all); ${a.n_paid ? `${a.n_paid} marked paid` : 'none is marked paid'}${a.n_unknown ? ` and ${a.n_unknown} with no payment status recorded, so I can't tell what is still owed on ${a.n_unknown === 1 ? 'it' : 'them'}` : ', so nothing is owed on them'}.`;
+  return baseAnswer(`${text}${note}`, rows.map((x) => invoiceFact(x)), { sources: rows.map((x) => docSource(x.document_id, x.total_page)), interpretation: subj ? `owed to ${label}` : 'owed to vendors',
+    cite: { records: financeRecords(rows), total: a.n, claimedCount: a.n, basis: `Counted the vendor bills (payable invoices)${subj ? ` from ${label}` : ''} and their recorded payment status.` } });
+}
+
+/**
+ * R2: "show me the invoice from a landlord" / "the invoice from a tenant": a role word names a SIDE of the books (landlord, vendor, supplier -> bills we received;
+ * tenant, donor, adopter, customer -> invoices we sent). The answer is short: how many, the newest few, and (for roles the records do not mark) that it is every document on that side.
+ */
+async function sideDocs(db, intent, ctx) {
+  const bill = intent.direction === 'out' || (intent.docNoun === 'bill' && intent.direction !== 'in');
+  const noun = bill ? 'bill' : 'invoice';
+  const today = String(ctx.today ?? '').slice(0, 10);
+  const scope = `f.doc_kind = 'invoice' AND f.direction = '${bill ? 'payable' : 'receivable'}'`;
+  const rows = await q(db, `SELECT f.* FROM financials f WHERE ${scope} ORDER BY f.doc_date DESC NULLS LAST, f.created_at DESC, f.document_id LIMIT 3`, [], ctx.hu);
+  const [{ n }] = await q(db, `SELECT count(*)::int AS n FROM financials f WHERE ${scope}`, [], ctx.hu);
+  const note = (intent.readNotes ?? []).length ? ` (${intent.readNotes.join('; ')})` : '';
+  const role = intent.role ?? 'party';
+  const plain = ['customer', 'vendor', 'supplier'].includes(role);
+  if (!n) return baseAnswer(`There ${bill ? 'are no vendor bills (bills we received)' : 'are no customer invoices (invoices we sent)'} in your records, so none is from a ${role}.${note}`, [], { confidence: 1, ...zeroCite(`Looked for ${bill ? 'payable' : 'receivable'} invoices; there are none on file.`) });
+  const nm = (x) => (x.direction === 'payable' ? (x.vendor_name || x.customer_name) : x.customer_name);
+  const one = (x) => `${x.invoice_number ? `#${x.invoice_number}` : 'no printed number'}${nm(x) ? ` ${bill ? 'from' : 'to'} ${nm(x)}` : ''}${humanDate(x.doc_date) ? `, ${humanDate(x.doc_date)}` : ''}${x.total == null ? '' : `, ${fmt(x.total)}`}${today && ymdOf(x.doc_date) > today ? ' (dated in the future)' : ''}`;
+  const lead = plain ? '' : `Your records don't mark who is a ${role}, so this is every ${noun} ${bill ? 'we received' : 'we sent'}: `;
+  const text = `${lead}${plural(n, noun)} ${plain ? (bill ? 'from vendors' : 'to customers') : 'in all'}${n > rows.length ? `; the newest ${rows.length}` : ''}: ${rows.map(one).join('; ')}${n > rows.length ? `; and ${n - rows.length} more. Name one (a ${bill ? 'vendor' : 'customer'} or an amount) to see it` : ''}.${note}`;
+  return baseAnswer(text.replace(/\.\)\./, '.)'), rows.map((x) => invoiceFact(x)), {
+    sources: rows.map((x) => docSource(x.document_id, x.total_page)), interpretation: `${noun}s from a ${role}`,
+    cite: { records: financeRecords(rows), total: n, claimedCount: n, basis: `Counted the ${bill ? 'payable' : 'receivable'} ${noun}s on file (newest first); ${plain ? '' : `the records do not say who is a ${role}.`}` } });
+}
+
+/** R41U E4: "invoices before december 24 2026" / "invoices from march 2026": count + newest in the window, from the rows (a date word is never an amount). */
+async function docsInWindow(db, intent, ctx) {
+  const bill = intent.direction === 'out' || (intent.docNoun === 'bill' && intent.direction !== 'in');
+  const noun = bill ? 'bill' : 'invoice';
+  const isoOk = (v) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
+  const wFrom = isoOk(intent.window?.from); const wTo = isoOk(intent.window?.to);
+  if (!wFrom && !wTo) return null;
+  const winSql = `${wFrom ? ` AND f.doc_date >= '${wFrom}'::date` : ''}${wTo ? ` AND f.doc_date <= '${wTo}'::date` : ''}`;
+  const scope = `f.doc_kind = 'invoice' AND f.direction = '${bill ? 'payable' : 'receivable'}'${winSql}`;
+  const rows = await q(db, `SELECT f.* FROM financials f WHERE ${scope} ORDER BY f.doc_date DESC NULLS LAST, f.document_id LIMIT 8`, [], ctx.hu);
+  const [{ n }] = await q(db, `SELECT count(*)::int AS n FROM financials f WHERE ${scope}`, [], ctx.hu);
+  const lab = String(intent.window?.label ?? '');
+  const when = /^(?:in|since|before|after|between|from|on|during|by|until)\b/i.test(lab) ? lab : `dated ${lab}`;
+  const note = (intent.readNotes ?? []).length ? ` (${intent.readNotes.join('; ')})` : '';
+  if (!n) return baseAnswer(`No ${noun}s ${bill ? 'we received ' : 'we sent '}${when} are on file.${note}`, [], { confidence: 1, ...zeroCite(`Searched every ${noun} ${when}; none found.`) });
+  const one = (x) => `${x.invoice_number ? `#${x.invoice_number}` : 'no printed number'}${(bill ? (x.vendor_name || x.customer_name) : x.customer_name) ? ` ${bill ? 'from' : 'to'} ${bill ? (x.vendor_name || x.customer_name) : x.customer_name}` : ''}${humanDate(x.doc_date) ? `, ${humanDate(x.doc_date)}` : ''}${x.total == null ? ', no printed total' : `, ${fmt(x.total)}`}`;
+  return baseAnswer(`${plural(n, noun)} ${bill ? 'we received' : 'we sent'} ${when}: ${rows.map(one).join('; ')}${n > rows.length ? `; and ${n - rows.length} more` : ''}.${note}`, rows.map((x) => invoiceFact(x)), {
+    sources: rows.map((x) => docSource(x.document_id, x.total_page)), interpretation: `${noun}s ${when}`,
+    cite: { records: financeRecords(rows), total: n, claimedCount: n, basis: `Counted the ${noun}s ${when} (newest first).` } });
+}
+
+/**
+ * R41U A3: "wheres George Garrison invoice": the invoices of one NAMED customer (or the bills of one named vendor), each with number, date and total.
+ * The name was read by the shared understanding step, so question words ("wheres", "whats", "show me") and role words are never part of it.
+ * A name that matches nobody is declined BY NAME (never answered with someone else's document).
+ */
+async function customerDocs(db, intent, ctx) {
+  let name = String(intent.subject ?? '').trim().replace(/^(?:mr|mrs|ms|miss|mx|dr|mister)\.?\s+(?=\S)/i, '');
+  if (!name) return null;
+  const note = (intent.readNotes ?? []).length ? ` (${intent.readNotes.join('; ')})` : '';
+  const isoOk = (v) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
+  const wFrom = isoOk(intent.window?.from); const wTo = isoOk(intent.window?.to);
+  // A time phrase this lane did not turn into a date window ("last quarter", "since June", "two weeks ago") must never be answered as if it
+  // were not there: step aside (null) so the question is declined or handled by a lane that reads the window, instead of listing everything.
+  if (!wFrom && !wTo) {
+    // (a phrase that carries an explicit year is read by the understanding step and applied further down, so it is left alone here)
+    const rest = String(intent.rawOriginal ?? intent.raw ?? '').toLowerCase().split(name.toLowerCase()).join(' ');
+    if (/\b(?:quarter(?:ly)?|q[1-4]|(?:last|past|previous|prior|next|this) (?:\d+ |few |couple (?:of )?)?(?:days?|weeks?|months?|quarters?|years?|spring|summer|fall|autumn|winter)|since|before|after|between|until|yesterday|today|ago|recent(?:ly)?|lately|year to date|ytd)\b/.test(rest) && !/\b(?:19|20)\d{2}\b/.test(rest)) return null;
+  }
+  const winSql = `${wFrom ? ` AND f.doc_date >= '${wFrom}'::date` : ''}${wTo ? ` AND f.doc_date <= '${wTo}'::date` : ''}`;
+  const wantBill = intent.direction === 'out';
+  const today = String(ctx.today ?? '').slice(0, 10);
+  const list = (rows, total, who, noun) => {
+    const one = (x) => `${x.invoice_number ? `#${x.invoice_number}` : `a ${noun} with no printed number`}${humanDate(x.doc_date) ? `, dated ${humanDate(x.doc_date)}` : ''}${x.total == null ? ', with no printed total' : `, for ${fmt(x.total)}`}${today && ymdOf(x.doc_date) > today ? ' (dated in the future)' : ''}`;
+    // R2: "last bill for X" / "latest bill from X": ONE document (the newest dated on or before today), with how many are on file; future-dated ones are said, never picked
+    if (intent.order === 'latest') {
+      const past = rows.filter((x) => x.doc_date && !(today && ymdOf(x.doc_date) > today));
+      const fut = rows.filter((x) => x.doc_date && today && ymdOf(x.doc_date) > today).length;
+      const pick = past[0] ?? rows.find((x) => !x.doc_date) ?? null;
+      const more = total > 1 ? ` (${total} ${noun}s on file)` : '';
+      const futNote = fut ? ` ${plural(fut, `${noun} is`, `${noun}s are`)} dated after today and ${fut === 1 ? 'was' : 'were'} left out.` : '';
+      if (!pick) return baseAnswer(`${who}${/s$/i.test(who) ? "'" : "'s"} only ${noun}${total === 1 ? ' is' : 's are'} dated after today, so there is no latest one to name yet.${futNote}${note}`, rows.slice(0, 3).map((x) => invoiceFact(x)), { sources: rows.slice(0, 3).map((x) => docSource(x.document_id, x.total_page)), interpretation: `latest ${noun} for ${who}`, cite: { records: financeRecords(rows.slice(0, 3)), total: rows.length, claimedCount: rows.length, basis: `Looked at the ${noun}s on file for ${who}; all are future-dated.` } });
+      return baseAnswer(`${who}${/s$/i.test(who) ? "'" : "'s"} latest ${noun} is ${one(pick)}${more}.${futNote}${note}`, [invoiceFact(pick)], {
+        sources: [docSource(pick.document_id, pick.total_page)], interpretation: `latest ${noun} for ${who}`,
+        cite: { records: financeRecords([pick]), total: 1, claimedCount: 1, basis: `Took the most recently dated ${noun} of the ${total} on file for ${who}.` } });
+    }
+    const multi = / and /.test(String(who)) && rows.some((x) => x.customer_name);
+    // several documents for ONE party: also state their combined total (the owner asked "in total" as often as "which ones"), only when every
+    // one of them is loaded and carries a total, so the sum is exact.
+    const sumCents = (rows.length === total && total > 1 && rows.every((x) => x.total != null && Number.isFinite(Number(x.total)))) ? rows.reduce((a, x) => a + Math.round(Number(x.total) * 100), 0) : null;
+    const sumNote = sumCents == null ? '' : ` Together they total ${fmt(String(sumCents / 100))}.`;
+    const oneN = (x) => (multi && x.customer_name ? `${one(x)} (${x.customer_name})` : one(x));
+    // "…in total" / "all together" about one party with several documents is a request for the sum, so lead with it (the documents are still cited)
+    const askedTotal = /\b(?:in total|all ?together|totals?|totall?ed|combined|sum)\b/i.test(String(intent.rawOriginal ?? intent.raw ?? ''));
+    const text = (askedTotal && sumCents != null && !multi) ? (noun === 'bill' ? `${who} has billed us ${fmt(String(sumCents / 100))} in total across ${total} bills.` : `We've invoiced ${who} ${fmt(String(sumCents / 100))} in total across ${total} invoices.`)
+      : total === 1 ? `${who}'s ${noun} is ${one(rows[0])}.`
+      : multi ? `${total} ${noun}s are on file for ${who}: ${rows.slice(0, 5).map((x) => oneN(x)).join('; ')}${total > 5 ? `; and ${total - 5} more` : ''}.`
+      : `${who} has ${total} ${noun}s: ${rows.slice(0, 5).map((x) => one(x)).join('; ')}${total > 5 ? `; and ${total - 5} more` : ''}.${sumNote}`;
+    return baseAnswer(`${text}${note}`, rows.slice(0, 6).map((x) => invoiceFact(x)), {
+      sources: rows.slice(0, 6).map((x) => docSource(x.document_id, x.total_page)), interpretation: `${noun}s for ${who}`,
+      cite: { records: financeRecords(rows), total, claimedCount: total, basis: `Listed the ${noun}s on file for ${who}, newest first.` } });
+  };
+  const forcedName = intent.__forced?.name ? String(intent.__forced.name) : null;
+  const vendorRows = async () => {
+    // R2: a look-alike section is ONE entity: its bills are the payable rows printed under exactly its name, never rows that merely share a word ("Adams" is not "Adams Supply")
+    if (forcedName) return q(db, `SELECT f.* FROM financials f WHERE f.direction = 'payable' AND f.doc_kind = 'invoice' AND (lower(f.vendor_name) = lower($2) OR lower(f.customer_name) = lower($2))${winSql} ORDER BY f.doc_date DESC NULLS LAST, f.created_at DESC LIMIT 12`, [forcedName], ctx.hu);
+    const toks = name.toLowerCase().split(/\s+/).filter((t) => t.length > 1).slice(0, 4);
+    if (!toks.length) return [];
+    const conds = toks.map((_, i) => `(f.vendor_name ILIKE $${i + 2} OR f.customer_name ILIKE $${i + 2})`).join(' AND ');
+    return q(db, `SELECT f.* FROM financials f WHERE f.direction = 'payable' AND f.doc_kind = 'invoice' AND ${conds}${winSql} ORDER BY f.doc_date DESC NULLS LAST, f.created_at DESC LIMIT 12`, toks.map((t) => `%${t.replace(/[%_\\]/g, ' ')}%`), ctx.hu);
+  };
+  // R2: a bill the user names is a vendor bill FIRST; but a named person who is a customer is never "missing" (their invoice is shown, with the honest note)
+  let asVendorFirst = false;
+  if (wantBill) {
+    const vr0 = await vendorRows();
+    if (vr0.length) return list(vr0, vr0.length, vr0[0].vendor_name || vr0[0].customer_name, 'bill');
+    asVendorFirst = !intent.viaLast;
+  }
+  let g = wantBill && !asVendorFirst ? { unresolved: true } : await subjectGate(db, { subject: name, __forced: intent.__forced });
+  // R2: a possessive typed without its apostrophe ("sandovals invoice"): when the name as typed is not found, drop the final s and use it if that finds exactly one customer
+  if (/[A-Za-z]{3}s$/i.test(name) && !intent.__forced && (!g || g.unresolved || g.answer || (g.name && !name.toLowerCase().split(/\s+/).filter((t) => t.length > 1).every((t) => String(g.name).toLowerCase().includes(t))))) {
+    const alt = name.slice(0, -1);
+    const g2 = await subjectGate(db, { subject: alt });
+    if (g2 && !g2.unresolved && !g2.answer && g2.name && alt.toLowerCase().split(/\s+/).filter((t) => t.length > 1).every((t) => String(g2.name).toLowerCase().includes(t))) { g = g2; name = alt; }
+  }
+  if (g?.answer) return g.answer;
+  // R41U E4: a single fuzzy-only candidate ("Sam Johnston" -> "Sam Johnsen") is never presented as the answer: ask.
+  if (g && !g.unresolved && !intent.__forced && g.name) {
+    const gl = String(g.name).toLowerCase();
+    const toks = name.toLowerCase().split(/\s+/).filter((t) => t.length > 1);
+    const glt = gl.match(/[a-z]+/g) ?? [];
+    if (toks.length && !toks.every((t) => glt.includes(t.replace(/[^a-z]/g, '')))) {
+      return baseAnswer(`I couldn't match "${name}" exactly. Did you mean ${g.name}? Ask again with that name and I'll show their ${wantBill ? 'bills' : 'invoices'}.${note}`, [], { confidence: 0.5, ...zeroCite(`The closest customer to "${name}" is ${g.name}, but the spelling differs, so nothing was answered as exact.`) });
+    }
+  }
+  if (!g || g.unresolved) {
+    const vr = await vendorRows();
+    if (vr.length) { const vn = vr[0].vendor_name || vr[0].customer_name; return list(vr, vr.length, vn, 'bill'); }
+    if (intent.declineByName || intent.__nameRetry) {
+      const v = await nameVerdict(db, name);
+      if (!v.deny) {
+        if (v.canonical && !intent.__nameRetry) return customerDocs(db, { ...intent, subject: v.canonical, __nameRetry: true }, ctx);
+        if (v.canonical && v.type === 'vendor') return vendorNote(v.canonical, note);
+        return nameClarify(name, v, note);
+      }
+      return baseAnswer(`${denialText({ name, scope: 'both', ask: wantBill ? 'a bill' : 'an invoice' })}${note}`, [], { confidence: 1, ...zeroCite(`Searched customer and vendor names for ${name}; none match.`) });
+    }
+    return null;
+  }
+  const rows = await q(db, `SELECT f.* FROM financials f WHERE ${LAST_INVOICE_WHERE} AND f.customer_id = ANY($2::uuid[])${winSql} ORDER BY f.doc_date DESC NULLS LAST, f.created_at DESC, f.document_id LIMIT 12`, [g.ids], ctx.hu);
+  const [{ n }] = await q(db, `SELECT count(*)::int AS n FROM financials f WHERE ${LAST_INVOICE_WHERE} AND f.customer_id = ANY($2::uuid[])${winSql}`, [g.ids], ctx.hu);
+  if (!rows.length) {
+    const vr = await vendorRows();
+    if (vr.length) return list(vr, vr.length, vr[0].vendor_name || vr[0].customer_name, 'bill');
+  }
+  if (!rows.length) return baseAnswer(`No invoice with financial details is on file for ${g.name}${intent.window?.label ? ` ${intent.window.label}` : ''} yet.${note}`, [], { confidence: 1, ...zeroCite(`Searched the invoices linked to ${g.name}; none have financial details captured.`) });
+  const ans = list(rows, n, g.name, 'invoice');
+  if (forcedName && !wantBill) { const vr = await vendorRows(); if (vr.length) ans.text = `${ans.text} As a vendor, ${forcedName} also has ${vr.length === 1 ? 'a bill' : `${vr.length} bills`}: ${vr.slice(0, 3).map((x) => `${x.invoice_number ? `#${x.invoice_number}` : 'one with no printed number'}${humanDate(x.doc_date) ? `, dated ${humanDate(x.doc_date)}` : ''}${x.total == null ? '' : `, for ${fmt(x.total)}`}`).join('; ')}.`; }
+  const pre = asVendorFirst ? `${g.name} is a customer, not a vendor, so there is no vendor bill; here ${n === 1 ? 'is their invoice' : 'are their invoices'}. ` : '';
+  // R2: "did X pay / is X's invoice paid": the honest line about payment status
+  let payNote = '';
+  if (intent.askPay) {
+    const known = rows.filter((x) => x.status && x.status !== 'unknown');
+    payNote = known.length ? ` Recorded payment status: ${known.slice(0, 5).map((x) => `${x.invoice_number ? `#${x.invoice_number}` : 'one invoice'} is ${x.status}`).join('; ')}${known.length < n ? `; the other${n - known.length === 1 ? '' : 's'} ${n - known.length === 1 ? "doesn't" : "don't"} print a payment status` : ''}.`
+      : ` Payment status isn't recorded on ${n === 1 ? 'it' : 'them'}, so I can't tell you whether ${n === 1 ? 'it has' : 'they have'} been paid.`;
+  }
+  if (pre || payNote) ans.text = `${pre}${ans.text}${payNote}`;
+  return ans;
 }
 
 /** "how much have we collected / have customers paid us" = SUM(amount_paid), never SUM(total). */
@@ -1523,10 +1946,13 @@ async function balanceLeaderboard(db, intent, ctx) {
 async function superlativeInvoice(db, intent, ctx) {
   const which = intent.superlative === 'min' ? 'smallest' : 'biggest';
   const dir = intent.superlative === 'min' ? 'ASC' : 'DESC';
-  const rows = await q(db, `SELECT f.* FROM financials f WHERE ${INVOICE_SCOPE} AND f.total IS NOT NULL ORDER BY f.total ${dir} LIMIT 1`, [], ctx.hu);
+  const todayS = String(ctx.today ?? '').slice(0, 10);
+  const notFut = /^\d{4}-\d{2}-\d{2}$/.test(todayS) ? ` AND (f.doc_date IS NULL OR f.doc_date <= '${todayS}'::date)` : '';
+  const rows = await q(db, `SELECT f.* FROM financials f WHERE ${INVOICE_SCOPE} AND f.total IS NOT NULL${notFut} ORDER BY f.total ${dir} LIMIT 1`, [], ctx.hu);
+  const [{ nf }] = notFut ? await q(db, `SELECT count(*)::int AS nf FROM financials f WHERE ${INVOICE_SCOPE} AND f.doc_date > '${todayS}'::date`, [], ctx.hu) : [{ nf: 0 }];
   if (!rows.length) return baseAnswer('No invoices with a printed total are on file yet.', [], { confidence: 1, ...zeroCite('Searched every invoice for a printed total; none have one.') });
   const r = rows[0];
-  const text = `The ${which} invoice we've sent is ${fmt(r.total)}${r.invoice_number ? ` (invoice #${r.invoice_number})` : ''}${r.customer_name ? `, to ${r.customer_name}` : ''}${r.doc_date ? `, dated ${humanDate(r.doc_date)}` : ''}. Invoices only - not quotes, purchase orders or maintenance agreements.`;
+  const text = `The ${which} invoice we've sent is ${fmt(r.total)}${r.invoice_number ? ` (invoice #${r.invoice_number})` : ''}${r.customer_name ? `, to ${r.customer_name}` : ''}${r.doc_date ? `, dated ${humanDate(r.doc_date)}` : ''}. Invoices only - not quotes, purchase orders or maintenance agreements.${nf ? ` I left out ${plural(nf, 'invoice')} dated after today.` : ''}`;
   return baseAnswer(text, [invoiceFact(r, `${which === 'biggest' ? 'Biggest' : 'Smallest'} invoice`)], {
     sources: [docSource(r.document_id, r.total_page)], interpretation: `${which} invoice`,
     cite: { records: financeRecords(rows), total: 1, claimedCount: 1, basis: `Took the invoice with the ${which === 'biggest' ? 'highest' : 'lowest'} printed total (invoices only, USD).` },
@@ -1836,11 +2262,53 @@ async function avgJobMargin(db, intent) {
  * @returns {Promise<object|null>} an answer `data` object, or null when this intent could not be
  *   answered honestly (unresolvable customer etc.) - the caller then falls through.
  */
+const nameKey = (n) => String(n ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+/**
+ * E2 A7: look-alike customers must never be merged silently. "the Henderson invoices" with Mark Henderson, Paula Henderson and Henderson Roofing LLC on file is THREE
+ * customers: an exact full-name match wins outright; otherwise every distinct full name gets its own answer (its own totals), labelled by full name, and the
+ * combined figure is given only as an explicitly labelled "all of them together". Returns null when there is nothing to split (one name, or the which-one-did-you-mean case).
+ */
+async function splitLookAlikes(db, intent, opts) {
+  if (!intent?.subject || intent.__forced || /^\d/.test(intent.subject) || intent.intent === 'customer_paid_up') return null; // a yes/no "all paid up" verdict over look-alikes is a conjunction, stated as one
+  const cands = await resolveSubject(db, intent.subject);
+  if (cands.length < 2 || cands.length > 5) return null;
+  const phrase = nameKey(intent.subject);
+  const exact = cands.filter((c) => nameKey(c.name) === phrase);
+  if (exact.length) {
+    if (exact.length === cands.length) return null;
+    return runMoneyIntentInner(db, { ...intent, __forced: { ids: exact.map((c) => c.id), name: exact[0].name } }, opts);
+  }
+  const groups = new Map();
+  for (const c of cands) { const k = nameKey(c.name); if (!groups.has(k)) groups.set(k, { name: c.name, ids: [] }); groups.get(k).ids.push(c.id); }
+  if (groups.size < 2 || !cands.every((c) => nameKey(c.name).includes(phrase))) return null; // unrelated sound-alikes keep the existing which-one-did-you-mean answer
+  const parts = [];
+  for (const g of groups.values()) {
+    const r = await runMoneyIntentInner(db, { ...intent, __forced: { ids: g.ids, name: g.name } }, opts);
+    if (!r || r.kind !== 'answer' || typeof r.text !== 'string') return null;
+    parts.push({ g, r });
+  }
+  // R2: a customer and a vendor that share a word are different entities: their documents are never merged into one "all together" sentence
+  if (intent.intent === 'customer_docs') {
+    const facts0 = parts.flatMap((p) => (p.r.facts ?? []).slice(0, 3).map((f) => ({ ...f, label: `${p.g.name} - ${f.label}` })));
+    return { ...parts[0].r, text: `"${intent.subject}" matches ${groups.size} different customers or vendors (${[...groups.values()].map((g) => g.name).join(', ')}), so each is answered on its own. ${parts.map((p) => `${p.g.name}: ${p.r.text}`).join(' ')} Ask with a full name to get just one.`, facts: facts0 };
+  }
+  const merged = await runMoneyIntentInner(db, intent, opts);
+  if (!merged || merged.kind !== 'answer') return null;
+  const lead = (r) => r.facts?.[0];
+  const facts = [
+    ...parts.filter((p) => lead(p.r)).map((p) => ({ ...lead(p.r), label: `${p.g.name} - ${lead(p.r).label}` })),
+    ...(lead(merged) ? [{ ...lead(merged), label: `All ${groups.size} together - ${lead(merged).label}` }] : []),
+  ];
+  const text = `"${intent.subject}" matches ${groups.size} different customers (${[...groups.values()].map((g) => g.name).join(', ')}), so I have not treated them as one. ` +
+    `${parts.map((p) => `${p.g.name}: ${p.r.text}`).join(' ')} All ${groups.size} together: ${merged.text} Ask with a full name to get just one.`;
+  return { ...merged, text, facts, interpretation: merged.interpretation };
+}
 export async function runMoneyIntent(db, intent, opts) {
-  const out = await runMoneyIntentInner(db, intent, opts);
+  const split = await splitLookAlikes(db, intent, opts);
+  const out = split ?? await runMoneyIntentInner(db, intent, opts);
   // A payment-status question that also named an amount ("open invoices over 5k"): the status answer cannot apply the amount, so say so plainly.
-  if (out && typeof out.text === 'string' && parseThreshold(intent?.rawOriginal ?? '') && /^(?:open_invoices|overdue|ar_aging|payment_status)$/.test(intent.intent)) {
-    out.text = `${out.text.replace(/\s+$/, '')} (I could not apply the dollar amount you named to this payment-status answer.)`;
+  if (out && typeof out.text === 'string' && parseThreshold(intent?.rawOriginal ?? '') && /^(?:open_invoices|overdue|ar_aging|payment_status|total_invoiced|last_invoice|avg_invoice|customer_docs|customer_paid_up|collected_total)$/.test(intent.intent) && !/did not apply|could not apply/.test(out.text)) {
+    out.text = `${out.text.replace(/\s+$/, '')} (I could not apply the dollar amount you named to this answer.)`;
   }
   return out;
 }
@@ -1850,7 +2318,6 @@ async function runMoneyIntentInner(db, intent, { today }) {
     case 'last_invoice': return lastInvoice(db, intent, ctx);
     case 'total_invoiced': return totalInvoiced(db, intent, ctx);
     case 'open_invoices': case 'overdue': case 'ar_aging': return receivables(db, intent, ctx, 'receivable');
-    case 'payables_open': return receivables(db, intent, ctx, 'payable');
     case 'revenue_by_month': return revenueByMonth(db, intent, ctx);
     case 'revenue_year_comparison': return revenueYearComparison(db, intent, ctx);
     case 'agreement_fees': return agreementFees(db, intent, ctx);
@@ -1865,6 +2332,19 @@ async function runMoneyIntentInner(db, intent, { today }) {
     case 'payment_status': return paymentStatusCounts(db, intent, ctx);
     case 'threshold_invoices': return thresholdInvoices(db, intent, ctx);
     case 'invoice_by_amount': return invoiceByAmount(db, intent, ctx);
+    case 'doc_extreme': return docExtreme(db, intent, ctx);
+    case 'doc_count': return docCount(db, intent, ctx);
+    case 'side_docs': return sideDocs(db, intent, ctx);
+    case 'bill_threshold': return billThreshold(db, intent, ctx);
+    case 'owed_vendor': return owedVendor(db, intent, ctx);
+    case 'payables_open': return intent.subject ? receivables(db, intent, ctx, 'payable') : owedVendor(db, { ...intent, fromPayables: true }, ctx);
+    case 'which_ask': return baseAnswer(intent.docNoun === 'bill' ? 'Which vendor or bill do you mean? Tell me a vendor\'s name, or an amount like "the bill for 3470".' : 'Which customer or invoice do you mean? Tell me a customer\'s name, or an amount like "the invoice for 3470".', [], { confidence: 0.5, ...zeroCite('The question had no name, number or amount in it, so nothing was searched.') });
+    case 'customer_docs': return customerDocs(db, intent, ctx);
+    case 'name_pay_decline': return namedPayDecline(db, intent, ctx);
+    case 'name_pay_multi': return namedPayMulti(intent);
+    case 'name_clarify': return nameClarify(intent.__clarify.raw, intent.__clarify.v);
+    case 'docs_in_window': return docsInWindow(db, intent, ctx);
+    case 'direction_ask': return baseAnswer('Do you mean invoices we sent to customers (money coming in), or bills we received from vendors (money going out)? Tell me which and I will look.', [], { confidence: 0.5, ...zeroCite('The question mixes words for money in and money out, so nothing was answered.') });
     case 'collected_total': return collectedTotal(db, intent, ctx);
     case 'sales_tax': return salesTaxTotal(db, intent, ctx);
     case 'quotes_waiting': return quotesWaiting(db, intent, ctx);

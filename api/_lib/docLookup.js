@@ -20,6 +20,7 @@
  * parseDocLookupQuestion's own doc comment for the "must not hijack an
  * analytics/retrieval question" guards this shares with contactLookup.js.
  */
+import { denyOr } from "./lookups/nameMatch.js";
 import { localYmdIn } from "./util/localDate.js";
 import { extractWindow } from "./lookups/dateQualifiers.js";
 import { correctTriggerWordTypos, normalizeQuestion } from "./nlNormalize.js";
@@ -107,7 +108,7 @@ export { DOCTYPE_TRIGGER_WORDS };
 // excluding "for (the) memo(s)" closes this collision the same way the apostrophe/case guards
 // close theirs, with no known-good phrasing lost.
 const INTERNAL_MEMO_PATTERNS = [
-  /(?<!\bfor )(?<!\bfor the )\bmemos?\b(?!')/,
+  /(?<!\bfor )(?<!\bfor the )(?<!\bcredit )\bmemos?\b(?!')/,
   /\binternal(?:-only)?\s+(?:notes?|documents?|writeups?|write-?ups?|paperwork)\b/i,
   /\bstaff-only\s+paperwork\b/i,
   /\bteam-wide\s+notice\b/i,
@@ -796,11 +797,19 @@ async function runDocLookupCore(db, question, opts = {}) {
   } else {
     const { candidates, declined } = await resolveCandidates(db, question, namePhrase, false);
     if (declined) return declined;
-    if (candidates.length === 0) {
+    if (candidates.length === 0 && /\b(?:open|unpaid|overdue|paid|outstanding|pending|owing|due)$/i.test(String(namePhrase).trim())) return null; // E2 A7: a status word is never part of a name ("henderson open invoices"): let the money lane read the status
+    if (candidates.length === 0 && /^(?:wheres|whats|hows|whos|where|what|how|who|which|when|show|find|pull|can|could|please|do|does|is|are)\b|\b(?:my|our|view|see)\b/i.test(String(namePhrase).trim())) {
+      // R41U E4 (owner rule 3): question words / my / our / view are never part of a name: ask one short question instead of "no customer named Wheres My".
       return attachCitations({
+        kind: "answer", text: "Which customer or invoice do you mean? Tell me a customer's name, or an amount like \"the invoice for 3470\".",
+        facts: [], sources: [], confidence: 0.5, verifiedCount: 0, unverifiedCount: 0, closest: [],
+      }, { records: [], total: 0, kind: "searched", basis: "The question had no customer name in it, so nothing was searched." });
+    }
+    if (candidates.length === 0) {
+      return denyOr(db, namePhrase, attachCitations({
         kind: "answer", text: `I couldn't find a customer named ${titleCase(namePhrase)}.`,
         facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
-      }, { records: [], total: 0, kind: "searched", basis: `Searched your customer names for ${titleCase(namePhrase)}; no customer matches.` });
+      }, { records: [], total: 0, kind: "searched", basis: `Searched your customer names for ${titleCase(namePhrase)}; no customer matches.` }));
     }
     if (candidates.length > MAX_AGGREGATE_CANDIDATES) {
       const names = candidates.map((r) => r.customer_name || r.customer_number || "Unnamed customer");

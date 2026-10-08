@@ -11,6 +11,7 @@
 import { attachCitations } from "../citations/records.js";
 import { documentRecordsFor, customerRecordsFor } from "../citations/enrich.js";
 import { TENANT_SQL, answerEnvelope } from "../scope.js";
+import { countSubject } from "../understanding/understand.js";
 
 const NOUNS = [
   [/^(?:invoices?|invoce|invioce|bills?)$/, "invoice", "invoice"], [/^(?:quotes?|qoute|quoet|estimates?|proposals?)$/, "proposal-quote", "quote"],
@@ -24,7 +25,7 @@ const STATUS = new Set(["open", "pending", "outstanding", "unaccepted", "unsigne
 
 export function parseCustomerDocRank(question) {
   if (process.env.DONOVAN_CUSTOMER_DOC_RANK === "0") return null;
-  const s = String(question ?? "").toLowerCase().replace(/[’`]/g, "'").replace(/[?!.,]+/g, " ").replace(/\s+/g, " ").trim();
+  const s = String(question ?? "").toLowerCase().replace(/[’`]/g, "'").replace(/[?!.,]+/g, " ").replace(/\s+/g, " ").trim().replace(/\bat least (?:one|1|a)\b/g, "a");
   if (!s || s.length > 80) return null;
   let toks = s.split(" "), noun = null, rank = null, status = null;
   // two-word nouns first
@@ -49,6 +50,8 @@ export function parseCustomerDocRank(question) {
   if (status) return null;
   if (rank) return asksWho && !neg ? { mode: "rank", dir: rank, noun } : null;
   if (cust && neg) return { mode: "none", noun };
+  // E2 A4: "how many customer invoices do we have" counts INVOICES (customer is a role word there, not the thing counted): leave it to the invoice count.
+  if (cust && countSubject(question) && countSubject(question).subject !== "customers") return null;
   if (cust && /\b(?:have|has|with)\b/.test(s) && !/\b(?:list|show)\b/.test(s) && /\bhow many\b|\bnumber of\b|\bcount\b/.test(s)) return { mode: "have", noun };
   return null;
 }

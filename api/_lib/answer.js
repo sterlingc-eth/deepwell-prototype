@@ -462,6 +462,15 @@ function sourceIsGrounded(s, allowed, isComputed) {
  */
 /** Forced when nothing survived citation-checking. Never the model's own words
  *  — see the "text is not citation-checked" note below for why. */
+const FACT_FIELDS = ["label", "value", "status", "entityId", "kind", "valueOk"];
+// the card's own keys carry enum / identifier values only: an arbitrary string in "status", "kind" or "entityId" (or a non-boolean "valueOk") would be text that reaches the user unchecked
+const FACT_FIELD_OK = {
+  label: () => true, value: () => true,
+  status: (v) => typeof v === "string" && ["ok", "warn", "bad", "info", "muted"].includes(v),
+  entityId: (v) => typeof v === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(v),
+  kind: (v) => typeof v === "string" && /^[a-z][a-z_-]{0,23}$/.test(v),
+  valueOk: (v) => typeof v === "boolean",
+};
 export const NO_ANSWER_TEXT = "Nothing in your records answers that.";
 
 /**
@@ -481,7 +490,10 @@ export function shapeAnswer(raw, allowed, { allowComputed = false, candidates = 
       const sources = (Array.isArray(f.sources) ? f.sources : []).filter((s) =>
         sourceIsGrounded(s, safeAllowed, basis === "computed")
       );
-      return { ...f, basis, modelBasis: f.basis === "computed" ? "computed" : "printed", sources };
+      // whitelist: any other field the model invents on a card (detail, note, ...) would reach the user unchecked
+      const kept = {};
+      for (const k of FACT_FIELDS) if (f[k] !== undefined && FACT_FIELD_OK[k](f[k])) kept[k] = f[k];
+      return { ...kept, basis, modelBasis: f.basis === "computed" ? "computed" : "printed", sources };
     })
     .filter((f) => f.sources.length > 0);
 

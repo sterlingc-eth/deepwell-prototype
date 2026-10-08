@@ -168,7 +168,7 @@ check('Becca Montoya -> Rebecca Montoya, warranty status', /^Showing results for
 r = await ask('tenantA', 'email for elizabeth zimmerman');
 check('Elizabeth Zimmerman -> Betty Zimmerman (stored nickname)', /^Showing results for Betty Zimmerman/.test(r.text) && /betty\.zimmerman4@aol\.com/.test(r.text), r.text);
 r = await ask('tenantA', 'phone for Bob Mercer');
-check('Bob Mercer (no Robert Mercer): honest decline naming the Mercers, no phone', /^I don't have a customer named "bob mercer"\. Did you mean Thomas Mercer, Laura Mercer\?$/.test(r.text) && !/\d{3}-\d{4}/.test(r.text) && r.model === 0, r.text);
+check('Bob Mercer (no Robert Mercer): honest decline naming the Mercers, no phone', /^I couldn't find "bob mercer" as asked\. Did you mean Thomas Mercer, Laura Mercer\?$/.test(r.text) && !/\d{3}-\d{4}/.test(r.text) && r.model === 0, r.text);
 r = await ask('tenantA', 'phone for Amy Quinley');
 check('Amy Quinley (Amy is a real name): never Amanda Quinley\'s phone', !/555-0158/.test(r.text) && /Did you mean/.test(r.text), r.text);
 r = await ask('tenantA', 'phone for Dan Holbrook');
@@ -305,7 +305,7 @@ check('off-domain / untracked / dangling declines are one short line (< 100 char
 
 console.log('\n-- 3. tenant B: hard negatives, collisions, live records, isolation');
 r = await ask('tenantB', 'phone for Chris Lee');
-check('ambiguous nickname: one-tap "Did you mean" naming both, no phone', /^I don't have a customer named "chris lee"\. Did you mean (?:Christopher Lee, Christina Lee|Christina Lee, Christopher Lee)\?$/.test(r.text) && !/555-9/.test(r.text), r.text);
+check('ambiguous nickname: one-tap "Did you mean" naming both, no phone', /^I couldn't find "chris lee" as asked\. Did you mean (?:Christopher Lee, Christina Lee|Christina Lee, Christopher Lee)\?$/.test(r.text) && !/555-9/.test(r.text), r.text);
 r = await ask('tenantB', 'phone for Will Smith');
 check('exact "Will Smith" wins over William Smith', /^Will Smith's phone is/.test(r.text) && !/Showing results/.test(r.text), r.text);
 r = await ask('tenantB', 'phone for Bill Smith');

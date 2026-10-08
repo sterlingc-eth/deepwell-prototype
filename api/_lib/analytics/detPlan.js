@@ -1017,6 +1017,8 @@ function mergeDetectedConditions(plan, q) {
  * question that named no real window at all.
  */
 const WARRANTY_EXPIRE_WORD_RE = /\bwarrant(?:y|ies)\b[\s\S]{0,20}\b(?:expir\w*|ends?|ending|lapse\w*|runs?\s+out)\b|\b(?:expir\w*|ends?|ending|lapse\w*)\b[\s\S]{0,20}\bwarrant(?:y|ies)\b/i;
+// E2 A7: "which units expire in the next 90 days" / "how many systems are expiring in the next 60 days": a unit that EXPIRES is its warranty ending (the only thing a unit has that expires), no "warranty" word needed.
+const UNIT_EXPIRE_WORD_RE = /\b(?:units?|equipment|systems?|installs?|installations?|furnaces?|acs?|air conditioners?|heat pumps?|condensers?|rtus?|boilers?|mini[- ]?splits?|air handlers?)\b[\s\S]{0,30}\b(?:expir\w*|lapse\w*|run(?:s|ning)?\s+out)\b/i;
 // D4: "warranties that run through 2030" / "good until 2031" - the term runs to (at least) the end of that year.
 const WARRANTY_RUN_THROUGH_RE = /\bwarrant(?:y|ies)\b[\s\S]{0,40}\b(?:run|runs|running|good|valid|active|covered|last|lasts|lasting)\s+(?:through|thru|until|till|to)\s+(?:the\s+end\s+of\s+)?((?:19|20|21)\d{2})\b/i;
 
@@ -1030,7 +1032,7 @@ const WARRANTY_RUN_THROUGH_RE = /\bwarrant(?:y|ies)\b[\s\S]{0,40}\b(?:run|runs|r
 function detectWarrantyExpiryWindow(q, today) {
   const through = WARRANTY_RUN_THROUGH_RE.exec(q);
   if (through) return { entity: 'equipment', op: opFromShape(q), filters: [{ field: 'warrantyExpires', op: 'gte', value: `${through[1]}-12-31` }] };
-  if (!WARRANTY_EXPIRE_WORD_RE.test(q)) return null;
+  if (!WARRANTY_EXPIRE_WORD_RE.test(q) && !UNIT_EXPIRE_WORD_RE.test(q)) return null;
   const range = resolveAnyTimeRange(q, today);
   if (!range) return null;
   const filters = [];

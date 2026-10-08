@@ -311,7 +311,7 @@ export function useSamplePrompts(role: AskRole, enabled = true, tenantKey: strin
  * suggested name into a one-tap re-ask of the SAME question with the name corrected: the tech confirms
  * with one tap, and Donovan never guesses who they meant. Pure: no network, no model.
  */
-const NEAR_MISS_RE = /^I don't have a customer named "([^"]+)"\.\s*Did you mean (.+)\?\s*$/;
+const NEAR_MISS_RE = /^(?:I don't have a customer named|I couldn't match|I couldn't find) "([^"]+)"(?: exactly| as asked)?\.\s*Did you mean (.+)\?\s*$/;
 
 /**
  * R32: an UNAMBIGUOUS typo'd customer name is now answered straight away, prefixed with

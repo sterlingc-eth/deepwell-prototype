@@ -102,6 +102,10 @@ export function isFinancialQuestion(question) {
   if (FIN_QUOTE_ASK_RE.test(q)) return true;
   // Defect 13: "what did William Quintana pay for his new system" / "how much did Amy Isaacson pay" / "what was Kevin Zimmerman charged" - what a named customer paid / was charged.
   if (FIN_CUSTOMER_PAY_RE.test(q)) return true;
+  // R2: "what do we owe" / "owed to <vendor>" is a money question (the vendor bills)
+  if (/\b(?:what|how much)\s+(?:do|did|will)\s+we\s+(?:still\s+)?owe\b(?!\s+us)/.test(q) || /\bowed\s+to\b/.test(q)) return true;
+  // R2: a plain count of credit memos / purchase orders ("how many credit memos", "number of purchase orders") is a document count from the rows
+  if (/\b(?:how many|number of|count of|total number of)\s+(?:credit\s*-?\s*memos?|purchase\s*orders?|pos)\b/.test(q)) return true;
   if (FIN_NOUN_RE.test(q) && FIN_COUNT_OR_AVG_RE.test(q)) {
     // Round 15 follow-up (P0 hook, generalization audit): "how many maintenance agreements are
     // there" / "how many customers are locked into a maintenance agreement" are a plain DOCUMENT

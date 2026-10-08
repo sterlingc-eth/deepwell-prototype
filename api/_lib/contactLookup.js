@@ -27,6 +27,7 @@
  * scripts/verify-analytics.mjs's contact-lookup section. resolveContact/
  * runContactLookup are the only functions here that touch `db`.
  */
+import { denyOr, questionNamesEntity } from "./lookups/nameMatch.js";
 import { parseDocFieldAsk } from './lookups/docFieldAsk.js';
 import { dropConflicting } from './addressConflict.js';
 import { normalizeQuestion, correctTriggerWordTypos } from "./nlNormalize.js";
@@ -1792,7 +1793,7 @@ export function buildNearMissDeclineAnswer(namePhrase, rows) {
   return attachCitations(
     {
       kind: "answer",
-      text: `I don't have a customer named "${namePhrase}".${suggestion}`,
+      text: names.length > 1 ? `I couldn't find "${namePhrase}" as asked.${suggestion}` : `I couldn't match "${namePhrase}" exactly.${suggestion}`,
       facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
     },
     {
@@ -2012,7 +2013,7 @@ async function runContactLookupCore(db, question, opts = {}) {
   // R16 F3: out-of-domain decline — no DB resolution at all, the question
   // itself is the whole answer.
   if (parsed.field === "slotFill") return runSlotFill(db, parsed, { today, question });
-  if (parsed.field === "outOfDomain") return buildOutOfDomainAnswer();
+  if (parsed.field === "outOfDomain") { if (await questionNamesEntity(db, question)) return null; return buildOutOfDomainAnswer(); }
   if (parsed.field === "untrackedField") return buildUntrackedFieldAnswer();
   if (parsed.field === "notHeld") {
     // D16: a company named in a "customers of <Name>" shape that IS this tenant's own letterhead is "our customers", not another company's.
@@ -2037,6 +2038,7 @@ async function runContactLookupCore(db, question, opts = {}) {
     // asked about) with that real customer's own address attached — see resolveNamedCustomers.
     const { candidates, declined } = await resolveNamedCustomers(db, question, parsed.namePhrase);
     if (declined) return declined;
+    if (!candidates.length) return denyOr(db, parsed.namePhrase, buildExistenceAnswer(candidates, titleCase(parsed.namePhrase), { named: true }));
     return buildExistenceAnswer(candidates, titleCase(parsed.namePhrase), { named: true });
   }
 

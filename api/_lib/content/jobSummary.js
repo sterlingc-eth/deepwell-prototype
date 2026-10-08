@@ -23,6 +23,7 @@
  *   - Every fact quotes an ACTUAL sentence/line from the source page (extractFindingSentences below never
  *     synthesizes text, only trims/clips whitespace) and cites the document id + page it came from.
  */
+import { nameVerdict, clarifyEnvelope } from '../lookups/nameMatch.js';
 import { documentTypeLabel, canonicalTypeId } from '../documentTypes.js';
 import { isoDate } from '../scope.js';
 import { attachCitations, customerRecord, documentRecord } from '../citations/records.js';
@@ -429,6 +430,8 @@ export async function runJobSummary(db, parsed, pack = null) {
   );
 
   if (!allMatches.length) {
+    const nv = await nameVerdict(db, customerName);
+    if (!nv.deny) return clarifyEnvelope(customerName, nv);
     return attachCitations({
       kind: 'answer',
       text: `No customer or job named "${customerName}" is on file.`,

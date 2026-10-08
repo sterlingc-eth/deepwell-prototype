@@ -112,9 +112,18 @@ export function resolveCalendarSpan(question, today) {
   if (dts.length) {
     const dt = dts[0];
     let y = dt.y;
+    let yearNote = '';
     if (y == null) {
       y = Y;
       if (iso(y, dt.m, dt.d) > todayISO) y -= 1; // same "not a day that hasn't happened yet" rule bare month names follow
+      // E2 A7: "before december 24" / "after march 3" with no year takes the year whose date is NEAREST to today (either side), and says so; a plain or "since" date keeps the most-recent-past reading.
+      const pre = q.slice(0, q.indexOf(dt.text.toLowerCase())).replace(/\b(?:on|of|the|day)\s*$/g, '').trim();
+      const isDir = /\b(before|prior to|until|till|by)\s*$/.test(pre); // "after <date>" keeps the most recent past one: nothing can be after a future day
+      if (isDir) {
+        const cand = [Y - 1, Y, Y + 1].map((yy) => ({ yy, diff: Math.abs(Date.parse(`${iso(yy, dt.m, dt.d)}T00:00:00Z`) - Date.parse(`${todayISO}T00:00:00Z`)) }));
+        y = cand.sort((a, b) => a.diff - b.diff)[0].yy;
+      }
+      void yearNote; // the chosen year is part of every label ("before December 24, 2026"), which is how the answer states it
     }
     // "march 15th, 2027" etc: a real future day stays a future day (callers decide), never rewritten.
     const day = iso(y, dt.m, dt.d);
@@ -124,12 +133,12 @@ export function resolveCalendarSpan(question, today) {
     if (dirWord) {
       const prev = new Date(Date.parse(`${day}T00:00:00Z`) - 86400000).toISOString().slice(0, 10);
       const next = new Date(Date.parse(`${day}T00:00:00Z`) + 86400000).toISOString().slice(0, 10);
-      if (dirWord === 'since' || dirWord === 'from' || dirWord === 'starting' || dirWord === 'beginning') return { from: day, to: todayISO, label: `since ${fmtLong(y, dt.m, dt.d)}`, bare: `since ${fmtLong(y, dt.m, dt.d)}` };
-      if (dirWord === 'before' || dirWord === 'prior to') return { from: '1900-01-01', to: prev, label: `before ${fmtLong(y, dt.m, dt.d)}`, bare: `before ${fmtLong(y, dt.m, dt.d)}` };
-      if (dirWord === 'after') return { from: next, to: todayISO > next ? todayISO : next, label: `after ${fmtLong(y, dt.m, dt.d)}`, bare: `after ${fmtLong(y, dt.m, dt.d)}` };
-      return { from: '1900-01-01', to: day, label: `through ${fmtLong(y, dt.m, dt.d)}`, bare: `through ${fmtLong(y, dt.m, dt.d)}` };
+      if (dirWord === 'since' || dirWord === 'from' || dirWord === 'starting' || dirWord === 'beginning') return { from: day, to: todayISO, label: `since ${fmtLong(y, dt.m, dt.d)}${yearNote}`, bare: `since ${fmtLong(y, dt.m, dt.d)}` };
+      if (dirWord === 'before' || dirWord === 'prior to') return { from: '1900-01-01', to: prev, label: `before ${fmtLong(y, dt.m, dt.d)}${yearNote}`, bare: `before ${fmtLong(y, dt.m, dt.d)}` };
+      if (dirWord === 'after') return { from: next, to: todayISO > next ? todayISO : next, label: `after ${fmtLong(y, dt.m, dt.d)}${yearNote}`, bare: `after ${fmtLong(y, dt.m, dt.d)}` };
+      return { from: '1900-01-01', to: day, label: `through ${fmtLong(y, dt.m, dt.d)}${yearNote}`, bare: `through ${fmtLong(y, dt.m, dt.d)}` };
     }
-    return { from: day, to: day, label: `on ${fmtLong(y, dt.m, dt.d)}`, bare: fmtLong(y, dt.m, dt.d) };
+    return { from: day, to: day, label: `on ${fmtLong(y, dt.m, dt.d)}${yearNote}`, bare: fmtLong(y, dt.m, dt.d) };
   }
 
   if (/\btoday\b/.test(q) && !/\btoday'?s\s+(?:date|prices?)\b/.test(q)) return { from: todayISO, to: todayISO, label: 'today', bare: `${fmtLong(Y, t.getUTCMonth() + 1, t.getUTCDate())} (today)` };

@@ -57,6 +57,7 @@ import { parseFieldAbsence, runFieldAbsence } from './lookups/fieldAbsence.js';
 import { parseFieldQuestion, runFieldMatch } from './lookups/fieldMatch.js';
 import { parseDateQualifier, runDateQualifier } from './lookups/dateQualifiers.js';
 import { parseDocWindow, runDocWindow } from './lookups/dateDocWindow.js';
+import { parseExpiryWindow, runExpiryWindow } from './lookups/expiryWindow.js';
 import { parseDocFieldAsk } from './lookups/docFieldAsk.js';
 import { parseFalsePremise, runFalsePremise } from './lookups/falsePremise.js';
 
@@ -167,6 +168,9 @@ export function classifyDeterministic(question, opts = {}) {
   const dateQ = parseDateQualifier(String(question ?? ''));
   if (dateQ) return { route: 'datequal', intent: dateQ };
   // Document-type counts with date lists / months / open windows / undated types / ambiguous dates (tickets on A and B, work orders in 2026-09) - lookups/dateDocWindow.js.
+  // E2 A7: an expiry window ("which leases expire in 60 days") computed from the stored end dates against today - lookups/expiryWindow.js.
+  const expiryQ = parseExpiryWindow(String(question ?? ''));
+  if (expiryQ) return { route: 'expiry', intent: expiryQ };
   const dateDocQ = parseDocWindow(String(question ?? ''));
   if (dateDocQ) return { route: 'datedocs', intent: dateDocQ };
   // Field asked = field returned (who installed X -> installer; invoice number vs phone) - lookups/fieldMatch.js.
@@ -616,6 +620,7 @@ async function runDeterministicCore(db, intent, { today } = {}) {
   }
   if (intent.route === 'datequal') return runDateQualifier(db, intent.intent);
   if (intent.route === 'datedocs') return runDocWindow(db, intent.intent);
+  if (intent.route === 'expiry') return runExpiryWindow(db, intent.intent, { today: t });
   if (intent.route === 'personamt') return runPersonAmount(db, intent.intent);
   if (intent.route === 'countqual') return runCountQualifier(db, intent.intent);
   if (intent.route === 'tonnage') return runTonnageCount(db, intent.intent);

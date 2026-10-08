@@ -138,7 +138,10 @@ check("v1 truth: 4 documents total $777 (2 invoices, 1 credit memo, 1 vendor bil
 for (const q of ["invoice for 777", "the invoice for $777", "$777.00 invoice", "invoices for 777 dollars", "wheres the invoice for 777 from a customer", "who has a 777 invoice"]) {
   const r = await ask("r40-v1", q);
   const stated = [...r.text.matchAll(/\b(?:INV|CM|BILL)-[A-Z0-9]+\b/g)].map((m) => m[0]).sort();
-  check(`v1 several: ${q}`, JSON.stringify([...new Set(stated)]) === JSON.stringify(v1Truth) && !/BIG|LINE|NOPRICE/.test(r.text) && /5 invoices total \$777\.00/.test(r.text), r.text);
+  // R41U: direction rule (owner rule 3) - customer = money in, vendor bill excluded
+  const recv = /from a customer/.test(q);
+  const truth = recv ? byTotal(v1, 77700).filter((f) => f.direction !== "payable" && !/^BILL-/.test(f.invoice_number)).map((f) => f.invoice_number).sort() : v1Truth;
+  check(`v1 several: ${q}`, JSON.stringify([...new Set(stated)]) === JSON.stringify(truth) && !/BIG|LINE|NOPRICE/.test(r.text) && (recv ? /4 invoices total \$777\.00/ : /5 invoices total \$777\.00/).test(r.text) && (!recv || !/BILL-9/.test(r.text)), r.text);
 }
 { const r = await ask("r40-v1", "invoice for 13777"); check("v1 substring: 13777 -> INV-BIG only", /INV-BIG/.test(r.text) && !/Z1|Z2|CM-Z1/.test(r.text), r.text); }
 { const r = await ask("r40-v1", "invoice for 3777"); check("v1 substring: 3777 -> none", /^No invoice on file has a total of \$3,777\.00/.test(r.text) && !/INV-BIG|Z1/.test(r.text), r.text); }

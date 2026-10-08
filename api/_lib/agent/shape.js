@@ -184,6 +184,8 @@ export function shapeAgentAnswer(raw, ledger, { question = "", today = "" } = {}
       verifiedCount,
       unverifiedCount: citedDocIds.size - verifiedCount,
       closest: [],
+      // an answer that cites no document is held to every document retrieved in the run (api/ask.js reads and removes this before anything is sent)
+      ...(citedDocIds.size === 0 ? { _gate: { docIds: [...ledger.docStage.keys()].slice(0, 40), rows: ledger.dataCalls > 0 } } : {}),
     },
     answered: true,
     dropped,

@@ -70,7 +70,10 @@ export async function runDocExtreme(db, intent, { today } = {}) {
   const label = intent.kind === "invoice" ? "invoice" : "quote";
   const byDate = intent.dir === "newest" || intent.dir === "oldest";
   const order = byDate ? `f.invoice_date ${intent.dir === "newest" ? "DESC" : "ASC"} NULLS LAST, f.total DESC NULLS LAST` : `f.total ${intent.dir === "max" ? "DESC" : "ASC"}, f.invoice_date DESC NULLS LAST`;
-  const where = (byDate ? "f.invoice_date IS NOT NULL" : "f.total IS NOT NULL") + (win ? " AND f.invoice_date >= $2::date AND f.invoice_date <= $3::date" : "");
+  // R41U E4: a document dated after today is never the newest/biggest "on file" without saying so (same rule as the role-word lane).
+  const tNow = /^\d{4}-\d{2}-\d{2}$/.test(String(todayIso(today))) ? String(todayIso(today)) : null;
+  const notFut = tNow && intent.kind === "invoice" ? ` AND (f.invoice_date IS NULL OR f.invoice_date <= '${tNow}'::date)` : "";
+  const where = (byDate ? "f.invoice_date IS NOT NULL" : "f.total IS NOT NULL") + (win ? " AND f.invoice_date >= $2::date AND f.invoice_date <= $3::date" : "") + notFut;
   const { rows } = await db.raw(
     `SELECT f.document_id, f.total, f.customer_name, f.invoice_number, f.invoice_date::text AS d
        FROM document_financials f JOIN documents d ON d.id = f.document_id AND d.${TENANT_SQL}
@@ -84,8 +87,11 @@ export async function runDocExtreme(db, intent, { today } = {}) {
       { records: [], total: 0, kind: "searched", basis: `Looked through every ${label}; none had ${byDate ? "a date" : "a total"}.` });
   }
   const r = rows[0];
+  let futN = 0;
+  if (notFut) { const fr = await db.raw(`SELECT count(*)::int AS n FROM document_financials f JOIN documents d ON d.id = f.document_id AND d.${TENANT_SQL} WHERE f.${TENANT_SQL} AND d.document_type = $1 AND f.invoice_date > '${tNow}'::date`, [type]); futN = fr.rows?.[0]?.n ?? 0; }
+  const futureNote = futN ? ` I left out ${futN} invoice${futN === 1 ? "" : "s"} dated after today.` : "";
   const word = { max: "biggest", min: "smallest", newest: "newest", oldest: "oldest" }[intent.dir];
-  const text = `The ${word} ${label}${win ? ` ${wp}` : ""} is ${r.total != null ? usd(r.total) : "(no total printed)"}${r.invoice_number ? ` (#${r.invoice_number})` : ""}${r.customer_name ? `, for ${r.customer_name}` : ""}${r.d && dateLabel(r.d) ? `, dated ${dateLabel(r.d)}` : ""}. ${intent.kind === "invoice" ? "Invoices only - not quotes or other documents." : "Quotes only - not invoices."}`;
+  const text = `The ${word} ${label}${win ? ` ${wp}` : ""} is ${r.total != null ? usd(r.total) : "(no total printed)"}${r.invoice_number ? ` (#${r.invoice_number})` : ""}${r.customer_name ? `, for ${r.customer_name}` : ""}${r.d && dateLabel(r.d) ? `, dated ${dateLabel(r.d)}` : ""}. ${intent.kind === "invoice" ? "Invoices only - not quotes or other documents." : "Quotes only - not invoices."}${futureNote}`;
   const facts = [{ label: `${word[0].toUpperCase()}${word.slice(1)} ${label}`, value: r.total != null ? usd(r.total) : "n/a", sources: [{ documentId: r.document_id, location: { field: "total" } }] }];
   return attachCitations(answerEnvelope({ text, facts, extra: { fastIntent: "doc_extreme" } }), {
     records: await documentRecordsFor(db, [r.document_id]), total: 1,

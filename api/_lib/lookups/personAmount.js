@@ -7,6 +7,7 @@
  * Counts come from customer-document links x invoice totals. Kill switch: DONOVAN_PERSON_AMOUNT=0.
  * pure: parsePersonAmount     db: runPersonAmount
  */
+import { nameVerdict, clarifyText, denialText } from "./nameMatch.js";
 import { attachCitations } from "../citations/records.js";
 import { documentRecordsFor, customerRecordsFor } from "../citations/enrich.js";
 import { TENANT_SQL, answerEnvelope } from "../scope.js";
@@ -52,11 +53,21 @@ const cmp = { ">": (a, b) => a > b, ">=": (a, b) => a >= b, "<": (a, b) => a < b
 export async function runPersonAmount(db, intent) {
   const { rows: custs } = await db.raw(`SELECT id, data->>'customer_name' AS n FROM entities WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT_SQL}`, []);
   const wordsOf = (n) => new Set(String(n ?? "").toLowerCase().replace(/'s\b/g, "").split(/[^a-z0-9'-]+/).filter(Boolean));
-  const matched = custs.filter((c) => { const ws = wordsOf(c.n); return intent.names.every((t) => ws.has(t)); });
+  let matched = custs.filter((c) => { const ws = wordsOf(c.n); return intent.names.every((t) => ws.has(t)); });
   if (!matched.length) {
     if (!intent.capitalised) return null;
-    return attachCitations(answerEnvelope({ text: `I don't see a customer named ${intent.display} on file, so I can't count their invoices ${intent.label} ${usd(intent.amount)}.`, facts: [], extra: { fastIntent: "person_amount" } }),
-      { records: [], total: 0, kind: "searched", basis: `Looked for a customer named ${intent.display} among ${custs.length} customers.` });
+    // R3 denial rule: only when no customer or vendor shares a name token (nameMatch.js); otherwise one holder of every word is used, or the sharing records are listed
+    const v = await nameVerdict(db, intent.display);
+    if (!v.deny) {
+      if (v.canonical && v.type === "customer") matched = custs.filter((c) => c.n === v.canonical);
+      if (!matched.length) {
+        return attachCitations(answerEnvelope({ text: `${clarifyText(intent.display, v, `invoices ${intent.label} ${usd(intent.amount)}`)}`, facts: [], extra: { fastIntent: "person_amount" } }),
+          { records: [], total: 0, kind: "searched", basis: `Several records share part of "${intent.display}"; none was answered.` });
+      }
+    } else {
+      return attachCitations(answerEnvelope({ text: denialText({ name: intent.display, scope: "customer", tail: `so I can't count their invoices ${intent.label} ${usd(intent.amount)}.` }), facts: [], extra: { fastIntent: "person_amount" } }),
+        { records: [], total: 0, kind: "searched", basis: `Looked for a customer named ${intent.display} among ${custs.length} customers.` });
+    }
   }
   const ids = matched.map((c) => c.id);
   const { rows: inv } = await db.raw(

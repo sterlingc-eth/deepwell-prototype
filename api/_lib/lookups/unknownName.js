@@ -11,6 +11,7 @@
  * of it (a typo of a real customer keeps the existing Did-you-mean / auto-resolve path). Anything else returns null and behaves as before.
  * Kill switch: DONOVAN_UNKNOWN_NAME_DECLINE=0.
  */
+import { denyOr } from "./nameMatch.js";
 import { attachCitations } from "../citations/records.js";
 import { stripConversationalFrame } from "../router/frame.js";
 import { isNonNameWord } from "./commonWords.js";
@@ -172,5 +173,5 @@ export async function buildUnknownNameDecline(db, question) {
   for (const r of custs) for (const w of String(r.n ?? "").toLowerCase().split(/\s+/)) if (w.length >= 3) { const c = w.replace(/[^a-z-]/g, ""); words.add(c); for (const part of c.split("-")) if (part.length >= 3) words.add(part); }
   for (const t of tokens) for (const w of words) if (damerauLevenshteinDistance(t, w) <= 2) return null; // a typo of a real name: the near-miss paths own it
   for (const t of tokens) if (await tokenExists(db, t)) return null;
-  return buildUnknownNameAnswer(phrase);
+  return denyOr(db, phrase, buildUnknownNameAnswer(phrase)); // R3 denial rule: never denied when any customer/vendor shares a name word
 }

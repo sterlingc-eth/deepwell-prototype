@@ -327,6 +327,9 @@ export function parseFilterClauses(question, pack) {
     && conditions.some((c) => c.type === 'hasDocType' || c.type === 'lacksDocType')) {
     return null;
   }
+  // R2: "how many Trane units in Mesa" (a brand and a city, nothing else) counts UNITS; this engine counts customers, so it steps aside and the analytics lane counts the units
+  // (a customer with two Trane units in Mesa is two units). Conditions that need a per-customer reading (warranty, documents, age...) keep the old behaviour.
+  if (/^\s*(?:how many|(?:the\s+)?(?:count|number|total number) of)\b/i.test(q) && !/\b(?:customers?|clients?|homes?|houses?|accounts?|owners?|tenants?|propert\w+|people|households?)\b/i.test(q) && conditions.every((c) => c.type === 'brand' || c.type === 'geoCity')) return null;
   return { mode: 'filter', op, conditions };
 }
 
