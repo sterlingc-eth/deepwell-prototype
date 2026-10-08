@@ -98,11 +98,17 @@ export async function answerMoneyQuestion({ withTenant = defaultWithTenant, ctxA
  * R40: "the invoice for 3470": decided by the organization's financial rows whose total equals the amount. Never throws; {handled:false} when the question is not
  * of this exact shape or the organization has no financial rows (the caller then continues down the normal, grounding-gated path).
  */
+/** RECORDS-R2: the money lanes read ONE thing (an amount). A question that asks who did the work / how long / hours / notes / labor belongs to the records lane, never to a total */
+const NOT_MONEY_FACT = /\b(?:who|whom|tech\w*|how long|hours?|hrs?|crew|notes?|labou?r|man[- ]?hours?|quotes?|estimates?|proposals?)\b/i;
+const NOT_MONEY_FACT_OK = /\b(?:who (?:owes|paid|pays|has not paid|hasn't paid|haven't paid|is late|are late)|who(?:'s| is| are) (?:overdue|unpaid|late))\b/i;
+export const asksNonMoneyFact = (q) => NOT_MONEY_FACT.test(String(q)) && !NOT_MONEY_FACT_OK.test(String(q));
+
 export async function answerAmountInvoiceQuestion({ withTenant = defaultWithTenant, ctxArg, question, today, understanding = null }) {
   // R41U: the shared reading (understanding/understand.js) decides the lane; the R40 strict parser stays as the second door for the exact R40 shape.
   const lane = understanding ? docLaneFromUnderstanding(understanding, question) : null;
   const amt = lane?.intent === 'invoice_by_amount' ? { cents: lane.amountCents, bare: lane.amountBare } : parseAmountInvoiceQuestion(question);
   if (!lane && !amt) return { handled: false, hasData: false };
+  if (lane && ['customer_docs', 'doc_extreme'].includes(lane.intent) && asksNonMoneyFact(question)) return { handled: false, hasData: false };
   const intent = (lane?.intent === 'doc_extreme' || lane?.intent === 'customer_docs' || lane?.intent === 'direction_ask' || lane?.intent === 'docs_in_window' || lane?.intent === 'doc_count' || lane?.intent === 'side_docs' || lane?.intent === 'which_ask' || lane?.intent === 'bill_threshold')
     ? { raw: String(question).toLowerCase(), rawOriginal: String(question), period: null, subject: null, ...lane }
     : { intent: 'invoice_by_amount', amountCents: amt.cents, amountBare: amt.bare, raw: String(question).toLowerCase(), rawOriginal: String(question), period: null, subject: null, ...(lane ?? {}) };
@@ -134,7 +140,7 @@ async function carriesKnownName(db, question) {
 
 export async function answerNamedMoneyQuestion({ withTenant = defaultWithTenant, ctxArg, question, today }) {
   const named = namedMoneyShape(question);
-  if (!named) return { handled: false, hasData: false };
+  if (!named || asksNonMoneyFact(question)) return { handled: false, hasData: false };
   try {
     return await withTenant(ctxArg, async (db) => {
       if (!(await tenantHasFinancialRows(db))) return { handled: false, hasData: false };

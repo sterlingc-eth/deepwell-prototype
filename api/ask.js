@@ -19,7 +19,7 @@ import {
   selectPassagesForContext,
 } from "./_lib/answer.js";
 import { planCacheBreakpoints, modelCallLogLine } from "./_lib/promptCache.js";
-import { recordModelCall, incrementAsksThisMonth as incrementAsksThisMonthRaw, isCountableAskSource, monthStartUtc } from "./_lib/usage.js";
+import { recordModelCall, incrementAsksThisMonth as incrementAsksThisMonthRaw, isCountableAskSource, monthStartUtc, currentUsageMeter } from "./_lib/usage.js";
 import { documentTypeLabel } from "./_lib/documentTypes.js";
 import { gateAsk } from "./_lib/plan.js";
 import { startTimer, formatServerTiming } from "./_lib/timing.js";
@@ -815,6 +815,7 @@ export default async function handler(req, res) {
   let brandTypoNote = null;
   // R31 3b: this tenant's replaced-document map (api/_lib/supersession.js), loaded once per ask after auth; null until then.
   let supersededMap = null;
+  const recordsFirstOn = () => !/^(?:0|false|off|no)$/i.test(String(process.env.DONOVAN_RECORDS_FIRST ?? "1").trim());
   const send = (status, body) => {
     // R2: an answer with no text and no cards is never sent (a clear decline instead)
     if (body?.success && body.data && typeof body.data === "object" && (body.data.kind === "answer" || body.data.kind === "no-answer") && !String(body.data.text ?? "").trim() && !(Array.isArray(body.data.facts) && body.data.facts.length)) {
@@ -861,6 +862,17 @@ export default async function handler(req, res) {
       if (body.data.sentences == null) {
         try { attachSentenceCitationsSync(body.data); } catch (err) { console.error("attachSentenceCitationsSync failed, sending answer without it:", err?.message); }
       }
+    }
+    // RECORDS-R1 item 6: which of the three produced this answer (records, model, decline). The marker never leaves the server; the trace is for operators / scorecard calls only.
+    if (body?.data && typeof body.data === "object" && (body.data.kind === "answer" || body.data.kind === "no-answer")) {
+      try {
+        const fromLane = body.data.recordsLane === true; delete body.data.recordsLane;
+        const modelCalls = currentUsageMeter()?.calls ?? 0;
+        const lane = body.data.kind === "no-answer" ? "decline" : (modelCalls > 0 || ["model", "analytics-model", "agent"].includes(body.data.source)) ? "model" : "records";
+        const laneDetail = fromLane ? "records-lane" : lane === "records" ? "records-rules" : lane === "decline" ? (modelCalls > 0 ? "decline-after-model" : "decline") : "model";
+        console.log(JSON.stringify({ route: "ask", answer_lane: lane, detail: laneDetail }));
+        if (scorecardCall || (req.body?.debug === true && auth && isPlatformOperator(auth))) body.data.debug = { ...(body.data.debug && typeof body.data.debug === "object" ? body.data.debug : {}), lane, laneDetail };
+      } catch { /* the trace never blocks an answer */ }
     }
     if (body?.data && typeof body.data === "object") { try { neutralizeMarkup(body.data); } catch { /* never block an answer on hygiene */ } }
     if (streaming) {
@@ -1087,6 +1099,15 @@ export default async function handler(req, res) {
         console.error("Brand typo note failed:", err?.message);
       }
     }
+    // RECORDS-FIRST: a name typed in lower case ("thomas mercer") is put back into the name's stored spelling before the older lanes read it, so wording and capital letters never change the answer.
+    if (!meta && tenantVocab && recordsFirstOn()) {
+      try {
+        const { restoreNameCase, canonicalFactWords } = await import("./_lib/records/nameCase.js");
+        const rc = restoreNameCase(question, tenantVocab);
+        if (rc.restored) question = rc.question;
+        question = canonicalFactWords(question);
+      } catch (err) { console.error("Name-case restore failed, using original question:", err?.message); }
+    }
     // R35 (owner decision 2026-10-01): a nickname ("Tom Mercer") resolves to the ONE person on file it can mean ("Thomas Mercer"),
     // announced on the answer like a typo correction. Ambiguous / no match: the question goes on exactly as typed (vocab/nicknames.js).
     if (!meta && tenantVocab && !techTypoNote) {
@@ -1218,6 +1239,29 @@ export default async function handler(req, res) {
     // memoization) so a request that never calls tryAgent() never loads either module.
     // R32: deterministic "clarify instead of model" (lookups/clarify.js): an on-topic question whose entities we recognise but no rule
     // answers gets 2-3 tap-able reformulations (the client fetches them through the existing didyoumean channel) instead of a model call.
+    // RECORDS-FIRST (see api/_lib/records/lane.js). phase "early" = before the older lanes; "late" = after they declined (also covers facts the older lanes own when they are right).
+    let _recordsLaneModule = null;
+    const tryRecordsFirst = async (phase) => {
+      if (meta || conversationContext || !question) return false;
+      try {
+        const mod = (_recordsLaneModule ??= await import("./_lib/records/lane.js"));
+        if (!mod.recordsFirstEnabled()) return false;
+        const rr = await timer.time("records", () => withTenant(ctxArg, (db) => mod.runRecordsLane(db, question, { today: todayResolved, phase })));
+        if (!rr?.data) { if (rr?.skip) console.log(JSON.stringify({ route: "ask", records_skip: rr.skip, phase })); return false; }
+        console.log(JSON.stringify({ route: "ask", records_first: rr.detail, phase }));
+        send(200, { success: true, data: rr.data });
+        await timer.time("bookkeeping", () =>
+          withTenant(ctxArg, (db) => db.logAction({
+            action: "document.queried", resource_type: "question", clerk_user_id: auth.userId,
+            changes: { question_hash: hashQuestion(question), documents: [...new Set((rr.data.sources ?? []).map((x) => x.documentId).filter(Boolean))], passages: 0, records_first: rr.detail },
+          })).catch((err) => console.error("Failed to write document.queried audit row (records-first):", err?.message))
+        );
+        return true;
+      } catch (err) {
+        console.error("Records-first look-up failed, continuing with the older lanes:", err?.message);
+        return false;
+      }
+    };
     const tryClarify = async () => {
       if (conversationContext) return false;
       try {
@@ -1416,6 +1460,9 @@ export default async function handler(req, res) {
       return send(gate.status, { error: gate.error, url: gate.url, ...(gate.scope ? { scope: gate.scope } : {}) });
     }
 
+    // RECORDS-R2: "invoice 20002 technician" names a document by its bare number, not an amount: the records lane gets the first look
+    if (/\b(?:invoice|inv|bill|quote|estimate|ticket|work order|purchase order|po|wo)\s*(?:number|no|num|#|:)?\s*#?\s*\d{4,}\b/i.test(question) && await tryRecordsFirst("early")) return;
+
     if (amountInvoiceIntent) {
       const amountGate = await loadMoneyGateModule();
       const fin = await timer.time("financials", () => amountGate.answerAmountInvoiceQuestion({ withTenant, ctxArg, question, today: todayResolved, understanding: understood }));
@@ -1498,6 +1545,10 @@ export default async function handler(req, res) {
         return send(200, { success: true, data: untrackedConceptAnswer(untracked) });
       }
     }
+
+    // ---- 0.25 RECORDS-FIRST (DONOVAN_RECORDS_FIRST, default on; "0" turns it off): "<fact> for <customer | document number | unit | address>" is read straight from the stored
+    // records (api/_lib/records/), each value cited to its page, no model. Returns false (and changes nothing) when no stored fact fits; the older lanes then run exactly as before. ----
+    if (await tryRecordsFirst("early")) return;
 
     // ---- 0.35 relations engine (Round 7, no model, DB only) -----------------
     // Returns null (falls through) whenever a named condition can't be applied exactly.
@@ -1883,6 +1934,7 @@ export default async function handler(req, res) {
         return;
       }
       if (await tryNamedMoney()) return;
+      if (await tryRecordsFirst("late")) return;
       if (fin.hasData && (await tryAgent())) return;
       const data = fin.hasData ? moneyGateModule.moneyNoMatchAnswer() : moneyFallbackAnswer();
       send(200, { success: true, data });
@@ -1901,6 +1953,7 @@ export default async function handler(req, res) {
     }
 
     if (!moneyQuestion && (await tryNamedMoney())) return;
+    if (await tryRecordsFirst("late")) return;
 
     // ---- 0.7 analytics pre-router (ONE Haiku tool-use call, before retrieval) --
     // "how many customers in Arizona", "list customers in Gilbert", "which

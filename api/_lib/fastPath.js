@@ -1165,6 +1165,10 @@ export function classifyFastPath(question) {
   }
   const intent = classifyIntent(question);
   if (!intent) return null;
+  // RECORDS-R2: "the invoice total" reads ONE thing. A question that also asks who did it / how long / the hours / the notes, or that carries a
+  // month or year to apply, is not that question: stepping aside lets the records lane (or an honest decline) answer it instead of the wrong fact.
+  if (intent === 'invoice_total' && /\b(?:who|whom|tech\w*|how long|hours?|hrs?|crew|notes?|labou?r|man[- ]?hours?|quotes?|estimates?|everything)\b|\b(?:in|during|from|of|on)\s+(?:(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s*\d{0,2},?\s*(?:19|20)?\d{0,4}|(?:19|20)\d{2})\b/i.test(String(question))) return null;
+  if (intent === 'last_service_tech' && /\b(?:last|this|past)\s+(?:month|year|week|quarter)\b|\b(?:in|during|from|of)\s+(?:(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*|(?:19|20)\d{2})\b/i.test(String(question))) return null; // RECORDS-R2: a period was asked for; the last visit overall is not that period
   const subject = extractSubject(question);
   return { intent, subject: { ...subject, anchored: hasAnchor(question) }, raw: String(question ?? '') };
 }

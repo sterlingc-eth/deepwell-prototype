@@ -154,6 +154,8 @@ export function createUsageMeter() {
   };
   return meter;
 }
+/** The meter of the question being answered right now (undefined outside one); lets the answer's trace say whether a model call happened. */
+export function currentUsageMeter() { return meterStore.getStore(); }
 export function runWithUsageMeter(meter, fn) {
   return meterStore.run(meter, fn);
 }

@@ -49,7 +49,10 @@ export async function runQuoteLookup(db, intent) {
     );
   }
   const line = (r) => `${usd(r.total)}${dateLabel(r.d) ? ` (${dateLabel(r.d)})` : ""}`;
-  const text = quotes.length === 1 ? `The quote for ${display} was ${line(quotes[0])}.` : `${display} has ${quotes.length} quotes on file: ${quotes.slice(0, 6).map(line).join("; ")}.`;
+  const text0 = quotes.length === 1 ? `The quote for ${display} was ${line(quotes[0])}.` : `${display} has ${quotes.length} quotes on file: ${quotes.slice(0, 6).map(line).join("; ")}.`;
+  // RECORDS-R2: a month / year / "last month" in the question is not applied here: say so rather than let the quote read as the one for that period
+  const winWord = String(intent.question ?? "").match(/\b(?:(?:last|this|next|past)\s+(?:month|year|week|quarter)|(?:in|during|from|of)\s+(?:(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s*(?:19|20)?\d{0,4}|(?:19|20)\d{2}))\b/i);
+  const text = winWord ? `${text0} (I did not apply "${winWord[0].trim()}"; the date shown is when the quote was written.)` : text0;
   const facts = quotes.slice(0, 20).map((r) => ({ label: "Quote", value: line(r), sources: [{ documentId: r.document_id, location: { field: "total" } }] }));
   return attachCitations(answerEnvelope({ text, facts, extra: { fastIntent: "quote_lookup" } }), {
     records: await documentRecordsFor(db, quotes.map((r) => r.document_id)), total: quotes.length,

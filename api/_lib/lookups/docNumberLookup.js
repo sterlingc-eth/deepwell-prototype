@@ -15,6 +15,7 @@
 import { attachCitations, customerRecord } from "../citations/records.js";
 import { documentRecordsFor } from "../citations/enrich.js";
 import { TENANT_SQL, humanDate, answerEnvelope } from "../scope.js";
+import { nameTokens, tokenSame, withinOne } from "./nameMatch.js";
 
 const PREFIXES = { INV: "invoice", WO: "work order", PO: "purchase order", BP: "permit", EST: "estimate", Q: "quote", TKT: "ticket" };
 const WORD_KIND = [
@@ -37,7 +38,8 @@ const digitsOf = (s) => String(s ?? "").replace(/\D/g, "");
 const FOCUS = [
   ["status", /\b(?:paid|unpaid|pay|payment|open|outstanding|overdue|past\s+due|balance|owe[ds]?|collected|status)\b/i],
   ["total", /\b(?:how much|total|amount|charge[ds]?|cost|price|billed|bill (?:for|was))\b/i],
-  ["who", /\b(?:who|whose|whos|who's|customer|client|for whom|homeowner|account)\b/i],
+  // "who" alone is NOT this focus: "who did that one" asks for the technician, not the customer (RECORDS-R2). Only the shapes that ask whom the document is for.
+  ["who", /\b(?:whose|whos|who's|customer|client|for whom|homeowner|account|billed to|bill to|sold to)\b|\bwho\s+(?:is|was|are)\b[^?]*\bfor\b|\bwho\s+(?:is|was)\s+(?:it|that|this)\b|\bwho\s+(?:did|do)\s+(?:we|you)\s+(?:bill|invoice|charge|sell)\b/i],
   ["date", /\b(?:when|what date|date[ds]?|day)\b/i],
   ["work", /\b(?:what (?:was|is) (?:it|that|this|[a-z]{2,5}-?\d+) for|what was done|what work|work performed|what did we do|for what|description|job was)\b/i],
 ];
@@ -67,7 +69,30 @@ export function parseDocNumberQuestion(question) {
   let focus = "default";
   const rest = q.replace(pm ? pm[0] : typed, " ");
   for (const [name, re] of FOCUS) if (re.test(rest)) { focus = name; break; }
-  return { typed, kind, digitsOnly, focus, question: q };
+  // RECORDS-R2 (cause 1): this lane answers ONE of five things (the customer, the total, the date, the payment status, the work) and says nothing else. A question that
+  // carries any other meaningful word ("labor", "technician", "hours", "notes", "who did that one", "how long did it take") asks for something this lane does not read:
+  // it must not answer it with the customer or the total. It steps aside (the records lane answers it from the stored row, or the question is declined).
+  return { typed, kind, digitsOnly, focus, question: q, unread: unreadWords(rest) };
+}
+
+/** words this lane understands: the five FOCUS phrasings, document words, and glue. Anything else is a meaningful word nobody here read. */
+const GLUE_WORDS = new Set(("a an the of for to from on at in by with and or but is are was were be been it its this that these those there here do does did done has have had can could would will should me my us our we you your i "
+  + "please pls plz tell show give get find look lookup pull up open view see check what whats which when whens where wheres how about as if so then than also just only thanks thank "
+  + "details detail info information summary summarize number no num nbr invoice invoices inv bill bills ticket order purchase permit estimate quote work wo po bp service building one ones doc document record "
+  + "customer client name names ok okay hey hi donovan paid unpaid pay payment open outstanding overdue past due balance owe owed owes collected status total amount charge charged charges cost price billed "
+  + "much date dated day homeowner account").split(/\s+/));
+const GLUE_LIST = [...GLUE_WORDS];
+const skeleton = (w) => w.replace(/[aeiou]/g, "");
+/** a typo or a short form of a word this lane knows ("wht" = what, "tot" = total, "invoce" = invoice) is read; any other word is not */
+function looksRead(w) {
+  if (GLUE_WORDS.has(w)) return true;
+  return GLUE_LIST.some((g) => (w.length >= 4 && g.length >= 4 && withinOne(w, g)) || (w.length >= 3 && g.length >= 5 && g.startsWith(w)) || (w.length >= 3 && g.length >= 3 && skeleton(g).length >= 3 && skeleton(g) === w));
+}
+export function unreadWords(rest) {
+  let t = String(rest).toLowerCase().replace(/[’`]/g, "'");
+  for (const [, re] of FOCUS) t = t.replace(new RegExp(re.source, "gi"), " ");
+  t = t.replace(/'s\b/g, " ").replace(/'(?:d|ll|ve|re|m|t)\b/g, " ").replace(/\b(?:what|how|who|that|there|it|he|she|where|when)'?(?:s|d|ll)?\b/g, " ");
+  return [...new Set((t.match(/[a-z\u00c0-\u024f]{2,}/g) ?? []).filter((w) => !looksRead(w)))];
 }
 
 /* ------------------------------------------------------------------ run */
@@ -95,7 +120,7 @@ async function docDetails(db, documentId) {
   const { rows: f } = await db.raw(
     `SELECT field_key, ${VAL("x")} AS value FROM extractions x
       WHERE x.document_id = $1 AND x.${TENANT_SQL} AND x.field_key = ANY($2::text[])`,
-    [documentId, ["invoice_date", "service_date", "work_performed", "technician", "service_type"]]
+    [documentId, ["invoice_date", "service_date", "work_performed", "technician", "service_type", "labor_hours", "notes"]]
   );
   const get = (k) => f.filter((r) => r.field_key === k).map((r) => String(r.value ?? "").trim()).filter(Boolean);
   const { rows: cust } = await db.raw(
@@ -118,6 +143,7 @@ async function docDetails(db, documentId) {
     date: dateRaw && /^\d{4}-\d{2}-\d{2}/.test(dateRaw) ? dateRaw.slice(0, 10) : null,
     work: get("work_performed").slice(0, 3),
     technician: get("technician")[0] ?? null,
+    hasHours: get("labor_hours").length > 0, hasNotes: get("notes").length > 0, serviceType: get("service_type")[0] ?? null,
     status: fin?.status && !/^unknown$/i.test(String(fin.status)) ? String(fin.status) : null,
     docKind: fin?.doc_kind ?? null, direction: fin?.direction ?? null,
     balance: fin?.balance_due != null && Number.isFinite(Number(fin.balance_due)) ? Number(fin.balance_due) : null,
@@ -182,6 +208,24 @@ export async function runDocNumberLookup(db, intent) {
       { kind: "no-answer", text: `${label} has no payment status on file${det.total != null ? ` (total ${money(det.total)})` : ""}${who ? ` — ${who}` : ""}.`, facts: [], sources: src, confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [] },
       { records: await documentRecordsFor(db, [d.document_id]), total: 1, kind: "searched", basis: `Read ${label}; it prints no paid / unpaid status or balance due.` }
     );
+  }
+  // RECORDS-R2 cause 1: words nobody here read (after removing the customer / vendor names the question may carry): this lane does not answer a different question
+  // with the customer or the total. It says plainly that it has no such thing stored for this document, and what IS stored on it.
+  if (intent.unread?.length) {
+    let rest = intent.unread;
+    try {
+      const { rows: nm } = await db.raw(`SELECT data->>'customer_name' AS n FROM entities WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT_SQL}
+        UNION SELECT value FROM extractions WHERE field_key = 'vendor_name' AND value IS NOT NULL AND ${TENANT_SQL}`, []);
+      const known = [...new Set(nm.flatMap((r) => nameTokens(r.n)))];
+      rest = rest.filter((w) => !known.some((k) => w === k || tokenSame(w, k) === "exact" || (w.length >= 4 && k.length >= 4 && tokenSame(w, k) === "typo")));
+    } catch { /* keep the unread words */ }
+    if (rest.length) {
+      const have = [who ? "customer" : null, when ? "date" : null, det.total != null ? "total" : null, det.work.length ? "work performed" : null, det.technician ? "technician" : null, det.hasHours ? "labor hours" : null, det.hasNotes ? "notes" : null, det.status ? "payment status" : null].filter(Boolean);
+      return attachCitations(
+        { kind: "no-answer", text: `I don't have that stored for ${label}${who ? ` (${who})` : ""}: I couldn't match ${rest.slice(0, 4).map((w) => `"${w}"`).join(", ")} to anything on its record.${have.length ? ` What is on file for it: ${have.join(", ")}.` : ""}`, facts: [], sources: src, confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [] },
+        { records: await documentRecordsFor(db, [d.document_id]), total: 1, kind: "searched", basis: `Read ${label}; the question asks for something that is not one of its stored facts, so nothing was answered in its place.` }
+      );
+    }
   }
   // a bare number that is also the TOTAL of invoices: say so (and honour a customer name typed in the question), never let a PO stand in for "the invoice"
   let alsoTotal = "";
