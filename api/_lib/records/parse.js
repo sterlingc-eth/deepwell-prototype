@@ -105,7 +105,7 @@ export function parseRecordsQuestion(question, { today = null, parsePeriodFn = n
   // with a document number in the question, "who did <it>" asks who worked it ("who did we bill" is a customer question and is left alone)
   if (/\b[a-z]{1,4}-?\d{4,}\b|\b(?:invoice|inv|wo|po|quote|estimate)\s*#?\s*\d{3,}\b/.test(text)) text = text.replace(/\bwho (?:did|does|do|handled|had|has)\b(?!\s+(?:we|i|you|they)\b)/g, "who worked on");
   const tokens = tokensOf(text);
-  const out = { text, tokens, facts: [], summary: false, docNumbers: [], serials: [], address: null, order: null, all: false, window: null, stepAside: null };
+  const out = { raw: String(question ?? ""), text, tokens, facts: [], summary: false, docNumbers: [], serials: [], address: null, order: null, all: false, window: null, stepAside: null };
   if (!tokens.length || tokens.length > 40) { out.stepAside = "length"; return out; }
   const vetoed = VETO.test(text);
   out.softVeto = SOFT_VETO.test(text);

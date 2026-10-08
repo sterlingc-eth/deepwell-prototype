@@ -14,9 +14,12 @@ import * as store from "./store.js";
 import { nameTokens, tokenSame } from "../lookups/nameMatch.js";
 import { isNonNameWord, isGivenName, isRealWordOrName } from "../lookups/commonWords.js";
 import { attachCitations, documentRecord, customerRecord, unitRecord } from "../citations/records.js";
+import { bindPick, subjectAgrees, readAsSentence, isRestricting } from "./pick.js";
 
 export const CAP = 5;
 const RESIDUAL_OK = /^(?:invoice|invoices|inv|ticket|tickets|permit|job|jobs|visit|visits|house|home|place|property|site|customer|customers|last|latest|first|oldest|newest|recent|all|every|each|please|thanks|unit|units|doc|docs|document|documents|record|records|file|files|number|numbers|date|dates|way|exactly|today|them|they|their|theirs|his|her|hers|he|she|summarize|summarise|summary|recap|rundown|overview|detail|details|happened|everything|story|visit|service|call|ticket|work|system|systems)$/;
+/** glue words that never make the pick path step aside (the same ones the document / customer unread-word checks already allow) */
+const UNREAD_OK = /^(?:order|purchase|pls|number|no|po|wo|inv|invoice|ticket|permit|worked|performed|completed|did|listed|stored|printed|written|recorded|say|says|said|shows|show|there|been|got|gets|was|were|tell|give|get|charge|charged|cost|bill|billed|spend|spent|how|much|many|long|latest|last|first|oldest|newest|earliest|recent|recently|most|account|accounts|invoices|tickets|list|lists|items|item)$/;
 /** words that never ask for a fact (RECORDS-R2): they are the glue of a spoken sentence, so they must not make the lane refuse a question it can read */
 const FILLER = /^(?:january|february|march|april|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept?|oct|nov|dec|take|took|taking|taken|spend|spent|spending|them|ever|always|again|there|over|time|times|ones?|thing|things|stuff|done|got|gets|put|came|went|were|was|been|being|know|need|needed|want|wanted|like|really|actually|exactly|anything|something|everything|ago|back|once|twice|whole|entire|total)$/;
 export function recordsFirstEnabled() { return !/^(?:0|false|off|no)$/i.test(String(process.env.DONOVAN_RECORDS_FIRST ?? "1").trim()); }
@@ -162,8 +165,13 @@ function storedLabels(doc, bundle, exceptIds = []) {
   return labels;
 }
 
-function notStoredText(fact, doc, bundle, who) {
+function notStoredText(fact, doc, bundle, who, wantedIds = []) {
   const title = docTitle(doc, bundle);
+  if (fact.id === "balance_due" && !wantedIds.includes("total")) {
+    // "what is owed on it" and no balance is stored: say so, and give the total labelled as the total (never as the balance)
+    const tot = observe(factById("total"), doc, bundle)[0];
+    if (tot) return `${fact.label} is not stored for ${who ? `${who}'s ` : "this "}${title}. The total on it is ${fmtMoney(tot.value)} (that is the total billed, not a balance).`;
+  }
   if (fact.id === "labor_charge") {
     const hrs = observe(factById("labor_hours"), doc, bundle)[0]; const tot = observe(factById("total"), doc, bundle)[0];
     return `${hrs ? `Labor hours: ${showValue(factById("labor_hours"), hrs.value)}. ` : ""}The ${typeLabel(doc.document_type)} does not record a separate labor charge${tot ? `; the total was ${fmtMoney(tot.value)}` : ""}.`;
@@ -255,7 +263,7 @@ function answerForDocs({ docs: allDocs, bundle, factsWanted, who, order, all, sc
   // facts asked for that none of the shown documents carries: say so once, with what IS stored
   const absentEverywhere = wanted.filter((f) => !shown.some((x) => x.obs.find((y) => y.f.id === f.id)?.o.length));
   if (absentEverywhere.length) {
-    if (docScope) text += ` ${absentEverywhere.map((f) => notStoredText(f, shown[0].d, bundle, null)).join(" ")}`;
+    if (docScope) text += ` ${absentEverywhere.map((f) => notStoredText(f, shown[0].d, bundle, null, wanted.map((w) => w.id))).join(" ")}`;
     else text += ` ${absentEverywhere.map((f) => f.label).join(" and ")} ${absentEverywhere.length === 1 ? "is" : "are"} not stored on ${shown.length === 1 ? "that document" : "those documents"}.`;
   }
   text += asideNote();
@@ -270,24 +278,56 @@ function entityText(c, key) { return clean(c[key]); }
 const SUBJECT_FOUND_SKIPS = new Set(["no-fact", "no-fact-after-name", "no-fact-after-subject", "unread-words-with-document-number", "unread-words-with-customer", "summary-nothing", "pointless", "customer-of-a-document-owned-by-older-lane", "yes-no-question", "unresolved-name-words", "whole-card-owned-by-older-lane", "several-customers-named"]);
 const EXISTENCE_ASK = /\b(?:any|anything|there|have|has|had|got|on file|recorded|stored|listed)\b/;
 
-export async function runRecordsLane(db, question, opts = {}) {
-  if (!recordsFirstEnabled()) return null;
-  const phase = opts.phase ?? "early";
-  const state = {};
-  const r = await runCore(db, question, opts, state);
-  if (phase !== "late") return r;
+/** the skips that mean "the subject may be there, but the wording named no fact this lane can read": the only ones the menu pick is asked about */
+const PICK_SKIPS = new Set(["no-fact", "no-fact-after-name", "no-fact-after-subject", "unread-words-with-document-number", "unread-words-with-customer", "unresolved-name-words"]);
+
+function applyYesNo(r, state) {
   if (r?.data?.kind === "answer" && state.yesNo) {
     // a yes/no question about a stored fact: say yes or no from the rows (only when the question asks whether it exists; a value check just gets the stored values)
     const has = (r.data.facts ?? []).length > 0;
-    if (state.yesNo.existence && state.yesNo.n === 1) r.data.text = has ? `Yes: ${r.data.text}` : `No. ${r.data.text}`;
+    if (state.yesNo.existence && state.yesNo.n === 1) r.data.text = has ? `Yes: ${r.data.text}` : `No, not stored. ${r.data.text}`;
   }
+}
+
+/** does the question name something the lane could resolve at all (a number, a serial, an address or a customer's name word)? A pick is never requested otherwise. */
+async function hasSubject(db, question, opts) {
+  const p = parseRecordsQuestion(question, { today: opts.today });
+  if (p.stepAside) return false;
+  if (p.docNumbers.length || p.serials.length || p.address) return true;
+  const cust = opts.customers ?? await store.loadCustomers(db);
+  return matchCustomers(p.tokens, cust, new Set()).kind !== "none";
+}
+
+/** RECORDS-R3C: answer through the SAME lane with the facts the (validated) menu pick names. null = the pick could not be used: the caller carries on exactly as without it. */
+async function runPicked(db, question, opts) {
+  const state = {};
+  try {
+    const r = await runCore(db, question, { ...opts, phase: "late" }, state);
+    if (!r?.data || r.data.kind !== "answer") return null; // a decline / clarify from the pick path is dropped: the normal path runs
+    if (!subjectAgrees(opts.pick, state.scopeInfo, nameTokens)) return null; // the model's subject must be the subject the lane resolved with its own rules
+    applyYesNo(r, state);
+    r.data.text = clean(`${readAsSentence(opts.pick.summary ? opts.pick.facts : (state.factIds?.length ? state.factIds : opts.pick.facts))} ${r.data.text}`);
+    return { ...r, detail: `menu-pick:${r.detail ?? "answer"}` };
+  } catch (err) { console.error("Menu pick answer failed:", err?.message); return null; }
+}
+
+export async function runRecordsLane(db, question, opts = {}) {
+  if (!recordsFirstEnabled()) return null;
+  const phase = opts.phase ?? "early";
+  if (phase === "late" && opts.pick) { const picked = await runPicked(db, question, opts); if (picked) return picked; }
+  const state = {};
+  const r = await runCore(db, question, { ...opts, pick: null }, state);
+  if (phase !== "late") return r;
+  applyYesNo(r, state);
+  // RECORDS-R3C: an unread wording about a resolvable subject may be read by the menu pick first (ask.js asks for it, then calls this again with { pick, afterPick: true })
+  if (opts.pickWanted && !opts.afterPick && r?.skip && PICK_SKIPS.has(r.skip)) { try { if (await hasSubject(db, question, opts)) return { skip: r.skip, pickable: true }; } catch { /* no pick: carry on */ } }
   if (r?.skip && SUBJECT_FOUND_SKIPS.has(r.skip)) {
     try { const f = await storedRecordFallback(db, question, opts); if (f) return f; } catch (err) { console.error("Records fallback failed:", err?.message); }
   }
   return r;
 }
 
-async function runCore(db, question, { today, phase = "early", customers = null } = {}, state = {}) {
+async function runCore(db, question, { today, phase = "early", customers = null, pick = null } = {}, state = {}) {
   let periodFn = null;
   const lower = String(question ?? "").toLowerCase();
   if (MAY_HAVE_WINDOW.test(lower)) { try { periodFn = (await import("../financials/answers.js")).parsePeriod; } catch { periodFn = null; } }
@@ -295,6 +335,17 @@ async function runCore(db, question, { today, phase = "early", customers = null 
   if (p.stepAside) return { skip: p.stepAside };
   if (p.softVeto && phase !== "late") return { skip: "aggregate-or-howto" };
   p.serials = p.serials.filter((sn) => !p.docNumbers.some((d) => d.alnum === sn));
+  // RECORDS-R3C: a validated menu pick supplies the FACTS only; the subject, order and window are still read from the question by the rules below
+  let pickBind = null;
+  if (pick) {
+    customers ??= await store.loadCustomers(db);
+    const vocabWords = await store.loadPickVocab(db);
+    const nameWords = new Set(customers.flatMap((c) => nameTokens(c.name)));
+    pickBind = bindPick(pick, p, { question, vocabWords, nameWords });
+    if (!pickBind.ok) return { skip: `pick-${pickBind.reason}` };
+    p.facts = pick.summary ? [] : [...new Set([...p.facts, ...pick.facts])];
+    p.summary = pick.summary || p.summary;
+  }
   if (!p.facts.length && !p.summary && !(p.docNumbers.length && /\bstatus\b/.test(p.text))) return { skip: "no-fact" };
   // a yes/no question ("do we have a maintenance agreement on file for ...", "is the technician Ray?") is answered yes or no by the older lanes, never with a list of values
   if (/^(?:do|does|did|is|are|was|were|has|have|had|can|could|will|would|should)\s/.test(p.text) && !/^(?:can|could|would|will) (?:you|u) /.test(p.text)) {
@@ -323,7 +374,7 @@ async function runCore(db, question, { today, phase = "early", customers = null 
   const nameIdx = new Set(named ? named.idx : []);
   // facts again, with the customer's own name words masked ("Rios Heating" must not read "heating" as a fact)
   const f2 = findFacts(p.tokens, { exclude: new Set([...nameIdx, ...nameSkip]) });
-  let factIds = f2.ids;
+  let factIds = pickBind && !pick.summary ? [...new Set([...f2.ids, ...pick.facts])] : f2.ids;
   if (factIds.some((id) => factById(id)?.elsewhere)) return { skip: "owned-by-older-lane" };
   // the thing the question GIVES is not the thing it ASKS for ("whose unit has serial X" gives the serial)
   if (p.serials.length || codes.length) factIds = factIds.filter((id) => !(id === "serial_number" && p.serials.length) && !(id === "invoice_number" && p.docNumbers.length && !/\bnumber|\bno\b|#/.test(p.text.replace(p.docNumbers.map((n) => n.raw).join("|"), ""))));
@@ -337,6 +388,7 @@ async function runCore(db, question, { today, phase = "early", customers = null 
   // "name of the guy who handled it" asks for the technician; the word "name" alone is not the customer
   if (factIds.includes("technician") && factIds.includes("customer_name") && !/\b(?:customer|whose|owner|billed|bill to|client|homeowner)\b/.test(p.text)) factIds = factIds.filter((id) => id !== "customer_name");
   if (!factIds.length && !p.summary) return { skip: "no-fact-after-name" };
+  state.factIds = factIds;
   if (state.yesNo) state.yesNo.n = factIds.length;
   if (p.summary && /\b(?:dispatch|proposal|quote|estimate|permit|agreement|warranty|startup|start up|inspection|purchase order|nameplate|correspondence|memo|email)\b/.test(p.text) && !p.docNumbers.length) return { skip: "summary-of-a-document-type" };
   if (phase === "early" && !codes.length && factIds.some((id) => LATE_ONLY.has(id))) return { skip: "late-only-fact" };
@@ -344,6 +396,7 @@ async function runCore(db, question, { today, phase = "early", customers = null 
   if (phase === "early" && !codes.length && factIds.some((id) => ["customer_name", "customer_address", "customer_phone", "customer_email", "equipment_list"].includes(id))) return { skip: "entity-fact-owned-by-older-lane" };
   // residual words that look like another person's name: the question is about someone we did not resolve
   const used = new Set([...nameIdx, ...nameSkip]); f2.used.forEach((u, i) => { if (u) used.add(i); });
+  if (pickBind) pickBind.factIdx.forEach((i) => used.add(i)); // the words the pick says mean the facts are read
   const residualNames = p.tokens.filter((t, i) => !used.has(i) && /^[a-z]{3,}$/.test(t) && !STOP.has(t) && !isNonNameWord(t) && !RESIDUAL_OK.test(t) && !FILLER.test(t));
 
   let scope = null; // {kind, who, label, docs, customer, units}
@@ -391,6 +444,28 @@ async function runCore(db, question, { today, phase = "early", customers = null 
     scope = { kind: "customer", customer: c, who: c.name, label: c.name };
   } else return { skip: "no-subject" };
 
+  if (pickBind) {
+    // the pick path reads EVERY word: a content word nobody explains (a brand, a person, "second", "annual", a currency ...) is a condition this lane cannot apply -> step aside
+    const owners = new Set([...(scope?.customer ? nameTokens(scope.customer.name) : []), ...(scopes ?? []).flatMap((s) => nameTokens(s.customer.name)), ...(scope?.docs ?? []).flatMap((d) => nameTokens(d.customer_name))]);
+    const restricted = p.tokens.filter((t, i) => !used.has(i) && !nameSkip.has(i) && (isRestricting(t) || (!p.window && /\d/.test(t) && !p.docNumbers.some((n) => n.raw === t || alnum(t) === n.alnum) && !p.serials.includes(alnum(t)) && !(p.address && p.text.includes(t)))));
+    // letters glued to digits ("pre-2025", "fy2025", "2-stage"), money/percent symbols, and two-ended orders ("oldest to newest") are conditions this lane cannot apply
+    const mixed = p.tokens.some((t, i) => !nameSkip.has(i) && /\d/.test(t) && /[a-z]/.test(t) && !p.docNumbers.some((n) => n.raw === t || alnum(t) === n.alnum) && !p.serials.includes(alnum(t)) && !(p.address && p.text.includes(t)));
+    const twoEnded = p.tokens.some((t) => /^(?:oldest|earliest|first)$/.test(t)) && p.tokens.some((t) => /^(?:newest|latest|last|recent|final)$/.test(t));
+    if (restricted.length || mixed || twoEnded || /[€£¥%]/.test(p.raw ?? "")) return { skip: "pick-restriction-words" };
+    // "... or the ticket", "... and the unit": a second thing is asked for after a conjunction and nothing explains it -> step aside rather than answer only the first
+    const cj = p.tokens.findIndex((t) => /^(?:or|and|plus|also|both)$/.test(t));
+    if (cj >= 0 && p.tokens.slice(cj + 1).some((t, k) => /^[a-z]{3,}$/.test(t) && !used.has(cj + 1 + k) && !nameSkip.has(cj + 1 + k) && !STOP.has(t) && !FILLER.test(t))) return { skip: "pick-conjunction-tail" };
+    // scope nouns, negations and joiners nobody explains change WHAT is asked ("the unit", "no damage", "then", "vs"): step aside
+    const scopeLeft = p.tokens.filter((t, i) => !used.has(i) && !nameSkip.has(i) && /^(?:units?|systems?|houses?|homes?|sites?|propert(?:y|ies)|jobs|visits|accounts?|files?|lists?|orders?|tickets?|plus|then|versus|vs|also|same|no|not|without|non|never|none|except|other|than|both|either|neither|ac|previous|prior|but|one|ii|iii|pp|ea|ex|grand|sum|average|percent|percentage|count)$/.test(t));
+    if (scopeLeft.length) return { skip: "pick-scope-words" };
+    const left = p.tokens.filter((t, i) => !used.has(i) && !nameSkip.has(i) && /[a-z]{3,}/.test(t) && !STOP.has(t) && !RESIDUAL_OK.test(t) && !FILLER.test(t) && !UNREAD_OK.test(t) && !owners.has(t));
+    if (left.length) return { skip: "pick-unread-words" };
+    const sc = scope ?? { kind: "customer" };
+    state.scopeInfo = {
+      kind: sc.kind, byAddress: Boolean(p.address && !named && !docHits.length && !unitHits.length), serial: p.serials[0] ?? null, docDigits: p.docNumbers.map((n) => n.digits),
+      names: [...(scope?.customer ? [scope.customer.name] : []), ...(scopes ?? []).map((s) => s.customer.name), ...(scope?.docs ?? []).map((d) => d.customer_name).filter(Boolean)],
+    };
+  }
   // words the directory does not know ("city", "term", "expires") mean the question asks for something this lane cannot read: step aside rather than answer a different fact
   if (named || scope?.kind === "customer") {
     const nameWords = new Set(cust.flatMap((c) => String(c.name).toLowerCase().split(/[^a-z]+/).filter(Boolean)));
@@ -584,9 +659,12 @@ const CUSTOMER_DUMP = ["service_type", "work_performed", "technician", "labor_ho
  * for anything that is not a single resolved subject: aggregates, time windows, negation, restricted wording, several or partial names, a number that does not exist.
  */
 async function storedRecordFallback(db, question, { today, customers = null } = {}) {
-  const p = parseRecordsQuestion(question, { today });
+  // RECORDS-R3C: a period the reader CAN apply is applied (one customer or unit only); one it cannot (p.stepAside) still ends here
+  let periodFn = null;
+  if (MAY_HAVE_WINDOW.test(String(question ?? "").toLowerCase())) { try { periodFn = (await import("../financials/answers.js")).parsePeriod; } catch { periodFn = null; } }
+  const p = parseRecordsQuestion(question, { today, parsePeriodFn: periodFn });
   if (p.stepAside || FALLBACK_SKIP_WORDS.test(p.text)) return null;
-  if (p.window) return null;
+  const win = p.window ?? null;
   if (!p.docNumbers.length && /\b(?:worst|best|longest|shortest|fastest|slowest|better|worse|compar\w*|difference|rank\w*|sort\w*|trend\w*|total of|sum)\b/.test(p.text)) return null; // a ranking or comparison is not "everything on file"
   if (/\b(?:arriv\w*|what time|gate code|eta|on ?site)\b|\btech(?:nician)?s?\s+(?:phone|email|number|address|cell)\b/.test(p.text)) return null;
   if (/\b(?:staff|internal|private|confidential|secret|hidden|admin|office only|owner only)\b/.test(p.text)) return null;
@@ -618,6 +696,7 @@ async function storedRecordFallback(db, question, { today, customers = null } = 
   let docHits = codes.length ? await store.docsByNumber(db, codes) : [];
   const unitHits = p.serials.length ? await store.unitsBySerial(db, p.serials) : [];
   if (codes.length && !docHits.length && !unitHits.length) return null; // a number that is not on file stays an honest not-found elsewhere, never another record
+  if (win && (docHits.length || several)) return null; // a period together with a document number or several customers: the older lanes decide
   if (docHits.length) {
     const ids = [...new Set(docHits.map((d) => d.document_id))];
     if (ids.length !== 1) return null;
@@ -636,9 +715,9 @@ async function storedRecordFallback(db, question, { today, customers = null } = 
     const u = unitHits[0]; const c = cust.find((x) => x.id === u.customer_id);
     const docs = await store.docsForUnit(db, u.id);
     const what = clean([u.data?.manufacturer, u.data?.model, u.data?.tonnage].filter(Boolean).join(" ")) || "equipment";
-    return docListDump({ docs, db, label: `unit ${u.data?.serial_number ?? ""}${c ? ` (${c.name})` : ""}`.trim(), intro: `Unit on file: ${what}${u.data?.serial_number ? `, serial ${u.data.serial_number}` : ""}.`, customer: c, unit: u });
+    return docListDump({ docs, db, label: `unit ${u.data?.serial_number ?? ""}${c ? ` (${c.name})` : ""}`.trim(), intro: `Unit on file: ${what}${u.data?.serial_number ? `, serial ${u.data.serial_number}` : ""}.`, customer: c, unit: u, win });
   }
-  if (named) return docListDump({ docs: await store.docsForCustomer(db, named.c.id), db, label: named.c.name, customer: named.c });
+  if (named) return docListDump({ docs: await store.docsForCustomer(db, named.c.id), db, label: named.c.name, customer: named.c, win });
   if (several) {
     // two or three customers named: each one's stored record, separately and labelled (never merged, never one invoice line for each)
     const outs = [];
@@ -679,11 +758,20 @@ function documentDump(d, bundle, customer, p) {
   return { data: base, lane: "records", detail: "stored-record-document" };
 }
 
-async function docListDump({ docs, db, label, intro = "", customer, unit = null }) {
+async function docListDump({ docs, db, label, intro = "", customer, unit = null, win = null }) {
   const customerRec = customer ? customerRecord({ id: customer.id, name: customer.name, service_address: customer.address }) : null;
   if (!docs.length) return { data: envelope({ text: `${label} is on file, but no stored document is linked to it yet.`, cards: [], sources: [], records: [customerRec].filter(Boolean), total: 1, basis: "Checked the documents linked to this record; none." }), lane: "records", detail: "stored-record-no-documents" };
   const bundle = await store.loadBundle(db, docs.map((x) => x.document_id));
-  const dated = docs.map((x) => ({ d: x, date: docDate(x, bundle) })).sort((a, b) => (b.date ?? "").localeCompare(a.date ?? "") || String(b.d.created_at).localeCompare(String(a.d.created_at)));
+  let dated = docs.map((x) => ({ d: x, date: docDate(x, bundle) })).sort((a, b) => (b.date ?? "").localeCompare(a.date ?? "") || String(b.d.created_at).localeCompare(String(a.d.created_at)));
+  if (win) {
+    // a period: only the documents dated in it; none in it is said plainly (with what IS on file), never a decline and never documents from another period
+    const inWin = (iso) => iso && (!win.from || iso >= win.from) && (!win.to || iso <= win.to);
+    const all = dated; dated = all.filter((x) => inWin(x.date));
+    if (!dated.length) {
+      const dates = all.map((x) => x.date).filter(Boolean).sort();
+      return { data: envelope({ text: clean(`No stored document for ${label} is dated in ${win.label}.${all.length ? ` ${plural(all.length, "document")} ${all.length === 1 ? "is" : "are"} on file for ${label}${dates.length ? `, dated ${humanDate(dates[0])}${dates.length > 1 ? ` to ${humanDate(dates[dates.length - 1])}` : ""}` : ""}.` : ""}`), cards: [], sources: [], records: [customerRec].filter(Boolean), total: 1, basis: `Checked the dates of the ${plural(all.length, "stored document")} for ${label}; none falls in ${win.label}.` }), lane: "records", detail: "stored-record-window-empty" };
+    }
+  }
   const withFacts = dated.map((x) => ({ ...x, ids: factsOnDoc(x.d, bundle, CUSTOMER_DUMP) })).filter((x) => x.ids.length);
   const shown = withFacts.slice(0, CAP); const more = withFacts.length - shown.length;
   const cards = [], sources = [], records = [];
@@ -693,6 +781,6 @@ async function docListDump({ docs, db, label, intro = "", customer, unit = null 
     pieces.push(one.text); cards.push(...(one.facts ?? [])); sources.push(...(one.sources ?? [])); records.push(...(one.records ?? []));
   }
   const none = dated.length - withFacts.length;
-  const text = clean(`Here is everything on file for ${label}:${intro ? ` ${intro}` : ""} ${plural(withFacts.length, "document")} with details, newest first. ${pieces.map((x) => x.replace(/^./, (c) => c.toUpperCase())).join(" ")}${more > 0 ? ` And ${more} more.` : ""}${!withFacts.length ? ` ${plural(dated.length, "document")} on file, none with work, technician, hours, notes or total stored.` : ""}${withFacts.length && none ? ` ${plural(none, "other document")} on file carry none of these.` : ""}`);
+  const text = clean(`Here is everything on file for ${label}${win ? ` in ${win.label}` : ""}:${intro ? ` ${intro}` : ""} ${plural(withFacts.length, "document")} with details, newest first. ${pieces.map((x) => x.replace(/^./, (c) => c.toUpperCase())).join(" ")}${more > 0 ? ` And ${more} more.` : ""}${!withFacts.length ? ` ${plural(dated.length, "document")} on file, none with work, technician, hours, notes or total stored.` : ""}${withFacts.length && none ? ` ${plural(none, "other document")} on file carry none of these.` : ""}`);
   return { data: envelope({ text, cards: cards.slice(0, 12), sources, records: [customerRec, ...records].filter(Boolean), total: dated.length + (customerRec ? 1 : 0), basis: `Listed the stored details of the ${plural(shown.length, "newest document")} for ${label}; each value is cited to its document and page.` }), lane: "records", detail: unit ? "stored-record-unit" : "stored-record-customer" };
 }

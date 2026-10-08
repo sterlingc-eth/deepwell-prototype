@@ -56,6 +56,8 @@ const RESEARCH_BUCKET = 'research_usd_micro';
  */
 export const ROUTE_BUCKETS = Object.freeze({
   analyticsPlanner: { bucket: 'analytics_usd_micro', envVar: 'DONOVAN_ANALYTICS_DAILY_USD', defaultUsd: 1 },
+  // RECORDS-R3C: the "menu pick" (records/pickCall.js), one small Haiku call per unread question, behind DONOVAN_MENU_PICK (default off).
+  menuPick: { bucket: 'menu_pick_usd_micro', envVar: 'DONOVAN_MENU_DAILY_USD', defaultUsd: 1 },
   retrieval: { bucket: 'retrieval_usd_micro', envVar: 'DONOVAN_RETRIEVAL_DAILY_USD', defaultUsd: 5 },
   escalation: { bucket: SONNET_BUCKET, envVar: 'DONOVAN_SONNET_DAILY_USD', defaultUsd: 2 },
   research: { bucket: RESEARCH_BUCKET, envVar: 'DONOVAN_RESEARCH_DAILY_USD', defaultUsd: 10 },

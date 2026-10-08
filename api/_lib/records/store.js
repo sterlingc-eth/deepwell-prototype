@@ -91,3 +91,16 @@ export async function loadBundle(db, docIds) {
   out.pages = await rows(db, `SELECT p.document_id, p.page_no, p.text FROM document_pages p WHERE p.document_id = ANY($1::uuid[]) AND ${T("p")} ORDER BY p.document_id, p.page_no`, [docIds]);
   return out;
 }
+
+/** RECORDS-R3C: words of THIS organization that restrict a question instead of naming a fact: equipment makes / types and technician names. The menu pick may never call one of them "the word that means the fact". */
+export async function loadPickVocab(db) {
+  const out = new Set();
+  try {
+    const r = await rows(db, `SELECT lower(v) AS v FROM (
+        SELECT e.data->>'manufacturer' AS v FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND ${T("e")}
+        UNION SELECT e.data->>'equipment_type' FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND ${T("e")}
+        UNION SELECT COALESCE(NULLIF(x.corrected_value, ''), x.value) FROM extractions x WHERE x.field_key IN ('technician', 'manufacturer', 'equipment_type', 'vendor_name') AND ${T("x")}) t WHERE v IS NOT NULL`);
+    for (const row of r) for (const w of String(row.v).split(/[^a-z0-9]+/)) if (w.length >= 3) out.add(w);
+  } catch { /* unreadable: the other checks still apply */ }
+  return out;
+}

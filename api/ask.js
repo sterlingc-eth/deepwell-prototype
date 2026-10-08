@@ -1246,7 +1246,16 @@ export default async function handler(req, res) {
       try {
         const mod = (_recordsLaneModule ??= await import("./_lib/records/lane.js"));
         if (!mod.recordsFirstEnabled()) return false;
-        const rr = await timer.time("records", () => withTenant(ctxArg, (db) => mod.runRecordsLane(db, question, { today: todayResolved, phase })));
+        // RECORDS-R3C menu pick (DONOVAN_MENU_PICK, default OFF): a late-phase question about a resolvable subject whose wording named no readable fact may be read by ONE small
+        // model call that only picks directory facts; the lane then answers from stored rows exactly as for a rule-matched question. Any failure = no pick = the path below as before.
+        const pickMod = phase === "late" ? await import("./_lib/records/pick.js") : null;
+        const pickWanted = Boolean(pickMod?.menuPickEnabled());
+        let rr = await timer.time("records", () => withTenant(ctxArg, (db) => mod.runRecordsLane(db, question, { today: todayResolved, phase, pickWanted })));
+        if (rr?.pickable) {
+          let pick = null;
+          try { await budgetPromise; pick = await (await import("./_lib/records/pickCall.js")).requestPick({ withTenant, ctxArg, question }); } catch { pick = null; }
+          rr = await timer.time("records", () => withTenant(ctxArg, (db) => mod.runRecordsLane(db, question, { today: todayResolved, phase, pick, afterPick: true })));
+        }
         if (!rr?.data) { if (rr?.skip) console.log(JSON.stringify({ route: "ask", records_skip: rr.skip, phase })); return false; }
         console.log(JSON.stringify({ route: "ask", records_first: rr.detail, phase }));
         send(200, { success: true, data: rr.data });
