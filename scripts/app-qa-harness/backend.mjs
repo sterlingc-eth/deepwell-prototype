@@ -85,6 +85,10 @@ export async function installBackend(page, opts = {}) {
           const page_ = rows.slice(start, start + limit);
           return ok({ rows: page_, total: rows.length, hasMore: start + limit < rows.length, nextCursor: start + limit < rows.length ? String(start + limit) : null, facets: [], sort: f.sort || 'upload-date', limit });
         }
+        case 'importProgress': {
+          const total = d.docRows.length;
+          return ok({ total, byStage: { received: 0, read: 0, mapped: 0, linked: 0, verified: total }, verified: total, needsReview: 0, pending: 0, readLast10m: 0, failedRecent: 0 });
+        }
         default: return ok({});
       }
     }

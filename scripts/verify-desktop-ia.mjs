@@ -148,6 +148,10 @@ async function main() {
     check('Inbox: no separate "Needs a decision" tab', !inboxTabs.some((t) => t.includes('Needs a decision')));
     await page.getByRole('tab', { name: /^Needs you/ }).click();
     await page.waitForTimeout(400);
+    // Needs-you redesign: the 5 most-used groups sit on the bar; Conflicts / Duplicates / Company records / Money / All
+    // are one click away under "More" (every filter is still reachable, just not all on screen at once).
+    await page.getByRole('button', { name: /^More/ }).click();
+    await page.waitForTimeout(150);
     const chipTexts = await page.getByRole('tablist', { name: 'Needs you filters' }).getByRole('tab').allTextContents();
     check('Inbox "Needs you": one row has "Decisions" + the original 9 filters (Money hidden when empty)', chipTexts.length >= 9, `got ${chipTexts.length}: ${JSON.stringify(chipTexts)}`);
     check('Inbox "Needs you": "Decisions" chip present (folds in the old Add-files-adjacent decision queue)', chipTexts.some((t) => t.includes('Decisions')));

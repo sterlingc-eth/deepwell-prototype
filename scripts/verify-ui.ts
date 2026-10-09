@@ -42,6 +42,7 @@ import { isAdminRole, seatStatus } from '../src/services/teamClient';
 import { unreadBadgeLabel, parseNotificationLink } from '../src/services/notifyClient';
 import { sentThisMonth, type OutreachMessage } from '../src/services/outreachClient';
 import { docsMatchingFilter } from '../src/screens/ReviewScreen';
+import { needInfo, neighbourAfterRemoval, sectionsFor } from '../src/screens/reviewGrouping';
 import { matchesCustomerScope } from '../src/core/customer';
 import { technicianFromNotes, shopRecordTechnician } from '../src/core/shopRecords';
 import { selectIngestProgress } from '../src/store/appStore';
@@ -1220,6 +1221,32 @@ function listFilesRecursive(dir: string): string[] {
 }
 
 /* ------------------------------------------------------------------ done */
+
+/* ---------------------------------------- Needs-you list: plain-words reasons, sections, next item */
+{
+  const mk = (id: string, typeId: string | null, have: string[], issues: Doc['issues'] = []): Doc => ({
+    id, filename: `${id}.pdf`, fileType: 'pdf', pages: 1, batchId: 'b', source: 'email', receivedAt: new Date(2026, 9, 1),
+    typeId, stage: 'extracted', linkedEntityIds: [], linkConfidence: 0, issues, preview: '',
+    extracted: have.map((name) => ({ name, value: 'x', confidence: 0.9, location: {} })),
+  });
+  eq('needInfo: missing fields are named in plain words', needInfo(mk('a', 'invoice', ['cost']), ['service_address', 'cost']).text, 'Needs: service address');
+  eq('needInfo: several missing fields are listed', needInfo(mk('a', 'invoice', []), ['service_address', 'cost']).text, 'Needs: service address, cost');
+  eq('needInfo: an either/or requirement reads "a or b"', needInfo(mk('a', 'dispatch-note', []), ['customer_name|service_address']).text, 'Needs: customer or service address');
+  eq('needInfo: nothing outstanding gives no text', needInfo(mk('a', 'invoice', ['service_address', 'cost']), ['service_address', 'cost']).text, null);
+  eq('needInfo: unlinked reads "Needs linking"', needInfo(mk('a', 'invoice', ['cost'], [{ kind: 'unlinked', confidence: 0 }]), ['cost']).text, 'Needs linking');
+  const rows = [
+    { doc: mk('1', 'invoice', []), need: needInfo(mk('1', 'invoice', []), ['service_address']), typeLabel: 'Invoice' },
+    { doc: mk('2', 'invoice', []), need: needInfo(mk('2', 'invoice', []), ['service_address']), typeLabel: 'Invoice' },
+    { doc: mk('3', 'invoice', ['service_address']), need: needInfo(mk('3', 'invoice', ['service_address']), ['service_address']), typeLabel: 'Invoice' },
+    { doc: mk('4', 'correspondence', []), need: needInfo(mk('4', 'correspondence', []), ['customer_name']), typeLabel: 'Correspondence' },
+  ];
+  const byNeed = sectionsFor(rows, 'attention');
+  eq('sections by need: largest first, every row kept', byNeed.map((x) => [x.label, x.items.length]), [['Needs: service address', 2], ['Needs: customer', 1], ['Other', 1]]);
+  eq('sections for other filters are by document type', sectionsFor(rows, 'all').map((x) => x.label), ['Invoice', 'Correspondence']);
+  eq('after a resolve the next row is selected', neighbourAfterRemoval(['a', 'b', 'c'], new Set(['a', 'c']), 'b'), 'c');
+  eq('after resolving the last row the previous one is selected', neighbourAfterRemoval(['a', 'b', 'c'], new Set(['a', 'b']), 'c'), 'b');
+  eq('an empty list selects nothing', neighbourAfterRemoval(['a'], new Set<string>(), 'a'), null);
+}
 
 console.log('');
 if (failures) {

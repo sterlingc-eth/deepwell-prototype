@@ -19,6 +19,11 @@ type UiTab = 'add' | 'needs';
  *  (round 13's "Needs a decision", server-backed) or one of ReviewBody's 9 document filters. */
 type Chip = 'decisions' | Filter;
 
+const PRIMARY_FILTERS: Filter[] = ['attention', 'gaps', 'unlinked', 'ready'];
+
+const chipClass = (on: boolean) =>
+  ['dw-btn !min-h-[44px] !py-1.5 !px-3 text-body-lg justify-center shrink-0 whitespace-nowrap', on ? 'bg-forest-700 text-stone-0 dark:bg-brass-300 dark:text-forest-950' : 'bg-surface border border-line text-ink-2 hover:bg-surface-2'].join(' ');
+
 /**
  * Inbox (round 17, U2 top fixes #8/#9): used to be 3 top-level tabs — Add
  * files / Needs a decision / Needs a person — with "Needs a person" carrying
@@ -69,13 +74,20 @@ export function InboxScreen() {
   // it's already the active one) — same rule ReviewBody's own row used to
   // apply, just read here from the counts it now reports up.
   const visibleFilters = FILTERS.filter((f) => f.id !== 'money' || (counts?.money ?? 0) > 0 || chip === 'money');
+  // The five most-used groups stay on the bar; the rest live under "More" (opened automatically when one of
+  // them is the active chip, so the selected group is never hidden).
+  const primaryFilters = visibleFilters.filter((f) => PRIMARY_FILTERS.includes(f.id));
+  const moreFilters = visibleFilters.filter((f) => !PRIMARY_FILTERS.includes(f.id));
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreForced = moreFilters.some((f) => f.id === chip);
+  const moreAttention = counts ? (counts.conflicts ?? 0) + (counts.money ?? 0) : 0;
 
   return (
     <AppShell>
-      <div className="space-y-6">
-        <header>
+      <div className="space-y-3 lg:space-y-4">
+        <header className="lg:flex lg:flex-wrap lg:items-baseline lg:gap-x-4">
           <h1>Inbox</h1>
-          <p className="text-ink-2 mt-1">Add paperwork, answer what autofill couldn't, and clear what needs your attention.</p>
+          <p className="text-ink-2 mt-1 lg:mt-0">Add paperwork, answer what autofill couldn't, and clear what needs your attention.</p>
         </header>
 
         <div role="tablist" aria-label="Inbox view" className="flex flex-wrap gap-1.5">
@@ -89,7 +101,7 @@ export function InboxScreen() {
               role="tab"
               aria-selected={tab === t.id}
               onClick={() => selectTab(t.id)}
-              className={['dw-btn !min-h-[40px] !py-1.5 !px-3 text-body-lg', tab === t.id ? 'bg-forest-700 text-stone-0 dark:bg-brass-300 dark:text-forest-950' : 'bg-surface border border-line text-ink-2 hover:bg-surface-2'].join(' ')}
+              className={['dw-btn !min-h-[44px] !py-1.5 !px-3 text-body-lg', tab === t.id ? 'bg-forest-700 text-stone-0 dark:bg-brass-300 dark:text-forest-950' : 'bg-surface border border-line text-ink-2 hover:bg-surface-2'].join(' ')}
             >
               {t.label}
               {t.count !== undefined && <span className="font-mono text-caption opacity-80">{t.count}</span>}
@@ -100,29 +112,30 @@ export function InboxScreen() {
         {tab === 'add' ? (
           <IntakeBody />
         ) : (
-          <div className="space-y-6">
-            <div role="tablist" aria-label="Needs you filters" className="flex flex-wrap gap-1.5">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={chip === 'decisions'}
-                onClick={() => setChip('decisions')}
-                className={['dw-btn !min-h-[40px] !py-1.5 !px-3 text-body-lg', chip === 'decisions' ? 'bg-forest-700 text-stone-0 dark:bg-brass-300 dark:text-forest-950' : 'bg-surface border border-line text-ink-2 hover:bg-surface-2'].join(' ')}
-              >
-                Decisions
-              </button>
-              {visibleFilters.map((f) => (
-                <button
-                  key={f.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={chip === f.id}
-                  onClick={() => setChip(f.id)}
-                  className={['dw-btn !min-h-[40px] !py-1.5 !px-3 text-body-lg', chip === f.id ? 'bg-forest-700 text-stone-0 dark:bg-brass-300 dark:text-forest-950' : 'bg-surface border border-line text-ink-2 hover:bg-surface-2'].join(' ')}
-                >
-                  {f.label} {counts && <span className="font-mono text-caption opacity-80">{counts[f.id]}</span>}
-                </button>
-              ))}
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <div className="flex items-start gap-1.5 overflow-x-auto sm:flex-wrap sm:overflow-visible -mx-4 px-4 sm:mx-0 sm:px-0 pb-1 sm:pb-0">
+                <div role="tablist" aria-label="Needs you filters" className="flex gap-1.5 shrink-0 sm:flex-wrap sm:shrink sm:min-w-0">
+                  {[{ id: 'decisions' as const, label: 'Decisions' }, ...primaryFilters, ...(moreOpen || moreForced ? moreFilters : [])].map((f) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={chip === f.id}
+                      onClick={() => setChip(f.id)}
+                      className={chipClass(chip === f.id)}
+                    >
+                      {f.label} {f.id !== 'decisions' && counts && <span className="font-mono text-caption opacity-80">{counts[f.id]}</span>}
+                    </button>
+                  ))}
+                </div>
+                {!moreForced && (
+                  <button type="button" aria-expanded={moreOpen} onClick={() => setMoreOpen((v) => !v)} className={chipClass(false) + ' shrink-0'}>
+                    {moreOpen ? 'Less' : 'More'}
+                    {!moreOpen && moreAttention > 0 && <span className="font-mono text-caption opacity-80">{moreAttention}</span>}
+                  </button>
+                )}
+              </div>
             </div>
 
             {chip === 'decisions' ? (

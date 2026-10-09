@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Check, AlertTriangle, Bell, Link2, GitMerge, Copy, Loader2, Plus, Search, Sparkles, Trash2, UserCog } from 'lucide-react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Check, AlertTriangle, ArrowLeft, Bell, Link2, GitMerge, Copy, Loader2, Plus, Search, Sparkles, Trash2, UserCog } from 'lucide-react';
 import { StagePill, STAGE_LABEL } from '../components/StagePill';
 import { DocumentPreview } from '../components/DocumentPreview';
 import { conflictDocs, entitiesOfType, gapDocs, isRequirementMet, maxStageFor, unlinkedDocs, useGraph, type GraphSnapshot } from '../core/entityGraph';
@@ -21,11 +22,18 @@ import { WorkFilterControl } from '../components/WorkFilterControl';
 import { FinancialStrip } from '../components/FinancialStrip';
 import { financialsClient } from '../services/financialsClient';
 import { FILTERS, FILTER_IDS, type Filter } from './reviewFilters';
+import { needInfo, neighbourAfterRemoval, sectionsFor } from './reviewGrouping';
+import { NeedsYouList, type QueueRowData } from '../components/inbox/NeedsYouList';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useCanAdmin, ASK_ADMIN_TITLE } from '../hooks/useCanAdmin';
 import { AskAdminNote } from '../components/AskAdminNote';
 import { baseFieldOf, futureDateNote, isUnconfirmedField, todayYmd, unconfirmedDates, visibleExtracted } from '../core/dateFlags';
 
 const CURRENT_USER = 'You';
+
+/** Rows drawn when the list opens, and added per "Show more" — keeps 3,000-document queues cheap. */
+const LIST_INITIAL_ROWS = 100;
+const LIST_STEP_ROWS = 100;
 
 // "Hide shop records" (owner defect report 2026-09-22, item 4): a per-user,
 // per-browser preference — deliberately localStorage, not a server setting,
@@ -587,9 +595,164 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
   };
 
   const doc = selectedDocumentId ? graph.docs[selectedDocumentId] : undefined;
+
+  // ---- Rows, sections and the render cap (400-3,000 documents must stay cheap) ----
+  const rows = useMemo<QueueRowData[]>(() => {
+    const typeById = new Map(graph.schema.documentTypes.map((t) => [t.id, t]));
+    return queue.map((d) => {
+      const t = d.typeId ? typeById.get(d.typeId) : undefined;
+      return {
+        doc: d,
+        name: documentName(d),
+        sub: [t?.label ?? 'Unclassified', hasFriendlyName(d) ? d.filename : null].filter(Boolean).join(' · '),
+        typeLabel: t?.label ?? 'Unclassified',
+        need: needInfo(d, t?.requiredFields ?? []),
+        // Owner defect report (2026-09-22): visible in both "My work" and "Everyone".
+        assignee: work.hasShop ? (d.uploadedBy && work.nameByUserId.get(d.uploadedBy)) || 'Teammate' : null,
+        hasReminder: d.extracted.some((f) => f.name === 'reminder_text' && (f.correctedValue ?? f.value).trim()),
+        technician: shopRecordTechnician(d),
+      };
+    });
+  }, [queue, graph.schema.documentTypes, work.hasShop, work.nameByUserId]);
+  const sections = useMemo(() => sectionsFor(rows, filter), [rows, filter]);
+  // Keyboard / selection order is the order rows appear on screen (section by section).
+  const flatIds = useMemo(() => sections.flatMap((sec) => sec.items.map((r) => r.doc.id)), [sections]);
+  const [cap, setCap] = useState(LIST_INITIAL_ROWS);
+  useEffect(() => { setCap(LIST_INITIAL_ROWS); }, [filter, inboxCustomerScope, shopTechFilter]);
+  const activeInQueue = !!doc && flatIds.includes(doc.id);
+  // Keep the selected row inside the rendered window (deep link, j/k, "next item" after a resolve).
   useEffect(() => {
-    if (!doc && queue[0]) openDocument(queue[0].id);
-  }, [doc, queue, openDocument]);
+    if (!doc) return;
+    const at = flatIds.indexOf(doc.id);
+    if (at >= 0) setCap((c) => (at >= c ? at + 1 : c));
+  }, [doc?.id, flatIds]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ---- Layout: desktop = list + sticky detail; phone = list, detail in a full-height sheet ----
+  const isDesktop = useMediaQuery('(min-width: 1024px)');
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const listRef = useRef<HTMLDivElement>(null);
+  const detailRef = useRef<HTMLDivElement>(null);
+  const sheetBodyRef = useRef<HTMLDivElement>(null);
+  const backRef = useRef<HTMLButtonElement>(null);
+  const returnFocusId = useRef<string | null>(null);
+  const savedScrollY = useRef(0);
+  const [stickyTop, setStickyTop] = useState(80);
+  const regionRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const measure = () => {
+      // The app's pinned top bar (not the page's own <header> heading).
+      const bar = [...document.querySelectorAll('header')].find((el) => ['sticky', 'fixed'].includes(getComputedStyle(el).position));
+      const bottom = bar ? Math.round(bar.getBoundingClientRect().bottom) : 64;
+      setStickyTop(bottom + 12);
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, []);
+  // Size both columns to the space actually left on screen (never below the pinned top), so the
+  // detail's action bar is visible on first view without scrolling the page.
+  useLayoutEffect(() => {
+    let raf = 0;
+    const size = () => {
+      raf = 0;
+      const el = regionRef.current;
+      if (!el) return;
+      const top = Math.max(stickyTop, el.getBoundingClientRect().top);
+      el.style.setProperty('--dw-col-h', `${Math.max(360, Math.round(window.innerHeight - top - 16))}px`);
+    };
+    const queueSize = () => { if (!raf) raf = requestAnimationFrame(size); };
+    size();
+    window.addEventListener('scroll', queueSize, { passive: true });
+    window.addEventListener('resize', queueSize);
+    return () => { window.removeEventListener('scroll', queueSize); window.removeEventListener('resize', queueSize); if (raf) cancelAnimationFrame(raf); };
+  }, [stickyTop]);
+
+  const rowEl = (id: string) => listRef.current?.querySelector<HTMLElement>(`[data-doc-id="${CSS.escape(id)}"]`) ?? null;
+  /** Scrolls only the list's own column, never the page, so the selected row is in view. */
+  const keepRowInView = useCallback((id: string) => {
+    const box = listRef.current;
+    const el = rowEl(id);
+    if (!box || !el || box.scrollHeight <= box.clientHeight) return;
+    const b = box.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    const pad = 48; // clears the sticky section header
+    if (r.top < b.top + pad) box.scrollTop -= b.top + pad - r.top;
+    else if (r.bottom > b.bottom) box.scrollTop += r.bottom - b.bottom;
+  }, []);
+
+  useEffect(() => {
+    if (doc && isDesktop) keepRowInView(doc.id);
+    if (detailRef.current) detailRef.current.scrollTop = 0;
+    if (sheetBodyRef.current) sheetBodyRef.current.scrollTop = 0;
+  }, [doc?.id, isDesktop, keepRowInView]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // System Back closes the sheet: opening pushes one history entry, popstate closes, and the in-sheet
+  // "Back to list" pops that same entry, so no stray entries are left behind.
+  const pushed = useRef(false);
+  const finishSheet = useCallback(() => {
+    setSheetOpen(false);
+    const y = savedScrollY.current;
+    // Back returns to exactly where the list was (and the row you came from).
+    requestAnimationFrame(() => {
+      window.scrollTo(0, y);
+      const id = returnFocusId.current;
+      const el = id ? rowEl(id) : null;
+      el?.focus({ preventScroll: true });
+    });
+  }, []);
+  const openSheet = (id: string) => {
+    returnFocusId.current = id;
+    savedScrollY.current = window.scrollY;
+    openDocument(id);
+    if (!pushed.current) {
+      try { window.history.pushState({ ...(window.history.state ?? {}), dwSheet: true }, ''); pushed.current = true; } catch { /* no history API: the Back button still works */ }
+    }
+    setSheetOpen(true);
+  };
+  const closeSheet = useCallback(() => {
+    if (pushed.current) window.history.back(); // popstate below finishes the close
+    else finishSheet();
+  }, [finishSheet]);
+  useEffect(() => {
+    const onPop = () => {
+      if (!pushed.current) return;
+      pushed.current = false;
+      finishSheet();
+    };
+    window.addEventListener('popstate', onPop);
+    return () => {
+      window.removeEventListener('popstate', onPop);
+      if (pushed.current) { pushed.current = false; window.history.back(); } // leaving the screen with the sheet open
+    };
+  }, [finishSheet]);
+  const sheetShown = sheetOpen && !isDesktop;
+  useEffect(() => {
+    if (!sheetShown) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    backRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !document.querySelector('[role="dialog"]:not([data-dw-sheet])')) closeSheet(); };
+    window.addEventListener('keydown', onKey);
+    return () => { document.body.style.overflow = prev; window.removeEventListener('keydown', onKey); };
+  }, [sheetShown, closeSheet]);
+  useEffect(() => { if (sheetOpen && (flatIds.length === 0 || isDesktop)) closeSheet(); }, [sheetOpen, flatIds.length, isDesktop, closeSheet]);
+
+  const selectRow = (id: string) => (isDesktop ? openDocument(id) : openSheet(id));
+
+  // ---- After a resolve (approve / merge / delete / filter no longer matches): move to the next item ----
+  const prevList = useRef<{ filter: Filter; ids: string[] }>({ filter, ids: [] });
+  useEffect(() => {
+    const prev = prevList.current;
+    prevList.current = { filter, ids: flatIds };
+    if (prev.filter !== filter) return; // switching chips is handled below
+    const present = new Set(flatIds);
+    if (selectedDocumentId && prev.ids.includes(selectedDocumentId) && !present.has(selectedDocumentId)) {
+      const next = neighbourAfterRemoval(prev.ids, present, selectedDocumentId);
+      if (next) { openDocument(next); return; }
+    }
+    if (!doc && flatIds[0]) openDocument(flatIds[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flatIds]);
 
   // Switching chips must not leave the detail pane on a document the new list
   // doesn't contain (stale pane): move to the first item of the new list.
@@ -604,13 +767,74 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc?.id]);
 
+  // ---- Keyboard: j / k (or arrows while the list has focus) move, Enter opens. Skipped in fields and dialogs. ----
+  const kb = useRef({ flatIds, selected: doc?.id, isDesktop, sheetShown, preview: !!preview });
+  kb.current = { flatIds, selected: doc?.id, isDesktop, sheetShown, preview: !!preview };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const c = kb.current;
+      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || c.sheetShown || c.preview) return;
+      const t = e.target as HTMLElement | null;
+      const tag = t?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || t?.isContentEditable) return;
+      if (document.querySelector('[role="dialog"]')) return;
+      const inList = !!t && !!listRef.current?.contains(t);
+      let delta = 0;
+      if (e.key === 'j' || (inList && e.key === 'ArrowDown')) delta = 1;
+      else if (e.key === 'k' || (inList && e.key === 'ArrowUp')) delta = -1;
+      else if (e.key === 'Enter' && tag !== 'BUTTON' && tag !== 'A' && tag !== 'SUMMARY' && c.selected) {
+        e.preventDefault();
+        if (c.isDesktop) detailRef.current?.focus({ preventScroll: true });
+        else openSheet(c.selected);
+        return;
+      }
+      if (!delta || c.flatIds.length === 0) return;
+      e.preventDefault();
+      const at = c.selected ? c.flatIds.indexOf(c.selected) : -1;
+      const nextId = c.flatIds[Math.min(c.flatIds.length - 1, Math.max(0, at + delta))];
+      if (!nextId || nextId === c.selected) return;
+      openDocument(nextId);
+      requestAnimationFrame(() => {
+        const el = rowEl(nextId);
+        if (inList) el?.focus({ preventScroll: true });
+        if (c.isDesktop) keepRowInView(nextId);
+        else el?.scrollIntoView({ block: 'nearest' });
+      });
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const docPanel = doc ? (
+    <DocPanel
+      key={doc.id}
+      doc={doc}
+      conflicts={Object.values(graph.conflicts).filter((c) => !c.resolvedValue && c.candidates.some((x) => x.documentId === doc.id))}
+      onPreview={() => setPreview({ documentId: doc.id, location: { page: 1 } })}
+      onCorrect={(name, value) => correctField(doc.id, name, value, CURRENT_USER, targetFor(doc, name, graph))}
+      onClassify={(typeId) => classifyDoc(doc.id, typeId)}
+      onLink={(entityId) => linkDoc(doc.id, entityId, CURRENT_USER)}
+      onApprove={() => approveDoc(doc.id, CURRENT_USER)}
+      onResolve={(conflictId, value) => resolveConflict(conflictId, value, CURRENT_USER)}
+      onMerge={() => mergeDuplicate(doc.id)}
+      onAsk={(q) => askQuestion(q)}
+      onAiVerify={() => aiVerifyDoc(doc.id)}
+      onDelete={async () => {
+        await deleteDocuments([doc.id]);
+        removeDoc(doc.id);
+      }}
+    />
+  ) : null;
+  const sheetPos = doc ? flatIds.indexOf(doc.id) : -1;
+
   return (
     <>
-      <div className="space-y-6">
+      <div className="space-y-3 lg:space-y-4">
         {REVIEW_IS_DEMO_ONLY && (
           <div
             role="status"
-            className="rounded-lg border border-line bg-surface-2 p-3 flex items-start gap-2"
+            className="rounded-lg border border-line bg-surface-2 px-3 py-1.5 flex items-start gap-2"
           >
             <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-ink-3" aria-hidden="true" />
             <p className="text-body text-ink-2">
@@ -637,12 +861,23 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
           </div>
         )}
 
-        {work.hasShop && <WorkFilterControl choice={work.choice} onChange={work.setChoice} showHint={work.showHint} />}
-
-        <label className="inline-flex items-center gap-2 text-caption text-ink-2">
-          <input type="checkbox" checked={hideShopRecords} onChange={toggleHideShopRecords} aria-label="Hide company records" />
-          Hide company records
-        </label>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+          {work.hasShop && <WorkFilterControl choice={work.choice} onChange={work.setChoice} showHint={work.showHint} />}
+          <label className="inline-flex items-center gap-2 min-h-[44px] text-body text-ink-2 cursor-pointer">
+            <input type="checkbox" className="w-5 h-5" checked={hideShopRecords} onChange={toggleHideShopRecords} aria-label="Hide company records" />
+            Hide company records
+          </label>
+          {(filter === 'gaps' || filter === 'attention') && missingQueueIds.length > 0 && !REVIEW_IS_DEMO_ONLY && (
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" className="dw-btn-tertiary !min-h-[44px] !py-1.5" disabled={recheckAllBusy || !canAdmin} title={canAdmin ? undefined : ASK_ADMIN_TITLE} onClick={() => void runRecheckAll()}>
+                {recheckAllBusy ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Search className="w-4 h-4" aria-hidden="true" />} Re-check all missing fields
+              </button>
+              {!canAdmin && <AskAdminNote />}
+            </div>
+          )}
+          <span className="hidden lg:inline text-caption text-ink-3 lg:ml-auto">Tip: j / k to move, Enter to open</span>
+        </div>
+        {recheckAllMsg && <p className="text-caption text-ink-3">{recheckAllMsg}</p>}
 
         {/* Filter chips: rendered by InboxScreen now, in the same row as its
             "Decisions" chip (round 17 merge) — see this file's own header
@@ -735,86 +970,65 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
           </div>
         )}
 
-        {(filter === 'gaps' || filter === 'attention') && missingQueueIds.length > 0 && !REVIEW_IS_DEMO_ONLY && (
-          <div className="flex flex-wrap items-center gap-2">
-            <button type="button" className="dw-btn-tertiary !min-h-[40px] !py-1.5" disabled={recheckAllBusy || !canAdmin} title={canAdmin ? undefined : ASK_ADMIN_TITLE} onClick={() => void runRecheckAll()}>
-              {recheckAllBusy ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Search className="w-4 h-4" aria-hidden="true" />} Re-check all missing fields
-            </button>
-            {!canAdmin && <AskAdminNote />}
-            {recheckAllMsg && <span className="text-caption text-ink-3">{recheckAllMsg}</span>}
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-6 items-start">
-          <ul className="min-w-0 divide-y divide-line border border-line rounded-lg bg-surface" aria-label="Documents in queue">
-            {queue.map((d) => {
-              const typeLabel = graph.schema.documentTypes.find((t) => t.id === d.typeId)?.label ?? 'Unclassified';
-              const active = d.id === doc?.id;
-              // CUSTOMER REMINDERS build (2026-09-22): a lightweight chip so a
-              // reminder-bearing document stands out in this list without
-              // having to open it first.
-              const hasReminder = d.extracted.some((f) => f.name === 'reminder_text' && (f.correctedValue ?? f.value).trim());
-              const technician = shopRecordTechnician(d);
-              return (
-                <li key={d.id}>
-                  <button type="button" onClick={() => openDocument(d.id)} aria-current={active ? 'true' : undefined} className={['w-full text-left flex items-center gap-3 px-4 py-3 min-h-touch transition-colors duration-quick', active ? 'bg-forest-50 dark:bg-forest-800' : 'hover:bg-surface-2'].join(' ')}>
-                    <StagePill stage={d.stage} compact />
-                    <span className="min-w-0 flex-1">
-                      <span className="block font-mono text-data text-ink truncate">{documentName(d)}</span>
-                      <span className="block text-body text-ink-3 truncate">{[typeLabel, hasFriendlyName(d) ? d.filename : null].filter(Boolean).join(' · ')}</span>
-                    </span>
-                    {/* Owner defect report (2026-09-22): this used to also
-                        require work.choice === 'everyone', so switching to
-                        "My work" hid the uploader chip entirely — visible in
-                        both modes now. */}
-                    {work.hasShop && (
-                      <span className="dw-pill-muted shrink-0 text-caption">
-                        {(d.uploadedBy && work.nameByUserId.get(d.uploadedBy)) || 'Teammate'}
-                      </span>
-                    )}
-                    {hasReminder && (
-                      <span className="dw-pill-muted shrink-0 text-caption flex items-center gap-1" title="Has a reminder">
-                        <Bell className="w-3 h-3" aria-hidden="true" />
-                      </span>
-                    )}
-                    {technician && <span className="dw-pill-muted shrink-0 text-caption">{technician}</span>}
-                    {d.issues.length > 0 && <span className="dw-pill-warn shrink-0">{d.issues.length}</span>}
-                  </button>
-                </li>
-              );
-            })}
-            {queue.length === 0 && (
-              <li className="px-4 py-8 text-center">
+        <div className="lg:!-mb-40">
+        <div
+          ref={regionRef}
+          className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-6 items-start lg:sticky lg:top-[var(--dw-sticky-top)]"
+          style={{ ['--dw-sticky-top' as string]: `${stickyTop}px` }}
+        >
+          {/* Desktop: the list scrolls inside its own column and the detail stays pinned beside it,
+              so picking an item far down never means scrolling back up. */}
+          <div
+            ref={listRef}
+            data-testid="needs-list"
+            className="min-w-0 border border-line rounded-lg bg-surface lg:max-h-[var(--dw-col-h)] lg:overflow-y-auto lg:overscroll-contain"
+          >
+            {queue.length === 0 ? (
+              <div className="px-4 py-8 text-center">
                 <Check className="w-6 h-6 text-ok mx-auto" aria-hidden="true" />
                 <p className="mt-2 text-ink-2">Nothing here. The queue is clear.</p>
-              </li>
+              </div>
+            ) : (
+              <NeedsYouList
+                sections={sections}
+                cap={cap}
+                total={rows.length}
+                activeId={activeInQueue ? doc?.id : undefined}
+                fallbackFocusId={flatIds[0]}
+                onSelect={selectRow}
+                onShowMore={() => setCap((c) => c + LIST_STEP_ROWS)}
+                step={LIST_STEP_ROWS}
+              />
             )}
-          </ul>
+          </div>
 
-          {doc ? (
-            <DocPanel
-              key={doc.id}
-              doc={doc}
-              conflicts={Object.values(graph.conflicts).filter((c) => !c.resolvedValue && c.candidates.some((x) => x.documentId === doc.id))}
-              onPreview={() => setPreview({ documentId: doc.id, location: { page: 1 } })}
-              onCorrect={(name, value) => correctField(doc.id, name, value, CURRENT_USER, targetFor(doc, name, graph))}
-              onClassify={(typeId) => classifyDoc(doc.id, typeId)}
-              onLink={(entityId) => linkDoc(doc.id, entityId, CURRENT_USER)}
-              onApprove={() => approveDoc(doc.id, CURRENT_USER)}
-              onResolve={(conflictId, value) => resolveConflict(conflictId, value, CURRENT_USER)}
-              onMerge={() => mergeDuplicate(doc.id)}
-              onAsk={(q) => askQuestion(q)}
-              onAiVerify={() => aiVerifyDoc(doc.id)}
-              onDelete={async () => {
-                await deleteDocuments([doc.id]);
-                removeDoc(doc.id);
-              }}
-            />
-          ) : (
-            <div className="dw-card p-8 text-ink-3">Nothing needs you right now — new uploads will show up here.</div>
+          {isDesktop && (
+            <div
+              ref={detailRef}
+              tabIndex={-1}
+              data-testid="needs-detail"
+              className="min-w-0 focus:outline-none lg:max-h-[var(--dw-col-h)] lg:overflow-y-auto lg:overscroll-contain"
+            >
+              {docPanel ?? <div className="dw-card p-8 text-ink-3">Nothing needs you right now — new uploads will show up here.</div>}
+            </div>
           )}
         </div>
+        {/* Slack below the pinned area so scrolling to the footer without the columns sliding under the app header. */}
+        <div className="hidden lg:block h-40 pointer-events-none" aria-hidden="true" />
+        </div>
       </div>
+      {sheetShown && docPanel && createPortal(
+        <div role="dialog" aria-modal="true" aria-label="Document details" data-dw-sheet className="fixed inset-0 z-50 flex flex-col bg-bg text-ink">
+          <div className="shrink-0 flex items-center gap-3 px-3 py-2 min-h-[60px] bg-surface border-b border-line">
+            <button ref={backRef} type="button" className="dw-btn-secondary !min-h-[44px]" onClick={closeSheet}>
+              <ArrowLeft className="w-4 h-4" aria-hidden="true" /> Back to list
+            </button>
+            {sheetPos >= 0 && <span className="ml-auto text-caption text-ink-3">{sheetPos + 1} of {flatIds.length}</span>}
+          </div>
+          <div ref={sheetBodyRef} className="flex-1 overflow-y-auto overscroll-contain p-3">{docPanel}</div>
+        </div>,
+        document.body,
+      )}
       {preview && <DocumentPreview documentId={preview.documentId} location={preview.location} onClose={() => setPreview(null)} />}
     </>
   );
@@ -1230,7 +1444,7 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
 
       {/* Approve */}
       {!duplicate && (
-        <footer className="p-5 flex flex-wrap items-center justify-between gap-3">
+        <footer className="sticky bottom-0 z-10 bg-surface rounded-b-lg border-t border-line p-4 flex flex-wrap items-center justify-between gap-3 shadow-[0_-6px_12px_-8px_rgba(0,0,0,0.25)]">
           <div className="text-body text-ink-3">
             <p>
               {canAdvance

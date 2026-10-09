@@ -550,19 +550,10 @@ export function IntakeBody() {
           </div>
         </header>
 
-        {/* Live import progress: shop-wide, from the server, any device, no time limit. Hidden when nothing is being read. */}
+        {/* The pipeline ring card: Uploaded, Sorted, Read, Matched, Checked, with live import progress merged in.
+            Always there once the shop has a document (see ImportProgressPanel for the stage-mapping decision). */}
         <ImportProgressPanel />
 
-        {/* Pipeline overview */}
-        <ol className="grid grid-cols-5 gap-2" aria-label="Pipeline">
-          {PIPELINE_STAGES.map((stage, i) => (
-            <li key={stage} className="dw-card px-3 py-3 relative">
-              <p className="text-caption text-ink-3">{i + 1}. {STAGE_LABEL[stage]}</p>
-              <p className="font-display text-h2 mt-1">{counts[stage]}</p>
-              {i < PIPELINE_STAGES.length - 1 && <ChevronRight className="hidden sm:block absolute -right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-line-2" aria-hidden="true" />}
-            </li>
-          ))}
-        </ol>
         <p className="text-caption text-ink-3 -mt-5">
           {total} documents · {counts.verified} answerable and counted · {counts.linked} answerable with “include unverified”
         </p>
