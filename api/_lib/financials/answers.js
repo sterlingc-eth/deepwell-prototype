@@ -657,7 +657,7 @@ function nameClarify(raw, v, note = '', what = '') {
 /** R3: payment / due-date question about a name several customers share: no figure, the matching customers are named */
 function namedPayMulti(intent) {
   const names = [...new Set(intent.__names)].slice(0, 6);
-  const a = baseAnswer(`I can't tell what ${intent.__asked} owes or when anything is due: these invoices don't record payments or due dates. Customers with that name: ${names.join(', ')}.`, [], { confidence: 1, ...zeroCite(`Looked for payment status and due dates for customers named ${intent.__asked}; none is recorded.`) });
+  const a = baseAnswer(`I can't tell which customer "${intent.__asked}" means, so I won't give what is owed or due. Customers with that name: ${names.join(', ')}. Ask again with the full name of one of them.`, [], { confidence: 1, ...zeroCite(`More than one customer is named ${intent.__asked}; no figure given.`) });
   return { ...a, kind: 'no-answer' };
 }
 
@@ -668,7 +668,9 @@ async function namedPayDecline(db, intent, ctx) {
   if (g?.answer) return g.answer;
   if (!g || g.unresolved) return null;
   const [{ n, k }] = await q(db, `SELECT count(*)::int AS n, count(*) FILTER (WHERE f.status IN ('paid','unpaid','partial'))::int AS k FROM financials f WHERE ${LAST_INVOICE_WHERE} AND f.customer_id = ANY($2::uuid[])`, [g.ids], ctx.hu);
-  if (k > 0) return null; // payment status IS recorded for this customer: the status lanes answer, this honest decline does not apply
+  // RECORDS-R4: receipts, statements and other non-invoice documents can record payments too; never say "no payments are recorded" while any financial document of this customer does
+  const [{ k2 }] = await q(db, `SELECT count(*) FILTER (WHERE f.doc_kind IN ('receipt','statement') AND (f.status IN ('paid','unpaid','partial') OR f.amount_paid IS NOT NULL))::int AS k2 FROM financials f WHERE f.customer_id = ANY($2::uuid[])`, [g.ids], ctx.hu);
+  if (k > 0 || k2 > 0) return null; // payment status IS recorded for this customer: the status lanes answer, this honest decline does not apply
   const has = n ? `${g.name} has ${plural(n, 'invoice')} on file; ask for "${g.name} invoice" to see ${n === 1 ? 'it' : 'them'}.` : `No invoice with financial details is on file for ${g.name}.`;
   const a = baseAnswer(`I can't tell what ${g.name} owes or when anything is due: these invoices don't record payments or due dates. ${has}`, [], { confidence: 1, ...zeroCite(`Looked for payment status and due dates on ${g.name}'s invoices; none is recorded.`) });
   return { ...a, kind: 'no-answer' };
@@ -785,7 +787,13 @@ async function totalInvoiced(db, intent, ctx) {
     : `${g ? `We've invoiced${who}` : 'We invoiced'} ${fmt(agg.amount)}${p ? ` in ${p.label}` : ' in total'} across ${plural(agg.n_sum, 'invoice')}.`;
   // Defect 13: "what did X pay" - the invoice is what they were charged; say plainly when the invoice records no payment status.
   const payNote = intent.paidAsk && g
-    ? (docs.some((d) => d.status === 'paid') ? '' : " The invoice doesn't record whether it has been paid, so this is the amount invoiced.")
+    ? (() => {
+        const paidSum = docs.reduce((t, d) => t + (Number(d.amount_paid) > 0 ? Number(d.amount_paid) : 0), 0);
+        const anyPaid = paidSum > 0 || docs.some((d) => d.status === 'paid' || d.status === 'partial');
+        if (anyPaid) return paidSum > 0 ? ` Payments recorded on these invoices total ${fmt(paidSum)}; the amount above is what was invoiced.` : ' Some of it is recorded as paid; the amount above is what was invoiced.';
+        const st = [...new Set(docs.map((d) => d.status).filter((x) => x && x !== 'unknown'))];
+        return st.length ? ` None of it is recorded as paid (recorded status: ${st.join(', ')}), so this is the amount invoiced.` : " The invoice doesn't record whether it has been paid, so this is the amount invoiced.";
+      })()
     : '';
   const text = head + payNote + exclusionText({ noTotal: agg.n_no_total, undated: agg.n_undated, foreign }) + flaggedText(agg.n_flagged);
   const facts = [

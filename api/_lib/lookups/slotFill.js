@@ -86,7 +86,7 @@ function detectConcepts(text, kind) {
   take(/\bmail\s+address\b/i, "email");
   take(/\b(?:service|street|site|job\s*site|physical)\s+address\b/i, "address");
   take(/\b(?:phone|telephone|cell|cellphone|mobile|dial)\b/i, "phone");
-  take(/\bnumber\b/i, "phone");
+  take(/(?<!(?:receipt|statement|stmt|chart|matter|engagement|letter|po\s+box|box|suite|gate|code|lot|plate|vin|parcel|policy|house|street|apartment|apt|zip|confirmation|check|lock|fax|facsimile|pager|extension|ext|tax|ein|license|licence|employee|badge|member|routing|id|tracking|case|account|acct|invoice|inv|permit|po|purchase\s+order|work\s+order|wo|ticket|order|quote|estimate|proposal|agreement|contract|job|reference|ref|claim|serial|model|part|sku|social|security|medical|record|file|mrn|patient|student|folio|room|unit|bill|payment|transaction|batch|route|stop|phase|revision|version|page|line|item|document|doc|customer\s+id|vendor|supplier|loan|lease|tenant|parking|bay|slip|space|pin|passport|visa|ssn|dl|card|credit|debit|bank|wire|check|cheque|deposit|plan|tag|asset|equipment|meter|circuit|zone|section|building|floor|rack|bin|shelf|aisle|dock|container|trailer|truck|vehicle|fleet|license plate|registration|docket|cause|file)\s)\bnumber\b/i, "phone");
   take(/\be-?mail\b/i, "email");
   take(/\baddress\b/i, "address");
   take(/\b(?:location|located|whereabouts|wheres|where(?:'s)?)\b/i, "address");

@@ -717,7 +717,17 @@ async function storedRecordFallback(db, question, { today, customers = null } = 
     const what = clean([u.data?.manufacturer, u.data?.model, u.data?.tonnage].filter(Boolean).join(" ")) || "equipment";
     return docListDump({ docs, db, label: `unit ${u.data?.serial_number ?? ""}${c ? ` (${c.name})` : ""}`.trim(), intro: `Unit on file: ${what}${u.data?.serial_number ? `, serial ${u.data.serial_number}` : ""}.`, customer: c, unit: u, win });
   }
-  if (named) return docListDump({ docs: await store.docsForCustomer(db, named.c.id), db, label: named.c.name, customer: named.c, win });
+  // RECORDS-R4: a word of the question that matched no stored fact is said plainly, so a dump never reads as the answer to a question it did not answer
+  const nameWords = new Set(named ? nameTokens(named.c.name) : []);
+  const missed = [...new Set(unused)].filter((w) => !nameWords.has(w) && !/^(?:llc|inc|incorporated|corp|corporation|co|company|ltd|llp|lp|pc|plc|group|the)$/.test(w)).slice(0, 3);
+  if (named) {
+    const docsN = await store.docsForCustomer(db, named.c.id);
+    const first = await docListDump({ docs: docsN, db, label: named.c.name, customer: named.c, win });
+    // say only what is true: a question word that appears in the dump itself was found, so it is not listed as unmatched
+    const shown = String(first?.data?.text ?? "").toLowerCase();
+    const stillMissed = missed.filter((w) => !shown.includes(w.slice(0, Math.max(4, w.length - 3))));
+    return stillMissed.length ? docListDump({ docs: docsN, db, label: named.c.name, customer: named.c, win, intro: `None of the stored fields is about ${stillMissed.map((w) => `"${w}"`).join(", ")} (the page text was not searched for it); this is what is stored instead.` }) : first;
+  }
   if (several) {
     // two or three customers named: each one's stored record, separately and labelled (never merged, never one invoice line for each)
     const outs = [];

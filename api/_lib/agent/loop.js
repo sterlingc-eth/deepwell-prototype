@@ -25,6 +25,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getApiKey, MODEL_TIMEOUT_MS, withBackoff, classifyProviderError, recordProviderOutage } from "../claude.js";
 import { assertModelBudget } from "../rateLimit.js";
 import { planCacheBreakpoints } from "../promptCache.js";
+import { withGroundingV2, samplingFor } from "../grounding/promptV2.js";
 import { recordModelCall, totalInputTokens, estimateModelCostUsd } from "../usage.js";
 import { ANALYTICS_MODEL } from "../routes/analytics.js";
 import { ALL_TOOL_DEFS, ANSWER_TOOL_NAME, VIEW_DOCS, createToolbox } from "./tools.js";
@@ -220,7 +221,7 @@ async function runAgentOnce({ withTenant, ctxArg, question, today, overlay, hint
   // an hvac tenant (and every tenant before packs existed) always got.
   let pack = null;
   try { pack = await packForTenant({ withTenant, ctxArg }); } catch { pack = null; }
-  const systemBlocks = [{ block: { type: "text", text: buildAgentSystemPrompt(pack) }, breakpoint: true }];
+  const systemBlocks = [{ block: { type: "text", text: withGroundingV2(buildAgentSystemPrompt(pack), { path: "agent" }) }, breakpoint: true }];
   if (catalogue) systemBlocks.push({ block: { type: "text", text: `CATALOGUE of this shop's records (JSON, refreshed every few minutes):\n${catalogue}` }, breakpoint: true });
   const { tools, system } = planCacheBreakpoints(
     {
@@ -248,7 +249,7 @@ async function runAgentOnce({ withTenant, ctxArg, question, today, overlay, hint
         {
           model,
           max_tokens: MAX_OUTPUT_TOKENS,
-          temperature: 0,
+          ...samplingFor(model),
           system,
           tools,
           tool_choice: forceAnswer ? { type: "tool", name: ANSWER_TOOL_NAME } : { type: "auto" },

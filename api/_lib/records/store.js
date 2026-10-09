@@ -7,7 +7,7 @@ import { financeViewsSql, docCustomerCte } from "../agent/financeViews.js";
 import { financialsTableExists } from "../financials/store.js";
 
 const T = (a) => `${a}.tenant_id = (current_setting('app.tenant_id', true))::uuid`;
-const CUSTOMERS_CTE = `customers AS (SELECT e.id AS customer_id, e.customer_number, e.data->>'customer_name' AS name, e.data->>'service_address' AS address, e.data->>'phone' AS phone, e.data->>'email' AS email FROM entities e WHERE e.entity_type = 'customer' AND e.merged_into IS NULL AND ${T("e")})`;
+export const CUSTOMERS_CTE = `customers AS (SELECT e.id AS customer_id, e.customer_number, e.data->>'customer_name' AS name, e.data->>'service_address' AS address, e.data->>'phone' AS phone, e.data->>'email' AS email FROM entities e WHERE e.entity_type = 'customer' AND e.merged_into IS NULL AND ${T("e")})`;
 
 async function rows(db, sql, params = []) { return (await db.raw(sql, params)).rows; }
 

@@ -19,6 +19,7 @@ import {
   selectPassagesForContext,
 } from "./_lib/answer.js";
 import { planCacheBreakpoints, modelCallLogLine } from "./_lib/promptCache.js";
+import { withGroundingV2, samplingFor } from "./_lib/grounding/promptV2.js";
 import { recordModelCall, incrementAsksThisMonth as incrementAsksThisMonthRaw, isCountableAskSource, monthStartUtc, currentUsageMeter } from "./_lib/usage.js";
 import { documentTypeLabel } from "./_lib/documentTypes.js";
 import { gateAsk } from "./_lib/plan.js";
@@ -358,6 +359,7 @@ async function getAgentOn() {
 
 const MAX_QUESTION = 2000;
 const MAX_PASSAGES = 12;
+const retrievalV2On = () => /^(?:1|true|on|yes)$/i.test(String(process.env.DONOVAN_RETRIEVAL_V2 ?? "").trim());
 const MAX_EXCERPT = 1200;
 // Haiku by default (owner decision 2026-09-20: cost). Set ASK_MODEL in Vercel
 // env to switch without a deploy. Retrieval is what makes answers right;
@@ -725,10 +727,16 @@ function retrieveEvidence(ctxArg, question, customerNumber, timer, { today, ques
           }
         }
 
-        const [passages, extractions] = await Promise.all([
+        let [passages, extractions] = await Promise.all([
           db.searchPassages(question, MAX_PASSAGES, { documentIds: documentIdsFilter }),
           db.searchExtractions(question, 25, { documentIds: documentIdsFilter }),
         ]);
+        // DONOVAN-R4 retrieval v2 (DONOVAN_RETRIEVAL_V2, default OFF): document cards + a named customer / document number as a hard filter + one refined search.
+        // Never throws: any failure leaves the evidence exactly as the two searches above returned it.
+        if (retrievalV2On()) {
+          const v2 = await (await import("./_lib/retrieval/index.js")).augmentEvidence(db, question, { passages, extractions, documentIdsFilter }, { limit: MAX_PASSAGES });
+          passages = v2.passages; extractions = v2.extractions;
+        }
         return { passages, extractions, cacheHit: false, cachedAnswer: null, questionHash, corpusStamp };
       });
     } catch (err) {
@@ -2215,14 +2223,14 @@ export default async function handler(req, res) {
       filename: p.original_filename,
       documentType: p.document_type,
       page: p.page_no,
-      excerpt: String(p.excerpt ?? "").slice(0, MAX_EXCERPT),
+      excerpt: String(p.excerpt ?? "").slice(0, /^card/.test(String(p.matched_by ?? "")) ? MAX_EXCERPT + 840 : MAX_EXCERPT), // a merged document card (<= 760 chars + label) must not eat into the page text
       stage: p.stage,
     }));
     const mappedExtractions = extractions.map((x) => ({
       documentId: x.document_id,
       filename: x.original_filename,
       field: x.field_key,
-      value: x.value,
+      value: String(x.value ?? "").replace(/\s+/g, " ").trim(), // one line: a stored value can not forge a separate "field = value" line
       entityType: x.entity_type,
       stage: x.stage,
     }));
@@ -2288,7 +2296,7 @@ export default async function handler(req, res) {
     const { tools: cachedTools, system: cachedSystem, messageBlocks: cachedContent } = planCacheBreakpoints(
       {
         tools: [{ block: ANSWER_TOOL, breakpoint: true }],
-        system: [{ block: { type: "text", text: SYSTEM_PROMPT }, breakpoint: true }],
+        system: [{ block: { type: "text", text: withGroundingV2(SYSTEM_PROMPT, { path: "grounded" }) }, breakpoint: true }],
         messageBlocks: [
           { block: { type: "text", text: contextText }, breakpoint: true },
           { block: { type: "text", text: questionText }, breakpoint: false }, // never cached — always different
@@ -2319,7 +2327,7 @@ export default async function handler(req, res) {
       // evidence -> identical answer. The 2026-09-19 walkthrough saw the
       // SAME question return different dollar figures on two runs; that
       // can't happen at temperature 0.
-      temperature: 0,
+      ...samplingFor(ASK_MODEL), // temperature 0 (unchanged) unless DONOVAN_GROUNDING_V2 is on and the model is a 5.x model, which rejects it
       system: cachedSystem,
       tools: cachedTools,
       tool_choice: { type: "tool", name: "answer" },

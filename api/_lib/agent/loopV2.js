@@ -39,6 +39,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getApiKey, MODEL_TIMEOUT_MS, withBackoff, classifyProviderError, recordProviderOutage } from "../claude.js";
 import { assertModelBudget } from "../rateLimit.js";
 import { planCacheBreakpoints, withRollingBreakpoint, isRollingCacheEnabled, estimateTokens } from "../promptCache.js";
+import { withGroundingV2, samplingFor } from "../grounding/promptV2.js";
 import { recordModelCall, totalInputTokens, estimateModelCostUsd } from "../usage.js";
 import { ALL_TOOL_DEFS_V2, ANSWER_TOOL_NAME, VIEW_DOCS, createToolbox } from "./tools.js";
 import { shapeAgentAnswer } from "./shape.js";
@@ -311,7 +312,7 @@ async function runResearchAgentOnce({ withTenant, ctxArg, question, today, overl
   const { tools, system } = planCacheBreakpoints(
     {
       tools: ALL_TOOL_DEFS_V2.map((block, i) => ({ block, breakpoint: i === ALL_TOOL_DEFS_V2.length - 1 })),
-      system: [{ block: { type: "text", text: buildResearchSystemPrompt(pack) }, breakpoint: true }],
+      system: [{ block: { type: "text", text: withGroundingV2(buildResearchSystemPrompt(pack), { path: "agent" }) }, breakpoint: true }],
     },
     runModel
   );
@@ -378,7 +379,7 @@ async function runResearchAgentOnce({ withTenant, ctxArg, question, today, overl
         {
           model: runModel,
           max_tokens: forceAnswer ? forcedAnswerTokenBudget(steps, toolbox.ledger) : MAX_OUTPUT_TOKENS_V2,
-          temperature: 0, system, tools,
+          ...samplingFor(runModel), system, tools,
           tool_choice: forceAnswer ? { type: "tool", name: ANSWER_TOOL_NAME } : { type: "auto" },
           // R31: rolling breakpoint on the run's own history (see promptCache.js's withRollingBreakpoint) — later
           // turns read earlier tool results from the cache instead of re-paying full input price for them.

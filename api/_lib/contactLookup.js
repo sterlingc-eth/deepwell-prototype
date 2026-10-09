@@ -102,7 +102,7 @@ import { parseTechnician, runTechnician, loadTechnicianVocab } from "./lookups/t
 // signal next to EITHER trailing noun, this just never had a second caller to expose it).
 const FIELD_RE = {
   // Defect 7: "invoice number for Amy Isaacson" asked for the INVOICE's number, not her phone: a bare "number" after a document noun is never a phone request.
-  phone: /\bphone(?:\s*number)?\b|\bph\s?#|(?<!serial\s)(?<!model\s)(?<!(?:invoice|inv|permit|po|purchase\s+order|work\s+order|wo|ticket|order|quote|estimate|proposal|agreement|contract|customer|account|job|check|confirmation|reference|claim|policy)\s)\bnumber\b/i,
+  phone: /\bphone(?:\s*number)?\b|\bph\s?#|(?<!(?:receipt|statement|stmt|chart|matter|engagement|letter|po\s+box|box|suite|gate|code|lot|plate|vin|parcel|policy|house|street|apartment|apt|zip|confirmation|check|lock|fax|facsimile|pager|extension|ext|tax|ein|license|licence|employee|badge|member|routing|id|tracking|case|account|acct|invoice|inv|permit|po|purchase\s+order|work\s+order|wo|ticket|order|quote|estimate|proposal|agreement|contract|job|reference|ref|claim|serial|model|part|sku|social|security|medical|record|file|mrn|patient|student|folio|room|unit|bill|payment|transaction|batch|route|stop|phase|revision|version|page|line|item|document|doc|customer\s+id|vendor|supplier|loan|lease|tenant|parking|bay|slip|space|pin|passport|visa|ssn|dl|card|credit|debit|bank|wire|check|cheque|deposit|plan|tag|asset|equipment|meter|circuit|zone|section|building|floor|rack|bin|shelf|aisle|dock|container|trailer|truck|vehicle|fleet|license plate|registration|docket|cause|file)\s)\bnumber\b/i,
   email: /\be-?mail\b/i,
   address: /\b(?:service\s+)?address\b/i,
   serial: /\bserial(?:\s*number)?\b/i,
@@ -152,7 +152,7 @@ const NAME_ACCOUNT_JOB_LEAD_RE =
 // purpose — a name-first "bracken serial number" must still resolve to the
 // serial field, never phone, the same collision FIELD_RE's own phone pattern
 // guards against with its negative lookbehind.
-const FIELD_WORDS_ALT = "phone(?:\\s*number)?|ph\\s?#|e-?mail|(?:service\\s+)?address|serial(?:\\s*number)?|last\\s+(?:visit|service)|(?<!(?:invoice|inv|permit|po|purchase\\s+order|work\\s+order|wo|ticket|order|quote|estimate|proposal|agreement|contract|customer|account|job|check|confirmation|reference|claim|policy)\\s)number";
+const FIELD_WORDS_ALT = "phone(?:\\s*number)?|ph\\s?#|e-?mail|(?:service\\s+)?address|serial(?:\\s*number)?|last\\s+(?:visit|service)|(?<!(?:receipt|statement|stmt|chart|matter|engagement|letter|po\\s+box|box|suite|gate|code|lot|plate|vin|parcel|policy|house|street|apartment|apt|zip|confirmation|check|lock|fax|facsimile|pager|extension|ext|tax|ein|license|licence|employee|badge|member|routing|id|tracking|case|account|acct|invoice|inv|permit|po|purchase\\s+order|work\\s+order|wo|ticket|order|quote|estimate|proposal|agreement|contract|job|reference|ref|claim|serial|model|part|sku|social|security|medical|record|file|mrn|patient|student|folio|room|unit|bill|payment|transaction|batch|route|stop|phase|revision|version|page|line|item|document|doc|customer\\s+id|vendor|supplier|loan|lease|tenant|parking|bay|slip|space|pin|passport|visa|ssn|dl|card|credit|debit|bank|wire|check|cheque|deposit|plan|tag|asset|equipment|meter|circuit|zone|section|building|floor|rack|bin|shelf|aisle|dock|container|trailer|truck|vehicle|fleet|license plate|registration|docket|cause|file)\\s)number";
 
 // Reviewer NO-GO (2026-09-21): "whats thomas mercer's phone number" / "donna
 // thornton's email" / "brian chavez address?" put the NAME before the field
@@ -1343,7 +1343,40 @@ function restoreTypedNameTokens(parsed, rawQuestion) {
 }
 
 /** R31: the classic regex shapes first (unchanged), then entity-first slot filling as the last resort. */
+const PHONE_WORD = /\b(?:phone|telephone|cell|cellphone|mobile|fone|phne|ph|tel|call|calls|calling|callback|ring|dial|text|digits|cel|mobil|cellular|landline|reach|line)\b|\bph\s?#/i;
+const NUMBER_OK_BEFORE = new Set("the a an his her their my our your its best good direct main new current other another alternate alternative alt primary secondary work home office business contact whats what's what which is get give me need have got do can for of and or toll-free to".split(" "));
+/**
+ * RECORDS-R4: a bare "number" asks for the PHONE only when it is not the number OF something else. After the name is taken out, the word before "number" must be missing, a
+ * function word or phone modifier, or part of the customer's own name ("Donna Thornton number"); any other noun ("receipt number", "rx #", "bed number") is an identifier of some
+ * other kind, which this lookup does not hold, so it steps aside instead of answering with the phone. An explicit phone word anywhere keeps the reading.
+ */
+export function bareNumberIsPhone(question, nameWords = []) {
+  const q = String(question ?? "");
+  if (PHONE_WORD.test(q)) return true;
+  const names = new Set(nameWords.map((w) => String(w).toLowerCase().replace(/['’]s$/, "")));
+  const re = /(\S+)\s+(?:numbers?|numbr|nbr|num|no\.?|#)(?=\s|$|[?.!,])/gi;
+  let m, any = false;
+  while ((m = re.exec(q))) {
+    any = true;
+    const w = m[1].toLowerCase().replace(/[^a-z0-9'’-]/g, "").replace(/['’]s$/, "");
+    if (!w || NUMBER_OK_BEFORE.has(w)) continue;
+    // the last word of the customer's own name ("Donna Thornton number"): a person's name is two words; a longer lower-case run may have swallowed a noun ("donna thornton bed number"), so then the word must be capitalised as typed
+    if (names.has(w) && (names.size <= 2 || /^[A-Z]/.test(m[1].replace(/^[^A-Za-z]+/, "")))) continue;
+    return false;
+  }
+  return true || any;
+}
+function guardPhone(question, parsed) {
+  if (!parsed) return parsed;
+  const isPhone = parsed.field === "phone" || (parsed.field === "slotFill" && /phone/.test(String(parsed.concept ?? "")));
+  if (!isPhone) return parsed;
+  const nameWords = String(parsed.namePhrase ?? "").split(/\s+/).concat(parsed.block ?? []);
+  return bareNumberIsPhone(question, nameWords) ? parsed : null;
+}
 export function parseContactLookupQuestion(question, opts = {}) {
+  return guardPhone(question, parseContactLookupQuestionInner(question, opts));
+}
+function parseContactLookupQuestionInner(question, opts = {}) {
   // internal-memo questions ("any internal memos on file?") are not a contact-field lookup ("X on file") — docLookup owns them
   if (process.env.DONOVAN_MEMO_AUDIENCE !== "0" && /\b(?:internal\s+memos?|memos?\s+on\s+file)\b/i.test(String(question ?? ""))) return null;
   // Defect 19/21: one printed field of one kind of document is docLookup's (lookups/docFieldAsk.js).
