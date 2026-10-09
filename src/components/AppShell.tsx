@@ -12,6 +12,7 @@ import { needsPersonCount } from '../screens/ReviewScreen';
 import { CommandPalette } from './command/CommandPalette';
 import { SupportWidget } from './support/SupportWidget';
 import { NAV } from './nav';
+import { APP_VERSION } from '../core/version';
 
 // Lazy — same reasoning as App.tsx's WarrantyExportScreen/OutreachScreen:
 // this is an admin-only destination most sessions never open, and it pulls
@@ -310,6 +311,17 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
             <a href="/" className="inline-flex items-center gap-1 hover:text-ink-2 transition-colors duration-quick">
               <Globe className="w-3.5 h-3.5" aria-hidden="true" /> Website
             </a>
+            {APP_VERSION && (
+              <a
+                href="/patch-notes.html"
+                target="_blank"
+                rel="noopener"
+                aria-label={`DeepWell version ${APP_VERSION}. See patch notes`}
+                className="tabular-nums hover:text-ink-2 transition-colors duration-quick"
+              >
+                v{APP_VERSION}
+              </a>
+            )}
           </span>
         </div>
       </footer>

@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="See the current version of the DeepWell app and of Donovan, with every update, patch and hotfix, newest first.">
+<meta property="og:title" content="Patch notes — DeepWell Technology">
+<meta property="og:description" content="See the current version of the DeepWell app and of Donovan, with every update, patch and hotfix, newest first.">
+<meta property="og:image" content="https://deepwelltechnology.com/og-image.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:site_name" content="DeepWell Technology">
+<meta property="og:url" content="https://deepwelltechnology.com/patch-notes.html">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Patch notes — DeepWell Technology">
+<meta name="twitter:description" content="See the current version of the DeepWell app and of Donovan, with every update, patch and hotfix, newest first.">
+<meta name="twitter:image" content="https://deepwelltechnology.com/og-image.jpg">
+<link rel="canonical" href="https://deepwelltechnology.com/patch-notes.html">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#0B1613">
+<title>Patch notes — DeepWell Technology</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script>if(window.matchMedia&&!matchMedia('(prefers-reduced-motion: reduce)').matches&&'IntersectionObserver' in window)document.documentElement.classList.add('pn-js')</script>
+<style>
+:root{
+  --well:#163C2C; --navy:#123D6B; --brass:#B98A4E; --ink:#0B1613;
+  --ground:#EEF2EE; --surface:#FFFFFF; --surface-2:#E2E9E4; --text:#0F1F19;
+  --muted:#4F6259; --faint:#576A62; --line:rgba(22,60,44,.18);
+  --line-strong:rgba(22,60,44,.38); --brass-text:#8E6530;
+  --shadow:0 20px 50px -30px rgba(11,22,19,.45);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#0B1613; --surface:#10201A; --surface-2:#152A22; --text:#E6EEE9;
+    --muted:#A9BBB2; --faint:#7B9286; --line:rgba(230,238,233,.14);
+    --line-strong:rgba(230,238,233,.32); --brass-text:#D8AE6E;
+    --shadow:0 20px 50px -30px rgba(0,0,0,.8);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark; --ground:#0B1613; --surface:#10201A; --surface-2:#152A22;
+  --text:#E6EEE9; --muted:#A9BBB2; --faint:#7B9286; --line:rgba(230,238,233,.14);
+  --line-strong:rgba(230,238,233,.32); --brass-text:#D8AE6E;
+  --shadow:0 20px 50px -30px rgba(0,0,0,.8);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--text);font-family:"IBM Plex Sans",-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+h1,h2{font-family:"Newsreader",Georgia,serif;font-weight:500;line-height:1.12;letter-spacing:-.01em;margin:0}
+h1{font-size:clamp(2rem,4.4vw,2.9rem)}
+h2{font-size:1.3rem;margin-bottom:6px}
+p{margin:0}
+a{color:inherit}
+.wrap{max-width:820px;margin:0 auto;padding-inline:clamp(16px,4vw,40px)}
+.eyebrow{font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);display:flex;align-items:center;gap:12px}
+.eyebrow::before{content:"";width:22px;height:1px;background:var(--brass)}
+.lede{font-size:1.1rem;color:var(--muted);max-width:62ch}
+:focus-visible{outline:2px solid var(--brass);outline-offset:3px}
+
+/* nav — same markup/classes as index.html so this is one design system,
+   not a lookalike. Links point back to sections on the main site since
+   this page has none of its own. */
+.nav{position:sticky;top:0;z-index:20;backdrop-filter:blur(12px);
+  background:color-mix(in srgb,var(--ground) 82%,transparent);border-bottom:1px solid var(--line);
+  --ground:#F4F7F4;--surface:#FFFFFF;--surface-2:#E2E9E4;--text:#0F1F19;--muted:#4F6259;--faint:#576A62;
+  --line:rgba(22,60,44,.18);--line-strong:rgba(22,60,44,.38);--well:#0D3827;
+  color:var(--text);background:#F4F7F4}
+.nav .wrap{display:flex;align-items:center;justify-content:space-between;height:68px;gap:24px}
+.brand{display:flex;align-items:center;gap:12px;text-decoration:none}
+.brand .mark{width:34px;height:34px}
+.brand .word{display:flex;flex-direction:column;gap:4px;font-family:"Newsreader",serif;font-weight:600;font-size:1.45rem;letter-spacing:-.01em;line-height:1}
+.brand .word small{font-family:"IBM Plex Mono",monospace;font-weight:500;font-size:.56rem;letter-spacing:.3em;text-transform:uppercase;color:var(--faint);padding-left:.1em}
+.brand .word b{color:#04315A;font-weight:600}
+.brand .word i{font-style:normal;color:var(--well)}
+.navlinks{display:flex;align-items:center;gap:28px;font-size:.92rem;font-weight:500;position:relative}
+.navlinks a{text-decoration:none;color:var(--muted)}
+.navlinks a:hover{color:var(--text)}
+.navlinks a[aria-current="page"]{color:var(--text)}
+.navcta{display:flex;align-items:center;gap:12px}
+@media (max-width:760px){.navlinks{display:none}}
+@media (max-width:520px){.navcta .btn-primary{display:none}}
+.btn{display:inline-flex;align-items:center;gap:10px;padding:12px 20px;border-radius:4px;font-weight:600;font-size:.95rem;text-decoration:none;border:1px solid transparent;transition:transform .2s ease,background .2s ease;min-height:44px}
+.btn-primary{background:var(--well);color:#fff}
+.btn-primary:hover{background:var(--navy);transform:translateY(-1px)}
+.btn-ghost{border-color:var(--line-strong);color:var(--text);background:transparent}
+.btn-ghost:hover{background:var(--surface)}
+
+/* Industries nav dropdown — copied from index.html verbatim (see that
+   file's labeled CSS block); kept in sync by hand until there's a shared
+   stylesheet. */
+.nav-dropdown{position:relative}
+.nav-dropdown-toggle{display:inline-flex;align-items:center;gap:5px;font:inherit;font-size:.92rem;
+  font-weight:500;color:var(--muted);background:none;border:0;padding:0;cursor:pointer}
+.nav-dropdown-toggle:hover,.nav-dropdown.open .nav-dropdown-toggle{color:var(--text)}
+.nav-dropdown-caret{flex:none;transition:transform .2s ease}
+.nav-dropdown.open .nav-dropdown-caret{transform:rotate(180deg)}
+.nav-dropdown-menu{position:absolute;top:calc(100% + 18px);left:50%;min-width:250px;
+  transform:translateX(-50%) translateY(-6px);background:var(--surface);border:1px solid var(--line);
+  border-radius:10px;box-shadow:var(--shadow);padding:8px;opacity:0;visibility:hidden;pointer-events:none;
+  transition:opacity .18s ease,transform .18s ease;z-index:30}
+.nav-dropdown.open .nav-dropdown-menu{opacity:1;visibility:visible;pointer-events:auto;
+  transform:translateX(-50%) translateY(0)}
+.nav-dropdown-menu a{display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:9px 12px;border-radius:6px;font-size:.88rem;font-weight:500;color:var(--text);text-decoration:none}
+.nav-dropdown-menu a:hover,.nav-dropdown-menu a:focus-visible{background:var(--surface-2)}
+.nav-dropdown-menu .tag{flex:none;font-family:"IBM Plex Mono",monospace;font-size:.64rem;
+  letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:20px}
+.nav-dropdown-menu .tag.live{color:#0D3827;background:color-mix(in srgb,#0D3827 16%,transparent)}
+.nav-dropdown-menu .tag.soon{color:#7A5326;background:color-mix(in srgb,var(--brass) 18%,transparent)}
+.nav-dropdown-menu{width:max-content;max-width:min(340px,calc(100vw - 32px))}
+.navlinks .nav-dropdown-menu a,.nav.menu-open .navlinks .nav-dropdown-menu a{flex-direction:column;align-items:flex-start;justify-content:center;gap:1px;white-space:normal;text-align:left}
+.nav.menu-open .nav-dropdown-menu{max-width:none}
+.nav-dropdown-menu .dd-t{font-size:.9rem;font-weight:600;line-height:1.3;color:var(--text)}
+.nav-dropdown-menu .dd-d{font-size:.8rem;font-weight:400;line-height:1.35;color:var(--muted)}
+.nav-dropdown-menu .dd-group{font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:8px 12px 4px}
+.nav-dropdown-menu .dd-group:not(:first-child){margin-top:6px;padding-top:12px;border-top:1px solid var(--line)}
+footer{border-top:1px solid var(--line);padding-block:28px;font-size:.84rem;color:var(--faint)}
+footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+footer .wrap>div:last-child{display:flex;flex-wrap:wrap;gap:8px 18px;min-width:0}
+footer a{color:var(--muted);text-decoration:none}
+footer a:hover{color:var(--text)}
+.navlinks a,.nav-dropdown-toggle,.navcta .btn{white-space:nowrap}
+@media (max-width:760px){.navlinks{display:flex;gap:0}.navlinks>a{display:none}.navlinks .nav-dropdown-menu{position:fixed;left:16px;right:16px;top:76px;width:auto;max-width:none;min-width:0;transform:none!important}.nav-dropdown-toggle,.navcta .btn{min-height:44px}}
+/* ===== Patch notes page ===== */
+:root{
+  --sm-fast:150ms;--sm-med:250ms;--sm-scene:600ms;--sm-settle:cubic-bezier(.2,.8,.2,1);--sm-travel:cubic-bezier(.65,0,.35,1);--sm-d1:6px;--sm-d2:14px;--sm-d3:28px;
+  --app-acc:#2F7A5B;--app-text:#1F5C44;--app-ink:#fff;--dv-acc:#B98A4E;--dv-text:#8E6530;--dv-ink:#1B1408;
+  --sc-top:#F4F7F4;--sc-bot:#CFDCD3;--sc-s1:rgba(22,60,44,.05);--sc-s2:rgba(22,60,44,.08);--sc-s3:rgba(22,60,44,.11);--sc-s4:rgba(22,60,44,.15);--sc-s5:rgba(22,60,44,.2);
+  --sc-edge:rgba(22,60,44,.22);--sc-ring:rgba(142,101,48,.38);--sc-glow:rgba(185,138,78,.26);--sc-orb-hi:#E8D1A8;--sc-orb-lo:#B98A4E;
+  --sc-warm:rgba(185,138,78,.24);--card-a:86%;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --app-acc:#9DC4B2;--app-text:#9DC4B2;--app-ink:#0B1613;--dv-acc:#D8AE6E;--dv-text:#D8AE6E;--dv-ink:#1B1408;
+    --sc-top:#12271F;--sc-bot:#050C09;--sc-s1:rgba(58,107,77,.10);--sc-s2:rgba(58,107,77,.15);--sc-s3:rgba(58,107,77,.20);--sc-s4:rgba(58,107,77,.27);--sc-s5:rgba(58,107,77,.34);
+    --sc-edge:rgba(157,196,178,.20);--sc-ring:rgba(216,174,110,.34);--sc-glow:rgba(216,174,110,.22);--sc-orb-hi:#E8D1A8;--sc-orb-lo:#7A5B2E;
+    --sc-warm:rgba(216,174,110,.16);--card-a:80%;
+  }
+}
+:root[data-theme="dark"]{
+  --app-acc:#9DC4B2;--app-text:#9DC4B2;--app-ink:#0B1613;--dv-acc:#D8AE6E;--dv-text:#D8AE6E;--dv-ink:#1B1408;
+  --sc-top:#12271F;--sc-bot:#050C09;--sc-s1:rgba(58,107,77,.10);--sc-s2:rgba(58,107,77,.15);--sc-s3:rgba(58,107,77,.20);--sc-s4:rgba(58,107,77,.27);--sc-s5:rgba(58,107,77,.34);
+  --sc-edge:rgba(157,196,178,.20);--sc-ring:rgba(216,174,110,.34);--sc-glow:rgba(216,174,110,.22);--sc-orb-hi:#E8D1A8;--sc-orb-lo:#7A5B2E;
+  --sc-warm:rgba(216,174,110,.16);--card-a:80%;
+}
+.wrap{max-width:1080px}
+.navlinks a,.nav-dropdown-toggle,.navcta .btn{white-space:nowrap}
+.pn{position:relative;isolation:isolate;overflow:clip}
+.pn-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* scenery: layered DOM, only transform/opacity ever animate (no repaint) */
+.pn-scene{position:absolute;inset:0;z-index:-1;pointer-events:none}
+.pn-scene-in{position:sticky;top:0;height:100vh;height:100svh;overflow:hidden;background:linear-gradient(to bottom,var(--sc-top),var(--sc-bot))}
+.sc{position:absolute;inset:0}
+.sc-left,.sc-right{position:absolute;inset:0;--cx:84%;--cy:24%;transition:opacity 700ms ease}
+.sc-left{-webkit-mask-image:linear-gradient(90deg,#000 42%,transparent 86%);mask-image:linear-gradient(90deg,#000 42%,transparent 86%)}
+.sc-right{-webkit-mask-image:linear-gradient(90deg,transparent 14%,#000 56%);mask-image:linear-gradient(90deg,transparent 14%,#000 56%)}
+/* A: strata on the left, ripples around a lit orb on the right */
+.band{position:absolute;left:-12%;width:136%;height:100vh;fill:var(--f)}
+.band path.edge{fill:none;stroke:var(--sc-edge);stroke-width:1.2;vector-effect:non-scaling-stroke}
+.band.b1{top:18%;--f:var(--sc-s1)}.band.b2{top:34%;--f:var(--sc-s2)}.band.b3{top:50%;--f:var(--sc-s3)}.band.b4{top:66%;--f:var(--sc-s4)}.band.b5{top:80%;--f:var(--sc-s5)}
+.rings{position:absolute;left:var(--cx);top:var(--cy);width:0;height:0}
+.rings i{position:absolute;left:0;top:0;width:var(--d);height:var(--d);margin:calc(var(--d)/-2);border-radius:50%;border:1px solid var(--sc-ring);opacity:var(--o,.5)}
+.glow{position:absolute;left:var(--cx);top:var(--cy);width:min(120vh,80vw);aspect-ratio:1;margin:calc(min(120vh,80vw)/-2) 0 0 calc(min(120vh,80vw)/-2);border-radius:50%;background:radial-gradient(closest-side,var(--sc-glow),transparent)}
+.orb{position:absolute;left:var(--cx);top:var(--cy);width:clamp(44px,7vh,76px);aspect-ratio:1;margin:calc(clamp(44px,7vh,76px)/-2) 0 0 calc(clamp(44px,7vh,76px)/-2);border-radius:50%;background:radial-gradient(circle at 38% 32%,var(--sc-orb-hi),var(--sc-orb-lo) 70%);opacity:.6;box-shadow:0 0 60px 8px var(--sc-glow)}
+.beam{position:absolute;top:-20%;left:36%;width:34%;height:150%;transform:skewX(-14deg);background:linear-gradient(to bottom,var(--sc-warm),transparent 75%);-webkit-mask-image:linear-gradient(90deg,transparent,#000 50%,transparent);mask-image:linear-gradient(90deg,transparent,#000 50%,transparent);opacity:.7}
+
+/* header */
+.pn-head{padding-block:clamp(34px,6vw,64px) clamp(18px,3vw,30px);text-align:center;display:flex;flex-direction:column;align-items:center;gap:14px}
+.pn-head .eyebrow{justify-content:center}
+.pn-head h1{max-width:22ch}
+.pn-head .lede{max-width:54ch}
+
+/* phone toggle */
+.pn-switch{display:none}
+.pn.pn-tabs .pn-switch{display:flex;position:sticky;top:68px;z-index:10;justify-content:center;padding:10px 16px;background:color-mix(in srgb,var(--ground) 86%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.pn-switch-in{display:inline-flex;gap:4px;padding:4px;border:1px solid var(--line-strong);border-radius:999px;background:var(--surface)}
+.pn-switch button{min-height:44px;padding:0 20px;border-radius:999px;border:0;background:transparent;color:var(--muted);font:600 .9rem "IBM Plex Sans",sans-serif;cursor:pointer;transition:background var(--sm-med) ease,color var(--sm-med) ease}
+.pn-switch button[data-for="app"][aria-pressed="true"]{background:var(--app-acc);color:var(--app-ink)}
+.pn-switch button[data-for="donovan"][aria-pressed="true"]{background:var(--dv-acc);color:var(--dv-ink)}
+
+/* the two halves */
+.pn-stage{position:relative;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);min-height:calc(100svh - 68px)}
+.pn-side{display:flex;flex-direction:column;gap:clamp(22px,3.4vw,40px);min-width:0;padding:clamp(18px,3vw,34px) clamp(18px,4.4vw,72px) 96px;scroll-margin-top:84px}
+.pn-app{--acc:var(--app-acc);--acc-text:var(--app-text);--acc-ink:var(--app-ink);padding-right:clamp(22px,4vw,64px)}
+.pn-donovan{--acc:var(--dv-acc);--acc-text:var(--dv-text);--acc-ink:var(--dv-ink);padding-left:clamp(22px,4vw,64px)}
+.pn-top{display:flex;flex-direction:column;align-items:flex-start;gap:8px}
+.pn-kicker{display:flex;align-items:center;gap:12px;font-family:"IBM Plex Mono",monospace;font-size:.74rem;letter-spacing:.16em;text-transform:uppercase;color:var(--acc-text)}
+.pn-kicker svg{width:38px;height:38px;flex:none}
+.pn-kicker h2{font:inherit;letter-spacing:inherit;margin:0}
+.pn-vline{margin:0;line-height:.9}
+.pn-num{display:inline-block;font-family:"Newsreader",Georgia,serif;font-weight:500;font-size:clamp(4.4rem,10.5vw,8.6rem);line-height:.95;letter-spacing:-.03em;font-variant-numeric:tabular-nums lining-nums;color:var(--text)}
+.pn-sub{color:var(--muted);max-width:44ch;margin:2px 0 0}
+.pn-since{display:flex;align-items:center;gap:10px;margin-top:6px;font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+.pn-since::before{content:"";width:22px;height:1px;background:var(--acc)}
+.pn-empty{color:var(--muted)}
+
+/* timeline */
+.pn-tl{list-style:none;margin:0;padding:0 0 0 28px;display:grid;gap:18px}
+.pn-rel{position:relative}
+.pn-rel::before{content:"";position:absolute;left:-24px;top:17px;bottom:-18px;width:1px;background:linear-gradient(to bottom,var(--acc),color-mix(in srgb,var(--acc) 22%,transparent));transform-origin:top}
+.pn-rel:last-child::before{bottom:auto;height:54px;background:linear-gradient(to bottom,color-mix(in srgb,var(--acc) 50%,transparent),transparent)}
+.pn-node{position:absolute;left:-28.5px;top:11px;width:10px;height:10px;border-radius:50%;background:var(--ground);border:2px solid var(--acc)}
+.pn-rel:first-child .pn-node{background:var(--acc);box-shadow:0 0 0 5px color-mix(in srgb,var(--acc) 22%,transparent)}
+.pn-card{border:1px solid var(--line);border-radius:12px;padding:18px 20px;background:color-mix(in srgb,var(--surface) var(--card-a),transparent);box-shadow:var(--shadow);transition:transform var(--sm-med) var(--sm-settle),border-color var(--sm-med) ease}
+.pn-card:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--acc) 62%,var(--line))}
+.pn-rel:hover .pn-node{box-shadow:0 0 0 5px color-mix(in srgb,var(--acc) 26%,transparent)}
+.pn-meta{display:flex;align-items:center;flex-wrap:wrap;gap:8px 14px;margin-bottom:10px}
+.pn-v{font-family:"Newsreader",Georgia,serif;font-weight:500;font-size:1.55rem;line-height:1;margin:0;letter-spacing:-.01em}
+.pn-meta time{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.05em;color:var(--faint)}
+.pn-card p{margin:0;color:var(--muted);font-size:.96rem;line-height:1.62}
+.pn-tag{display:inline-flex;align-items:center;gap:6px;font-family:"IBM Plex Mono",monospace;font-size:.66rem;font-weight:500;letter-spacing:.09em;text-transform:uppercase;padding:3px 10px 3px 8px;border-radius:20px;border:1px solid transparent}
+.pn-tag::before{content:"";width:7px;height:7px;background:currentColor;flex:none}
+.pn-tag--update{background:var(--acc);color:var(--acc-ink)}
+.pn-tag--update::before{transform:rotate(45deg)}
+.pn-tag--patch{color:var(--acc-text);border-color:color-mix(in srgb,var(--acc) 70%,transparent)}
+.pn-tag--patch::before{border-radius:50%}
+.pn-tag--hotfix{color:var(--acc-text);background:color-mix(in srgb,var(--acc) 20%,transparent);border-color:color-mix(in srgb,var(--acc) 40%,transparent)}
+.pn-tag--hotfix::before{clip-path:polygon(50% 0,100% 100%,0 100%)}
+
+/* divider */
+.pn-divider{position:absolute;top:0;bottom:0;left:50%;width:0;pointer-events:none}
+.pn-divider i{position:absolute;top:0;bottom:0;left:-.5px;width:1px;transform-origin:top;background:linear-gradient(to bottom,var(--brass) 0,var(--line-strong) 22%,var(--line-strong) 80%,transparent)}
+.pn-divider::before{content:"";position:absolute;top:26px;left:-4px;width:8px;height:8px;border-radius:50%;background:var(--ground);border:2px solid var(--brass)}
+
+@media (max-width:860px){
+  .pn-stage{grid-template-columns:minmax(0,1fr)}
+  .pn-divider{display:none}
+  .pn-side,.pn-app,.pn-donovan{padding:18px clamp(16px,5vw,32px) 80px}
+  .pn.pn-tabs[data-active="app"] .pn-donovan,.pn.pn-tabs[data-active="donovan"] .pn-app{display:none}
+  .pn-tabs .sc-left,.pn-tabs .sc-right{-webkit-mask-image:none;mask-image:none}
+  .sc-left,.sc-right{--cx:100%;--cy:4%}
+  .orb{display:none}.rings,.glow{opacity:.55}
+  .pn-tabs[data-active="app"] .sc-right,.pn-tabs[data-active="donovan"] .sc-left{opacity:0}
+  .pn-num{font-size:clamp(4.6rem,24vw,7rem)}
+}
+@media (max-width:480px){.pn-card{padding:16px}.pn-meta time{margin-left:0;flex-basis:100%}}
+
+/* motion: only when the visitor has not asked for less */
+@media (prefers-reduced-motion:no-preference){
+  html.pn-js .pn-rel{opacity:0;transform:translateY(var(--sm-d3))}
+  html.pn-js .pn-rel::before{transform:scaleY(0)}
+  html.pn-js .pn-rel.in{opacity:1;transform:none;transition:opacity var(--sm-scene) var(--sm-settle) calc(var(--d,0)*90ms),transform var(--sm-scene) var(--sm-settle) calc(var(--d,0)*90ms)}
+  html.pn-js .pn-rel.in::before{transform:scaleY(1);transition:transform 900ms var(--sm-travel) calc(var(--d,0)*90ms + 250ms)}
+  html.pn-js .pn-num{opacity:0;transform:translateY(.16em);letter-spacing:.02em}
+  html.pn-js .pn-num.in{opacity:1;transform:none;letter-spacing:-.03em;transition:opacity 700ms var(--sm-settle),transform 900ms var(--sm-settle),letter-spacing 1100ms var(--sm-settle)}
+  html.pn-js .pn-top>*:not(.pn-vline){opacity:0;transform:translateY(var(--sm-d2))}
+  html.pn-js .pn-side.in .pn-top>*:not(.pn-vline){opacity:1;transform:none;transition:opacity var(--sm-scene) var(--sm-settle),transform var(--sm-scene) var(--sm-settle)}
+  html.pn-js .pn-side.in .pn-top>.pn-sub{transition-delay:.35s}
+  html.pn-js .pn-side.in .pn-top>.pn-since{transition-delay:.5s}
+  html.pn-js .pn-divider i{transform:scaleY(0)}
+  html.pn-js .pn-divider::before{opacity:0;transform:scale(.4)}
+  html.pn-js .pn-stage.pn-in .pn-divider i{transform:scaleY(1);transition:transform 1800ms var(--sm-travel)}
+  html.pn-js .pn-stage.pn-in .pn-divider::before{opacity:1;transform:none;transition:opacity 500ms ease,transform 500ms var(--sm-settle)}
+  .pn-rel:hover .pn-node{transition:box-shadow var(--sm-med) ease}
+  /* scenery drift: slow, transform and opacity only */
+  @keyframes pn-drift{from{transform:translateX(0)}to{transform:translateX(-7%)}}
+  @keyframes pn-drift-r{from{transform:translateX(-7%)}to{transform:translateX(0)}}
+  .band.b1{animation:pn-drift 110s ease-in-out infinite alternate}.band.b2{animation:pn-drift-r 90s ease-in-out infinite alternate}
+  .band.b3{animation:pn-drift 75s ease-in-out infinite alternate}.band.b4{animation:pn-drift-r 100s ease-in-out infinite alternate}.band.b5{animation:pn-drift 85s ease-in-out infinite alternate}
+  @keyframes pn-rip{0%{transform:scale(.3);opacity:0}15%{opacity:.5}100%{transform:scale(1.5);opacity:0}}
+  .rings i.rip{--d:min(70vh,46vw);animation:pn-rip 14s cubic-bezier(.2,.6,.3,1) infinite}
+  .rings i.rip:nth-child(2){animation-delay:-4.7s}.rings i.rip:nth-child(3){animation-delay:-9.4s}
+  @keyframes pn-breathe{0%,100%{opacity:.78;transform:scale(1)}50%{opacity:1;transform:scale(1.05)}}
+  .orb{animation:pn-breathe 9s ease-in-out infinite}
+  @keyframes pn-beam{0%,100%{opacity:.35}50%{opacity:.85}}
+  .beam{animation:pn-beam 16s ease-in-out infinite}
+  .pn-idle .sc *{animation-play-state:paused}
+}
+@media (prefers-reduced-motion:reduce){.pn-card,.pn-switch button{transition:none}}
+
+@media (prefers-reduced-motion:no-preference){@keyframes pn-ring{0%,100%{opacity:.35}50%{opacity:1}}.dvmark .r{animation:pn-ring 6s ease-in-out infinite}.dvmark .r:nth-of-type(2){animation-delay:.45s}.dvmark .r:nth-of-type(3){animation-delay:.9s}.dvmark .r:nth-of-type(4){animation-delay:1.35s}}
+
+</style>
+</head>
+<body>
+<nav class="nav" aria-label="Primary">
+  <div class="wrap">
+    <a class="brand" href="/" aria-label="DeepWell Technology home">
+      <svg class="mark" viewBox="0 0 100 100" aria-hidden="true"><g fill="none" stroke="var(--well)" stroke-width="4"><circle cx="50" cy="50" r="10"/><circle cx="50" cy="50" r="19"/><circle cx="50" cy="50" r="28"/><circle cx="50" cy="50" r="37"/><circle cx="50" cy="50" r="46"/></g></svg>
+      <span class="word"><span class="name"><b>Deep</b><i>Well</i></span><small>Technology</small></span>
+    </a>
+    <div class="navlinks">
+      <a href="/#how-it-works">How it works</a>
+      <a href="/#demo">Try it</a>
+      <div class="nav-dropdown">
+        <button type="button" class="nav-dropdown-toggle" aria-haspopup="true" aria-expanded="false" aria-controls="industriesMenu">
+          Who it&rsquo;s for
+          <svg class="nav-dropdown-caret" width="10" height="6" viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="nav-dropdown-menu" id="industriesMenu" role="menu" aria-label="Who it's for">
+          <div class="dd-group" role="presentation">By role</div>
+          <a role="menuitem" href="/who.html#office"><span class="dd-t">Office staff</span><span class="dd-d">Answer a caller with the original page in hand.</span></a>
+          <a role="menuitem" href="/who.html#field"><span class="dd-t">People in the field</span><span class="dd-d">Look things up and scan paperwork from a phone.</span></a>
+          <a role="menuitem" href="/who.html#owners"><span class="dd-t">Owners</span><span class="dd-d">See which warranties and agreements are expiring.</span></a>
+          <div class="dd-group" role="presentation">By industry</div>
+          <a role="menuitem" href="/who.html#industries"><span class="dd-t">Every industry, one app</span><span class="dd-d">See how Donovan fits your kind of business.</span></a>
+          <a role="menuitem" href="/who.html#hvac"><span class="dd-t">HVAC</span><span class="dd-d">Warranties, serial numbers and service tickets.</span></a>
+          <a role="menuitem" href="/who.html#electrical"><span class="dd-t">Electrical and plumbing</span><span class="dd-d">Permits, inspections and work orders.</span></a>
+          <a role="menuitem" href="/who.html#property"><span class="dd-t">Property management</span><span class="dd-d">Work orders, vendor contracts and invoices.</span></a>
+        </div>
+      </div>
+      <a href="/#plans">Pricing</a>
+      <a href="/#team">Founders</a>
+    </div>
+    <div class="navcta">
+      <a class="btn btn-ghost" href="/app/">Log in</a>
+      <a class="btn btn-primary" href="/app/?plan=solo&interval=month">Start free trial</a>
+    </div>
+  </div>
+</nav>
+<main class="pn" data-active="app">
+<div class="pn-scene" aria-hidden="true"><div class="pn-scene-in">
+<div class="sc sc-a"><div class="sc-left"><svg class="band b1" viewBox="0 0 1600 900" preserveAspectRatio="none"><path d="M0 120 C200 60 380 170 620 120 S1040 50 1300 110 S1500 150 1600 100 L1600 900 L0 900Z"/><path class="edge" d="M0 120 C200 60 380 170 620 120 S1040 50 1300 110 S1500 150 1600 100"/></svg><svg class="band b2" viewBox="0 0 1600 900" preserveAspectRatio="none"><path d="M0 90 C260 150 420 40 700 100 S1100 160 1360 90 S1520 60 1600 110 L1600 900 L0 900Z"/><path class="edge" d="M0 90 C260 150 420 40 700 100 S1100 160 1360 90 S1520 60 1600 110"/></svg><svg class="band b3" viewBox="0 0 1600 900" preserveAspectRatio="none"><path d="M0 130 C180 80 460 150 700 110 S1000 40 1280 120 S1480 140 1600 90 L1600 900 L0 900Z"/><path class="edge" d="M0 130 C180 80 460 150 700 110 S1000 40 1280 120 S1480 140 1600 90"/></svg><svg class="band b4" viewBox="0 0 1600 900" preserveAspectRatio="none"><path d="M0 100 C240 150 500 60 760 120 S1120 150 1340 80 S1500 70 1600 120 L1600 900 L0 900Z"/><path class="edge" d="M0 100 C240 150 500 60 760 120 S1120 150 1340 80 S1500 70 1600 120"/></svg><svg class="band b5" viewBox="0 0 1600 900" preserveAspectRatio="none"><path d="M0 110 C220 70 440 140 720 100 S1060 70 1300 130 S1520 120 1600 80 L1600 900 L0 900Z"/><path class="edge" d="M0 110 C220 70 440 140 720 100 S1060 70 1300 130 S1520 120 1600 80"/></svg></div><div class="sc-right"><div class="beam"></div><div class="glow"></div><div class="rings"><i style="--d:min(30vh,20vw);--o:0.6"></i><i style="--d:min(48vh,32vw);--o:0.46"></i><i style="--d:min(68vh,44vw);--o:0.34"></i><i style="--d:min(92vh,60vw);--o:0.24"></i><i style="--d:min(120vh,78vw);--o:0.16"></i><i class="rip"></i><i class="rip"></i><i class="rip"></i></div><div class="orb"></div></div></div>
+</div></div>
+<header class="pn-head wrap"><div class="eyebrow">Patch notes</div><h1>What&rsquo;s new in DeepWell and Donovan</h1><p class="lede">The DeepWell app and Donovan each have their own version and their own release history, newest first.</p></header>
+<div class="pn-switch"><div class="pn-switch-in" role="group" aria-label="Choose a version history"><button type="button" data-for="app" aria-pressed="true" aria-controls="app">DeepWell App</button><button type="button" data-for="donovan" aria-pressed="false" aria-controls="donovan">Donovan</button></div></div>
+<div class="pn-stage">
+<section class="pn-side pn-app" id="app" aria-labelledby="h-app">
+<div class="pn-top"><div class="pn-kicker"><svg viewBox="0 0 100 100" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="4"><circle cx="50" cy="50" r="10"/><circle cx="50" cy="50" r="19"/><circle cx="50" cy="50" r="28"/><circle cx="50" cy="50" r="37"/><circle cx="50" cy="50" r="46"/></g></svg><h2 id="h-app">DeepWell App</h2></div>
+<p class="pn-vline"><span class="pn-sr">Current version %%APP_VERSION%%</span><span class="pn-num" data-v="%%APP_VERSION%%" aria-hidden="true">%%APP_VERSION%%</span></p>
+<p class="pn-sub">Where your paperwork lives.</p><p class="pn-since">Live since %%APP_SINCE%%</p></div>
+%%APP_TIMELINE%%
+</section>
+<div class="pn-divider" aria-hidden="true"><i></i></div>
+<section class="pn-side pn-donovan" id="donovan" aria-labelledby="h-donovan">
+<div class="pn-top"><div class="pn-kicker"><svg class="dvmark" viewBox="0 0 80 80" aria-hidden="true"><defs><radialGradient id="pnDv" cx="38%" cy="32%" r="70%"><stop offset="0%" stop-color="#5a8c6c"/><stop offset="55%" stop-color="#245239"/><stop offset="100%" stop-color="#0a1b14"/></radialGradient></defs><circle cx="40" cy="40" r="34" fill="url(#pnDv)"/><g fill="none" stroke="#d9b57a"><circle class="r" cx="40" cy="40" r="30" stroke-width="1.4"/><circle class="r" cx="40" cy="40" r="22" stroke-width="1.4"/><circle class="r" cx="40" cy="40" r="14" stroke-width="1.4"/><circle class="r" cx="40" cy="40" r="7" stroke-width="2.2"/></g><circle cx="40" cy="40" r="2.6" fill="#d9b57a"/></svg><h2 id="h-donovan">Donovan</h2></div>
+<p class="pn-vline"><span class="pn-sr">Current version %%DONOVAN_VERSION%%</span><span class="pn-num" data-v="%%DONOVAN_VERSION%%" aria-hidden="true">%%DONOVAN_VERSION%%</span></p>
+<p class="pn-sub">Your assistant for questions about your paperwork.</p><p class="pn-since">Live since %%DONOVAN_SINCE%%</p></div>
+%%DONOVAN_TIMELINE%%
+</section>
+</div></main>
+<footer>
+  <div class="wrap">
+    <div>© 2026 DeepWell Technology · Knowledge Builds Business.</div>
+    <div><a href="/#how-it-works">How it works</a><a href="/#plans">Plans</a><a href="/#team">Founders</a><a href="/#contact">Contact</a><a href="/security.html">Security</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a><a href="/patch-notes.html" aria-current="page">Patch notes</a><a href="https://status.deepwelltechnology.com">Status</a></div>
+  </div>
+</footer>
+<script>
+(function () {
+  var dd = document.querySelector('.nav-dropdown');
+  if (!dd) return;
+  var toggle = dd.querySelector('.nav-dropdown-toggle');
+  var menu = dd.querySelector('.nav-dropdown-menu');
+  if (!toggle || !menu) return;
+  var items = Array.prototype.slice.call(menu.querySelectorAll('a'));
+
+  function isOpen() { return dd.classList.contains('open'); }
+  function open() {
+    dd.classList.add('open');
+    toggle.setAttribute('aria-expanded', 'true');
+  }
+  function close(focusToggle) {
+    dd.classList.remove('open');
+    toggle.setAttribute('aria-expanded', 'false');
+    if (focusToggle) toggle.focus();
+  }
+
+  toggle.addEventListener('click', function (e) {
+    e.stopPropagation();
+    if (isOpen()) { close(false); } else { open(); }
+  });
+
+  toggle.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      open();
+      if (items[0]) items[0].focus();
+    } else if (e.key === 'Escape' && isOpen()) {
+      close(true);
+    }
+  });
+
+  menu.addEventListener('keydown', function (e) {
+    var i = items.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      var next = items[(i + 1) % items.length];
+      if (next) next.focus();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      var prev = items[(i - 1 + items.length) % items.length];
+      if (prev) prev.focus();
+    } else if (e.key === 'Escape') {
+      close(true);
+    } else if (e.key === 'Tab') {
+      setTimeout(function () {
+        if (!dd.contains(document.activeElement)) close(false);
+      }, 0);
+    }
+  });
+
+  document.addEventListener('click', function (e) {
+    if (!dd.contains(e.target)) close(false);
+  });
+  document.addEventListener('focusin', function (e) {
+    if (!dd.contains(e.target)) close(false);
+  });
+})();
+</script>
+<script>
+(function () {
+  var root = document.documentElement;
+  var pn = document.querySelector('.pn');
+  if (!pn) return;
+  var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var stage = pn.querySelector('.pn-stage');
+
+  // Phones: the two halves stack, and a toggle shows one at a time.
+  var btns = Array.prototype.slice.call(pn.querySelectorAll('.pn-switch button'));
+  var mq = window.matchMedia ? matchMedia('(max-width: 860px)') : null;
+  function setActive(k) {
+    pn.setAttribute('data-active', k);
+    btns.forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-for') === k)); });
+  }
+  function syncTabs() { pn.classList.toggle('pn-tabs', !!(mq && mq.matches)); }
+  if (btns.length) {
+    btns.forEach(function (b) {
+      b.addEventListener('click', function () {
+        var k = b.getAttribute('data-for');
+        setActive(k);
+        try { history.replaceState(null, '', '#' + k); } catch (e) {}
+        window.scrollTo({ top: Math.max(0, stage.getBoundingClientRect().top + window.scrollY - 130), behavior: reduce ? 'auto' : 'smooth' });
+      });
+    });
+    if (location.hash === '#donovan') setActive('donovan');
+    syncTabs();
+    if (mq) { if (mq.addEventListener) mq.addEventListener('change', syncTabs); else if (mq.addListener) mq.addListener(syncTabs); }
+  }
+
+  if (!('IntersectionObserver' in window)) return;
+
+  // Scenery pauses when it is off screen or the tab is hidden.
+  new IntersectionObserver(function (es) {
+    pn.classList.toggle('pn-idle', !es[0].isIntersecting);
+  }).observe(stage);
+  document.addEventListener('visibilitychange', function () {
+    pn.classList.toggle('pn-idle', document.hidden);
+  });
+
+  if (reduce || !root.classList.contains('pn-js')) return; // still, complete page
+
+  function ease(t) { return 1 - Math.pow(1 - t, 3); }
+  function countUp(el) {
+    var target = (el.getAttribute('data-v') || '').split('.').map(Number);
+    if (target.length !== 3 || target.some(isNaN)) { el.classList.add('in'); return; }
+    el.style.minWidth = el.offsetWidth + 'px';
+    el.textContent = '0.0.0';
+    el.classList.add('in');
+    var t0 = null, dur = 1100;
+    (function frame(ts) {
+      if (t0 === null) t0 = ts;
+      var p = Math.min(1, (ts - t0) / dur), e = ease(p);
+      el.textContent = target.map(function (n) { return Math.round(n * e); }).join('.');
+      if (p < 1) requestAnimationFrame(frame); else el.textContent = target.join('.');
+    })(performance.now());
+  }
+
+  var seen = new IntersectionObserver(function (es) {
+    var batch = es.filter(function (e) { return e.isIntersecting; })
+      .sort(function (a, b) { return a.boundingClientRect.top - b.boundingClientRect.top; });
+    batch.forEach(function (e, i) {
+      var t = e.target;
+      seen.unobserve(t);
+      if (t.classList.contains('pn-rel')) { t.style.setProperty('--d', Math.min(i, 4)); t.classList.add('in'); }
+      else if (t.classList.contains('pn-num')) countUp(t);
+      else t.classList.add('in');
+    });
+  }, { threshold: 0.2 });
+  Array.prototype.forEach.call(pn.querySelectorAll('.pn-rel,.pn-num,.pn-side'), function (n) { seen.observe(n); });
+
+  var first = new IntersectionObserver(function (es) {
+    if (es[0].isIntersecting) { stage.classList.add('pn-in'); first.disconnect(); }
+  }, { threshold: 0.05 });
+  first.observe(stage);
+})();
+</script>
+<script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
+<script defer src="/_vercel/insights/script.js"></script>
+<script defer src="/support/widget.js"></script>
+</body>
+</html>

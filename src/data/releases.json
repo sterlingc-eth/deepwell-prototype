@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "releases": [
+    {
+      "track": "app",
+      "version": "1.0.0",
+      "date": "2026-10-08",
+      "type": "update",
+      "released": true,
+      "public": true,
+      "notes": [
+        "DeepWell 1.0 brings your paperwork into one place: add PDFs, photos, Word and Excel files, CSV or plain text, one at a time or in batches.",
+        "Browse your records by document or customer, explore how they connect, and watch alerts, money owed and paid, and upcoming expiry dates on the dashboard.",
+        "Invite your team, prepare warranty claim packets, send customer outreach, and export your documents and customers as CSV whenever you need them."
+      ],
+      "internal": { "sha": "33f685a" }
+    },
+    {
+      "track": "donovan",
+      "version": "1.0.0",
+      "date": "2026-10-08",
+      "type": "update",
+      "released": true,
+      "public": true,
+      "notes": [
+        "Donovan answers your questions about your paperwork in plain English and shows the source page with every answer.",
+        "It starts from the facts already saved from your documents, so common questions about customers, invoices and visits are quick.",
+        "Each answer is checked against the page it cites, Donovan tells you when something is not on file, and it only ever uses your own organization's documents."
+      ],
+      "internal": { "sha": "33f685a" }
+    },
+    {
+      "track": "donovan",
+      "version": "1.0.1",
+      "date": "2026-10-08",
+      "type": "patch",
+      "released": false,
+      "public": true,
+      "notes": [
+        "Donovan now reads your documents more completely when it answers.",
+        "More of your questions are answered from the right page."
+      ],
+      "internal": { "sha": "33f685a" }
+    }
+  ]
+}
