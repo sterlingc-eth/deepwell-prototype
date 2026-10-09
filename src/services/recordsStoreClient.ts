@@ -20,6 +20,16 @@ import type { BrowseFacet, BrowseFilters, BrowseResponse } from '../components/r
 
 const API_URL = '/api/records';
 
+/** What POST /api/records { action: 'importProgress' } returns: ReviewSummary plus the live import numbers. */
+export interface ImportProgressSummary extends ReviewSummary {
+  /** Documents still waiting to be read (recent ones only; see importProgress in api/_lib/recordsStore.js). */
+  pending: number;
+  /** Documents that finished reading in the last 10 minutes: the pace the time-left estimate uses. */
+  readLast10m: number;
+  /** Documents from the last three days that could not be read. */
+  failedRecent: number;
+}
+
 /** R36: what POST /api/records { action: 'reviewSummary' } returns. */
 export interface ReviewSummary {
   total: number;
@@ -92,6 +102,11 @@ export class RecordsStoreClient implements RecordsStore {
   /** R36: shop-wide document counts (the client graph only holds the newest 500, so it cannot know these). */
   async reviewSummary(): Promise<ReviewSummary> {
     return this.call('reviewSummary', {});
+  }
+
+  /** Live import progress for the Inbox panel: still to read, pace (read in the last 10 minutes), recent failures, stage counts. */
+  async importProgress(): Promise<ImportProgressSummary> {
+    return this.call('importProgress', {});
   }
 
   /** R36: the needs-review list (every document that is not verified), newest first, paged by an opaque cursor. */

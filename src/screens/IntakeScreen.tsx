@@ -6,6 +6,9 @@ import { docCountsByStage, documentTotalFor, useGraph } from '../core/entityGrap
 import { INTAKE_SOURCES, PIPELINE_STAGES, type Batch, type Doc, type IntakeSource, type PipelineStage } from '../core/types';
 import { classifyByFilename, fileTypeOf, SAMPLE_UPLOADS } from '../domains/hvac/intake';
 import { useAppStore } from '../store/appStore';
+import { ImportProgressPanel } from '../components/intake/ImportProgressPanel';
+import { ImportPrecheck } from '../components/intake/ImportPrecheck';
+import { summarizePrecheck } from '../core/importPrecheck';
 import { documentName, hasFriendlyName } from '../core/documentName';
 import { ACCEPT_ATTRIBUTE, ACCEPTED_TYPES_SENTENCE } from '../../api/_lib/uploadTypes.js';
 import { ingestFiles, STILL_PROCESSING_LINK_LABEL, STILL_PROCESSING_MESSAGE, type IngestProgress, type IngestResult } from '../services/ingestClient';
@@ -63,6 +66,8 @@ const SKIP_REASON_LABEL: Record<NonNullable<BulkFileState['skipReason']>, string
 
 const ZIP_EXTENSION = /\.zip$/i;
 const BULK_ROW_LIMIT = 200;
+/** The upload list and the batch's document list show this many rows in a scrolling box; Records has every document. */
+const LIST_ROW_LIMIT = 200;
 
 function isZipFile(file: File): boolean {
   return ZIP_EXTENSION.test(file.name) || file.type === 'application/zip' || file.type === 'application/x-zip-compressed';
@@ -378,6 +383,16 @@ export function IntakeBody() {
    * way without ever going through jszip, which is only ever loaded for an
    * actual zip.
    */
+  // Guided import: a bulk drop is summarized first ("Check before importing"); nothing uploads until Start import.
+  const [precheck, setPrecheck] = useState<{ accepted: WalkedFile[]; skipped: BulkFileState[] } | null>(null);
+  const precheckSummary = useMemo(() => (precheck ? summarizePrecheck(precheck.accepted, precheck.skipped) : null), [precheck]);
+  const startPrechecked = () => {
+    if (!precheck) return;
+    const { accepted, skipped } = precheck;
+    setPrecheck(null);
+    runBulkImport(accepted, skipped);
+  };
+
   const handleBulkFiles = async (files: File[]) => {
     if (!files.length) return;
     setBulkNotice(null);
@@ -386,10 +401,11 @@ export function IntakeBody() {
       setBulkRunning(true);
       try {
         const walked = await walkZip(files[0]);
-        runBulkImport(
-          walked.accepted,
-          walked.skipped.map((s) => toSkippedState(s.path, s.reason, s.detail))
-        );
+        setBulkRunning(false);
+        setPrecheck({
+          accepted: walked.accepted,
+          skipped: walked.skipped.map((s) => toSkippedState(s.path, s.reason, s.detail)),
+        });
       } catch (err) {
         setBulkRunning(false);
         setBulkNotice(err instanceof Error ? err.message : 'Could not read that zip file.');
@@ -405,7 +421,7 @@ export function IntakeBody() {
       if (verdict.accept) accepted.push(src);
       else skipped.push(toSkippedState(src.path, verdict.reason, verdict.detail));
     }
-    runBulkImport(accepted, skipped);
+    setPrecheck({ accepted, skipped });
   };
 
   const onBulkDrop = (e: DragEvent<HTMLDivElement>) => {
@@ -534,6 +550,9 @@ export function IntakeBody() {
           </div>
         </header>
 
+        {/* Live import progress: shop-wide, from the server, any device, no time limit. Hidden when nothing is being read. */}
+        <ImportProgressPanel />
+
         {/* Pipeline overview */}
         <ol className="grid grid-cols-5 gap-2" aria-label="Pipeline">
           {PIPELINE_STAGES.map((stage, i) => (
@@ -588,6 +607,15 @@ export function IntakeBody() {
               <Upload className="w-4 h-4" aria-hidden="true" /> {bulkRunning ? 'Importing…' : 'Choose files or a .zip'}
             </button>
           </div>
+
+          {precheck && precheckSummary && (
+            <ImportPrecheck
+              summary={precheckSummary}
+              reasonLabel={(r) => SKIP_REASON_LABEL[r as keyof typeof SKIP_REASON_LABEL] ?? 'Skipped'}
+              onStart={startPrechecked}
+              onCancel={() => setPrecheck(null)}
+            />
+          )}
 
           {bulkNotice && (
             <p className="dw-pill-warn inline-flex items-start gap-1.5">
@@ -745,8 +773,8 @@ export function IntakeBody() {
                   </div>
                 </div>
                 {Object.values(uploads).length > 0 && (
-                  <ul className="border border-line rounded-lg bg-surface divide-y divide-line text-sm" aria-live="polite">
-                    {Object.values(uploads).map((u) => {
+                  <ul className="border border-line rounded-lg bg-surface divide-y divide-line text-sm max-h-80 overflow-y-auto" aria-live="polite">
+                    {Object.values(uploads).slice(0, LIST_ROW_LIMIT).map((u) => {
                       // Once the read step itself is done, the row switches to the
                       // document's own live stage pill — Extracting/Linked/AI
                       // verified as review and sync move it along — so it never
@@ -772,11 +800,15 @@ export function IntakeBody() {
                         </li>
                       );
                     })}
+                    {Object.values(uploads).length > LIST_ROW_LIMIT && (
+                      <li className="px-4 py-2 text-ink-3 text-caption">…and {(Object.values(uploads).length - LIST_ROW_LIMIT).toLocaleString('en-US')} more</li>
+                    )}
                   </ul>
                 )}
-                <ul className="divide-y divide-line border border-line rounded-lg bg-surface">
+                <ul className="divide-y divide-line border border-line rounded-lg bg-surface max-h-[28rem] overflow-y-auto">
                   {batchDocs(selected)
                     .sort((a, b) => PIPELINE_STAGES.indexOf(a.stage) - PIPELINE_STAGES.indexOf(b.stage))
+                    .slice(0, LIST_ROW_LIMIT)
                     .map((d) => {
                       const issue = issueSummary(d);
                       const typeLabel = graph.schema.documentTypes.find((t) => t.id === d.typeId)?.label ?? 'Unclassified';
@@ -795,6 +827,11 @@ export function IntakeBody() {
                       );
                     })}
                   {selected.documentIds.length === 0 && <li className="px-4 py-6 text-ink-3">No documents yet. Add files to this batch.</li>}
+                  {batchDocs(selected).length > LIST_ROW_LIMIT && (
+                    <li className="px-4 py-2 text-ink-3 text-caption">
+                      …and {(batchDocs(selected).length - LIST_ROW_LIMIT).toLocaleString('en-US')} more. Every document is under Records.
+                    </li>
+                  )}
                 </ul>
               </>
             ) : (

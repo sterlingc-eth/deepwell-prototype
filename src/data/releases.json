@@ -41,6 +41,20 @@
         "More of your questions are answered from the right page."
       ],
       "internal": { "sha": "33f685a" }
+    },
+    {
+      "track": "app",
+      "version": "1.1.0",
+      "date": "2026-10-09",
+      "type": "update",
+      "released": true,
+      "public": true,
+      "notes": [
+        "The Inbox now shows live progress while your documents are read, with a five-part circle and the time left.",
+        "Before a bulk import starts, DeepWell shows what will be imported and what will be skipped.",
+        "Refreshing keeps you on the page you were on, and read notifications clear from the bell."
+      ],
+      "internal": { "sha": "a05404a" }
     }
   ]
 }

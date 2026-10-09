@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { restoredPlace } from '../core/restorePlace';
 import type { IngestProgress } from '../services/ingestClient';
 import { summarizeProgress, type BulkFileState } from '../services/bulkImport';
 import type { BillingInterval, BillingStatus } from '../services/billingClient';
@@ -25,6 +26,30 @@ export interface PendingPlan {
   plan: string;
   interval: BillingInterval;
 }
+
+/**
+ * Refresh keeps your place: the screen (and Inbox tab) are remembered for this browser tab only (sessionStorage), so a
+ * reload lands where you were instead of on Ask. Screens that need an open record (a customer, an entity) come back to
+ * the list they were opened from. A deep link (?screen=, ?entity=, ...) still wins: useDeepLink applies it after this.
+ */
+const SCREEN_KEY = 'deepwell.screen';
+function readSavedPlace() {
+  try {
+    return restoredPlace(window.sessionStorage.getItem(SCREEN_KEY));
+  } catch {
+    return null;
+  }
+}
+
+function savePlace(screen: Screen, inboxTab: 'add' | 'needs-person') {
+  try {
+    window.sessionStorage.setItem(SCREEN_KEY, JSON.stringify({ screen, inboxTab }));
+  } catch {
+    /* private mode or storage blocked: refresh just starts on Ask, as before */
+  }
+}
+
+const savedPlace = typeof window === 'undefined' ? null : readSavedPlace();
 
 const FIELD_MODE_KEY = 'deepwell.fieldMode';
 
@@ -280,7 +305,7 @@ const initialFieldMode = readFieldMode();
 applyFieldMode(initialFieldMode); // always: Office (dark) is the default and needs the class
 
 export const useAppStore = create<AppState>((set) => ({
-  currentScreen: 'ask',
+  currentScreen: savedPlace?.screen ?? 'ask',
   // 'review' and 'records' are retired top-level ids kept as aliases so any
   // existing call site, deep link, or bookmark still lands somewhere sane:
   // 'review' -> the Inbox screen's "Needs a person" tab (its old separate
@@ -295,7 +320,7 @@ export const useAppStore = create<AppState>((set) => ({
           : { currentScreen: screen },
     ),
 
-  inboxTab: 'add',
+  inboxTab: savedPlace?.inboxTab ?? 'add',
   setInboxTab: (tab) => set({ inboxTab: tab }),
   pendingReviewFilter: null,
   clearPendingReviewFilter: () => set({ pendingReviewFilter: null }),
@@ -429,3 +454,9 @@ export const useAppStore = create<AppState>((set) => ({
   billingConfirming: false,
   setBillingConfirming: (confirming) => set({ billingConfirming: confirming }),
 }));
+
+if (typeof window !== 'undefined') {
+  useAppStore.subscribe((state, prev) => {
+    if (state.currentScreen !== prev.currentScreen || state.inboxTab !== prev.inboxTab) savePlace(state.currentScreen, state.inboxTab);
+  });
+}

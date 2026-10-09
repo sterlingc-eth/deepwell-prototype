@@ -4,6 +4,7 @@ import { extractDocumentFields } from "./extractDocument.js";
 import { extractFinancialsDeterministicFirst as extractFinancialsBestEffort } from "./modelAvoidance/financialsHook.js"; // R32: same contract as financials/hook.js, deterministic text first
 import { getDailyModelBudgetStatus } from "./rateLimit.js";
 import { assertActiveBilling } from "./plan.js";
+import { notifyIfImportDone } from "./importDone.js";
 
 /**
  * The ingestion queue.
@@ -468,7 +469,14 @@ function buildFunctions(inngest, NonRetriableError) {
       });
       // FINANCIALS: invoice / quote / PO / maintenance-agreement documents also get their money read (own step, own
       // model call, swallows every failure - the document's main extraction above already succeeded).
-      await step.run("extract-financials", () => extractFinancialsBestEffort(ctx, documentId, { modelAttempts: 1 }));
+      // Import progress: after the last step of every document, one cheap check sends a single "Your documents are
+      // ready" bell notification when a bulk import has nothing left to read (importDone.js; never throws). Inside this
+      // step rather than a step of its own so it adds no Inngest execution per document.
+      await step.run("extract-financials", async () => {
+        const fin = await extractFinancialsBestEffort(ctx, documentId, { modelAttempts: 1 });
+        await notifyIfImportDone(ctx);
+        return fin;
+      });
       return extracted;
     }
   );

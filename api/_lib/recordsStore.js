@@ -1908,6 +1908,38 @@ function makeStore(db, tenantId) {
     },
 
     /**
+     * Live import progress for the Inbox (src/components/intake/ImportProgressPanel.tsx): how many documents are still
+     * waiting to be read, how many finished reading in the last 10 minutes (the pace the time-left estimate uses) and
+     * how many recent ones could not be read. "Still to read" is a received document with no error from the last three
+     * days, plus a read document still inside its field-extraction window (15 minutes): anything older that never moved
+     * is not an import in progress and must not hold the panel open forever. Also returns the same shop-wide stage
+     * counts as reviewSummary so the panel can refresh them. One pass over `documents`, tenant-scoped like every read here.
+     */
+    importProgress: async () => {
+      const r = await one(
+        `SELECT count(*)::int AS total,
+                count(*) FILTER (WHERE stage = 'received')::int AS received,
+                count(*) FILTER (WHERE stage = 'read')::int AS read,
+                count(*) FILTER (WHERE stage = 'mapped')::int AS mapped,
+                count(*) FILTER (WHERE stage = 'linked')::int AS linked,
+                count(*) FILTER (WHERE stage = 'verified')::int AS verified,
+                count(*) FILTER (WHERE extract_error IS NULL AND (
+                    (stage = 'received' AND created_at > NOW() - INTERVAL '3 days')
+                 OR (stage = 'read' AND extracted_at > NOW() - INTERVAL '15 minutes')))::int AS pending,
+                count(*) FILTER (WHERE extracted_at > NOW() - INTERVAL '10 minutes')::int AS read_last_10m,
+                count(*) FILTER (WHERE extract_error IS NOT NULL AND created_at > NOW() - INTERVAL '3 days')::int AS failed_recent
+           FROM documents WHERE ${TENANT}`,
+        []
+      );
+      const byStage = { received: r?.received ?? 0, read: r?.read ?? 0, mapped: r?.mapped ?? 0, linked: r?.linked ?? 0, verified: r?.verified ?? 0 };
+      const total = r?.total ?? 0;
+      return {
+        total, byStage, needsReview: total - byStage.verified, verified: byStage.verified,
+        pending: r?.pending ?? 0, readLast10m: r?.read_last_10m ?? 0, failedRecent: r?.failed_recent ?? 0,
+      };
+    },
+
+    /**
      * R36: the needs-review list, paged. Every document that is not verified, newest first, `limit` (max 200) per page,
      * resumed by an opaque keyset cursor (created_at, id), with the exact `total` (counted on the first page, carried in the
      * cursor after that). Rows are the plain `documents` rows listDocuments returns, so the client turns them into graph

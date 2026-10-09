@@ -24,7 +24,7 @@ export function formatDate(iso: string): string {
 
 function entry(r: Release, index: number): string {
   const label = TYPE_LABEL[r.type]
-  const sentences = r.notes.map((n) => esc(n)).join(' ')
+  const bullets = r.notes.map((n) => `<li>${esc(n)}</li>`).join('')
   return (
     `<li class="pn-rel" data-type="${r.type}" style="--i:${index}">` +
     `<span class="pn-node" aria-hidden="true"></span>` +
@@ -32,7 +32,7 @@ function entry(r: Release, index: number): string {
     `<header class="pn-meta"><span class="pn-tag pn-tag--${r.type}">${label}</span>` +
     `<h3 class="pn-v">${esc(r.version)}</h3>` +
     `<time datetime="${r.date}">${formatDate(r.date)}</time></header>` +
-    `<p>${sentences}</p></article></li>`
+    `<ul class="pn-notes">${bullets}</ul></article></li>`
   )
 }
 

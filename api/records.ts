@@ -48,7 +48,7 @@ const MONTH_MS = 30 * 24 * 60 * 60 * 1000;
  */
 export const RECORDS_READ_ACTIONS: ReadonlySet<string> = new Set([
   'getDocument', 'getDocumentPage', 'listDocuments', 'browseDocuments', 'browseFacets',
-  'reviewSummary', 'listUnverifiedDocuments', 'listEntitiesByIds',
+  'reviewSummary', 'importProgress', 'listUnverifiedDocuments', 'listEntitiesByIds',
   'getFacet', 'listFacetsByDocument',
   'getExtraction', 'listExtractionsByDocument', 'listExtractionsByDocuments', 'listExtractionsByEntity',
   'getEntity', 'listEntities',
@@ -284,6 +284,8 @@ export async function processRecords(req: VercelRequest, res: VercelResponse, au
           case 'browseFacets': return await db.browseFacets(payload.filters, { currentUserId: auth.userId });
           // R36: shop-wide counts and the uncapped needs-review list (the client graph only holds the newest 500).
           case 'reviewSummary': return await db.reviewSummary();
+          // Live import progress for the Inbox panel (what is still being read, the pace, recent failures).
+          case 'importProgress': return await db.importProgress();
           case 'listUnverifiedDocuments': return await db.listUnverifiedDocuments({ cursor: payload.cursor ?? null, limit: payload.limit });
           case 'listEntitiesByIds': return await db.listEntitiesByIds(payload.ids);
           case 'updateDocument':

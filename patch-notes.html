@@ -151,6 +151,7 @@ footer a:hover{color:var(--text)}
 .wrap{max-width:1080px}
 .navlinks a,.nav-dropdown-toggle,.navcta .btn{white-space:nowrap}
 .pn{position:relative;isolation:isolate;overflow:clip}
+.pn-focal{position:absolute;inset:0;opacity:calc(1 - var(--pn-fade,0))}
 .pn-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
 /* scenery: layered DOM, only transform/opacity ever animate (no repaint) */
@@ -214,6 +215,9 @@ footer a:hover{color:var(--text)}
 .pn-v{font-family:"Newsreader",Georgia,serif;font-weight:500;font-size:1.55rem;line-height:1;margin:0;letter-spacing:-.01em}
 .pn-meta time{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.05em;color:var(--faint)}
 .pn-card p{margin:0;color:var(--muted);font-size:.96rem;line-height:1.62}
+.pn-notes{margin:0;padding:0;list-style:none;display:grid;gap:6px;color:var(--muted);font-size:.96rem;line-height:1.55}
+.pn-notes li{position:relative;padding-left:18px}
+.pn-notes li::before{content:"";position:absolute;left:2px;top:.62em;width:6px;height:6px;border-radius:50%;background:var(--acc)}
 .pn-tag{display:inline-flex;align-items:center;gap:6px;font-family:"IBM Plex Mono",monospace;font-size:.66rem;font-weight:500;letter-spacing:.09em;text-transform:uppercase;padding:3px 10px 3px 8px;border-radius:20px;border:1px solid transparent}
 .pn-tag::before{content:"";width:7px;height:7px;background:currentColor;flex:none}
 .pn-tag--update{background:var(--acc);color:var(--acc-ink)}
@@ -334,7 +338,7 @@ footer a:hover{color:var(--text)}
 </nav>
 <main class="pn" data-active="app">
 <div class="pn-scene" aria-hidden="true"><div class="pn-scene-in">
-<div class="sc sc-a"><div class="sc-left"><div class="lglow"></div><div class="lwell"><i style="--d:min(26vh,17vw);--o:.6"></i><i style="--d:min(42vh,28vw);--o:.48"></i><i style="--d:min(60vh,39vw);--o:.36"></i><i style="--d:min(80vh,52vw);--o:.26"></i><i style="--d:min(104vh,68vw);--o:.17"></i><i style="--d:min(132vh,86vw);--o:.1"></i><i class="rip"></i><i class="rip"></i></div><div class="lmouth"><svg viewBox="0 0 100 100" aria-hidden="true" focusable="false"><g fill="none" stroke="#163C2C" stroke-width="4"><circle cx="50" cy="50" r="10"/><circle cx="50" cy="50" r="19"/><circle cx="50" cy="50" r="28"/><circle cx="50" cy="50" r="37"/><circle cx="50" cy="50" r="46"/></g></svg></div><svg class="band b1" viewBox="0 0 1600 900" preserveAspectRatio="none"><path d="M0 120 C200 60 380 170 620 120 S1040 50 1300 110 S1500 150 1600 100 L1600 900 L0 900Z"/><path class="edge" d="M0 120 C200 60 380 170 620 120 S1040 50 1300 110 S1500 150 1600 100"/></svg><svg class="band b2" viewBox="0 0 1600 900" preserveAspectRatio="none"><path d="M0 90 C260 150 420 40 700 100 S1100 160 1360 90 S1520 60 1600 110 L1600 900 L0 900Z"/><path class="edge" d="M0 90 C260 150 420 40 700 100 S1100 160 1360 90 S1520 60 1600 110"/></svg><svg class="band b3" viewBox="0 0 1600 900" preserveAspectRatio="none"><path d="M0 130 C180 80 460 150 700 110 S1000 40 1280 120 S1480 140 1600 90 L1600 900 L0 900Z"/><path class="edge" d="M0 130 C180 80 460 150 700 110 S1000 40 1280 120 S1480 140 1600 90"/></svg><svg class="band b4" viewBox="0 0 1600 900" preserveAspectRatio="none"><path d="M0 100 C240 150 500 60 760 120 S1120 150 1340 80 S1500 70 1600 120 L1600 900 L0 900Z"/><path class="edge" d="M0 100 C240 150 500 60 760 120 S1120 150 1340 80 S1500 70 1600 120"/></svg><svg class="band b5" viewBox="0 0 1600 900" preserveAspectRatio="none"><path d="M0 110 C220 70 440 140 720 100 S1060 70 1300 130 S1520 120 1600 80 L1600 900 L0 900Z"/><path class="edge" d="M0 110 C220 70 440 140 720 100 S1060 70 1300 130 S1520 120 1600 80"/></svg></div><div class="sc-right"><div class="beam"></div><div class="glow"></div><div class="rings"><i style="--d:min(30vh,20vw);--o:0.6"></i><i style="--d:min(48vh,32vw);--o:0.46"></i><i style="--d:min(68vh,44vw);--o:0.34"></i><i style="--d:min(92vh,60vw);--o:0.24"></i><i style="--d:min(120vh,78vw);--o:0.16"></i><i class="rip"></i><i class="rip"></i><i class="rip"></i></div><div class="orb"></div></div></div>
+<div class="sc sc-a"><div class="sc-left"><div class="pn-focal"><div class="lglow"></div><div class="lwell"><i style="--d:min(26vh,17vw);--o:.6"></i><i style="--d:min(42vh,28vw);--o:.48"></i><i style="--d:min(60vh,39vw);--o:.36"></i><i style="--d:min(80vh,52vw);--o:.26"></i><i style="--d:min(104vh,68vw);--o:.17"></i><i style="--d:min(132vh,86vw);--o:.1"></i><i class="rip"></i><i class="rip"></i></div><div class="lmouth"><svg viewBox="0 0 100 100" aria-hidden="true" focusable="false"><g fill="none" stroke="#163C2C" stroke-width="4"><circle cx="50" cy="50" r="10"/><circle cx="50" cy="50" r="19"/><circle cx="50" cy="50" r="28"/><circle cx="50" cy="50" r="37"/><circle cx="50" cy="50" r="46"/></g></svg></div></div><svg class="band b1" viewBox="0 0 1600 900" preserveAspectRatio="none"><path d="M0 120 C200 60 380 170 620 120 S1040 50 1300 110 S1500 150 1600 100 L1600 900 L0 900Z"/><path class="edge" d="M0 120 C200 60 380 170 620 120 S1040 50 1300 110 S1500 150 1600 100"/></svg><svg class="band b2" viewBox="0 0 1600 900" preserveAspectRatio="none"><path d="M0 90 C260 150 420 40 700 100 S1100 160 1360 90 S1520 60 1600 110 L1600 900 L0 900Z"/><path class="edge" d="M0 90 C260 150 420 40 700 100 S1100 160 1360 90 S1520 60 1600 110"/></svg><svg class="band b3" viewBox="0 0 1600 900" preserveAspectRatio="none"><path d="M0 130 C180 80 460 150 700 110 S1000 40 1280 120 S1480 140 1600 90 L1600 900 L0 900Z"/><path class="edge" d="M0 130 C180 80 460 150 700 110 S1000 40 1280 120 S1480 140 1600 90"/></svg><svg class="band b4" viewBox="0 0 1600 900" preserveAspectRatio="none"><path d="M0 100 C240 150 500 60 760 120 S1120 150 1340 80 S1500 70 1600 120 L1600 900 L0 900Z"/><path class="edge" d="M0 100 C240 150 500 60 760 120 S1120 150 1340 80 S1500 70 1600 120"/></svg><svg class="band b5" viewBox="0 0 1600 900" preserveAspectRatio="none"><path d="M0 110 C220 70 440 140 720 100 S1060 70 1300 130 S1520 120 1600 80 L1600 900 L0 900Z"/><path class="edge" d="M0 110 C220 70 440 140 720 100 S1060 70 1300 130 S1520 120 1600 80"/></svg></div><div class="sc-right"><div class="pn-focal"><div class="beam"></div><div class="glow"></div><div class="rings"><i style="--d:min(30vh,20vw);--o:0.6"></i><i style="--d:min(48vh,32vw);--o:0.46"></i><i style="--d:min(68vh,44vw);--o:0.34"></i><i style="--d:min(92vh,60vw);--o:0.24"></i><i style="--d:min(120vh,78vw);--o:0.16"></i><i class="rip"></i><i class="rip"></i><i class="rip"></i></div><div class="orb"></div></div></div></div>
 </div></div>
 <header class="pn-head wrap"><div class="eyebrow">Patch notes</div><h1>What&rsquo;s new in DeepWell and Donovan</h1><p class="lede">The DeepWell app and Donovan each have their own version and their own release history, newest first.</p></header>
 <div class="pn-switch"><div class="pn-switch-in" role="group" aria-label="Choose a version history"><button type="button" data-for="app" aria-pressed="true" aria-controls="app">DeepWell App</button><button type="button" data-for="donovan" aria-pressed="false" aria-controls="donovan">Donovan</button></div></div>
@@ -450,6 +454,17 @@ footer a:hover{color:var(--text)}
     syncTabs();
     if (mq) { if (mq.addEventListener) mq.addEventListener('change', syncTabs); else if (mq.addListener) mq.addListener(syncTabs); }
   }
+
+  // The well and the orb belong to the top of the page: fade them out as the reader scrolls into the release notes,
+  // so they never sit behind text. Opacity only, once per frame.
+  var fadeQueued = false;
+  function setFade() {
+    fadeQueued = false;
+    var f = Math.min(1, Math.max(0, window.scrollY / (window.innerHeight * 0.55)));
+    root.style.setProperty('--pn-fade', f.toFixed(3));
+  }
+  window.addEventListener('scroll', function () { if (!fadeQueued) { fadeQueued = true; requestAnimationFrame(setFade); } }, { passive: true });
+  setFade();
 
   if (!('IntersectionObserver' in window)) return;
 

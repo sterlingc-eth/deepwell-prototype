@@ -48,6 +48,8 @@ export function NotificationsPanel() {
   const [ownUnreadCount, setOwnUnreadCount] = useState<number | null>(null);
   const unreadCount = ownUnreadCount ?? bootstrapUnread;
   const [loaded, setLoaded] = useState(false);
+  // Read notifications leave the list (they are done); "Show earlier notifications" brings them back for a look.
+  const [showRead, setShowRead] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const openEntity = useAppStore((s) => s.openEntity);
   const openCustomer = useAppStore((s) => s.openCustomer);
@@ -161,6 +163,8 @@ export function NotificationsPanel() {
   };
 
   const badge = unreadBadgeLabel(unreadCount);
+  const readCount = items.filter((i) => i.readAt).length;
+  const visibleItems = showRead ? items : items.filter((i) => !i.readAt);
 
   return (
     <div className="relative" ref={containerRef}>
@@ -199,10 +203,10 @@ export function NotificationsPanel() {
           </div>
           <div className="max-h-96 overflow-y-auto">
             {!loaded && <p className="px-4 py-6 text-caption text-ink-3 text-center">Loading…</p>}
-            {loaded && items.length === 0 && (
+            {loaded && visibleItems.length === 0 && (
               <p className="px-4 py-6 text-caption text-ink-3 text-center">Nothing needs your attention.</p>
             )}
-            {items.map((item) => (
+            {visibleItems.map((item) => (
               <button
                 key={item.id}
                 type="button"
@@ -222,6 +226,13 @@ export function NotificationsPanel() {
               </button>
             ))}
           </div>
+          {loaded && readCount > 0 && (
+            <div className="px-4 py-2 border-t border-line">
+              <button type="button" onClick={() => setShowRead((v) => !v)} className="text-caption text-ink-2 hover:text-ink underline">
+                {showRead ? 'Hide earlier notifications' : 'Show earlier notifications'}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
