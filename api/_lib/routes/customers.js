@@ -5,7 +5,7 @@ import { limit as rateLimit } from "../rateLimit.js";
 import { withTenant, normalizeMatchText } from "../recordsStore.js";
 import { alertTier, daysBetween, isPlausibleToday } from "../warrantyRules.js";
 import {
-  findDuplicateCustomerPairs, normalizeAddressKey, compareNamesStrict, pickKeepDrop,
+  findDuplicateCustomerPairs, crowdedAddressKeys, dedupePairs, normalizeAddressKey, compareNamesStrict, pickKeepDrop,
   possibleDuplicatePairKey, normalizeSurname, damerauLevenshteinDistance,
   SURNAME_FUZZY_MIN_LENGTH, SURNAME_FUZZY_MAX_DISTANCE,
 } from "../integrity.js";
@@ -187,6 +187,7 @@ export async function loadKeepSeparatePairs(db) {
 export function planPossibleDuplicates(customers, { keepSeparatePairs } = {}) {
   const skip = keepSeparatePairs ?? new Set();
   const list = Array.isArray(customers) ? customers : [];
+  const crowded = crowdedAddressKeys(list);
   const out = [];
   for (let i = 0; i < list.length; i++) {
     for (let j = i + 1; j < list.length; j++) {
@@ -195,6 +196,9 @@ export function planPossibleDuplicates(customers, { keepSeparatePairs } = {}) {
       if (!a?.id || !b?.id || a.id === b.id) continue;
       const addrKey = normalizeAddressKey(a.address);
       if (!addrKey || addrKey !== normalizeAddressKey(b.address)) continue;
+      // A shop / store / office address shared by many customers is not a
+      // duplicate signal (see MAX_CUSTOMERS_PER_ADDRESS).
+      if (crowded.has(addrKey)) continue;
       const nameRel = compareNamesStrict(a.name, b.name);
       if (nameRel === "equal" || nameRel === "subset" || nameRel === "unknown") continue;
       const key = possibleDuplicatePairKey(a.id, b.id);
@@ -440,7 +444,7 @@ export async function customers(req, res) {
     // never proposed for auto-merge and never counted in `duplicates` above
     // (see planPossibleDuplicates's own doc comment) — the Inbox "Duplicates"
     // chip and both customer profiles read this field to stop showing 0.
-    const possibleDuplicates = planPossibleDuplicates(customersForPairs, { keepSeparatePairs });
+    const possibleDuplicates = dedupePairs(planPossibleDuplicates(customersForPairs, { keepSeparatePairs }), duplicates);
 
     const body = { customers: data, duplicates, possibleDuplicates };
     if (paging) {

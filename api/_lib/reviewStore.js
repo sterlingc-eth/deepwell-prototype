@@ -93,6 +93,10 @@ import {
   inferDocumentType,
   isReclassifiable,
   isShopInternalDocument,
+  mayVerifyWithoutLink,
+  linkNotRequired,
+  resortDecision,
+  inferTypeFromFilename,
   completenessFor,
   toCompletenessFields,
   AI_VERIFY_MIN_CONFIDENCE,
@@ -158,8 +162,10 @@ export function assertNonEmptyString(name, v) {
  * @param {{stage: string}|null|undefined} doc
  * @param {unknown[]|null|undefined} links
  */
-export function canVerify(doc, links) {
-  return !!doc && doc.stage === 'linked' && Array.isArray(links) && links.length > 0;
+export function canVerify(doc, links, { noLinkNeeded = false } = {}) {
+  if (!doc) return false;
+  if (noLinkNeeded) return doc.stage === 'linked' || doc.stage === 'read' || doc.stage === 'mapped';
+  return doc.stage === 'linked' && Array.isArray(links) && links.length > 0;
 }
 
 /** What stage a document should be at right after one of its fields is
@@ -542,11 +548,15 @@ export async function verifyDocument(ctx, { documentId, by }, actorClerkId) {
   assertNonEmptyString('by', by);
 
   return withTenant(ctx, async (client, tenantId) => {
-    const doc = (await client.query(`SELECT id, stage FROM documents WHERE id = $1 AND ${TENANT}`, [documentId])).rows[0];
+    const doc = (await client.query(`SELECT id, stage, document_type FROM documents WHERE id = $1 AND ${TENANT}`, [documentId])).rows[0];
     if (!doc) throw new ReviewError('Document not found', 404);
     const links = (await client.query(`SELECT id FROM document_entity_links WHERE document_id = $1 AND ${TENANT}`, [documentId])).rows;
+    // Company paperwork and address-less invoices/receipts have nothing to link to: a person may still check them.
+    const keys = new Set((await client.query(
+      `SELECT field_key FROM extractions WHERE document_id = $1 AND ${TENANT} AND TRIM(COALESCE(corrected_value, value, '')) <> ''`, [documentId])).rows.map((r) => r.field_key));
+    const noLinkNeeded = linkNotRequired(normalizeDocumentType(doc.document_type), keys);
 
-    if (!canVerify(doc, links)) {
+    if (!canVerify(doc, links, { noLinkNeeded })) {
       throw new ReviewError('Document must be linked to at least one record before it can be verified', 409);
     }
 
@@ -555,9 +565,9 @@ export async function verifyDocument(ctx, { documentId, by }, actorClerkId) {
     // something else changed the stage between the SELECT above and here.
     const r = await client.query(
       `UPDATE documents SET stage = 'verified', verified_by = $2, verified_at = NOW()
-        WHERE id = $1 AND ${TENANT} AND stage = 'linked'
+        WHERE id = $1 AND ${TENANT} AND stage = ANY($3::text[])
         RETURNING *`,
-      [documentId, by]
+      [documentId, by, noLinkNeeded ? ['linked', 'read', 'mapped'] : ['linked']]
     );
     if (!r.rowCount) throw new ReviewError('Document is no longer eligible to verify', 409);
 
@@ -847,7 +857,7 @@ export async function aiVerifyDocument(ctx, { documentId }, actorClerkId) {
 
     let verified = false;
     if (completeness.complete && completeness.minConfidence >= AI_VERIFY_MIN_CONFIDENCE) {
-      verified = (await db.verifyByAi(documentId)) > 0;
+      verified = (await db.verifyByAi(documentId, { allowUnlinked: mayVerifyWithoutLink(type, completenessFields) })) > 0;
     }
 
     if (verified) {
@@ -1094,6 +1104,93 @@ export async function reclassifyDocuments(ctx, { documentIds } = {}, actorClerkI
   }
 
   return { changes, remaining };
+}
+
+/**
+ * ONE-TIME RE-SORT (document-rules round, 2026-10-09). Owner-triggered from Needs you ("Sort my documents") and
+ * admin-only. For one bounded page of this tenant's documents it:
+ *   1. moves documents typed invoice / other / correspondence / dispatch-note to a better type ONLY when a title line
+ *      on the stored page text or the file name confidently says so (documentTypes.js resortDecision) - never a
+ *      document a person classified, and no model call at all;
+ *   2. then runs the same automatic check a new document gets: a complete, readable document that needs no
+ *      customer link (company paperwork, an address-less invoice or receipt) is marked checked by "ai".
+ * Tenant-scoped (RLS + explicit tenant filters), no schema change, idempotent (a second run finds nothing to move and
+ * nothing to check), keyset-paged: the caller passes back `nextAfterId` until `done`. $0.
+ */
+export const RESORT_SOURCE_LIST = ['invoice', 'other', 'correspondence', 'dispatch-note'];
+export async function resortDocuments(ctx, { afterId = null, limit = 100 } = {}, actorClerkId) {
+  const cap = Math.max(1, Math.min(200, Number(limit) || 100));
+  if (afterId != null && !isUuid(afterId)) throw new ReviewError('afterId must be a uuid', 400);
+  const types = [...RESORT_SOURCE_LIST, 'proposal-quote', 'purchase-order', 'internal', 'receipt', 'agreement', 'delivery-ticket', 'schedule', 'price-list', 'statement', 'insurance-certificate', 'hr-letter'];
+
+  const page = await withRecordsTenant(ctx, async (db) => {
+    const r = await db.raw(
+      `SELECT id, document_type, original_filename, stage FROM documents
+        WHERE ${TENANT} AND document_type = ANY($1::text[]) AND ($2::uuid IS NULL OR id > $2::uuid)
+        ORDER BY id LIMIT $3`,
+      [types, afterId, cap + 1]
+    );
+    return r.rows;
+  });
+  const hasMore = page.length > cap;
+  const docs = page.slice(0, cap);
+  const summary = { scanned: docs.length, retyped: 0, checked: 0, byType: {}, errors: 0, done: !hasMore, nextAfterId: hasMore ? docs[docs.length - 1].id : null };
+  const changes = [];
+
+  for (const d of docs) {
+    try {
+      const out = await withRecordsTenant(ctx, async (db) => {
+        const doc = await db.getDocument(d.id);
+        if (!doc) return null;
+        let type = normalizeDocumentType(doc.document_type);
+        let moved = null;
+        if (RESORT_SOURCE_LIST.includes(type)) {
+          const classificationRows = await db.getAuditLog({ action: 'review.document_classified', resource_type: 'document', resource_id: d.id });
+          if (!wasClassifiedByHuman(doc.document_type, classificationRows)) {
+            const pages = await db.listPages(d.id);
+            const hit = classifyFromText(pages.map((p) => ({ page_no: p.page_no, text: p.text ?? '' })));
+            const next = resortDecision({ currentType: type, filename: doc.original_filename, titleType: hit?.type ?? null });
+            if (next) {
+              await db.updateDocument(d.id, { document_type: next });
+              await db.logAction({
+                clerk_user_id: actorClerkId, action: 'review.document_resorted', resource_type: 'document', resource_id: d.id,
+                changes: { from: type, to: next, source: hit?.type === next ? 'title' : 'filename', model_calls: 0 },
+              });
+              moved = { documentId: d.id, from: type, to: next };
+              type = next;
+            }
+          }
+        }
+        let checked = false;
+        if (doc.stage !== 'verified') {
+          const fields = toCompletenessFields(await db.listExtractionsByDocument(d.id));
+          const c = completenessFor(type, fields);
+          if (c.complete && c.minConfidence >= AI_VERIFY_MIN_CONFIDENCE && mayVerifyWithoutLink(type, fields)) {
+            checked = (await db.verifyByAi(d.id, { allowUnlinked: true })) > 0;
+            if (checked) {
+              await db.logAction({
+                clerk_user_id: actorClerkId, action: 'review.ai_verified', resource_type: 'document', resource_id: d.id,
+                changes: { completeness: c, source: 'resort' },
+              });
+            }
+          }
+        }
+        return { moved, checked };
+      });
+      if (out?.moved) { summary.retyped++; summary.byType[out.moved.to] = (summary.byType[out.moved.to] ?? 0) + 1; changes.push(out.moved); }
+      if (out?.checked) summary.checked++;
+    } catch (err) {
+      summary.errors++;
+      console.error('resortDocuments: document failed, continuing:', d.id, err?.message);
+    }
+  }
+
+  if (changes.length) {
+    await withRecordsTenant(ctx, async (db) => {
+      await db.logAction({ clerk_user_id: actorClerkId, action: 'review.resorted', resource_type: 'document', changes: { count: changes.length, byType: summary.byType } });
+    });
+  }
+  return summary;
 }
 
 // ---------------------------------------------------------------------------

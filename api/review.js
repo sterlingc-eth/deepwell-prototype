@@ -90,7 +90,7 @@ import {
 // (list_autopilot_summary_window / a live gap-report rebuild can scan list_ask_misses_window and
 // list_scorecard_failures_window) an operator's dashboard could otherwise poll without limit — same
 // reasoning as missDigest above, even though neither makes a billed model call.
-const INTEGRITY_RATE_LIMIT_ACTIONS = new Set(['recheckDocument', 'recheckMissing', 'integrityScan', 'integrityFix', 'missDigest', 'learningRunNow', 'learningReplay', 'learningRejectAllGaps', 'askFeedback', 'scorecardRun', 'scorecardBaseline', 'semanticBackfill', 'dossierBackfill', 'learningAutopilotStatus', 'learningGapReport']);
+const INTEGRITY_RATE_LIMIT_ACTIONS = new Set(['recheckDocument', 'recheckMissing', 'resortDocuments', 'integrityScan', 'integrityFix', 'missDigest', 'learningRunNow', 'learningReplay', 'learningRejectAllGaps', 'askFeedback', 'scorecardRun', 'scorecardBaseline', 'semanticBackfill', 'dossierBackfill', 'learningAutopilotStatus', 'learningGapReport']);
 const OPERATOR_ACTIONS = new Set(['missDigest', 'learningList', 'learningDecide', 'learningDeactivate', 'learningRunNow', 'learningExport', 'learningReplay', 'learningRejectAllGaps', 'scorecardRun', 'scorecardStatus', 'scorecardBaseline', 'learningAutopilotStatus', 'learningGapReport', 'examPromote', 'examList', 'examExport']);
 
 // HARD GATE (Reviewer NO-GO, 2026-09-21): which of this route's actions
@@ -183,6 +183,8 @@ const ACTIONS = new Set([
   // R33: $0 re-read of a stored document's own page text for a missing required field (api/_lib/recheck.js).
   'recheckDocument',
   'recheckMissing',
+  // Document-rules round: one-time owner-triggered re-sort + automatic check, $0 (reviewStore.resortDocuments).
+  'resortDocuments',
   'reclassify',
   'createCustomer',
   'updateCustomer',
@@ -340,6 +342,10 @@ export default async (req, res) => {
           source: 'inbox-bulk',
           deadlineAt: Date.now() + 240_000,
         });
+        break;
+      case 'resortDocuments':
+        requireAdmin(auth);
+        result = await reviewStore.resortDocuments(ctx, { afterId: payload.afterId ?? null, limit: Math.min(200, Number(payload.limit) || 100) }, auth.userId);
         break;
       case 'reclassify':
         result = await reviewStore.reclassifyDocuments(ctx, payload, auth.userId);

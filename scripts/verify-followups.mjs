@@ -68,7 +68,8 @@ eq('an empty extraction list -> null', docTechnicianName([]), null);
 eq(
   'missingFieldsForDocument reuses documentTypes.js completenessFor: work-order missing everything',
   missingFieldsForDocument({ document_type: 'work-order', extractions: [] }),
-  ['service_address', 'service_date', 'technician']
+  // Document-rules round (2026-10-09): a work order no longer requires a technician (owner decision).
+  ['service_address', 'service_date']
 );
 eq(
   'missingFieldsForDocument: a satisfied requirement drops out',
@@ -76,10 +77,9 @@ eq(
     document_type: 'work-order',
     extractions: [
       { field_key: 'service_address', value: '123 Main St', confidence: 0.9 },
-      { field_key: 'service_date', value: '2026-09-01', confidence: 0.9 },
     ],
   }),
-  ['technician']
+  ['service_date']
 );
 eq('missingFieldsForDocument: a fully satisfied document has nothing missing', missingFieldsForDocument({
   document_type: 'nameplate-photo',

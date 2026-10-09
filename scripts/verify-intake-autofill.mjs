@@ -48,6 +48,11 @@ console.log = (...a) => { if (typeof a[0] === 'string' && (a[0].startsWith('{"ro
 
 /* ================================================================== 1. pure */
 const A = await import('../api/_lib/intake/autofill.js');
+// Document-rules round (2026-10-09): the owner decided a work order no longer REQUIRES a technician. This script exercises
+// the sibling-fill MECHANISM with technician as the missing field, so it restores that one requirement for the test only
+// (a tenant or industry pack can still require it). Every other section of the script is unchanged.
+const DTYPES = await import('../api/_lib/documentTypes.js');
+DTYPES.REQUIRED_FIELDS['work-order'] = ['service_address', 'service_date', 'technician'];
 
 eq('normalizeCompareValue: trims, collapses space, lowercases', [A.normalizeCompareValue('  Mike   Rivera '), A.normalizeCompareValue(null), A.normalizeCompareValue(undefined)], ['mike rivera', '', '']);
 eq('splitAltKeys: alt-key requirement splits, bare key stays one', [A.splitAltKeys('a|b'), A.splitAltKeys('technician'), A.splitAltKeys('')], [['a', 'b'], ['technician'], []]);

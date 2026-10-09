@@ -160,6 +160,8 @@ export function dateBasisPhrase(basis) {
 export const NON_VISIT_TYPES = new Set([
   'maintenance-agreement', 'maintenance-plan', 'warranty-registration', 'warranty', 'proposal-quote', 'proposal', 'quote',
   'purchase-order', 'permit', 'nameplate-photo', 'nameplate', 'correspondence', 'internal',
+  // Generic business paperwork: none of these is a service visit.
+  'receipt', 'agreement', 'delivery-ticket', 'schedule', 'price-list', 'statement', 'insurance-certificate', 'hr-letter',
 ]);
 
 export const normalizeTypeId = (t) => String(t ?? '').trim().toLowerCase().replace(/_/g, '-');

@@ -195,6 +195,28 @@ export function isAnswerable(doc: Doc, includeUnverified: boolean): boolean {
   return includeUnverified ? stageIndex(doc.stage) >= stageIndex('linked') : doc.stage === 'verified';
 }
 
+/** Non-empty extracted field names of a document (a correction wins over the read value). */
+function presentFieldNames(doc: Doc): Set<string> {
+  return new Set(doc.extracted.filter((f) => (f.correctedValue ?? f.value).trim()).map((f) => f.name));
+}
+
+/** True when this document is company paperwork (purchase order, schedule, price list, statement, HR letter,
+ *  insurance certificate, company record, or an agreement naming no customer). Exported for Review's filters. */
+export function isCompanyRecordDoc(doc: Doc, schema: DomainSchema): boolean {
+  const type = schema.documentTypes.find((t) => t.id === doc.typeId);
+  if (!type) return false;
+  if (type.companyRecord) return true;
+  return !!type.companyRecordIfNoCustomer && !presentFieldNames(doc).has('customer_name');
+}
+
+/** True when a missing link is fine for this document: company paperwork, or a link-optional type (invoice, receipt,
+ *  delivery ticket...) that names no service address (an address means a job at a place, which should link). */
+export function linkNotRequiredFor(doc: Doc, schema: DomainSchema): boolean {
+  if (isCompanyRecordDoc(doc, schema)) return true;
+  const type = schema.documentTypes.find((t) => t.id === doc.typeId);
+  return !!type?.linkOptional && !presentFieldNames(doc).has('service_address');
+}
+
 /** Where in the pipeline a document can legitimately sit given its issues. */
 export function maxStageFor(doc: Doc, schema: DomainSchema): PipelineStage {
   if (doc.issues.some((i) => i.kind === 'duplicate')) return 'received';
@@ -203,7 +225,7 @@ export function maxStageFor(doc: Doc, schema: DomainSchema): PipelineStage {
   const present = new Set(doc.extracted.filter((f) => (f.correctedValue ?? f.value).trim()).map((f) => f.name));
   const missing = (type?.requiredFields ?? []).filter((r) => !isRequirementMet(present, r));
   if (missing.length) return 'classified';
-  if (doc.linkedEntityIds.length === 0) return 'extracted';
+  if (doc.linkedEntityIds.length === 0 && !linkNotRequiredFor(doc, schema)) return 'extracted';
   if (doc.issues.some((i) => i.kind === 'conflict')) return 'linked';
   return 'verified';
 }
@@ -221,9 +243,10 @@ export function maxStageFor(doc: Doc, schema: DomainSchema): PipelineStage {
 export function recomputeIssues(doc: Doc, schema: DomainSchema): Doc {
   const type = schema.documentTypes.find((t) => t.id === doc.typeId);
   const present = new Set(doc.extracted.filter((f) => (f.correctedValue ?? f.value).trim()).map((f) => f.name));
-  let kept = doc.issues.filter((i) => i.kind !== 'missing-field' && !(i.kind === 'unlinked' && doc.linkedEntityIds.length > 0));
+  const noLinkNeeded = linkNotRequiredFor(doc, schema);
+  let kept = doc.issues.filter((i) => i.kind !== 'missing-field' && !(i.kind === 'unlinked' && (doc.linkedEntityIds.length > 0 || noLinkNeeded)));
   const missing = (type?.requiredFields ?? []).filter((r) => !isRequirementMet(present, r)).map((f) => ({ kind: 'missing-field' as const, field: f }));
-  if (doc.typeId && doc.linkedEntityIds.length === 0 && !kept.some((i) => i.kind === 'unlinked')) {
+  if (doc.typeId && doc.linkedEntityIds.length === 0 && !kept.some((i) => i.kind === 'unlinked') && !linkNotRequiredFor(doc, schema)) {
     kept = [...kept, { kind: 'unlinked' as const, confidence: 0 }];
   }
   return { ...doc, issues: [...missing, ...kept] };

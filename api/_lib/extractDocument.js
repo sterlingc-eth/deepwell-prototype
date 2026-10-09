@@ -21,9 +21,11 @@ import {
   isLegacyOrUnknownType,
   completenessFor,
   isShopInternalDocument,
+  mayVerifyWithoutLink,
   AI_VERIFY_MIN_CONFIDENCE,
 } from "./documentTypes.js";
 import { integrityFixDocument } from "./routes/integrity.js";
+import { isFragmentName } from "./integrity.js";
 import { applyBodyNameLinks } from "./bodyNameLink.js";
 import { completeIntake } from "./intake/autofill.js";
 import { classifyDocumentAudience } from "./audience/store.js";
@@ -218,6 +220,10 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
   }
   const highestPage = pages.reduce((n, p) => Math.max(n, Number(p.page_no) || 0), 0);
   let { fields, dropped } = normalizeFields(toolUse?.input?.fields, { pageCount: highestPage, pack });
+
+  // A customer_name that is only a business suffix ("Management", "Inc.",
+  // "Group") is a parse fragment, not a name: never store it as an identity.
+  fields = fields.filter((f) => !(f.field_key === 'customer_name' && isFragmentName(f.value)));
 
   // A document that states nothing extractable is a real answer, not a failure.
   // The write still happens, so an empty result replaces stale rows from an
@@ -489,7 +495,7 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
     const completeness = completenessFor(resolvedType, fields, pack);
     let aiVerified = false;
     if (completeness.complete && completeness.minConfidence >= AI_VERIFY_MIN_CONFIDENCE) {
-      aiVerified = (await db.verifyByAi(documentId)) > 0;
+      aiVerified = (await db.verifyByAi(documentId, { allowUnlinked: mayVerifyWithoutLink(resolvedType, fields) })) > 0;
     }
 
     await db.logAction({

@@ -3,10 +3,10 @@ import { createPortal } from 'react-dom';
 import { Check, AlertTriangle, ArrowLeft, Bell, Link2, GitMerge, Copy, Loader2, Plus, Search, Sparkles, Trash2, UserCog } from 'lucide-react';
 import { StagePill, STAGE_LABEL } from '../components/StagePill';
 import { DocumentPreview } from '../components/DocumentPreview';
-import { conflictDocs, entitiesOfType, gapDocs, isRequirementMet, maxStageFor, unlinkedDocs, useGraph, type GraphSnapshot } from '../core/entityGraph';
+import { conflictDocs, entitiesOfType, gapDocs, isCompanyRecordDoc, isRequirementMet, maxStageFor, unlinkedDocs, useGraph, type GraphSnapshot } from '../core/entityGraph';
 import type { Conflict, Doc, Entity, SourceRef } from '../core/types';
 import { targetFor } from '../domains/hvac/intake';
-import { fieldLabel, requirementLabel } from '../domains/hvac/schema';
+import { fieldLabel, hvacSchema, requirementLabel } from '../domains/hvac/schema';
 import { groupExtractionsByUnit } from '../domains/hvac/units';
 import { normalize, str } from '../core/answer';
 import { customerForDocument, matchesCustomerScope } from '../core/customer';
@@ -106,7 +106,7 @@ function matches(doc: Doc, f: Filter, sets: QueueSets): boolean {
     case 'conflicts': return sets.conflicts.has(doc.id);
     case 'duplicates': return doc.issues.some((i) => i.kind === 'duplicate');
     case 'ready': return doc.stage === 'linked' && doc.issues.length === 0;
-    case 'shop-records': return doc.typeId === 'internal';
+    case 'shop-records': return isCompanyRecordDoc(doc, hvacSchema);
     case 'money': return sets.money.has(doc.id);
     case 'all': return true;
   }
@@ -512,7 +512,7 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
   // Hiding never applies to the "Shop records" tab itself (see the state
   // comment above) — everywhere else, an internal document is excluded
   // while the toggle is on.
-  const notHiddenShop = (d: Doc, f: Filter) => f === 'shop-records' || !hideShopRecords || d.typeId !== 'internal';
+  const notHiddenShop = (d: Doc, f: Filter) => f === 'shop-records' || !hideShopRecords || !isCompanyRecordDoc(d, hvacSchema);
   const matchesTechFilter = (d: Doc, f: Filter) => f !== 'shop-records' || !shopTechFilter || shopRecordTechnician(d) === shopTechFilter;
 
   const queue = useMemo(
@@ -591,6 +591,32 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
       setRecheckAllMsg(e instanceof Error ? e.message : 'Could not re-check these documents.');
     } finally {
       setRecheckAllBusy(false);
+    }
+  };
+
+  // Owner action (admin): "Sort my documents" - a one-time tidy. Documents typed Invoice/Other/Correspondence whose title
+  // or file name clearly says Receipt, Statement, Agreement... are moved to that type, then complete ones that need no
+  // customer link are checked. Runs on the server in bounded pages ($0, no model; reviewStore.resortDocuments).
+  const [resortBusy, setResortBusy] = useState(false);
+  const [resortMsg, setResortMsg] = useState<string | null>(null);
+  const runResort = async () => {
+    setResortBusy(true);
+    setResortMsg(null);
+    try {
+      let scanned = 0, retyped = 0, checked = 0, errors = 0;
+      let after: string | null = null;
+      for (let guard = 0; guard < 200; guard++) {
+        const r = await reviewClient.resortDocuments(after, 100);
+        scanned += r.scanned; retyped += r.retyped; checked += r.checked; errors += r.errors;
+        if (r.done || !r.nextAfterId) break;
+        after = r.nextAfterId;
+      }
+      try { await loadGraphFromServer(); } catch { /* keep last-good data */ }
+      setResortMsg(`Sorted ${scanned} document${scanned === 1 ? '' : 's'}: ${retyped} moved to a better type and ${checked} checked automatically.${errors > 0 ? ` ${errors} couldn't be sorted this time.` : ''}`);
+    } catch (e) {
+      setResortMsg(e instanceof Error ? e.message : 'Could not sort these documents.');
+    } finally {
+      setResortBusy(false);
     }
   };
 
@@ -867,6 +893,14 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
             <input type="checkbox" className="w-5 h-5" checked={hideShopRecords} onChange={toggleHideShopRecords} aria-label="Hide company records" />
             Hide company records
           </label>
+          {(filter === 'gaps' || filter === 'attention' || filter === 'unlinked') && !REVIEW_IS_DEMO_ONLY && (
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" className="dw-btn-tertiary !min-h-[44px] !py-1.5" disabled={resortBusy || !canAdmin} title={canAdmin ? 'Moves receipts, statements, agreements and similar paperwork out of Invoice, then checks what is complete.' : ASK_ADMIN_TITLE} onClick={() => void runResort()}>
+                {resortBusy ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Sparkles className="w-4 h-4" aria-hidden="true" />} Sort my documents
+              </button>
+              {!canAdmin && <AskAdminNote />}
+            </div>
+          )}
           {(filter === 'gaps' || filter === 'attention') && missingQueueIds.length > 0 && !REVIEW_IS_DEMO_ONLY && (
             <div className="flex flex-wrap items-center gap-2">
               <button type="button" className="dw-btn-tertiary !min-h-[44px] !py-1.5" disabled={recheckAllBusy || !canAdmin} title={canAdmin ? undefined : ASK_ADMIN_TITLE} onClick={() => void runRecheckAll()}>
@@ -878,6 +912,7 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
           <span className="hidden lg:inline text-caption text-ink-3 lg:ml-auto">Tip: j / k to move, Enter to open</span>
         </div>
         {recheckAllMsg && <p className="text-caption text-ink-3">{recheckAllMsg}</p>}
+        {resortMsg && <p className="text-caption text-ink-3">{resortMsg}</p>}
 
         {/* Filter chips: rendered by InboxScreen now, in the same row as its
             "Decisions" chip (round 17 merge) — see this file's own header

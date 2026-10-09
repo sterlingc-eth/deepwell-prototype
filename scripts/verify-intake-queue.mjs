@@ -97,6 +97,10 @@ const { withTenant, getTenantContext } = await import('../api/_lib/recordsStore.
 const { intakeStatus } = await import('../api/_lib/intake/status.js');
 const Q = await import('../api/_lib/intake/queue.js');
 const A = await import('../api/_lib/intake/autofill.js');
+// Document-rules round (2026-10-09): a work order no longer REQUIRES a technician (owner decision). This script exercises the
+// conflicting-technician question flow, so it restores that one requirement for the test only (a pack can still require it).
+const DTYPES = await import('../api/_lib/documentTypes.js');
+DTYPES.REQUIRED_FIELDS['work-order'] = ['service_address', 'service_date', 'technician'];
 const R = await import('../api/_lib/reviewStore.js');
 
 const ctxA = { tenantKey: 'org_iq_a', tenantName: 'Desert Peak HVAC' };

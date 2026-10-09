@@ -29,7 +29,8 @@
  */
 import { normalizeDate } from "../extractFields.js";
 import { BRAND_RULES } from "../warrantyRules.js";
-import { REQUIRED_FIELDS, DOCUMENT_TYPE_IDS } from "../documentTypes.js";
+import { isFragmentName } from "../integrity.js";
+import { REQUIRED_FIELDS, DOCUMENT_TYPE_IDS, GENERIC_TITLE_PATTERNS } from "../documentTypes.js";
 
 export const TEXT_EXTRACTOR_VERSION = 1;
 
@@ -55,6 +56,8 @@ const TITLES = [
   ["dispatch-note", /^dispatch\s+(?:note|slip|ticket)(?:\s*[-:].*)?$/],
   ["correspondence", /^(?:letter|memo|email|correspondence)$/],
   ["internal", /^internal\s+(?:memo|note|record)$/],
+  // Generic business paperwork (receipt, agreement, statement ...). None is a template type, so these only classify.
+  ...GENERIC_TITLE_PATTERNS,
 ];
 
 const norm = (s) => String(s ?? "").replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[–—]/g, "-").replace(/ /g, " ");
@@ -449,7 +452,7 @@ export function extractFromText(pages, opts = {}) {
         }
         case "customer_name": {
           if (PLACEHOLDER_RE.test(value)) return reject("placeholder-customer-name", type);
-          if (!NAME_RE.test(value) || /\d/.test(value) || value.length < 3) return reject("bad-customer-name", type);
+          if (!NAME_RE.test(value) || /\d/.test(value) || value.length < 3 || isFragmentName(value)) return reject("bad-customer-name", type);
           if (!setSingle("customer_name", value, line)) return reject("conflict:customer_name", type);
           break;
         }
@@ -752,7 +755,7 @@ export function scanLabeledValues(pages, opts = {}) {
           if (!(ADDR_RE.test(pm[1]) || ADDR_LOOSE_RE.test(pm[1]))) return;
           value = pm[1];
           const nm = cleanValue(pm[2]);
-          if (NAME_RE.test(nm) && !/\d/.test(nm)) push("customer_name", nm, line, label, "bare");
+          if (NAME_RE.test(nm) && !/\d/.test(nm) && !isFragmentName(nm)) push("customer_name", nm, line, label, "bare");
         } else if (!isAddress(value)) {
           return; // the loose form must END at the ZIP: no trailing text riding along into the address
         }
@@ -779,7 +782,7 @@ export function scanLabeledValues(pages, opts = {}) {
       default: break;
     }
     switch (key) {
-      case "customer_name": if (!PLACEHOLDER_RE.test(value) && NAME_RE.test(value) && !/\d/.test(value) && value.length >= 3) push(key, value, line, label); return;
+      case "customer_name": if (!PLACEHOLDER_RE.test(value) && !isFragmentName(value) && NAME_RE.test(value) && !/\d/.test(value) && value.length >= 3) push(key, value, line, label); return;
       case "technician": if (!PLACEHOLDER_RE.test(value) && NAME_RE.test(value) && !/\d/.test(value) && !/\s(?:and|&)\s|[,/]/.test(value)) push(key, value, line, label); return;
       case "serial_number": if (SERIAL_RE.test(value) && /\d/.test(value)) push(key, value, line, label); return;
       case "model": if (MODEL_RE.test(value) && /\d/.test(value)) push(key, value, line, label); return;

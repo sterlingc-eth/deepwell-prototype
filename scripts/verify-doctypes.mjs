@@ -129,7 +129,10 @@ eq('dispatch-note doc with weak facts (service_date only) resolved by filename',
 eq('service-ticket doc with no work_performed extracted still resolved by filename',
   inferDocumentType({ service_address: '3247 Elm St' }, '03-service-ticket-3247-elm-capacitor.pdf'),
   'service-ticket');
-eq('a real cost still wins over a conflicting filename', inferDocumentType({ cost: '150.00' }, '07-dispatch-note.txt'), 'invoice');
+// Document-rules round (2026-10-09): a SPECIFIC file name now beats the bare "has a cost -> invoice" guess (a packing
+// slip, rent ledger or statement prints amounts without being an invoice). Updated from 'invoice' on purpose.
+eq('a specific filename now beats a bare cost', inferDocumentType({ cost: '150.00' }, '07-dispatch-note.txt'), 'dispatch-note');
+eq('a real cost still falls back to invoice when the name says nothing', inferDocumentType({ cost: '150.00' }, 'scan0007.pdf'), 'invoice');
 eq('work_performed still wins over a conflicting filename', inferDocumentType({ work_performed: 'replaced capacitor' }, 'invoice-draft.pdf'), 'service-ticket');
 eq('permit_number still wins over a conflicting filename', inferDocumentType({ permit_number: 'P-1' }, 'invoice.pdf'), 'permit');
 
@@ -158,19 +161,24 @@ eq('permit_number still wins over a conflicting filename', inferDocumentType({ p
 /* -------------------------------------------------------------- completenessFor */
 
 {
+  // Invoice now needs a customer or vendor, a date and an amount - no address (document-rules round, 2026-10-09).
   const c = completenessFor('invoice', [
-    { field_key: 'service_address', value: '123 Main St', confidence: 0.95 },
+    { field_key: 'vendor', value: 'Hale Law', confidence: 0.95 },
+    { field_key: 'service_date', value: '2026-09-01', confidence: 0.95 },
     { field_key: 'cost', value: '100.00', confidence: 0.9 },
   ]);
-  eq('invoice complete with both required fields', c.complete, true);
-  eq('invoice minConfidence is the lower of the two', c.minConfidence, 0.9);
-  eq('invoice required list', c.required, ['service_address', 'cost']);
-  eq('invoice present list', c.present.sort(), ['cost', 'service_address']);
+  eq('invoice complete with name, date and amount', c.complete, true);
+  eq('invoice minConfidence is the lowest of the three', c.minConfidence, 0.9);
+  eq('invoice required list', c.required, ['customer_name|vendor', 'service_date', 'cost']);
+  eq('invoice present list', c.present.sort(), ['cost', 'service_date', 'vendor']);
   eq('invoice missing list is empty', c.missing, []);
 }
 
 {
-  const c = completenessFor('invoice', [{ field_key: 'service_address', value: '123 Main St', confidence: 0.95 }]);
+  const c = completenessFor('invoice', [
+    { field_key: 'customer_name', value: 'Jane Doe', confidence: 0.95 },
+    { field_key: 'service_date', value: '2026-09-01', confidence: 0.95 },
+  ]);
   eq('invoice missing cost is incomplete', c.complete, false);
   eq('invoice reports cost missing', c.missing, ['cost']);
 }
@@ -202,15 +210,15 @@ eq('permit_number still wins over a conflicting filename', inferDocumentType({ p
 
 {
   // Blank / whitespace-only values do not count as present.
-  const c = completenessFor('correspondence', [{ field_key: 'customer_name', value: '   ', confidence: 0.9 }]);
+  const c = completenessFor('statement', [{ field_key: 'vendor', value: '   ', confidence: 0.9 }]);
   eq('whitespace-only value does not satisfy a requirement', c.complete, false);
 }
 
 {
   // Highest-confidence duplicate wins when a field_key appears twice.
-  const c = completenessFor('correspondence', [
-    { field_key: 'customer_name', value: 'Jane', confidence: 0.4 },
-    { field_key: 'customer_name', value: 'Jane', confidence: 0.95 },
+  const c = completenessFor('statement', [
+    { field_key: 'vendor', value: 'Jane', confidence: 0.4 },
+    { field_key: 'vendor', value: 'Jane', confidence: 0.95 },
   ]);
   eq('duplicate field_key uses the higher confidence', c.minConfidence, 0.95);
 }
@@ -233,7 +241,7 @@ eq('permit_number still wins over a conflicting filename', inferDocumentType({ p
   eq('legacy-typed document can still be complete', c.complete, true);
 }
 
-eq('malformed fields array is safe', completenessFor('invoice', null).required, ['service_address', 'cost']);
+eq('malformed fields array is safe', completenessFor('invoice', null).required, ['customer_name|vendor', 'service_date', 'cost']);
 eq('non-array fields is safe', completenessFor('invoice', 'nope').complete, false);
 
 /* -------------------------------------------------------- AI-verify threshold */

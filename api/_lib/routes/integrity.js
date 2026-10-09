@@ -21,7 +21,7 @@ import { isShopInternalDocument, toCompletenessFields } from '../documentTypes.j
 import { applyBodyNameLinks, planBodyNameLinks } from '../bodyNameLink.js';
 import { planPossibleDuplicates, loadKeepSeparatePairs } from './customers.js';
 import {
-  findDuplicateCustomerPairs, isUnlinkedDocument,
+  findDuplicateCustomerPairs, dedupePairs, isUnlinkedDocument,
   isEquipmentMissingCustomer, multiUnitUnderLinked, CUSTOMER_MATCH_THRESHOLD,
   unitIndexBackfillPlan, groupExtractionRowsByUnit, coalesceEntityData,
   isLikelyShopAddress, normalizeAddressKey, normalizeSurname, compareNamesStrict,
@@ -786,7 +786,7 @@ export async function integrityScan(ctx) {
     // never proposed for auto-merge, never counted by findDuplicateCustomerPairs
     // below (see planPossibleDuplicates's own doc comment, routes/customers.js)
     // — surfaced separately so the Inbox "Duplicates" chip stops showing 0.
-    const possibleDuplicates = planPossibleDuplicates(customers, { keepSeparatePairs });
+    const possibleDuplicatesRaw = planPossibleDuplicates(customers, { keepSeparatePairs });
     const suspectedShopAddresses = await loadSuspectedShopAddresses(db, shopContext);
 
     // Limit-test defect A (2026-09-20): a phone/email shared as a likely shop
@@ -799,6 +799,8 @@ export async function integrityScan(ctx) {
     // see loadContactExtractionEvidence's doc comment.
     const contactCtx = buildContactCtx(customers, shopContext, extraContactRows);
     const duplicateCustomers = findDuplicateCustomerPairs(customers, { ctx: contactCtx });
+    // Never list the same pair in both lists (the Inbox chip adds them).
+    const possibleDuplicates = dedupePairs(possibleDuplicatesRaw, duplicateCustomers);
     const shopContactLeaks = findShopContactLeaks(customers, contactCtx);
     // Round 4: a value only findable via the extraction-evidence signal above
     // was never learned into known_shop_contacts either (that only happens

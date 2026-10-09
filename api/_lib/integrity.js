@@ -101,6 +101,49 @@ function normalizeNamePlain(raw) {
 const HONORIFICS = new Set(['mr', 'mrs', 'ms', 'dr', 'the']);
 
 /**
+ * Business suffix / generic words. They describe the KIND of organisation, not
+ * who it is, so they are never a surname and never an identity on their own:
+ * "Mesa Property Management Inc." must not be found via "inc", and a stored
+ * customer name that is only one of these ("Management", "Inc.", "Group") is a
+ * fragment, not a name. Matching of a business name is done on the WHOLE
+ * normalized name (see compareNamesStrict).
+ */
+export const BUSINESS_SUFFIXES = new Set([
+  'llc', 'inc', 'incorporated', 'co', 'corp', 'corporation', 'company', 'group',
+  'management', 'mgmt', 'services', 'service', 'properties', 'property', 'partners',
+  'partnership', 'holdings', 'holding', 'ltd', 'limited', 'lp', 'llp', 'pllc', 'pc',
+  'trust', 'association', 'assoc', 'hoa', 'enterprises', 'associates', 'realty',
+  'investments', 'international', 'intl', 'ventures', 'and', 'of', 'the',
+  // trade / industry words: a name containing one is a business, never a surname
+  'plumbing', 'heating', 'air', 'cooling', 'electric', 'electrical', 'roofing', 'dental', 'construction',
+  'landscaping', 'cleaning', 'auto', 'motors', 'rentals', 'rental', 'equipment', 'supply', 'insurance', 'law',
+  'consulting', 'hardware', 'restaurant', 'church', 'school', 'hospital', 'clinic', 'bank', 'sons', 'bros', 'brothers',
+  'contractors', 'contracting', 'mechanical', 'builders', 'solutions', 'systems', 'technologies', 'industries',
+]);
+
+function nameTokens(raw) {
+  return normalizeNamePlain(raw).split(' ').filter(Boolean);
+}
+
+/** True when a name contains a business suffix/generic word. */
+export function isBusinessName(raw) {
+  return nameTokens(raw).some((t) => BUSINESS_SUFFIXES.has(t) && t !== 'and' && t !== 'of' && t !== 'the');
+}
+
+/** The identifying tokens of a name: everything except suffix/generic words. */
+export function nameCoreTokens(raw) {
+  return nameTokens(raw).filter((t) => !BUSINESS_SUFFIXES.has(t) && !HONORIFICS.has(t));
+}
+
+/** A name made only of suffix/generic words ("Management", "Inc.", "Group
+ *  LLC") or with no letters at all. Never usable as a customer identity. */
+export function isFragmentName(raw) {
+  const t = nameTokens(raw);
+  if (!t.length) return false; // empty is "no name", not a fragment
+  return nameCoreTokens(raw).filter((x) => x.length > 1).length === 0;
+}
+
+/**
  * Best-effort surname: "Ray & Linda Castillo" / "Castillo, Ray" /
  * "R. Castillo" / "The Castillos" all -> "castillo". A heuristic, not a name
  * parser — it exists to widen a candidate search, never to merge on its own
@@ -109,6 +152,8 @@ const HONORIFICS = new Set(['mr', 'mrs', 'ms', 'dr', 'the']);
 export function normalizeSurname(raw) {
   let s = String(raw ?? '').toLowerCase().trim();
   if (!s) return '';
+  // Business names have no surname: matching is on the whole name.
+  if (isBusinessName(s) || isFragmentName(s)) return '';
   const hadThe = /^the\s+/.test(s);
   if (s.includes(',')) s = s.split(',')[0]; // "Castillo, Ray" -> "Castillo"
   s = s.replace(/^the\s+/, '').replace(/\./g, '');
@@ -387,6 +432,26 @@ export function compareNamesStrict(a, b) {
   const na = normalizeNamePlain(a);
   const nb = normalizeNamePlain(b);
   if (!na || !nb) return 'unknown';
+  // A bare fragment ("Management", "Inc.") is not a name: nothing to compare.
+  if (isFragmentName(a) || isFragmentName(b)) return 'unknown';
+  if (isBusinessName(a) || isBusinessName(b)) {
+    // Whole-name matching only. Same normalized name, or both are businesses
+    // whose identifying (non-suffix) tokens are the same set, e.g.
+    // "Smith Property Management" vs "Smith Property Management LLC".
+    if (na === nb) return 'equal';
+    // "Plaza Dental Group" vs "Plaza Dental": the shorter name's tokens (two or
+    // more identifying ones) all appear in the longer.
+    const ta2 = na.split(' ').filter(Boolean);
+    const tb2 = nb.split(' ').filter(Boolean);
+    const [sh, lo] = ta2.length <= tb2.length ? [ta2, new Set(tb2)] : [tb2, new Set(ta2)];
+    if (sh.length < Math.max(ta2.length, tb2.length) && nameCoreTokens(sh.join(' ')).length >= 2 && sh.every((t) => lo.has(t))) return 'subset';
+    if (isBusinessName(a) && isBusinessName(b)) {
+      const ca = new Set(nameCoreTokens(a));
+      const cb = new Set(nameCoreTokens(b));
+      if (ca.size && ca.size === cb.size && [...ca].every((t) => cb.has(t))) return 'subset';
+    }
+    return 'no-match';
+  }
   const ta = na.split(' ').filter(Boolean);
   const tb = nb.split(' ').filter(Boolean);
   const setA = new Set(ta);
@@ -720,6 +785,51 @@ export function possibleDuplicatePairKey(aId, bId) {
 }
 
 /**
+ * A shared address with MORE than this many customers is a shop / store /
+ * office / landlord address, not a household: many unrelated customers
+ * legitimately sit there (receipts captured with the store address as the
+ * service address), so address alone says nothing. 3 allows a real
+ * household (a couple, a parent, a business and its owner) while excluding
+ * buildings and retailers. Pairs there also grow with the square of the
+ * customer count (23 customers = 253 pairs).
+ */
+export const MAX_CUSTOMERS_PER_ADDRESS = 3;
+
+/** Set of address keys shared by more than MAX_CUSTOMERS_PER_ADDRESS customers. */
+export function crowdedAddressKeys(customers) {
+  const counts = new Map();
+  for (const c of Array.isArray(customers) ? customers : []) {
+    const k = normalizeAddressKey(c?.address);
+    if (k) counts.set(k, (counts.get(k) ?? 0) + 1);
+  }
+  const out = new Set();
+  for (const [k, n] of counts) if (n > MAX_CUSTOMERS_PER_ADDRESS) out.add(k);
+  return out;
+}
+
+/** Same-address pair where at least one side has no usable name (empty,
+ *  placeholder or a bare fragment such as "Management"): no real name signal. */
+export function isNamelessPair(a, b) {
+  return compareNamesStrict(a?.name, b?.name) === 'unknown';
+}
+
+/** Drop pairs already present in `exclude` (pairs having aId/bId or
+ *  keepId/dropId) and repeats within `pairs`, by possibleDuplicatePairKey. */
+export function dedupePairs(pairs, exclude = []) {
+  const seen = new Set();
+  const idsOf = (p) => (p.aId !== undefined ? [p.aId, p.bId] : [p.keepId, p.dropId]);
+  for (const p of exclude) seen.add(possibleDuplicatePairKey(...idsOf(p)));
+  const out = [];
+  for (const p of pairs) {
+    const k = possibleDuplicatePairKey(...idsOf(p));
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(p);
+  }
+  return out;
+}
+
+/**
  * All same-household pairs among a tenant's customers. `customers`:
  * [{id, name, address, customerNumber, phone?, email?}]. Returns
  * [{keepId, dropId, score, tier, evidence, reason}], keep = the fuller name
@@ -735,6 +845,7 @@ export function possibleDuplicatePairKey(aId, bId) {
  */
 export function findDuplicateCustomerPairs(customers, { threshold = CUSTOMER_SUGGEST_THRESHOLD, ctx } = {}) {
   const list = Array.isArray(customers) ? customers : [];
+  const crowded = crowdedAddressKeys(list);
   const pairs = [];
   for (let i = 0; i < list.length; i++) {
     for (let j = i + 1; j < list.length; j++) {
@@ -743,6 +854,14 @@ export function findDuplicateCustomerPairs(customers, { threshold = CUSTOMER_SUG
       if (!a?.id || !b?.id || a.id === b.id) continue;
       const { score, tier, evidence, reason } = evaluateCustomerMatch(a, b, ctx);
       if (score < threshold) continue;
+      // Real name signal required: an address alone (one side nameless or a
+      // fragment like "Management") never makes a duplicate. Shared-surname
+      // pairs stay here, and the callers drop them from the possible list
+      // (dedupePairs) so the Duplicates chip never counts a pair twice.
+      if (isNamelessPair(a, b)) continue;
+      // A shop / store / office address shared by many customers is no signal
+      // for a weak-name pair; real equal/subset names still pair there.
+      if (crowded.has(normalizeAddressKey(a.address)) && !(compareNamesStrict(a.name, b.name) === 'equal' || compareNamesStrict(a.name, b.name) === 'subset')) continue;
       const [keep, drop] = pickKeepDrop(a, b);
       pairs.push({ keepId: keep.id, dropId: drop.id, score, tier, evidence, reason });
     }

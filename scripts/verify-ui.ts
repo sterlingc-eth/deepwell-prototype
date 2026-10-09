@@ -432,7 +432,18 @@ const eq = (name: string, got: unknown, want: unknown): void =>
 {
   eq('DOCUMENT_TYPES ids match the backend exactly', hvacDocTypes.DOCUMENT_TYPES.map((t) => t.id), backendDocTypes.DOCUMENT_TYPES.map((t: { id: string }) => t.id));
   eq('DOCUMENT_TYPES labels match the backend exactly', hvacDocTypes.DOCUMENT_TYPES.map((t) => t.label), backendDocTypes.DOCUMENT_TYPES.map((t: { label: string }) => t.label));
-  eq('there are exactly the 16 canonical types (15 the brief lists + Round 4\'s "internal")', hvacDocTypes.DOCUMENT_TYPES.length, 16);
+  // 16 before the document-rules round; +8 generic business types (receipt, agreement, delivery-ticket, schedule, price-list, statement, insurance-certificate, hr-letter).
+  eq('there are exactly the 24 canonical types (16 HVAC-era + 8 generic business types)', hvacDocTypes.DOCUMENT_TYPES.length, 24);
+  eq('COMPANY_RECORD_TYPES matches the backend exactly', [...hvacDocTypes.COMPANY_RECORD_TYPES].sort(), [...backendDocTypes.COMPANY_RECORD_TYPES].sort());
+  eq('COMPANY_RECORD_IF_NO_CUSTOMER_TYPES matches the backend exactly', [...hvacDocTypes.COMPANY_RECORD_IF_NO_CUSTOMER_TYPES].sort(), [...backendDocTypes.COMPANY_RECORD_IF_NO_CUSTOMER_TYPES].sort());
+  eq('LINK_OPTIONAL_TYPES matches the backend exactly', [...hvacDocTypes.LINK_OPTIONAL_TYPES].sort(), [...backendDocTypes.LINK_OPTIONAL_TYPES].sort());
+  for (const t of backendDocTypes.DOCUMENT_TYPES.map((x: { id: string }) => x.id)) {
+    for (const present of [new Set<string>(), new Set(['customer_name']), new Set(['service_address'])]) {
+      eq(`isCompanyRecordType/linkNotRequired agree with the backend for ${t} / ${[...present].join(',') || 'no facts'}`,
+        [hvacDocTypes.isCompanyRecordType(t, present), hvacDocTypes.linkNotRequired(t, present)],
+        [backendDocTypes.isCompanyRecordType(t, present), backendDocTypes.linkNotRequired(t, present)]);
+    }
+  }
   eq('REQUIRED_FIELDS matches the backend exactly, including a|b alternatives', hvacDocTypes.REQUIRED_FIELDS, backendDocTypes.REQUIRED_FIELDS);
   eq('FIELD_LABELS matches the backend exactly', hvacDocTypes.FIELD_LABELS, backendDocTypes.FIELD_LABELS);
   eq('AI_VERIFY_MIN_CONFIDENCE matches the backend', hvacDocTypes.AI_VERIFY_MIN_CONFIDENCE, backendDocTypes.AI_VERIFY_MIN_CONFIDENCE);

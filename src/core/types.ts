@@ -42,6 +42,12 @@ export interface DocumentTypeSpec {
   label: string;
   /** Extracted field names that must be present (and non-empty) before a document counts as Extracted */
   requiredFields: string[];
+  /** Company paperwork: never "Not linked", leaves Needs you once its own required fields are present. */
+  companyRecord?: boolean;
+  /** Company paperwork only while no customer is named on it (an agreement with no customer). */
+  companyRecordIfNoCustomer?: boolean;
+  /** Needs no customer/equipment link when it carries no service address (invoice, receipt, delivery ticket...). */
+  linkOptional?: boolean;
 }
 
 export interface DomainSchema {

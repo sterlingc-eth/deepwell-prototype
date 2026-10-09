@@ -267,7 +267,7 @@ function measure(cases, { oracle }) {
   for (const c of cases) for (const r of DT.REQUIRED_FIELDS[c.type] ?? []) for (const k of r.split('|')) if (c.expect[k] != null) perKey[k] = (perKey[k] ?? 0) + 1;
   const bySource = cases.reduce((m, c) => ({ ...m, [c.source]: (m[c.source] ?? 0) + 1 }), {});
   realLog(`\nobvious-fields benchmark: ${cases.length} documents ${JSON.stringify(bySource)}; printed required values per field: ${JSON.stringify(perKey)}`);
-  const thin = ['service_address', 'service_date', 'work_performed', 'technician', 'cost', 'serial_number', 'model', 'customer_name', 'vendor', 'agreement_term'].filter((k) => (perKey[k] ?? 0) < 120);
+  const thin = ['service_address', 'service_date', 'work_performed', 'cost', 'serial_number', 'model', 'customer_name', 'vendor', 'agreement_term'].filter((k) => (perKey[k] ?? 0) < 120);
   check('benchmark: >= 120 printed cases for every required field key', !thin.length, thin.join(', '));
   check('benchmark: all nine document types present', FX.BENCH_TYPES.every((t) => cases.some((c) => c.type === t)));
   check('benchmark: includes the exact Sonoran case and corpus-derived documents', cases.some((c) => c.id === 'adv-sonoran-118') && cases.some((c) => c.source === 'corpus') && cases.some((c) => c.source === 'corpus-mutated'));

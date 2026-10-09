@@ -30,7 +30,7 @@ import { staffImportWindowFor, noteDatabaseClock } from './staffImport.js';
 import {
   customerMatchScore, CUSTOMER_MATCH_THRESHOLD, normalizeSurname, normalizeAddressKey, normalizeUnitKey,
   addressOnlyCustomerName, isAddressOnlyCustomer, isLikelyShopAddress, houseNumberOf,
-  normalizePhoneKey, normalizeEmailKey, compareNamesStrict, chooseUpgradedCustomerName,
+  normalizePhoneKey, normalizeEmailKey, compareNamesStrict, isFragmentName, chooseUpgradedCustomerName,
   extractNameMention, matchNameMention,
 } from './integrity.js';
 import { TTLCache, memoAsync, logStage, registerTenantCache, bustTenantCaches } from './perf.js';
@@ -647,6 +647,7 @@ function browseBaseColumns(hasDisplayName, hasFinancials, hasAudienceColumn) {
              d.document_type, d.stage, d.created_at, d.created_at::text AS created_at_raw, d.verified_by, d.uploaded_by,
              linked.customer_id, linked.customer_name, linked.site_address, linked.brand, linked.warranty_expiry,
              fields.service_date, fields.technician_name,
+             fields.ex_customer_name, fields.ex_service_address, fields.ex_cost, fields.ex_total, fields.ex_amount,
              (${AUDIENCE_EXPR(hasAudienceColumn)}) AS audience,
              ${hasFinancials
                ? "df.total AS amount, df.balance_due, df.status AS money_status, (df.id IS NOT NULL) AS has_money,"
@@ -674,13 +675,18 @@ function browseLateralJoins(hasAudienceColumn) {
       LEFT JOIN LATERAL (
         SELECT MAX(value) FILTER (WHERE field_key = 'service_date') AS service_date,
                MAX(value) FILTER (WHERE field_key = 'technician') AS technician_name,
+               MAX(value) FILTER (WHERE field_key = 'customer_name') AS ex_customer_name,
+               MAX(value) FILTER (WHERE field_key = 'service_address') AS ex_service_address,
+               MAX(value) FILTER (WHERE field_key = 'cost') AS ex_cost,
+               MAX(value) FILTER (WHERE field_key = 'total') AS ex_total,
+               MAX(value) FILTER (WHERE field_key = 'amount') AS ex_amount,
                ${hasAudienceColumn
                  ? 'NULL::text AS audience_fallback'
                  : `MAX(value) FILTER (WHERE field_key = '${AUDIENCE_FALLBACK_FIELD_KEY}') AS audience_fallback`}
           FROM (
-            SELECT DISTINCT ON (field_key) field_key, value
+            SELECT DISTINCT ON (field_key) field_key, COALESCE(corrected_value, value) AS value
               FROM extractions
-             WHERE ${TENANT} AND document_id = d.id AND field_key IN ('service_date', 'technician'${hasAudienceColumn ? '' : `, '${AUDIENCE_FALLBACK_FIELD_KEY}'`})
+             WHERE ${TENANT} AND document_id = d.id AND field_key IN ('service_date', 'technician', 'customer_name', 'service_address', 'cost', 'total', 'amount'${hasAudienceColumn ? '' : `, '${AUDIENCE_FALLBACK_FIELD_KEY}'`})
              ORDER BY field_key, confidence DESC NULLS LAST, id
           ) best
       ) fields ON TRUE`;
@@ -717,13 +723,18 @@ function sharedBrowseCtes(hasDisplayName, hasFinancials, wherePart, hasAudienceC
       SELECT document_id,
              MAX(value) FILTER (WHERE field_key = 'service_date') AS service_date,
              MAX(value) FILTER (WHERE field_key = 'technician') AS technician_name,
+               MAX(value) FILTER (WHERE field_key = 'customer_name') AS ex_customer_name,
+               MAX(value) FILTER (WHERE field_key = 'service_address') AS ex_service_address,
+               MAX(value) FILTER (WHERE field_key = 'cost') AS ex_cost,
+               MAX(value) FILTER (WHERE field_key = 'total') AS ex_total,
+               MAX(value) FILTER (WHERE field_key = 'amount') AS ex_amount,
              ${hasAudienceColumn
                ? 'NULL::text AS audience_fallback'
                : `MAX(value) FILTER (WHERE field_key = '${AUDIENCE_FALLBACK_FIELD_KEY}') AS audience_fallback`}
         FROM (
-          SELECT DISTINCT ON (document_id, field_key) document_id, field_key, value
+          SELECT DISTINCT ON (document_id, field_key) document_id, field_key, COALESCE(corrected_value, value) AS value
             FROM extractions
-           WHERE ${TENANT} AND field_key IN ('service_date', 'technician'${hasAudienceColumn ? '' : `, '${AUDIENCE_FALLBACK_FIELD_KEY}'`}) ${inCand('document_id')}
+           WHERE ${TENANT} AND field_key IN ('service_date', 'technician', 'customer_name', 'service_address', 'cost', 'total', 'amount'${hasAudienceColumn ? '' : `, '${AUDIENCE_FALLBACK_FIELD_KEY}'`}) ${inCand('document_id')}
            ORDER BY document_id, field_key, confidence DESC NULLS LAST, id
         ) best
        GROUP BY document_id
@@ -943,10 +954,49 @@ async function runBrowseFacets(db, ctxB, currentUserId) {
   return out;
 }
 
+/** Parses an extracted money string ("$1,234.50", "334.56") to a number, or null. */
+function parseExtractedAmount(raw) {
+  if (raw == null) return null;
+  const m = String(raw).replace(/[,\s]/g, '').match(/-?\$?-?(\d+(?:\.\d+)?)/);
+  if (!m) return null;
+  const n = Number(String(m[0]).replace('$', ''));
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Pure. Display values for a Records row: the LINKED customer / address /
+ * amount win; when the document is not linked (or the link lacks the value)
+ * fall back to what was EXTRACTED from the document itself (stored extraction
+ * values, already tenant-scoped by the query). Fallback values are marked
+ * `*FromDocument` so the UI can show them as read-from-document.
+ * Technician already comes from the extraction. No schema change.
+ */
+export function applyBrowseFallbacks(r) {
+  const clean = (v) => { const t = String(v ?? '').trim(); return t && !isFragmentName(t) ? t : null; };
+  const linkedName = clean(r.customer_name);
+  const linkedAddr = clean(r.site_address);
+  const customerName = linkedName ?? clean(r.ex_customer_name);
+  const siteAddress = linkedAddr ?? (String(r.ex_service_address ?? '').trim() || null);
+  let amount = r.amount != null ? Number(r.amount) : null;
+  let amountFromDocument = false;
+  if (amount == null) {
+    for (const k of ['ex_total', 'ex_amount', 'ex_cost']) {
+      const n = parseExtractedAmount(r[k]);
+      if (n != null) { amount = n; amountFromDocument = true; break; }
+    }
+  }
+  return {
+    customerName, siteAddress, amount,
+    customerFromDocument: !linkedName && !!customerName,
+    addressFromDocument: !linkedAddr && !!siteAddress,
+    amountFromDocument,
+  };
+}
+
 /** Shapes a browse page (rows straight from SQL) into the wire response. */
 function browseResult(rows, { total, hasMore, nextCursor, facets, sort, limit }) {
   return {
-    rows: rows.map((r) => ({
+    rows: rows.map((r) => { const fb = applyBrowseFallbacks(r); return {
       id: r.id,
       filename: r.original_filename,
       displayName: r.display_name ?? null,
@@ -958,20 +1008,23 @@ function browseResult(rows, { total, hasMore, nextCursor, facets, sort, limit })
       createdAt: r.created_at ? new Date(r.created_at).toISOString() : null,
       serviceDate: r.service_date ?? null,
       customerId: r.customer_id,
-      customerName: r.customer_name,
-      siteAddress: r.site_address,
+      customerName: fb.customerName,
+      siteAddress: fb.siteAddress,
+      customerFromDocument: fb.customerFromDocument,
+      addressFromDocument: fb.addressFromDocument,
+      amountFromDocument: fb.amountFromDocument,
       technician: r.technician_name,
       brand: r.brand,
       warrantyExpiry: r.warranty_expiry,
       warrantyBucket: r.warranty_bucket,
-      amount: r.amount != null ? Number(r.amount) : null,
+      amount: fb.amount,
       balanceDue: r.balance_due != null ? Number(r.balance_due) : null,
       moneyStatus: r.money_status,
       hasMoney: r.has_money,
       // Round 18, part 2 (owner ask (a)): drives the "Team only" badge (src/components/records/RecordsBrowser.tsx) -
       // always 'customer' or 'internal', never null (AUDIENCE_EXPR's own COALESCE).
       audience: r.audience === 'internal' ? 'internal' : 'customer',
-    })),
+    }; }),
     total,
     hasMore,
     nextCursor,
@@ -1067,6 +1120,13 @@ export function normalizeMatchText(raw) {
   return /[\p{L}\p{N}]/u.test(s) ? s : '';
 }
 
+/** normalizeMatchText for a customer NAME: a bare business-suffix fragment
+ *  ("Management", "Inc.", "Group") is not a name, so it reads as "no name". */
+export function normalizeCustomerNameText(raw) {
+  const s = normalizeMatchText(raw);
+  return s && isFragmentName(s) ? '' : s;
+}
+
 /**
  * findOrCreateCustomer's `matchBasis` -> the `linked_by` value every caller
  * (extractDocument.js, reviewStore.js, routes/integrity.js) should stamp on
@@ -1143,7 +1203,7 @@ export function selectCustomerMatch(candidates, incoming) {
       // eligible on the address alone — the address-only path
       // (findOrCreateCustomerByAddress) never reaches this function at all,
       // so `name` here is always a real extracted customer_name when set.
-      const candidateName = normalizeMatchText(c.data?.customer_name);
+      const candidateName = normalizeCustomerNameText(c.data?.customer_name);
       if (!name || !candidateName) return true;
       const rel = compareNamesStrict(name, candidateName);
       return rel === 'equal' || rel === 'subset' || rel === 'surname';
@@ -1260,7 +1320,7 @@ export async function linkDocumentToEntity(db, { documentId, entityId, confidenc
  * surname-ILIKE scan uses.
  */
 export async function findCustomerNameCandidates(db, name) {
-  const normalized = normalizeMatchText(name);
+  const normalized = normalizeCustomerNameText(name);
   if (!normalized) return [];
   const surname = normalizeSurname(normalized).replace(/[%_]/g, '\\$&');
   if (!surname) return [];
@@ -2254,16 +2314,26 @@ function makeStore(db, tenantId) {
      * already 'verified' (by a human or a previous AI pass) is left alone —
      * this never re-stamps verified_at or flips verified_by back to 'ai'.
      */
-    verifyByAi: async (documentId) => {
-      const r = await db.query(
-        `UPDATE documents SET stage = 'verified', verified_by = 'ai', verified_at = NOW()
-          WHERE id = $1 AND ${TENANT} AND stage IN ('read','mapped','linked')
-            AND (
+    // `allowUnlinked` (document-rules round, 2026-10-09): company paperwork and address-less invoices/receipts have no
+    // customer or equipment to link to, so the link guard would keep them in Needs you forever. The caller decides
+    // eligibility (documentTypes.js mayVerifyWithoutLink + completeness); this only relaxes the link guard and still
+    // requires something readable: an extraction or non-empty page text.
+    verifyByAi: async (documentId, opts = {}) => {
+      const guard = opts && opts.allowUnlinked === true
+        ? `(
+                  EXISTS (SELECT 1 FROM extractions x WHERE x.document_id = documents.id AND x.tenant_id = documents.tenant_id)
+               OR EXISTS (SELECT 1 FROM document_pages p WHERE p.document_id = documents.id AND p.tenant_id = documents.tenant_id AND COALESCE(p.text, '') <> '')
+            )`
+        : `(
                   EXISTS (SELECT 1 FROM extractions x
                            WHERE x.document_id = documents.id AND x.entity_id IS NOT NULL)
                OR EXISTS (SELECT 1 FROM document_entity_links l
                            WHERE l.document_id = documents.id)
-            )`,
+            )`;
+      const r = await db.query(
+        `UPDATE documents SET stage = 'verified', verified_by = 'ai', verified_at = NOW()
+          WHERE id = $1 AND ${TENANT} AND stage IN ('read','mapped','linked')
+            AND ${guard}`,
         [documentId]
       );
       return r.rowCount;
@@ -3036,7 +3106,7 @@ function makeStore(db, tenantId) {
      *   on every row; omitted, the address-only path computes it itself.
      */
     findOrCreateCustomer: async (facts, shopContext) => {
-      const name = normalizeMatchText(facts?.customer_name);
+      const name = normalizeCustomerNameText(facts?.customer_name);
       const address = normalizeMatchText(facts?.service_address);
       if (!name) {
         if (address) return findOrCreateCustomerByAddress(db, tenantId, address, facts, shopContext);
@@ -3257,7 +3327,7 @@ function makeStore(db, tenantId) {
      * while merely looking for a suggestion.
      */
     suggestCustomer: async ({ customer_name, service_address } = {}) => {
-      const name = normalizeMatchText(customer_name);
+      const name = normalizeCustomerNameText(customer_name);
       if (!name) return null;
       const address = normalizeMatchText(service_address);
       const surname = normalizeSurname(name).replace(/[%_]/g, '\\$&');

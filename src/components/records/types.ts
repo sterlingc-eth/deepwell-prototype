@@ -83,6 +83,10 @@ export interface BrowseRow {
   customerId: string | null;
   customerName: string | null;
   siteAddress: string | null;
+  /** True when customerName / siteAddress / amount were read from the document's own extracted fields because no linked record had them. */
+  customerFromDocument?: boolean;
+  addressFromDocument?: boolean;
+  amountFromDocument?: boolean;
   technician: string | null;
   brand: string | null;
   warrantyExpiry: string | null;

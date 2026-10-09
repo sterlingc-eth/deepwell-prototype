@@ -123,7 +123,7 @@ const CHIP_KEYS: (keyof BrowseFilters)[] = [
 
 export function RecordsBrowser({ onOpenDocument }: { onOpenDocument: (id: string) => void }) {
   const b = useRecordsBrowse();
-  const [panelOpen, setPanelOpen] = useState(true);
+  const [panelOpen, setPanelOpen] = useState(() => { try { return window.matchMedia('(min-width: 768px)').matches; } catch { return true; } }); // closed by default on a phone
   const [searchDraft, setSearchDraft] = useState(b.filters.q ?? '');
   const [savingName, setSavingName] = useState<string | null>(null);
   const [activeRow, setActiveRow] = useState(0);
@@ -156,6 +156,12 @@ export function RecordsBrowser({ onOpenDocument }: { onOpenDocument: (id: string
     if (n.has(key)) n.delete(key); else n.add(key);
     return n;
   });
+
+  // Team-only documents the default Customer view leaves out: the audience facet's
+  // 'internal' count (the facet ignores its own filter, so it is the true hidden count).
+  const hiddenTeamOnly = (b.filters.audience ?? 'customer') === 'customer'
+    ? Number(((b.facets.find((f) => f.key === 'audience') as { options?: { value: string; count: number }[] } | undefined)?.options ?? []).find((o) => o.value === 'internal')?.count ?? 0)
+    : 0;
 
   const activeChips = CHIP_KEYS.map((k) => ({ key: k, label: chipLabel(k, b.filters) })).filter((c) => c.label);
 
@@ -249,14 +255,20 @@ export function RecordsBrowser({ onOpenDocument }: { onOpenDocument: (id: string
 
       {b.error && <p role="alert" className="text-body text-warn-ink dark:text-brass-200">{b.error}</p>}
 
-      <div className="flex items-start gap-4">
+      <div className="flex flex-col md:flex-row items-stretch md:items-start gap-4">
         {panelOpen && (
           <FacetPanel filters={b.filters} facets={b.facets} onPatch={b.patchFilters} onClose={() => setPanelOpen(false)} />
         )}
 
         <div className="flex-1 min-w-0 space-y-3">
-          <p className="text-caption text-ink-3" aria-live="polite">
-            {b.loading ? 'Loading…' : `${b.rows.length} of ${b.total} document${b.total === 1 ? '' : 's'} shown`}
+          <p className="text-caption text-ink-3 flex flex-wrap items-center gap-x-2 gap-y-1" aria-live="polite">
+            <span>{b.loading ? 'Loading…' : `${b.rows.length} of ${b.total} ${(b.filters.audience ?? 'customer') === 'customer' ? 'customer ' : ''}document${b.total === 1 ? '' : 's'} shown`}</span>
+            {!b.loading && hiddenTeamOnly > 0 && (
+              <>
+                <span className="dw-pill-muted" data-testid="records-hidden-note">{hiddenTeamOnly.toLocaleString()} hidden</span>
+                <button type="button" className="dw-btn-tertiary !min-h-[28px] !py-0.5 !px-2 text-caption" onClick={() => b.patchFilters({ audience: 'all' })}>Show all</button>
+              </>
+            )}
           </p>
 
           {!b.loading && b.rows.length === 0 ? (
@@ -266,17 +278,17 @@ export function RecordsBrowser({ onOpenDocument }: { onOpenDocument: (id: string
             </div>
           ) : b.viewMode === 'table' ? (
             <div className="overflow-x-auto border border-line rounded-lg bg-surface" onKeyDown={onRowKeyDown}>
-              <table className="w-full text-left text-body">
+              <table className="w-full min-w-[48rem] text-left text-body">
                 <thead>
                   <tr className="border-b border-line text-caption text-ink-3">
-                    <th className="px-3 py-2">Name</th>
-                    <th className="px-3 py-2">Type</th>
-                    <th className="px-3 py-2">Customer</th>
-                    <th className="px-3 py-2">Address</th>
-                    <th className="px-3 py-2">Date</th>
-                    <th className="px-3 py-2">Tech</th>
-                    <th className="px-3 py-2">Status</th>
-                    <th className="px-3 py-2">Amount</th>
+                    <th className="px-2 py-2">Name</th>
+                    <th className="px-2 py-2">Type</th>
+                    <th className="px-2 py-2">Customer</th>
+                    <th className="px-2 py-2">Address</th>
+                    <th className="px-2 py-2">Date</th>
+                    <th className="px-2 py-2">Tech</th>
+                    <th className="px-2 py-2 text-right">Amount</th>
+                    <th className="px-2 py-2 sticky right-0 bg-surface border-l border-line">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line">
@@ -334,21 +346,21 @@ function GroupRows({ group, groupBy, collapsed, onToggle, onOpen, activeId }: {
         </tr>
       )}
       {!collapsed && group.rows.map((r) => (
-        <tr key={r.id} className={`hover:bg-surface-2 cursor-pointer ${activeId === r.id ? 'bg-surface-2' : ''}`} tabIndex={0} onClick={() => onOpen(r.id)} onKeyDown={(e) => { if (e.key === 'Enter') onOpen(r.id); }}>
-          <td className="px-3 py-2 max-w-[16rem]" title={rowName(r)}>
+        <tr key={r.id} className={`group hover:bg-surface-2 cursor-pointer ${activeId === r.id ? 'bg-surface-2' : ''}`} tabIndex={0} onClick={() => onOpen(r.id)} onKeyDown={(e) => { if (e.key === 'Enter') onOpen(r.id); }}>
+          <td className="px-2 py-2 max-w-[11rem]" title={rowName(r)}>
             <span className="flex items-center gap-1.5 min-w-0">
               <span className="truncate font-medium text-ink">{rowName(r)}</span>
               {r.audience === 'internal' && <TeamOnlyBadge />}
             </span>
             {r.displayName && <span className="block truncate text-caption text-ink-3">{r.filename}</span>}
           </td>
-          <td className="px-3 py-2 text-ink-2">{typeLabel(r.documentType)}</td>
-          <td className="px-3 py-2 text-ink-2">{r.customerName || '—'}</td>
-          <td className="px-3 py-2 text-ink-2 max-w-[14rem] truncate" title={r.siteAddress ?? ''}>{r.siteAddress || '—'}</td>
-          <td className="px-3 py-2 text-ink-2 whitespace-nowrap">{rowDateLabel(r)}</td>
-          <td className="px-3 py-2 text-ink-2">{r.technician || '—'}</td>
-          <td className="px-3 py-2"><StagePill stage={toPipelineStage(r.stage)} ai={r.verifiedBy === 'ai'} compact /></td>
-          <td className="px-3 py-2 text-ink-2 whitespace-nowrap">{r.amount != null ? fmtMoney(r.amount) : '—'}</td>
+          <td className="px-2 py-2 text-ink-2 whitespace-nowrap">{typeLabel(r.documentType)}</td>
+          <td className="px-2 py-2 text-ink-2 max-w-[9rem] truncate" title={r.customerName ?? ''}>{r.customerName || '—'}</td>
+          <td className="px-2 py-2 text-ink-2 max-w-[9rem] truncate" title={r.siteAddress ?? ''}>{r.siteAddress || '—'}</td>
+          <td className="px-2 py-2 text-ink-2 whitespace-nowrap">{rowDateLabel(r)}</td>
+          <td className="px-2 py-2 text-ink-2 max-w-[8rem] truncate" title={r.technician ?? ''}>{r.technician || '—'}</td>
+          <td className="px-2 py-2 text-ink-2 whitespace-nowrap text-right" title={r.amountFromDocument ? 'Read from the document' : undefined}>{r.amount != null ? fmtMoney(r.amount) : '—'}</td>
+          <td className="px-2 py-2 whitespace-nowrap sticky right-0 bg-surface group-hover:bg-surface-2 border-l border-line"><StagePill stage={toPipelineStage(r.stage)} ai={r.verifiedBy === 'ai'} compact /></td>
         </tr>
       ))}
     </>
@@ -448,7 +460,7 @@ function FacetPanel({ filters, facets, onPatch, onClose }: {
   filters: BrowseFilters; facets: BrowseFacet[]; onPatch: (p: Partial<BrowseFilters>) => void; onClose: () => void;
 }) {
   return (
-    <aside className="w-64 shrink-0 dw-card p-3 space-y-4 max-h-[calc(100vh-14rem)] overflow-y-auto" aria-label="Filters">
+    <aside className="w-full md:w-64 shrink-0 dw-card p-3 space-y-4 max-h-[calc(100vh-14rem)] overflow-y-auto" aria-label="Filters">
       <div className="flex items-center justify-between">
         <p className="font-medium text-ink">Filters</p>
         <button type="button" aria-label="Hide filters" onClick={onClose} className="text-ink-3 hover:text-ink"><X className="w-4 h-4" aria-hidden="true" /></button>

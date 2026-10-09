@@ -26,6 +26,15 @@ export const DOCUMENT_TYPES = [
   { id: 'equipment-record', label: 'Equipment record' },
   { id: 'correspondence', label: 'Correspondence' },
   { id: 'internal', label: 'Company record' },
+  // Generic business paperwork (any industry) — added with the document-rules round, 2026-10-09.
+  { id: 'receipt', label: 'Receipt' },
+  { id: 'agreement', label: 'Agreement / contract' },
+  { id: 'delivery-ticket', label: 'Delivery / pickup ticket' },
+  { id: 'schedule', label: 'Schedule' },
+  { id: 'price-list', label: 'Price list' },
+  { id: 'statement', label: 'Statement' },
+  { id: 'insurance-certificate', label: 'Insurance certificate' },
+  { id: 'hr-letter', label: 'HR / employment letter' },
   { id: 'other', label: 'Other' },
 ];
 
@@ -89,7 +98,7 @@ export function documentTypeLabel(typeId, pack = null) {
  *  part of extractFields.js's cacheable prompt block, never per-document. */
 export const DOCUMENT_TYPE_DEFINITIONS = {
   'work-order': 'A dispatched job: address, date, technician, and what to do — not yet completed.',
-  'invoice': 'A bill for work or equipment: a customer, a charge, a total cost.',
+  'invoice': 'A bill for work, goods or services: a customer or vendor, a date and a total amount. Credit memos belong here.',
   'warranty-registration': 'Registers equipment with the manufacturer for warranty coverage.',
   'startup-sheet': 'Records commissioning/startup readings for newly installed equipment.',
   'permit': 'A government or utility permit for HVAC work, carrying a permit number.',
@@ -102,7 +111,15 @@ export const DOCUMENT_TYPE_DEFINITIONS = {
   'purchase-order': 'An order placed with a vendor for parts or equipment.',
   'equipment-record': 'Identifies a piece of equipment with no service or billing context.',
   'correspondence': 'A letter or email about a customer or job, not a paperwork form.',
-  'internal': 'Shop-only record with no customer on it at all — a parts count, a truck dispatch note, an internal memo to all techs.',
+  'internal': 'Company-only record with no customer on it at all — an inventory or parts count, a gift card log, a daily log, an internal memo.',
+  'receipt': 'Proof of a purchase or payment: a store or vendor, a date and an amount. Includes return slips and retainer receipts.',
+  'agreement': 'A signed or formal agreement between parties: rental, consignment, lease, subcontract, grant, NDA or MOU.',
+  'delivery-ticket': 'A delivery, pickup or packing slip listing goods handed over, with a date and who it is for.',
+  'schedule': 'A calendar of shifts, jobs, visits or deliveries for a period. No customer or amount.',
+  'price-list': 'A list of items or services with their prices, rates or catalog.',
+  'statement': 'A summary of an account over a period: a bank, card, fuel, consignor or rent ledger statement.',
+  'insurance-certificate': 'A certificate of insurance or insurance policy document.',
+  'hr-letter': 'An employment, offer, award or other HR letter about a person who works for the company.',
   'other': 'Does not clearly fit any type above.',
 };
 
@@ -112,23 +129,82 @@ export const DOCUMENT_TYPE_DEFINITIONS = {
  * FIELD_KEYS (plus permit_number, added there for exactly this).
  */
 export const REQUIRED_FIELDS = {
-  'work-order': ['service_address', 'service_date', 'technician'],
+  // Address is required only where work happened at a place (work order, service ticket, inspection, permit).
+  'work-order': ['service_address', 'service_date'],
   'service-ticket': ['service_address', 'service_date', 'work_performed'],
-  'invoice': ['service_address', 'cost'],
+  'invoice': ['customer_name|vendor', 'service_date', 'cost'],
   'warranty-registration': ['serial_number', 'model', 'warranty_expires|warranty_term'],
   'startup-sheet': ['serial_number', 'service_date'],
   'permit': ['service_address', 'permit_number'],
   'nameplate-photo': ['serial_number', 'model'],
-  'maintenance-agreement': ['service_address', 'customer_name', 'warranty_term|agreement_term'],
-  'dispatch-note': ['customer_name|service_address', 'service_date'],
+  'maintenance-agreement': ['customer_name', 'warranty_term|agreement_term'],
+  'dispatch-note': ['customer_name|service_address|vendor', 'service_date'],
   'proposal-quote': ['customer_name|service_address', 'cost'],
   'inspection-report': ['service_address', 'service_date'],
   'purchase-order': ['vendor|customer_name', 'cost'],
   'equipment-record': ['serial_number|model'],
-  'correspondence': ['customer_name'],
+  'correspondence': [],
   'internal': [],
+  'receipt': ['vendor|customer_name', 'service_date', 'cost'],
+  'agreement': ['customer_name|vendor', 'agreement_term|service_date'],
+  'delivery-ticket': ['customer_name|vendor', 'service_date'],
+  'schedule': [],
+  'price-list': [],
+  'statement': ['vendor|customer_name'],
+  'insurance-certificate': ['vendor|customer_name'],
+  'hr-letter': [],
   'other': [],
 };
+
+/**
+ * Company paperwork: the business's own records, never "linked" to a customer. Documents of these types are never
+ * flagged "Not linked" and leave Needs you once their own required fields are present (browser mirror:
+ * src/domains/hvac/documentTypes.ts, parity checked by verify:ui).
+ */
+export const COMPANY_RECORD_TYPES = new Set([
+  'purchase-order', 'internal', 'schedule', 'price-list', 'statement', 'insurance-certificate', 'hr-letter',
+]);
+/** Company paperwork only while no customer is named on it (an NDA/MOU/lease with the company's own counterparty). */
+export const COMPANY_RECORD_IF_NO_CUSTOMER_TYPES = new Set(['agreement']);
+/** Types that need no customer/equipment link when they also carry no service address (an address means a job at a
+ *  place, which should link). */
+export const LINK_OPTIONAL_TYPES = new Set(['invoice', 'receipt', 'delivery-ticket', 'correspondence']);
+
+const hasKey = (present, k) => (present instanceof Set ? present.has(k) : !!present?.[k]);
+
+/** True when the document is company paperwork. `present` = Set (or object) of non-empty extracted field keys. */
+export function isCompanyRecordType(typeId, present = new Set()) {
+  const t = canonicalTypeId(typeId);
+  if (COMPANY_RECORD_TYPES.has(t)) return true;
+  return COMPANY_RECORD_IF_NO_CUSTOMER_TYPES.has(t) && !hasKey(present, 'customer_name');
+}
+
+/** True when a missing customer/equipment link must NOT be flagged and must not stop an automatic check. */
+export function linkNotRequired(typeId, present = new Set()) {
+  const t = canonicalTypeId(typeId);
+  if (isCompanyRecordType(t, present)) return true;
+  return LINK_OPTIONAL_TYPES.has(t) && !hasKey(present, 'service_address');
+}
+
+/** Facts-array convenience: may this document be checked automatically with no link? Needs something readable
+ *  (at least one non-empty fact) and never applies to the undecided 'other' type. */
+export function mayVerifyWithoutLink(typeId, fields) {
+  const t = canonicalTypeId(typeId);
+  if (t === 'other') return false;
+  const present = new Set();
+  let lowest = 1;
+  for (const f of Array.isArray(fields) ? fields : []) {
+    if (f && typeof f.field_key === 'string' && f.value != null && String(f.value).trim() !== '') {
+      present.add(f.field_key);
+      const c = Number(f.confidence);
+      lowest = Math.min(lowest, Number.isFinite(c) ? c : 0);
+    }
+  }
+  // Readable enough: two facts, or a name fact. And every fact used is confident (types that require nothing
+  // would otherwise count a 0.1-confidence fact as complete).
+  const readable = present.size >= 2 || present.has('customer_name') || present.has('vendor');
+  return readable && lowest >= AI_VERIFY_MIN_CONFIDENCE && linkNotRequired(t, present);
+}
 
 /** Facts a shop-internal document is allowed to carry (see
  *  isShopInternalDocument below) — its own letterhead facts plus a free-text
@@ -379,12 +455,34 @@ export function normalizeDocumentType(raw, facts = {}, pack = null) {
  * specific patterns (purchase order, service ticket) are checked before the
  * generic ones they could otherwise collide with.
  */
+// Document codes like "R-20120", "RA_0012", "PT 31": a short letter prefix, then digits, not glued to other letters.
+const code = (prefixes) => new RegExp(`(?:^|[^a-z0-9])(?:${prefixes})[-_ ]\\d`, 'i');
+const word = (w) => new RegExp(`(?:^|[^a-z])(?:${w})(?:[^a-z]|$)`, 'i');
 const FILENAME_PATTERNS = [
   [/purchase[-_ ]?order|\bpo[-_]?\d+\b/i, 'purchase-order'],
+  // Generic business paperwork. More specific phrases first so "rental agreement receipt" style names resolve sanely.
+  [/packing[-_ ]?slip|delivery[-_ ](?:ticket|note|slip|receipt)|pick[-_ ]?up[-_ ](?:ticket|slip|receipt)|bill[-_ ]of[-_ ]lading/i, 'delivery-ticket'],
+  [code('ps|pt|dt|pk'), 'delivery-ticket'],
+  [/certificate[-_ ]of[-_ ]insurance|insurance[-_ ](?:certificate|policy)/i, 'insurance-certificate'],
+  [word('coi|policy'), 'insurance-certificate'],
+  [/offer[-_ ]letter|award[-_ ]letter|employment|termination[-_ ]letter|new[-_ ]hire|job[-_ ]offer|onboarding[-_ ]letter/i, 'hr-letter'],
+  [/statement|ledger|account[-_ ]summary|remittance/i, 'statement'],
+  [code('cs'), 'statement'],
+  [/credit[-_ ]?(?:memo|note)|debit[-_ ]?memo/i, 'invoice'],
+  [code('cm'), 'invoice'],
+  [/receipt|return[-_ ]?slip|sales[-_ ]slip/i, 'receipt'],
+  [code('rc|rcpt|r'), 'receipt'],
+  [/price[-_ ]?list|rate[-_ ]?(?:card|sheet)|catalog(?:ue)?|fee[-_ ]schedule/i, 'price-list'],
+  [/schedule|roster|timesheet/i, 'schedule'],
+  [/inventory|stock[-_ ]?count|parts[-_ ]?count|gift[-_ ]?card|daily[-_ ]log/i, 'internal'],
+  [code('p'), 'internal'],
   [/service[-_ ]?ticket/i, 'service-ticket'],
   [/dispatch/i, 'dispatch-note'],
   [/work[-_ ]?order/i, 'work-order'],
-  [/(maintenance|service)[-_ ]?agreement|\bmsa\b/i, 'maintenance-agreement'],
+  [/(maintenance|service)[-_ ](?:agreement|contract|plan)|\bmsa\b/i, 'maintenance-agreement'],
+  [/rental[-_ ]agreement|consign\w*[-_ ]agreement|grant[-_ ]agreement|non[-_ ]?disclosure|memorandum[-_ ]of|sub[-_ ]?contract|agreement|contract/i, 'agreement'],
+  [code('ra|ca|sc'), 'agreement'],
+  [word('lease|nda|mou'), 'agreement'],
   [/proposal|quote|estimate/i, 'proposal-quote'],
   [/inspection/i, 'inspection-report'],
   [/nameplate|data[-_ ]?plate/i, 'nameplate-photo'],
@@ -392,6 +490,36 @@ const FILENAME_PATTERNS = [
   [/permit/i, 'permit'],
   [/invoice/i, 'invoice'],
 ];
+
+/** Title-line patterns (a document announcing its own type), tried against short lines in modelAvoidance/textExtract.js
+ *  classifyFromText and by the one-time re-sort. Lowercase, trailing punctuation already stripped. */
+export const GENERIC_TITLE_PATTERNS = [
+  ['receipt', /^(?:sales\s+|payment\s+|retainer\s+|cash\s+)?receipt(?:\s*(?:#|no\.?|number)\s*[\w-]+)?$|^return\s+slip$/],
+  ['agreement', /^(?:rental|consignment|lease|subcontract(?:or)?|grant|service|vendor|independent\s+contractor)\s+(?:agreement|contract)$|^(?:non[-\s]?disclosure|confidentiality)\s+agreement$|^(?:mutual\s+)?nda$|^memorandum\s+of\s+understanding$|^agreement$/],
+  ['delivery-ticket', /^(?:packing\s+slip|delivery\s+(?:ticket|note|receipt)|pick[-\s]?up\s+(?:ticket|slip)|bill\s+of\s+lading)$/],
+  ['schedule', /^(?:weekly\s+|monthly\s+|daily\s+|staff\s+|work\s+)?(?:schedule|roster)$/],
+  ['price-list', /^(?:price\s+list|rate\s+(?:card|sheet)|fee\s+schedule|product\s+catalog(?:ue)?)$/],
+  ['statement', /^(?:account\s+|monthly\s+|consignor\s+|card\s+)?statement(?:\s+of\s+account)?$|^rent\s+ledger$/],
+  ['insurance-certificate', /^certificate\s+of\s+(?:liability\s+)?insurance$|^insurance\s+(?:certificate|policy)$/],
+  ['hr-letter', /^(?:offer|award|employment|termination)\s+letter$|^employment\s+(?:agreement|offer)$/],
+];
+
+/** Types a one-time re-sort may move a document INTO when the rule is confident (a name or title says so). */
+export const RESORT_TARGET_TYPES = new Set(['receipt', 'agreement', 'delivery-ticket', 'schedule', 'price-list', 'statement', 'insurance-certificate', 'hr-letter', 'purchase-order', 'internal']);
+/** Types a re-sort may move a document OUT of (the catch-alls the old rules over-used). */
+export const RESORT_SOURCE_TYPES = new Set(['invoice', 'other', 'correspondence', 'dispatch-note']);
+
+/** Pure re-sort rule. `titleType` = type a title line announced (or null). Returns the new type, or null to leave it. */
+export function resortDecision({ currentType, filename, titleType = null }) {
+  const cur = canonicalTypeId(currentType || 'other');
+  if (!RESORT_SOURCE_TYPES.has(cur)) return null;
+  const nameType = inferTypeFromFilename(filename);
+  const t1 = titleType && RESORT_TARGET_TYPES.has(titleType) ? titleType : null;
+  const t2 = nameType && RESORT_TARGET_TYPES.has(nameType) ? nameType : null;
+  if (t1 && t2 && t1 !== t2) return null; // the title and the name disagree: not confident
+  const next = t1 || t2;
+  return next && next !== cur ? next : null;
+}
 
 /** Pure: filename -> canonical type, or null if nothing matches. Exported so
  *  the pattern list itself is directly testable (scripts/verify-doctypes.mjs)
@@ -425,6 +553,11 @@ export function inferDocumentType(facts = {}, filename = '') {
     if (has('customer_name') && has('service_address') && !has('serial_number')) return 'maintenance-agreement';
     return 'warranty-registration';
   }
+  // A specific name ("Packing slip PS-31", "Rent ledger", "Offer letter") beats the blanket "has a cost -> invoice"
+  // guess: stores, landlords and vendors print amounts on documents that are not invoices. A generic "invoice" name
+  // is not specific, so it falls through to the fact rules below.
+  const specificByName = inferTypeFromFilename(name);
+  if (specificByName && specificByName !== 'invoice') return specificByName;
   if (has('invoice_number') || has('cost')) return 'invoice';
   if (has('work_performed')) return 'service-ticket';
   if (has('service_date') && has('technician')) return 'work-order';

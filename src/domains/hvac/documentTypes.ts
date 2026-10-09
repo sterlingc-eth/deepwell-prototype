@@ -29,6 +29,14 @@ export const DOCUMENT_TYPES: DocumentTypeDef[] = [
   { id: 'equipment-record', label: 'Equipment record' },
   { id: 'correspondence', label: 'Correspondence' },
   { id: 'internal', label: 'Company record' },
+  { id: 'receipt', label: 'Receipt' },
+  { id: 'agreement', label: 'Agreement / contract' },
+  { id: 'delivery-ticket', label: 'Delivery / pickup ticket' },
+  { id: 'schedule', label: 'Schedule' },
+  { id: 'price-list', label: 'Price list' },
+  { id: 'statement', label: 'Statement' },
+  { id: 'insurance-certificate', label: 'Insurance certificate' },
+  { id: 'hr-letter', label: 'HR / employment letter' },
   { id: 'other', label: 'Other' },
 ];
 
@@ -40,23 +48,56 @@ export const DOCUMENT_TYPE_IDS = new Set(DOCUMENT_TYPES.map((t) => t.id));
  * FIELD_KEYS.
  */
 export const REQUIRED_FIELDS: Record<string, string[]> = {
-  'work-order': ['service_address', 'service_date', 'technician'],
+  // Address is required only where work happened at a place (work order, service ticket, inspection, permit).
+  'work-order': ['service_address', 'service_date'],
   'service-ticket': ['service_address', 'service_date', 'work_performed'],
-  invoice: ['service_address', 'cost'],
+  invoice: ['customer_name|vendor', 'service_date', 'cost'],
   'warranty-registration': ['serial_number', 'model', 'warranty_expires|warranty_term'],
   'startup-sheet': ['serial_number', 'service_date'],
   permit: ['service_address', 'permit_number'],
   'nameplate-photo': ['serial_number', 'model'],
-  'maintenance-agreement': ['service_address', 'customer_name', 'warranty_term|agreement_term'],
-  'dispatch-note': ['customer_name|service_address', 'service_date'],
+  'maintenance-agreement': ['customer_name', 'warranty_term|agreement_term'],
+  'dispatch-note': ['customer_name|service_address|vendor', 'service_date'],
   'proposal-quote': ['customer_name|service_address', 'cost'],
   'inspection-report': ['service_address', 'service_date'],
   'purchase-order': ['vendor|customer_name', 'cost'],
   'equipment-record': ['serial_number|model'],
-  correspondence: ['customer_name'],
+  correspondence: [],
   internal: [],
+  receipt: ['vendor|customer_name', 'service_date', 'cost'],
+  agreement: ['customer_name|vendor', 'agreement_term|service_date'],
+  'delivery-ticket': ['customer_name|vendor', 'service_date'],
+  schedule: [],
+  'price-list': [],
+  statement: ['vendor|customer_name'],
+  'insurance-certificate': ['vendor|customer_name'],
+  'hr-letter': [],
   other: [],
 };
+
+/** Company paperwork (never "Not linked"; leaves Needs you once its own required fields are present).
+ *  Mirrors api/_lib/documentTypes.js; verify:ui checks parity. */
+export const COMPANY_RECORD_TYPES = new Set([
+  'purchase-order', 'internal', 'schedule', 'price-list', 'statement', 'insurance-certificate', 'hr-letter',
+]);
+/** Company paperwork only while no customer is named on it. */
+export const COMPANY_RECORD_IF_NO_CUSTOMER_TYPES = new Set(['agreement']);
+/** Types that need no link when they carry no service address. */
+export const LINK_OPTIONAL_TYPES = new Set(['invoice', 'receipt', 'delivery-ticket', 'correspondence']);
+
+/** True when the document is company paperwork. `present` = set of non-empty extracted field keys. */
+export function isCompanyRecordType(typeId: string | undefined | null, present: ReadonlySet<string> = new Set()): boolean {
+  const t = String(typeId ?? '');
+  if (COMPANY_RECORD_TYPES.has(t)) return true;
+  return COMPANY_RECORD_IF_NO_CUSTOMER_TYPES.has(t) && !present.has('customer_name');
+}
+
+/** True when a missing customer/equipment link must not be flagged or stop an automatic check. */
+export function linkNotRequired(typeId: string | undefined | null, present: ReadonlySet<string> = new Set()): boolean {
+  const t = String(typeId ?? '');
+  if (isCompanyRecordType(t, present)) return true;
+  return LINK_OPTIONAL_TYPES.has(t) && !present.has('service_address');
+}
 
 /** Display labels for field_keys, used wherever "missing" fields are shown. */
 export const FIELD_LABELS: Record<string, string> = {

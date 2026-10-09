@@ -26,7 +26,7 @@
  */
 import { withTenant, FIELD_RECHECK_SEGMENT } from "./recordsStore.js";
 import { planLabelFill, LABEL_FILL_VERSION } from "./modelAvoidance/labelFill.js";
-import { completenessFor, toCompletenessFields, normalizeDocumentType, AI_VERIFY_MIN_CONFIDENCE } from "./documentTypes.js";
+import { completenessFor, toCompletenessFields, normalizeDocumentType, mayVerifyWithoutLink, AI_VERIFY_MIN_CONFIDENCE } from "./documentTypes.js";
 import { deriveWarranty } from "./warrantyRules.js";
 import { packForTenant } from "./industry/index.js";
 
@@ -99,7 +99,7 @@ export async function recheckDocumentTx(db, documentId, { actorClerkId = null, s
 
   let aiVerified = false;
   if (written.length && after.complete && after.minConfidence >= AI_VERIFY_MIN_CONFIDENCE) {
-    aiVerified = (await db.verifyByAi(documentId)) > 0;
+    aiVerified = (await db.verifyByAi(documentId, { allowUnlinked: mayVerifyWithoutLink(type, fieldsAfter) })) > 0;
   }
 
   await db.logAction({

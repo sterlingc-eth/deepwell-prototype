@@ -120,11 +120,13 @@ const FIXTURES = [
     expectComplete: true, expectMissing: [], expectUnlinked: false, expectAttention: false,
   },
   {
+    // Document-rules round (2026-10-09): an invoice now needs a customer/vendor, a date and an amount (no address), so this
+    // fixture gained the name and date. It still carries an address and no link, so it must STILL be flagged "Not linked".
     name: 'invoice: address-only, not yet linked to anything',
     typeId: 'invoice',
-    fields: [field('service_address', '77 Birch Ln'), field('cost', '450.00')],
+    fields: [field('customer_name', 'T. Birch'), field('service_date', '2026-09-02'), field('service_address', '77 Birch Ln'), field('cost', '450.00')],
     linkedEntityIds: [],
-    hasCustomerName: false, hasAddress: true, linkedToCustomer: false,
+    hasCustomerName: true, hasAddress: true, linkedToCustomer: false,
     expectComplete: true, expectMissing: [], expectUnlinked: true, expectAttention: true,
   },
 ];

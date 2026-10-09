@@ -770,6 +770,17 @@ export const reviewClient = {
     });
   },
 
+  /** One-time owner re-sort (admin): moves documents typed Invoice/Other/Correspondence to a better type when their
+   *  title or file name clearly says so, then checks the ones that need no link. $0, no model. Loop while `done` is false,
+   *  passing back `nextAfterId`. */
+  resortDocuments(afterId: string | null = null, limit = 100) {
+    return postJson<{ scanned: number; retyped: number; checked: number; byType: Record<string, number>; errors: number; done: boolean; nextAfterId: string | null }>({
+      action: 'resortDocuments',
+      ...(afterId ? { afterId } : {}),
+      limit,
+    });
+  },
+
   /** Batch reclassification of legacy/unknown/'other' document_type values
    *  (≤100 ids; may make a few cheap model calls for stubborn ones). `remaining`
    *  is how many of THESE ids are still 'other' after this pass — the caller
