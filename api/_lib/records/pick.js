@@ -91,7 +91,7 @@ export const RESTRICTING = /^(?:once|twice|ever|first|second|third|fourth|fifth|
 
 /** order words are read from the question by the parser itself; they are never restrictions and a model quoting one as "the fact word" is simply ignored */
 /** words that name a KIND of document or agreement: a model may not call one "the word that means the fact" (that would drop "only the quote / the contract / the estimate" and answer for every document) */
-const DOC_KIND_WORDS = /^(?:quotes?|quoted|estimates?|estimated|bids?|proposals?|contracts?|agreements?|plans?|memberships?|permits?|warrant(?:y|ies)|registrations?|purchase|orders?|tickets?|units?|houses?|homes?|ac|furnaces?|systems?)$/;
+export const DOC_KIND_WORDS = /^(?:quotes?|quoted|estimates?|estimated|bids?|proposals?|contracts?|agreements?|plans?|memberships?|permits?|warrant(?:y|ies)|registrations?|purchase|orders?|tickets?|units?|houses?|homes?|ac|furnaces?|systems?)$/;
 export const ORDER_WORDS = /^(?:first|last|latest|newest|oldest|earliest|recent|recently|final|previous|most)$/;
 /** restricting words that must NOT be waved through as unexplained words (everything in RESTRICTING except the order words) */
 export const isRestricting = (t) => RESTRICTING.test(t) && !ORDER_WORDS.test(t);

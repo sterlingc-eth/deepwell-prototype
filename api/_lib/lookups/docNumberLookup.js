@@ -133,7 +133,7 @@ async function docDetails(db, documentId) {
   );
   let fin = null;
   try {
-    const { rows } = await db.raw(`SELECT total, invoice_date::text AS invoice_date, customer_name, status, balance_due, amount_paid, doc_kind, direction FROM document_financials WHERE document_id = $1 AND ${TENANT_SQL} LIMIT 1`, [documentId]);
+    const { rows } = await db.raw(`SELECT total, invoice_date::text AS invoice_date, customer_name, vendor_name, status, balance_due, amount_paid, doc_kind, direction FROM document_financials WHERE document_id = $1 AND ${TENANT_SQL} LIMIT 1`, [documentId]);
     fin = rows[0] ?? null;
   } catch { fin = null; }
   const dateRaw = fin?.invoice_date || get("invoice_date")[0] || get("service_date")[0] || null;
@@ -145,6 +145,7 @@ async function docDetails(db, documentId) {
     technician: get("technician")[0] ?? null,
     hasHours: get("labor_hours").length > 0, hasNotes: get("notes").length > 0, serviceType: get("service_type")[0] ?? null,
     status: fin?.status && !/^unknown$/i.test(String(fin.status)) ? String(fin.status) : null,
+    vendor: fin?.vendor_name ?? null,
     docKind: fin?.doc_kind ?? null, direction: fin?.direction ?? null,
     balance: fin?.balance_due != null && Number.isFinite(Number(fin.balance_due)) ? Number(fin.balance_due) : null,
   };
@@ -160,6 +161,33 @@ function trueLabel(documentType, kindWord, det) {
   return TYPE_LABEL[documentType] ?? cap(kindWord);
 }
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** the customer / vendor of THIS organization whose full name the question carries and who is not one of `owners` (null when the question names nobody else) */
+async function namedOtherOwner(db, question, owners) {
+  const qt = nameTokens(question);
+  if (!qt.length) return null;
+  const has = (t) => qt.some((x) => x === t || tokenSame(x, t) === "exact");
+  let names = [];
+  try {
+    const { rows } = await db.raw(`SELECT data->>'customer_name' AS n FROM entities WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT_SQL}
+      UNION SELECT value FROM extractions WHERE field_key = 'vendor_name' AND value IS NOT NULL AND ${TENANT_SQL}`, []);
+    names = [...new Set(rows.map((r) => String(r.n ?? "").trim()).filter(Boolean))];
+  } catch { return null; }
+  const ownerToks = owners.filter(Boolean).map((o) => nameTokens(o));
+  const mine = (nt) => ownerToks.some((ot) => nt.every((t) => ot.some((x) => x === t || tokenSame(x, t) === "exact")) || ot.every((t) => nt.some((x) => x === t || tokenSame(x, t) === "exact")));
+  const named = names.map((n) => ({ n, nt: nameTokens(n) }))
+    .filter(({ nt }) => nt.length >= 2 || (nt.length === 1 && nt[0].length >= 5 && !looksRead(nt[0])))
+    .filter(({ nt }) => nt.every(has));
+  if (!named.length || named.some(({ nt }) => mine(nt))) return null;
+  return named.sort((a, b) => b.nt.length - a.nt.length)[0].n;
+}
+/** does the named party have an invoice whose total equals the typed digits ("invoice 3470 for Maria Lopez" names the amount, not a number) */
+async function totalBelongsTo(db, digits, name) {
+  try {
+    const { rows } = await db.raw(`SELECT 1 FROM document_financials WHERE total = $1::numeric AND lower(customer_name) = lower($2) AND ${TENANT_SQL} LIMIT 1`, [Number(digits), name]);
+    return rows.length > 0;
+  } catch { return false; }
+}
 
 /** @returns an /api/ask data object, or null (nothing typed matches and the question was not clearly about a numbered document). */
 export async function runDocNumberLookup(db, intent) {
@@ -202,6 +230,15 @@ export async function runDocNumberLookup(db, intent) {
   const who = det.customers.map((c) => c.customer_name).filter(Boolean).join(" and ") || null;
   const when = det.date ? humanDate(det.date) : null;
   const src = [{ documentId: d.document_id, location: { field: d.field_key } }];
+  // R5: a document number given together with ANOTHER customer's (or vendor's) name is a contradiction, not a lookup: say whose document it is and answer nothing as if it were theirs.
+  const wrongOwner = await namedOtherOwner(db, intent.question, [...det.customers.map((c) => c.customer_name), det.vendor]);
+  if (wrongOwner && !(intent.digitsOnly && /^\d{3,}$/.test(intent.typed) && (await totalBelongsTo(db, intent.typed, wrongOwner)))) {
+    const records = [...await documentRecordsFor(db, [d.document_id]), ...det.customers.filter((c) => c.id).map((c) => customerRecord(c))];
+    return attachCitations(
+      { kind: "no-answer", text: `${label} is on file for ${who ?? det.vendor ?? "someone else"}, not ${wrongOwner}, so I have not answered for ${wrongOwner}. Ask about ${d.number} on its own, or ask for ${wrongOwner}'s own invoices.`, facts: [], sources: src, confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [] },
+      { records, total: records.length, kind: "searched", basis: `Matched ${intent.typed} to one document; its customer is ${who ?? det.vendor ?? "a different party"}, which is not the party the question names.` }
+    );
+  }
   if (intent.focus === "status" && !det.status) {
     // paid / open can't be told from this document: an honest "not on file", never a guess (the total is context, not the answer)
     return attachCitations(

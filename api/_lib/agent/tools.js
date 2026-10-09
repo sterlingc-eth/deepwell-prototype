@@ -13,6 +13,7 @@
  *
  * Nothing here logs question text or row values.
  */
+import { neutralizeDocText } from "../promptFence.js";
 import { guardSql, wrapSql, referencedNames, VIEW_NAMES } from "./sqlGuard.js";
 import { resolveContactCandidates, resolveAddressCandidates } from "../contactLookup.js";
 import { customerDocumentIds } from "../docLookup.js";
@@ -709,7 +710,7 @@ export function createToolbox({ withTenant, ctxArg, today, fetchObject, deadline
         const hits = await searchKnowledge(db, { query, filters, k: limit, rerank: true });
         rows = hits.map((h) => ({
           document_id: h.doc.id, page_no: h.page, original_filename: h.doc.filename,
-          document_type: h.doc.docType, stage: h.doc.stage, excerpt: h.excerpt,
+          document_type: h.doc.docType, stage: h.doc.stage, excerpt: neutralizeDocText(h.excerpt),
         }));
       } else {
         rows = await db.searchPassages(query, scopeIds ? 40 : docType ? 40 : limit + 4, scopeIds ? { documentIds: scopeIds } : {});
@@ -728,7 +729,7 @@ export function createToolbox({ withTenant, ctxArg, today, fetchObject, deadline
       }
       return rows.map((r) => ({
         documentId: r.document_id, page: r.page_no, filename: r.original_filename, documentType: r.document_type,
-        stage: r.stage, customer: names.get(r.document_id) ?? null, excerpt: String(r.excerpt ?? "").replace(/\s+/g, " ").slice(0, 320),
+        stage: r.stage, customer: names.get(r.document_id) ?? null, excerpt: neutralizeDocText(String(r.excerpt ?? "").replace(/\s+/g, " ").slice(0, 320)),
       }));
     });
     const parts = [];
@@ -1032,7 +1033,7 @@ export function createToolbox({ withTenant, ctxArg, today, fetchObject, deadline
     }
     const lastIncluded = included[included.length - 1]?.page ?? fromPage;
     const nextPage = out.pages.some((p) => p.page_no > lastIncluded) ? lastIncluded + 1 : null;
-    const body = included.map((p) => `\n--- page ${p.page} ---\n${p.text}`).join("");
+    const body = included.map((p) => `\n--- page ${p.page} ---\n${neutralizeDocText(p.text)}`).join("");
     const text = JSON.stringify({
       documentId: id, documentType: out.doc.document_type, filename: out.doc.original_filename,
       pagesShown: included.map((p) => p.page), nextPage,

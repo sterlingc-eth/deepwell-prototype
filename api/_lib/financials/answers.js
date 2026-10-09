@@ -183,7 +183,7 @@ const TIME_STOP = new Set([
 
 /** A candidate name phrase is usable only if it has at least one non-stop word. */
 function usablePhrase(p) {
-  const words = String(p ?? '').toLowerCase().replace(/[^a-z0-9'.\s-]/g, ' ').split(/\s+/).filter(Boolean);
+  const words = String(p ?? '').toLowerCase().replace(/\s*&\s*/g, ' & ').replace(/[^a-z0-9'.&\s-]/g, ' ').split(/\s+/).filter(Boolean); // R5: an ampersand joiner is part of a business name
   const kept = words.filter((w) => !TIME_STOP.has(w) && !/^\d+$/.test(w));
   if (!kept.length) return null;
   // Trim leading/trailing stop words ("the bracken job" -> "bracken").
@@ -560,7 +560,23 @@ export async function invoiceKindCounts(db) {
 }
 
 /** Resolve a subject phrase to customers: {ids:[...], names:[...], candidates:[...]}. */
+/**
+ * R5: the joiner in a business name is part of its identity. "A & B Plumbing", "A and B Plumbing" and "A B Plumbing" are three names: the key keeps "&" and "and" as
+ * their own tokens. Ordinary punctuation, case and spacing still do not matter.
+ */
+export const nameKey = (n) => String(n ?? '').toLowerCase().replace(/[’`´']/g, '').replace(/\s*&\s*/g, ' & ').replace(/[^a-z0-9&]+/g, ' ').replace(/\s+/g, ' ').trim();
+const hasJoiner = (n) => /(?:^| )(?:&|and)(?= )/.test(nameKey(n)) && nameKey(n).split(' ').length > 2;
 async function resolveSubject(db, phrase) {
+  const found = await resolveSubjectBase(db, phrase);
+  if (!found || !phrase || /^\d/.test(phrase) || found.length < 1) return found;
+  // an exact name (same key, joiner included) beats near neighbours; a joiner the asker typed must be on the stored name too ("A & B" is never "A B")
+  const k = nameKey(phrase);
+  const exact = found.filter((c) => nameKey(c.name) === k);
+  if (exact.length) return exact.length < found.length ? exact : found;
+  if (hasJoiner(phrase)) return found.filter((c) => nameKey(c.name).includes(' & ') === k.includes(' & ') && /(?:^| )and(?= )/.test(nameKey(c.name)) === /(?:^| )and(?= )/.test(k));
+  return found;
+}
+async function resolveSubjectBase(db, phrase) {
   if (!phrase) return null;
   let rows = /^\d/.test(phrase) ? await resolveAddressCandidates(db, phrase) : await resolveContactCandidates(db, phrase);
   if (!rows.length && !/^\d/.test(phrase)) {
@@ -2282,7 +2298,6 @@ async function avgJobMargin(db, intent) {
  * @returns {Promise<object|null>} an answer `data` object, or null when this intent could not be
  *   answered honestly (unresolvable customer etc.) - the caller then falls through.
  */
-const nameKey = (n) => String(n ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 /**
  * E2 A7: look-alike customers must never be merged silently. "the Henderson invoices" with Mark Henderson, Paula Henderson and Henderson Roofing LLC on file is THREE
  * customers: an exact full-name match wins outright; otherwise every distinct full name gets its own answer (its own totals), labelled by full name, and the

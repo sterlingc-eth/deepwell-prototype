@@ -16,6 +16,7 @@
  * identifier (so an amount from one document cannot be glued to another document's invoice number).
  * Fails CLOSED on a claim it cannot find; never throws.
  */
+import { payStatusConflict, storedPayState } from './finStatus.js';
 import { parseDateLoose, datesEqual } from '../claims/dates.js';
 import { parseAmountAt } from '../amountWords.js';
 import { initGate3, sentenceGuards, cardGuards, fixPages } from './gate3.js';
@@ -639,13 +640,16 @@ export function fieldOfText(t, forLine = false) {
 /** every total-like amount a document prints (a TOTAL / AMOUNT DUE line - not a subtotal), plus its financial row's total */
 export function printedTotals(h) { return new Set(fieldAmounts(h).total); }
 /** is `value` the amount the document prints under field(s) `types`? null when the document prints no such field and the field is the total (quotes/leases without a total line are not judged) */
-function amountFieldOk(evidence, ids, types, value) {
+function amountFieldOk(evidence, ids, types, value, { ignoreStored = false } = {}) {
   let any = false;
   for (const id of ids) {
     const fa = fieldAmounts(docHay(evidence, id));
     const d = evidence?.get?.(id);
     const tys = types.length === 2 && types[0] === 'total' && types[1] === 'balance' && fa.paid.size ? ['balance'] : types;
     for (const t of tys) {
+      // R5: a field the organization has STORED is that stored value; a figure the page prints near the same label (or plants there) does not stand in for it
+      const stored = t === 'total' ? d?.totalNum : t === 'balance' ? d?.balanceNum : t === 'paid' ? d?.paidNum : null;
+      if (stored != null && !ignoreStored) { any = true; if (stored === value) return true; continue; }
       const set = new Set(fa[t]);
       if (t === 'total' && d?.totalNum != null) set.add(d.totalNum);
       if (t === 'balance' && d?.balanceNum != null) set.add(d.balanceNum);
@@ -656,6 +660,10 @@ function amountFieldOk(evidence, ids, types, value) {
   }
   if (!any && types.length === 1 && types[0] === 'total') return null;
   return false;
+}
+/** R5: the value IS the stored total / balance / paid amount of one of the documents, for a field type the sentence named */
+function storedFieldHit(evidence, ids, types, value) {
+  return ids.some((id) => { const d = evidence?.get?.(id); return types.some((t) => (t === 'total' ? d?.totalNum : t === 'balance' ? d?.balanceNum : t === 'paid' ? d?.paidNum : null) === value); });
 }
 const NOT_FIELD = /\b(?:fee|fees|rate|per|monthly|annual|yearly|rent|hourly|labor|parts|discount|late|credit|refund|permit|equipment|materials?|shipping|travel|line|item)\b/i;
 const labelField = (l) => {
@@ -921,6 +929,11 @@ function checkGroundingInner(data0, evidence, { agent = false, agentRows = false
   const sup = (c, id) => {
     const h = docHay(evidence, id);
     if (c.kind === 'count' && countSet.has(c.value)) return true;
+    if (c.kind === 'status' && c.value === 'full') { const st = storedPayState(evidence?.get?.(id)?.fin); if (st) return st === 'paid'; } // R5: "paid in full" is held to the stored state
+    if (c.kind === 'stat' && (c.key === 'paid' || c.key === 'unpaid' || c.key === 'overdue')) { // R5: the stored payment state outranks what the page says about itself
+      const st = storedPayState(evidence?.get?.(id)?.fin);
+      if (st) return c.key === 'paid' ? st === 'paid' : st === 'unpaid' || st === 'partial';
+    }
     if (c.kind === 'qtyn' && agent && countSet.has(c.value)) return true;
     if (!claimSupportedIn(c, h)) return false;
     if (c.kind === 'name' && c.role) return roleOkFor(c, h, c.role);
@@ -936,6 +949,7 @@ function checkGroundingInner(data0, evidence, { agent = false, agentRows = false
     const extraTexts = Object.entries(f).filter(([k, v]) => !isOwnKey(k, v) && typeof v === 'string' && v.trim()).map(([, v]) => v);
     if (f.__mixed || tooBig(f.value, MAX_CARD) || tooBig(f.label, MAX_CARD) || extraTexts.some((t) => tooBig(t, MAX_CARD))) { checked++; failures.push({ where: 'fact', index: i, label: String(f.label ?? '').slice(0, 40), kind: 'unparsed', claim: 'unverifiable text', docs }); return false; }
     const own = [...extractClaims(`${f.value}`, { ...ctx, capsAll, statusContext: /\b(?:status|state|condition|standing)\b/i.test(String(f.label ?? '')) }), ...extractClaims(`${f.label}`, {}), ...extraTexts.flatMap((t) => extractClaims(t, {}))];
+    if (/\b(?:status|state|paid|payment)\b/i.test(String(f.label ?? '')) && docs.length) { const ps = payStatusConflict(`${f.value}`, docs, evidence); if (ps) { checked++; failures.push({ where: 'fact', index: i, label: String(f.label ?? '').slice(0, 40), kind: ps.kind, claim: ps.claim.slice(0, 60), docs }); return false; } }
     const hays = docs.map((id) => docHay(evidence, id));
     const multi = agent && docs.length > 1;
     const perKind = {}; for (const c of own) perKind[c.kind] = (perKind[c.kind] ?? 0) + 1;
@@ -957,6 +971,8 @@ function checkGroundingInner(data0, evidence, { agent = false, agentRows = false
       if (found && !viaSum && KINDS_BOUND.includes(c.kind) && !c.range && !hays.some((h) => boundToLabel(c, h, c.kind === 'id' ? String(f.label ?? '').replace(/\b(?:part|parts|tag|asset|serial|model|code|id|ref|reference|certificate|cert)\b/gi, ' ') : f.label))) found = false;
       if (found && c.kind === 'qty' && ctx.qtyDefault) { const toks = bindTokens(f.label, false, false, 'qty').filter((t) => !t.digit); if (toks.length && !hays.some((h) => h.split('\n').some((ln) => claimSupportedIn(c, ln) && toks.some((t) => t.re.test(ln))))) found = false; }
       if (found && ['address', 'city'].includes(c.kind) && /\b(?:ship|deliver\w*|bill\w*|job\s?site|site)\b/i.test(String(f.label ?? ''))) found = hays.some((h) => claimSupportedIn(c, roleText(h, f.label, true)));
+      // R5: a card labelled Due date / Invoice date shows the STORED date when one is stored (a planted "due 1/1" on the page is not the due date)
+      if (found && c.kind === 'date' && docs.length) { const lb = String(f.label ?? ''); const key = /\bdue\b/i.test(lb) ? 'dueDate' : /\binvoice\s+date\b|\bissued?\b|\bbilling\s+date\b/i.test(lb) ? 'invoiceDate' : null; if (key) { const st = docs.map((id) => evidence?.get?.(id)?.[key]).filter(Boolean); if (st.length && !st.some((x) => sameDate(c.value, x))) found = false; } }
       if (found && c.kind === 'name' && hays.length) { const g3 = cardGuards(f.label, f.value, hays); if (g3) found = false; }
       if (found) supported++; else { ok = false; failures.push({ where: 'fact', index: i, label: String(f.label ?? '').slice(0, 40), kind: c.kind, claim: c.raw.slice(0, 60), docs }); }
     }
@@ -1026,7 +1042,7 @@ function checkGroundingInner(data0, evidence, { agent = false, agentRows = false
         const exempt = aggUncited && (c.kind === 'money' || c.kind === 'qty'); // "$589,866.50 across 40 invoices": an aggregate over records that are not all cited
         const found = viaSum || exempt || oneDoc != null || pool.some((id) => sup(c, id));
         const useDocs = oneDoc != null ? [oneDoc] : pool;
-        let fieldOk = true;
+        let fieldOk = true; let storedHit = false;
         if (found && !viaSum && !exempt && c.kind === 'money') {
           const near = `${cx.before40.slice(-40)}`;
           const lf = /(?:(?:prior|previous|opening|beginning|closing|ending|new|statement)\s+)?(?:subtotal|sub-total|tax(?:es)?|deposit|past due|minimum payment|closing balance|opening balance|new balance|original contract|new contract|revised contract|change order|paid|payment|collected|balance|outstanding|owes?|owed|remaining|total|amount|due|cost|price|billed|charged?|invoiced)\b[^.$]{0,40}\$?\s*$/i.exec(near);
@@ -1034,7 +1050,10 @@ function checkGroundingInner(data0, evidence, { agent = false, agentRows = false
           let types = lf && !perPart ? fieldOfText(lf[0]) : null;
           if (!types && cx.post) types = fieldOfText(cx.post);
           if (types && types.length === 1 && types[0] === 'total' && !/\b(?:total|due|invoice|grand)\b/i.test(lf?.[0] ?? cx.post) && useDocs.some((id) => presentTokens(docHay(evidence, id), (cx.lead + ' ' + cx.post).trim(), true).length)) types = null;
-          if (types && amountFieldOk(evidence, useDocs, types, c.value) === false) fieldOk = false;
+          // a QUALIFIED total ("including tax", "before discount", "after deposit") is a different figure from the stored plain total: the printed layout decides, as before R5
+          const qualified = /\btotal\s+(?:amount\s+)?(?:including|excluding|incl\.?|excl\.?|before|after|plus|less|with|without|net\s+of|inclusive\s+of|exclusive\s+of)\b/i.test(`${cx.lead.slice(-48)} ${cx.post}`.toLowerCase()) || /\b(?:including|excluding|before|after)\s+(?:sales\s+)?(?:tax|taxes|discount|deposit|fees?|tip|shipping)\s*(?:is|was|of|:)?\s*$/i.test(cx.lead.slice(-40));
+          if (types && amountFieldOk(evidence, useDocs, types, c.value, { ignoreStored: qualified }) === false) fieldOk = false;
+          if (types && fieldOk && !qualified && storedFieldHit(evidence, useDocs, types, c.value)) storedHit = true; // R5: equals the organization's STORED field value: the printed page layout does not have to repeat the label
           // "40 bags of flour at $22.50 each, $900.00 total": a line item's own total, on the row that names the item
           if (!fieldOk && types?.length === 1 && types[0] === 'total' && cx.pre60.trim() && useDocs.some((id) => presentTokens(docHay(evidence, id), cx.pre60, false, true, 'money').length && boundToLabel(c, docHay(evidence, id), cx.pre60, false))) fieldOk = true;
           if (fieldOk) { const dir = `${cx.before40.slice(-32)}${cx.after}`; if (!signOk(c, dir, useDocs.map((id) => docHay(evidence, id)))) fieldOk = false; }
@@ -1044,7 +1063,7 @@ function checkGroundingInner(data0, evidence, { agent = false, agentRows = false
         if (found && !viaSum && !exempt && !derivedD && !c.range && KINDS_BOUND.includes(c.kind) && !(c.kind === 'id' && ids.includes(c))) {
           const ctxText = c.kind === 'qty' ? clause.slice(c.start, c.start + 40).replace(/^(\d+(?:\.\d+)?)([\s\S]*?)(?=\d|$)/, '$1$2') : `${cx.lead.slice(-34)} ${c.kind === 'money' ? cx.post : ''}`;
           const rule = lineRuleFor(c.kind, c.kind === 'qty' ? ctxText.replace(/^[\d.]+/, '').split(/\d/)[0] : ctxText, c.kind === 'qty');
-          if (rule && !useDocs.some((id) => onRuledLine(c, docHay(evidence, id), rule))) fieldOk = false;
+          if (rule && !storedHit && !useDocs.some((id) => onRuledLine(c, docHay(evidence, id), rule))) fieldOk = false;
         }
         if (found && fieldOk && !viaSum && !exempt && c.kind === 'qty' && c.reading) {
           const lead = clause.slice(0, c.start).split(/[.;:!?]\s/).pop().slice(-26);
@@ -1052,14 +1071,15 @@ function checkGroundingInner(data0, evidence, { agent = false, agentRows = false
         }
         if (found && fieldOk && !viaSum && !exempt && !derivedD && !c.range && ['date', 'mday', 'monyear', 'time', 'year', 'money'].includes(c.kind)) {
           const lead = (cx.lead + ' ' + (c.kind === 'money' ? cx.post : '')).trim();
-          if (!/\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve)\s+[a-z]+\s+of\s*$/i.test(lead) && !useDocs.some((id) => boundToLabel(c, docHay(evidence, id), lead, true))) fieldOk = false;
+          if (!/\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve)\s+[a-z]+\s+of\s*$/i.test(lead) && !storedHit && !useDocs.some((id) => boundToLabel(c, docHay(evidence, id), lead, true))) fieldOk = false;
         }
         if (found && fieldOk && (oneDoc != null || rest.length === 1 || aggClause || viaSum)) supported++;
         else { ok = false; failures.push({ where: pi ? 'interpretation' : 'text', sentence: si, kind: c.kind, claim: c.raw.slice(0, 60), docs: pool, glue: found }); }
       }
       checked += ids.length; supported += ids.length;
     }
-    if (ok && citedDocs.length) { const g3 = sentenceGuards(sent, (g3hays ??= citedDocs.map((id) => docHay(evidence, id)))); if (g3) { checked++; ok = false; failures.push({ where: pi ? 'interpretation' : 'text', sentence: si, kind: g3.kind, claim: g3.claim.slice(0, 60), docs: citedDocs }); } }
+    if (ok && citedDocs.length) { const ps = payStatusConflict(sent, citedDocs, evidence); if (ps) { checked++; ok = false; failures.push({ where: pi ? 'interpretation' : 'text', sentence: si, kind: ps.kind, claim: ps.claim.slice(0, 60), docs: citedDocs }); } }
+    if (ok && citedDocs.length) { const g3 = sentenceGuards(sent, (g3hays ??= citedDocs.map((id) => docHay(evidence, id))), { storedStates: citedDocs.map((id) => storedPayState(evidence?.get?.(id)?.fin)).filter(Boolean) }); if (g3) { checked++; ok = false; failures.push({ where: pi ? 'interpretation' : 'text', sentence: si, kind: g3.kind, claim: g3.claim.slice(0, 60), docs: citedDocs }); } }
     sentenceOk.push({ ok, interp: Boolean(pi) });
   }); });
   return { checked, supported, failures, factOk, textOk: sentenceOk.filter((x) => !x.interp).every((x) => x.ok), interpOk: sentenceOk.filter((x) => x.interp).every((x) => x.ok), sentenceOk: sentenceOk.map((x) => x.ok) };
@@ -1151,10 +1171,13 @@ export async function loadFinancialRows(db, evidence) {
     if (!ids.length) return;
     const hu = await extractionsHaveUnitIndex(db);
     const views = buildViewsSql({ hasUnitIndex: hu, hasFinancials: true });
-    const r = await db.raw(`WITH ${views} SELECT f.document_id, f.invoice_number, f.po_number, f.total, f.subtotal, f.tax, f.amount_paid, f.balance_due, f.invoice_date, f.due_date, f.customer_name, f.vendor_name FROM financials f WHERE f.document_id = ANY($2::uuid[])`, [JSON.stringify({ c: [], e: [] }), ids]);
+    const r = await db.raw(`WITH ${views} SELECT f.document_id, f.invoice_number, f.po_number, f.total, f.subtotal, f.tax, f.amount_paid, f.balance_due, f.status, f.invoice_date, f.due_date, f.customer_name, f.vendor_name FROM financials f WHERE f.document_id = ANY($2::uuid[])`, [JSON.stringify({ c: [], e: [] }), ids]);
     for (const row of r.rows) {
       const e = evidence.get(row.document_id); if (!e) continue;
-      for (const [k, v] of Object.entries(row)) if (k !== 'document_id' && v != null && v !== '') e.rows += `${k}: ${v instanceof Date ? v.toISOString().slice(0, 10) : v}\n`;
+      for (const [k, v] of Object.entries(row)) if (k !== 'document_id' && k !== 'status' && v != null && v !== '') e.rows += `${k}: ${v instanceof Date ? v.toISOString().slice(0, 10) : v}\n`;
+      e.fin = { status: row.status ?? null, total: row.total ?? null, paid: row.amount_paid ?? null, balance: row.balance_due ?? null, invoice_number: row.invoice_number ?? null }; // R5: the stored payment state, kept apart from the page text
+      { const iso = (v) => (v instanceof Date ? v.toISOString().slice(0, 10) : v ? String(v).slice(0, 10) : null); e.dueDate = iso(row.due_date); e.invoiceDate = iso(row.invoice_date); }
+      if (row.amount_paid != null) e.paidNum = canonNumber(row.amount_paid);
       if (row.total != null) e.totalNum = canonNumber(row.total);
       if (row.balance_due != null) e.balanceNum = canonNumber(row.balance_due);
       if (row.total != null) e.total = `$${Number(row.total).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

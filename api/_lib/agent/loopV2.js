@@ -34,6 +34,7 @@
  *
  * No question text, no row values, no model output is ever logged here — only counts.
  */
+import { FENCE_NOTE } from "../promptFence.js";
 import { createHash } from "node:crypto";
 import Anthropic from "@anthropic-ai/sdk";
 import { getApiKey, MODEL_TIMEOUT_MS, withBackoff, classifyProviderError, recordProviderOutage } from "../claude.js";
@@ -189,7 +190,9 @@ RESEARCH TOOLS (beyond the SQL views above):
 - get_dossier(entityId) — a precomputed, cited rolling summary for ONE customer or unit. Try this FIRST for a broad "everything about X" / "what do we know about this customer" question, before several search_documents/get_customer/timeline calls; dossier:null means none has been built yet, so fall back to those.
 - synthesize(question, customerId?/equipmentId?/docType?/technician?/dateFrom?/dateTo?) — answers a question that spans MANY documents at once (dozens to hundreds) by reading each one and combining cited facts, with an honest coverage note. Use it for "across all of...", "every time we...", or a whole history no handful of search_documents/read_document calls can cover; note in your answer if it comes back as status 'dossier' or 'queued' rather than a fresh read.
 
-search_documents note: it now also tries to work out which customer or unit the query itself names (the same way find_customers would) and scopes the search to just that entity's own documents when it can — pass customerId explicitly when you already have it rather than relying on that.`;
+search_documents note: it now also tries to work out which customer or unit the query itself names (the same way find_customers would) and scopes the search to just that entity's own documents when it can — pass customerId explicitly when you already have it rather than relying on that.
+
+${FENCE_NOTE}`;
 }
 
 /** This tenant's resolved system prompt (Team G industry packs, same mechanism as loop.js). */

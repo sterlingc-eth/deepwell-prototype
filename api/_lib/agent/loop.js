@@ -20,6 +20,7 @@
  * No question text, no row values, no model output is ever logged here — only
  * counts (see the single JSON line at the end of runDonovanAgent).
  */
+import { FENCE_NOTE } from '../promptFence.js';
 import { createHash } from "node:crypto";
 import Anthropic from "@anthropic-ai/sdk";
 import { getApiKey, MODEL_TIMEOUT_MS, withBackoff, classifyProviderError, recordProviderOutage } from "../claude.js";
@@ -116,7 +117,9 @@ function agentSystemPromptFor(businessNoun) {
 
 ${VIEW_DOCS}
 
-${VIEW_PAGE_DOCS}`;
+${VIEW_PAGE_DOCS}
+
+${FENCE_NOTE}`;
 }
 
 export const AGENT_SYSTEM_PROMPT = agentSystemPromptFor('HVAC shop');

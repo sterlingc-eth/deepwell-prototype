@@ -25,7 +25,7 @@
  */
 
 /** The model the loop escalates to. Env-overridable; defaults to the Sonnet id readDocument.js documents. */
-export const DEFAULT_ESCALATION_MODEL = "claude-sonnet-4-5";
+export const DEFAULT_ESCALATION_MODEL = "claude-sonnet-5-5";
 export const escalationModel = (env = process.env) => env?.DONOVAN_ESCALATION_MODEL || DEFAULT_ESCALATION_MODEL;
 
 export const DEFAULT_SONNET_DAILY_USD = 2;

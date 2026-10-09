@@ -83,10 +83,10 @@ export async function loadBundle(db, docIds) {
     const fr = await rows(db, `WITH ${CUSTOMERS_CTE}, ${financeViewsSql({ hasFinancials: true })}
       SELECT f.document_id, f.doc_kind, f.direction, f.invoice_number, f.po_number, f.invoice_date::text AS invoice_date, f.due_date::text AS due_date, f.doc_date::text AS doc_date, f.agreement_term,
              f.subtotal::text AS subtotal, f.tax::text AS tax, f.total::text AS total, f.amount_paid::text AS amount_paid, f.balance_due::text AS balance_due, f.status, f.customer_name, f.vendor_name, f.total_page
-        FROM financials f WHERE f.document_id = ANY($1::uuid[])`, [docIds]);
+        FROM financials f WHERE f.document_id = ANY($1::uuid[]) AND EXISTS (SELECT 1 FROM documents td WHERE td.id = f.document_id AND ${T("td")})`, [docIds]);
     for (const r of fr) out.fin.set(r.document_id, r);
     out.lines = await rows(db, `WITH ${CUSTOMERS_CTE}, ${financeViewsSql({ hasFinancials: true })}
-      SELECT l.document_id, l.line_no, l.description, l.qty::text AS qty, l.unit_price::text AS unit_price, l.amount::text AS amount, l.category_guess, l.page_no FROM invoice_lines l WHERE l.document_id = ANY($1::uuid[]) ORDER BY l.document_id, l.line_no`, [docIds]);
+      SELECT l.document_id, l.line_no, l.description, l.qty::text AS qty, l.unit_price::text AS unit_price, l.amount::text AS amount, l.category_guess, l.page_no FROM invoice_lines l WHERE l.document_id = ANY($1::uuid[])  AND EXISTS (SELECT 1 FROM documents td WHERE td.id = l.document_id AND ${T("td")}) ORDER BY l.document_id, l.line_no`, [docIds]);
   }
   out.pages = await rows(db, `SELECT p.document_id, p.page_no, p.text FROM document_pages p WHERE p.document_id = ANY($1::uuid[]) AND ${T("p")} ORDER BY p.document_id, p.page_no`, [docIds]);
   return out;

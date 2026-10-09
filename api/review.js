@@ -591,6 +591,15 @@ export default async (req, res) => {
           const note = typeof payload.note === 'string' ? payload.note.trim().slice(0, 300) : '';
           result = { ok: true, ...(await applyThumbsDown({ ctxArg: ctx, question, note })) };
         }
+        // DONOVAN-R5 step 3 (DONOVAN_EXAMPLE_BANK, default OFF): the person's verdict on a menu-pick reading of THIS organization's question
+        try {
+          const bank = await import('./_lib/records/exampleBank.js');
+          if (bank.exampleBankEnabled()) {
+            const { withTenant } = await import('./_lib/recordsStore.js');
+            await withTenant(ctx, (db) => (payload.rating === 'up' ? bank.markConfirmed(db, question) : bank.retractExample(db, question)));
+            try { (await import('./_lib/records/orgPickCall.js')).clearOrgPickCache(); } catch { /* none */ }
+          }
+        } catch { /* best-effort */ }
         break;
       }
       // SUPPORT-ACCESS (Round 22, S2): "everything runs against the CALLING operator's own tenant"

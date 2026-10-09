@@ -486,7 +486,7 @@ section("r3c-pick", async () => {
   const restore = () => { for (const [k, v] of [["DONOVAN_MENU_PICK", savedEnv.pick], ["DONOVAN_MENU_DAILY_USD", savedEnv.cap], ["DONOVAN_ESCALATION", savedEnv.esc]]) { if (v === undefined) delete process.env[k]; else process.env[k] = v; } };
   let picks = 0, others = 0; const seen = [];
   /** a scripted model: pick calls get `pickFn(questionText)` (an object, or a thing that is not one), every other call gets the always-lying answer */
-  const model = (pickFn) => (text, req) => { if (req.tools?.some((t) => t.name === "menu_pick")) { picks++; const q = (/<<<\n([\s\S]*)\n>>>/.exec(text) ?? [])[1] ?? ""; seen.push(text); return pickFn(q); } others++; return LIE; };
+  const model = (pickFn) => (text, req) => { if (req.tools?.some((t) => t.name === "org_pick")) return { none: true }; if (req.tools?.some((t) => t.name === "menu_pick")) { picks++; const q = (/<<<\n([\s\S]*)\n>>>/.exec(text) ?? [])[1] ?? ""; seen.push(text); return pickFn(q); } others++; return LIE; };
   const ask = async (org, q, pickFn, { fresh = true } = {}) => { picks = 0; others = 0; if (fresh) PC.clearPickCache(); return { ...(await h.ask(org, q, model(pickFn))), picks, others }; };
   const good = (facts, subject, extra = {}) => () => ({ none: false, facts, subject, fact_words: [], extra_conditions: [], order: "none", window: null, ...extra });
   const noPickShape = (r) => !/^I read that as/.test(r.text);
@@ -626,7 +626,7 @@ section("r3c-measure", async () => {
       for (const [fact, tpl, fw] of DOCQ) {
         const q = tpl.replace("{S}", d.num);
         const cnt = { ot: 0 };
-        const fn = (text, req) => { if (mode === "on" && req.tools?.some((t) => t.name === "menu_pick")) return { none: false, facts: [fact], subject: { kind: "document", text: d.num }, fact_words: fw, extra_conditions: [], order: "none", window: null }; cnt.ot++; return LIE; };
+        const fn = (text, req) => { if (req.tools?.some((t) => t.name === "org_pick")) return { none: true }; if (mode === "on" && req.tools?.some((t) => t.name === "menu_pick")) return { none: false, facts: [fact], subject: { kind: "document", text: d.num }, fact_words: fw, extra_conditions: [], order: "none", window: null }; cnt.ot++; return LIE; };
         PC.clearPickCache();
         const r = await h.ask("A", q, fn); r.others = cnt.ot;
         score(r, T.docFactValues(ixA, d.id, fact), owner ? otherNames(owner) : [], q);
@@ -636,7 +636,7 @@ section("r3c-measure", async () => {
       for (const [fact, tpl, fw] of CUSTQ) {
         const q = tpl.replace("{N}", c.data.customer_name);
         const cnt = { ot: 0 };
-        const fn = (text, req) => { if (mode === "on" && req.tools?.some((t) => t.name === "menu_pick")) return { none: false, facts: [fact], subject: { kind: "customer", text: c.data.customer_name }, fact_words: fw, extra_conditions: [], order: /last/.test(tpl) ? "newest" : "none", window: null }; cnt.ot++; return LIE; };
+        const fn = (text, req) => { if (req.tools?.some((t) => t.name === "org_pick")) return { none: true }; if (mode === "on" && req.tools?.some((t) => t.name === "menu_pick")) return { none: false, facts: [fact], subject: { kind: "customer", text: c.data.customer_name }, fact_words: fw, extra_conditions: [], order: /last/.test(tpl) ? "newest" : "none", window: null }; cnt.ot++; return LIE; };
         PC.clearPickCache();
         const r = await h.ask("A", q, fn); r.others = cnt.ot;
         const exp = T.customerDocs(ixA, c.id).flatMap((id) => T.docFactValues(ixA, id, fact));

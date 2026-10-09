@@ -31,6 +31,7 @@
  * nicely: it drops any source that doesn't check out and then drops facts
  * left with no source at all.
  */
+import { fenceDocText, flatValue, FENCE_NOTE, neutralizeDocText } from "./promptFence.js";
 import { DOCUMENT_TYPES, DOCUMENT_TYPE_DEFINITIONS, REQUIRED_FIELDS, fieldLabel } from './documentTypes.js';
 import { FIELD_SPECS } from './extractFields.js';
 import { BRAND_RULES } from './warrantyRules.js';
@@ -290,7 +291,7 @@ const ANSWER_STYLE_RULES = `ANSWER STYLE:
 - Never fill in a customer's phone number, address, or unit location that isn't itself in the evidence, even to make a sentence read more naturally.`;
 
 export const SYSTEM_PROMPT =
-  `${PREAMBLE}\n\n${HVAC_GLOSSARY}\n\n${ABBREVIATIONS}\n\n${DOCUMENT_TYPE_GUIDE}\n\n${REQUIRED_FIELDS_GUIDE}\n\n${FIELD_KEY_GUIDE}\n\n${WARRANTY_BRAND_TABLE}\n\n${BRAND_COMPRESSOR_NOTE}\n\n${ANSWER_STYLE_RULES}\n\n${RULES}`;
+  `${PREAMBLE}\n\n${HVAC_GLOSSARY}\n\n${ABBREVIATIONS}\n\n${DOCUMENT_TYPE_GUIDE}\n\n${REQUIRED_FIELDS_GUIDE}\n\n${FIELD_KEY_GUIDE}\n\n${WARRANTY_BRAND_TABLE}\n\n${BRAND_COMPRESSOR_NOTE}\n\n${ANSWER_STYLE_RULES}\n\n${RULES}\n\n${FENCE_NOTE}`;
 
 export function buildContextBlock({ passages, extractions } = {}) {
   const ev =
@@ -299,14 +300,14 @@ export function buildContextBlock({ passages, extractions } = {}) {
         (p, i) =>
           `[${i + 1}] documentId: ${p.documentId} | page: ${p.page} | file: ${p.filename}${
             p.documentType ? ` (${p.documentType})` : ""
-          }\n${p.excerpt}`
+          }\n${fenceDocText(p.excerpt)}`
       )
       .join("\n\n") || "(no passages matched)";
 
   const factsBlock = extractions?.length
     ? `\n\nALREADY-EXTRACTED FIELDS (verified by the pipeline; cite with location: { "field": "<field>" }, no page):\n` +
       extractions
-        .map((x) => `- ${x.field} = ${x.value}  [documentId: ${x.documentId} | file: ${x.filename}]`)
+        .map((x) => `- ${x.field} = ${neutralizeDocText(flatValue(x.value))}  [documentId: ${x.documentId} | file: ${flatValue(x.filename)}]`)
         .join("\n")
     : "";
 
@@ -378,14 +379,14 @@ export function buildPrompt({ question, today, passages, extractions }) {
         (p, i) =>
           `[${i + 1}] documentId: ${p.documentId} | page: ${p.page} | file: ${p.filename}${
             p.documentType ? ` (${p.documentType})` : ""
-          }\n${p.excerpt}`
+          }\n${fenceDocText(p.excerpt)}`
       )
       .join("\n\n") || "(no passages matched)";
 
   const factsBlock = extractions?.length
     ? `\n\nALREADY-EXTRACTED FIELDS (verified by the pipeline; cite with location: { "field": "<field>" }, no page):\n` +
       extractions
-        .map((x) => `- ${x.field} = ${x.value}  [documentId: ${x.documentId} | file: ${x.filename}]`)
+        .map((x) => `- ${x.field} = ${neutralizeDocText(flatValue(x.value))}  [documentId: ${x.documentId} | file: ${flatValue(x.filename)}]`)
         .join("\n")
     : "";
 

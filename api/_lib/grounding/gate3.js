@@ -359,14 +359,14 @@ function figureLabelGuard(sent, hays) {
 /* status words, credits, amounts owed on a paid page */
 const LEX = [['delivered', /\bdelivered\b/i], ['shipped', /\bshipped\b/i], ['transit', /\bin\s+transit\b/i], ['pending', /\bpending\b/i], ['processing', /\bprocessing\b/i], ['returned', /\breturned\b/i], ['backordered', /\bback-?ordered\b/i], ['completed', /\bcompleted?\b/i], ['approved', /\bapproved\b/i], ['declined', /\b(?:declined|denied)\b/i]];
 const LEX_CUE = /deliver|shipped|transit|pending|processing|returned|back-?order|complete|approved|declined|denied/i;
-function statusGuard(sent, hays) {
+function statusGuard(sent, hays, ctx = {}) {
   for (const [k, re] of LEX) {
     const m = re.exec(sent); if (!m) continue;
     if (/\b(?:not|never|un|isn't|wasn't|hasn't)\s*(?:yet\s+|been\s+)?$/i.test(sent.slice(Math.max(0, m.index - 16), m.index))) continue;
     if (hays.some((h) => re.test(h))) continue;
     if (hays.some((h) => LEX.some(([k2, r2]) => k2 !== k && r2.test(h)))) return { kind: 'stat', claim: m[0] };
   }
-  if (/\b(?:owes?|owed|outstanding|still\s+due|unpaid)\b/i.test(sent) && /\$\s?(?!0(?:\.0+)?(?![\d,]))[1-9\d]/.test(sent) && hays.every((h) => payEvidence(h) && !unpaidEvidence(h))) return { kind: 'stat', claim: 'owes' };
+  if (/\b(?:owes?|owed|outstanding|still\s+due|unpaid)\b/i.test(sent) && /\$\s?(?!0(?:\.0+)?(?![\d,]))[1-9\d]/.test(sent) && hays.every((h) => payEvidence(h) && !unpaidEvidence(h)) && !(ctx.storedStates ?? []).some((st) => st === 'unpaid' || st === 'partial')) return { kind: 'stat', claim: 'owes' }; // R5: the stored payment status outranks what the page text says about itself
   if (/\bcredit/i.test(sent) && /\b(?:added|adds|increas\w+)\b/i.test(sent)) {
     const cl = hays.flatMap((h) => h.split('\n').filter((l) => /\bcredit/i.test(l)));
     if (cl.some((l) => /-\s?\$|\(\s?\$|applied|deduct|subtract|\bless\b|reduc/i.test(l)) && !cl.some((l) => /\badded\b|\badds\b/i.test(l))) return { kind: 'money', claim: 'credit added' };
@@ -414,7 +414,7 @@ const CUE_MARK = /checked|ticked|selected|marked|opted|authori|signed|\bsign\b|i
 const CUE_REF = /Article|Section|Exhibit|Schedule|Appendix|Clause|Paragraph|Addendum|Attachment|Annex/;
 const CUE_Q = /\b(?:before|after|excl|including|inclusive|incl|plus|without|pre|post)\b|\+\s*tax/i;
 /** all the sentence guards; returns the first failure {kind, claim} or null. Bounded work: long sentences are skipped by the callers' own size caps, cue words gate each guard. */
-export function sentenceGuards(sent, hays) {
+export function sentenceGuards(sent, hays, ctx = {}) {
   if (!D || !hays?.length || typeof sent !== 'string' || sent.length > 700) return null;
   const s = fixQ(sent);
   return (CUE_SUF.test(s) && suffixGuard(s, hays)) || (CUE_ROLE.test(s) && roleGuard(s, hays)) || (CUE_DATE.test(s) && dateLabelGuard(s, hays))
@@ -423,7 +423,7 @@ export function sentenceGuards(sent, hays) {
     || ((NEG_RE.test(s) || COND_RE.test(s) || hays.some((h) => hinfo(h).hasPol)) && polarityGuard(s, hays))
     || (ANT_CUE.test(s) && antonymGuard(s, hays)) || ((s.includes('$') && (MOD_ANY.test(s) || hays.some((h) => hinfo(h).hasMod))) && modifierGuard(s, hays))
     || (/\bfrom\b[\s\S]{0,60}\bto\b/i.test(s) && fromToGuard(s, hays)) || (/\d/.test(s) && figureLabelGuard(s, hays))
-    || (LEX_CUE.test(s) || /owe|outstanding|unpaid|credit|half|quarter|third/i.test(s)) && statusGuard(s, hays) || (/[A-Z][a-z]{2,}\s+[A-Z]\.?\s+[A-Z]/.test(s) && initialGuard(s, hays))
+    || (LEX_CUE.test(s) || /owe|outstanding|unpaid|credit|half|quarter|third/i.test(s)) && statusGuard(s, hays, ctx) || (/[A-Z][a-z]{2,}\s+[A-Z]\.?\s+[A-Z]/.test(s) && initialGuard(s, hays))
     || (TOPIC_RE.test(s) && ((TOPIC_RE.lastIndex = 0), topicGuard(s, hays))) || null;
 }
 /** a card (label, value) read as a sentence for the role / suffix guards */

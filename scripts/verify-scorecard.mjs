@@ -906,7 +906,7 @@ const countThenAnswer = () => scripted([() => [tu('run_query', { sql: 'SELECT co
     usage.estimateModelCostUsd('claude-haiku-4-5', { inputTokens: 1e6, outputTokens: 1e6 }),
     usage.estimateModelCostUsd('claude-sonnet-4-5', { cacheReadInputTokens: 1e6 }),
   ], [18, 6, 0.3]);
-  eq('escalation model defaults to the Sonnet id readDocument.js documents; env overrides it', [esc.escalationModel({}), esc.escalationModel({ DONOVAN_ESCALATION_MODEL: 'x' })], ['claude-sonnet-4-5', 'x']);
+  eq('escalation model defaults to the Sonnet id readDocument.js documents; env overrides it', [esc.escalationModel({}), esc.escalationModel({ DONOVAN_ESCALATION_MODEL: 'x' })], ['claude-sonnet-5-5', 'x']);
   check('classifier: comparison / why / trend / stacked conditions are hard; a plain count is not',
     esc.classifyQuestionDifficulty('Why did expired warranties grow compared to last year in Mesa?').hard
     && esc.classifyQuestionDifficulty('Which Trane customers in Tucson have no service and an expired warranty but an active agreement?').hard

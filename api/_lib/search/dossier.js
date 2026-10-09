@@ -48,6 +48,8 @@
 import { createHash } from 'node:crypto';
 import Anthropic from '@anthropic-ai/sdk';
 import { getApiKey, MODEL_TIMEOUT_MS, withBackoff } from '../claude.js';
+import { samplingFor } from '../grounding/promptV2.js';
+import { fenceDocText, FENCE_NOTE } from '../promptFence.js';
 import { estimateCostUsd, recordModelCall } from '../usage.js';
 import { documentIdsForEntities } from './knowledge.js';
 import { withTenantRaw } from './store.js';
@@ -173,17 +175,17 @@ const SUMMARIZE_TOOL = {
 /** One Haiku call: cited sentences for ONE new document's page text. Never throws. */
 async function summarizeDocument(client, deadlineAt, doc) {
   try {
-    const text = doc.pages.map((p) => `[page ${p.page_no}] ${p.text}`.slice(0, MAX_PAGE_CHARS_PER_DOC)).join('\n\n');
+    const text = doc.pages.map((p) => `[page ${p.page_no}] ${fenceDocText(String(p.text ?? ''))}`.slice(0, MAX_PAGE_CHARS_PER_DOC)).join('\n\n');
     if (!text.trim()) return { sentences: [], costUsd: 0 };
     const response = await withBackoff(
       () => client.messages.create(
         {
           model: DOSSIER_MODEL,
           max_tokens: MAX_OUTPUT_TOKENS,
-          temperature: 0,
+          ...samplingFor(DOSSIER_MODEL),
           system: 'Extract at most 4 short, factual sentences a technician would want to remember from this ' +
             'document, each citing the page it came from. Skip boilerplate (form headers, signatures). If ' +
-            'nothing is worth remembering, return an empty list. Never invent a page number.',
+            'nothing is worth remembering, return an empty list. Never invent a page number. ' + FENCE_NOTE,
           tools: [SUMMARIZE_TOOL],
           tool_choice: { type: 'tool', name: 'dossier_sentences' },
           messages: [{ role: 'user', content: `Document type: ${doc.documentType ?? 'unknown'}\n\n${text}` }],

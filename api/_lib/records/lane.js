@@ -15,6 +15,7 @@ import { nameTokens, tokenSame } from "../lookups/nameMatch.js";
 import { isNonNameWord, isGivenName, isRealWordOrName } from "../lookups/commonWords.js";
 import { attachCitations, documentRecord, customerRecord, unitRecord } from "../citations/records.js";
 import { bindPick, subjectAgrees, readAsSentence, isRestricting } from "./pick.js";
+import { bindOrgPick, slugOf, dynamicFact, parseRecordsQuestion as _prq } from "./orgMenu.js";
 
 export const CAP = 5;
 const RESIDUAL_OK = /^(?:invoice|invoices|inv|ticket|tickets|permit|job|jobs|visit|visits|house|home|place|property|site|customer|customers|last|latest|first|oldest|newest|recent|all|every|each|please|thanks|unit|units|doc|docs|document|documents|record|records|file|files|number|numbers|date|dates|way|exactly|today|them|they|their|theirs|his|her|hers|he|she|summarize|summarise|summary|recap|rundown|overview|detail|details|happened|everything|story|visit|service|call|ticket|work|system|systems)$/;
@@ -188,7 +189,7 @@ function notStoredText(fact, doc, bundle, who, wantedIds = []) {
 /** documents whose amount is NOT what a job cost: a quote is a price proposed for work not yet done, an agreement is a yearly fee, a purchase order is what we bought. Never listed as the job's cost unless the question asks for that kind. */
 const NOT_A_COST = { "proposal-quote": { what: "a proposed price, not a billed amount", asked: /\b(?:quotes?|quoted|estimates?|estimated|proposals?|bids?)\b/ }, "maintenance-agreement": { what: "a plan fee, not a billed job", asked: /\b(?:agreements?|contracts?|plans?|memberships?)\b/ }, "purchase-order": { what: "an order to a supplier, not a billed job", asked: /\b(?:purchase orders?|pos?|suppliers?|vendors?|ordered)\b/ } };
 function answerForDocs({ docs: allDocs, bundle, factsWanted, who, order, all, scopeLabel, customerRec, unitRecs, win, askText = "" }) {
-  const wanted = factsWanted.map(factById).filter(Boolean);
+  const wanted = factsWanted.map((f) => (f && typeof f === "object" ? f : factById(f))).filter(Boolean);
   // RECORDS-R2 cause 5: with several documents in scope, a money question is answered from the billed documents; quotes / agreements / purchase orders are set aside and named as what they are
   const moneyAsked = wanted.some((f) => f.kind === "money" || ["line_items", "labor_charge", "parts_charge"].includes(f.id));
   const setAside = moneyAsked && allDocs.length > 1 ? allDocs.filter((d) => NOT_A_COST[d.document_type] && !NOT_A_COST[d.document_type].asked.test(askText)) : [];
@@ -411,6 +412,14 @@ async function runCore(db, question, { today, phase = "early", customers = null,
     if (factIds.includes("line_items") && docHits.some((d) => d.document_type === "purchase-order")) return { skip: "purchase-order-parts-owned-by-older-lane" };
     if (factIds.length === 1 && factIds[0] === "customer_name" && !docHits.some((d) => d.document_type === "proposal-quote") && p.docNumbers.every((n) => n.prefixed)) return { skip: "customer-of-a-document-owned-by-older-lane" };
     if (named && docHits.every((d) => d.customer_id !== named.c.id)) return { skip: "number-not-under-named-customer" };
+    // a document number together with the name (or a distinctive word of the name) of a DIFFERENT customer or vendor is a contradiction: say whose document it is, answer nothing as theirs
+    if (!named) {
+      const other = await otherPartyNamed(db, p.tokens, p.tokens.filter((t) => !STOP.has(t) && !FILLER.test(t) && !used.has(p.tokens.indexOf(t))), docHits);
+      if (other) {
+        const d0 = docHits[0];
+        return { data: envelope({ text: `${d0.document_number ?? d0.invoice_number ?? "That number"} is on file for ${other.owner || "someone else"}, not ${other.named}, so I have not answered for ${other.named}. Ask about the number on its own, or ask for ${other.named}'s own documents.`, cards: [], sources: [], records: [], total: 0, basis: "The number matched one document; its owner is not the party the question names." }), lane: "records", detail: "number-other-owner" };
+      }
+    }
     const docs = named ? docHits.filter((d) => d.customer_id === named.c.id) : docHits;
     const owners = [...new Set(docs.map((d) => d.customer_id).filter(Boolean))];
     scope = { kind: "doc", docs, who: null, label: docs.length === 1 ? null : "That number", customer: owners.length === 1 ? cust.find((c) => c.id === owners[0]) ?? null : null };
@@ -707,6 +716,10 @@ async function storedRecordFallback(db, question, { today, customers = null } = 
     // a name in the question that is a value stored on this very document (a technician being checked) is not a second customer
     const hay = bundle.facts.map((f) => String(f.value ?? "")).join(" ").toLowerCase();
     if (suspects.some((t) => onFile.has(t) && !hay.includes(t))) return null; // another customer's name word; a person's name that is not on file is just a word in the question
+    if (!named) {
+      const other = await otherPartyNamed(db, p.tokens, p.tokens.filter((t) => !STOP.has(t) && !FILLER.test(t)), docHits);
+      if (other) return { data: envelope({ text: `${d.document_number ?? d.invoice_number ?? "That number"} is on file for ${other.owner || "someone else"}, not ${other.named}, so I have not answered for ${other.named}. Ask about the number on its own, or ask for ${other.named}'s own documents.`, cards: [], sources: [], records: [], total: 0, basis: "The number matched one document; its owner is not the party the question names." }), lane: "records", detail: "number-other-owner" };
+    }
     return documentDump(d, bundle, cr, p);
   }
   if (suspects.length) return null;
@@ -793,4 +806,151 @@ async function docListDump({ docs, db, label, intro = "", customer, unit = null,
   const none = dated.length - withFacts.length;
   const text = clean(`Here is everything on file for ${label}${win ? ` in ${win.label}` : ""}:${intro ? ` ${intro}` : ""} ${plural(withFacts.length, "document")} with details, newest first. ${pieces.map((x) => x.replace(/^./, (c) => c.toUpperCase())).join(" ")}${more > 0 ? ` And ${more} more.` : ""}${!withFacts.length ? ` ${plural(dated.length, "document")} on file, none with work, technician, hours, notes or total stored.` : ""}${withFacts.length && none ? ` ${plural(none, "other document")} on file carry none of these.` : ""}`);
   return { data: envelope({ text, cards: cards.slice(0, 12), sources, records: [customerRec, ...records].filter(Boolean), total: dated.length + (customerRec ? 1 : 0), basis: `Listed the stored details of the ${plural(shown.length, "newest document")} for ${label}; each value is cited to its document and page.` }), lane: "records", detail: unit ? "stored-record-unit" : "stored-record-customer" };
+}
+
+
+/**
+ * DONOVAN-R5 step 1: answer from a validated ORGANIZATION-DRIVEN pick (orgMenu.js). The pick only names which stored facts are asked and which subject; this
+ * function resolves the subject and reads every value from the organization's stored rows (typed columns, extractions, or the "Label: value" lines of the pages),
+ * with the page cited. null (or {skip}) = the pick could not be used: the caller carries on exactly as without it.
+ */
+const ORG_KIND_MAP = [[/\b(?:invoices?|bills?)\b/, ["invoice"]], [/\b(?:tickets?|work orders?|service calls?|visits?)\b/, ["ticket", "work-order", "work_order"]], [/\b(?:quotes?|estimates?|proposals?|bids?)\b/, ["quote", "estimate", "proposal"]], [/\bpermits?\b/, ["permit"]], [/\b(?:agreements?|contracts?)\b/, ["agreement", "contract"]], [/\b(?:purchase orders?|pos?)\b|(?<!work )(?<!service )\borders?\b/, ["purchase"]], [/\bwarrant(?:y|ies)\b/, ["warranty"]]];
+function orgKindsAsked(text) { const t = String(text ?? "").toLowerCase(); const out = []; for (const [re, k] of ORG_KIND_MAP) if (re.test(t)) out.push(...k); return out.length ? out : null; }
+/** a stored customer / vendor name (other than the document's owner) that the question names in full, or by one distinctive word. null when none. */
+const T = (a) => `${a}.tenant_id = (current_setting('app.tenant_id', true))::uuid`;
+async function otherPartyNamed(db, qTokens, residual, docHits) {
+  try {
+    const { rows } = await db.raw(`SELECT DISTINCT data->>'customer_name' AS n FROM entities WHERE entity_type = 'customer' AND merged_into IS NULL AND ${T("entities")}
+      UNION SELECT DISTINCT value FROM extractions WHERE field_key = 'vendor_name' AND value IS NOT NULL AND ${T("extractions")}`, []);
+    const names = rows.map((r) => String(r.n ?? "").trim()).filter(Boolean);
+    const ids = docHits.map((d) => d.document_id);
+    let ownerNames = docHits.map((d) => d.customer_name).filter(Boolean);
+    try { const v = await db.raw(`SELECT value FROM extractions WHERE field_key = 'vendor_name' AND document_id = ANY($1::uuid[]) AND ${T("extractions")}`, [ids]); ownerNames.push(...v.rows.map((r) => r.value)); } catch { /* none */ }
+    const ownTok = ownerNames.map((n) => nameTokens(n));
+    const isOwner = (nt) => ownTok.some((ot) => nt.some((t) => ot.some((x) => x === t || tokenSame(x, t) === "exact")));
+    const qset = new Set(qTokens);
+    const full = names.map((n) => ({ n, nt: nameTokens(n) })).filter(({ nt }) => nt.length && nt.every((t) => qset.has(t)) && !isOwner(nt));
+    if (full.length) return { named: full.sort((a, b) => b.nt.length - a.nt.length)[0].n, owner: ownerNames[0] ?? null };
+    // one distinctive word (a surname, a first name, a vendor's first word) that belongs to exactly one stored name that is not the owner
+    for (const w of residual ?? []) {
+      if (w.length < 4) continue;
+      const hit = names.filter((n) => nameTokens(n).includes(w));
+      if (hit.length === 1 && !isOwner(nameTokens(hit[0]))) return { named: hit[0], owner: ownerNames[0] ?? null };
+    }
+  } catch { /* the check is an extra guard: any failure leaves today's behaviour */ }
+  return null;
+}
+export async function runOrgPicked(db, question, { pick, inv, today = null } = {}) {
+  try {
+    const lower = String(question ?? "").toLowerCase();
+    let periodFn = null;
+    if (MAY_HAVE_WINDOW.test(lower)) { try { periodFn = (await import("../financials/answers.js")).parsePeriod; } catch { periodFn = null; } }
+    const p = _prq(question, { today, parsePeriodFn: periodFn });
+    p.serials = p.serials.filter((sn) => !p.docNumbers.some((d) => d.alnum === sn));
+    const bind = bindOrgPick(pick, p, inv, question);
+    if (!bind.ok) return { skip: `org-pick-${bind.reason}` };
+    let menu = pick.menuFacts;
+    // a staff member / patient / vendor is not a customer record: their phone / email / address is the labelled line on their own forms, when there is one
+    if (!pick.notOnMenu && bind.subject && bind.subject.kind !== "customer" && menu.some((m) => m.route === "directory" && m.belongs === "customer")) {
+      const mapped = menu.map((m) => { if (!(m.route === "directory" && m.belongs === "customer")) return m; const e = [...inv.labels.values()].find((x) => x.slug === slugOf(m.label) || slugOf(m.label).endsWith(`_${x.slug}`) || x.slug === slugOf(m.label).replace(/^customer_/, "")); return e ? { id: `page:${e.slug}`, label: e.label, kind: e.kind, route: "page", belongs: "document", on: [...e.types.keys()].slice(0, 3), count: e.count } : null; });
+      if (mapped.some((x) => !x)) return { skip: "org-pick-subject-is-not-a-customer" };
+      menu = mapped; pick = { ...pick, menuFacts: mapped, facts: mapped.map((m) => m.id) };
+    }
+    if (pick.notOnMenu) {
+      const sj = bind.subject; const ids = new Set(sj.docIds);
+      if (sj.customerId) for (const d of await store.docsForCustomer(db, sj.customerId)) ids.add(d.document_id);
+      const have = new Set(); for (const id of ids) for (const l of inv.lines.get(id) ?? []) have.add(l.label.toLowerCase());
+      const c = sj.customerId ? inv.customers.find((x) => x.id === sj.customerId) : null;
+      if (c) { if (c.phone) have.add("phone"); if (c.email) have.add("email"); if (c.address) have.add("address"); }
+      const asked = pick.factWords.join(" ");
+      const list = [...have].slice(0, 8);
+      const records = [...ids].slice(0, 3).map((id) => inv.docs.get(id)).filter(Boolean).map((d) => documentRecord({ id: d.document_id, document_type: d.document_type, original_filename: d.filename }, { label: typeLabel(d.document_type) })).filter(Boolean);
+      const data = envelope({ text: clean(`I read that as asking for "${asked}" about ${sj.name}. I could not find that as a stored field for ${sj.name}.${list.length ? ` Fields I can see: ${list.join(", ")}.` : ""} (Free-text notes are not searched here.)`), cards: [], sources: [], records, total: ids.size, basis: `Checked every stored field of ${sj.name} (${ids.size} document${ids.size === 1 ? "" : "s"}); none is "${asked}".` });
+      return { data, detail: "org-pick:not-stored" };
+    }
+    const typedAs = bind.subject && nameTokens(bind.subject.name).some((t) => !p.tokens.includes(t)) ? ` Showing ${bind.subject.name} (a close match to what you typed).` : "";
+    const sentence = () => `I read that as asking for ${menu.map((m) => String(m.label).toLowerCase()).join(" and ")}.${typedAs}`;
+    // facts that belong to a customer, a unit or the line items are read by the existing, tested lane (same stored rows), driven by the pick
+    const delegated = menu.filter((m) => m.route === "directory" && m.belongs !== "document");
+    const custFacts = delegated.filter((m) => m.belongs === "customer" && m.id !== "equipment_list" && m.id !== "customer_name");
+    if (custFacts.length && custFacts.length === menu.length) {
+      // the customer RECORD (phone, email, address, number): read verbatim from the stored customer row, cited to a page that prints the value when one does
+      const c0 = bind.subject?.kind === "customer" ? inv.customers.find((x) => x.id === bind.subject.customerId) : null;
+      const c = c0 ? ((await store.loadCustomers(db)).find((x) => x.id === c0.id) ?? c0) : null;
+      if (!c) return { skip: "org-pick-subject-is-not-a-customer" };
+      const colOf = { customer_address: "address", customer_phone: "phone", customer_email: "email", customer_number: "customer_number" };
+      const cdocs = await store.docsForCustomer(db, c.id);
+      const cb = await store.loadBundle(db, cdocs.slice(0, 40).map((d) => d.document_id));
+      const cards = [], sources = [], records = [], parts = [];
+      for (const m of custFacts) {
+        const f = factById(m.id); const raw = clean(c[colOf[m.id]]);
+        if (!raw) { parts.push(`${f.label} is not stored for ${c.name}.`); continue; }
+        let src = [];
+        for (const d of cdocs.slice(0, 40)) { const hit = cb.pages.find((x) => x.document_id === d.document_id && clean(x.text).toLowerCase().includes(raw.toLowerCase())); if (hit) { src = [sourceOf(d, hit.page_no)]; break; } }
+        parts.push(`${c.name}'s ${f.label.toLowerCase()} is ${raw}.`);
+        cards.push({ label: f.label, value: raw, status: "ok", entityId: c.id, sources: src }); sources.push(...src);
+      }
+      const rec = customerRecord({ id: c.id, name: c.name, service_address: c.address, phone: c.phone, email: c.email, customer_number: c.customer_number });
+      if (rec) records.push(rec);
+      return { data: envelope({ text: clean(`${sentence()} ${parts.join(" ")}`), cards, sources, records, basis: `Read the stored customer record of ${c.name}.` }), detail: "org-pick:customer-record" };
+    }
+    if (delegated.length) {
+      if (delegated.length !== menu.length) return { skip: "org-pick-mixed-facts" };
+      if (!(bind.subject?.kind === "customer" || bind.docNumber)) return { skip: "org-pick-subject-has-no-record" };
+      const old = { facts: pick.facts, summary: false, subject: { kind: bind.docNumber ? "document" : "customer", text: pick.subject.text }, factWords: pick.factWords, order: pick.order, window: pick.window };
+      const r = await runPicked(db, question, { today, pick: old, customers: null });
+      return r ? { ...r, detail: `org-${r.detail}` } : { skip: "org-pick-lane-declined" };
+    }
+    // document-level facts: find the subject's documents
+    let docs = [];
+    if (bind.docNumber) {
+      const rows = await store.docsByNumber(db, [{ alnum: bind.docNumber.alnum, digits: bind.docNumber.digits, prefixed: bind.docNumber.prefixed }]);
+      if (rows.length !== 1) return { skip: "org-pick-document-not-unique" };
+      if (bind.dupName && nameTokens(rows[0].customer_name ?? "").join(" ") !== nameTokens(bind.dupName).join(" ")) return { skip: "org-pick-number-and-name-disagree" };
+      if (bind.subject) { // a document number together with someone's name: it must be that subject's document, else the older lanes name the true owner
+        const mine = bind.subject.docIds.has(rows[0].document_id) || (bind.subject.customerId && rows[0].customer_id === bind.subject.customerId);
+        if (!mine) return { skip: "org-pick-number-and-name-disagree" };
+      }
+      docs = rows;
+    } else {
+      const ids = new Set(bind.subject.docIds);
+      if (bind.subject.customerId) for (const d of await store.docsForCustomer(db, bind.subject.customerId)) ids.add(d.document_id);
+      docs = [...ids].map((id) => inv.docs.get(id)).filter(Boolean).map((d) => ({ ...d, customer_name: bind.subject.name }));
+    }
+    if (!docs.length) return { skip: "org-pick-no-documents" };
+    // a document kind named in the question (invoice, ticket, quote, permit, agreement ...) filters the subject's documents by kind; a kind that matches none is a decline, never "all documents"
+    if (!bind.docNumber) {
+      const kinds = orgKindsAsked(p.text);
+      const pickedWords = new Set(menu.flatMap((m) => String(m.label).toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)));
+      if (kinds) { const k = docs.filter((d) => kinds.some((x) => String(d.document_type ?? "").toLowerCase().includes(x))); if (k.length) docs = k; else if (!(String(p.text).split(/\s+/).some((w) => pickedWords.has(w) && ORG_KIND_MAP.some(([re]) => re.test(w))))) return { skip: "org-pick-no-document-of-the-asked-kind" }; }
+    }
+    docs = docs.slice(0, 200);
+    const bundle = await store.loadBundle(db, docs.map((d) => d.document_id));
+    const wanted = menu.map((m) => (m.route === "page" ? dynamicFact(m) : factById(m.id)));
+    for (const m of menu) if (m.route === "page") for (const d of docs) for (const l of inv.lines.get(d.document_id) ?? []) if (`page:${l.slug}` === m.id) bundle.facts.push({ document_id: d.document_id, entity_id: null, field_key: m.id, value: l.value, created_at: "", page_no: l.page });
+    {
+      const pageIds0 = menu.filter((m) => m.route === "page").map((m) => m.id.slice(5));
+      const nm0 = String(bind.subject?.name ?? "").toLowerCase();
+      for (const sl of pageIds0) {
+        if (!docs.some((d) => (inv.lines.get(d.document_id) ?? []).some((l) => l.slug === sl)) && nm0 && [...inv.lines.values()].some((ls) => ls.some((l) => l.slug === sl && l.value.toLowerCase().includes(nm0)))) return { skip: "org-pick-subject-is-the-value-elsewhere" };
+      }
+    }
+    let scoped = docs;
+    if (p.window) {
+      const inWin = (iso) => iso && (!p.window.from || iso >= p.window.from) && (!p.window.to || iso <= p.window.to);
+      scoped = docs.filter((d) => inWin(docDate(d, bundle)));
+      if (!scoped.length) return { skip: "org-pick-window-empty" };
+      const pg1 = menu.filter((m) => m.route === "page").map((m) => m.id.slice(5));
+      if (pg1.length && !scoped.some((d) => pg1.every((sl) => (inv.lines.get(d.document_id) ?? []).some((l) => l.slug === sl))) && docs.some((d) => pg1.every((sl) => (inv.lines.get(d.document_id) ?? []).some((l) => l.slug === sl)))) return { skip: "org-pick-window-excludes-the-carrier" };
+    }
+    const order = p.order ?? (pick.order !== "none" ? pick.order : null);
+    if (order) { const pageIds = menu.filter((m) => m.route === "page").map((m) => m.id.slice(5)); if (pageIds.length) { const carry = scoped.filter((d) => pageIds.every((sl) => (inv.lines.get(d.document_id) ?? []).some((l) => l.slug === sl))); if (carry.length) scoped = carry; } }
+    // money-state facts (balance, paid, status) over several documents would list only the ones that carry them and hide the rest: the older lane states the gaps
+    if (!bind.docNumber && !order && scoped.length > 1 && menu.some((m) => /^(?:balance_due|amount_due|amount_paid|payment_status|status|paid|total_due)$/.test(String(m.id).replace(/^page:/, "")))) return { skip: "org-pick-money-state-across-documents" };
+    const label = bind.subject?.name ?? docTitle(docs[0], bundle);
+    const data = answerForDocs({ docs: scoped, bundle, factsWanted: wanted, who: bind.subject?.name ?? null, order, all: p.all, scopeLabel: label, customerRec: null, unitRecs: [], win: p.window, askText: p.text });
+    if (!data || data.kind !== "answer") return { skip: "org-pick-no-answer" };
+    data.text = clean(`${sentence()} ${data.text}`);
+    return { data, detail: "org-pick:doc-facts" };
+  } catch (err) { console.error("Org pick answer failed:", err?.message); return { skip: "org-pick-error" }; }
 }

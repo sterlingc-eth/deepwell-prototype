@@ -1258,7 +1258,8 @@ export default async function handler(req, res) {
         // model call that only picks directory facts; the lane then answers from stored rows exactly as for a rule-matched question. Any failure = no pick = the path below as before.
         const pickMod = phase === "late" ? await import("./_lib/records/pick.js") : null;
         const pickWanted = Boolean(pickMod?.menuPickEnabled());
-        let rr = await timer.time("records", () => withTenant(ctxArg, (db) => mod.runRecordsLane(db, question, { today: todayResolved, phase, pickWanted })));
+        let rr = null;
+        rr = await timer.time("records", () => withTenant(ctxArg, (db) => mod.runRecordsLane(db, question, { today: todayResolved, phase, pickWanted })));
         if (rr?.pickable) {
           let pick = null;
           try { await budgetPromise; pick = await (await import("./_lib/records/pickCall.js")).requestPick({ withTenant, ctxArg, question }); } catch { pick = null; }
@@ -1276,6 +1277,43 @@ export default async function handler(req, res) {
         return true;
       } catch (err) {
         console.error("Records-first look-up failed, continuing with the older lanes:", err?.message);
+        return false;
+      }
+    };
+    // DONOVAN-R5 step 1 (switch DONOVAN_MENU_PICK, default OFF): the ORGANIZATION-DRIVEN pick reads a question that names a subject this organization has stored (a customer, vendor,
+    // person or document number) BEFORE every older lane. One small model call picks which stored fact is asked; code reads the value from the stored rows and cites the page.
+    // Any failure, "none", an invalid or unexplained pick = false: the older lanes run exactly as before.
+    const tryOrgPick = async () => {
+      if (meta || conversationContext || !question) return false;
+      try {
+        const om = await import("./_lib/records/orgMenu.js");
+        if (!om.orgPickEnabled()) return false;
+        const mod = (_recordsLaneModule ??= await import("./_lib/records/lane.js"));
+        if (!mod.recordsFirstEnabled()) return false;
+        await budgetPromise;
+        const got = await (await import("./_lib/records/orgPickCall.js")).requestOrgPick({ withTenant, ctxArg, question });
+        if (!got) return false;
+        const rr = await timer.time("records", () => withTenant(ctxArg, (db) => mod.runOrgPicked(db, question, { pick: got.pick, inv: got.inv, today: todayResolved })));
+        if (!rr?.data) { if (rr?.skip) console.log(JSON.stringify({ route: "ask", org_pick_skip: rr.skip })); return false; }
+        console.log(JSON.stringify({ route: "ask", records_first: rr.detail, phase: "org-pick" }));
+        send(200, { success: true, data: rr.data });
+        // DONOVAN-R5 step 3 (switch DONOVAN_EXAMPLE_BANK, default OFF): the reading the server verified and answered from is kept for THIS organization (thumbs-up confirms it, thumbs-down retires it)
+        try {
+          const bank = await import("./_lib/records/exampleBank.js");
+          if (bank.exampleBankEnabled() && !got.pick.notOnMenu) {
+            const menuNow = (await import("./_lib/records/orgMenu.js")).buildMenu(got.inv);
+            await withTenant(ctxArg, (db) => bank.addExample(db, { question, reading: got.pick, source: "served" }, { menu: menuNow }));
+          }
+        } catch { /* the bank is best-effort */ }
+        await timer.time("bookkeeping", () =>
+          withTenant(ctxArg, (db) => db.logAction({
+            action: "document.queried", resource_type: "question", clerk_user_id: auth.userId,
+            changes: { question_hash: hashQuestion(question), documents: [...new Set((rr.data.sources ?? []).map((x) => x.documentId).filter(Boolean))], passages: 0, records_first: rr.detail },
+          })).catch((err) => console.error("Failed to write document.queried audit row (org-pick):", err?.message))
+        );
+        return true;
+      } catch (err) {
+        console.error("Org pick failed, continuing with the older lanes:", err?.message);
         return false;
       }
     };
@@ -1476,6 +1514,8 @@ export default async function handler(req, res) {
       if (retrievalPromise) await retrievalPromise; // don't leak an in-flight transaction on the way out
       return send(gate.status, { error: gate.error, url: gate.url, ...(gate.scope ? { scope: gate.scope } : {}) });
     }
+
+    if (await tryOrgPick()) { if (retrievalPromise) await retrievalPromise.catch(() => {}); return; }
 
     // RECORDS-R2: "invoice 20002 technician" names a document by its bare number, not an amount: the records lane gets the first look
     if (/\b(?:invoice|inv|bill|quote|estimate|ticket|work order|purchase order|po|wo)\s*(?:number|no|num|#|:)?\s*#?\s*\d{4,}\b/i.test(question) && await tryRecordsFirst("early")) return;

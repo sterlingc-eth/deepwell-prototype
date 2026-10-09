@@ -43,6 +43,8 @@
  */
 import Anthropic from '@anthropic-ai/sdk';
 import { getApiKey, MODEL_TIMEOUT_MS, withBackoff } from '../claude.js';
+import { samplingFor } from '../grounding/promptV2.js';
+import { fenceDocText, FENCE_NOTE } from '../promptFence.js';
 import { escalationModel } from '../agent/escalation.js';
 import { estimateCostUsd, recordModelCall } from '../usage.js';
 import { sendEmail } from '../email.js';
@@ -119,7 +121,7 @@ const MAP_TOOL = {
 async function mapOneDocument(client, deadlineAt, question, doc, pageTextByPage) {
   try {
     const text = doc.pages
-      .map((p) => `[page ${p.page_no}] ${(pageTextByPage.get(p.page_no) ?? p.excerpt ?? '').slice(0, MAX_PAGE_CHARS)}`)
+      .map((p) => `[page ${p.page_no}] ${fenceDocText((pageTextByPage.get(p.page_no) ?? p.excerpt ?? '').slice(0, MAX_PAGE_CHARS))}`)
       .join('\n\n');
     if (!text.trim()) return { facts: [], costUsd: 0 };
     const response = await withBackoff(
@@ -127,10 +129,10 @@ async function mapOneDocument(client, deadlineAt, question, doc, pageTextByPage)
         {
           model: MAP_MODEL,
           max_tokens: MAP_MAX_OUTPUT_TOKENS,
-          temperature: 0,
+          ...samplingFor(MAP_MODEL),
           system: 'You are given one excerpt from ONE document and a question spanning many documents. Return only ' +
             'facts THIS document actually states that bear on the question, each citing its page. Never speculate ' +
-            'and never answer the overall question — that happens later, once every document has been read.',
+            'and never answer the overall question — that happens later, once every document has been read. ' + FENCE_NOTE,
           tools: [MAP_TOOL],
           tool_choice: { type: 'tool', name: 'facts_for_question' },
           messages: [{ role: 'user', content: `QUESTION: ${question}\n\nDOCUMENT (${doc.documentType ?? 'unknown type'}):\n${text}` }],
@@ -180,7 +182,7 @@ async function reduceFacts(question, facts, { deadlineAt }) {
     const response = await withBackoff(
       () => client.messages.create(
         {
-          model, max_tokens: REDUCE_MAX_OUTPUT_TOKENS, temperature: 0,
+          model, max_tokens: REDUCE_MAX_OUTPUT_TOKENS, ...samplingFor(model),
           system: 'Synthesize these cited facts (drawn from many documents) into a direct answer to the question. ' +
             'Every claim must keep its citation inline as (doc <id> p.<page>). If the facts don\'t fully answer the ' +
             'question, say plainly what is and isn\'t covered — never fill a gap with something not in the facts.',
