@@ -112,6 +112,7 @@ a{color:inherit}
 .nav-dropdown-menu .tag.live{color:#0D3827;background:color-mix(in srgb,#0D3827 16%,transparent)}
 .nav-dropdown-menu .tag.soon{color:#7A5326;background:color-mix(in srgb,var(--brass) 18%,transparent)}
 .nav-dropdown-menu{width:max-content;max-width:min(340px,calc(100vw - 32px))}
+.nav-dropdown-menu{max-height:calc(100vh - 96px);overflow-y:auto;overscroll-behavior:contain}
 .navlinks .nav-dropdown-menu a,.nav.menu-open .navlinks .nav-dropdown-menu a{flex-direction:column;align-items:flex-start;justify-content:center;gap:1px;white-space:normal;text-align:left}
 .nav.menu-open .nav-dropdown-menu{max-width:none}
 .nav-dropdown-menu .dd-t{font-size:.9rem;font-weight:600;line-height:1.3;color:var(--text)}
@@ -131,21 +132,21 @@ footer a:hover{color:var(--text)}
   --app-acc:#2F7A5B;--app-text:#1F5C44;--app-ink:#fff;--dv-acc:#B98A4E;--dv-text:#8E6530;--dv-ink:#1B1408;
   --sc-top:#F4F7F4;--sc-bot:#CFDCD3;--sc-s1:rgba(22,60,44,.05);--sc-s2:rgba(22,60,44,.08);--sc-s3:rgba(22,60,44,.11);--sc-s4:rgba(22,60,44,.15);--sc-s5:rgba(22,60,44,.2);
   --sc-edge:rgba(22,60,44,.22);--sc-ring:rgba(142,101,48,.38);--sc-glow:rgba(185,138,78,.26);--sc-orb-hi:#E8D1A8;--sc-orb-lo:#B98A4E;
-  --sc-warm:rgba(185,138,78,.24);--card-a:86%;
+  --sc-warm:rgba(185,138,78,.24);--card-a:86%;--sc-edge-l:rgba(22,60,44,.26);--sc-glow-l:rgba(47,122,91,.14);--sc-ring-l:#2F7A5B;--sc-mouth:#1F3D30;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --app-acc:#9DC4B2;--app-text:#9DC4B2;--app-ink:#0B1613;--dv-acc:#D8AE6E;--dv-text:#D8AE6E;--dv-ink:#1B1408;
     --sc-top:#12271F;--sc-bot:#050C09;--sc-s1:rgba(58,107,77,.10);--sc-s2:rgba(58,107,77,.15);--sc-s3:rgba(58,107,77,.20);--sc-s4:rgba(58,107,77,.27);--sc-s5:rgba(58,107,77,.34);
     --sc-edge:rgba(157,196,178,.20);--sc-ring:rgba(216,174,110,.34);--sc-glow:rgba(216,174,110,.22);--sc-orb-hi:#E8D1A8;--sc-orb-lo:#7A5B2E;
-    --sc-warm:rgba(216,174,110,.16);--card-a:80%;
+    --sc-warm:rgba(216,174,110,.16);--card-a:80%;--sc-edge-l:rgba(157,196,178,.30);--sc-glow-l:rgba(157,196,178,.16);--sc-ring-l:#9DC4B2;--sc-mouth:#050C09;
   }
 }
 :root[data-theme="dark"]{
   --app-acc:#9DC4B2;--app-text:#9DC4B2;--app-ink:#0B1613;--dv-acc:#D8AE6E;--dv-text:#D8AE6E;--dv-ink:#1B1408;
   --sc-top:#12271F;--sc-bot:#050C09;--sc-s1:rgba(58,107,77,.10);--sc-s2:rgba(58,107,77,.15);--sc-s3:rgba(58,107,77,.20);--sc-s4:rgba(58,107,77,.27);--sc-s5:rgba(58,107,77,.34);
   --sc-edge:rgba(157,196,178,.20);--sc-ring:rgba(216,174,110,.34);--sc-glow:rgba(216,174,110,.22);--sc-orb-hi:#E8D1A8;--sc-orb-lo:#7A5B2E;
-  --sc-warm:rgba(216,174,110,.16);--card-a:80%;
+  --sc-warm:rgba(216,174,110,.16);--card-a:80%;--sc-edge-l:rgba(157,196,178,.30);--sc-glow-l:rgba(157,196,178,.16);--sc-ring-l:#9DC4B2;--sc-mouth:#050C09;
 }
 .wrap{max-width:1080px}
 .navlinks a,.nav-dropdown-toggle,.navcta .btn{white-space:nowrap}
@@ -271,6 +272,18 @@ footer a:hover{color:var(--text)}
   .beam{animation:pn-beam 16s ease-in-out infinite}
   .pn-idle .sc *{animation-play-state:paused}
 }
+/* App side: the well seen from above (DeepWell logo rings); ripples flow in, Donovan's flow out */
+.sc-left{--lx:15%;--ly:24%}
+.lwell{position:absolute;left:var(--lx);top:var(--ly);width:0;height:0}
+.lwell i{position:absolute;left:0;top:0;width:var(--d);height:var(--d);margin:calc(var(--d)/-2);border-radius:50%;border:1px solid var(--sc-edge-l);opacity:var(--o,.5)}
+.lglow{position:absolute;left:var(--lx);top:var(--ly);width:min(110vh,70vw);aspect-ratio:1;margin:calc(min(110vh,70vw)/-2) 0 0 calc(min(110vh,70vw)/-2);border-radius:50%;background:radial-gradient(closest-side,var(--sc-glow-l),transparent)}
+.lmouth{position:absolute;left:var(--lx);top:var(--ly);width:clamp(44px,7vh,76px);aspect-ratio:1;margin:calc(clamp(44px,7vh,76px)/-2) 0 0 calc(clamp(44px,7vh,76px)/-2);border-radius:50%;background:radial-gradient(circle at 50% 50%,var(--sc-mouth) 0 38%,transparent 39%),repeating-radial-gradient(circle,var(--sc-ring-l) 0 1.5px,transparent 1.5px 7px);opacity:.85;box-shadow:0 0 50px 6px var(--sc-glow-l)}
+@media (prefers-reduced-motion:no-preference){
+ @keyframes pn-rip-in{0%{transform:scale(1.5);opacity:0}20%{opacity:.45}100%{transform:scale(.3);opacity:0}}
+ .lwell i.rip{--d:min(70vh,46vw);animation:pn-rip-in 16s cubic-bezier(.4,0,.6,1) infinite}
+ .lwell i.rip:nth-of-type(7){animation-delay:-5.3s}.lwell i.rip:nth-of-type(8){animation-delay:-10.6s}
+}
+@media (max-width:860px){.sc-left{--lx:100%;--ly:4%}.lmouth{display:none}.lwell,.lglow{opacity:.55}}
 @media (prefers-reduced-motion:reduce){.pn-card,.pn-switch button{transition:none}}
 
 @media (prefers-reduced-motion:no-preference){@keyframes pn-ring{0%,100%{opacity:.35}50%{opacity:1}}.dvmark .r{animation:pn-ring 6s ease-in-out infinite}.dvmark .r:nth-of-type(2){animation-delay:.45s}.dvmark .r:nth-of-type(3){animation-delay:.9s}.dvmark .r:nth-of-type(4){animation-delay:1.35s}}
@@ -299,9 +312,15 @@ footer a:hover{color:var(--text)}
           <a role="menuitem" href="/who.html#owners"><span class="dd-t">Owners</span><span class="dd-d">See which warranties and agreements are expiring.</span></a>
           <div class="dd-group" role="presentation">By industry</div>
           <a role="menuitem" href="/who.html#industries"><span class="dd-t">Every industry, one app</span><span class="dd-d">See how Donovan fits your kind of business.</span></a>
-          <a role="menuitem" href="/who.html#hvac"><span class="dd-t">HVAC</span><span class="dd-d">Warranties, serial numbers and service tickets.</span></a>
-          <a role="menuitem" href="/who.html#electrical"><span class="dd-t">Electrical and plumbing</span><span class="dd-d">Permits, inspections and work orders.</span></a>
-          <a role="menuitem" href="/who.html#property"><span class="dd-t">Property management</span><span class="dd-d">Work orders, vendor contracts and invoices.</span></a>
+          <a role="menuitem" href="/industries/any-business.html"><span class="dd-t">Any business</span><span class="dd-d">If you keep paperwork, it works.</span></a>
+          <a role="menuitem" href="/industries/hvac.html"><span class="dd-t">HVAC</span><span class="dd-d">Warranties, serial numbers and service tickets.</span></a>
+          <a role="menuitem" href="/industries/electrical.html"><span class="dd-t">Electrical</span><span class="dd-d">Permits, inspections and work orders.</span></a>
+          <a role="menuitem" href="/industries/plumbing.html"><span class="dd-t">Plumbing</span><span class="dd-d">Service tickets, permits and warranty paperwork.</span></a>
+          <a role="menuitem" href="/industries/property-management.html"><span class="dd-t">Property management</span><span class="dd-d">Work orders, vendor contracts and invoices.</span></a>
+          <a role="menuitem" href="/industries/fleet-equipment-rental.html"><span class="dd-t">Fleet and equipment rental</span><span class="dd-d">Service records, inspections and rental agreements.</span></a>
+          <a role="menuitem" href="/industries/contractors.html"><span class="dd-t">Contractors</span><span class="dd-d">Contracts, permits and purchase orders.</span></a>
+          <a role="menuitem" href="/industries/offices.html"><span class="dd-t">Offices</span><span class="dd-d">Vendor contracts, agreements and forms.</span></a>
+          <a role="menuitem" href="/industries/nonprofits.html"><span class="dd-t">Nonprofits</span><span class="dd-d">Agreements, invoices and correspondence.</span></a>
         </div>
       </div>
       <a href="/#plans">Pricing</a>
@@ -315,7 +334,7 @@ footer a:hover{color:var(--text)}
 </nav>
 <main class="pn" data-active="app">
 <div class="pn-scene" aria-hidden="true"><div class="pn-scene-in">
-<div class="sc sc-a"><div class="sc-left"><svg class="band b1" viewBox="0 0 1600 900" preserveAspectRatio="none"><path d="M0 120 C200 60 380 170 620 120 S1040 50 1300 110 S1500 150 1600 100 L1600 900 L0 900Z"/><path class="edge" d="M0 120 C200 60 380 170 620 120 S1040 50 1300 110 S1500 150 1600 100"/></svg><svg class="band b2" viewBox="0 0 1600 900" preserveAspectRatio="none"><path d="M0 90 C260 150 420 40 700 100 S1100 160 1360 90 S1520 60 1600 110 L1600 900 L0 900Z"/><path class="edge" d="M0 90 C260 150 420 40 700 100 S1100 160 1360 90 S1520 60 1600 110"/></svg><svg class="band b3" viewBox="0 0 1600 900" preserveAspectRatio="none"><path d="M0 130 C180 80 460 150 700 110 S1000 40 1280 120 S1480 140 1600 90 L1600 900 L0 900Z"/><path class="edge" d="M0 130 C180 80 460 150 700 110 S1000 40 1280 120 S1480 140 1600 90"/></svg><svg class="band b4" viewBox="0 0 1600 900" preserveAspectRatio="none"><path d="M0 100 C240 150 500 60 760 120 S1120 150 1340 80 S1500 70 1600 120 L1600 900 L0 900Z"/><path class="edge" d="M0 100 C240 150 500 60 760 120 S1120 150 1340 80 S1500 70 1600 120"/></svg><svg class="band b5" viewBox="0 0 1600 900" preserveAspectRatio="none"><path d="M0 110 C220 70 440 140 720 100 S1060 70 1300 130 S1520 120 1600 80 L1600 900 L0 900Z"/><path class="edge" d="M0 110 C220 70 440 140 720 100 S1060 70 1300 130 S1520 120 1600 80"/></svg></div><div class="sc-right"><div class="beam"></div><div class="glow"></div><div class="rings"><i style="--d:min(30vh,20vw);--o:0.6"></i><i style="--d:min(48vh,32vw);--o:0.46"></i><i style="--d:min(68vh,44vw);--o:0.34"></i><i style="--d:min(92vh,60vw);--o:0.24"></i><i style="--d:min(120vh,78vw);--o:0.16"></i><i class="rip"></i><i class="rip"></i><i class="rip"></i></div><div class="orb"></div></div></div>
+<div class="sc sc-a"><div class="sc-left"><div class="lglow"></div><div class="lwell"><i style="--d:min(26vh,17vw);--o:.6"></i><i style="--d:min(42vh,28vw);--o:.48"></i><i style="--d:min(60vh,39vw);--o:.36"></i><i style="--d:min(80vh,52vw);--o:.26"></i><i style="--d:min(104vh,68vw);--o:.17"></i><i style="--d:min(132vh,86vw);--o:.1"></i><i class="rip"></i><i class="rip"></i></div><div class="lmouth"></div><svg class="band b1" viewBox="0 0 1600 900" preserveAspectRatio="none"><path d="M0 120 C200 60 380 170 620 120 S1040 50 1300 110 S1500 150 1600 100 L1600 900 L0 900Z"/><path class="edge" d="M0 120 C200 60 380 170 620 120 S1040 50 1300 110 S1500 150 1600 100"/></svg><svg class="band b2" viewBox="0 0 1600 900" preserveAspectRatio="none"><path d="M0 90 C260 150 420 40 700 100 S1100 160 1360 90 S1520 60 1600 110 L1600 900 L0 900Z"/><path class="edge" d="M0 90 C260 150 420 40 700 100 S1100 160 1360 90 S1520 60 1600 110"/></svg><svg class="band b3" viewBox="0 0 1600 900" preserveAspectRatio="none"><path d="M0 130 C180 80 460 150 700 110 S1000 40 1280 120 S1480 140 1600 90 L1600 900 L0 900Z"/><path class="edge" d="M0 130 C180 80 460 150 700 110 S1000 40 1280 120 S1480 140 1600 90"/></svg><svg class="band b4" viewBox="0 0 1600 900" preserveAspectRatio="none"><path d="M0 100 C240 150 500 60 760 120 S1120 150 1340 80 S1500 70 1600 120 L1600 900 L0 900Z"/><path class="edge" d="M0 100 C240 150 500 60 760 120 S1120 150 1340 80 S1500 70 1600 120"/></svg><svg class="band b5" viewBox="0 0 1600 900" preserveAspectRatio="none"><path d="M0 110 C220 70 440 140 720 100 S1060 70 1300 130 S1520 120 1600 80 L1600 900 L0 900Z"/><path class="edge" d="M0 110 C220 70 440 140 720 100 S1060 70 1300 130 S1520 120 1600 80"/></svg></div><div class="sc-right"><div class="beam"></div><div class="glow"></div><div class="rings"><i style="--d:min(30vh,20vw);--o:0.6"></i><i style="--d:min(48vh,32vw);--o:0.46"></i><i style="--d:min(68vh,44vw);--o:0.34"></i><i style="--d:min(92vh,60vw);--o:0.24"></i><i style="--d:min(120vh,78vw);--o:0.16"></i><i class="rip"></i><i class="rip"></i><i class="rip"></i></div><div class="orb"></div></div></div>
 </div></div>
 <header class="pn-head wrap"><div class="eyebrow">Patch notes</div><h1>What&rsquo;s new in DeepWell and Donovan</h1><p class="lede">The DeepWell app and Donovan each have their own version and their own release history, newest first.</p></header>
 <div class="pn-switch"><div class="pn-switch-in" role="group" aria-label="Choose a version history"><button type="button" data-for="app" aria-pressed="true" aria-controls="app">DeepWell App</button><button type="button" data-for="donovan" aria-pressed="false" aria-controls="donovan">Donovan</button></div></div>

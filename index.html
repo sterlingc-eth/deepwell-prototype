@@ -261,7 +261,7 @@ section{padding-block:clamp(36px,5vw,64px);border-top:1px solid var(--line)}
 /* roadmap section (generated markup: scripts/build-roadmap.mjs from docs/roadmap.json) */
 #roadmap{padding-block:clamp(36px,5vw,64px);--rm-gap:clamp(18px,2.6vw,36px);--rm-node:34px}
 #roadmap .sec-head{align-items:end;margin-bottom:clamp(20px,3vw,32px)}
-.rm-stages{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--rm-gap)}
+.rm-stages{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--rm-gap)}
 .rm-stage{position:relative;min-width:0;display:flex;flex-direction:column}
 .rm-stage:not(:last-child)::before{content:"";position:absolute;top:calc(var(--rm-node)/2 - 1px);left:calc(var(--rm-node) + 10px);right:calc(-1*var(--rm-gap) + 10px);height:2px;background:var(--well);opacity:.55}
 .rm-next::before{background:repeating-linear-gradient(90deg,var(--brass) 0 8px,transparent 8px 14px)!important;opacity:.8!important}
@@ -524,6 +524,7 @@ footer a{color:var(--muted);text-decoration:none}
   padding:9px 12px;border-radius:6px;font-size:.88rem;font-weight:500;color:var(--text);text-decoration:none}
 .nav-dropdown-menu a:hover,.nav-dropdown-menu a:focus-visible{background:var(--surface-2)}
 .nav-dropdown-menu{width:max-content;max-width:min(340px,calc(100vw - 32px))}
+.nav-dropdown-menu{max-height:calc(100vh - 96px);overflow-y:auto;overscroll-behavior:contain}
 .navlinks .nav-dropdown-menu a,.nav.menu-open .navlinks .nav-dropdown-menu a{flex-direction:column;align-items:flex-start;justify-content:center;gap:1px;white-space:normal;text-align:left}
 .nav.menu-open .nav-dropdown-menu{max-width:none}
 .nav-dropdown-menu .dd-t{font-size:.9rem;font-weight:600;line-height:1.3;color:var(--text)}
@@ -1391,9 +1392,15 @@ html.dwm .q[aria-pressed="true"]{box-shadow:none}
           <a role="menuitem" href="/who.html#owners"><span class="dd-t">Owners</span><span class="dd-d">See which warranties and agreements are expiring.</span></a>
           <div class="dd-group" role="presentation">By industry</div>
           <a role="menuitem" href="/who.html#industries"><span class="dd-t">Every industry, one app</span><span class="dd-d">See how Donovan fits your kind of business.</span></a>
-          <a role="menuitem" href="/who.html#hvac"><span class="dd-t">HVAC</span><span class="dd-d">Warranties, serial numbers and service tickets.</span></a>
-          <a role="menuitem" href="/who.html#electrical"><span class="dd-t">Electrical and plumbing</span><span class="dd-d">Permits, inspections and work orders.</span></a>
-          <a role="menuitem" href="/who.html#property"><span class="dd-t">Property management</span><span class="dd-d">Work orders, vendor contracts and invoices.</span></a>
+          <a role="menuitem" href="/industries/any-business.html"><span class="dd-t">Any business</span><span class="dd-d">If you keep paperwork, it works.</span></a>
+          <a role="menuitem" href="/industries/hvac.html"><span class="dd-t">HVAC</span><span class="dd-d">Warranties, serial numbers and service tickets.</span></a>
+          <a role="menuitem" href="/industries/electrical.html"><span class="dd-t">Electrical</span><span class="dd-d">Permits, inspections and work orders.</span></a>
+          <a role="menuitem" href="/industries/plumbing.html"><span class="dd-t">Plumbing</span><span class="dd-d">Service tickets, permits and warranty paperwork.</span></a>
+          <a role="menuitem" href="/industries/property-management.html"><span class="dd-t">Property management</span><span class="dd-d">Work orders, vendor contracts and invoices.</span></a>
+          <a role="menuitem" href="/industries/fleet-equipment-rental.html"><span class="dd-t">Fleet and equipment rental</span><span class="dd-d">Service records, inspections and rental agreements.</span></a>
+          <a role="menuitem" href="/industries/contractors.html"><span class="dd-t">Contractors</span><span class="dd-d">Contracts, permits and purchase orders.</span></a>
+          <a role="menuitem" href="/industries/offices.html"><span class="dd-t">Offices</span><span class="dd-d">Vendor contracts, agreements and forms.</span></a>
+          <a role="menuitem" href="/industries/nonprofits.html"><span class="dd-t">Nonprofits</span><span class="dd-d">Agreements, invoices and correspondence.</span></a>
         </div>
       </div>
       <a href="#roadmap">Roadmap</a>
@@ -2079,7 +2086,7 @@ html.dwm .q[aria-pressed="true"]{box-shadow:none}
         <div class="eyebrow">Roadmap</div>
         <h2 id="roadmap-h">What we're building</h2>
       </div>
-      <p class="lede">What works today, what's being built now, and what comes after. No dates. We'd rather ship it than promise it.</p>
+      <p class="lede">What works today and what's being built now. No dates. We'd rather ship it than promise it.</p>
     </div>
     <ol class="rm-stages" id="rm-stages" data-snap aria-label="Roadmap: live now, building next, later">
       <li class="rm-stage rm-live dw-observe dw-once">
@@ -2103,11 +2110,6 @@ html.dwm .q[aria-pressed="true"]{box-shadow:none}
           <li><b>Callback analytics</b><span>See which technicians and equipment brands generate the most repeat visits.</span></li>
           <li><b>Backups and per-company restore</b><span>Scheduled off-site backups, with the option to restore a single company.</span></li>
           <li><b>Uptime SLA</b><span>An uptime commitment with service credits.</span></li>
-        </ul>
-      </li>
-      <li class="rm-stage rm-later dw-observe dw-once">
-        <div class="rm-top"><span class="rm-node" aria-hidden="true"></span><div><h3>Later</h3><small>Planned</small></div></div>
-        <ul class="rm-items">
           <li><b>Electrical</b><span>Panel schedules, permits and inspections for electrical contractors.</span></li>
           <li><b>Plumbing</b><span>Backflow testing, water heater warranties and permits for plumbing contractors.</span></li>
           <li><b>Property management</b><span>Leases, unit turns, vendor compliance and appliance warranties for property managers.</span></li>
@@ -2311,7 +2313,7 @@ html.dwm .q[aria-pressed="true"]{box-shadow:none}
       </details>
       <details>
         <summary>Will it work for my business?</summary>
-        <p>If your business keeps documents or paperwork, yes. DeepWell reads invoices, contracts, permits, forms, correspondence and photos of documents, files them by customer and address, and answers questions with the original page attached. Equipment paperwork (warranties, serials, service tickets) is where it understands the most today. Electrical, plumbing and property-management features are marked coming soon, with no dates; you can still upload your paperwork now. Not sure? Send a sample box free.</p>
+        <p>If your business keeps documents or paperwork, yes. DeepWell reads invoices, contracts, permits, forms, correspondence and photos of documents, files them by customer and address, and answers questions with the original page attached. Equipment paperwork (warranties, serials, service tickets) is where it understands the most today. Electrical, plumbing, property-management, and fleet and equipment rental features are marked coming soon, with no dates; you can still upload your paperwork now. Not sure? Send a sample box free.</p>
       </details>
     </div>
   </div>
@@ -3286,4 +3288,4 @@ sync(true);if(mq.addEventListener)mq.addEventListener('change',function(){sync(f
 
 <script defer src="/support/widget.js"></script>
 </body>
-</html>
+</html>
