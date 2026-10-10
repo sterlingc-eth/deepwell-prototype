@@ -110,7 +110,8 @@ const traps = [
   ['unexplained-prose', ticket(1, { extra: ['Customer said the unit also makes a rattling noise at night and asked us to look at the attic fan next visit.'] })],
   ['reminder-language', ticket(2, { extra: ['Please schedule the next filter change in six months.'] })],
   ['conflicting-phone', ticket(3, { extra: ['Customer phone: (480) 555-9999'] })],
-  ['missing-required-address', ticket(0, { drop: 'Service Address:' })],
+  // A service ticket now needs a service address OR a serial number (documentTypes.js REQUIRED_FIELDS), so the trap drops both.
+  ['missing-required-address', (() => { const t = ticket(0, { drop: 'Service Address:' }); return { ...t, lines: t.lines.filter((l) => !l.startsWith('Equipment:')) }; })()],
   ['install-invoice', invoice(1, { install: true })],
   ['two-different-totals', invoice(2, { twoTotals: true })],
   ['no-title', { lines: [...SHOP, 'Customer: Robert Castillo', 'Service Address: 918 W Palm Ln, Tempe, AZ 85281', 'Notes: called back'], truth: {} }],

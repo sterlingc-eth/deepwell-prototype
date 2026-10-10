@@ -121,6 +121,7 @@ import { classifyAll } from "./_lib/router/classifyAll.js";
 import { rewriteInvoiceTotal } from "./_lib/lookups/countQualifiers.js";
 import { buildAddressMissAnswer } from "./_lib/lookups/addressMiss.js";
 import { buildUnknownNameDecline } from "./_lib/lookups/unknownName.js";
+import { tryPropertyPack, isResidentTenantsQuestion } from "./_lib/lookups/propertyPack.js"; // R41N E2: property-pack resident/lease/unit lane
 import { parseCustomerCount, runCustomerCount } from "./_lib/lookups/namedCompare.js";
 import { buildClarifyAnswer, clarifyEnabled, ADDRESS_RE } from "./_lib/lookups/clarify.js";
 import { answerAddressConflict, softConflictNote } from "./_lib/addressConflict.js";
@@ -1016,7 +1017,11 @@ export default async function handler(req, res) {
     // R34: injection / sensitive-identifier / forecast / impossible-date questions are declined here at $0, for every caller
     // (scorecard included), before any router can answer them with a confident wrong number. See router/safetyGate.js.
     {
-      const safety = classifySafety(question);
+      let safety = classifySafety(question);
+      // R41N E2: "how many different tenants have rented at <address>" is a RESIDENT question for a property organization, not a probe of other DeepWell tenants.
+      if (safety?.kind === "injection" && isResidentTenantsQuestion(question)) {
+        try { if ((await packForTenant({ withTenant, ctxArg: { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId } }))?.id === "property") safety = null; } catch { /* keep the decline */ }
+      }
       if (safety) {
         console.log(JSON.stringify({ route: "ask", safety_gate: safety.kind }));
         return send(200, { success: true, data: buildSafetyAnswer(safety) });
@@ -1175,6 +1180,14 @@ export default async function handler(req, res) {
       } catch (err) {
         console.error("Street vocab correction failed, using original question:", err?.message);
       }
+    }
+
+    // R41N E2: property organizations only - resident / lease / unit questions answered from the tenant's own lease, inspection and work-order extractions.
+    if (pack?.id === "property" && !conversationContext) {
+      try {
+        const pp = await withTenant(ctxArg, (db) => tryPropertyPack(db, question, { today: resolveToday(today) }));
+        if (pp) return send(200, { success: true, data: pp });
+      } catch (err) { console.error("property pack lane failed:", err?.message); }
     }
 
     // ---- unified pre-router classification (Round 18, H3) ------------------
@@ -1520,7 +1533,9 @@ export default async function handler(req, res) {
     // RECORDS-R2: "invoice 20002 technician" names a document by its bare number, not an amount: the records lane gets the first look
     if (/\b(?:invoice|inv|bill|quote|estimate|ticket|work order|purchase order|po|wo)\s*(?:number|no|num|#|:)?\s*#?\s*\d{4,}\b/i.test(question) && await tryRecordsFirst("early")) return;
 
-    if (amountInvoiceIntent) {
+    // R41N E3: a question the vendor-bills lane (deterministic 0.4) really answers (a vendor of THIS organization is named) never goes to the amount lane first
+    const vendorBillsOwns = amountInvoiceIntent && detIntent?.route === 'vendorbills' ? await withTenant(ctxArg, async (db) => Boolean(await (await import('./_lib/lookups/vendorBills.js')).runVendorBills(db, detIntent.intent))).catch(() => false) : false;
+    if (amountInvoiceIntent && !vendorBillsOwns) {
       const amountGate = await loadMoneyGateModule();
       const fin = await timer.time("financials", () => amountGate.answerAmountInvoiceQuestion({ withTenant, ctxArg, question, today: todayResolved, understanding: understood }));
       if (fin.handled) {

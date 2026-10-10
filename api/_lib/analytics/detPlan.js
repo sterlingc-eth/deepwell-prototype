@@ -522,6 +522,10 @@ const TECHNICIAN_ACTION_PERFECT_RE =
 const NON_NAME_STOPWORDS = new Set([
   'we', 'you', 'they', 'it', 'he', 'she', 'the', 'our', 'any', 'each', 'this', 'that',
   'customers', 'clients', 'units', 'equipment', 'jobs', 'work', 'service',
+  // auxiliaries, quantifiers and adverbs that sit where a name would after has/have/did ("how many inspections have BEEN done")
+  'been', 'being', 'be', 'was', 'were', 'is', 'are', 'am', 'had', 'has', 'have', 'did', 'do', 'does', 'all', 'many', 'much', 'not', 'never',
+  'also', 'ever', 'already', 'just', 'yet', 'still', 'only', 'then', 'there', 'these', 'those', 'what', 'which', 'who', 'how', 'when', 'where',
+  'a', 'an', 'my', 'your', 'their', 'its', 'i', 'us', 'me', 'them', 'so', 'been',
 ]);
 
 /** "ddanny ochoa" — a doubled FIRST letter typo of a proper name (there is no

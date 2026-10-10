@@ -80,6 +80,16 @@ export function parseTechnician(question, tenantVocab, opts = {}) {
   if (hits.length > 2) return null;
   const found = hits.sort((x, y) => x.at - y.at).map((h) => h.nm); // question order (matters for "does A have more than B")
 
+  // R3 B2: "how many documents mention Denise Ford" / "paperwork on Denise Ford": when the one name is a technician on the roster, the documents are those that carry her
+  // as the technician (the answer says so). Only the plain one-technician total reads it; every other shape still releases on the unknown noun.
+  let docNoun = false;
+  if (process.env.DONOVAN_TECH_DOCS !== "0" && found.length === 1 && /\b(?:documents?|docs?|paperwork|files?|records?)\b/.test(t) && /\b(?:how many|number of|count|total)\b/.test(t)) {
+    docNoun = true;
+    t = t.replace(/\b(?:documents?|docs?|paperwork|files?|records?)\b/, " jobs ")
+      .replace(/\b(?:(?:are\s+)?filed\s+(?:under|for|on)|mention(?:s|ed|ing)?|list(?:s|ed|ing)?|name[sd]?|reference[sd]?|appears?\s+on|show(?:s|ing)?\s+up\s+on|(?:do\s+we\s+)?(?:have|has)|about|under|regarding)\b/g, " ")
+      .replace(/\bas\s+(?:the\s+)?(?:tech(?:nician)?)\b/, " ").replace(/\s+/g, " ").trim();
+  }
+
   // 2. numeric threshold ("at least 56", "at or above 50", "40+", "50 or more")
   let min = null;
   const thr = t.match(/\b(?:at least|at or above|minimum of|min)\s+(\d{1,4})\b|\b(\d{1,4})\s*\+|\b(\d{1,4})\s+or more\b/);
@@ -136,13 +146,15 @@ export function parseTechnician(question, tenantVocab, opts = {}) {
     return null;
   }
   if (has(/\bthan\b|\bmore\b|\bfewer\b|\bless\b|\bbusier\b|\bcombined\b|\bplus\b|\bboth\b|\bbelow\b|\bover\b|\bunder\b|\bahead\b|\bbehind\b|\bhigher\b|\bgreater\b|\btrail\w*|\blead(?:s|ing)?\b/)) return null;
+  if (docNoun && (type || city)) return null;
   if (type) {
     if (city) return null;
     if (has(/\b(?:how many|number|count|total)\b/) && !has(/\bever\b|\bany\b/)) return { kind: "typeCount", techs: found, type };
     return { kind: "ever", techs: found, type };
   }
   if (has(/\bever\b|\bany\b/)) return null;
-  return city ? { kind: "city", techs: found, city } : { kind: "total", techs: found };
+  if (docNoun && (city || type)) return null;
+  return city ? { kind: "city", techs: found, city } : { kind: "total", techs: found, ...(docNoun ? { docNoun: true } : {}) };
 }
 
 const TECH_CTE = `SELECT x.id, x.document_id, coalesce(nullif(x.corrected_value, ''), x.value) AS tech
@@ -236,6 +248,10 @@ export async function runTechnician(db, parsed) {
   if (kind === "city") {
     const c = parsed.city.replace(/\b\w/g, (m) => m.toUpperCase());
     return answer(`${a} has ${plural(n, "job")} in ${c} on file.`, [{ label: `${a} jobs in ${c}`, value: String(n), sources: [] }], rows, `Counted service records with ${a} as technician at a customer whose service address is in ${c}.`);
+  }
+  if (parsed.docNoun) {
+    const nd = new Set(rows.map((r) => r.document_id).filter(Boolean)).size;
+    return answer(`${plural(nd, "document")} list${nd === 1 ? "s" : ""} ${a} as the technician.`, [{ label: `${a} documents`, value: String(nd), sources: [] }], rows, `Counted the documents with ${a} as technician. Documents that only mention ${a} elsewhere are not counted.`);
   }
   return answer(`${a} has ${plural(n, "job")} on file.`, [{ label: `${a} jobs`, value: String(n), sources: [] }], rows, `Counted the service records with ${a} as technician.`);
 }

@@ -145,8 +145,7 @@ async function docDetails(db, documentId) {
     technician: get("technician")[0] ?? null,
     hasHours: get("labor_hours").length > 0, hasNotes: get("notes").length > 0, serviceType: get("service_type")[0] ?? null,
     status: fin?.status && !/^unknown$/i.test(String(fin.status)) ? String(fin.status) : null,
-    vendor: fin?.vendor_name ?? null,
-    docKind: fin?.doc_kind ?? null, direction: fin?.direction ?? null,
+    docKind: fin?.doc_kind ?? null, direction: fin?.direction ?? null, vendor: fin?.vendor_name ? String(fin.vendor_name).trim() || null : null,
     balance: fin?.balance_due != null && Number.isFinite(Number(fin.balance_due)) ? Number(fin.balance_due) : null,
   };
 }
@@ -227,7 +226,10 @@ export async function runDocNumberLookup(db, intent) {
   const det = await docDetails(db, d.document_id);
   const tl = trueLabel(d.document_type, intent.kind, det);
   const label = `${tl} ${d.number}`;
-  const who = det.customers.map((c) => c.customer_name).filter(Boolean).join(" and ") || null;
+  // a payable bill is FROM a vendor: that vendor is who billed us (the stored customer_name on a bill is the bill-to, not the biller)
+  const isBill = tl === "Bill" && !!det.vendor;
+  const askedVendor = isBill && /\b(?:who|which vendor|what vendor|vendor|supplier|company)\b/i.test(intent.question) && !/\b(?:how much|total|amount|when|date)\b/i.test(intent.question);
+  const who = isBill ? `${det.vendor} (vendor)` : det.customers.map((c) => c.customer_name).filter(Boolean).join(" and ") || null;
   const when = det.date ? humanDate(det.date) : null;
   const src = [{ documentId: d.document_id, location: { field: d.field_key } }];
   // R5: a document number given together with ANOTHER customer's (or vendor's) name is a contradiction, not a lookup: say whose document it is and answer nothing as if it were theirs.
@@ -266,7 +268,7 @@ export async function runDocNumberLookup(db, intent) {
   }
   // a bare number that is also the TOTAL of invoices: say so (and honour a customer name typed in the question), never let a PO stand in for "the invoice"
   let alsoTotal = "";
-  const notInvoice = tl !== "Invoice";
+  const notInvoice = tl !== "Invoice" && tl !== "Bill";
   if (intent.digitsOnly && /^\d{3,}$/.test(intent.typed) && ["invoice", "bill", "document"].includes(intent.kind)) {
     try {
       const { rows } = await db.raw(
@@ -285,7 +287,8 @@ export async function runDocNumberLookup(db, intent) {
   }
   if (notInvoice && ["invoice", "bill"].includes(intent.kind)) alsoTotal = ` It is not an invoice.${alsoTotal}`;
   let text;
-  switch (intent.focus) {
+  if (askedVendor) text = `${label} is from ${det.vendor}${when ? ` (${when})` : ""}${det.total != null ? `, ${money(det.total)}` : ""}.`;
+  else switch (intent.focus) {
     case "status":
       text = det.status
         ? `${label} is marked ${det.status.replace(/_/g, " ")}${det.balance != null ? ` (balance ${money(det.balance)})` : ""}${who ? ` — ${who}` : ""}.`
@@ -303,12 +306,12 @@ export async function runDocNumberLookup(db, intent) {
   text += alsoTotal;
   const facts = [
     { label: "Document", value: label, sources: src },
-    ...(who ? [{ label: "Customer", value: who, sources: src }] : []),
+    ...(who ? [{ label: isBill ? "Vendor" : "Customer", value: isBill ? det.vendor : who, sources: src }] : []),
     ...(det.total != null ? [{ label: "Total", value: money(det.total), sources: src }] : []),
     ...(when ? [{ label: "Date", value: when, sources: src }] : []),
     ...(det.work.length ? [{ label: "Work performed", value: det.work.join("; "), sources: src }] : []),
   ];
-  const records = [...await documentRecordsFor(db, [d.document_id]), ...det.customers.filter((c) => c.id).map((c) => customerRecord(c))];
+  const records = [...await documentRecordsFor(db, [d.document_id]), ...(isBill ? [] : det.customers).filter((c) => c.id).map((c) => customerRecord(c))];
   return attachCitations(answerEnvelope({ text, facts, sources: src, extra: { fastIntent: "doc_number_lookup" } }), {
     records, total: records.length,
     basis: `Matched ${intent.typed} to the number printed on one ${String(d.document_type ?? "document").replace(/-/g, " ")}; read that document's own customer, date${det.total != null ? ", total" : ""} and work performed.`,

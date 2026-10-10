@@ -32,9 +32,11 @@ import { BRAND_RULES } from "../warrantyRules.js";
 import { isFragmentName } from "../integrity.js";
 import { REQUIRED_FIELDS, DOCUMENT_TYPE_IDS, GENERIC_TITLE_PATTERNS } from "../documentTypes.js";
 import { extractLabelled } from "./labelledExtract.js";
-import { FIELD_SYNONYMS, labelSrc } from "./fieldSynonyms.js";
+import { FIELD_SYNONYMS, LABEL_RANK, labelSrc } from "./fieldSynonyms.js";
 import { detectLetterhead, isOwnName, counterpartyFromParties } from "./ownCompany.js";
 
+/** A term/period value must hold a real date or a duration ("12 months"); "see page 2" is not one (QA round 4). */
+const TERM_VALUE_RE = /(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}|\d{4}-\d{2}-\d{2}|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d|\b\d+\s*(?:-\s*)?(?:day|week|month|year|yr|mo)s?\b)/i;
 export const TEXT_EXTRACTOR_VERSION = 1;
 
 /** Types whose paperwork is a labelled form. Everything else always goes to the model. */
@@ -48,6 +50,8 @@ const TITLES = [
   ["invoice", /^(?:tax\s+|service\s+|customer\s+)?invoice(?:\s*(?:#|no\.?|number)\s*[\w-]+)?$/],
   // a credit memo is an invoice with a negative total (documentTypes.js files credit memos under invoice)
   ["invoice", /^(?:customer\s+|vendor\s+)?credit\s+(?:memo|note)(?:randum)?(?:\s*(?:#|no\.?|number)\s*[\w-]+)?$/],
+  // a pay application (AIA G702 style) is a progress invoice
+  ["invoice", /^(?:contractor'?s?\s+)?(?:pay\s+(?:app(?:lication)?|request)|payment\s+application|application\s+(?:and\s+certificate\s+)?for\s+payment|progress\s+(?:invoice|billing))(?:\s*(?:#|no\.?|number)\s*[\w-]+)?$/],
   ["service-ticket", /^(?:hvac\s+)?service\s+(?:ticket|report|call\s+report|record)$/],
   ["work-order", /^(?:service\s+)?work\s+order(?:\s*(?:#|no\.?|number)\s*[\w-]+)?$/],
   ["warranty-registration", /^(?:equipment\s+|product\s+)?warranty\s+registration(?:\s+form)?$/],
@@ -136,6 +140,8 @@ export const SERVICE_DATE_LABEL_SRC = [
   "job\\s+date", "date\\s+completed", "completed\\s+on", "completion\\s+date", "completed",
   // the date an inspection / a startup was PERFORMED is that paperwork's service date
   "inspection\\s+date", "date\\s+of\\s+inspection", "inspected\\s+on", "start[-\\s]?up\\s+date", "commissioning\\s+date", "commissioned\\s+on",
+  // jargon round: the labels the research lists for the same meaning (encounter date, date of procedure ...), from the one table
+  ...(LABEL_RANK.serviceDate ?? []).map((p) => labelSrc([p])),
 ].map((x) => `(?:${x})`).join("|").replace(/^/, "(?:").concat(")");
 export const OTHER_DATE_LABEL_SRC = [
   "next\\s+(?:service|visit|pm|maintenance|inspection|appointment|tune[-\\s]?up)(?:\\s+(?:date|due(?:\\s+(?:date|on|by))?|scheduled|on))?",
@@ -893,7 +899,7 @@ export function scanLabeledValues(pages, opts = {}) {
         if (MODEL_RE.test(model) && /\d/.test(model)) push("model", model, line, label);
         return;
       }
-      case "warranty_term": case "agreement_term": if (value.length <= 90) push(key, value, line, label); return;
+      case "warranty_term": case "agreement_term": if (value.length <= 90 && (key !== "agreement_term" || TERM_VALUE_RE.test(value))) push(key, value, line, label); return;
       case "permit_number": if (/^[A-Za-z0-9][A-Za-z0-9-_/.]{3,30}$/.test(value) && /\d/.test(value)) push(key, value, line, label); return;
       case "invoice_number": if (/^[A-Za-z0-9][A-Za-z0-9-_/.]{0,29}$/.test(value)) push(key, value, line, label); return;
       default: return;

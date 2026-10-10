@@ -18,6 +18,8 @@
 import { parseDecompose } from './clauses.js';
 import { evaluateFilterClauses } from './entitySets.js';
 import { runComparison } from './compare.js';
+import { parseCompound, runCompound } from './compound.js';
+import { parseNegation, parseRatio, runNegation } from './negation.js';
 import { todayIso, answerEnvelope } from '../scope.js';
 import { attachCitations, customerRecord } from '../citations/records.js';
 import { documentRecordsFor } from '../citations/enrich.js';
@@ -29,7 +31,9 @@ import { classifyWithTypoTolerance } from '../relations/normalize.js';
  *  typo/abbreviation-normalized candidates — see relations/normalize.js's own doc comment for why this
  *  lives here rather than in ask.js. */
 export function classifyDecompose(question, { pack } = {}) {
-  return classifyWithTypoTolerance(question, (q) => parseDecompose(q, pack));
+  // Existing conjunctive-filter / job-comparison readings first (byte-identical to before); a question that is none of those
+  // but asks two or three small things at once ("how many X and what was the total") is read by compound.js.
+  return classifyWithTypoTolerance(question, (q) => parseDecompose(q, pack)) ?? parseCompound(question, pack) ?? withPack(parseNegation(question) ?? parseRatio(question), pack);
 }
 
 /** One short, human sentence naming every condition applied — same "list every condition in one basis
@@ -115,6 +119,8 @@ export async function runDecompose(db, intent, { today } = {}) {
   if (!intent) return null;
   if (intent.mode === 'compare') return runComparison(db, intent, { today });
   if (intent.mode === 'filter') return runFilter(db, intent, { today });
+  if (intent.mode === 'compound' && (intent.negation || intent.ratio)) return runNegation(db, intent, { today, pack: intent.pack });
+  if (intent.mode === 'compound') return runCompound(db, intent, { today });
   return null;
 }
 
@@ -131,3 +137,5 @@ export async function answerDecomposeQuestion({ withTenant, ctxArg, question, to
     return null;
   }
 }
+
+function withPack(intent, pack) { return intent ? { ...intent, pack } : intent; }

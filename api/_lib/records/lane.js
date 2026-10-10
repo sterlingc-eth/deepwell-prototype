@@ -570,6 +570,20 @@ async function runCore(db, question, { today, phase = "early", customers = null,
 
 /* ---------------------------------------------------------------------------------------------- customer / unit record answers */
 
+/** R42: an equipment make named in the question (a make THIS organization has on file) that none of this customer's units carries; null when not applicable */
+async function absentMake(db, p, units, customer) {
+  if (process.env.DONOVAN_ABSENT_MAKE === "off" || !p?.tokens?.length) return null;
+  try {
+    const org = new Set(((await db.raw(`SELECT DISTINCT lower(e.data->>'manufacturer') AS v FROM entities e WHERE e.tenant_id = (current_setting('app.tenant_id', true))::uuid AND e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' IS NOT NULL`)).rows).flatMap((r) => String(r.v).split(/[^a-z0-9]+/)).filter((w) => w.length >= 3));
+    if (!org.size) return null;
+    const mine = new Set(units.flatMap((u) => String(u.data?.manufacturer ?? "").toLowerCase().split(/[^a-z0-9]+/)));
+    const nm = new Set(nameTokens(customer?.name ?? ""));
+    const typeWords = new Set(units.flatMap((u) => String(u.data?.equipment_type ?? "").toLowerCase().split(/[^a-z0-9]+/)).concat(["water", "heater", "general", "american", "standard", "gas", "electric", "air", "home", "pipe"]));
+    const hit = p.tokens.find((t) => org.has(t) && !mine.has(t) && !nm.has(t) && !typeWords.has(t));
+    return hit ? hit.replace(/^./, (c) => c.toUpperCase()) : null;
+  } catch { return null; }
+}
+
 async function answerEntityFacts(db, scope, customerFacts, unitFacts, customerRec, p) {
   const c = scope.customer; const who = scope.who ?? scope.label;
   const parts = [], cards = [], sources = [], records = [customerRec].filter(Boolean);
@@ -593,6 +607,9 @@ async function answerEntityFacts(db, scope, customerFacts, unitFacts, customerRe
   }
   if (unitFacts.length) {
     const units = scope.kind === "unit-direct" ? [scope.unit] : await store.unitsForCustomer(db, c.id);
+    // R42: the question names an equipment make that THIS organization has on file but this customer's units are not (a dropped-condition probe: "the Amana at X's"): say so, never another make's reading
+    const wrongMake = scope.kind !== "unit-direct" && units.length ? await absentMake(db, p, units, c) : null;
+    if (wrongMake) return envelope({ text: `${who} has no ${wrongMake} unit on file${units.length ? ` (the equipment stored for them is ${units.slice(0, 4).map((u) => clean([u.data?.manufacturer, u.data?.equipment_type].filter(Boolean).join(" ")) || "a unit").join("; ")})` : ""}.`, cards: [], sources: [], records: [customerRec].filter(Boolean), total: 1, basis: `The make named in the question is not among the stored units of ${who}.` });
     if (!units.length) parts.push(`No equipment is stored for ${who}.`);
     else {
       const fact1 = unitFacts.filter((id) => id !== "equipment_list").map(factById);
@@ -661,6 +678,61 @@ const FALLBACK_SKIP_WORDS = /\b(?:isnt|isn t|is not|arent|not|never|no longer|ex
 /** every fact that is stored on one document, in directory order (the facts a person can ask a document for; plumbing and the document's own number / customer are in its heading) */
 const DOC_DUMP_SKIP = new Set(["customer_name", "invoice_number", "doc_kind", "direction", "equipment_list", "po_number", "vendor_name"]);
 const CUSTOMER_DUMP = ["service_type", "work_performed", "technician", "labor_hours", "notes", "total"];
+
+function lev(a, b) { const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]); for (let j = 1; j <= b.length; j++) d[0][j] = j; for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[a.length][b.length]; }
+const R42_INTENT = ["biggest", "largest", "highest", "lowest", "smallest", "average", "cheapest", "expensive", "unpaid", "overdue", "expired", "upcoming", "outstanding", "longest", "model", "serial", "latest", "last", "recent", "recently", "newest", "oldest", "first", "billing", "billed", "invoiced", "invoice", "invoices", "paid", "payment", "payments", "owed", "owes", "total", "cost", "costs", "price", "amount", "charge", "charged", "spend", "spent", "history", "visit", "visits", "visited", "service", "serviced", "services", "technician", "tech", "techs", "plumber", "name", "phone", "email", "address", "date", "when", "number", "count", "many", "much", "agreement", "contract", "plan", "warranty", "equipment", "unit", "units", "ticket", "tickets", "estimate", "quote", "permit", "report", "record", "records", "document", "documents", "file", "details", "info", "information", "everything", "balance"];
+const R42_FILLER = /^(?:hang|real|quick|sorry|lol|thanks|thank|please|yo|alright|more|just|kinda|maybe|actually|anyway|hey|okay|ok|um|uh|usually|typically)$/;
+/** R42: does a word (or, for a longer word, its first five letters, so a typo or inflection still counts as "possibly present") occur anywhere in THIS organization's own pages, stored values or field names? Errors count as present (keep the old dump). */
+async function wordInOrgData(db, w) {
+  const stem = String(w).toLowerCase().replace(/[^a-z]/g, ""); if (stem.length < 3) return true;
+  if (R42_INTENT.some((x) => x === stem || (stem.length >= 5 && x.length >= 5 && lev(x, stem) <= 2))) return true; // an ordinary asking word (or a typo of one) is never an attribute the organization lacks
+  const needle = stem.length >= 7 ? stem.slice(0, 5) : stem;
+  await db.raw("SAVEPOINT r42_word", []).catch(() => {});
+  try {
+    const like = `%${needle}%`;
+    const r1 = await db.raw("SELECT 1 FROM document_pages WHERE tenant_id = (current_setting('app.tenant_id', true))::uuid AND text ILIKE $1 LIMIT 1", [like]); if (r1.rows.length) return true;
+    const r2 = await db.raw("SELECT 1 FROM extractions WHERE tenant_id = (current_setting('app.tenant_id', true))::uuid AND (value ILIKE $1 OR replace(field_key, '_', ' ') ILIKE $1) LIMIT 1", [like]); if (r2.rows.length) return true;
+    const r3 = await db.raw("SELECT 1 FROM entities WHERE tenant_id = (current_setting('app.tenant_id', true))::uuid AND data::text ILIKE $1 LIMIT 1", [like]); if (r3.rows.length) return true;
+    if (stem.length >= 5) { const keys = (await db.raw("SELECT DISTINCT field_key FROM extractions WHERE tenant_id = (current_setting('app.tenant_id', true))::uuid")).rows; for (const k of keys) for (const t of String(k.field_key).toLowerCase().split(/[^a-z]+/)) if (t.length >= 4 && Math.abs(t.length - stem.length) <= 2 && lev(t, stem) <= 2) return true; } // a typo of a stored field name ("perimt" for permit)
+    return false;
+  } catch { await db.raw("ROLLBACK TO SAVEPOINT r42_word", []).catch(() => {}); return true; }
+}
+
+const R42_GENERIC_KEY = new Set(["date", "number", "name", "value", "no", "id", "term", "type", "status", "list"]);
+const R42_SYN = { pass: "result", passed: "result", passing: "result", fail: "result", failed: "result", failing: "result", results: "result", tested: "test", testing: "test", tests: "test" };
+const nearWord = (a, b) => a === b || (a.length >= 4 && b.length >= 4 && (a.slice(0, 4) === b.slice(0, 4) && Math.abs(a.length - b.length) <= 3 ? true : a.length >= 5 && b.length >= 5 && lev(a, b) <= 2));
+/**
+ * R42: the named customer's documents hold a stored field whose NAME (from this organization's own extractions, e.g. backflow_test_result, permit_number) is spelled out by the question
+ * ("backflow test result", "did X's backflow pass", "permit #", typos tolerated). Every non-generic word of the field name must be matched and nothing else of the question may be left over.
+ * Returns the cited stored value(s) or null (the caller then falls through to its old behaviour).
+ */
+async function fieldNameAnswer({ db, named, docs, tokens, nameIdx, unused }) {
+  if (!docs.length) return null;
+  const bundle = await store.loadBundle(db, docs.map((x) => x.document_id));
+  const keys = [...new Set(bundle.facts.map((f) => f.field_key))];
+  const qtok = tokens.map((t, i) => ({ t: R42_SYN[t] ?? t, raw: t, i })).filter((x) => !nameIdx.has(x.i) && /^[a-z]{3,}$/.test(x.raw));
+  let best = null;
+  for (const k of keys) {
+    const kt = k.toLowerCase().split(/[^a-z]+/).filter(Boolean); const core = kt.filter((w) => !R42_GENERIC_KEY.has(w)); if (!core.length) continue;
+    const hit = core.map((w) => qtok.find((x) => nearWord(x.t, w) || nearWord(x.t, R42_SYN[w] ?? w)));
+    if (hit.some((h) => !h)) continue;
+    const used = new Set(hit.map((h) => h.i));
+    const left = qtok.filter((x) => !used.has(x.i) && unused.includes(x.raw) && !R42_FILLER.test(x.raw) && !R42_GENERIC_KEY.has(x.raw) && !core.some((w) => nearWord(x.t, w)));
+    if (left.length) continue;
+    const score = core.length; if (!best || score > best.score) best = { k, score, tie: false }; else if (score === best.score && best.k !== k) best.tie = true;
+  }
+  if (!best || best.tie) return null;
+  const hits = bundle.facts.filter((f) => f.field_key === best.k && String(f.value ?? "").trim());
+  if (!hits.length) return null;
+  const docById = new Map(docs.map((d) => [d.document_id, d]));
+  const rows = hits.map((f) => ({ f, d: docById.get(f.document_id) })).filter((x) => x.d).map((x) => ({ ...x, date: docDate(x.d, bundle) })).sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+  const label = best.k.replace(/_/g, " ");
+  const seen = new Set(); const pick = rows.filter((x) => { const key = `${x.d.document_id}|${x.f.value}`; if (seen.has(key)) return false; seen.add(key); return true; }).slice(0, 6);
+  const cards = pick.map((x) => ({ label: `${label} · ${docTitle(x.d, bundle)}${humanDate(x.date) ? ` · ${humanDate(x.date)}` : ""}`, value: String(x.f.value), status: "ok", sources: [sourceOf(x.d, x.f.page_no)] }));
+  const text = pick.length === 1 ? `${named.c.name}, ${label}: ${pick[0].f.value} (${docTitle(pick[0].d, bundle)}${humanDate(pick[0].date) ? `, ${humanDate(pick[0].date)}` : ""}).` : `${named.c.name}, ${label}, newest first: ${pick.map((x) => `${x.f.value} (${docTitle(x.d, bundle)}${humanDate(x.date) ? `, ${humanDate(x.date)}` : ""})`).join("; ")}.`;
+  const customerRec = customerRecord({ id: named.c.id, name: named.c.name, service_address: named.c.address });
+  return { data: envelope({ text: clean(text), cards, sources: cards.flatMap((c) => c.sources), records: [customerRec].filter(Boolean), total: 1, basis: `Read the stored field "${best.k}" of ${named.c.name}'s documents; each value is cited to its document and page.` }), lane: "records", detail: "stored-field-by-name" };
+}
 
 /**
  * LATE PHASE ONLY, after the older lanes declined: the question named exactly one subject (a document number, a unit serial or a customer's full name) but its wording
@@ -735,10 +807,44 @@ async function storedRecordFallback(db, question, { today, customers = null } = 
   const missed = [...new Set(unused)].filter((w) => !nameWords.has(w) && !/^(?:llc|inc|incorporated|corp|corporation|co|company|ltd|llp|lp|pc|plc|group|the)$/.test(w)).slice(0, 3);
   if (named) {
     const docsN = await store.docsForCustomer(db, named.c.id);
+    if (process.env.DONOVAN_FIELD_NAME !== "off") { const fa = await fieldNameAnswer({ db, named, docs: docsN, tokens: p.tokens, nameIdx, unused }); if (fa) return fa; }
     const first = await docListDump({ docs: docsN, db, label: named.c.name, customer: named.c, win });
     // say only what is true: a question word that appears in the dump itself was found, so it is not listed as unmatched
     const shown = String(first?.data?.text ?? "").toLowerCase();
     const stillMissed = missed.filter((w) => !shown.includes(w.slice(0, Math.max(4, w.length - 3))));
+    // R42: a question word that appears NOWHERE in this organization's own data (page text, stored values, field names) names an attribute the organization does not hold: say so plainly with no facts.
+    // A word that is merely unmatched on this customer, or has any look-alike prefix in the organization's data, keeps the dump below (the old behaviour).
+    if (stillMissed.length && process.env.DONOVAN_MISSED_NOT_ON_FILE !== "off") {
+      const absent = []; 
+      // every content word of the question must be absent from the organization's data; one that IS present ("size WATER HEATER") means the question is about something stored and the dump below may answer it
+      const content = [...new Set(unused)].filter((w) => !nameWords.has(w) && !R42_FILLER.test(w) && !/^(?:llc|inc|incorporated|corp|corporation|co|company|ltd|llp|lp|pc|plc|group|the)$/.test(w));
+      let allAbsent = content.length > 0 && !f2.used.some(Boolean);
+      if (allAbsent) for (const w of content) { if (await wordInOrgData(db, w)) { allAbsent = false; break; } else absent.push(w); }
+      // R43: one question word that occurs NOWHERE in this organization's data ("cfm", "shutoff", "hoa", "ductwork") already names an attribute it does not hold, even when the other words (air handler, water, building) do occur as ordinary nouns. A declined attribute is honest; a dump of the customer's file is not an answer.
+      if (!allAbsent && !f2.used.some(Boolean) && process.env.DONOVAN_ABSENT_ATTR !== "off") {
+        absent.length = 0;
+        // a present content word that is part of one of this organization's own document types or stored field names ("sewer" in sewer-camera-report) means the question is about a stored thing, and an unfamiliar word beside it ("scope") may just be a synonym: keep the dump
+        let storedThing = false;
+        try {
+          const dt = (await db.raw("SELECT DISTINCT document_type AS k FROM documents WHERE tenant_id = (current_setting('app.tenant_id', true))::uuid UNION SELECT DISTINCT field_key FROM extractions WHERE tenant_id = (current_setting('app.tenant_id', true))::uuid", [])).rows;
+          const toks = new Set(); for (const r of dt) for (const t of String(r.k).toLowerCase().split(/[^a-z]+/)) if (t.length >= 4) toks.add(t.replace(/s$/, ""));
+          storedThing = content.some((w) => toks.has(String(w).toLowerCase().replace(/s$/, "")));
+        } catch { storedThing = true; }
+        if (!storedThing) for (const w of content) {
+          if (isRealWordOrName(w) || (await wordInOrgData(db, w))) continue; // an ordinary English word ("wrong", "fees") or a word the data has is not the signal
+          const lw = String(w).toLowerCase(); let typo = false; // a transposed or dropped letter of a real word / of a word in the data is a typo, never an attribute the organization lacks
+          for (let i = 0; i < lw.length && !typo; i++) {
+            const swap = i + 1 < lw.length ? lw.slice(0, i) + lw[i + 1] + lw[i] + lw.slice(i + 2) : null;
+            const drop = lw.slice(0, i) + lw.slice(i + 1);
+            for (const v of [swap, drop]) if (v && v !== lw && v.length >= 4 && (isRealWordOrName(v) || await wordInOrgData(db, v))) { typo = true; break; }
+          }
+          if (!typo) absent.push(w);
+        }
+        if (absent.length) allAbsent = true;
+      }
+      if (!allAbsent) absent.length = 0;
+      if (absent.length) return { data: envelope({ text: `I don't have ${absent.map((w) => `"${w}"`).join(" or ")} on file: nothing stored for ${named.c.name}, or in this organization's records at all, is about it.`, cards: [], sources: [], records: [], total: 0, basis: `No page, stored value or field name in this organization's data contains ${absent.join(", ")}.` }), lane: "records", detail: "stored-record-not-on-file" };
+    }
     return stillMissed.length ? docListDump({ docs: docsN, db, label: named.c.name, customer: named.c, win, intro: `None of the stored fields is about ${stillMissed.map((w) => `"${w}"`).join(", ")} (the page text was not searched for it); this is what is stored instead.` }) : first;
   }
   if (several) {
@@ -760,6 +866,13 @@ function documentDump(d, bundle, customer, p) {
   const ids = factsOnDoc(d, bundle);
   const customerRec = customer ? customerRecord({ id: customer.id, name: customer.name, service_address: customer.address }) : null;
   const head = docHead(d, bundle);
+  // R42: "which vendor sent INV-123" - the document's own vendor/supplier (financial row), cited to the page its total is printed on
+  const fin = bundle.fin.get(d.document_id);
+  if (fin?.vendor_name && /\b(?:vendor|supplier|who sent|who billed|who issued|billed by|sent by|from who|company)\b/.test(askText) && !/\b(?:total|amount|date|paid|balance|customer|tenant|resident)\b/.test(askText)) {
+    const src = sourceOf(d, fin.total_page ?? null);
+    const rec = documentRecord({ id: d.document_id, document_type: d.document_type, original_filename: d.filename }, { label: docTitle(d, bundle) });
+    return { data: envelope({ text: `${docTitle(d, bundle)} is from ${fin.vendor_name}.`, cards: [{ label: "Vendor", value: fin.vendor_name, status: "ok", sources: [src] }], sources: [src], records: [customerRec, rec].filter(Boolean), basis: `Read the vendor printed on ${docTitle(d, bundle)}.` }), lane: "records", detail: "stored-record-vendor" };
+  }
   if (!ids.length) {
     const rec = documentRecord({ id: d.document_id, document_type: d.document_type, original_filename: d.filename }, { label: docTitle(d, bundle) });
     return { data: envelope({ text: `Here is everything on file for ${head}: nothing beyond its heading is stored on it.`, cards: [], sources: [sourceOf(d, null)], records: [customerRec, rec].filter(Boolean), basis: `Read the stored record of ${docTitle(d, bundle)}; no facts are stored on it.` }), lane: "records", detail: "stored-record-document" };

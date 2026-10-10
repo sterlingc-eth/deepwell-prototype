@@ -44,7 +44,12 @@ import { parseAggregate, runAggregate } from './lookups/aggregates.js';
 import { parseTemplate } from './lookups/aggTemplates.js';
 import { parseSerialQuestion, runSerialLookup } from './lookups/serialLookup.js';
 import { parseDocNumberQuestion, runDocNumberLookup } from './lookups/docNumberLookup.js';
+import { parseVendorBills, runVendorBills } from './lookups/vendorBills.js';
+import { parseFindingWho, runFindingWho } from './lookups/docFindingWho.js';
+import { parseTenantCount, runTenantCount } from './lookups/tenantCount.js';
+import { parseQuotedPhraseCount, runQuotedPhraseCount } from './lookups/quotedPhraseCount.js';
 import { parseAgreementEndQuestion, runAgreementEnd } from './lookups/agreementEnd.js';
+import { parseAgreementFee, runAgreementFee } from './lookups/agreementFee.js';
 import { parseQuoteQuestion, runQuoteLookup } from './lookups/quoteLookup.js';
 import { parsePaidQuestion, runPaidLookup } from './lookups/paidLookup.js';
 import { parseDocExtreme, runDocExtreme } from './lookups/docExtremes.js';
@@ -141,6 +146,15 @@ export function classifyDeterministic(question, opts = {}) {
   const docNo = process.env.DONOVAN_DOCNUMBER === '0' || serial?.anchored ? null : parseDocNumberQuestion(String(question ?? ''));
   if (docNo) return { route: 'docnumber', intent: docNo };
   if (serial) return { route: 'serial', intent: serial };
+  // R41N E3: vendor bills (total billed by / most charged on one invoice / paid an unknown vendor) - lookups/vendorBills.js.
+  const vendQ = opts?.skipVendorBills ? null : (parseVendorBills(String(question ?? '')) ?? (() => { const v = parseVendorBills(q); return v ? { ...v, question: String(question ?? '') } : null; })());
+  if (vendQ) return { route: 'vendorbills', intent: Object.defineProperty(vendQ, '__opts', { value: opts, enumerable: false }) };
+  const fwQ = opts?.skipFindingWho ? null : (parseFindingWho(String(question ?? '')) ?? parseFindingWho(q));
+  if (fwQ) return { route: 'findingwho', intent: Object.defineProperty(fwQ, '__opts', { value: opts, enumerable: false }) };
+  const quotQ = opts?.skipQuotedCount ? null : parseQuotedPhraseCount(String(question ?? ''));
+  if (quotQ) return { route: 'quotedcount', intent: Object.defineProperty(quotQ, '__opts', { value: opts, enumerable: false }) };
+  const agFee = opts?.skipAgreementFee ? null : parseAgreementFee(String(question ?? ''));
+  if (agFee) return { route: 'agreementfee', intent: Object.defineProperty(agFee, '__opts', { value: opts, enumerable: false }) };
   // Agreement end dates are a document field ("expire in 2026", "run through 2027") - lookups/agreementEnd.js.
   const agEnd = parseAgreementEndQuestion(String(question ?? ''));
   if (agEnd) return { route: 'agreementend', intent: agEnd };
@@ -224,6 +238,10 @@ export function classifyDeterministic(question, opts = {}) {
   // R39: "how many invoices have no due date" - decided from the organization's own field keys (lookups/fieldAbsence.js).
   const absentQ = parseFieldAbsence(String(question ?? ''));
   if (absentQ) return { route: 'fieldabsence', intent: absentQ };
+
+  // R42: multi-condition counts (brand + city, gallons + brand, kind + install year, technician + document type + year, service type + city/year) read from this tenant's own data - lookups/tenantCount.js.
+  const tcQ = opts?.skipTenantCount ? null : parseTenantCount(String(question ?? ''));
+  if (tcQ) return { route: 'tenantcount', intent: Object.defineProperty(tcQ, '__opts', { value: opts, enumerable: false }) };
 
   // R32 (loop 4): "what was the last visit at <addr> for" / "what type of service was the latest call at <addr>" / "last service type at <addr>"
   // — the SERVICE TYPE (Repair / Preventive Maintenance / ...) of the most recent visit. Subject extraction reuses the fast path's own
@@ -604,6 +622,36 @@ async function runDeterministicCore(db, intent, { today } = {}) {
   const t = todayIso(today);
   if (intent.route === 'serial') return runSerialLookup(db, intent.intent, { today: t });
   if (intent.route === 'docnumber') return runDocNumberLookup(db, intent.intent);
+  if (intent.route === 'vendorbills') {
+    const vb = await runVendorBills(db, intent.intent);
+    if (vb) return vb;
+    const again = classifyDeterministic(intent.intent.question, { ...(intent.intent.__opts ?? {}), skipVendorBills: true });
+    return again && again.route !== 'vendorbills' ? runDeterministicCore(db, again, { today }) : null;
+  }
+  if (intent.route === 'findingwho') {
+    const fw = await runFindingWho(db, intent.intent);
+    if (fw) return fw;
+    const again = classifyDeterministic(intent.intent.question, { ...(intent.intent.__opts ?? {}), skipFindingWho: true });
+    return again && again.route !== 'findingwho' ? runDeterministicCore(db, again, { today }) : null;
+  }
+  if (intent.route === 'tenantcount') {
+    const tc = await runTenantCount(db, intent.intent);
+    if (tc) return tc;
+    const again = classifyDeterministic(intent.intent.question, { ...(intent.intent.__opts ?? {}), skipTenantCount: true });
+    return again && again.route !== 'tenantcount' ? runDeterministicCore(db, again, { today }) : null;
+  }
+  if (intent.route === 'quotedcount') {
+    const qc = await runQuotedPhraseCount(db, intent.intent);
+    if (qc) return qc;
+    const again = classifyDeterministic(intent.intent.question, { ...(intent.intent.__opts ?? {}), skipQuotedCount: true });
+    return again && again.route !== 'quotedcount' ? runDeterministicCore(db, again, { today }) : null;
+  }
+  if (intent.route === 'agreementfee') {
+    const af = await runAgreementFee(db, intent.intent);
+    if (af) return af;
+    const again = classifyDeterministic(intent.intent.question, { ...(intent.intent.__opts ?? {}), skipAgreementFee: true });
+    return again && again.route !== 'agreementfee' ? runDeterministicCore(db, again, { today }) : null;
+  }
   if (intent.route === 'agreementend') return runAgreementEnd(db, intent.intent);
   if (intent.route === 'quote') return runQuoteLookup(db, intent.intent);
   if (intent.route === 'custdocrank') return runCustomerDocRank(db, intent.intent);

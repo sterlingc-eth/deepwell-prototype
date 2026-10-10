@@ -19,6 +19,7 @@ import { AccountMenu } from './AccountMenu'
 import { offlineQueue } from './offline/uploadQueue'
 import { reconcileDeviceOwner } from './offline/deviceIsolation'
 import { SupportLauncherButton, SupportLoading } from '../components/support/SupportWidget'
+import { SupportAccessBanner } from '../components/support/SupportAccess'
 import { useLauncherPulse } from '../components/support/useLauncherPulse'
 import { SupportLogo } from '../components/support/SupportLogo'
 
@@ -283,6 +284,11 @@ export function MobileApp() {
           </div>
         </div>
       )}
+
+      {/* Lifted above the bottom tab bar so the notice never covers a tab. */}
+      <div className="contents [&>[data-testid=support-access-banner]]:!bottom-[calc(4.5rem+env(safe-area-inset-bottom))]">
+        <SupportAccessBanner surface="mobile" />
+      </div>
 
       <main className="flex-1 min-h-0 overflow-hidden">
         {/* All three stay mounted so an upload keeps going and the Ask

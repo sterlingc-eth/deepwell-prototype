@@ -44,7 +44,10 @@ export function parseDocExtreme(question) {
     if (new RegExp(`(?:^| )${w}(?= |$)`).test(s)) { if (dir) return null; dir = d; hit = w; s = s.replace(new RegExp(`(?:^| )${w}(?= |$)`), " "); }
   }
   if (!dir) return null;
-  const rest = s.split(" ").filter((t) => t && !FILLER.has(t));
+  let rest = s.split(" ").filter((t) => t && !FILLER.has(t));
+  // R2 B2: "date of the newest proposal" / "when was the latest quote" ask which quote and give its date, which this lane already says. Quotes only: the
+  // older financial lane keeps answering the same wording for invoices (with the date in ISO form).
+  if (rest.length === 2 && rest.some((t) => /^(?:dates?|when)$/.test(t)) && rest.some((t) => KIND.quote.test(t))) rest = rest.filter((t) => !/^(?:dates?|when)$/.test(t));
   if (rest.length !== 1) return null;
   const kind = Object.keys(KIND).find((k) => KIND[k].test(rest[0]));
   if (kind === "invoice" && !dated && ["biggest", "largest", "smallest"].includes(hit)) return null; // older financial path already answers these (all-time)

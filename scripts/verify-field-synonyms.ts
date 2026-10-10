@@ -125,7 +125,8 @@ const FX: Fx[] = [
 /* ------------------------------------------------------------------ 1. every reader, every fixture: zero wrong values */
 console.log('1. fixtures: zero wrong values from every reader');
 let wrong = 0;
-for (const f of FX) {
+const runFixtures = (list: Fx[]) => {
+for (const f of list) {
   const pages = [{ page_no: 1, text: f.text }];
   const readers: Record<string, Record<string, string>> = {};
 
@@ -155,7 +156,17 @@ for (const f of FX) {
   const recovered = f.must.filter((k) => k in readers.storedTextRead);
   check(`${f.name}: the stored-text read recovers ${f.must.join(', ')}`, recovered.length === f.must.length, `recovered ${recovered.join(', ') || 'nothing'}`);
 }
+};
+runFixtures(FX);
 check('ZERO WRONG VALUES across all fixtures and readers', wrong === 0, `${wrong} wrong`);
+
+/* ------------------------------------------------------------------ 1b. J2 jargon round: labels from the research, many industries */
+console.log('1b. jargon-round fixtures (new labels, many industries): zero wrong values');
+const FX2 = (await import(rel('scripts/lib/field-synonym-fixtures-j2.ts'))).FX2 as Fx[];
+wrong = 0;
+runFixtures(FX2);
+check(`at least 30 jargon-round fixtures (${FX2.length})`, FX2.length >= 30);
+check('ZERO WRONG VALUES across the jargon-round fixtures and readers', wrong === 0, `${wrong} wrong`);
 
 /* ------------------------------------------------------------------ 2. the owner's exact sentence */
 console.log('2. the donation receipt is no longer "missing Vendor or Customer, Service date and Cost"');
@@ -193,6 +204,58 @@ console.log('3. one synonym table feeds the scanners and the prompt');
   for (const w of SYN.FIELD_SYNONYMS.notIgnorable.filter((x: string) => x !== 'deposit' && x !== 'order date')) {
     const t = TE.scanLabeledValues([{ page_no: 1, text: `${w}: ${w.includes('date') ? '09/12/2026' : '$40.00'}` }], { type: 'receipt' }).candidates;
     check(`"${w}" is read, not ignored`, Boolean(t.cost?.length || t.service_date?.length));
+  }
+}
+
+/* ------------------------------------------------------------------ 3b. J2: research labels are read as labels; document-type words */
+console.log('3b. research labels read as labels, never from prose; document-type words');
+{
+  const scan = (text: string, type: string) => TE.scanLabeledValues([{ page_no: 1, text }], { type }).candidates;
+  const one = (text: string, type: string, key: string) => scan(text, type)[key]?.[0]?.value;
+  check('"Encounter Date:" is the date', one('RECEIPT\nEncounter Date: 05/05/2026', 'receipt', 'service_date') === '2026-05-05');
+  check('"Date of Gift:" is the date', one('RECEIPT\nDate of Gift: 12/20/2025', 'receipt', 'service_date') === '2025-12-20');
+  check('"Amount Donated:" is the amount', one('RECEIPT\nAmount Donated: $75.00', 'receipt', 'cost') === '75.00');
+  check('"Please Remit:" is the amount', one('INVOICE\nPlease Remit: $900.00', 'invoice', 'cost') === '900.00');
+  check('"Claim #:" is the document number', one('STATEMENT\nClaim #: 88321004', 'statement', 'invoice_number') === '88321004');
+  check('"Pay App #:" is the document number', one('PAY APPLICATION\nPay App #: 4', 'invoice', 'invoice_number') === '4');
+  check('"Make Checks Payable To:" is the vendor', one('INVOICE\nMake Checks Payable To: Cactus Roofing Inc', 'invoice', 'vendor') === 'Cactus Roofing Inc');
+  check('"Policy Inception"/"Plan Term" style period labels are read as the agreement term', one('AGREEMENT\nPlan Term: 18 months', 'agreement', 'agreement_term') === '18 months');
+  check('"Policyholder:" is NOT read as a vendor (it is the member on an EOB)', !scan('EXPLANATION OF BENEFITS\nPolicyholder: Dana Whitfield', 'statement').vendor);
+  check('"PO Number:" on an invoice is not the invoice number', one('INVOICE\nInvoice #: 5001\nPO Number: PO-1234', 'invoice', 'invoice_number') === '5001');
+  for (const [role, sample] of [['customer', 'bill to'], ['cost', 'balance due'], ['termStart', 'on-rent date'], ['termEnd', 'off-rent date'], ['documentNumber', 'claim #'], ['serviceDate', 'encounter date']] as const) {
+    check(`table: ${role} lists "${sample}"`, SYN.FIELD_SYNONYMS[role].includes(sample));
+  }
+  // prose: the same label words in a sentence read nothing
+  for (const prose of [
+    'Please make checks payable to Acme Supply within 30 days and note the amount due on page two.',
+    'The lease start date and the off-rent date are confirmed by the office; the claim # is on the letter.',
+    'We received from the tenant a payment, and the date of service was last week at a bill to be sent later.',
+  ]) {
+    const c = scan(`Notes\n${prose}`, 'invoice');
+    check(`prose reads nothing: "${prose.slice(0, 48)}..."`, Object.keys(c).filter((k) => c[k]?.length).length === 0, JSON.stringify(c));
+  }
+  // the prompt stays compact: the generated additions are a handful, not the table
+  const guide: string = SYN.synonymGuide();
+  check('the prompt guide stays compact (< 3200 characters)', guide.length < 3200, `${guide.length}`);
+  check('the prompt names no PO label as a document number', !/Po #|Purchase Order/.test(guide.split('invoice_number')[1] ?? ''));
+  // document-type words (phrase matching only)
+  const DTS: any = await import(rel('api/_lib/documentTypes.js'));
+  const words: Record<string, string[]> = {
+    invoice: ['pay app', 'pay application', 'credit memo', 'progress billing'],
+    'delivery-ticket': ['packing list', 'bill of lading', 'will-call', 'will call ticket'],
+    'insurance-certificate': ['coi', 'acord 25', 'proof of insurance'],
+    'hr-letter': ['offer letter', 'w-4', 'i-9'],
+    agreement: ['lease', 'subcontract', 'nda', 'mou', 'award letter', 'rental agreement'],
+    statement: ['rent roll', 'tenant ledger', 'owner statement', 'eob', 'superbill'],
+  };
+  for (const [type, ws] of Object.entries(words)) for (const w of ws) check(`"${w}" means ${type}`, DTS.docTypeFromWord(w) === type, String(DTS.docTypeFromWord(w)));
+  for (const w of Object.values(words).flat()) check(`"${w}" is NOT a typo-correction trigger word`, !DTS.DOCTYPE_TRIGGER_WORDS.includes(w) && !w.split(' ').some((x: string) => x.length > 2 && DTS.DOCTYPE_TRIGGER_WORDS.includes(x) && !['order', 'letter', 'ticket', 'statement', 'agreement', 'insurance', 'certificate', 'of', 'list', 'invoice', 'slip'].includes(x)));
+  const fn: Record<string, string> = { 'pay_app_4.pdf': 'invoice', 'ACORD25_acme.pdf': 'insurance-certificate', 'W-4_smith.pdf': 'hr-letter', 'rent_roll_may.xlsx': 'statement', 'EOB_0412.pdf': 'statement', 'willcall_882.pdf': 'delivery-ticket', 'packing_list_9.pdf': 'delivery-ticket', 'credit_memo_12.pdf': 'invoice', 'Sub_contract_roof.pdf': 'agreement' };
+  for (const [f, t] of Object.entries(fn)) check(`file name ${f} -> ${t}`, DTS.inferTypeFromFilename(f) === t, String(DTS.inferTypeFromFilename(f)));
+  const titles: Record<string, string> = { 'PAY APPLICATION': 'invoice', 'Application and Certificate for Payment': 'invoice', 'CREDIT MEMO': 'invoice', 'PACKING LIST': 'delivery-ticket', 'WILL CALL TICKET': 'delivery-ticket', 'ACORD 25 CERTIFICATE OF LIABILITY INSURANCE': 'insurance-certificate', 'PROOF OF INSURANCE': 'insurance-certificate', 'OFFER LETTER': 'hr-letter', 'Form W-4': 'hr-letter', 'RENT ROLL': 'statement', 'TENANT LEDGER': 'statement', 'EXPLANATION OF BENEFITS': 'statement', 'SUPERBILL': 'statement', 'RESIDENTIAL LEASE': 'agreement', 'MUTUAL NDA': 'agreement', 'GRANT AWARD LETTER': 'agreement' };
+  for (const [ttl, t] of Object.entries(titles)) {
+    const c = TE.classifyFromText([{ page_no: 1, text: ttl }]);
+    check(`title "${ttl}" -> ${t}`, c?.type === t, JSON.stringify(c));
   }
 }
 

@@ -20,6 +20,7 @@ import { resolveAnyTimeRange } from '../analytics.js';
 import { extractDocTypeMentions } from '../search/knowledge.js';
 import { KNOWN_AZ_CITY_NAMES } from '../analytics.js';
 import { looksLikeContinuation, classifyFollowupKind, detectSwapTarget, looksLikeDisambiguationReply } from './classify.js';
+import { slotFollowup } from './slots.js';
 import { subjectFromText, subjectFromEntities, pronounReplacement, substitutePronouns, stripTrailingPunct, brandMentionIn, inferNoun, anchorAlreadyPresent, pronounNeedsBrandFromEarlierTurn } from './subject.js';
 
 /** Runs a pronoun substitution and guarantees the anchor's own raw text (address/name/customer
@@ -277,6 +278,12 @@ export function resolveFollowup(context, question) {
     const resolved = resolveDisambiguationReply(q, priorTurn);
     if (resolved) return resolved;
   }
+
+  // R2 (B1): an elliptical follow-up that names ONE new slot value (period, person, city, brand, document type,
+  // dollar threshold), asks a different measure of the same scope, or asks another field of the same document
+  // is composed into a self-contained question from the prior question's own text (slots.js).
+  const slotted = slotFollowup(turns, q);
+  if (slotted) return { query: clip(slotted.query), filters: {}, isFollowup: true, kind: 'slot', needsClarification: false };
 
   if (!looksLikeContinuation(q, priorTurn)) return passthrough(q);
 

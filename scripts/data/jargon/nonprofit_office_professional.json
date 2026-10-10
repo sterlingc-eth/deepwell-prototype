@@ -1,0 +1,6084 @@
+{
+ "group": "nonprofit_office_professional",
+ "entries": [
+  {
+   "term": "donation receipt",
+   "variants": [
+    "donor receipt",
+    "gift receipt",
+    "contribution receipt",
+    "donation receipts",
+    "tax receipt",
+    "charitable receipt",
+    "receipt for donation"
+   ],
+   "class": "doc_type",
+   "means": "receipt",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Acknowledgment sent to a donor",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "written acknowledgment",
+   "variants": [
+    "contemporaneous written acknowledgment",
+    "cwa",
+    "donor acknowledgment",
+    "acknowledgement letter",
+    "gift acknowledgment",
+    "thank you letter tax"
+   ],
+   "class": "doc_type",
+   "means": "receipt",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "IRS-required letter for gifts of $250+",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "year-end giving statement",
+   "variants": [
+    "annual giving statement",
+    "year end statement",
+    "annual donor statement",
+    "giving summary",
+    "tax giving statement",
+    "consolidated receipt"
+   ],
+   "class": "doc_type",
+   "means": "statement",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Annual summary of a donor's gifts",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "pledge",
+   "variants": [
+    "pledges",
+    "pledge form",
+    "pledge card",
+    "pledge agreement",
+    "gift pledge",
+    "multi-year pledge"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Promise to give later; not yet paid",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "pledge reminder",
+   "variants": [
+    "pledge reminders",
+    "pledge notice",
+    "pledge payment reminder"
+   ],
+   "class": "doc_type",
+   "means": "correspondence",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Reminder about an unpaid pledge",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "in-kind gift letter",
+   "variants": [
+    "in kind donation letter",
+    "in-kind acknowledgment",
+    "in kind receipt",
+    "gift in kind receipt"
+   ],
+   "class": "doc_type",
+   "means": "receipt",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Receipt for non-cash goods or services; value is donor's to state",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "in-kind donation",
+   "variants": [
+    "in kind donation",
+    "in-kind gift",
+    "gift in kind",
+    "gik",
+    "donated goods",
+    "donated services",
+    "donated item"
+   ],
+   "class": "money",
+   "means": "in-kind-gift",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Non-cash gift of goods or services",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "award letter",
+   "variants": [
+    "grant award letter",
+    "notice of award",
+    "notice of grant award",
+    "noa",
+    "grant notification",
+    "award notice",
+    "funding letter",
+    "award notification"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Funder letter confirming a grant",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "grant agreement",
+   "variants": [
+    "grant contract",
+    "grant award agreement",
+    "funding agreement",
+    "grant terms and conditions",
+    "grant terms"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Terms attached to grant money",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "grant application",
+   "variants": [
+    "grant proposal",
+    "grant request",
+    "funding request",
+    "application for funding",
+    "letter of inquiry",
+    "loi"
+   ],
+   "class": "doc_type",
+   "means": "proposal-quote",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Request for funding; not yet awarded",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "MOU",
+   "variants": [
+    "memorandum of understanding",
+    "memo of understanding",
+    "mou",
+    "mous",
+    "memorandum of agreement",
+    "moa",
+    "partnership agreement"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Non-binding or light agreement between organizations",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "board minutes",
+   "variants": [
+    "minutes of the board",
+    "board meeting minutes",
+    "meeting minutes",
+    "board minutes",
+    "minutes",
+    "board resolution",
+    "resolutions"
+   ],
+   "class": "doc_type",
+   "means": "internal",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Record of a board meeting; no customer",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "board packet",
+   "variants": [
+    "board book",
+    "board report",
+    "board meeting packet",
+    "board agenda"
+   ],
+   "class": "doc_type",
+   "means": "internal",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Pre-meeting materials",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "form 990",
+   "variants": [
+    "990",
+    "form 990-ez",
+    "990-ez",
+    "990-pf",
+    "990-n",
+    "irs 990",
+    "annual return exempt org"
+   ],
+   "class": "doc_type",
+   "means": "other",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "IRS annual information return of an exempt org",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "determination letter",
+   "variants": [
+    "irs determination letter",
+    "501c3 letter",
+    "501(c)(3) letter",
+    "tax exempt letter",
+    "exemption letter",
+    "tax-exempt determination"
+   ],
+   "class": "doc_type",
+   "means": "other",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "IRS letter recognizing tax-exempt status",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "grant report",
+   "variants": [
+    "progress report",
+    "final report",
+    "interim report",
+    "grantee report",
+    "outcomes report",
+    "impact report"
+   ],
+   "class": "doc_type",
+   "means": "correspondence",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Report back to a funder",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "fundraising appeal",
+   "variants": [
+    "appeal letter",
+    "annual appeal",
+    "donation appeal",
+    "solicitation letter",
+    "ask letter"
+   ],
+   "class": "doc_type",
+   "means": "correspondence",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Letter asking for gifts",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "volunteer agreement",
+   "variants": [
+    "volunteer waiver",
+    "volunteer application",
+    "volunteer form",
+    "volunteer sign up"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Volunteer paperwork",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "fiscal sponsorship agreement",
+   "variants": [
+    "fiscal sponsor agreement",
+    "fiscal sponsorship",
+    "fiscal host agreement"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Agreement where a 501c3 hosts another project",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "silent auction sheet",
+   "variants": [
+    "auction bid sheet",
+    "auction receipt",
+    "event auction receipt",
+    "gala receipt",
+    "raffle receipt",
+    "event ticket receipt"
+   ],
+   "class": "doc_type",
+   "means": "receipt",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Event purchase; partly deductible",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "budget",
+   "variants": [
+    "grant budget",
+    "project budget",
+    "budget narrative",
+    "operating budget",
+    "program budget"
+   ],
+   "class": "doc_type",
+   "means": "internal",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Planned spend; internal or grant attachment",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "donor",
+   "variants": [
+    "donors",
+    "contributor",
+    "contributors",
+    "giver",
+    "supporter",
+    "supporters",
+    "benefactor",
+    "patron",
+    "philanthropist",
+    "sponsor"
+   ],
+   "class": "role",
+   "means": "customer",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Person or org giving money",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "major donor",
+   "variants": [
+    "major gift donor",
+    "major givers",
+    "high-value donor",
+    "top donor",
+    "principal gift"
+   ],
+   "class": "role",
+   "means": "customer",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Large giver",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "grantor",
+   "variants": [
+    "funder",
+    "funders",
+    "grant maker",
+    "grantmaker",
+    "foundation",
+    "granting agency",
+    "awarding agency",
+    "awarding organization"
+   ],
+   "class": "role",
+   "means": "vendor",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Issuer of a grant (money source)",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "grantee",
+   "variants": [
+    "grant recipient",
+    "awardee",
+    "sub-grantee",
+    "subgrantee",
+    "subrecipient",
+    "sub-recipient"
+   ],
+   "class": "role",
+   "means": "customer",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Recipient of grant",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "board member",
+   "variants": [
+    "trustee",
+    "trustees",
+    "director",
+    "board director",
+    "board of directors member",
+    "board chair",
+    "board president"
+   ],
+   "class": "role",
+   "means": "internal-person",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Governing board role",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "executive director",
+   "variants": [
+    "ed",
+    "exec director",
+    "ceo nonprofit",
+    "president ceo"
+   ],
+   "class": "role",
+   "means": "internal-person",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Top staff",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "development director",
+   "variants": [
+    "director of development",
+    "fundraiser",
+    "development officer",
+    "gift officer",
+    "fundraising manager"
+   ],
+   "class": "role",
+   "means": "internal-person",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Fundraising staff",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "beneficiary",
+   "variants": [
+    "clients served",
+    "program participant",
+    "participants",
+    "recipient of services"
+   ],
+   "class": "role",
+   "means": "customer",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Person receiving the charity's services",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "volunteer",
+   "variants": [
+    "volunteers",
+    "vols"
+   ],
+   "class": "role",
+   "means": "technician",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Unpaid worker; closest to who did the work",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "received from",
+   "variants": [],
+   "class": "field",
+   "means": "customer_name",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Label on donation receipt",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "donor name",
+   "variants": [
+    "name of donor",
+    "donor",
+    "contributor name"
+   ],
+   "class": "field",
+   "means": "customer_name",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Label",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "gift amount",
+   "variants": [
+    "amount of gift",
+    "donation amount",
+    "contribution",
+    "amount donated",
+    "gift total",
+    "pledge amount",
+    "amount pledged"
+   ],
+   "class": "field",
+   "means": "cost",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Label; amount",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "gift date",
+   "variants": [
+    "date of gift",
+    "donation date",
+    "date of donation",
+    "date received",
+    "contribution date"
+   ],
+   "class": "field",
+   "means": "service_date",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Label; document date",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "receipt no.",
+   "variants": [
+    "receipt #",
+    "receipt number",
+    "gift id",
+    "donation id",
+    "gift number",
+    "transaction id",
+    "confirmation number"
+   ],
+   "class": "field",
+   "means": "invoice_number",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Label",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "fund",
+   "variants": [
+    "fund name",
+    "designation",
+    "designated to",
+    "designation fund",
+    "gift designation",
+    "campaign",
+    "appeal code"
+   ],
+   "class": "field",
+   "means": "fund",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Where the gift is assigned",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "tax id",
+   "variants": [
+    "ein",
+    "tax id number",
+    "federal id",
+    "fein",
+    "tax-exempt id",
+    "employer identification number",
+    "501c3 number",
+    "tax id #"
+   ],
+   "class": "field",
+   "means": "tax_id",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Org's EIN printed on receipts",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "goods or services provided",
+   "variants": [
+    "no goods or services were provided",
+    "quid pro quo statement",
+    "value of goods or services",
+    "goods and services statement",
+    "benefit received",
+    "value of benefit"
+   ],
+   "class": "field",
+   "means": "goods_services_statement",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Required statement on receipts over $75",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "fair market value",
+   "variants": [
+    "fmv",
+    "fair value",
+    "estimated value",
+    "appraised value",
+    "value of gift"
+   ],
+   "class": "money",
+   "means": "fair-market-value",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Value of non-cash gift",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "award amount",
+   "variants": [
+    "amount awarded",
+    "total award",
+    "grant amount",
+    "award total",
+    "funded amount",
+    "approved amount",
+    "grant total"
+   ],
+   "class": "field",
+   "means": "cost",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Label",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "award date",
+   "variants": [
+    "date of award",
+    "notice date",
+    "award notice date"
+   ],
+   "class": "field",
+   "means": "service_date",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Label",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "grant period",
+   "variants": [
+    "period of performance",
+    "project period",
+    "budget period",
+    "grant term",
+    "funding period",
+    "performance period",
+    "award period"
+   ],
+   "class": "field",
+   "means": "agreement_term",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Dates grant money can be spent",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "award number",
+   "variants": [
+    "grant number",
+    "award no",
+    "award id",
+    "grant id",
+    "grant #",
+    "contract number",
+    "award #",
+    "fain",
+    "federal award identification number"
+   ],
+   "class": "field",
+   "means": "invoice_number",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Label",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "principal investigator",
+   "variants": [
+    "pi",
+    "project director",
+    "program director",
+    "project lead",
+    "authorized official"
+   ],
+   "class": "role",
+   "means": "technician",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Person responsible for grant work",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "match",
+   "variants": [
+    "matching funds",
+    "matching gift",
+    "match requirement",
+    "cost share",
+    "cost sharing",
+    "in-kind match",
+    "employer match",
+    "matching contribution"
+   ],
+   "class": "money",
+   "means": "matching-funds",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Required or offered matching dollars",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "indirect costs",
+   "variants": [
+    "indirect rate",
+    "overhead rate",
+    "admin costs",
+    "f&a",
+    "facilities and administrative",
+    "de minimis rate",
+    "indirect cost rate",
+    "overhead"
+   ],
+   "class": "money",
+   "means": "indirect-costs",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Overhead charged on a grant",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "direct costs",
+   "variants": [
+    "direct expenses",
+    "program costs",
+    "program expenses"
+   ],
+   "class": "money",
+   "means": "direct-costs",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Costs tied straight to the project",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "drawdown",
+   "variants": [
+    "draw down",
+    "draw-down",
+    "payment request",
+    "reimbursement request",
+    "request for funds",
+    "advance payment"
+   ],
+   "class": "action",
+   "means": "grant-drawdown",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Asking to be paid out of the grant",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "disbursement",
+   "variants": [
+    "disbursements",
+    "disbursed",
+    "funds released",
+    "payout",
+    "grant payment"
+   ],
+   "class": "action",
+   "means": "paid",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Money released",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "reimbursable",
+   "variants": [
+    "reimbursement basis",
+    "cost reimbursement",
+    "paid on reimbursement"
+   ],
+   "class": "status",
+   "means": "reimbursable",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Paid only after spending",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "restricted funds",
+   "variants": [
+    "restricted gift",
+    "restricted gifts",
+    "restricted donation",
+    "restricted contribution",
+    "donor restricted",
+    "with donor restrictions",
+    "temporarily restricted",
+    "permanently restricted",
+    "restricted"
+   ],
+   "class": "money",
+   "means": "restricted-fund",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Money that must be used as the donor says",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "unrestricted funds",
+   "variants": [
+    "unrestricted gift",
+    "unrestricted donation",
+    "general operating",
+    "general operating support",
+    "gos",
+    "without donor restrictions",
+    "general fund",
+    "unrestricted"
+   ],
+   "class": "money",
+   "means": "unrestricted-fund",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Money usable for any purpose",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "endowment",
+   "variants": [
+    "endowed fund",
+    "permanent fund",
+    "quasi-endowment",
+    "board designated fund"
+   ],
+   "class": "money",
+   "means": "endowment",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Fund where principal is kept",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "net assets",
+   "variants": [
+    "fund balance",
+    "net asset balance",
+    "reserves"
+   ],
+   "class": "money",
+   "means": "net-assets",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Balance sheet equity of a nonprofit",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "restriction released",
+   "variants": [
+    "released from restriction",
+    "net assets released",
+    "satisfied restriction",
+    "purpose met"
+   ],
+   "class": "status",
+   "means": "restriction-released",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Restricted money now usable",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "unpaid pledge",
+   "variants": [
+    "outstanding pledge",
+    "pledge balance",
+    "pledges receivable",
+    "pledge receivable",
+    "open pledge",
+    "pledge unpaid",
+    "pledge due"
+   ],
+   "class": "status",
+   "means": "unpaid",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Promised but not yet received",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "fulfilled pledge",
+   "variants": [
+    "pledge paid",
+    "pledge fulfilled",
+    "pledge complete",
+    "paid in full pledge"
+   ],
+   "class": "status",
+   "means": "paid",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Pledge fully received",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "lapsed donor",
+   "variants": [
+    "lybunt",
+    "sybunt",
+    "lapsed",
+    "lapsed giver",
+    "inactive donor",
+    "stopped giving"
+   ],
+   "class": "status",
+   "means": "lapsed-donor",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Donor who has not given recently",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "recurring gift",
+   "variants": [
+    "monthly donor",
+    "monthly giving",
+    "sustainer",
+    "sustaining donor",
+    "recurring donation",
+    "recurring donor",
+    "automatic gift",
+    "autopay donation"
+   ],
+   "class": "status",
+   "means": "recurring-gift",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Repeating donation",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "tribute gift",
+   "variants": [
+    "in honor of",
+    "in memory of",
+    "memorial gift",
+    "memorial donation",
+    "honorarium",
+    "in memoriam",
+    "tribute"
+   ],
+   "class": "field",
+   "means": "tribute",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Gift made in someone's name",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "soft credit",
+   "variants": [
+    "hard credit",
+    "matching credit",
+    "credited to"
+   ],
+   "class": "field",
+   "means": "soft-credit",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Credit attribution term",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "gift aid",
+   "variants": [
+    "gift-aid",
+    "giftaid"
+   ],
+   "class": "money",
+   "means": "tax-reclaim",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "UK charity tax reclaim; not US",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "deductible amount",
+   "variants": [
+    "tax deductible amount",
+    "tax-deductible portion",
+    "deductible portion",
+    "non-deductible amount",
+    "quid pro quo"
+   ],
+   "class": "money",
+   "means": "deductible-amount",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Part of gift that counts for taxes",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "matching gift",
+   "variants": [
+    "employer matching gift",
+    "corporate match"
+   ],
+   "class": "money",
+   "means": "matching-funds",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Employer matches donation",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "donor advised fund",
+   "variants": [
+    "daf",
+    "donor-advised fund",
+    "daf grant"
+   ],
+   "class": "money",
+   "means": "daf",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Gift via a DAF sponsor",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "stock gift",
+   "variants": [
+    "gift of stock",
+    "appreciated stock",
+    "securities donation",
+    "stock donation"
+   ],
+   "class": "money",
+   "means": "non-cash-gift",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Non-cash gift",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "in-kind value",
+   "variants": [
+    "value of in-kind",
+    "in-kind total",
+    "donated value"
+   ],
+   "class": "field",
+   "means": "cost",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Label; fair value",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "sponsorship",
+   "variants": [
+    "corporate sponsorship",
+    "event sponsorship",
+    "sponsor level",
+    "sponsor package",
+    "sponsorship level"
+   ],
+   "class": "money",
+   "means": "sponsorship",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Business gives in return for recognition",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "membership dues",
+   "variants": [
+    "member dues",
+    "annual dues",
+    "dues",
+    "membership fee",
+    "membership renewal"
+   ],
+   "class": "money",
+   "means": "membership-dues",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Recurring member payment",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "fiscal year",
+   "variants": [
+    "fy",
+    "fiscal yr",
+    "fiscal year end",
+    "fye",
+    "fy end"
+   ],
+   "class": "date_phrase",
+   "means": "fiscal-year",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Nonprofit year may not be calendar",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "program service",
+   "variants": [
+    "program services",
+    "programs",
+    "program area"
+   ],
+   "class": "field",
+   "means": "program",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "What the money was spent on",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "functional expense",
+   "variants": [
+    "functional allocation",
+    "program management fundraising",
+    "program/management/fundraising"
+   ],
+   "class": "money",
+   "means": "functional-expense",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Expense split program/admin/fundraising",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "audit",
+   "variants": [
+    "audited financials",
+    "audit report",
+    "financial audit",
+    "independent audit",
+    "single audit"
+   ],
+   "class": "doc_type",
+   "means": "other",
+   "industries": [
+    "nonprofit"
+   ],
+   "note": "Audit report",
+   "source": "https://www.irs.gov/charities-non-profits/charitable-organizations/charitable-contributions-written-acknowledgments"
+  },
+  {
+   "term": "retainer",
+   "variants": [
+    "retainer fee",
+    "retainers",
+    "retainer agreement",
+    "advance fee",
+    "advance deposit",
+    "initial retainer",
+    "security retainer",
+    "evergreen retainer",
+    "replenishment"
+   ],
+   "class": "money",
+   "means": "retainer",
+   "industries": [
+    "legal"
+   ],
+   "note": "Up-front money held against future work",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "retainer agreement",
+   "variants": [
+    "fee agreement",
+    "fee contract",
+    "retention agreement",
+    "attorney client agreement",
+    "representation agreement",
+    "client agreement"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "legal"
+   ],
+   "note": "Terms of the engagement",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "engagement letter",
+   "variants": [
+    "engagement agreement",
+    "engagement",
+    "engagement letters",
+    "letter of engagement",
+    "scope letter",
+    "terms of engagement",
+    "client engagement"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "legal"
+   ],
+   "note": "Defines scope and fees",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "statement of work",
+   "variants": [
+    "sow",
+    "sows",
+    "scope of work",
+    "work statement",
+    "work order sow",
+    "project scope",
+    "scope document",
+    "project charter"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "legal"
+   ],
+   "note": "Scope, deliverables, price for a project",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "master services agreement",
+   "variants": [
+    "msa",
+    "master agreement",
+    "master service agreement",
+    "framework agreement",
+    "services agreement",
+    "professional services agreement",
+    "psa"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "legal"
+   ],
+   "note": "Umbrella contract; SOWs sit under it",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "change order",
+   "variants": [
+    "change request",
+    "scope change",
+    "amendment",
+    "contract amendment",
+    "addendum",
+    "change notice"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "legal"
+   ],
+   "note": "Modifies scope or price",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "non-disclosure agreement",
+   "variants": [
+    "nda",
+    "ndas",
+    "confidentiality agreement",
+    "confidentiality",
+    "nondisclosure",
+    "mutual nda"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "legal"
+   ],
+   "note": "Confidentiality contract",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "legal invoice",
+   "variants": [
+    "law firm invoice",
+    "attorney invoice",
+    "legal bill",
+    "legal statement",
+    "bill for services",
+    "professional fees invoice",
+    "fee statement"
+   ],
+   "class": "doc_type",
+   "means": "invoice",
+   "industries": [
+    "legal"
+   ],
+   "note": "Invoice from a firm",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "pre-bill",
+   "variants": [
+    "prebill",
+    "pre bill",
+    "draft bill",
+    "draft invoice",
+    "billing proof",
+    "proforma bill",
+    "pro forma"
+   ],
+   "class": "doc_type",
+   "means": "invoice",
+   "industries": [
+    "legal"
+   ],
+   "note": "Draft invoice, not yet sent",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "trust account statement",
+   "variants": [
+    "iolta statement",
+    "client trust statement",
+    "trust ledger",
+    "client ledger",
+    "trust accounting",
+    "iolta",
+    "iolta account",
+    "trust account"
+   ],
+   "class": "doc_type",
+   "means": "statement",
+   "industries": [
+    "legal"
+   ],
+   "note": "Statement of client money held",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "proposal",
+   "variants": [
+    "consulting proposal",
+    "project proposal",
+    "bid",
+    "fee proposal",
+    "fee quote",
+    "engagement proposal",
+    "pitch"
+   ],
+   "class": "doc_type",
+   "means": "proposal-quote",
+   "industries": [
+    "legal"
+   ],
+   "note": "Offer of work and price",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "matter",
+   "variants": [
+    "matters",
+    "case",
+    "cases",
+    "file",
+    "client matter",
+    "matter number",
+    "matter no",
+    "matter #",
+    "case number",
+    "file number",
+    "docket"
+   ],
+   "class": "field",
+   "means": "matter",
+   "industries": [
+    "legal"
+   ],
+   "note": "Legal unit of work",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "matter name",
+   "variants": [
+    "matter description",
+    "re",
+    "re:",
+    "regarding",
+    "subject matter",
+    "case name",
+    "case title"
+   ],
+   "class": "field",
+   "means": "matter",
+   "industries": [
+    "legal"
+   ],
+   "note": "Label",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "client",
+   "variants": [
+    "clients",
+    "client name",
+    "client matter",
+    "client of record",
+    "represented party"
+   ],
+   "class": "role",
+   "means": "customer",
+   "industries": [
+    "legal"
+   ],
+   "note": "Who the firm works for",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "attorney",
+   "variants": [
+    "lawyer",
+    "counsel",
+    "counselor",
+    "legal counsel",
+    "solicitor",
+    "barrister",
+    "esq",
+    "esquire",
+    "attorneys",
+    "lawyers"
+   ],
+   "class": "role",
+   "means": "technician",
+   "industries": [
+    "legal"
+   ],
+   "note": "Who did the legal work",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "paralegal",
+   "variants": [
+    "legal assistant",
+    "legal secretary",
+    "law clerk",
+    "clerk",
+    "legal staff"
+   ],
+   "class": "role",
+   "means": "technician",
+   "industries": [
+    "legal"
+   ],
+   "note": "Support staff in legal",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "partner",
+   "variants": [
+    "partners",
+    "equity partner",
+    "senior partner",
+    "managing partner",
+    "name partner"
+   ],
+   "class": "role",
+   "means": "technician",
+   "industries": [
+    "legal"
+   ],
+   "note": "Firm owner/senior",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "associate",
+   "variants": [
+    "associates",
+    "junior attorney",
+    "staff attorney",
+    "of counsel"
+   ],
+   "class": "role",
+   "means": "technician",
+   "industries": [
+    "legal"
+   ],
+   "note": "Firm staff",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "responsible attorney",
+   "variants": [
+    "billing attorney",
+    "originating attorney",
+    "supervising attorney",
+    "lead attorney",
+    "attorney of record",
+    "relationship partner",
+    "responsible partner",
+    "originator"
+   ],
+   "class": "role",
+   "means": "technician",
+   "industries": [
+    "legal"
+   ],
+   "note": "Matter owner",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "timekeeper",
+   "variants": [
+    "timekeepers",
+    "time keeper",
+    "fee earner",
+    "biller",
+    "billing professional",
+    "biller initials"
+   ],
+   "class": "role",
+   "means": "technician",
+   "industries": [
+    "legal"
+   ],
+   "note": "Person billing time",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "opposing counsel",
+   "variants": [
+    "opposing party",
+    "adverse party",
+    "other side",
+    "respondent",
+    "defendant",
+    "plaintiff",
+    "opponent"
+   ],
+   "class": "role",
+   "means": "other-party",
+   "industries": [
+    "legal"
+   ],
+   "note": "Other side of a case",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "accountant",
+   "variants": [
+    "cpa",
+    "cpas",
+    "bookkeeper",
+    "bookkeepers",
+    "tax preparer",
+    "tax pro",
+    "preparer",
+    "enrolled agent",
+    "ea",
+    "controller",
+    "accounting firm",
+    "cpa firm"
+   ],
+   "class": "role",
+   "means": "technician",
+   "industries": [
+    "legal"
+   ],
+   "note": "Who did accounting work",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "consultant",
+   "variants": [
+    "consultants",
+    "advisor",
+    "adviser",
+    "contractor",
+    "freelancer",
+    "independent contractor",
+    "subcontractor",
+    "1099 contractor",
+    "specialist"
+   ],
+   "class": "role",
+   "means": "technician",
+   "industries": [
+    "legal"
+   ],
+   "note": "External professional",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "account manager",
+   "variants": [
+    "engagement manager",
+    "project manager",
+    "pm",
+    "engagement lead",
+    "relationship manager",
+    "delivery manager"
+   ],
+   "class": "role",
+   "means": "technician",
+   "industries": [
+    "legal"
+   ],
+   "note": "Lead on a client engagement",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "billable hours",
+   "variants": [
+    "billable time",
+    "billables",
+    "billable",
+    "billed hours",
+    "hours billed",
+    "chargeable hours",
+    "chargeable time"
+   ],
+   "class": "field",
+   "means": "labor_hours",
+   "industries": [
+    "legal"
+   ],
+   "note": "Hours charged to client",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "non-billable",
+   "variants": [
+    "nonbillable",
+    "non billable",
+    "no charge time",
+    "write-off time",
+    "admin time",
+    "internal time"
+   ],
+   "class": "status",
+   "means": "non-billable",
+   "industries": [
+    "legal"
+   ],
+   "note": "Time not charged",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "hourly rate",
+   "variants": [
+    "billing rate",
+    "rate per hour",
+    "rate/hr",
+    "hourly fee",
+    "standard rate",
+    "bill rate",
+    "rack rate",
+    "blended rate",
+    "per hour rate",
+    "$/hr"
+   ],
+   "class": "money",
+   "means": "hourly_rate",
+   "industries": [
+    "legal"
+   ],
+   "note": "Dollar rate per hour",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "time entry",
+   "variants": [
+    "time entries",
+    "timesheet entry",
+    "time record",
+    "time slip",
+    "time slips",
+    "timesheet",
+    "time card",
+    "daily time",
+    "wip entry"
+   ],
+   "class": "doc_type",
+   "means": "internal",
+   "industries": [
+    "legal"
+   ],
+   "note": "One logged unit of time",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "billing increment",
+   "variants": [
+    "minimum billing increment",
+    "tenth of an hour",
+    "six minute increment",
+    "0.1 hour",
+    "quarter hour",
+    "minimum increment"
+   ],
+   "class": "field",
+   "means": "billing_increment",
+   "industries": [
+    "legal"
+   ],
+   "note": "Smallest unit of time billed",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "flat fee",
+   "variants": [
+    "fixed fee",
+    "fixed price",
+    "lump sum",
+    "set fee",
+    "flat rate",
+    "fixed-fee",
+    "fixed bid"
+   ],
+   "class": "money",
+   "means": "flat_fee",
+   "industries": [
+    "legal"
+   ],
+   "note": "One price for whole job",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "contingency fee",
+   "variants": [
+    "contingent fee",
+    "contingency",
+    "no win no fee",
+    "percentage fee",
+    "success fee",
+    "contingent"
+   ],
+   "class": "money",
+   "means": "contingency_fee",
+   "industries": [
+    "legal"
+   ],
+   "note": "Fee only if there is a recovery",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "not-to-exceed",
+   "variants": [
+    "nte",
+    "cap",
+    "fee cap",
+    "capped fee",
+    "budget cap",
+    "maximum fee",
+    "not to exceed",
+    "ceiling price"
+   ],
+   "class": "money",
+   "means": "not_to_exceed",
+   "industries": [
+    "legal"
+   ],
+   "note": "Max amount billable",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "disbursements",
+   "variants": [
+    "costs advanced",
+    "expenses advanced",
+    "out of pocket costs",
+    "reimbursable expenses",
+    "expenses",
+    "costs",
+    "filing fees",
+    "court costs",
+    "hard costs",
+    "soft costs"
+   ],
+   "class": "money",
+   "means": "reimbursable-expense",
+   "industries": [
+    "legal"
+   ],
+   "note": "Costs a firm passes through",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "WIP",
+   "variants": [
+    "work in progress",
+    "work in process",
+    "unbilled time",
+    "unbilled",
+    "unbilled work",
+    "unbilled fees",
+    "unbilled wip"
+   ],
+   "class": "status",
+   "means": "unbilled",
+   "industries": [
+    "legal"
+   ],
+   "note": "Time worked but not yet invoiced",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "write-off",
+   "variants": [
+    "write off",
+    "written off",
+    "writeoff",
+    "write down",
+    "write-down",
+    "courtesy discount",
+    "adjustment"
+   ],
+   "class": "action",
+   "means": "write-off",
+   "industries": [
+    "legal"
+   ],
+   "note": "Amount not collected",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "realization",
+   "variants": [
+    "realization rate",
+    "collection rate",
+    "billing realization"
+   ],
+   "class": "money",
+   "means": "realization",
+   "industries": [
+    "legal"
+   ],
+   "note": "Share of billed time actually collected",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "A/R",
+   "variants": [
+    "ar",
+    "accounts receivable",
+    "receivables",
+    "aged receivables",
+    "ar aging",
+    "aging report",
+    "outstanding fees",
+    "fees owed"
+   ],
+   "class": "status",
+   "means": "unpaid",
+   "industries": [
+    "legal"
+   ],
+   "note": "Money owed by clients",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "past due",
+   "variants": [
+    "past-due",
+    "pastdue",
+    "delinquent",
+    "late",
+    "overdue",
+    "arrears",
+    "behind",
+    "in arrears",
+    "over 30",
+    "over 60",
+    "over 90",
+    "60 days past due"
+   ],
+   "class": "status",
+   "means": "overdue",
+   "industries": [
+    "legal"
+   ],
+   "note": "Payment late",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "balance forward",
+   "variants": [
+    "previous balance",
+    "prior balance",
+    "opening balance",
+    "beginning balance",
+    "carried forward"
+   ],
+   "class": "field",
+   "means": "previous_balance",
+   "industries": [
+    "legal"
+   ],
+   "note": "Label",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "net 30",
+   "variants": [
+    "net30",
+    "net thirty",
+    "due in 30 days",
+    "30 days net",
+    "n30",
+    "payment terms 30",
+    "terms net 30"
+   ],
+   "class": "date_phrase",
+   "means": "net-30",
+   "industries": [
+    "legal"
+   ],
+   "note": "Payment due 30 days after invoice",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "net 15",
+   "variants": [
+    "net15",
+    "due in 15 days",
+    "n15"
+   ],
+   "class": "date_phrase",
+   "means": "net-15",
+   "industries": [
+    "legal"
+   ],
+   "note": "15-day terms",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "net 45",
+   "variants": [
+    "net45",
+    "n45",
+    "due in 45 days"
+   ],
+   "class": "date_phrase",
+   "means": "net-45",
+   "industries": [
+    "legal"
+   ],
+   "note": "45-day terms",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "net 60",
+   "variants": [
+    "net60",
+    "n60",
+    "due in 60 days"
+   ],
+   "class": "date_phrase",
+   "means": "net-60",
+   "industries": [
+    "legal"
+   ],
+   "note": "60-day terms",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "due on receipt",
+   "variants": [
+    "due upon receipt",
+    "payable on receipt",
+    "pay on receipt",
+    "immediate",
+    "due immediately",
+    "cash on delivery",
+    "cod",
+    "upon receipt"
+   ],
+   "class": "date_phrase",
+   "means": "due-on-receipt",
+   "industries": [
+    "legal"
+   ],
+   "note": "Pay right away",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "2/10 net 30",
+   "variants": [
+    "2/10 n30",
+    "2% 10 net 30",
+    "early payment discount",
+    "prompt pay discount",
+    "early pay discount"
+   ],
+   "class": "date_phrase",
+   "means": "early-pay-discount",
+   "industries": [
+    "legal"
+   ],
+   "note": "2 percent off if paid within 10 days",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "invoice period",
+   "variants": [
+    "billing period",
+    "period billed",
+    "services through",
+    "for services rendered through",
+    "through date",
+    "billing through",
+    "invoice period ending",
+    "period covered"
+   ],
+   "class": "field",
+   "means": "billing_period",
+   "industries": [
+    "legal"
+   ],
+   "note": "Label",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "billing cycle",
+   "variants": [
+    "bill cycle",
+    "billing frequency",
+    "monthly billing",
+    "monthly invoice",
+    "invoice cycle",
+    "recurring invoice"
+   ],
+   "class": "date_phrase",
+   "means": "billing-cycle",
+   "industries": [
+    "legal"
+   ],
+   "note": "How often invoiced",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "fees",
+   "variants": [
+    "professional fees",
+    "fees for services",
+    "services rendered",
+    "legal fees",
+    "total fees",
+    "fee total",
+    "total professional fees"
+   ],
+   "class": "field",
+   "means": "cost",
+   "industries": [
+    "legal"
+   ],
+   "note": "Label",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "amount due",
+   "variants": [
+    "balance due",
+    "please pay",
+    "total due",
+    "pay this amount",
+    "total amount due",
+    "amount payable"
+   ],
+   "class": "field",
+   "means": "cost",
+   "industries": [
+    "legal"
+   ],
+   "note": "Label",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "remit to",
+   "variants": [
+    "remittance address",
+    "make checks payable to",
+    "pay to",
+    "send payment to",
+    "payable to"
+   ],
+   "class": "field",
+   "means": "vendor",
+   "industries": [
+    "legal"
+   ],
+   "note": "Label",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "matter ledger",
+   "variants": [
+    "client ledger",
+    "matter statement",
+    "account of matter",
+    "billing history"
+   ],
+   "class": "doc_type",
+   "means": "statement",
+   "industries": [
+    "legal"
+   ],
+   "note": "History of charges and payments on a matter",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "conflict check",
+   "variants": [
+    "conflicts check",
+    "conflict waiver",
+    "conflicts clearance",
+    "new matter intake",
+    "intake form"
+   ],
+   "class": "doc_type",
+   "means": "internal",
+   "industries": [
+    "legal"
+   ],
+   "note": "Pre-engagement screen",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "privileged",
+   "variants": [
+    "attorney-client privilege",
+    "confidential privileged",
+    "work product",
+    "attorney work product",
+    "privileged and confidential",
+    "priv"
+   ],
+   "class": "status",
+   "means": "privileged",
+   "industries": [
+    "legal"
+   ],
+   "note": "Legal protection marker",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "closing letter",
+   "variants": [
+    "disengagement letter",
+    "termination of engagement",
+    "file closing letter",
+    "matter closing",
+    "end of engagement"
+   ],
+   "class": "doc_type",
+   "means": "correspondence",
+   "industries": [
+    "legal"
+   ],
+   "note": "Ends the engagement",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "power of attorney",
+   "variants": [
+    "poa",
+    "durable power of attorney",
+    "dpoa"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "legal"
+   ],
+   "note": "Authority to act for someone",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "retainer replenishment",
+   "variants": [
+    "replenish retainer",
+    "top up retainer",
+    "retainer balance",
+    "remaining retainer",
+    "retainer used",
+    "retainer applied",
+    "applied to retainer"
+   ],
+   "class": "money",
+   "means": "retainer",
+   "industries": [
+    "legal"
+   ],
+   "note": "Retainer balance wording",
+   "source": "https://www.law.cornell.edu/wex/retainer"
+  },
+  {
+   "term": "engagement letter",
+   "variants": [
+    "tax engagement letter",
+    "audit engagement letter",
+    "bookkeeping engagement",
+    "engagement terms"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "accounting"
+   ],
+   "note": "Accountant's scope letter",
+   "source": "https://www.law.cornell.edu/wex/contingent_fee"
+  },
+  {
+   "term": "organizer",
+   "variants": [
+    "tax organizer",
+    "client organizer",
+    "tax questionnaire",
+    "intake organizer"
+   ],
+   "class": "doc_type",
+   "means": "internal",
+   "industries": [
+    "accounting"
+   ],
+   "note": "Checklist sent to client for tax prep",
+   "source": "https://www.law.cornell.edu/wex/contingent_fee"
+  },
+  {
+   "term": "workpapers",
+   "variants": [
+    "work papers",
+    "working papers",
+    "workpaper",
+    "audit file",
+    "wp"
+   ],
+   "class": "doc_type",
+   "means": "internal",
+   "industries": [
+    "accounting"
+   ],
+   "note": "Accountant's supporting files",
+   "source": "https://www.law.cornell.edu/wex/contingent_fee"
+  },
+  {
+   "term": "management representation letter",
+   "variants": [
+    "rep letter",
+    "representation letter"
+   ],
+   "class": "doc_type",
+   "means": "correspondence",
+   "industries": [
+    "accounting"
+   ],
+   "note": "Client letter to auditor",
+   "source": "https://www.law.cornell.edu/wex/contingent_fee"
+  },
+  {
+   "term": "compilation",
+   "variants": [
+    "review engagement",
+    "compiled financials",
+    "reviewed financials",
+    "financial statement compilation"
+   ],
+   "class": "doc_type",
+   "means": "other",
+   "industries": [
+    "accounting"
+   ],
+   "note": "Accountant-prepared statements",
+   "source": "https://www.law.cornell.edu/wex/contingent_fee"
+  },
+  {
+   "term": "trial balance",
+   "variants": [
+    "tb",
+    "adjusted trial balance",
+    "atb",
+    "unadjusted trial balance"
+   ],
+   "class": "doc_type",
+   "means": "statement",
+   "industries": [
+    "accounting"
+   ],
+   "note": "Ledger balances list",
+   "source": "https://www.law.cornell.edu/wex/contingent_fee"
+  },
+  {
+   "term": "general ledger",
+   "variants": [
+    "gl",
+    "the ledger",
+    "ledger",
+    "ledger detail",
+    "gl detail"
+   ],
+   "class": "doc_type",
+   "means": "statement",
+   "industries": [
+    "accounting"
+   ],
+   "note": "All account transactions",
+   "source": "https://www.law.cornell.edu/wex/contingent_fee"
+  },
+  {
+   "term": "chart of accounts",
+   "variants": [
+    "coa",
+    "account list",
+    "accounts list"
+   ],
+   "class": "doc_type",
+   "means": "internal",
+   "industries": [
+    "accounting"
+   ],
+   "note": "List of ledger accounts",
+   "source": "https://www.law.cornell.edu/wex/contingent_fee"
+  },
+  {
+   "term": "1099",
+   "variants": [
+    "1099-nec",
+    "1099-misc",
+    "form 1099",
+    "1099 form",
+    "contractor tax form"
+   ],
+   "class": "doc_type",
+   "means": "other",
+   "industries": [
+    "accounting"
+   ],
+   "note": "Tax form for contractor pay",
+   "source": "https://www.law.cornell.edu/wex/contingent_fee"
+  },
+  {
+   "term": "W-9",
+   "variants": [
+    "w9",
+    "form w-9",
+    "w 9",
+    "taxpayer id request",
+    "request for taxpayer identification"
+   ],
+   "class": "doc_type",
+   "means": "other",
+   "industries": [
+    "accounting"
+   ],
+   "note": "Collect vendor tax id",
+   "source": "https://www.law.cornell.edu/wex/contingent_fee"
+  },
+  {
+   "term": "W-2",
+   "variants": [
+    "w2",
+    "form w-2",
+    "wage statement"
+   ],
+   "class": "doc_type",
+   "means": "hr-letter",
+   "industries": [
+    "accounting"
+   ],
+   "note": "Employee wage form",
+   "source": "https://www.law.cornell.edu/wex/contingent_fee"
+  },
+  {
+   "term": "bank reconciliation",
+   "variants": [
+    "bank rec",
+    "reconciliation",
+    "recon",
+    "reconciled",
+    "rec",
+    "bank recs"
+   ],
+   "class": "doc_type",
+   "means": "statement",
+   "industries": [
+    "accounting"
+   ],
+   "note": "Match book to bank",
+   "source": "https://www.law.cornell.edu/wex/contingent_fee"
+  },
+  {
+   "term": "month-end close",
+   "variants": [
+    "month end",
+    "close the books",
+    "monthly close",
+    "period close",
+    "close"
+   ],
+   "class": "action",
+   "means": "close",
+   "industries": [
+    "accounting"
+   ],
+   "note": "Closing monthly books",
+   "source": "https://www.law.cornell.edu/wex/contingent_fee"
+  },
+  {
+   "term": "accrual",
+   "variants": [
+    "accruals",
+    "accrued",
+    "accrued expense",
+    "accrued revenue",
+    "accrual basis"
+   ],
+   "class": "money",
+   "means": "accrual",
+   "industries": [
+    "accounting"
+   ],
+   "note": "Booked before cash moves",
+   "source": "https://www.law.cornell.edu/wex/contingent_fee"
+  },
+  {
+   "term": "deferred revenue",
+   "variants": [
+    "unearned revenue",
+    "prepaid revenue",
+    "customer deposits",
+    "advance billing",
+    "deferred income"
+   ],
+   "class": "money",
+   "means": "deferred-revenue",
+   "industries": [
+    "accounting"
+   ],
+   "note": "Paid but not yet earned",
+   "source": "https://www.law.cornell.edu/wex/contingent_fee"
+  },
+  {
+   "term": "prepaid expense",
+   "variants": [
+    "prepaids",
+    "prepaid",
+    "prepayment",
+    "prepayments"
+   ],
+   "class": "money",
+   "means": "prepaid-expense",
+   "industries": [
+    "accounting"
+   ],
+   "note": "Paid ahead of use",
+   "source": "https://www.law.cornell.edu/wex/contingent_fee"
+  },
+  {
+   "term": "accounts payable",
+   "variants": [
+    "ap",
+    "a/p",
+    "payables",
+    "bills to pay",
+    "vendor bills",
+    "ap aging",
+    "payable"
+   ],
+   "class": "status",
+   "means": "unpaid",
+   "industries": [
+    "accounting"
+   ],
+   "note": "What the business owes",
+   "source": "https://www.law.cornell.edu/wex/contingent_fee"
+  },
+  {
+   "term": "billable expense",
+   "variants": [
+    "pass-through expense",
+    "reimbursable",
+    "rebillable",
+    "re-billable",
+    "markup"
+   ],
+   "class": "money",
+   "means": "reimbursable-expense",
+   "industries": [
+    "accounting"
+   ],
+   "note": "Cost re-billed to client",
+   "source": "https://www.law.cornell.edu/wex/contingent_fee"
+  },
+  {
+   "term": "tax year",
+   "variants": [
+    "ty",
+    "tax period",
+    "filing year",
+    "return year"
+   ],
+   "class": "date_phrase",
+   "means": "tax-year",
+   "industries": [
+    "accounting"
+   ],
+   "note": "Year a return covers",
+   "source": "https://www.law.cornell.edu/wex/contingent_fee"
+  },
+  {
+   "term": "extension",
+   "variants": [
+    "form 4868",
+    "form 7004",
+    "filing extension",
+    "tax extension",
+    "extended return",
+    "ext"
+   ],
+   "class": "action",
+   "means": "extension",
+   "industries": [
+    "accounting"
+   ],
+   "note": "Extra time to file",
+   "source": "https://www.law.cornell.edu/wex/contingent_fee"
+  },
+  {
+   "term": "estimated tax",
+   "variants": [
+    "quarterly estimates",
+    "estimated payments",
+    "1040-es",
+    "q1 estimate",
+    "quarterly tax",
+    "estimated taxes"
+   ],
+   "class": "money",
+   "means": "estimated-tax",
+   "industries": [
+    "accounting"
+   ],
+   "note": "Quarterly tax payments",
+   "source": "https://www.law.cornell.edu/wex/contingent_fee"
+  },
+  {
+   "term": "retainer for tax",
+   "variants": [
+    "annual retainer",
+    "monthly retainer",
+    "monthly bookkeeping fee",
+    "monthly fee",
+    "monthly service fee",
+    "subscription fee",
+    "managed services fee"
+   ],
+   "class": "money",
+   "means": "retainer",
+   "industries": [
+    "accounting"
+   ],
+   "note": "Recurring professional fee",
+   "source": "https://www.law.cornell.edu/wex/contingent_fee"
+  },
+  {
+   "term": "preparer",
+   "variants": [
+    "paid preparer",
+    "ptin",
+    "preparer tax id",
+    "firm ein",
+    "signing preparer"
+   ],
+   "class": "field",
+   "means": "preparer",
+   "industries": [
+    "accounting"
+   ],
+   "note": "Who prepared the return",
+   "source": "https://www.law.cornell.edu/wex/contingent_fee"
+  },
+  {
+   "term": "deliverable",
+   "variants": [
+    "deliverables",
+    "work product",
+    "milestone",
+    "milestones",
+    "project deliverable",
+    "final deliverable"
+   ],
+   "class": "field",
+   "means": "deliverable",
+   "industries": [
+    "consulting"
+   ],
+   "note": "Thing the client receives",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "milestone payment",
+   "variants": [
+    "milestone billing",
+    "progress payment",
+    "progress billing",
+    "stage payment",
+    "payment schedule",
+    "installments",
+    "phase payment"
+   ],
+   "class": "money",
+   "means": "milestone-payment",
+   "industries": [
+    "consulting"
+   ],
+   "note": "Payment tied to a stage",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "phase",
+   "variants": [
+    "phases",
+    "stage",
+    "workstream",
+    "work stream",
+    "project phase",
+    "discovery phase"
+   ],
+   "class": "field",
+   "means": "phase",
+   "industries": [
+    "consulting"
+   ],
+   "note": "Part of a project",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "kickoff",
+   "variants": [
+    "kick-off",
+    "kickoff meeting",
+    "project start",
+    "go live",
+    "go-live",
+    "launch date"
+   ],
+   "class": "date_phrase",
+   "means": "project-start",
+   "industries": [
+    "consulting"
+   ],
+   "note": "Project start",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "acceptance",
+   "variants": [
+    "sign off",
+    "sign-off",
+    "signoff",
+    "client acceptance",
+    "deliverable acceptance",
+    "approved by client",
+    "acceptance criteria"
+   ],
+   "class": "status",
+   "means": "accepted",
+   "industries": [
+    "consulting"
+   ],
+   "note": "Client agrees work is done",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "scope creep",
+   "variants": [
+    "out of scope",
+    "out-of-scope",
+    "additional work",
+    "extra work",
+    "extras",
+    "add-on work",
+    "change in scope"
+   ],
+   "class": "status",
+   "means": "out-of-scope",
+   "industries": [
+    "consulting"
+   ],
+   "note": "Work beyond the agreement",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "time and materials",
+   "variants": [
+    "t&m",
+    "t and m",
+    "time & materials",
+    "time and material",
+    "tm contract",
+    "hourly contract"
+   ],
+   "class": "money",
+   "means": "time_and_materials",
+   "industries": [
+    "consulting"
+   ],
+   "note": "Billing by hours plus costs",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "per diem",
+   "variants": [
+    "per-diem",
+    "daily rate",
+    "day rate",
+    "daily fee",
+    "travel per diem"
+   ],
+   "class": "money",
+   "means": "per_diem",
+   "industries": [
+    "consulting"
+   ],
+   "note": "Daily rate",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "expense report",
+   "variants": [
+    "expense reports",
+    "expense claim",
+    "expenses report",
+    "reimbursement report",
+    "mileage log",
+    "reimbursement form",
+    "expense form"
+   ],
+   "class": "doc_type",
+   "means": "receipt",
+   "industries": [
+    "consulting"
+   ],
+   "note": "Employee/consultant expenses",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "master list",
+   "variants": [
+    "vendor list",
+    "approved vendor list",
+    "avl",
+    "supplier list",
+    "vendor master"
+   ],
+   "class": "doc_type",
+   "means": "price-list",
+   "industries": [
+    "consulting"
+   ],
+   "note": "List of vendors",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "purchase requisition",
+   "variants": [
+    "requisition",
+    "purchase request",
+    "pr",
+    "req",
+    "pr form",
+    "request to purchase"
+   ],
+   "class": "doc_type",
+   "means": "purchase-order",
+   "industries": [
+    "consulting"
+   ],
+   "note": "Internal request that precedes a PO",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "PO number",
+   "variants": [
+    "po #",
+    "po no",
+    "po",
+    "p.o.",
+    "p.o. number",
+    "purchase order number",
+    "po ref",
+    "customer po"
+   ],
+   "class": "field",
+   "means": "invoice_number",
+   "industries": [
+    "consulting"
+   ],
+   "note": "Label",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "renewal",
+   "variants": [
+    "auto-renew",
+    "auto renew",
+    "automatic renewal",
+    "evergreen",
+    "evergreen clause",
+    "renews automatically",
+    "renewal date",
+    "renewal term"
+   ],
+   "class": "date_phrase",
+   "means": "renewed",
+   "industries": [
+    "consulting"
+   ],
+   "note": "Contract rolls over",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "termination for convenience",
+   "variants": [
+    "termination clause",
+    "termination notice",
+    "notice period",
+    "cancel with notice",
+    "30 day notice",
+    "notice of termination"
+   ],
+   "class": "field",
+   "means": "termination_notice",
+   "industries": [
+    "consulting"
+   ],
+   "note": "How a contract can end",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "indemnification",
+   "variants": [
+    "indemnity",
+    "hold harmless",
+    "indemnify"
+   ],
+   "class": "field",
+   "means": "indemnification",
+   "industries": [
+    "consulting"
+   ],
+   "note": "Liability clause",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "limitation of liability",
+   "variants": [
+    "liability cap",
+    "lol",
+    "cap on liability"
+   ],
+   "class": "field",
+   "means": "liability_cap",
+   "industries": [
+    "consulting"
+   ],
+   "note": "Max exposure",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "governing law",
+   "variants": [
+    "jurisdiction",
+    "venue",
+    "choice of law",
+    "governing jurisdiction"
+   ],
+   "class": "field",
+   "means": "governing_law",
+   "industries": [
+    "consulting"
+   ],
+   "note": "Which state's law applies",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "service level agreement",
+   "variants": [
+    "sla",
+    "slas",
+    "service levels",
+    "uptime commitment",
+    "response time commitment"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "consulting"
+   ],
+   "note": "Performance commitments",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "certificate of insurance",
+   "variants": [
+    "coi",
+    "cois",
+    "proof of insurance",
+    "insurance cert",
+    "insurance certificate",
+    "acord 25",
+    "acord certificate",
+    "liability certificate"
+   ],
+   "class": "doc_type",
+   "means": "insurance-certificate",
+   "industries": [
+    "consulting"
+   ],
+   "note": "Proof of coverage",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "professional liability",
+   "variants": [
+    "e&o",
+    "errors and omissions",
+    "malpractice insurance",
+    "pli",
+    "professional indemnity",
+    "malpractice",
+    "errors & omissions"
+   ],
+   "class": "doc_type",
+   "means": "insurance-certificate",
+   "industries": [
+    "consulting"
+   ],
+   "note": "Professional coverage",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "general liability",
+   "variants": [
+    "gl insurance",
+    "cgl",
+    "commercial general liability",
+    "gl policy"
+   ],
+   "class": "doc_type",
+   "means": "insurance-certificate",
+   "industries": [
+    "consulting"
+   ],
+   "note": "Business liability coverage",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "workers comp",
+   "variants": [
+    "workers compensation",
+    "work comp",
+    "wc",
+    "workmans comp",
+    "workers' comp",
+    "wc policy"
+   ],
+   "class": "doc_type",
+   "means": "insurance-certificate",
+   "industries": [
+    "consulting"
+   ],
+   "note": "Injury coverage",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "additional insured",
+   "variants": [
+    "named additional insured",
+    "ai",
+    "certificate holder",
+    "cert holder",
+    "holder"
+   ],
+   "class": "field",
+   "means": "certificate_holder",
+   "industries": [
+    "consulting"
+   ],
+   "note": "Who is listed on the certificate",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "policy number",
+   "variants": [
+    "policy no",
+    "policy #",
+    "pol #",
+    "policy num"
+   ],
+   "class": "field",
+   "means": "invoice_number",
+   "industries": [
+    "consulting"
+   ],
+   "note": "Label",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "office lease",
+   "variants": [
+    "lease",
+    "suite lease",
+    "commercial lease",
+    "sublease",
+    "space lease",
+    "rent agreement"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "consulting"
+   ],
+   "note": "Office space lease",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "copier lease",
+   "variants": [
+    "equipment lease",
+    "lease agreement equipment",
+    "printer lease",
+    "postage meter lease",
+    "lease payment"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "consulting"
+   ],
+   "note": "Equipment lease",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "IT services agreement",
+   "variants": [
+    "managed services agreement",
+    "msp agreement",
+    "managed it",
+    "it support contract",
+    "support contract"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "consulting"
+   ],
+   "note": "IT vendor contract",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "software subscription",
+   "variants": [
+    "saas agreement",
+    "subscription agreement",
+    "license agreement",
+    "software license",
+    "eula",
+    "license"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "consulting"
+   ],
+   "note": "Software contract",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "service contract",
+   "variants": [
+    "maintenance contract",
+    "support agreement",
+    "support plan",
+    "annual service plan",
+    "service plan",
+    "care plan"
+   ],
+   "class": "doc_type",
+   "means": "maintenance-agreement",
+   "industries": [
+    "consulting"
+   ],
+   "note": "Recurring service contract",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "office supplies order",
+   "variants": [
+    "supply order",
+    "supplies invoice",
+    "staples order",
+    "office depot order"
+   ],
+   "class": "doc_type",
+   "means": "purchase-order",
+   "industries": [
+    "consulting"
+   ],
+   "note": "Order of supplies",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "shipping label",
+   "variants": [
+    "packing list",
+    "shipment confirmation",
+    "tracking receipt",
+    "courier receipt",
+    "fedex receipt",
+    "ups receipt"
+   ],
+   "class": "doc_type",
+   "means": "delivery-ticket",
+   "industries": [
+    "consulting"
+   ],
+   "note": "Shipping document",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "meeting minutes",
+   "variants": [
+    "agenda",
+    "minutes of meeting",
+    "meeting notes",
+    "mom",
+    "action items"
+   ],
+   "class": "doc_type",
+   "means": "internal",
+   "industries": [
+    "consulting"
+   ],
+   "note": "Internal meeting record",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "memo",
+   "variants": [
+    "internal memo",
+    "interoffice memo",
+    "memorandum",
+    "office memo"
+   ],
+   "class": "doc_type",
+   "means": "internal",
+   "industries": [
+    "consulting"
+   ],
+   "note": "Internal message",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "policy manual",
+   "variants": [
+    "employee handbook",
+    "handbook",
+    "procedures manual",
+    "sop",
+    "sops",
+    "standard operating procedure",
+    "office policy"
+   ],
+   "class": "doc_type",
+   "means": "internal",
+   "industries": [
+    "consulting"
+   ],
+   "note": "Internal policy",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "W-4",
+   "variants": [
+    "w4",
+    "employee withholding",
+    "i-9",
+    "i9",
+    "new hire paperwork",
+    "onboarding paperwork"
+   ],
+   "class": "doc_type",
+   "means": "hr-letter",
+   "industries": [
+    "consulting"
+   ],
+   "note": "Employee forms",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "payroll register",
+   "variants": [
+    "pay stub",
+    "paystub",
+    "pay slip",
+    "payslip",
+    "earnings statement",
+    "payroll report"
+   ],
+   "class": "doc_type",
+   "means": "hr-letter",
+   "industries": [
+    "consulting"
+   ],
+   "note": "Pay records",
+   "source": "https://www.law.cornell.edu/wex/work_product"
+  },
+  {
+   "term": "EOB",
+   "variants": [
+    "explanation of benefits",
+    "explanation of benefit",
+    "eobs",
+    "insurance statement",
+    "benefits statement",
+    "claim statement",
+    "insurance eob",
+    "this is not a bill"
+   ],
+   "class": "doc_type",
+   "means": "statement",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Insurer statement of what was paid",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "ERA",
+   "variants": [
+    "electronic remittance advice",
+    "835",
+    "remittance advice",
+    "remit advice",
+    "ra",
+    "remit",
+    "remittance",
+    "payer remit"
+   ],
+   "class": "doc_type",
+   "means": "statement",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Electronic payment detail from insurer",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "superbill",
+   "variants": [
+    "super bill",
+    "superbills",
+    "encounter form",
+    "fee ticket",
+    "charge ticket",
+    "routing slip",
+    "charge slip",
+    "patient superbill",
+    "itemized receipt"
+   ],
+   "class": "doc_type",
+   "means": "invoice",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Itemized visit form with codes for claims; non-clinical",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "patient statement",
+   "variants": [
+    "patient bill",
+    "patient invoice",
+    "patient balance statement",
+    "billing statement",
+    "statement of account patient",
+    "balance bill"
+   ],
+   "class": "doc_type",
+   "means": "statement",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Bill to patient",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "claim form",
+   "variants": [
+    "cms-1500",
+    "cms 1500",
+    "hcfa",
+    "hcfa-1500",
+    "ub-04",
+    "ub04",
+    "insurance claim",
+    "claim",
+    "claims",
+    "ada claim form",
+    "ada form",
+    "dental claim form"
+   ],
+   "class": "doc_type",
+   "means": "invoice",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Claim submitted to insurer",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "prior authorization",
+   "variants": [
+    "prior auth",
+    "pre-auth",
+    "preauth",
+    "preauthorization",
+    "pre authorization",
+    "authorization",
+    "auth",
+    "pa",
+    "precert",
+    "pre-certification",
+    "predetermination",
+    "pre-determination"
+   ],
+   "class": "doc_type",
+   "means": "correspondence",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Insurer approval before service",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "referral",
+   "variants": [
+    "referral form",
+    "referral authorization",
+    "referral letter",
+    "referral number"
+   ],
+   "class": "doc_type",
+   "means": "correspondence",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Referral between providers",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "patient intake form",
+   "variants": [
+    "new patient form",
+    "registration form",
+    "patient registration",
+    "intake form",
+    "new patient paperwork",
+    "demographics form",
+    "patient information form"
+   ],
+   "class": "doc_type",
+   "means": "internal",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Admin sign-up form",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "consent form",
+   "variants": [
+    "consent",
+    "hipaa form",
+    "hipaa acknowledgment",
+    "notice of privacy practices",
+    "npp",
+    "financial policy",
+    "financial agreement",
+    "authorization to release",
+    "release of information",
+    "roi",
+    "release form"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Signed admin consents",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "assignment of benefits",
+   "variants": [
+    "aob",
+    "assignment benefits",
+    "assign benefits",
+    "direct payment authorization"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Patient lets insurer pay provider",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "payment plan agreement",
+   "variants": [
+    "payment arrangement",
+    "payment plan",
+    "financing agreement",
+    "installment plan",
+    "carecredit",
+    "care credit",
+    "financing plan",
+    "treatment financing"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Plan to pay a balance over time",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "treatment plan estimate",
+   "variants": [
+    "treatment estimate",
+    "cost estimate",
+    "good faith estimate",
+    "gfe",
+    "fee estimate",
+    "treatment plan fee",
+    "patient estimate",
+    "estimate of benefits"
+   ],
+   "class": "doc_type",
+   "means": "proposal-quote",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Estimate of cost; admin view only",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "fee schedule",
+   "variants": [
+    "fee sched",
+    "chargemaster",
+    "cdm",
+    "price sheet",
+    "ucr",
+    "usual and customary",
+    "u&c",
+    "allowed amounts",
+    "contracted rates",
+    "in-network rates"
+   ],
+   "class": "doc_type",
+   "means": "price-list",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Price list of services",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "appointment schedule",
+   "variants": [
+    "provider schedule",
+    "daily schedule",
+    "appointment book",
+    "day sheet",
+    "daysheet",
+    "schedule of appointments",
+    "appointment list",
+    "recall list"
+   ],
+   "class": "doc_type",
+   "means": "schedule",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Calendar of visits",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "recall",
+   "variants": [
+    "recare",
+    "recall notice",
+    "reminder card",
+    "reminder postcard",
+    "appointment reminder",
+    "six month recall"
+   ],
+   "class": "doc_type",
+   "means": "correspondence",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Reminder to book",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "credentialing",
+   "variants": [
+    "credentialing application",
+    "caqh",
+    "enrollment",
+    "payer enrollment",
+    "provider enrollment",
+    "contracting"
+   ],
+   "class": "doc_type",
+   "means": "other",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Payer onboarding paperwork",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "insurance card",
+   "variants": [
+    "insurance id card",
+    "member card",
+    "insurance information",
+    "ins card"
+   ],
+   "class": "doc_type",
+   "means": "other",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Coverage card copy",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "equipment warranty",
+   "variants": [
+    "warranty",
+    "extended warranty",
+    "manufacturer warranty",
+    "service warranty",
+    "parts warranty",
+    "labor warranty",
+    "warranty card",
+    "warranty certificate"
+   ],
+   "class": "doc_type",
+   "means": "warranty-registration",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Equipment coverage",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "service agreement equipment",
+   "variants": [
+    "equipment service contract",
+    "biomed contract",
+    "maintenance contract equipment",
+    "preventive maintenance agreement",
+    "pm agreement",
+    "service plan equipment"
+   ],
+   "class": "doc_type",
+   "means": "maintenance-agreement",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Contract to maintain equipment",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "vendor contract",
+   "variants": [
+    "supplier agreement",
+    "supply agreement",
+    "vendor agreement",
+    "purchase agreement",
+    "lab agreement",
+    "dental lab contract",
+    "lab slip",
+    "lab prescription"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Contract with a supplier",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "business associate agreement",
+   "variants": [
+    "baa",
+    "baas",
+    "business associate contract",
+    "hipaa baa"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Admin data-sharing contract",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "patient",
+   "variants": [
+    "patients",
+    "pt",
+    "pts",
+    "client patient",
+    "insured patient",
+    "guarantor patient"
+   ],
+   "class": "role",
+   "means": "customer",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Person who receives care and is billed",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "guarantor",
+   "variants": [
+    "responsible party",
+    "financial responsible party",
+    "policyholder",
+    "subscriber",
+    "insured",
+    "primary insured",
+    "account holder",
+    "guarantor name"
+   ],
+   "class": "role",
+   "means": "customer",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Person responsible for paying",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "provider",
+   "variants": [
+    "rendering provider",
+    "billing provider",
+    "treating provider",
+    "doctor",
+    "dr",
+    "physician",
+    "dentist",
+    "hygienist",
+    "practitioner",
+    "npp",
+    "np",
+    "pa-c",
+    "clinician",
+    "provider name"
+   ],
+   "class": "role",
+   "means": "technician",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Person who performed the service",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "front desk",
+   "variants": [
+    "receptionist",
+    "front office",
+    "office manager",
+    "practice manager",
+    "biller",
+    "billing staff",
+    "billing office",
+    "scheduler",
+    "patient coordinator"
+   ],
+   "class": "role",
+   "means": "internal-person",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Admin staff",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "payer",
+   "variants": [
+    "insurance company",
+    "insurer",
+    "carrier",
+    "plan",
+    "health plan",
+    "third party payer",
+    "tpa",
+    "insurance carrier",
+    "payor",
+    "medicare",
+    "medicaid",
+    "commercial plan"
+   ],
+   "class": "role",
+   "means": "vendor",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Insurer paying the claim",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "DOS",
+   "variants": [
+    "date of service",
+    "service date",
+    "dos",
+    "date svc",
+    "visit date",
+    "date of visit",
+    "date of procedure",
+    "encounter date",
+    "treatment date"
+   ],
+   "class": "field",
+   "means": "service_date",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Label",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "CPT",
+   "variants": [
+    "cpt code",
+    "cpt codes",
+    "procedure code",
+    "procedure codes",
+    "cdt",
+    "cdt code",
+    "cdt codes",
+    "hcpcs",
+    "service code",
+    "billing code"
+   ],
+   "class": "field",
+   "means": "service_code",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Billing codes on superbills; admin only",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "ICD-10",
+   "variants": [
+    "icd10",
+    "icd 10",
+    "diagnosis code",
+    "dx code",
+    "dx",
+    "icd code"
+   ],
+   "class": "field",
+   "means": "diagnosis_code",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Code printed on claims; do not interpret clinically",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "NPI",
+   "variants": [
+    "npi number",
+    "national provider identifier",
+    "provider npi",
+    "billing npi",
+    "rendering npi"
+   ],
+   "class": "field",
+   "means": "npi",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Provider id label",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "member id",
+   "variants": [
+    "subscriber id",
+    "policy id",
+    "insurance id",
+    "ins id",
+    "id number insurance",
+    "member number",
+    "insured id",
+    "sub id",
+    "group number",
+    "group #",
+    "group no",
+    "grp"
+   ],
+   "class": "field",
+   "means": "member_id",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Insurance ids",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "claim number",
+   "variants": [
+    "claim #",
+    "claim no",
+    "icn",
+    "dcn",
+    "claim id",
+    "tcn",
+    "claim control number",
+    "reference number claim"
+   ],
+   "class": "field",
+   "means": "invoice_number",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Label",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "billed amount",
+   "variants": [
+    "charge",
+    "charges",
+    "amount billed",
+    "billed charges",
+    "total charges",
+    "provider charge",
+    "submitted charge",
+    "fee charged",
+    "usual fee"
+   ],
+   "class": "field",
+   "means": "cost",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Amount provider billed",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "allowed amount",
+   "variants": [
+    "allowable",
+    "allowed",
+    "negotiated rate",
+    "contracted amount",
+    "eligible expense",
+    "approved amount",
+    "plan allowed"
+   ],
+   "class": "money",
+   "means": "allowed-amount",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Max insurer recognizes",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "insurance paid",
+   "variants": [
+    "plan paid",
+    "payer paid",
+    "insurance payment",
+    "paid by insurance",
+    "insurer paid",
+    "plan payment",
+    "ins paid",
+    "ins pmt"
+   ],
+   "class": "money",
+   "means": "insurance-paid",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "What insurer paid",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "patient responsibility",
+   "variants": [
+    "patient resp",
+    "pt resp",
+    "you owe",
+    "amount you owe",
+    "your responsibility",
+    "patient balance",
+    "patient portion",
+    "balance due from patient",
+    "pt balance",
+    "amount owed by patient"
+   ],
+   "class": "money",
+   "means": "patient-responsibility",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "What the patient must pay",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "copay",
+   "variants": [
+    "co-pay",
+    "copayment",
+    "co payment",
+    "copays",
+    "co-payment",
+    "visit copay"
+   ],
+   "class": "money",
+   "means": "copay",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Fixed fee per visit",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "coinsurance",
+   "variants": [
+    "co-insurance",
+    "coinsurance percent",
+    "co ins",
+    "co-ins",
+    "coins"
+   ],
+   "class": "money",
+   "means": "coinsurance",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Percent patient pays",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "deductible",
+   "variants": [
+    "deductibles",
+    "annual deductible",
+    "plan deductible",
+    "deductible met",
+    "deductible remaining",
+    "ded",
+    "deductible applied"
+   ],
+   "class": "money",
+   "means": "deductible",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Amount before insurer pays",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "out-of-pocket maximum",
+   "variants": [
+    "oop max",
+    "out of pocket max",
+    "oopm",
+    "out-of-pocket max",
+    "oop",
+    "max out of pocket"
+   ],
+   "class": "money",
+   "means": "oop-max",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Yearly cap on patient costs",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "annual maximum",
+   "variants": [
+    "annual max",
+    "yearly maximum",
+    "benefit maximum",
+    "plan maximum",
+    "remaining benefits",
+    "benefits remaining",
+    "used benefits"
+   ],
+   "class": "money",
+   "means": "annual-maximum",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Yearly insurer limit, common in dental",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "adjustment",
+   "variants": [
+    "contractual adjustment",
+    "contractual write off",
+    "write-off",
+    "writeoff",
+    "write off",
+    "courtesy adjustment",
+    "insurance adjustment",
+    "discount adjustment",
+    "adj"
+   ],
+   "class": "money",
+   "means": "adjustment",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Reduction from billed amount",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "denial",
+   "variants": [
+    "denied",
+    "claim denied",
+    "denied claim",
+    "denials",
+    "rejected",
+    "rejection",
+    "claim rejection",
+    "not covered",
+    "non-covered",
+    "noncovered",
+    "denial code",
+    "carc",
+    "rarc"
+   ],
+   "class": "status",
+   "means": "denied",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Insurer refused to pay",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "appeal",
+   "variants": [
+    "appeals",
+    "claim appeal",
+    "appeal letter",
+    "resubmission",
+    "resubmit",
+    "corrected claim",
+    "reprocess"
+   ],
+   "class": "action",
+   "means": "appeal",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Dispute a denial",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "in-network",
+   "variants": [
+    "in network",
+    "innetwork",
+    "participating",
+    "par",
+    "par provider",
+    "contracted",
+    "in-net"
+   ],
+   "class": "status",
+   "means": "in-network",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Provider contracts with payer",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "out-of-network",
+   "variants": [
+    "out of network",
+    "oon",
+    "oon provider",
+    "non-par",
+    "nonpar",
+    "non participating",
+    "non-participating",
+    "out-of-net"
+   ],
+   "class": "status",
+   "means": "out-of-network",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "No contract with payer",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "accounts receivable days",
+   "variants": [
+    "days in ar",
+    "ar days",
+    "days in a/r",
+    "dso",
+    "days sales outstanding"
+   ],
+   "class": "money",
+   "means": "ar-days",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Collection speed",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "collections",
+   "variants": [
+    "sent to collections",
+    "in collections",
+    "collection agency",
+    "collections account",
+    "collection letter",
+    "final notice",
+    "third party collections"
+   ],
+   "class": "status",
+   "means": "in-collections",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Debt moved to collector",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "self-pay",
+   "variants": [
+    "self pay",
+    "cash pay",
+    "cash patient",
+    "uninsured",
+    "private pay",
+    "selfpay",
+    "out of pocket"
+   ],
+   "class": "status",
+   "means": "self-pay",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Patient pays without insurance",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "sliding scale",
+   "variants": [
+    "sliding fee",
+    "income based fee",
+    "discount program",
+    "charity care",
+    "financial assistance",
+    "hardship"
+   ],
+   "class": "money",
+   "means": "sliding-scale",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Reduced fee by income",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "write-off adjustment",
+   "variants": [
+    "bad debt",
+    "uncollectible",
+    "bad debt write off",
+    "uncollectable"
+   ],
+   "class": "action",
+   "means": "write-off",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Uncollectible balance",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "no-show fee",
+   "variants": [
+    "no show fee",
+    "missed appointment fee",
+    "late cancellation fee",
+    "cancellation fee",
+    "broken appointment fee",
+    "late cancel"
+   ],
+   "class": "money",
+   "means": "fee",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Fee for missed visit",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "copay collected",
+   "variants": [
+    "collected at time of service",
+    "paid at visit",
+    "payment at checkout",
+    "checkout payment",
+    "pmt received",
+    "payment posted"
+   ],
+   "class": "status",
+   "means": "paid",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Paid at visit",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "posted payment",
+   "variants": [
+    "payment posting",
+    "posted",
+    "posting",
+    "era posting",
+    "applied payment",
+    "unapplied payment",
+    "unapplied",
+    "applied"
+   ],
+   "class": "status",
+   "means": "paid",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Payment recorded to account",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "credit balance",
+   "variants": [
+    "patient credit",
+    "overpayment",
+    "refund due",
+    "refund",
+    "credit on account",
+    "overpaid",
+    "refunds"
+   ],
+   "class": "status",
+   "means": "credit-balance",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Provider owes patient money",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "aging",
+   "variants": [
+    "aged balance",
+    "30-60-90",
+    "0-30",
+    "31-60",
+    "61-90",
+    "91-120",
+    "120+",
+    "aging bucket",
+    "aging report"
+   ],
+   "class": "status",
+   "means": "aging",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Age of unpaid balances",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "eligibility",
+   "variants": [
+    "eligibility check",
+    "verify insurance",
+    "insurance verification",
+    "benefit verification",
+    "verification of benefits",
+    "vob",
+    "eligibility verification",
+    "coverage check"
+   ],
+   "class": "action",
+   "means": "eligibility",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Checking coverage",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "claim status",
+   "variants": [
+    "claim pending",
+    "pending claim",
+    "pended",
+    "in process",
+    "processing",
+    "submitted",
+    "claim submitted",
+    "claim in review",
+    "claim accepted",
+    "claim paid",
+    "claim closed"
+   ],
+   "class": "status",
+   "means": "claim-status",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Where a claim is",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "timely filing",
+   "variants": [
+    "filing deadline",
+    "filing limit",
+    "timely filing limit",
+    "claim deadline",
+    "filing window"
+   ],
+   "class": "date_phrase",
+   "means": "timely-filing",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Deadline to file a claim",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "policy effective",
+   "variants": [
+    "coverage start",
+    "coverage begins",
+    "coverage end",
+    "termed",
+    "termed date",
+    "eff date",
+    "effective date",
+    "term date",
+    "coverage dates"
+   ],
+   "class": "field",
+   "means": "agreement_term",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Plan coverage dates",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "equipment",
+   "variants": [
+    "x-ray",
+    "xray",
+    "autoclave",
+    "chair",
+    "operatory",
+    "dental chair",
+    "handpiece",
+    "compressor",
+    "sterilizer",
+    "intraoral camera",
+    "panoramic",
+    "ultrasound",
+    "exam table",
+    "centrifuge",
+    "ekg",
+    "monitor"
+   ],
+   "class": "equipment",
+   "means": "equipment_type",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Practice equipment; admin tracking only",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "serial number",
+   "variants": [
+    "serial no",
+    "serial #",
+    "sn",
+    "s/n",
+    "ser no",
+    "ser #"
+   ],
+   "class": "field",
+   "means": "serial_number",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Label",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "model number",
+   "variants": [
+    "model no",
+    "model #",
+    "mdl",
+    "m/n"
+   ],
+   "class": "field",
+   "means": "model",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Label",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "warranty expiration",
+   "variants": [
+    "warranty expires",
+    "warranty end",
+    "warranty through",
+    "warranty ends",
+    "under warranty",
+    "out of warranty",
+    "warranty period",
+    "warranty term"
+   ],
+   "class": "field",
+   "means": "warranty_expires",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Label",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "preventive maintenance",
+   "variants": [
+    "pm",
+    "pms",
+    "planned maintenance",
+    "annual pm",
+    "calibration",
+    "calibration certificate",
+    "safety inspection",
+    "inspection sticker"
+   ],
+   "class": "action",
+   "means": "service_type",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Scheduled equipment upkeep",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "service call",
+   "variants": [
+    "repair call",
+    "service visit",
+    "field service",
+    "service report",
+    "repair ticket",
+    "rma",
+    "return authorization"
+   ],
+   "class": "doc_type",
+   "means": "service-ticket",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Repair visit on equipment",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "biomedical",
+   "variants": [
+    "biomed",
+    "biomed tech",
+    "field engineer",
+    "fse",
+    "service engineer",
+    "service rep",
+    "vendor tech"
+   ],
+   "class": "role",
+   "means": "technician",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Equipment servicer",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "rep",
+   "variants": [
+    "sales rep",
+    "vendor rep",
+    "manufacturer rep",
+    "territory rep",
+    "account rep",
+    "supplier rep"
+   ],
+   "class": "role",
+   "means": "vendor",
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ],
+   "note": "Vendor representative",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "paid",
+   "variants": [
+    "paid in full",
+    "pif",
+    "settled",
+    "payment received",
+    "fully paid",
+    "cleared",
+    "zero balance",
+    "$0 balance",
+    "balance zero"
+   ],
+   "class": "status",
+   "means": "paid",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Payment done",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "unpaid",
+   "variants": [
+    "not paid",
+    "open",
+    "outstanding",
+    "open balance",
+    "owing",
+    "owed",
+    "due",
+    "payment pending",
+    "pending payment",
+    "balance outstanding",
+    "still owe"
+   ],
+   "class": "status",
+   "means": "unpaid",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Not yet paid",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "void",
+   "variants": [
+    "voided",
+    "void invoice",
+    "cancelled",
+    "canceled",
+    "cancelled invoice",
+    "nullified",
+    "invalid",
+    "reversed"
+   ],
+   "class": "status",
+   "means": "voided",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Cancelled document",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "partial payment",
+   "variants": [
+    "partially paid",
+    "part paid",
+    "deposit paid",
+    "partial",
+    "paid partial",
+    "on account",
+    "payment on account",
+    "installment received"
+   ],
+   "class": "status",
+   "means": "partially-paid",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Part received",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "draft",
+   "variants": [
+    "drafts",
+    "draft status",
+    "unsent",
+    "not sent",
+    "pending approval",
+    "not finalized",
+    "preliminary"
+   ],
+   "class": "status",
+   "means": "draft",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Not yet final",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "sent",
+   "variants": [
+    "emailed",
+    "mailed",
+    "delivered to client",
+    "issued",
+    "billed",
+    "invoiced"
+   ],
+   "class": "status",
+   "means": "sent",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Issued to the other party",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "signed",
+   "variants": [
+    "executed",
+    "fully executed",
+    "countersigned",
+    "counter-signed",
+    "signed copy",
+    "signature",
+    "executed copy",
+    "wet signature"
+   ],
+   "class": "status",
+   "means": "signed",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Signed agreement",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "expired",
+   "variants": [
+    "expiry",
+    "lapsed",
+    "ended",
+    "no longer valid",
+    "ran out",
+    "terminated",
+    "expired agreement"
+   ],
+   "class": "status",
+   "means": "expired",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Past its end date",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "renewed",
+   "variants": [
+    "renewal",
+    "extended",
+    "auto-renewed",
+    "rolled over",
+    "re-upped",
+    "renew"
+   ],
+   "class": "status",
+   "means": "renewed",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Term extended",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "pending",
+   "variants": [
+    "awaiting",
+    "in review",
+    "under review",
+    "in process",
+    "waiting on",
+    "on hold",
+    "hold"
+   ],
+   "class": "status",
+   "means": "pending",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Not yet decided",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "approved",
+   "variants": [
+    "approval",
+    "accepted",
+    "ok to proceed",
+    "authorized",
+    "greenlit",
+    "green lit",
+    "cleared for"
+   ],
+   "class": "status",
+   "means": "approved",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Approved",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "rejected",
+   "variants": [
+    "declined",
+    "denied",
+    "not approved",
+    "disapproved",
+    "turned down"
+   ],
+   "class": "status",
+   "means": "rejected",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Not approved",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "closed",
+   "variants": [
+    "closed out",
+    "case closed",
+    "file closed",
+    "matter closed",
+    "completed",
+    "complete",
+    "done",
+    "closeout",
+    "closed matter"
+   ],
+   "class": "status",
+   "means": "closed",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Finished",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "active",
+   "variants": [
+    "open matter",
+    "current",
+    "ongoing",
+    "in progress",
+    "live",
+    "in force",
+    "in effect"
+   ],
+   "class": "status",
+   "means": "active",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Still running",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "signature line",
+   "variants": [
+    "signed by",
+    "authorized signature",
+    "signature",
+    "date signed",
+    "signatory",
+    "authorized signer",
+    "witness"
+   ],
+   "class": "field",
+   "means": "signature",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Label",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "authorized signer",
+   "variants": [
+    "signer",
+    "signers",
+    "officer",
+    "authorized representative",
+    "representative",
+    "designee",
+    "contact person",
+    "primary contact"
+   ],
+   "class": "role",
+   "means": "contact",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Person who signs",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "effective date",
+   "variants": [
+    "start date",
+    "commencement",
+    "eff date",
+    "date effective",
+    "begins",
+    "beginning"
+   ],
+   "class": "field",
+   "means": "agreement_term",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Label",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "expiration date",
+   "variants": [
+    "expires",
+    "end date",
+    "expiry date",
+    "termination date",
+    "exp date",
+    "exp",
+    "expires on",
+    "valid through",
+    "valid until"
+   ],
+   "class": "field",
+   "means": "agreement_term",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Label",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "term",
+   "variants": [
+    "contract term",
+    "agreement term",
+    "length of agreement",
+    "duration",
+    "period",
+    "initial term",
+    "renewal term"
+   ],
+   "class": "field",
+   "means": "agreement_term",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Label",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "tax receipt",
+   "variants": [
+    "tax-deductible receipt",
+    "deductible receipt",
+    "tax deductible receipt"
+   ],
+   "class": "doc_type",
+   "means": "receipt",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Gift receipt for taxes",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "check number",
+   "variants": [
+    "check #",
+    "cheque number",
+    "chk #",
+    "check no",
+    "chk no",
+    "ck #"
+   ],
+   "class": "field",
+   "means": "invoice_number",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Label",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "payment method",
+   "variants": [
+    "paid by check",
+    "paid by card",
+    "cash",
+    "credit card",
+    "ach",
+    "wire",
+    "wire transfer",
+    "zelle",
+    "venmo",
+    "paypal",
+    "eft",
+    "direct deposit",
+    "money order",
+    "online payment"
+   ],
+   "class": "field",
+   "means": "payment_method",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "How it was paid",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "deposit",
+   "variants": [
+    "deposits",
+    "down payment",
+    "downpayment",
+    "advance",
+    "prepayment",
+    "earnest money",
+    "initial payment",
+    "good faith deposit"
+   ],
+   "class": "money",
+   "means": "deposit",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Money paid ahead",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "late fee",
+   "variants": [
+    "late charge",
+    "late payment fee",
+    "finance charge",
+    "interest charge",
+    "service charge",
+    "penalty",
+    "late penalty",
+    "late interest"
+   ],
+   "class": "money",
+   "means": "late-fee",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Fee for paying late",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "sales tax",
+   "variants": [
+    "tax",
+    "vat",
+    "gst",
+    "hst",
+    "state tax",
+    "tax amount",
+    "tax rate"
+   ],
+   "class": "money",
+   "means": "tax",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Tax on invoice",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "subtotal",
+   "variants": [
+    "sub-total",
+    "sub total",
+    "amount before tax",
+    "net amount",
+    "pre-tax total",
+    "line total"
+   ],
+   "class": "money",
+   "means": "subtotal",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Before tax",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "discount",
+   "variants": [
+    "disc",
+    "discounts",
+    "adjustment discount",
+    "courtesy credit",
+    "promo",
+    "promotional discount"
+   ],
+   "class": "money",
+   "means": "discount",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Reduction",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "credit memo",
+   "variants": [
+    "credit note",
+    "credit",
+    "credit memorandum",
+    "refund memo",
+    "cm",
+    "customer credit"
+   ],
+   "class": "doc_type",
+   "means": "invoice",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Reduces balance owed",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "recurring invoice",
+   "variants": [
+    "repeating invoice",
+    "subscription invoice",
+    "standing invoice",
+    "auto invoice"
+   ],
+   "class": "doc_type",
+   "means": "invoice",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Invoice sent regularly",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "quote",
+   "variants": [
+    "quotation",
+    "estimate",
+    "bid",
+    "price quote",
+    "proposal",
+    "written quote",
+    "quoted price",
+    "quote request",
+    "rfq",
+    "rfp",
+    "request for proposal",
+    "request for quote"
+   ],
+   "class": "doc_type",
+   "means": "proposal-quote",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Offered price",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "purchase order",
+   "variants": [
+    "po",
+    "p.o.",
+    "order form",
+    "purchase orders",
+    "pos",
+    "order confirmation",
+    "sales order"
+   ],
+   "class": "doc_type",
+   "means": "purchase-order",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Order placed with a vendor",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "statement of account",
+   "variants": [
+    "account statement",
+    "monthly statement",
+    "customer statement",
+    "ar statement",
+    "past due statement"
+   ],
+   "class": "doc_type",
+   "means": "statement",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Account summary",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "receipt",
+   "variants": [
+    "sales receipt",
+    "proof of payment",
+    "payment confirmation",
+    "paid receipt",
+    "payment acknowledgment",
+    "remittance"
+   ],
+   "class": "doc_type",
+   "means": "receipt",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Proof of payment",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "vendor",
+   "variants": [
+    "supplier",
+    "payee",
+    "seller",
+    "provider",
+    "merchant"
+   ],
+   "class": "role",
+   "means": "vendor",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Party you pay or who bills you",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "customer",
+   "variants": [
+    "client",
+    "patron",
+    "account",
+    "buyer",
+    "purchaser",
+    "payer"
+   ],
+   "class": "role",
+   "means": "customer",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Party who pays you",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "staff",
+   "variants": [
+    "employee",
+    "employees",
+    "team member",
+    "team members",
+    "workers",
+    "personnel",
+    "hire"
+   ],
+   "class": "role",
+   "means": "technician",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Who did the work in an office",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  },
+  {
+   "term": "office",
+   "variants": [
+    "front office",
+    "back office",
+    "admin office",
+    "office admin",
+    "office staff"
+   ],
+   "class": "role",
+   "means": "internal-person",
+   "industries": [
+    "nonprofit",
+    "office"
+   ],
+   "note": "Admin function",
+   "source": "https://www.irs.gov/pub/irs-pdf/p1771.pdf"
+  }
+ ],
+ "ambiguous": [
+  {
+   "term": "retainer",
+   "could_mean": [
+    "retainer (money held against future legal or professional fees)",
+    "retainer (recurring monthly fee for ongoing availability)",
+    "dental retainer (orthodontic appliance, clinical)"
+   ],
+   "industries": [
+    "legal",
+    "consulting",
+    "dental-admin"
+   ]
+  },
+  {
+   "term": "matter",
+   "could_mean": [
+    "legal matter (case/file)",
+    "general 'it matters'"
+   ],
+   "industries": [
+    "legal"
+   ]
+  },
+  {
+   "term": "fund",
+   "could_mean": [
+    "fund (nonprofit accounting designation)",
+    "fund (investment fund)",
+    "fund (verb: to pay for)"
+   ],
+   "industries": [
+    "nonprofit"
+   ]
+  },
+  {
+   "term": "restricted",
+   "could_mean": [
+    "restricted fund (donor restriction)",
+    "restricted access (confidential)",
+    "restricted license"
+   ],
+   "industries": [
+    "nonprofit",
+    "office"
+   ]
+  },
+  {
+   "term": "pledge",
+   "could_mean": [
+    "pledge (donor promise)",
+    "pledge (collateral for a loan)",
+    "pledge (oath)"
+   ],
+   "industries": [
+    "nonprofit"
+   ]
+  },
+  {
+   "term": "award",
+   "could_mean": [
+    "grant award (funding)",
+    "employee award (recognition)",
+    "court or arbitration award"
+   ],
+   "industries": [
+    "nonprofit",
+    "legal",
+    "office"
+   ]
+  },
+  {
+   "term": "match",
+   "could_mean": [
+    "matching funds (grant/gift)",
+    "a record match in reconciliation"
+   ],
+   "industries": [
+    "nonprofit",
+    "accounting"
+   ]
+  },
+  {
+   "term": "charge",
+   "could_mean": [
+    "billed amount on a medical claim",
+    "a credit card charge",
+    "a late charge",
+    "a criminal charge"
+   ],
+   "industries": [
+    "medical-admin",
+    "legal"
+   ]
+  },
+  {
+   "term": "adjustment",
+   "could_mean": [
+    "contractual write-off on an EOB",
+    "accounting journal adjustment",
+    "price adjustment on invoice"
+   ],
+   "industries": [
+    "medical-admin",
+    "accounting"
+   ]
+  },
+  {
+   "term": "credit",
+   "could_mean": [
+    "credit memo (reduces balance)",
+    "patient credit balance",
+    "credit card",
+    "donor credit/soft credit"
+   ],
+   "industries": [
+    "medical-admin",
+    "office",
+    "nonprofit"
+   ]
+  },
+  {
+   "term": "balance",
+   "could_mean": [
+    "amount owed on invoice",
+    "fund balance (nonprofit)",
+    "retainer balance",
+    "patient balance"
+   ],
+   "industries": [
+    "nonprofit",
+    "legal",
+    "medical-admin"
+   ]
+  },
+  {
+   "term": "deposit",
+   "could_mean": [
+    "customer down payment",
+    "bank deposit (money into bank)",
+    "security deposit",
+    "retainer deposit"
+   ],
+   "industries": [
+    "office",
+    "legal"
+   ]
+  },
+  {
+   "term": "plan",
+   "could_mean": [
+    "insurance plan (payer)",
+    "payment plan",
+    "treatment plan",
+    "service plan (maintenance agreement)"
+   ],
+   "industries": [
+    "medical-admin",
+    "dental-admin"
+   ]
+  },
+  {
+   "term": "auth",
+   "could_mean": [
+    "prior authorization",
+    "payment authorization (card)",
+    "authorization to release records"
+   ],
+   "industries": [
+    "medical-admin"
+   ]
+  },
+  {
+   "term": "PA",
+   "could_mean": [
+    "prior authorization",
+    "physician assistant",
+    "professional association (PA suffix on a firm name)"
+   ],
+   "industries": [
+    "medical-admin",
+    "legal"
+   ]
+  },
+  {
+   "term": "partner",
+   "could_mean": [
+    "law/accounting firm partner (owner)",
+    "business partner",
+    "partner agency (nonprofit)"
+   ],
+   "industries": [
+    "legal",
+    "accounting",
+    "nonprofit"
+   ]
+  },
+  {
+   "term": "client",
+   "could_mean": [
+    "customer (paying party)",
+    "beneficiary served by a nonprofit (not paying)"
+   ],
+   "industries": [
+    "legal",
+    "nonprofit"
+   ]
+  },
+  {
+   "term": "provider",
+   "could_mean": [
+    "clinician who performed service",
+    "vendor/service provider",
+    "insurance provider (payer)"
+   ],
+   "industries": [
+    "medical-admin"
+   ]
+  },
+  {
+   "term": "draft",
+   "could_mean": [
+    "draft document (not final)",
+    "bank draft (payment)"
+   ],
+   "industries": [
+    "office"
+   ]
+  },
+  {
+   "term": "rep letter",
+   "could_mean": [
+    "management representation letter",
+    "representative letter"
+   ],
+   "industries": [
+    "accounting"
+   ]
+  },
+  {
+   "term": "PO",
+   "could_mean": [
+    "purchase order",
+    "post office box",
+    "protective order (legal)"
+   ],
+   "industries": [
+    "office",
+    "legal"
+   ]
+  },
+  {
+   "term": "ED",
+   "could_mean": [
+    "executive director",
+    "emergency department"
+   ],
+   "industries": [
+    "nonprofit",
+    "medical-admin"
+   ]
+  },
+  {
+   "term": "ROI",
+   "could_mean": [
+    "release of information (medical admin)",
+    "return on investment"
+   ],
+   "industries": [
+    "medical-admin",
+    "consulting"
+   ]
+  },
+  {
+   "term": "AR",
+   "could_mean": [
+    "accounts receivable",
+    "accounts receivable days"
+   ],
+   "industries": [
+    "accounting",
+    "medical-admin"
+   ]
+  },
+  {
+   "term": "costs",
+   "could_mean": [
+    "reimbursable expenses advanced for client",
+    "cost of goods",
+    "direct program costs"
+   ],
+   "industries": [
+    "legal",
+    "nonprofit"
+   ]
+  },
+  {
+   "term": "contribution",
+   "could_mean": [
+    "charitable donation",
+    "employer 401k contribution",
+    "capital contribution to a company"
+   ],
+   "industries": [
+    "nonprofit",
+    "accounting"
+   ]
+  },
+  {
+   "term": "allowed",
+   "could_mean": [
+    "insurer allowed amount",
+    "permitted"
+   ],
+   "industries": [
+    "medical-admin"
+   ]
+  },
+  {
+   "term": "par",
+   "could_mean": [
+    "participating provider (in-network)",
+    "par value"
+   ],
+   "industries": [
+    "medical-admin"
+   ]
+  },
+  {
+   "term": "termed",
+   "could_mean": [
+    "coverage terminated",
+    "terms agreed"
+   ],
+   "industries": [
+    "medical-admin"
+   ]
+  },
+  {
+   "term": "held",
+   "could_mean": [
+    "funds held in trust",
+    "on hold",
+    "board meeting held"
+   ],
+   "industries": [
+    "legal",
+    "nonprofit"
+   ]
+  }
+ ],
+ "new_concepts": [
+  {
+   "id": "fund",
+   "why": "Restricted/unrestricted/designated fund label on gifts and ledgers; nonprofits ask 'how much is in the building fund'"
+  },
+  {
+   "id": "restricted-fund",
+   "why": "Money the donor limited to a purpose"
+  },
+  {
+   "id": "unrestricted-fund",
+   "why": "Money usable for any purpose"
+  },
+  {
+   "id": "pledge",
+   "why": "A promised future gift distinct from an agreement or receipt; track pledged vs received"
+  },
+  {
+   "id": "in-kind-gift",
+   "why": "Non-cash donation with a fair market value"
+  },
+  {
+   "id": "matching-funds",
+   "why": "Matching gift or grant cost share"
+  },
+  {
+   "id": "grant-award",
+   "why": "Grant amount, period and award number"
+  },
+  {
+   "id": "grant-period",
+   "why": "Dates a grant can be spent"
+  },
+  {
+   "id": "indirect-costs",
+   "why": "Overhead rate on grants"
+  },
+  {
+   "id": "tax_id",
+   "why": "EIN printed on receipts and W-9s"
+  },
+  {
+   "id": "goods_services_statement",
+   "why": "Statement on donor receipts about benefits given"
+  },
+  {
+   "id": "retainer",
+   "why": "Money held or paid up front to a firm; balance and replenishment"
+  },
+  {
+   "id": "matter",
+   "why": "Legal/engagement unit of work with a number"
+  },
+  {
+   "id": "time-entry",
+   "why": "A billed unit of time with timekeeper, hours, rate"
+  },
+  {
+   "id": "hourly_rate",
+   "why": "Dollar rate per hour"
+  },
+  {
+   "id": "billing-increment",
+   "why": "Smallest billable time unit"
+  },
+  {
+   "id": "unbilled",
+   "why": "Work in progress not yet invoiced"
+  },
+  {
+   "id": "write-off",
+   "why": "Amount forgiven or uncollectible"
+  },
+  {
+   "id": "flat_fee",
+   "why": "Fixed price engagement"
+  },
+  {
+   "id": "contingency_fee",
+   "why": "Fee depends on recovery"
+  },
+  {
+   "id": "milestone-payment",
+   "why": "Payment tied to a project stage"
+  },
+  {
+   "id": "deliverable",
+   "why": "Thing handed to the client"
+  },
+  {
+   "id": "statement-of-work",
+   "why": "SOW as a doc type distinct from agreement; DeepWell maps it to agreement today"
+  },
+  {
+   "id": "eob",
+   "why": "Explanation of benefits: allowed, paid, patient responsibility"
+  },
+  {
+   "id": "superbill",
+   "why": "Itemized visit charges with codes"
+  },
+  {
+   "id": "claim",
+   "why": "Insurance claim and claim number/status"
+  },
+  {
+   "id": "prior-authorization",
+   "why": "Insurer pre-approval record"
+  },
+  {
+   "id": "allowed-amount",
+   "why": "Insurer-allowed amount"
+  },
+  {
+   "id": "patient-responsibility",
+   "why": "Amount patient owes"
+  },
+  {
+   "id": "insurance-paid",
+   "why": "Amount insurer paid"
+  },
+  {
+   "id": "copay",
+   "why": "Per-visit patient fee"
+  },
+  {
+   "id": "deductible",
+   "why": "Annual deductible"
+  },
+  {
+   "id": "coinsurance",
+   "why": "Percent patient share"
+  },
+  {
+   "id": "denied",
+   "why": "Claim refused"
+  },
+  {
+   "id": "in-network",
+   "why": "Contracted with payer"
+  },
+  {
+   "id": "member_id",
+   "why": "Insurance member/subscriber id"
+  },
+  {
+   "id": "service_code",
+   "why": "CPT/CDT code printed on paperwork"
+  },
+  {
+   "id": "npi",
+   "why": "Provider NPI"
+  },
+  {
+   "id": "certificate_holder",
+   "why": "Who is listed on a COI"
+  },
+  {
+   "id": "net-30",
+   "why": "Payment terms net 30 and variants"
+  },
+  {
+   "id": "early-pay-discount",
+   "why": "2/10 net 30 style terms"
+  },
+  {
+   "id": "late-fee",
+   "why": "Late fee or finance charge"
+  },
+  {
+   "id": "deposit",
+   "why": "Deposit or down payment"
+  },
+  {
+   "id": "billing-cycle",
+   "why": "Billing frequency"
+  },
+  {
+   "id": "billing_period",
+   "why": "Period an invoice covers"
+  },
+  {
+   "id": "payment_method",
+   "why": "Check/card/ACH/wire"
+  },
+  {
+   "id": "not_to_exceed",
+   "why": "NTE cap on fees"
+  },
+  {
+   "id": "fiscal-year",
+   "why": "Fiscal year and end date"
+  },
+  {
+   "id": "voided",
+   "why": "Cancelled document status"
+  },
+  {
+   "id": "partially-paid",
+   "why": "Part of an invoice paid"
+  },
+  {
+   "id": "draft",
+   "why": "Draft status"
+  },
+  {
+   "id": "signed",
+   "why": "Executed status"
+  },
+  {
+   "id": "accepted",
+   "why": "Client accepted deliverable"
+  },
+  {
+   "id": "program",
+   "why": "Nonprofit program a gift or cost belongs to"
+  },
+  {
+   "id": "sponsorship",
+   "why": "Sponsorship gift with recognition benefits"
+  },
+  {
+   "id": "membership-dues",
+   "why": "Recurring member dues"
+  },
+  {
+   "id": "recurring-gift",
+   "why": "Repeating donation"
+  },
+  {
+   "id": "lapsed-donor",
+   "why": "Donor who stopped giving"
+  },
+  {
+   "id": "deductible-amount",
+   "why": "Tax-deductible portion of a gift"
+  },
+  {
+   "id": "fair-market-value",
+   "why": "Value of non-cash gift"
+  }
+ ]
+}

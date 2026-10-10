@@ -271,6 +271,8 @@ function parseVocabCountInner(question, vocab) {
   const raw = String(question ?? "").trim();
   if (!raw || raw.length > 120) return null;
   let q = norm(raw);
+  // R3 B2: "total of Kevin Pratt's invoices" / "what do his invoices add up to" asks for dollars, not a count: the amount readers take it (never a count printed as the total)
+  if (/\b(?:total|sum)\s+(?:of|for)\b[^?]*\b(?:invoices?|quotes?|estimates?|proposals?|bills?|purchase orders?)\b|\badd(?:s|ed)?\s+up\b|\bworth\b|\bdollar\s+value\b/.test(q)) return null;
   const existence = !COUNT_RE.test(q) && EXIST_RE.test(q);
   if (!COUNT_RE.test(q) && !existence) return null;
   q = q.replace(COUNT_RE, " ");

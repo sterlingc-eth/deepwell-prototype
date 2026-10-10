@@ -1,0 +1,6191 @@
+{
+ "group": "property_fleet_construction",
+ "entries": [
+  {
+   "term": "lease",
+   "variants": [
+    "leases",
+    "lease agreement",
+    "lease agreements",
+    "rental agreement",
+    "rental agreements",
+    "residential lease",
+    "tenancy agreement",
+    "rental contract",
+    "lease contract",
+    "lease doc"
+   ],
+   "class": "doc_type",
+   "means": "lease-agreement",
+   "industries": [
+    "property"
+   ],
+   "note": "pack doc type; \"rental agreement\" is also an equipment-rental agreement, see ambiguous",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "lease renewal",
+   "variants": [
+    "renewal lease",
+    "lease renewal offer",
+    "renewal offer",
+    "lease extension",
+    "lease addendum renewal"
+   ],
+   "class": "doc_type",
+   "means": "lease-agreement",
+   "industries": [
+    "property"
+   ],
+   "note": "renewal of a lease; treat as lease-agreement",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "lease addendum",
+   "variants": [
+    "addendum",
+    "addenda",
+    "lease amendment",
+    "lease rider",
+    "pet addendum",
+    "pet agreement",
+    "parking addendum"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "property"
+   ],
+   "note": "amends a lease",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "month-to-month",
+   "variants": [
+    "month to month",
+    "mtm",
+    "m2m",
+    "month-to-month tenancy",
+    "holdover"
+   ],
+   "class": "status",
+   "means": "month_to_month",
+   "industries": [
+    "property"
+   ],
+   "note": "lease past term or no fixed term",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "move-in inspection",
+   "variants": [
+    "move in inspection",
+    "move-in checklist",
+    "move in checklist",
+    "move-in condition report",
+    "move in report",
+    "check-in report",
+    "condition checklist"
+   ],
+   "class": "doc_type",
+   "means": "move-in-inspection",
+   "industries": [
+    "property"
+   ],
+   "note": "condition report at move in",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "move-out inspection",
+   "variants": [
+    "move out inspection",
+    "move-out checklist",
+    "move out checklist",
+    "move-out condition report",
+    "check-out report",
+    "move out walkthrough",
+    "move-out walk-through",
+    "final walkthrough"
+   ],
+   "class": "doc_type",
+   "means": "move-out-inspection",
+   "industries": [
+    "property"
+   ],
+   "note": "condition report at move out",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "rent roll",
+   "variants": [
+    "rentroll",
+    "rent rolls",
+    "rent-roll",
+    "tenant roster",
+    "occupancy report",
+    "unit roster"
+   ],
+   "class": "doc_type",
+   "means": "statement",
+   "industries": [
+    "property"
+   ],
+   "note": "list of units, tenants, rent and lease dates; filed as statement",
+   "source": "https://rets.ai/blog/how-to-read-a-rent-roll-reconcile-leases"
+  },
+  {
+   "term": "tenant ledger",
+   "variants": [
+    "resident ledger",
+    "tenant statement",
+    "tenant account",
+    "tenant balance sheet",
+    "ledger card",
+    "rent ledger",
+    "payment ledger",
+    "tenant history",
+    "resident statement"
+   ],
+   "class": "doc_type",
+   "means": "statement",
+   "industries": [
+    "property"
+   ],
+   "note": "running charges and payments for one tenant",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "owner statement",
+   "variants": [
+    "owner statements",
+    "owner report",
+    "owner distribution statement",
+    "owner draw statement",
+    "landlord statement",
+    "monthly owner report"
+   ],
+   "class": "doc_type",
+   "means": "statement",
+   "industries": [
+    "property"
+   ],
+   "note": "monthly report from manager to owner",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "late notice",
+   "variants": [
+    "late rent notice",
+    "late fee notice",
+    "past due notice",
+    "notice of late rent",
+    "delinquency notice"
+   ],
+   "class": "doc_type",
+   "means": "correspondence",
+   "industries": [
+    "property"
+   ],
+   "note": "notice to tenant",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "notice to pay or quit",
+   "variants": [
+    "pay or quit",
+    "3-day notice",
+    "three day notice",
+    "3 day notice to pay or quit",
+    "notice to quit",
+    "eviction notice",
+    "notice to vacate",
+    "demand for rent",
+    "notice of termination"
+   ],
+   "class": "doc_type",
+   "means": "correspondence",
+   "industries": [
+    "property"
+   ],
+   "note": "legal notice; treat as correspondence",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "notice of entry",
+   "variants": [
+    "24-hour notice",
+    "24 hour notice",
+    "entry notice",
+    "notice to enter",
+    "notice of intent to enter"
+   ],
+   "class": "doc_type",
+   "means": "correspondence",
+   "industries": [
+    "property"
+   ],
+   "note": "landlord entry notice",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "rental application",
+   "variants": [
+    "rental applications",
+    "tenant application",
+    "application to rent",
+    "prospect application",
+    "resident application",
+    "applicant"
+   ],
+   "class": "doc_type",
+   "means": "other",
+   "industries": [
+    "property"
+   ],
+   "note": "applicant paperwork; no dedicated type",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "security deposit",
+   "variants": [
+    "security deposits",
+    "sec dep",
+    "sec deposit",
+    "damage deposit",
+    "move-in deposit",
+    "refundable deposit",
+    "security dep"
+   ],
+   "class": "field",
+   "means": "security_deposit",
+   "industries": [
+    "property"
+   ],
+   "note": "amount held; \"deposit\" alone ambiguous",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "security deposit refund",
+   "variants": [
+    "deposit refund",
+    "deposit return",
+    "deposit disposition",
+    "deposit accounting",
+    "itemized deductions",
+    "deposit statement"
+   ],
+   "class": "document_label",
+   "means": "security_deposit",
+   "industries": [
+    "property"
+   ],
+   "note": "settlement of deposit after move out",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "pet deposit",
+   "variants": [
+    "pet fee",
+    "pet rent",
+    "pet deposit amount"
+   ],
+   "class": "field",
+   "means": "pet_deposit",
+   "industries": [
+    "property"
+   ],
+   "note": "new concept",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "monthly rent",
+   "variants": [
+    "rent",
+    "base rent",
+    "contract rent",
+    "rental amount",
+    "rent amount",
+    "rent due",
+    "monthly rate",
+    "monthly charge",
+    "scheduled rent",
+    "market rent",
+    "lease rent",
+    "rent per month",
+    "rent/mo"
+   ],
+   "class": "field",
+   "means": "rent_amount",
+   "industries": [
+    "property"
+   ],
+   "note": "amount of recurring rent; \"market rent\" is asking rent for vacant unit",
+   "source": "https://rets.ai/blog/how-to-read-a-rent-roll-reconcile-leases"
+  },
+  {
+   "term": "tenant",
+   "variants": [
+    "tenants",
+    "resident",
+    "residents",
+    "lessee",
+    "renter",
+    "renters",
+    "occupant",
+    "occupants",
+    "leaseholder",
+    "co-tenant",
+    "roommate",
+    "cosigner",
+    "guarantor"
+   ],
+   "class": "role",
+   "means": "tenant_name",
+   "industries": [
+    "property"
+   ],
+   "note": "end resident; guarantor/cosigner are distinct but listed as variants for lookup",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "landlord",
+   "variants": [
+    "lessor",
+    "property owner",
+    "owner of record",
+    "rental owner",
+    "investor"
+   ],
+   "class": "role",
+   "means": "customer_name",
+   "industries": [
+    "property"
+   ],
+   "note": "owner of the property; in PM packs owner is the customer",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "property manager",
+   "variants": [
+    "manager",
+    "property mgr",
+    "site manager",
+    "community manager",
+    "leasing manager",
+    "leasing agent",
+    "leasing consultant",
+    "onsite manager",
+    "on-site manager",
+    "resident manager",
+    "building manager",
+    "superintendent"
+   ],
+   "class": "role",
+   "means": "property_manager",
+   "industries": [
+    "property"
+   ],
+   "note": "new concept; \"super\" also construction superintendent",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "maintenance tech",
+   "variants": [
+    "maintenance man",
+    "maintenance guy",
+    "handyman",
+    "maintenance staff",
+    "porter",
+    "maintenance supervisor",
+    "maintenance worker"
+   ],
+   "class": "role",
+   "means": "technician",
+   "industries": [
+    "property"
+   ],
+   "note": "staff or vendor who did work",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "vendor",
+   "variants": [
+    "service provider",
+    "plumber",
+    "electrician",
+    "repair company"
+   ],
+   "class": "role",
+   "means": "vendor",
+   "industries": [
+    "property"
+   ],
+   "note": "outside company doing work",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "unit",
+   "variants": [
+    "apartment",
+    "apt",
+    "suite",
+    "space",
+    "door",
+    "doors",
+    "flat",
+    "residence",
+    "premises",
+    "demised premises",
+    "rental unit",
+    "unit #",
+    "apt #",
+    "suite #",
+    "unit no"
+   ],
+   "class": "field",
+   "means": "unit_number",
+   "industries": [
+    "property"
+   ],
+   "note": "\"doors\" means unit count in PM talk",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "property",
+   "variants": [
+    "building",
+    "community",
+    "complex",
+    "site",
+    "project property",
+    "premises address",
+    "rental property",
+    "portfolio property"
+   ],
+   "class": "field",
+   "means": "service_address",
+   "industries": [
+    "property"
+   ],
+   "note": "ambiguous with unit/portfolio; treated as address",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "lease start",
+   "variants": [
+    "lease start date",
+    "commencement date",
+    "move-in date",
+    "lease begins",
+    "start of term",
+    "term start",
+    "possession date",
+    "occupancy date"
+   ],
+   "class": "field",
+   "means": "lease_start_date",
+   "industries": [
+    "property"
+   ],
+   "note": "when lease starts",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "lease end",
+   "variants": [
+    "lease end date",
+    "lease expiration",
+    "lease expires",
+    "expiration date of lease",
+    "lease exp",
+    "term end",
+    "end of term",
+    "lease ends",
+    "move-out date",
+    "vacate date",
+    "termination date"
+   ],
+   "class": "field",
+   "means": "lease_end_date",
+   "industries": [
+    "property"
+   ],
+   "note": "when lease ends; move-out date is actual vacate",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "lease term",
+   "variants": [
+    "term",
+    "term of lease",
+    "lease length",
+    "lease period",
+    "lease duration",
+    "12-month lease",
+    "12 month lease",
+    "six month lease"
+   ],
+   "class": "field",
+   "means": "agreement_term",
+   "industries": [
+    "property"
+   ],
+   "note": "length of lease",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "notice period",
+   "variants": [
+    "notice to vacate period",
+    "60 day notice",
+    "30 day notice",
+    "notice required"
+   ],
+   "class": "field",
+   "means": "notice_period",
+   "industries": [
+    "property"
+   ],
+   "note": "new concept",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "rent due date",
+   "variants": [
+    "due date",
+    "rent due on",
+    "due day",
+    "rent due day",
+    "day rent is due",
+    "grace period",
+    "grace days"
+   ],
+   "class": "date_phrase",
+   "means": "rent_due_day",
+   "industries": [
+    "property"
+   ],
+   "note": "new concept; grace period is separate",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "late fee",
+   "variants": [
+    "late charge",
+    "late charges",
+    "late fees",
+    "late penalty",
+    "delinquent fee",
+    "returned payment fee",
+    "nsf fee"
+   ],
+   "class": "money",
+   "means": "late_fee",
+   "industries": [
+    "property"
+   ],
+   "note": "new concept",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "nsf",
+   "variants": [
+    "bounced check",
+    "returned check",
+    "non-sufficient funds",
+    "returned payment",
+    "chargeback",
+    "bounced payment",
+    "ach return"
+   ],
+   "class": "status",
+   "means": "returned_payment",
+   "industries": [
+    "property"
+   ],
+   "note": "new concept",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "delinquent",
+   "variants": [
+    "delinquency",
+    "delinquent rent",
+    "behind on rent",
+    "arrears",
+    "rent arrears",
+    "past due rent",
+    "in arrears",
+    "owes rent",
+    "not paid",
+    "hasnt paid",
+    "hasn't paid"
+   ],
+   "class": "status",
+   "means": "overdue",
+   "industries": [
+    "property"
+   ],
+   "note": "tenant owing past due",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "balance forward",
+   "variants": [
+    "previous balance",
+    "prior balance",
+    "opening balance",
+    "beginning balance",
+    "carry forward",
+    "balance brought forward"
+   ],
+   "class": "field",
+   "means": "prior_balance",
+   "industries": [
+    "property"
+   ],
+   "note": "new concept; on statements",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "prepaid rent",
+   "variants": [
+    "prepaid",
+    "prepay",
+    "credit balance",
+    "paid ahead",
+    "paid in advance",
+    "prepayment"
+   ],
+   "class": "money",
+   "means": "prepaid",
+   "industries": [
+    "property"
+   ],
+   "note": "tenant credit",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "concession",
+   "variants": [
+    "concessions",
+    "free rent",
+    "rent concession",
+    "move-in special",
+    "one month free",
+    "rent credit",
+    "rent abatement"
+   ],
+   "class": "money",
+   "means": "concession",
+   "industries": [
+    "property"
+   ],
+   "note": "new concept",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "vacancy",
+   "variants": [
+    "vacant",
+    "vacancies",
+    "vacant unit",
+    "vacant units",
+    "empty unit",
+    "unoccupied",
+    "available unit",
+    "vacancy rate",
+    "vac"
+   ],
+   "class": "status",
+   "means": "Vacant",
+   "industries": [
+    "property"
+   ],
+   "note": "status value exists on pack (\"Vacant\")",
+   "source": "https://rets.ai/blog/how-to-read-a-rent-roll-reconcile-leases"
+  },
+  {
+   "term": "occupied",
+   "variants": [
+    "occupancy",
+    "occupancy rate",
+    "leased",
+    "current tenant",
+    "in place"
+   ],
+   "class": "status",
+   "means": "Occupied",
+   "industries": [
+    "property"
+   ],
+   "note": "status value on pack",
+   "source": "https://rets.ai/blog/how-to-read-a-rent-roll-reconcile-leases"
+  },
+  {
+   "term": "notice given",
+   "variants": [
+    "on notice",
+    "notice unit",
+    "notice to vacate given",
+    "pre-leased",
+    "preleased",
+    "pending move-in",
+    "future tenant",
+    "applicant approved"
+   ],
+   "class": "status",
+   "means": "on_notice",
+   "industries": [
+    "property"
+   ],
+   "note": "new concept",
+   "source": "https://rets.ai/blog/how-to-read-a-rent-roll-reconcile-leases"
+  },
+  {
+   "term": "make ready",
+   "variants": [
+    "make-ready",
+    "makeready",
+    "unit turn",
+    "turnover",
+    "unit turnover",
+    "turn work",
+    "turn board",
+    "apartment turn",
+    "ready unit",
+    "rent ready",
+    "rent-ready",
+    "down unit",
+    "down units"
+   ],
+   "class": "action",
+   "means": "Make-Ready",
+   "industries": [
+    "property"
+   ],
+   "note": "prep between tenants; pack service_type value",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "work order",
+   "variants": [
+    "w/o",
+    "work orders",
+    "maintenance request",
+    "maintenance requests",
+    "service request",
+    "service requests",
+    "repair request",
+    "repair ticket",
+    "maint request",
+    "maintenance ticket",
+    "trouble ticket",
+    "fix request",
+    "tenant request"
+   ],
+   "class": "doc_type",
+   "means": "work-order",
+   "industries": [
+    "property"
+   ],
+   "note": "request to fix something",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "emergency work order",
+   "variants": [
+    "emergency",
+    "after hours call",
+    "after-hours call",
+    "urgent request",
+    "priority 1",
+    "p1 ticket",
+    "no heat call",
+    "no water call"
+   ],
+   "class": "status",
+   "means": "Emergency",
+   "industries": [
+    "property"
+   ],
+   "note": "service_type value",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "preventive maintenance",
+   "variants": [
+    "pm schedule",
+    "pm task",
+    "scheduled maintenance",
+    "routine maintenance",
+    "planned maintenance",
+    "filter change",
+    "seasonal maintenance"
+   ],
+   "class": "action",
+   "means": "preventive_maintenance",
+   "industries": [
+    "property",
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "\"PM\" ambiguous: property manager",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "inspection",
+   "variants": [
+    "annual inspection",
+    "unit inspection",
+    "quarterly inspection",
+    "drive-by inspection",
+    "property inspection",
+    "hud inspection",
+    "section 8 inspection",
+    "nspire",
+    "hqs inspection",
+    "code inspection",
+    "inspection checklist"
+   ],
+   "class": "doc_type",
+   "means": "inspection-report",
+   "industries": [
+    "property"
+   ],
+   "note": "findings of an inspection",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "violation",
+   "variants": [
+    "violation notice",
+    "lease violation",
+    "hoa violation",
+    "code violation",
+    "citation",
+    "compliance notice",
+    "cure notice",
+    "notice of violation",
+    "notice to cure"
+   ],
+   "class": "doc_type",
+   "means": "correspondence",
+   "industries": [
+    "property"
+   ],
+   "note": "notice that someone broke a rule",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "certificate of insurance",
+   "variants": [
+    "coi",
+    "certs of insurance",
+    "vendor insurance",
+    "proof of insurance",
+    "insurance cert",
+    "acord 25",
+    "acord certificate",
+    "liability certificate"
+   ],
+   "class": "doc_type",
+   "means": "certificate-of-insurance",
+   "industries": [
+    "property",
+    "construction"
+   ],
+   "note": "proof of vendor insurance",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "coi expiration",
+   "variants": [
+    "coi expires",
+    "insurance expiration",
+    "insurance expiry",
+    "policy expiry",
+    "expired insurance",
+    "insurance lapse",
+    "cert expiring"
+   ],
+   "class": "field",
+   "means": "coi_expires",
+   "industries": [
+    "property",
+    "construction"
+   ],
+   "note": "expiration date of vendor insurance",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "renters insurance",
+   "variants": [
+    "renter insurance",
+    "tenant insurance",
+    "liability policy tenant",
+    "renters policy"
+   ],
+   "class": "doc_type",
+   "means": "insurance-certificate",
+   "industries": [
+    "property"
+   ],
+   "note": "tenant policy proof",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "cam charges",
+   "variants": [
+    "cam",
+    "common area maintenance",
+    "common area charges",
+    "cam fees",
+    "cam expenses",
+    "nnn charges",
+    "triple net charges",
+    "operating expenses",
+    "opex",
+    "opex pass-through",
+    "pass-throughs",
+    "additional rent",
+    "nnn",
+    "nnn expenses"
+   ],
+   "class": "money",
+   "means": "cam_charge",
+   "industries": [
+    "property"
+   ],
+   "note": "commercial lease: tenant share of common area costs; new concept",
+   "source": "https://rentana.io/glossary/what-is-cam-reconciliation-a-clear-explanation"
+  },
+  {
+   "term": "cam reconciliation",
+   "variants": [
+    "cam rec",
+    "cam true-up",
+    "cam true up",
+    "annual reconciliation",
+    "opex reconciliation",
+    "cam statement",
+    "year-end reconciliation",
+    "cam audit",
+    "cam recovery"
+   ],
+   "class": "doc_type",
+   "means": "statement",
+   "industries": [
+    "property"
+   ],
+   "note": "annual true-up of estimated vs actual CAM",
+   "source": "https://rentana.io/glossary/what-is-cam-reconciliation-a-clear-explanation"
+  },
+  {
+   "term": "pro rata share",
+   "variants": [
+    "pro-rata share",
+    "pro rata",
+    "tenant share",
+    "tenants proportionate share",
+    "proportionate share",
+    "percent share",
+    "tenant percentage",
+    "square footage share"
+   ],
+   "class": "field",
+   "means": "pro_rata_share",
+   "industries": [
+    "property"
+   ],
+   "note": "new concept: tenant sqft / building sqft",
+   "source": "https://rentana.io/glossary/what-is-cam-reconciliation-a-clear-explanation"
+  },
+  {
+   "term": "base year",
+   "variants": [
+    "base year expenses",
+    "expense stop",
+    "base year stop",
+    "gross lease",
+    "modified gross",
+    "full service gross"
+   ],
+   "class": "field",
+   "means": "base_year",
+   "industries": [
+    "property"
+   ],
+   "note": "new concept: commercial lease cost basis",
+   "source": "https://rentana.io/glossary/what-is-cam-reconciliation-a-clear-explanation"
+  },
+  {
+   "term": "square footage",
+   "variants": [
+    "sq ft",
+    "sqft",
+    "rentable square feet",
+    "rsf",
+    "usable square feet",
+    "usf",
+    "square feet",
+    "rentable area",
+    "gla",
+    "leasable area"
+   ],
+   "class": "field",
+   "means": "square_footage",
+   "industries": [
+    "property"
+   ],
+   "note": "new concept",
+   "source": "https://rets.ai/blog/how-to-read-a-rent-roll-reconcile-leases"
+  },
+  {
+   "term": "rent per square foot",
+   "variants": [
+    "psf",
+    "$/sf",
+    "per sf",
+    "rate psf",
+    "price per square foot",
+    "annual rate per sf",
+    "rent psf"
+   ],
+   "class": "money",
+   "means": "rent_psf",
+   "industries": [
+    "property"
+   ],
+   "note": "new concept",
+   "source": "https://rets.ai/blog/how-to-read-a-rent-roll-reconcile-leases"
+  },
+  {
+   "term": "tenant improvement allowance",
+   "variants": [
+    "ti allowance",
+    "tia",
+    "build-out allowance",
+    "buildout allowance",
+    "improvement allowance",
+    "tenant improvements",
+    "leasehold improvements"
+   ],
+   "class": "money",
+   "means": "ti_allowance",
+   "industries": [
+    "property",
+    "construction"
+   ],
+   "note": "new concept; TI also tenant improvement project",
+   "source": "https://rets.ai/blog/how-to-read-a-rent-roll-reconcile-leases"
+  },
+  {
+   "term": "percentage rent",
+   "variants": [
+    "overage rent",
+    "percent rent",
+    "breakpoint",
+    "sales percentage rent",
+    "percentage rental"
+   ],
+   "class": "money",
+   "means": "percentage_rent",
+   "industries": [
+    "property"
+   ],
+   "note": "new concept: retail lease",
+   "source": "https://rets.ai/blog/how-to-read-a-rent-roll-reconcile-leases"
+  },
+  {
+   "term": "estoppel",
+   "variants": [
+    "estoppel certificate",
+    "tenant estoppel",
+    "estoppel letter"
+   ],
+   "class": "doc_type",
+   "means": "correspondence",
+   "industries": [
+    "property"
+   ],
+   "note": "tenant certification of lease terms",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "sublease",
+   "variants": [
+    "sublet",
+    "sub-lease",
+    "assignment of lease",
+    "lease assignment"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "property"
+   ],
+   "note": "tenant leases to another",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "hoa dues",
+   "variants": [
+    "hoa fee",
+    "hoa fees",
+    "hoa assessment",
+    "assessments",
+    "monthly assessment",
+    "association dues",
+    "association fees",
+    "condo fees",
+    "condo dues",
+    "maintenance fee",
+    "common charges",
+    "coa dues",
+    "pod fee"
+   ],
+   "class": "money",
+   "means": "hoa_dues",
+   "industries": [
+    "property"
+   ],
+   "note": "new concept: association assessment",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "special assessment",
+   "variants": [
+    "special assessments",
+    "one-time assessment",
+    "capital assessment",
+    "assessment levy"
+   ],
+   "class": "money",
+   "means": "special_assessment",
+   "industries": [
+    "property"
+   ],
+   "note": "new concept",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "hoa",
+   "variants": [
+    "homeowners association",
+    "homeowner association",
+    "condo association",
+    "association",
+    "poa",
+    "property owners association",
+    "board",
+    "hoa board",
+    "community association",
+    "management company"
+   ],
+   "class": "role",
+   "means": "hoa",
+   "industries": [
+    "property"
+   ],
+   "note": "new concept; \"management company\" ambiguous",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "reserve fund",
+   "variants": [
+    "reserves",
+    "reserve study",
+    "capital reserve",
+    "sinking fund",
+    "replacement reserve",
+    "operating reserve"
+   ],
+   "class": "money",
+   "means": "reserve_fund",
+   "industries": [
+    "property"
+   ],
+   "note": "new concept",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "architectural request",
+   "variants": [
+    "arc request",
+    "architectural review",
+    "arc approval",
+    "modification request",
+    "design review request",
+    "arc form"
+   ],
+   "class": "doc_type",
+   "means": "other",
+   "industries": [
+    "property"
+   ],
+   "note": "HOA approval request",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "estoppel resale certificate",
+   "variants": [
+    "resale certificate",
+    "resale package",
+    "hoa resale",
+    "condo certificate",
+    "status letter",
+    "payoff letter hoa"
+   ],
+   "class": "doc_type",
+   "means": "other",
+   "industries": [
+    "property"
+   ],
+   "note": "HOA seller disclosure packet",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "management fee",
+   "variants": [
+    "mgmt fee",
+    "pm fee",
+    "management percentage",
+    "manager fee",
+    "leasing fee",
+    "lease-up fee",
+    "placement fee",
+    "renewal fee",
+    "setup fee",
+    "onboarding fee"
+   ],
+   "class": "money",
+   "means": "management_fee",
+   "industries": [
+    "property"
+   ],
+   "note": "new concept",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "trust account",
+   "variants": [
+    "trust accounting",
+    "escrow account",
+    "operating account",
+    "owner funds",
+    "owner reserve",
+    "security deposit account",
+    "reserve balance"
+   ],
+   "class": "field",
+   "means": "trust_account",
+   "industries": [
+    "property"
+   ],
+   "note": "new concept",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "1099",
+   "variants": [
+    "1099-nec",
+    "1099 nec",
+    "1099-misc",
+    "1099 misc",
+    "w-9",
+    "w9",
+    "tax id form",
+    "form w-9"
+   ],
+   "class": "doc_type",
+   "means": "other",
+   "industries": [
+    "property",
+    "construction"
+   ],
+   "note": "vendor tax forms; nothing dedicated",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "utility charge",
+   "variants": [
+    "utilities",
+    "utility bill",
+    "utility billing",
+    "ratio utility billing",
+    "rubs",
+    "water sewer trash",
+    "wst",
+    "submetered",
+    "submeter",
+    "utility reimbursement",
+    "utility fee"
+   ],
+   "class": "money",
+   "means": "utility_charge",
+   "industries": [
+    "property"
+   ],
+   "note": "new concept",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "parking fee",
+   "variants": [
+    "parking",
+    "garage fee",
+    "storage fee",
+    "storage unit fee",
+    "amenity fee",
+    "trash fee",
+    "valet trash",
+    "pest fee",
+    "admin fee",
+    "application fee",
+    "processing fee"
+   ],
+   "class": "money",
+   "means": "other_charge",
+   "industries": [
+    "property"
+   ],
+   "note": "recurring/misc charge; new concept",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "charge",
+   "variants": [
+    "charges",
+    "posted charge",
+    "tenant charge",
+    "chargebacks",
+    "back charge",
+    "backcharge",
+    "resident charge"
+   ],
+   "class": "money",
+   "means": "charge",
+   "industries": [
+    "property",
+    "construction"
+   ],
+   "note": "new concept; back-charge in construction means cost billed to a sub",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "payment posted",
+   "variants": [
+    "payment received",
+    "paid",
+    "receipt posted",
+    "applied payment",
+    "payment applied",
+    "rent received",
+    "rent paid"
+   ],
+   "class": "status",
+   "means": "paid",
+   "industries": [
+    "property"
+   ],
+   "note": "paid status",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "outstanding balance",
+   "variants": [
+    "balance due",
+    "past due balance",
+    "amount owed",
+    "total due",
+    "unpaid",
+    "open balance",
+    "balance owed",
+    "a/r",
+    "ar",
+    "accounts receivable"
+   ],
+   "class": "status",
+   "means": "unpaid",
+   "industries": [
+    "property",
+    "construction",
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "unpaid money; AR is the aggregate",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "eviction",
+   "variants": [
+    "evictions",
+    "eviction filing",
+    "unlawful detainer",
+    "ud",
+    "writ",
+    "writ of possession",
+    "lockout",
+    "forcible entry",
+    "eviction case"
+   ],
+   "class": "status",
+   "means": "eviction",
+   "industries": [
+    "property"
+   ],
+   "note": "new concept",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "abandoned",
+   "variants": [
+    "abandonment",
+    "skip",
+    "skipped",
+    "left behind",
+    "abandoned property",
+    "notice of abandonment"
+   ],
+   "class": "status",
+   "means": "abandoned",
+   "industries": [
+    "property"
+   ],
+   "note": "new concept",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "renewal",
+   "variants": [
+    "renewals",
+    "renewing",
+    "expiring leases",
+    "leases expiring",
+    "renewal rate",
+    "expirations",
+    "lease expirations",
+    "lease exp report"
+   ],
+   "class": "action",
+   "means": "renewed",
+   "industries": [
+    "property"
+   ],
+   "note": "renewed status/lease renewals",
+   "source": "https://rets.ai/blog/how-to-read-a-rent-roll-reconcile-leases"
+  },
+  {
+   "term": "turnover cost",
+   "variants": [
+    "turn cost",
+    "turn costs",
+    "make ready cost",
+    "paint and clean",
+    "paint clean",
+    "carpet cleaning",
+    "unit paint",
+    "cleaning fee",
+    "damage charge",
+    "tenant damages",
+    "repairs charged"
+   ],
+   "class": "money",
+   "means": "turn_cost",
+   "industries": [
+    "property"
+   ],
+   "note": "new concept",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "appliance",
+   "variants": [
+    "appliances",
+    "fridge",
+    "refrigerator",
+    "stove",
+    "range",
+    "dishwasher",
+    "washer",
+    "dryer",
+    "water heater",
+    "wh",
+    "hvac unit",
+    "microwave",
+    "disposal",
+    "garbage disposal"
+   ],
+   "class": "equipment",
+   "means": "equipment_type",
+   "industries": [
+    "property"
+   ],
+   "note": "per-unit appliance",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "smoke detector",
+   "variants": [
+    "smoke alarm",
+    "co detector",
+    "carbon monoxide detector",
+    "fire extinguisher",
+    "sprinkler inspection",
+    "fire alarm inspection",
+    "backflow test",
+    "elevator inspection",
+    "boiler inspection"
+   ],
+   "class": "equipment",
+   "means": "safety_equipment",
+   "industries": [
+    "property"
+   ],
+   "note": "new concept; compliance items",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "key",
+   "variants": [
+    "keys",
+    "lock change",
+    "rekey",
+    "re-key",
+    "lockset",
+    "fob",
+    "key fob",
+    "access card",
+    "garage remote",
+    "mailbox key"
+   ],
+   "class": "part",
+   "means": "keys",
+   "industries": [
+    "property"
+   ],
+   "note": "new concept",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "amenity",
+   "variants": [
+    "amenities",
+    "clubhouse",
+    "pool",
+    "gym",
+    "laundry room",
+    "common area",
+    "common areas",
+    "lobby",
+    "elevator",
+    "parking lot",
+    "carport"
+   ],
+   "class": "equipment",
+   "means": "common_area",
+   "industries": [
+    "property"
+   ],
+   "note": "common area items",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "landlord tenant ledger charge code",
+   "variants": [
+    "gl code",
+    "gl account",
+    "chart of accounts",
+    "income account",
+    "expense account",
+    "account code",
+    "coa code"
+   ],
+   "class": "field",
+   "means": "gl_account",
+   "industries": [
+    "property",
+    "construction"
+   ],
+   "note": "new concept; \"coa\" ambiguous",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "net operating income",
+   "variants": [
+    "noi",
+    "cap rate",
+    "cash flow",
+    "dscr",
+    "operating income",
+    "gross potential rent",
+    "gpr",
+    "egi",
+    "effective gross income",
+    "loss to lease",
+    "economic occupancy"
+   ],
+   "class": "money",
+   "means": "noi",
+   "industries": [
+    "property"
+   ],
+   "note": "owner financial metrics; new concept",
+   "source": "https://rets.ai/blog/how-to-read-a-rent-roll-reconcile-leases"
+  },
+  {
+   "term": "annual budget",
+   "variants": [
+    "operating budget",
+    "budget vs actual",
+    "variance report",
+    "proforma",
+    "pro forma",
+    "forecast"
+   ],
+   "class": "doc_type",
+   "means": "schedule",
+   "industries": [
+    "property",
+    "construction"
+   ],
+   "note": "budget docs",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "rental agreement",
+   "variants": [
+    "rental contract",
+    "rental agreements",
+    "rental ticket",
+    "rental order",
+    "equipment rental agreement",
+    "rental form",
+    "rental terms",
+    "contract number",
+    "rental contract number"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "equipment rental contract; same words used for residential lease",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "rental invoice",
+   "variants": [
+    "rental bill",
+    "rental invoices",
+    "rental charges invoice",
+    "rental billing",
+    "final invoice",
+    "rental statement"
+   ],
+   "class": "doc_type",
+   "means": "invoice",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "bill for rental",
+   "source": "https://invoicequick.com/invoice-templates/equipment-rental-invoice-template"
+  },
+  {
+   "term": "pickup ticket",
+   "variants": [
+    "pick up ticket",
+    "pickup receipt",
+    "pick-up receipt",
+    "counter pickup",
+    "will call",
+    "will-call",
+    "will call ticket",
+    "customer pickup",
+    "cust pickup",
+    "pickup order"
+   ],
+   "class": "doc_type",
+   "means": "delivery-ticket",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "customer picks up at yard",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "delivery ticket",
+   "variants": [
+    "delivery tkt",
+    "delivery receipt",
+    "bill of lading",
+    "bol",
+    "drop ticket",
+    "drop-off ticket",
+    "dropoff ticket",
+    "delivery order",
+    "haul ticket",
+    "trucking ticket",
+    "dispatch ticket",
+    "pickup/delivery ticket",
+    "p/d ticket",
+    "pd ticket",
+    "p&d ticket"
+   ],
+   "class": "doc_type",
+   "means": "delivery-ticket",
+   "industries": [
+    "fleet",
+    "equipment-rental",
+    "construction"
+   ],
+   "note": "goods or equipment delivered; BOL freight document",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "return ticket",
+   "variants": [
+    "return receipt",
+    "check-in ticket",
+    "checkin ticket",
+    "off-rent ticket",
+    "off rent ticket",
+    "return slip",
+    "return inspection",
+    "check in report",
+    "check-in report",
+    "checked in",
+    "equipment return"
+   ],
+   "class": "doc_type",
+   "means": "delivery-ticket",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "equipment returned",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "on rent",
+   "variants": [
+    "on-rent",
+    "onrent",
+    "out on rent",
+    "currently rented",
+    "on a rental",
+    "rented out",
+    "in use",
+    "on hire",
+    "on-hire",
+    "on a job"
+   ],
+   "class": "status",
+   "means": "on_rent",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "new concept status; \"on hire\" common UK/AU",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "off rent",
+   "variants": [
+    "off-rent",
+    "offrent",
+    "off rented",
+    "back in yard",
+    "in yard",
+    "checked in",
+    "came back",
+    "off hire",
+    "off-hire",
+    "pickup requested",
+    "call off",
+    "call-off",
+    "called off"
+   ],
+   "class": "status",
+   "means": "off_rent",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "new concept status; call-off = customer calls to end rental",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "off-rent date",
+   "variants": [
+    "off rent date",
+    "return date",
+    "date returned",
+    "date in",
+    "check-in date",
+    "checkin date",
+    "date off rent",
+    "off hire date",
+    "end date of rental",
+    "rental end"
+   ],
+   "class": "field",
+   "means": "off_rent_date",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "new concept date",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "on-rent date",
+   "variants": [
+    "on rent date",
+    "out date",
+    "date out",
+    "check-out date",
+    "checkout date",
+    "rental start",
+    "rental start date",
+    "pickup date",
+    "start of rental",
+    "on hire date",
+    "date rented"
+   ],
+   "class": "field",
+   "means": "on_rent_date",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "new concept date",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "due back",
+   "variants": [
+    "due date back",
+    "return due",
+    "expected return",
+    "scheduled return",
+    "estimated return",
+    "est return",
+    "due in",
+    "due-in",
+    "overdue return",
+    "late return",
+    "overdue rental",
+    "past due rental"
+   ],
+   "class": "date_phrase",
+   "means": "due_back",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "new concept; overdue return = overdue",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "rental period",
+   "variants": [
+    "rental term",
+    "rental duration",
+    "rental length",
+    "rate period",
+    "billing period",
+    "billing cycle",
+    "rental days",
+    "days on rent"
+   ],
+   "class": "field",
+   "means": "agreement_term",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "length of rental",
+   "source": "https://booqable.com/glossary/"
+  },
+  {
+   "term": "rental rate",
+   "variants": [
+    "daily rate",
+    "weekly rate",
+    "monthly rate",
+    "4 week rate",
+    "four week rate",
+    "28 day rate",
+    "day rate",
+    "week rate",
+    "month rate",
+    "hourly rate",
+    "rental rates",
+    "rate per day",
+    "rate/day",
+    "rate card"
+   ],
+   "class": "field",
+   "means": "rental_rate",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "new concept; often day/week/4-week tiers",
+   "source": "https://booqable.com/glossary/"
+  },
+  {
+   "term": "minimum rental",
+   "variants": [
+    "minimum charge",
+    "min rental",
+    "minimum rate",
+    "one day minimum",
+    "minimum days",
+    "minimum billing",
+    "min bill",
+    "minimum hours"
+   ],
+   "class": "money",
+   "means": "minimum_charge",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "new concept",
+   "source": "https://booqable.com/glossary/"
+  },
+  {
+   "term": "half day",
+   "variants": [
+    "half-day",
+    "half day rate",
+    "1/2 day",
+    "shift rate",
+    "shift",
+    "8 hour day",
+    "single shift",
+    "double shift",
+    "triple shift",
+    "extra shift",
+    "overtime hours"
+   ],
+   "class": "money",
+   "means": "shift_rate",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "new concept; shift multiplier",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "damage waiver",
+   "variants": [
+    "dw",
+    "ldw",
+    "loss damage waiver",
+    "liability damage waiver",
+    "damage waiver fee",
+    "dmg waiver",
+    "waiver fee",
+    "equipment protection",
+    "rental protection",
+    "rpp",
+    "rental protection plan",
+    "damage protection",
+    "protection plan",
+    "cdw",
+    "collision damage waiver",
+    "insurance waiver"
+   ],
+   "class": "money",
+   "means": "damage_waiver",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "fee for waiving customer damage liability; new concept",
+   "source": "https://booqable.com/glossary/"
+  },
+  {
+   "term": "environmental fee",
+   "variants": [
+    "env fee",
+    "environmental charge",
+    "enviro fee",
+    "environmental recovery fee",
+    "eco fee",
+    "shop supplies fee",
+    "shop supply fee",
+    "haz fee",
+    "fuel surcharge",
+    "fuel charge",
+    "fuel fee",
+    "refuel charge",
+    "refueling charge",
+    "refuel fee",
+    "fuel service",
+    "fuel service charge"
+   ],
+   "class": "money",
+   "means": "rental_fee",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "misc rental fees; new concept",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "delivery charge",
+   "variants": [
+    "delivery fee",
+    "pickup charge",
+    "pick up fee",
+    "freight",
+    "freight charge",
+    "cartage",
+    "haul fee",
+    "hauling fee",
+    "trucking charge",
+    "transport charge",
+    "mobilization",
+    "mob fee",
+    "demob",
+    "demobilization",
+    "delivery & pickup",
+    "d&p",
+    "p&d charge"
+   ],
+   "class": "money",
+   "means": "delivery_charge",
+   "industries": [
+    "fleet",
+    "equipment-rental",
+    "construction"
+   ],
+   "note": "transport fees; mobilization also construction mobilization",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "cleaning fee",
+   "variants": [
+    "wash fee",
+    "wash charge",
+    "cleaning charge",
+    "dirty return",
+    "cleanup fee",
+    "clean up fee",
+    "washout fee",
+    "wash out"
+   ],
+   "class": "money",
+   "means": "cleaning_fee",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "new concept",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "late fee rental",
+   "variants": [
+    "late return fee",
+    "overdue fee",
+    "overtime charge",
+    "extended rental charge",
+    "holdover charge",
+    "hold-over"
+   ],
+   "class": "money",
+   "means": "late_fee",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "late return charge",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "restocking fee",
+   "variants": [
+    "restock fee",
+    "cancellation fee",
+    "no show fee",
+    "no-show fee",
+    "reservation fee",
+    "booking fee",
+    "deposit rental"
+   ],
+   "class": "money",
+   "means": "rental_fee",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "misc fees",
+   "source": "https://booqable.com/glossary/"
+  },
+  {
+   "term": "rental deposit",
+   "variants": [
+    "equipment deposit",
+    "refundable rental deposit",
+    "cash deposit",
+    "card hold",
+    "credit card hold",
+    "authorization hold",
+    "pre-auth",
+    "preauth",
+    "deposit on rental"
+   ],
+   "class": "money",
+   "means": "security_deposit",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "deposit held against rental",
+   "source": "https://booqable.com/glossary/"
+  },
+  {
+   "term": "meter hours",
+   "variants": [
+    "hour meter",
+    "engine hours",
+    "machine hours",
+    "hr meter",
+    "hobbs",
+    "run hours",
+    "runtime",
+    "meter reading",
+    "meter in",
+    "meter out",
+    "hours out",
+    "hours in",
+    "hours used",
+    "usage hours",
+    "smu",
+    "service meter unit"
+   ],
+   "class": "field",
+   "means": "meter_hours",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "new concept; engine/hour reading",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "odometer",
+   "variants": [
+    "miles out",
+    "miles in",
+    "miles driven",
+    "kilometers",
+    "odometer reading",
+    "mileage out",
+    "mileage in",
+    "excess mileage",
+    "mileage charge",
+    "per mile"
+   ],
+   "class": "field",
+   "means": "odometer",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "new concept",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "fuel level",
+   "variants": [
+    "fuel in",
+    "fuel out",
+    "fuel gauge",
+    "tank level",
+    "full tank",
+    "returned empty",
+    "fuel returned",
+    "fuel status",
+    "def level",
+    "propane level"
+   ],
+   "class": "field",
+   "means": "fuel_level",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "new concept",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "unit number fleet",
+   "variants": [
+    "unit #",
+    "unit no",
+    "equipment #",
+    "equipment number",
+    "equip #",
+    "asset #",
+    "asset number",
+    "asset tag",
+    "asset id",
+    "fleet #",
+    "fleet number",
+    "fleet id",
+    "truck #",
+    "truck number",
+    "vehicle #",
+    "vehicle number",
+    "veh #",
+    "tag number",
+    "stock #",
+    "stock number",
+    "id number",
+    "machine #",
+    "machine number",
+    "cat class",
+    "cat-class",
+    "catclass",
+    "equipment id"
+   ],
+   "class": "field",
+   "means": "equipment_id",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "internal fleet identifier",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "vin",
+   "variants": [
+    "vin number",
+    "v.i.n.",
+    "vehicle identification number",
+    "chassis number",
+    "frame number",
+    "product identification number",
+    "serial #",
+    "s/n",
+    "serial no"
+   ],
+   "class": "field",
+   "means": "serial_number",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "serial or VIN",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "make",
+   "variants": [
+    "manufacturer",
+    "mfr",
+    "mfg",
+    "brand",
+    "maker",
+    "oem"
+   ],
+   "class": "field",
+   "means": "manufacturer",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "make of equipment",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "model year",
+   "variants": [
+    "year built",
+    "year manufactured",
+    "mfg year"
+   ],
+   "class": "field",
+   "means": "model_year",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "new concept",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "license plate",
+   "variants": [
+    "plate number",
+    "plate #",
+    "license #",
+    "lic plate",
+    "registration",
+    "reg number",
+    "dot number",
+    "usdot",
+    "us dot",
+    "mc number",
+    "cdl",
+    "registration expires",
+    "reg expiration"
+   ],
+   "class": "field",
+   "means": "license_plate",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "new concept; registration docs",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "equipment class",
+   "variants": [
+    "cat class",
+    "equipment category",
+    "item class",
+    "product class",
+    "category class",
+    "item type",
+    "equipment type",
+    "type of equipment",
+    "asset class",
+    "asset type",
+    "equipment group"
+   ],
+   "class": "field",
+   "means": "equipment_type",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "type of equipment",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "equipment",
+   "variants": [
+    "rental equipment",
+    "rental fleet",
+    "yellow iron"
+   ],
+   "class": "equipment",
+   "means": "equipment",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "generic equipment words",
+   "source": "https://booqable.com/glossary/"
+  },
+  {
+   "term": "aerial lift",
+   "variants": [
+    "boom lift",
+    "scissor lift",
+    "scissors",
+    "man lift",
+    "manlift",
+    "telehandler",
+    "forklift",
+    "skid steer",
+    "skidsteer",
+    "bobcat",
+    "excavator",
+    "mini ex",
+    "backhoe",
+    "loader",
+    "dozer",
+    "compactor",
+    "roller",
+    "generator",
+    "light tower",
+    "compressor",
+    "pump",
+    "trench box",
+    "scaffold",
+    "scaffolding",
+    "lull",
+    "reach forklift"
+   ],
+   "class": "equipment",
+   "means": "equipment_type",
+   "industries": [
+    "fleet",
+    "equipment-rental",
+    "construction"
+   ],
+   "note": "common rental equipment words",
+   "source": "https://booqable.com/glossary/"
+  },
+  {
+   "term": "attachment",
+   "variants": [
+    "attachments",
+    "bucket",
+    "auger",
+    "breaker",
+    "hammer",
+    "forks",
+    "fork attachment",
+    "grapple",
+    "thumb",
+    "coupler",
+    "quick coupler",
+    "sweeper",
+    "trencher",
+    "tiller",
+    "accessory",
+    "accessories",
+    "add-on",
+    "addon"
+   ],
+   "class": "part",
+   "means": "attachment",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "new concept; rented with the machine",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "pm schedule",
+   "variants": [
+    "pm interval",
+    "pm due",
+    "service interval",
+    "service due",
+    "service due hours",
+    "next service",
+    "next pm",
+    "pm hours",
+    "250 hour service",
+    "500 hour service",
+    "oil change due",
+    "maintenance interval",
+    "maintenance schedule",
+    "service schedule",
+    "pm cycle",
+    "pm program",
+    "pm sheet",
+    "pm checklist",
+    "pm inspection",
+    "dot inspection",
+    "annual dot",
+    "annual inspection fleet"
+   ],
+   "class": "document_label",
+   "means": "preventive_maintenance",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "preventive maintenance schedule; \"PM\" in property = property manager",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "pre-rental inspection",
+   "variants": [
+    "pri",
+    "pre-delivery inspection",
+    "pdi",
+    "pre trip inspection",
+    "pretrip",
+    "pre-trip",
+    "dvir",
+    "driver vehicle inspection report",
+    "daily inspection",
+    "walkaround",
+    "walk-around",
+    "condition report",
+    "equipment condition",
+    "damage report",
+    "check-out inspection",
+    "post-rental inspection",
+    "return inspection report"
+   ],
+   "class": "doc_type",
+   "means": "inspection-report",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "inspection before/after rental",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "repair order",
+   "variants": [
+    "r/o",
+    "repair orders",
+    "shop order",
+    "shop ticket",
+    "shop work order",
+    "service order",
+    "mechanic ticket",
+    "internal work order",
+    "iwo",
+    "wo shop",
+    "maintenance work order",
+    "repair ticket"
+   ],
+   "class": "doc_type",
+   "means": "work-order",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "shop job to repair a unit",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "damage",
+   "variants": [
+    "damage claim",
+    "damage charge",
+    "accident report",
+    "incident report",
+    "missing parts",
+    "missing item",
+    "customer damage",
+    "misuse"
+   ],
+   "class": "status",
+   "means": "damaged",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "new concept; claim and incident docs map to other/inspection",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "billable damage",
+   "variants": [
+    "customer repair",
+    "customer-caused damage",
+    "repair billed",
+    "bill customer repair",
+    "repair charge",
+    "chargeable damage",
+    "wear and tear",
+    "normal wear",
+    "excess wear",
+    "normal wear and tear"
+   ],
+   "class": "money",
+   "means": "damage_charge",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "new concept",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "down",
+   "variants": [
+    "down unit",
+    "unit down",
+    "out of service",
+    "broken down",
+    "breakdown",
+    "in the shop",
+    "at the shop",
+    "awaiting parts",
+    "awaiting repair",
+    "waiting on parts",
+    "waiting for parts",
+    "awaiting inspection",
+    "on hold",
+    "red tag",
+    "red-tagged",
+    "tagged out",
+    "lockout tagout"
+   ],
+   "class": "status",
+   "means": "out_of_service",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "new concept status",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "available",
+   "variants": [
+    "avail",
+    "in stock",
+    "ready to rent",
+    "rentable",
+    "on the yard",
+    "on yard",
+    "yard stock",
+    "available inventory",
+    "idle equipment",
+    "idle units",
+    "not rented"
+   ],
+   "class": "status",
+   "means": "available",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "new concept status",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "reserved",
+   "variants": [
+    "reservation",
+    "reservations",
+    "booked",
+    "booking",
+    "bookings",
+    "quote rental",
+    "hold for customer",
+    "pending pickup",
+    "scheduled out",
+    "scheduled delivery",
+    "staged"
+   ],
+   "class": "status",
+   "means": "reserved",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "new concept status",
+   "source": "https://booqable.com/glossary/"
+  },
+  {
+   "term": "utilization",
+   "variants": [
+    "utilisation",
+    "util",
+    "fleet utilization",
+    "time utilization",
+    "dollar utilization",
+    "rental utilization",
+    "rate of return",
+    "roi equipment",
+    "revenue per unit",
+    "rental revenue",
+    "rental income",
+    "rental rev",
+    "ancillary revenue",
+    "ancillary"
+   ],
+   "class": "money",
+   "means": "utilization",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "new concept metric",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "fleet maintenance",
+   "variants": [
+    "fleet service",
+    "vehicle maintenance",
+    "truck maintenance",
+    "service history",
+    "service record",
+    "maintenance history",
+    "maintenance log",
+    "service log",
+    "repair history",
+    "repair log",
+    "unit history",
+    "asset history",
+    "equipment history",
+    "warranty history",
+    "tire history"
+   ],
+   "class": "doc_type",
+   "means": "equipment-record",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "history per unit",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "fuel card",
+   "variants": [
+    "fuel receipt",
+    "fuel purchase",
+    "fuel log",
+    "fuel statement",
+    "fuel transaction",
+    "fleetcor",
+    "comdata",
+    "fuelman",
+    "fuel tax",
+    "ifta",
+    "ifta report",
+    "mileage log"
+   ],
+   "class": "doc_type",
+   "means": "statement",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "fuel statement/receipt",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "insurance",
+   "variants": [
+    "liability insurance",
+    "general liability",
+    "auto policy",
+    "commercial auto",
+    "inland marine",
+    "equipment floater",
+    "insurance policy",
+    "policy number",
+    "policy #",
+    "policy no",
+    "additional insured",
+    "certificate holder",
+    "workers comp",
+    "workers compensation",
+    "wc",
+    "wc policy",
+    "surety",
+    "surety bond",
+    "bonding"
+   ],
+   "class": "doc_type",
+   "means": "insurance-certificate",
+   "industries": [
+    "fleet",
+    "equipment-rental",
+    "construction",
+    "property"
+   ],
+   "note": "insurance paperwork; \"GL\" also general ledger",
+   "source": "https://booqable.com/glossary/"
+  },
+  {
+   "term": "customer rental account",
+   "variants": [
+    "rental customer",
+    "account customer",
+    "charge account",
+    "house account",
+    "credit account",
+    "cash customer",
+    "cash sale",
+    "c.o.d.",
+    "cash on delivery",
+    "credit app",
+    "credit application",
+    "credit limit",
+    "account number",
+    "acct #",
+    "acct no",
+    "customer #",
+    "customer number",
+    "cust no",
+    "cust #"
+   ],
+   "class": "field",
+   "means": "customer_name",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "who rents; account number identifiers",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "job site",
+   "variants": [
+    "jobsite",
+    "job-site",
+    "job site address",
+    "site address",
+    "delivery address",
+    "delivery location",
+    "job location",
+    "project address",
+    "ship-to address",
+    "worksite",
+    "work site",
+    "project site",
+    "job name",
+    "jobname",
+    "job number",
+    "job #",
+    "job no",
+    "project name",
+    "project number",
+    "project #",
+    "proj #",
+    "ship to",
+    "site contact",
+    "site phone",
+    "site contact phone",
+    "gate code"
+   ],
+   "class": "field",
+   "means": "service_address",
+   "industries": [
+    "fleet",
+    "equipment-rental",
+    "construction"
+   ],
+   "note": "where equipment goes / work happens",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "po number",
+   "variants": [
+    "p.o. number",
+    "po #",
+    "po no",
+    "p.o. #",
+    "customer po",
+    "cust po",
+    "purchase order number",
+    "job po",
+    "release number",
+    "release #",
+    "blanket po",
+    "blanket order",
+    "work authorization",
+    "wo number",
+    "authorization number",
+    "auth #"
+   ],
+   "class": "field",
+   "means": "invoice_number",
+   "industries": [
+    "fleet",
+    "equipment-rental",
+    "construction"
+   ],
+   "note": "customer PO reference; also invoice-like ids",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "rental sales",
+   "variants": [
+    "sales ticket",
+    "item sale",
+    "merchandise",
+    "consumables",
+    "sales items",
+    "supplies",
+    "misc sales",
+    "parts sale",
+    "counter sale",
+    "retail sale",
+    "sundries",
+    "propane",
+    "blades",
+    "bits",
+    "chains",
+    "pads"
+   ],
+   "class": "part",
+   "means": "part_number",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "items sold with rental",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "quote rental",
+   "variants": [
+    "rental quote",
+    "rental estimate",
+    "rate quote",
+    "rate quotation",
+    "price quote",
+    "quotation",
+    "rent quote",
+    "rental proposal",
+    "pricing"
+   ],
+   "class": "doc_type",
+   "means": "proposal-quote",
+   "industries": [
+    "fleet",
+    "equipment-rental",
+    "construction"
+   ],
+   "note": "proposal",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "service call",
+   "variants": [
+    "road service",
+    "roadside",
+    "field service",
+    "service truck",
+    "mobile mechanic",
+    "mobile service",
+    "field mechanic",
+    "mechanic",
+    "tech",
+    "shop tech",
+    "fleet tech",
+    "driver",
+    "operator",
+    "operator included",
+    "operated rental",
+    "operated",
+    "bare rental",
+    "bare",
+    "wet rental",
+    "wet rate",
+    "dry rental",
+    "dry",
+    "dry rate"
+   ],
+   "class": "role",
+   "means": "technician",
+   "industries": [
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "who serviced; operated/bare/wet are rental modes",
+   "source": "https://booqable.com/glossary/"
+  },
+  {
+   "term": "hours worked",
+   "variants": [
+    "hours billed",
+    "billable hours",
+    "labor hrs",
+    "labour hours",
+    "man hours",
+    "man-hours",
+    "manhours",
+    "shop hours",
+    "labor time",
+    "time on job"
+   ],
+   "class": "field",
+   "means": "labor_hours",
+   "industries": [
+    "fleet",
+    "equipment-rental",
+    "construction",
+    "property"
+   ],
+   "note": "labor hours",
+   "source": "https://naoc6.texadasoftware.com:10814/resources/openclient/srmv10/appHelp/source/rsfr01.htm"
+  },
+  {
+   "term": "pay application",
+   "variants": [
+    "pay app",
+    "payapp",
+    "pay apps",
+    "pay applications",
+    "application for payment",
+    "application and certificate for payment",
+    "progress billing",
+    "progress payment",
+    "progress invoice",
+    "draw request",
+    "payment request",
+    "payment application",
+    "periodic estimate",
+    "pay est",
+    "pay estimate",
+    "pencil draw",
+    "requisition",
+    "req",
+    "pay req",
+    "payment requisition",
+    "monthly billing"
+   ],
+   "class": "doc_type",
+   "means": "invoice",
+   "industries": [
+    "construction"
+   ],
+   "note": "contractor bill for work done; filed as invoice",
+   "source": "https://www.autodesk.com/blogs/construction/g702-g703-forms-aia-billing/"
+  },
+  {
+   "term": "g702",
+   "variants": [
+    "aia g702",
+    "g-702",
+    "aia g-702",
+    "application and certificate for payment form",
+    "g702 form",
+    "g702s",
+    "g702-1992",
+    "g702 2017"
+   ],
+   "class": "document_label",
+   "means": "invoice",
+   "industries": [
+    "construction"
+   ],
+   "note": "summary page of AIA pay app",
+   "source": "https://www.autodesk.com/blogs/construction/g702-g703-forms-aia-billing/"
+  },
+  {
+   "term": "g703",
+   "variants": [
+    "aia g703",
+    "g-703",
+    "continuation sheet",
+    "continuation sheets",
+    "schedule of values",
+    "sov",
+    "s.o.v.",
+    "cont sheet",
+    "g703 form",
+    "contract line items",
+    "line items sheet",
+    "bid items",
+    "bid item schedule",
+    "unit price schedule"
+   ],
+   "class": "document_label",
+   "means": "schedule_of_values",
+   "industries": [
+    "construction"
+   ],
+   "note": "new concept: schedule of values / continuation sheet",
+   "source": "https://www.fieldpromax.com/blog/aia-pay-applications-and-the-schedule-of-values-explained"
+  },
+  {
+   "term": "retainage",
+   "variants": [
+    "retention",
+    "retainage held",
+    "retainage withheld",
+    "retention held",
+    "retained",
+    "holdback",
+    "hold back",
+    "holdbacks",
+    "retainage %",
+    "retention %",
+    "retainage percent",
+    "retainage amount",
+    "retainage release",
+    "retention release",
+    "release of retainage",
+    "retainage payable",
+    "retention payable",
+    "5% retainage",
+    "10% retainage",
+    "withhold",
+    "withholding"
+   ],
+   "class": "money",
+   "means": "retainage",
+   "industries": [
+    "construction"
+   ],
+   "note": "portion of payment held until completion; new concept",
+   "source": "https://www.autodesk.com/blogs/construction/g702-g703-forms-aia-billing/"
+  },
+  {
+   "term": "stored materials",
+   "variants": [
+    "materials stored",
+    "stored mat",
+    "materials presently stored",
+    "stored material",
+    "material on hand",
+    "mos",
+    "materials on site",
+    "off-site storage",
+    "offsite stored materials",
+    "stored materials bond",
+    "materials stored off site"
+   ],
+   "class": "money",
+   "means": "stored_materials",
+   "industries": [
+    "construction"
+   ],
+   "note": "new concept: column on G703",
+   "source": "https://www.autodesk.com/blogs/construction/g702-g703-forms-aia-billing/"
+  },
+  {
+   "term": "work completed",
+   "variants": [
+    "work completed to date",
+    "completed to date",
+    "completed and stored to date",
+    "total completed and stored",
+    "work in place",
+    "wip",
+    "percent complete",
+    "% complete",
+    "pct complete",
+    "percent completed",
+    "previous applications",
+    "from previous application",
+    "previous work completed",
+    "this period",
+    "work this period",
+    "current payment due",
+    "current due",
+    "balance to finish",
+    "balance to finish including retainage"
+   ],
+   "class": "field",
+   "means": "work_completed",
+   "industries": [
+    "construction"
+   ],
+   "note": "new concept: G703 columns",
+   "source": "https://www.autodesk.com/blogs/construction/g702-g703-forms-aia-billing/"
+  },
+  {
+   "term": "contract sum",
+   "variants": [
+    "original contract sum",
+    "contract amount",
+    "original contract",
+    "contract price",
+    "contract value",
+    "contract total",
+    "base contract",
+    "base bid",
+    "lump sum",
+    "lump-sum",
+    "lump sum price",
+    "gmp",
+    "guaranteed maximum price",
+    "cost plus",
+    "cost-plus",
+    "t&m",
+    "time and materials",
+    "time & materials",
+    "t and m",
+    "unit price",
+    "unit pricing",
+    "stipulated sum"
+   ],
+   "class": "money",
+   "means": "contract_sum",
+   "industries": [
+    "construction"
+   ],
+   "note": "new concept: total contract amount; GMP/T&M are contract types",
+   "source": "https://www.autodesk.com/blogs/construction/g702-g703-forms-aia-billing/"
+  },
+  {
+   "term": "contract sum to date",
+   "variants": [
+    "revised contract sum",
+    "adjusted contract sum",
+    "contract sum including change orders",
+    "current contract",
+    "current contract value",
+    "revised contract",
+    "contract to date",
+    "total contract with changes"
+   ],
+   "class": "money",
+   "means": "contract_sum_to_date",
+   "industries": [
+    "construction"
+   ],
+   "note": "new concept",
+   "source": "https://www.autodesk.com/blogs/construction/g702-g703-forms-aia-billing/"
+  },
+  {
+   "term": "net change by change orders",
+   "variants": [
+    "net change orders",
+    "change order total",
+    "total changes",
+    "co total",
+    "approved changes",
+    "total approved cos",
+    "net changes",
+    "additions and deductions",
+    "changes total",
+    "change order summary"
+   ],
+   "class": "money",
+   "means": "change_order_total",
+   "industries": [
+    "construction"
+   ],
+   "note": "new concept: G702 line 2",
+   "source": "https://www.autodesk.com/blogs/construction/g702-g703-forms-aia-billing/"
+  },
+  {
+   "term": "change order",
+   "variants": [
+    "c/o",
+    "change orders",
+    "cor",
+    "change order request",
+    "cco",
+    "pco",
+    "potential change order",
+    "proposed change order",
+    "change directive",
+    "construction change directive",
+    "ccd",
+    "field order",
+    "change request",
+    "change proposal",
+    "chg order",
+    "extra work order",
+    "ewo",
+    "extra work",
+    "deductive change",
+    "additive change",
+    "t&m ticket",
+    "time and material ticket",
+    "change order log",
+    "co log",
+    "pcos",
+    "rom",
+    "rough order of magnitude",
+    "cop",
+    "change order proposal",
+    "asi",
+    "supplemental instruction",
+    "architects supplemental instruction",
+    "bulletin",
+    "pr",
+    "proposal request",
+    "owner change",
+    "directive"
+   ],
+   "class": "doc_type",
+   "means": "change-order",
+   "industries": [
+    "construction"
+   ],
+   "note": "new concept: modifies contract price/time; PCO/COR are requests, CCO is approved; \"co\" ambiguous with company/certificate of occupancy",
+   "source": "https://www.ruh.ai/industrial/construction/glossary"
+  },
+  {
+   "term": "rfi",
+   "variants": [
+    "request for information",
+    "rfis",
+    "requests for information",
+    "rfi log",
+    "rfi response",
+    "design clarification",
+    "clarification request",
+    "clarification",
+    "questions to architect",
+    "field question",
+    "rfc",
+    "request for clarification",
+    "tq",
+    "technical query"
+   ],
+   "class": "doc_type",
+   "means": "rfi",
+   "industries": [
+    "construction"
+   ],
+   "note": "new concept: question to design team",
+   "source": "https://www.ruh.ai/industrial/construction/glossary"
+  },
+  {
+   "term": "submittal",
+   "variants": [
+    "submittals",
+    "submittal log",
+    "shop drawing",
+    "shop drawings",
+    "shops",
+    "product data",
+    "product data sheet",
+    "cut sheet",
+    "cutsheet",
+    "cut sheets",
+    "data sheet",
+    "spec sheet",
+    "mockup",
+    "mock-up",
+    "samples",
+    "sample",
+    "submittal package",
+    "submittal register",
+    "submittal review",
+    "approved as noted",
+    "revise and resubmit",
+    "r&r",
+    "revise & resubmit",
+    "no exceptions taken",
+    "make corrections noted",
+    "resubmit",
+    "for approval",
+    "for record",
+    "for information"
+   ],
+   "class": "doc_type",
+   "means": "submittal",
+   "industries": [
+    "construction"
+   ],
+   "note": "new concept: documents submitted for design approval; status words are review stamps",
+   "source": "https://www.ruh.ai/industrial/construction/glossary"
+  },
+  {
+   "term": "o&m manual",
+   "variants": [
+    "om manual",
+    "o and m",
+    "operations and maintenance manual",
+    "operation and maintenance manuals",
+    "o&ms",
+    "closeout manual",
+    "closeout docs",
+    "close out documents",
+    "closeout documents",
+    "as-builts",
+    "as builts",
+    "as-built drawings",
+    "record drawings",
+    "red lines",
+    "redlines",
+    "warranty binder",
+    "turnover package",
+    "turnover docs",
+    "commissioning report",
+    "punch list",
+    "punchlist",
+    "punch",
+    "punch items",
+    "closeout list",
+    "deficiency list",
+    "snag list",
+    "snagging",
+    "final punch"
+   ],
+   "class": "doc_type",
+   "means": "closeout_document",
+   "industries": [
+    "construction"
+   ],
+   "note": "new concept: closeout docs; punch list is an item list",
+   "source": "https://www.ruh.ai/industrial/construction/glossary"
+  },
+  {
+   "term": "lien waiver",
+   "variants": [
+    "lien waivers",
+    "waiver of lien",
+    "waiver and release",
+    "release of lien",
+    "lien release",
+    "waiver and release of lien",
+    "conditional waiver",
+    "unconditional waiver",
+    "conditional lien waiver",
+    "unconditional lien waiver",
+    "conditional waiver on progress payment",
+    "unconditional waiver on progress payment",
+    "conditional waiver on final payment",
+    "unconditional waiver on final payment",
+    "progress waiver",
+    "final waiver",
+    "final lien waiver",
+    "partial waiver",
+    "partial lien waiver",
+    "statutory waiver",
+    "statutory lien waiver",
+    "sub waiver",
+    "supplier waiver",
+    "lien waiver form",
+    "lien rel"
+   ],
+   "class": "doc_type",
+   "means": "lien-waiver",
+   "industries": [
+    "construction"
+   ],
+   "note": "new concept: releases lien rights on payment; conditional vs unconditional",
+   "source": "https://www.ruh.ai/industrial/construction/glossary"
+  },
+  {
+   "term": "preliminary notice",
+   "variants": [
+    "prelim",
+    "prelim notice",
+    "prelien",
+    "pre-lien",
+    "pre-lien notice",
+    "20-day notice",
+    "20 day notice",
+    "notice to owner",
+    "nto",
+    "notice of intent to lien",
+    "notice of right to lien",
+    "notice of commencement",
+    "noc",
+    "notice of completion",
+    "notice of cessation",
+    "intent to lien",
+    "claim of lien",
+    "mechanics lien",
+    "mechanic's lien",
+    "construction lien",
+    "lien",
+    "liens",
+    "lien filing",
+    "lien claim",
+    "lien release recorded",
+    "bond claim",
+    "stop notice",
+    "stop payment notice",
+    "notice of non-payment",
+    "notice of nonpayment"
+   ],
+   "class": "doc_type",
+   "means": "lien_notice",
+   "industries": [
+    "construction"
+   ],
+   "note": "new concept: lien process notices",
+   "source": "https://www.ruh.ai/industrial/construction/glossary"
+  },
+  {
+   "term": "subcontract",
+   "variants": [
+    "subcontracts",
+    "sub contract",
+    "sub agreement",
+    "subcontractor agreement",
+    "subcontract agreement",
+    "sub-contract",
+    "trade contract",
+    "trade agreement",
+    "subcontract amount",
+    "sub amount",
+    "sub contract amount",
+    "master subcontract",
+    "msa",
+    "master service agreement",
+    "master services agreement",
+    "purchase order subcontract",
+    "work order subcontract",
+    "scope of work",
+    "sow",
+    "scope",
+    "scope letter",
+    "letter of intent",
+    "loi",
+    "notice to proceed",
+    "ntp",
+    "award letter",
+    "letter of award",
+    "intent to award"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "construction"
+   ],
+   "note": "agreement between GC and sub; NTP/LOI are start documents",
+   "source": "https://www.ruh.ai/industrial/construction/glossary"
+  },
+  {
+   "term": "prime contract",
+   "variants": [
+    "owner contract",
+    "general contract",
+    "owner-contractor agreement",
+    "a101",
+    "aia a101",
+    "a102",
+    "a201",
+    "general conditions",
+    "aia a201",
+    "a133",
+    "cmar",
+    "cm at risk",
+    "design build agreement",
+    "contract documents",
+    "contract agreement",
+    "construction contract",
+    "construction agreement",
+    "agreement between owner and contractor",
+    "standard form of agreement"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "construction"
+   ],
+   "note": "contract between owner and GC",
+   "source": "https://aiacontracts.com/documents/g702s-2017"
+  },
+  {
+   "term": "general contractor",
+   "variants": [
+    "g.c.",
+    "prime contractor",
+    "construction manager",
+    "construction mgr",
+    "gc company",
+    "main contractor",
+    "head contractor",
+    "principal contractor"
+   ],
+   "class": "role",
+   "means": "vendor",
+   "industries": [
+    "construction"
+   ],
+   "note": "GC; from owner viewpoint a vendor, from sub viewpoint the customer",
+   "source": "https://www.ruh.ai/industrial/construction/glossary"
+  },
+  {
+   "term": "subcontractor",
+   "variants": [
+    "subs",
+    "subcontractors",
+    "sub contractor",
+    "sub-contractor",
+    "trade partner",
+    "trade contractor",
+    "specialty contractor",
+    "subbie",
+    "subbies",
+    "vendor sub",
+    "materials supplier",
+    "material supplier",
+    "lower-tier",
+    "second tier",
+    "2nd tier",
+    "tier 2",
+    "sub-sub",
+    "sub-subcontractor"
+   ],
+   "class": "role",
+   "means": "vendor",
+   "industries": [
+    "construction"
+   ],
+   "note": "who did the work for the GC",
+   "source": "https://www.ruh.ai/industrial/construction/glossary"
+  },
+  {
+   "term": "owner",
+   "variants": [
+    "project owner",
+    "owners rep",
+    "owner's rep",
+    "owners representative",
+    "owner's representative",
+    "end user",
+    "building owner",
+    "facility owner",
+    "landlord construction"
+   ],
+   "class": "role",
+   "means": "customer_name",
+   "industries": [
+    "construction"
+   ],
+   "note": "who pays the GC",
+   "source": "https://www.ruh.ai/industrial/construction/glossary"
+  },
+  {
+   "term": "architect",
+   "variants": [
+    "design professional",
+    "a/e",
+    "ae",
+    "architect of record",
+    "aor",
+    "engineer of record",
+    "eor",
+    "design team",
+    "design consultant",
+    "mep engineer",
+    "structural engineer",
+    "civil engineer",
+    "landscape architect",
+    "interior designer",
+    "spec writer",
+    "specifier",
+    "architect/engineer"
+   ],
+   "class": "role",
+   "means": "design_professional",
+   "industries": [
+    "construction"
+   ],
+   "note": "new concept: reviews submittals/RFIs, certifies pay apps",
+   "source": "https://aiacontracts.com/documents/g702s-2017"
+  },
+  {
+   "term": "superintendent",
+   "variants": [
+    "supt",
+    "site super",
+    "field superintendent",
+    "general superintendent",
+    "foreman",
+    "foremen",
+    "leadman",
+    "crew lead",
+    "crew chief",
+    "working foreman",
+    "site foreman",
+    "job foreman",
+    "project foreman"
+   ],
+   "class": "role",
+   "means": "technician",
+   "industries": [
+    "construction"
+   ],
+   "note": "who runs the field; foreman leads a crew",
+   "source": "https://www.ruh.ai/industrial/construction/glossary"
+  },
+  {
+   "term": "project manager",
+   "variants": [
+    "proj manager",
+    "project mgr",
+    "pm construction",
+    "assistant project manager",
+    "apm",
+    "project engineer",
+    "field engineer",
+    "project coordinator",
+    "estimator",
+    "chief estimator",
+    "takeoff",
+    "purchasing",
+    "buyer"
+   ],
+   "class": "role",
+   "means": "project_manager",
+   "industries": [
+    "construction"
+   ],
+   "note": "new concept; \"PM\" ambiguous; \"PE\" also professional engineer",
+   "source": "https://www.ruh.ai/industrial/construction/glossary"
+  },
+  {
+   "term": "journeyman",
+   "variants": [
+    "journeyperson",
+    "journey man",
+    "apprentice",
+    "laborer",
+    "labourer",
+    "day laborer",
+    "operator",
+    "equipment operator",
+    "tradesman",
+    "tradesmen",
+    "carpenter",
+    "electrician",
+    "plumber",
+    "pipefitter",
+    "ironworker",
+    "mason",
+    "bricklayer",
+    "roofer",
+    "painter",
+    "drywaller",
+    "finisher",
+    "concrete finisher",
+    "glazier",
+    "sheet metal",
+    "insulator",
+    "welder",
+    "hvac tech",
+    "tin knocker",
+    "flagger",
+    "manpower",
+    "headcount"
+   ],
+   "class": "role",
+   "means": "technician",
+   "industries": [
+    "construction"
+   ],
+   "note": "who did the work; trade labels",
+   "source": "https://www.ruh.ai/industrial/construction/glossary"
+  },
+  {
+   "term": "daily log",
+   "variants": [
+    "daily report",
+    "daily reports",
+    "daily field report",
+    "dfr",
+    "field report",
+    "site diary",
+    "site diaries",
+    "daily diary",
+    "job diary",
+    "job log",
+    "superintendents daily",
+    "superintendent daily report",
+    "supers log",
+    "foreman daily",
+    "foreman report",
+    "daily activity report",
+    "daily record",
+    "shift report",
+    "project diary",
+    "diary",
+    "journal"
+   ],
+   "class": "doc_type",
+   "means": "internal",
+   "industries": [
+    "construction"
+   ],
+   "note": "daily record of site activity; matches internal type definition",
+   "source": "https://www.ruh.ai/industrial/construction/glossary"
+  },
+  {
+   "term": "weather delay",
+   "variants": [
+    "rain day",
+    "rain delay",
+    "weather day",
+    "weather days",
+    "weather",
+    "rained out",
+    "rain out",
+    "lost day",
+    "lost days",
+    "delay",
+    "delays",
+    "delay notice",
+    "notice of delay",
+    "delay claim",
+    "time extension",
+    "extension of time",
+    "eot",
+    "extension request",
+    "schedule impact",
+    "impact",
+    "critical path",
+    "float",
+    "schedule slip",
+    "slippage",
+    "liquidated damages",
+    "ld",
+    "lds",
+    "ld clause",
+    "liquidated damages clause"
+   ],
+   "class": "field",
+   "means": "delay",
+   "industries": [
+    "construction"
+   ],
+   "note": "new concept: delay events and claims",
+   "source": "https://www.ruh.ai/industrial/construction/glossary"
+  },
+  {
+   "term": "schedule construction",
+   "variants": [
+    "project schedule",
+    "construction schedule",
+    "baseline schedule",
+    "look-ahead",
+    "lookahead",
+    "3 week lookahead",
+    "three week look ahead",
+    "gantt",
+    "cpm",
+    "cpm schedule",
+    "master schedule",
+    "milestone schedule",
+    "milestones",
+    "milestone",
+    "phase schedule",
+    "phasing",
+    "sequence",
+    "sequencing",
+    "p6",
+    "primavera",
+    "ms project",
+    "schedule of values update",
+    "two week lookahead",
+    "pull plan",
+    "pull planning",
+    "last planner"
+   ],
+   "class": "doc_type",
+   "means": "schedule",
+   "industries": [
+    "construction"
+   ],
+   "note": "project schedule documents",
+   "source": "https://www.ruh.ai/industrial/construction/glossary"
+  },
+  {
+   "term": "substantial completion",
+   "variants": [
+    "substantially complete",
+    "certificate of substantial completion",
+    "g704",
+    "aia g704",
+    "sub completion",
+    "date of substantial completion",
+    "practical completion",
+    "pc",
+    "final completion",
+    "final acceptance",
+    "project closeout",
+    "closeout",
+    "close-out",
+    "closed out",
+    "handover",
+    "hand over",
+    "turnover",
+    "owner acceptance",
+    "beneficial occupancy",
+    "tco",
+    "temporary certificate of occupancy",
+    "certificate of occupancy",
+    "c of o",
+    "cofo",
+    "co occupancy",
+    "final inspection",
+    "final cof"
+   ],
+   "class": "status",
+   "means": "substantially_complete",
+   "industries": [
+    "construction"
+   ],
+   "note": "new concept milestone; \"CO\" ambiguous with change order",
+   "source": "https://aiacontracts.com/documents/g702s-2017"
+  },
+  {
+   "term": "warranty construction",
+   "variants": [
+    "one year warranty",
+    "1 year warranty",
+    "warranty period",
+    "warranty period start",
+    "warranty start",
+    "warranty callback",
+    "warranty call",
+    "warranty claim",
+    "warranty work",
+    "warranty letter",
+    "warranty bond",
+    "correction period",
+    "defects liability period",
+    "dlp",
+    "latent defect",
+    "latent defects",
+    "nonconformance",
+    "ncr",
+    "non-conformance report",
+    "corrective action"
+   ],
+   "class": "field",
+   "means": "warranty_term",
+   "industries": [
+    "construction"
+   ],
+   "note": "warranty term/callbacks",
+   "source": "https://www.ruh.ai/industrial/construction/glossary"
+  },
+  {
+   "term": "permit construction",
+   "variants": [
+    "building permit",
+    "bldg permit",
+    "permit set",
+    "permit drawings",
+    "permit application",
+    "permit fees",
+    "permit fee",
+    "permit card",
+    "permit number",
+    "permit #",
+    "permit no",
+    "permit status",
+    "permit pulled",
+    "pulled permit",
+    "permit expires",
+    "electrical permit",
+    "plumbing permit",
+    "mechanical permit",
+    "demo permit",
+    "demolition permit",
+    "grading permit",
+    "right of way permit",
+    "row permit",
+    "sign permit",
+    "fire permit",
+    "trade permit",
+    "permit inspection",
+    "inspection sign off",
+    "inspection signoff",
+    "inspection passed",
+    "inspection failed",
+    "failed inspection",
+    "passed inspection",
+    "red tag inspection",
+    "correction notice",
+    "reinspection",
+    "re-inspection",
+    "reinspect fee",
+    "inspector",
+    "building inspector",
+    "city inspector",
+    "ahj",
+    "authority having jurisdiction",
+    "plan check",
+    "plan review",
+    "plans examiner"
+   ],
+   "class": "doc_type",
+   "means": "permit",
+   "industries": [
+    "construction",
+    "property"
+   ],
+   "note": "permit and inspection related terms",
+   "source": "https://www.ruh.ai/industrial/construction/glossary"
+  },
+  {
+   "term": "bid",
+   "variants": [
+    "bid package",
+    "bid proposal",
+    "bid sheet",
+    "bid form",
+    "bid tab",
+    "bid tabulation",
+    "bid leveling",
+    "bid day",
+    "bidding",
+    "invitation to bid",
+    "itb",
+    "request for proposal",
+    "rfp",
+    "request for quote",
+    "rfq",
+    "request for qualifications",
+    "rfq qual",
+    "bid bond",
+    "bid opening",
+    "bid list",
+    "bidders list",
+    "plan holders",
+    "plan room",
+    "estimate construction",
+    "cost estimate",
+    "takeoff sheet",
+    "quantity takeoff",
+    "ballpark",
+    "budget estimate",
+    "ballpark number",
+    "conceptual estimate",
+    "detailed estimate",
+    "proposal construction",
+    "sub bid",
+    "sub quote",
+    "vendor quote",
+    "supplier quote",
+    "material quote",
+    "price quote construction",
+    "add alternate",
+    "deduct alternate",
+    "owner contingency",
+    "contractor contingency",
+    "overhead and profit",
+    "o&p",
+    "oh&p",
+    "mark-up",
+    "general conditions cost",
+    "gcs",
+    "general requirements",
+    "division 01",
+    "csi",
+    "masterformat",
+    "cost code",
+    "cost codes",
+    "phase code",
+    "job cost",
+    "job costing",
+    "wip report",
+    "work in progress report",
+    "over billing",
+    "overbilling",
+    "underbilling",
+    "under billing",
+    "overbilled",
+    "underbilled",
+    "billings in excess",
+    "costs in excess"
+   ],
+   "class": "doc_type",
+   "means": "proposal-quote",
+   "industries": [
+    "construction"
+   ],
+   "note": "bidding and estimating terms",
+   "source": "https://www.ruh.ai/industrial/construction/glossary"
+  },
+  {
+   "term": "invoice construction",
+   "variants": [
+    "sub invoice",
+    "subcontractor invoice",
+    "vendor invoice",
+    "supplier invoice",
+    "material invoice",
+    "materials invoice",
+    "invoice for materials",
+    "final invoice construction",
+    "final billing",
+    "final bill",
+    "final pay app",
+    "final application",
+    "final payment",
+    "final pay",
+    "final payment request",
+    "close out invoice",
+    "back charge",
+    "backcharge",
+    "back-charge",
+    "backcharges",
+    "deduct invoice",
+    "credit memo",
+    "credit note",
+    "debit memo",
+    "retainage invoice",
+    "retention invoice",
+    "invoice retention",
+    "release retainage invoice",
+    "lien waiver with invoice",
+    "invoice package",
+    "billing package",
+    "billing backup",
+    "backup",
+    "pay app backup",
+    "certified payroll",
+    "wh-347",
+    "wh347",
+    "davis-bacon",
+    "davis bacon",
+    "prevailing wage",
+    "prevailing wage report",
+    "payroll report",
+    "union payroll",
+    "fringe",
+    "fringes",
+    "fringe benefits",
+    "burden",
+    "labor burden",
+    "labor rate",
+    "labor rates",
+    "billing rate",
+    "bill rate",
+    "cost rate",
+    "loaded rate",
+    "markup rate"
+   ],
+   "class": "doc_type",
+   "means": "invoice",
+   "industries": [
+    "construction"
+   ],
+   "note": "bills in construction",
+   "source": "https://www.ruh.ai/industrial/construction/glossary"
+  },
+  {
+   "term": "purchase order construction",
+   "variants": [
+    "material po",
+    "materials po",
+    "vendor po",
+    "supplier po",
+    "po log",
+    "po change",
+    "po revision",
+    "po release",
+    "blanket purchase order",
+    "open po",
+    "po status",
+    "committed cost",
+    "commitment",
+    "commitments",
+    "committed",
+    "buyout",
+    "buy-out",
+    "buyout log",
+    "procurement",
+    "procurement log",
+    "long lead",
+    "long-lead",
+    "long lead item",
+    "long lead items",
+    "lead time",
+    "expedite",
+    "expediting",
+    "expedited",
+    "rush order",
+    "will call material",
+    "material delivery",
+    "mat delivery",
+    "delivery receipt",
+    "material receipt",
+    "receiving report",
+    "packing list",
+    "shipping notice",
+    "asn",
+    "tracking number",
+    "bol number",
+    "freight bill",
+    "pro number",
+    "delivery date construction",
+    "ship date"
+   ],
+   "class": "doc_type",
+   "means": "purchase-order",
+   "industries": [
+    "construction"
+   ],
+   "note": "procurement words",
+   "source": "https://www.ruh.ai/industrial/construction/glossary"
+  },
+  {
+   "term": "safety",
+   "variants": [
+    "toolbox talk",
+    "tool box talk",
+    "tailgate",
+    "tailgate meeting",
+    "safety meeting",
+    "jha",
+    "job hazard analysis",
+    "jsa",
+    "job safety analysis",
+    "sds",
+    "msds",
+    "safety data sheet",
+    "swppp",
+    "osha 300",
+    "osha log",
+    "near miss",
+    "injury report",
+    "first report of injury",
+    "emr",
+    "emod",
+    "experience modifier",
+    "trir",
+    "safety plan",
+    "site safety plan",
+    "ssp",
+    "safety orientation",
+    "orientation",
+    "osha 10",
+    "osha 30",
+    "osha card",
+    "fall protection",
+    "confined space permit",
+    "hot work permit",
+    "lockout",
+    "excavation permit",
+    "trench permit",
+    "crane permit",
+    "lift plan",
+    "critical lift",
+    "pick plan",
+    "rigging plan"
+   ],
+   "class": "doc_type",
+   "means": "inspection-report",
+   "industries": [
+    "construction"
+   ],
+   "note": "safety paperwork; map to inspection/other",
+   "source": "https://www.ruh.ai/industrial/construction/glossary"
+  },
+  {
+   "term": "meeting minutes",
+   "variants": [
+    "minutes",
+    "meeting notes",
+    "oac",
+    "oac meeting",
+    "owner architect contractor meeting",
+    "pre-con",
+    "precon",
+    "pre-construction meeting",
+    "preconstruction meeting",
+    "kickoff",
+    "kick-off",
+    "kick off meeting",
+    "coordination meeting",
+    "weekly meeting",
+    "progress meeting",
+    "foreman meeting",
+    "sub meeting",
+    "subcontractor meeting",
+    "trade meeting",
+    "pre-installation meeting",
+    "pre-pour meeting",
+    "agenda",
+    "action items",
+    "action item",
+    "open items",
+    "open item",
+    "issues log",
+    "issue log",
+    "decision log",
+    "decisions log",
+    "project log",
+    "correspondence log",
+    "transmittal",
+    "transmittals",
+    "transmittal form",
+    "letter of transmittal",
+    "cover letter",
+    "cover sheet",
+    "memorandum",
+    "formal notice",
+    "notice of default",
+    "default notice",
+    "cure",
+    "cure period",
+    "termination",
+    "notice of termination construction",
+    "suspension",
+    "suspension notice",
+    "stop work",
+    "stop work order",
+    "swo"
+   ],
+   "class": "doc_type",
+   "means": "correspondence",
+   "industries": [
+    "construction"
+   ],
+   "note": "communications and meeting records",
+   "source": "https://www.ruh.ai/industrial/construction/glossary"
+  },
+  {
+   "term": "plans",
+   "variants": [
+    "drawing set",
+    "plan set",
+    "blueprints",
+    "blue prints",
+    "sheet index",
+    "drawing log",
+    "drawing list",
+    "plan log",
+    "rev.",
+    "revision cloud",
+    "revision log",
+    "addenda construction",
+    "addendum",
+    "construction documents",
+    "cds",
+    "100% cds",
+    "ifc",
+    "issued for construction",
+    "issued for bid",
+    "ifb",
+    "issued for permit",
+    "ifp",
+    "issued for review",
+    "for construction",
+    "fc",
+    "specifications",
+    "spec book",
+    "project manual",
+    "divisions",
+    "spec section",
+    "elevation",
+    "elevations",
+    "section drawing",
+    "floor plan",
+    "floor plans",
+    "site plan",
+    "civil plans",
+    "structural plans",
+    "mep plans",
+    "mechanical plans",
+    "electrical plans",
+    "plumbing plans",
+    "architectural plans",
+    "reflected ceiling plan",
+    "rcp",
+    "schedule drawings",
+    "door schedule",
+    "window schedule",
+    "finish schedule",
+    "room finish schedule",
+    "equipment schedule",
+    "fixture schedule",
+    "light fixture schedule",
+    "panel schedule"
+   ],
+   "class": "doc_type",
+   "means": "other",
+   "industries": [
+    "construction"
+   ],
+   "note": "drawing and spec terms; panel schedule is a distinct type in electrical pack",
+   "source": "https://www.ruh.ai/industrial/construction/glossary"
+  },
+  {
+   "term": "insurance construction",
+   "variants": [
+    "builders risk",
+    "builder's risk",
+    "builders risk policy",
+    "wrap up",
+    "wrap-up",
+    "ocip",
+    "ccip",
+    "owner controlled insurance program",
+    "contractor controlled insurance program",
+    "general liability construction",
+    "cgl",
+    "commercial general liability",
+    "umbrella construction",
+    "excess liability",
+    "professional liability",
+    "e&o",
+    "errors and omissions",
+    "pollution liability",
+    "cpl",
+    "contractors pollution",
+    "auto liability",
+    "workers comp construction",
+    "wc certificate",
+    "wc cert",
+    "certificate of liability insurance",
+    "acord 25 form",
+    "acord 28",
+    "evidence of property insurance",
+    "additional insured endorsement",
+    "ai endorsement",
+    "waiver of subrogation",
+    "primary and noncontributory",
+    "p&nc",
+    "blanket additional insured",
+    "insurance requirements",
+    "insurance compliance",
+    "coi compliance",
+    "coi tracking",
+    "coi tracker",
+    "expired coi",
+    "coi on file",
+    "missing coi",
+    "insurance expired",
+    "insurance expiring"
+   ],
+   "class": "doc_type",
+   "means": "insurance-certificate",
+   "industries": [
+    "construction"
+   ],
+   "note": "insurance requirements in construction",
+   "source": "https://www.ruh.ai/industrial/construction/glossary"
+  },
+  {
+   "term": "bond",
+   "variants": [
+    "performance bond",
+    "payment bond",
+    "labor and material bond",
+    "l&m bond",
+    "p&p bond",
+    "p and p bond",
+    "payment and performance bond",
+    "surety construction",
+    "surety",
+    "obligee",
+    "bid bond construction",
+    "maintenance bond",
+    "warranty bond construction",
+    "license bond",
+    "contractor license bond",
+    "subdivision bond",
+    "lien bond",
+    "bond premium",
+    "bond rate",
+    "bonding capacity",
+    "bonding company",
+    "bond agent",
+    "bond number",
+    "bond #",
+    "power of attorney",
+    "poa bond",
+    "a312",
+    "aia a312"
+   ],
+   "class": "doc_type",
+   "means": "insurance-certificate",
+   "industries": [
+    "construction"
+   ],
+   "note": "surety bond documents; a312 is the AIA bond form",
+   "source": "https://aiacontracts.com/documents/g702s-2017"
+  },
+  {
+   "term": "payment terms",
+   "variants": [
+    "net 30",
+    "net30",
+    "net 45",
+    "net 60",
+    "net 15",
+    "net 10",
+    "net 7",
+    "due on receipt",
+    "due upon receipt",
+    "upon receipt",
+    "payable on receipt",
+    "2/10 net 30",
+    "2/10 n30",
+    "eom",
+    "net eom",
+    "end of month",
+    "pay when paid",
+    "pay-when-paid",
+    "pay if paid",
+    "pay-if-paid",
+    "paid when paid",
+    "pay when paid clause",
+    "contingent payment",
+    "contingent payment clause",
+    "conditions precedent",
+    "prompt pay",
+    "prompt payment",
+    "prompt payment act",
+    "prompt payment interest",
+    "interest on late payments",
+    "1.5% per month",
+    "finance charge",
+    "service charge",
+    "finance charges",
+    "late payment penalty",
+    "cod terms",
+    "cash on delivery terms",
+    "prepay terms",
+    "net 30 days",
+    "30 days",
+    "30 day terms",
+    "payment due",
+    "payment due date",
+    "pay by",
+    "pay on or before",
+    "due by",
+    "due date construction"
+   ],
+   "class": "field",
+   "means": "payment_terms",
+   "industries": [
+    "property",
+    "fleet",
+    "equipment-rental",
+    "construction"
+   ],
+   "note": "new concept: net-day terms; pay-when-paid is a construction clause",
+   "source": "https://www.ruh.ai/industrial/construction/glossary"
+  },
+  {
+   "term": "billing cycle",
+   "variants": [
+    "billing date",
+    "billing period end",
+    "period to",
+    "period from",
+    "period ending",
+    "through date",
+    "pay period",
+    "application period",
+    "cutoff",
+    "cutoff date",
+    "cut-off",
+    "cut-off date",
+    "monthly cycle",
+    "25th of month",
+    "invoice cycle",
+    "statement cycle",
+    "close date",
+    "closing date",
+    "cycle date",
+    "period of performance",
+    "pop",
+    "performance period"
+   ],
+   "class": "date_phrase",
+   "means": "billing_period",
+   "industries": [
+    "property",
+    "fleet",
+    "equipment-rental",
+    "construction"
+   ],
+   "note": "new concept",
+   "source": "https://www.autodesk.com/blogs/construction/g702-g703-forms-aia-billing/"
+  },
+  {
+   "term": "application number",
+   "variants": [
+    "app number",
+    "application #",
+    "application no",
+    "pay app #",
+    "pay app number",
+    "pay app no",
+    "payment application number",
+    "draw number",
+    "draw #",
+    "draw no",
+    "requisition number",
+    "requisition #",
+    "req #",
+    "req no",
+    "estimate number",
+    "estimate #",
+    "invoice no",
+    "invoice #",
+    "invoice number",
+    "inv #",
+    "inv no",
+    "bill number",
+    "bill #",
+    "billing number"
+   ],
+   "class": "field",
+   "means": "invoice_number",
+   "industries": [
+    "construction"
+   ],
+   "note": "pay-app sequential number maps to invoice_number",
+   "source": "https://www.autodesk.com/blogs/construction/g702-g703-forms-aia-billing/"
+  },
+  {
+   "term": "period to",
+   "variants": [
+    "application date",
+    "date of application",
+    "pay app date",
+    "invoice date",
+    "billing date construction",
+    "date submitted",
+    "submitted date",
+    "date received construction",
+    "received date",
+    "date approved",
+    "approval date",
+    "approved on",
+    "date certified",
+    "certified date",
+    "date paid construction",
+    "paid date",
+    "check date",
+    "date issued construction",
+    "issue date",
+    "issued on",
+    "dated",
+    "as of date",
+    "through",
+    "thru"
+   ],
+   "class": "field",
+   "means": "service_date",
+   "industries": [
+    "construction"
+   ],
+   "note": "dates on pay apps",
+   "source": "https://www.autodesk.com/blogs/construction/g702-g703-forms-aia-billing/"
+  },
+  {
+   "term": "architect certification",
+   "variants": [
+    "certificate for payment",
+    "architects certificate for payment",
+    "architects certification",
+    "architect's certification",
+    "amount certified",
+    "certified amount",
+    "amount approved",
+    "approved amount",
+    "approved for payment",
+    "approved to pay",
+    "owner approval",
+    "owner approved",
+    "owners approval",
+    "signed off",
+    "notarized",
+    "notary",
+    "notary seal",
+    "notarization",
+    "sworn",
+    "subscribed and sworn",
+    "sworn statement",
+    "contractors sworn statement",
+    "contractor's sworn statement",
+    "affidavit",
+    "affidavit of payment",
+    "final affidavit",
+    "contractors affidavit",
+    "affidavit of release",
+    "sub affidavit",
+    "affidavit of lien waiver",
+    "owners affidavit",
+    "owner affidavit"
+   ],
+   "class": "field",
+   "means": "approval",
+   "industries": [
+    "construction"
+   ],
+   "note": "new concept: approval/certification",
+   "source": "https://aiacontracts.com/documents/g702s-2017"
+  },
+  {
+   "term": "change in contract time",
+   "variants": [
+    "time change",
+    "added days",
+    "calendar days",
+    "working days",
+    "contract time",
+    "contract duration",
+    "duration",
+    "completion date",
+    "scheduled completion",
+    "scheduled completion date",
+    "completion deadline",
+    "required completion",
+    "project completion",
+    "target completion",
+    "target date",
+    "substantial completion date",
+    "final completion date",
+    "start date construction",
+    "notice to proceed date",
+    "ntp date",
+    "mobilization date",
+    "mob date",
+    "kickoff date",
+    "date of commencement",
+    "commencement",
+    "date of commencement of work",
+    "project start",
+    "project end",
+    "end date construction",
+    "project duration",
+    "schedule duration"
+   ],
+   "class": "date_phrase",
+   "means": "contract_time",
+   "industries": [
+    "construction"
+   ],
+   "note": "new concept: contract start/end/duration",
+   "source": "https://aiacontracts.com/documents/g702s-2017"
+  },
+  {
+   "term": "unit cost",
+   "variants": [
+    "unit prices",
+    "unit rate",
+    "price per unit",
+    "cost per unit",
+    "unit of measure",
+    "u/m",
+    "qty installed",
+    "quantity installed",
+    "quantity complete",
+    "units complete",
+    "installed to date",
+    "installed quantity",
+    "install qty",
+    "linear feet",
+    "linear foot",
+    "cubic yard",
+    "cubic yards",
+    "square yards",
+    "square feet construction",
+    "lump sum item",
+    "sheet count"
+   ],
+   "class": "field",
+   "means": "quantity",
+   "industries": [
+    "construction"
+   ],
+   "note": "new concept: quantity/unit measure",
+   "source": "https://www.ruh.ai/industrial/construction/glossary"
+  },
+  {
+   "term": "labor",
+   "variants": [
+    "labor cost",
+    "labor charges",
+    "labor total",
+    "labor subtotal",
+    "labor and material",
+    "labor & material",
+    "l&m",
+    "material only",
+    "materials only",
+    "material cost",
+    "materials cost",
+    "mat cost",
+    "material total",
+    "equipment cost",
+    "equipment charges",
+    "equipment rental cost",
+    "sub cost",
+    "subs cost",
+    "subcontract cost",
+    "subcontractor cost",
+    "other cost",
+    "other costs",
+    "misc cost",
+    "overhead cost",
+    "direct cost",
+    "direct costs",
+    "indirect cost",
+    "indirect costs",
+    "job cost total",
+    "total cost",
+    "cost to date",
+    "cost to complete",
+    "ctc",
+    "estimate to complete",
+    "etc",
+    "eac",
+    "estimate at completion",
+    "projected cost",
+    "cost report",
+    "cost-to-cost",
+    "cost to cost"
+   ],
+   "class": "money",
+   "means": "cost",
+   "industries": [
+    "construction"
+   ],
+   "note": "cost breakdown words map to cost; line parts",
+   "source": "https://www.ruh.ai/industrial/construction/glossary"
+  },
+  {
+   "term": "crew",
+   "variants": [
+    "crew size",
+    "crew count",
+    "man count",
+    "manpower count",
+    "workers on site",
+    "headcount on site",
+    "people on site",
+    "labor on site",
+    "trades on site",
+    "hours worked today",
+    "daily hours",
+    "time sheet",
+    "timesheet",
+    "time sheets",
+    "timecard",
+    "time card",
+    "time cards",
+    "time ticket",
+    "time tickets",
+    "tm ticket",
+    "t&m tickets",
+    "labor ticket",
+    "labor tickets",
+    "labor report",
+    "daily timesheet",
+    "weekly timesheet",
+    "payroll construction",
+    "certified payroll report",
+    "cpr",
+    "local union",
+    "union hall",
+    "dispatch hall",
+    "apprenticeship",
+    "prevailing",
+    "journeyman rate",
+    "union scale",
+    "overtime",
+    "double time",
+    "straight time",
+    "regular time",
+    "premium time",
+    "shift differential",
+    "per diem",
+    "travel pay",
+    "show up pay",
+    "reporting pay"
+   ],
+   "class": "field",
+   "means": "labor_hours",
+   "industries": [
+    "construction"
+   ],
+   "note": "crew and time-tracking words",
+   "source": "https://www.ruh.ai/industrial/construction/glossary"
+  },
+  {
+   "term": "open",
+   "variants": [
+    "in progress",
+    "in process",
+    "wip status",
+    "not started",
+    "submitted",
+    "awaiting",
+    "awaiting approval",
+    "under review",
+    "in review",
+    "outstanding",
+    "unresolved",
+    "unanswered",
+    "open rfi",
+    "open submittal",
+    "open co",
+    "open item construction"
+   ],
+   "class": "status",
+   "means": "open",
+   "industries": [
+    "property",
+    "fleet",
+    "equipment-rental",
+    "construction"
+   ],
+   "note": "not yet done",
+   "source": "https://www.ruh.ai/industrial/construction/glossary"
+  },
+  {
+   "term": "closed",
+   "variants": [
+    "resolved",
+    "fulfilled",
+    "closed out status",
+    "approved status",
+    "fully executed",
+    "closed rfi",
+    "closed co"
+   ],
+   "class": "status",
+   "means": "closed",
+   "industries": [
+    "property",
+    "fleet",
+    "equipment-rental",
+    "construction"
+   ],
+   "note": "done",
+   "source": "https://www.ruh.ai/industrial/construction/glossary"
+  },
+  {
+   "term": "void",
+   "variants": [
+    "voided",
+    "void invoice",
+    "cancelled",
+    "canceled",
+    "cancel",
+    "cancellation",
+    "rescinded",
+    "withdrawn",
+    "superseded",
+    "replaced by",
+    "revoked",
+    "rejected status",
+    "denied",
+    "declined",
+    "terminated",
+    "nullified",
+    "written off",
+    "write off",
+    "write-off",
+    "bad debt",
+    "uncollectible",
+    "collections",
+    "sent to collections",
+    "in collections"
+   ],
+   "class": "status",
+   "means": "void",
+   "industries": [
+    "property",
+    "fleet",
+    "equipment-rental",
+    "construction"
+   ],
+   "note": "not valid anymore",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "past due",
+   "variants": [
+    "pastdue",
+    "overdue",
+    "late",
+    "delinquent invoice",
+    "behind",
+    "aging",
+    "aged",
+    "aged receivables",
+    "ar aging",
+    "aging report",
+    "30 days past due",
+    "60 days past due",
+    "90 days past due",
+    "over 30",
+    "over 60",
+    "over 90",
+    "30+",
+    "60+",
+    "90+",
+    "120+",
+    "1-30",
+    "31-60",
+    "61-90",
+    "91+",
+    "not yet due",
+    "coming due",
+    "due soon",
+    "due this week",
+    "due next week"
+   ],
+   "class": "status",
+   "means": "overdue",
+   "industries": [
+    "property",
+    "fleet",
+    "equipment-rental",
+    "construction"
+   ],
+   "note": "late payment; aging buckets",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "partial payment",
+   "variants": [
+    "partially paid",
+    "part paid",
+    "part payment",
+    "deposit paid",
+    "down payment",
+    "downpayment",
+    "progress payment received",
+    "payment on account",
+    "on account",
+    "pay on account",
+    "applied credit",
+    "credit applied",
+    "partial",
+    "balance remaining",
+    "remaining balance",
+    "still owe"
+   ],
+   "class": "status",
+   "means": "partial",
+   "industries": [
+    "property",
+    "fleet",
+    "equipment-rental",
+    "construction"
+   ],
+   "note": "new concept status: partially paid",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "change order approved",
+   "variants": [
+    "co approved",
+    "approved co",
+    "executed co",
+    "signed co",
+    "co signed",
+    "co pending",
+    "pending co",
+    "co rejected",
+    "co denied",
+    "co void",
+    "unapproved change order",
+    "unapproved co",
+    "unapproved changes",
+    "unsigned co",
+    "verbal approval",
+    "verbal authorization",
+    "verbal go ahead",
+    "verbal go-ahead",
+    "written authorization",
+    "written approval",
+    "email approval",
+    "approved by email",
+    "pending approval",
+    "pending change orders",
+    "pending cos",
+    "pending changes"
+   ],
+   "class": "status",
+   "means": "co_status",
+   "industries": [
+    "construction"
+   ],
+   "note": "new concept: CO workflow status",
+   "source": "https://www.ruh.ai/industrial/construction/glossary"
+  },
+  {
+   "term": "submittal status",
+   "variants": [
+    "submittal approved",
+    "submittal rejected",
+    "submittal pending",
+    "submittal in review",
+    "submittal overdue",
+    "submittal due",
+    "submittal required",
+    "submittal returned",
+    "returned submittal",
+    "resubmittal",
+    "resubmitted",
+    "submittal revision",
+    "rev a",
+    "rev b",
+    "rev 1",
+    "rev 2",
+    "revised and resubmitted",
+    "reviewed no exceptions",
+    "reviewed as noted",
+    "exception taken",
+    "rejected submittal",
+    "not approved",
+    "void submittal",
+    "superseded submittal",
+    "closed submittal",
+    "distributed",
+    "distribution list",
+    "ball in court",
+    "bic",
+    "ball-in-court",
+    "responsible party",
+    "assigned to",
+    "assignee",
+    "due date submittal",
+    "response due",
+    "response required",
+    "response date",
+    "days open",
+    "days overdue",
+    "days late",
+    "turnaround",
+    "turnaround time",
+    "review time",
+    "review period"
+   ],
+   "class": "status",
+   "means": "submittal_status",
+   "industries": [
+    "construction"
+   ],
+   "note": "new concept: review workflow",
+   "source": "https://www.ruh.ai/industrial/construction/glossary"
+  },
+  {
+   "term": "rfi status",
+   "variants": [
+    "rfi open",
+    "rfi closed",
+    "rfi answered",
+    "rfi pending",
+    "rfi overdue",
+    "rfi due",
+    "rfi response due",
+    "rfi response",
+    "rfi answer",
+    "rfi cost impact",
+    "rfi schedule impact",
+    "cost impact",
+    "schedule impact days",
+    "potential cost impact",
+    "potential schedule impact",
+    "impact yes no",
+    "rfi originator",
+    "rfi author",
+    "rfi number",
+    "rfi #",
+    "rfi no",
+    "rfi subject",
+    "rfi question",
+    "rfi reference",
+    "rfi spec section",
+    "rfi drawing",
+    "rfi location",
+    "rfi priority",
+    "rfi urgent",
+    "rfi attachments",
+    "rfi official response"
+   ],
+   "class": "status",
+   "means": "rfi_status",
+   "industries": [
+    "construction"
+   ],
+   "note": "new concept",
+   "source": "https://www.ruh.ai/industrial/construction/glossary"
+  },
+  {
+   "term": "equipment status",
+   "variants": [
+    "status code",
+    "unit status",
+    "asset status",
+    "rental status",
+    "contract status",
+    "ticket status",
+    "order status",
+    "job status",
+    "project status",
+    "work order status",
+    "wo status",
+    "wo open",
+    "wo closed",
+    "wo pending",
+    "wo in progress",
+    "wo complete",
+    "wo completed",
+    "wo cancelled",
+    "wo scheduled",
+    "wo assigned",
+    "wo on hold",
+    "wo waiting on parts",
+    "wo waiting on vendor",
+    "wo waiting on approval",
+    "wo overdue",
+    "wo past due",
+    "wo late",
+    "wo emergency",
+    "wo urgent",
+    "wo priority",
+    "wo high",
+    "wo medium",
+    "wo low",
+    "wo routine",
+    "wo preventive"
+   ],
+   "class": "status",
+   "means": "status",
+   "industries": [
+    "property",
+    "fleet",
+    "equipment-rental"
+   ],
+   "note": "generic status field label",
+   "source": "https://www.revela.co/resources/property-management-accounting-guide"
+  },
+  {
+   "term": "subtotal",
+   "variants": [
+    "sub-total",
+    "sub total",
+    "line total",
+    "extended",
+    "extension",
+    "ext",
+    "ext price",
+    "extended price",
+    "amount ext",
+    "line amount",
+    "item total",
+    "item amount",
+    "net amount",
+    "gross amount",
+    "gross total"
+   ],
+   "class": "money",
+   "means": "cost",
+   "industries": [
+    "property",
+    "fleet",
+    "equipment-rental",
+    "construction"
+   ],
+   "note": "line/sub totals; generic total is cost",
+   "source": "https://invoicequick.com/invoice-templates/equipment-rental-invoice-template"
+  },
+  {
+   "term": "tax",
+   "variants": [
+    "sales tax",
+    "state tax",
+    "county tax",
+    "city tax",
+    "local tax",
+    "tax rate",
+    "tax amount",
+    "taxable",
+    "non-taxable",
+    "nontaxable",
+    "tax exempt",
+    "tax-exempt",
+    "resale certificate",
+    "resale cert",
+    "exemption certificate",
+    "exempt cert",
+    "tax id",
+    "ein",
+    "fein",
+    "tax id number",
+    "taxpayer id",
+    "tin",
+    "vat",
+    "gst",
+    "hst",
+    "pst",
+    "use tax",
+    "rental tax",
+    "equipment rental tax",
+    "lodging tax",
+    "tourism tax",
+    "surcharge",
+    "surcharges",
+    "other fees",
+    "misc fees",
+    "additional charges",
+    "additional fees",
+    "extra charges"
+   ],
+   "class": "money",
+   "means": "tax",
+   "industries": [
+    "property",
+    "fleet",
+    "equipment-rental",
+    "construction"
+   ],
+   "note": "new concept: tax lines",
+   "source": "https://invoicequick.com/invoice-templates/equipment-rental-invoice-template"
+  },
+  {
+   "term": "discount",
+   "variants": [
+    "disc",
+    "discounts",
+    "discount amount",
+    "discount %",
+    "discount percent",
+    "early pay discount",
+    "early payment discount",
+    "prompt pay discount",
+    "volume discount",
+    "contract discount",
+    "customer discount",
+    "negotiated rate",
+    "special rate",
+    "job rate",
+    "project rate",
+    "preferred rate",
+    "national account",
+    "national account rate",
+    "rate discount",
+    "less discount",
+    "credit amount",
+    "adjustment",
+    "write down",
+    "writedown",
+    "courtesy credit",
+    "goodwill credit",
+    "refund amount",
+    "refunded"
+   ],
+   "class": "money",
+   "means": "discount",
+   "industries": [
+    "property",
+    "fleet",
+    "equipment-rental",
+    "construction"
+   ],
+   "note": "new concept",
+   "source": "https://invoicequick.com/invoice-templates/equipment-rental-invoice-template"
+  },
+  {
+   "term": "deposit received",
+   "variants": [
+    "deposit paid",
+    "deposits",
+    "deposit applied",
+    "less deposit",
+    "less deposits",
+    "less payments",
+    "less payment",
+    "less previous payments",
+    "previous payments",
+    "prior payments",
+    "payments to date",
+    "total payments",
+    "total paid to date",
+    "paid to date",
+    "amount previously paid",
+    "previous certificates for payment",
+    "less previous certificates for payment",
+    "previous certificates",
+    "amount of previous",
+    "balance after deposit"
+   ],
+   "class": "money",
+   "means": "paid",
+   "industries": [
+    "property",
+    "fleet",
+    "equipment-rental",
+    "construction"
+   ],
+   "note": "payments received to date; G702 line 7",
+   "source": "https://www.autodesk.com/blogs/construction/g702-g703-forms-aia-billing/"
+  },
+  {
+   "term": "amount due",
+   "variants": [
+    "amt due",
+    "balance due now",
+    "due now",
+    "due this invoice",
+    "current payment due construction",
+    "payment due now",
+    "amount payable",
+    "amount to pay",
+    "pay this amount",
+    "please remit",
+    "remittance",
+    "total remittance",
+    "amount remitted",
+    "remit amount",
+    "net payment due",
+    "net due now",
+    "current amount due",
+    "amount currently due",
+    "current balance",
+    "new balance",
+    "ending balance",
+    "closing balance",
+    "statement balance",
+    "account balance",
+    "total balance",
+    "total outstanding",
+    "total unpaid"
+   ],
+   "class": "money",
+   "means": "cost",
+   "industries": [
+    "property",
+    "fleet",
+    "equipment-rental",
+    "construction"
+   ],
+   "note": "document total owed",
+   "source": "https://invoicequick.com/invoice-templates/equipment-rental-invoice-template"
+  },
+  {
+   "term": "remit to",
+   "variants": [
+    "remittance address",
+    "remit address",
+    "pay to address",
+    "send payment to",
+    "mail payment to",
+    "make checks payable to",
+    "checks payable to",
+    "check payable to",
+    "payable to",
+    "pay to the order of",
+    "lock box",
+    "po box",
+    "p.o. box",
+    "ach info",
+    "ach instructions",
+    "wire instructions",
+    "wire info",
+    "routing number",
+    "account number bank",
+    "bank info",
+    "banking info",
+    "payment instructions",
+    "how to pay",
+    "pay online",
+    "online payment",
+    "payment portal",
+    "pay portal",
+    "tenant portal",
+    "resident portal",
+    "customer portal",
+    "owner portal"
+   ],
+   "class": "field",
+   "means": "vendor",
+   "industries": [
+    "property",
+    "fleet",
+    "equipment-rental",
+    "construction"
+   ],
+   "note": "payee label",
+   "source": "https://invoicequick.com/invoice-templates/equipment-rental-invoice-template"
+  }
+ ],
+ "ambiguous": [
+  {
+   "term": "rental agreement",
+   "could_mean": [
+    "residential lease",
+    "equipment rental contract",
+    "vehicle rental agreement"
+   ],
+   "industries": [
+    "property",
+    "fleet"
+   ]
+  },
+  {
+   "term": "pm",
+   "could_mean": [
+    "property manager",
+    "project manager",
+    "preventive maintenance",
+    "private mortgage insurance",
+    "payment (pm) in schedule"
+   ],
+   "industries": [
+    "property",
+    "fleet",
+    "construction"
+   ]
+  },
+  {
+   "term": "co",
+   "could_mean": [
+    "change order",
+    "certificate of occupancy",
+    "company",
+    "carbon monoxide",
+    "cash only"
+   ],
+   "industries": [
+    "property",
+    "construction"
+   ]
+  },
+  {
+   "term": "sub",
+   "could_mean": [
+    "subcontractor",
+    "subtotal",
+    "sublease",
+    "subscription"
+   ],
+   "industries": [
+    "construction",
+    "property"
+   ]
+  },
+  {
+   "term": "super",
+   "could_mean": [
+    "superintendent",
+    "building superintendent",
+    "supervisor"
+   ],
+   "industries": [
+    "construction",
+    "property"
+   ]
+  },
+  {
+   "term": "deposit",
+   "could_mean": [
+    "security deposit",
+    "rental deposit",
+    "down payment",
+    "bank deposit"
+   ],
+   "industries": [
+    "property",
+    "fleet",
+    "construction"
+   ]
+  },
+  {
+   "term": "retention",
+   "could_mean": [
+    "retainage",
+    "customer retention (renewals)"
+   ],
+   "industries": [
+    "construction",
+    "property"
+   ]
+  },
+  {
+   "term": "draw",
+   "could_mean": [
+    "construction pay application",
+    "loan draw",
+    "owner draw (distribution)"
+   ],
+   "industries": [
+    "construction",
+    "property"
+   ]
+  },
+  {
+   "term": "turn",
+   "could_mean": [
+    "unit turnover make-ready",
+    "inventory turnover",
+    "equipment turn (rental turns/utilization)"
+   ],
+   "industries": [
+    "property",
+    "fleet"
+   ]
+  },
+  {
+   "term": "wo",
+   "could_mean": [
+    "work order",
+    "wire order"
+   ],
+   "industries": [
+    "property",
+    "fleet",
+    "construction"
+   ]
+  },
+  {
+   "term": "ro",
+   "could_mean": [
+    "repair order",
+    "rental order",
+    "receiving order"
+   ],
+   "industries": [
+    "fleet"
+   ]
+  },
+  {
+   "term": "gl",
+   "could_mean": [
+    "general ledger",
+    "general liability"
+   ],
+   "industries": [
+    "property",
+    "construction",
+    "fleet"
+   ]
+  },
+  {
+   "term": "coa",
+   "could_mean": [
+    "chart of accounts",
+    "condo owners association",
+    "certificate of authenticity"
+   ],
+   "industries": [
+    "property"
+   ]
+  },
+  {
+   "term": "ti",
+   "could_mean": [
+    "tenant improvement",
+    "tenant improvement allowance"
+   ],
+   "industries": [
+    "property",
+    "construction"
+   ]
+  },
+  {
+   "term": "unit",
+   "could_mean": [
+    "apartment unit",
+    "piece of equipment",
+    "unit of measure",
+    "unit price"
+   ],
+   "industries": [
+    "property",
+    "fleet",
+    "construction"
+   ]
+  },
+  {
+   "term": "rate",
+   "could_mean": [
+    "rental rate",
+    "interest rate",
+    "tax rate",
+    "labor rate"
+   ],
+   "industries": [
+    "fleet",
+    "property",
+    "construction"
+   ]
+  },
+  {
+   "term": "hours",
+   "could_mean": [
+    "meter hours",
+    "labor hours",
+    "office hours"
+   ],
+   "industries": [
+    "fleet",
+    "construction"
+   ]
+  },
+  {
+   "term": "release",
+   "could_mean": [
+    "lien release",
+    "retainage release",
+    "release number (PO)",
+    "release of liability"
+   ],
+   "industries": [
+    "construction",
+    "fleet"
+   ]
+  },
+  {
+   "term": "waiver",
+   "could_mean": [
+    "damage waiver",
+    "lien waiver",
+    "late fee waiver",
+    "liability waiver"
+   ],
+   "industries": [
+    "fleet",
+    "construction",
+    "property"
+   ]
+  },
+  {
+   "term": "application",
+   "could_mean": [
+    "pay application",
+    "rental application",
+    "credit application",
+    "permit application"
+   ],
+   "industries": [
+    "construction",
+    "property",
+    "fleet"
+   ]
+  },
+  {
+   "term": "rev",
+   "could_mean": [
+    "revision",
+    "revenue"
+   ],
+   "industries": [
+    "construction",
+    "fleet"
+   ]
+  },
+  {
+   "term": "bol",
+   "could_mean": [
+    "bill of lading",
+    "bill of ladings"
+   ],
+   "industries": [
+    "fleet",
+    "construction"
+   ]
+  },
+  {
+   "term": "lease",
+   "could_mean": [
+    "property lease",
+    "equipment lease (long-term finance lease)",
+    "truck lease"
+   ],
+   "industries": [
+    "property",
+    "fleet"
+   ]
+  },
+  {
+   "term": "ticket",
+   "could_mean": [
+    "service ticket",
+    "delivery ticket",
+    "rental ticket",
+    "time ticket",
+    "parking ticket"
+   ],
+   "industries": [
+    "fleet",
+    "construction"
+   ]
+  },
+  {
+   "term": "allowance",
+   "could_mean": [
+    "construction allowance",
+    "tenant improvement allowance",
+    "moving allowance"
+   ],
+   "industries": [
+    "construction",
+    "property"
+   ]
+  },
+  {
+   "term": "assessment",
+   "could_mean": [
+    "hoa assessment",
+    "property tax assessment",
+    "risk assessment"
+   ],
+   "industries": [
+    "property"
+   ]
+  },
+  {
+   "term": "paid",
+   "could_mean": [
+    "payment received",
+    "paid in full",
+    "marked paid but may be partial"
+   ],
+   "industries": [
+    "property",
+    "fleet",
+    "construction"
+   ]
+  },
+  {
+   "term": "on hold",
+   "could_mean": [
+    "equipment on hold",
+    "retainage on hold",
+    "pay app on hold",
+    "lease application on hold"
+   ],
+   "industries": [
+    "fleet",
+    "construction",
+    "property"
+   ]
+  },
+  {
+   "term": "final",
+   "could_mean": [
+    "final invoice",
+    "final payment",
+    "final lien waiver",
+    "final inspection"
+   ],
+   "industries": [
+    "construction",
+    "property"
+   ]
+  },
+  {
+   "term": "deductive",
+   "could_mean": [
+    "deductive change order",
+    "deduct from invoice"
+   ],
+   "industries": [
+    "construction"
+   ]
+  },
+  {
+   "term": "stop",
+   "could_mean": [
+    "stop notice",
+    "stop work order",
+    "payment stop",
+    "rental stop (off-rent)"
+   ],
+   "industries": [
+    "construction",
+    "fleet"
+   ]
+  },
+  {
+   "term": "sc",
+   "could_mean": [
+    "substantial completion",
+    "service charge",
+    "sales contract"
+   ],
+   "industries": [
+    "construction",
+    "property"
+   ]
+  },
+  {
+   "term": "lw",
+   "could_mean": [
+    "lien waiver",
+    "lost wages"
+   ],
+   "industries": [
+    "construction"
+   ]
+  },
+  {
+   "term": "tm",
+   "could_mean": [
+    "time and materials",
+    "trademark"
+   ],
+   "industries": [
+    "construction"
+   ]
+  },
+  {
+   "term": "mob",
+   "could_mean": [
+    "mobilization",
+    "mobile"
+   ],
+   "industries": [
+    "construction",
+    "fleet"
+   ]
+  },
+  {
+   "term": "tenant",
+   "could_mean": [
+    "resident",
+    "commercial tenant vs trade tenant improvement scope",
+    "subcontractor (in some GC speak)"
+   ],
+   "industries": [
+    "property",
+    "construction"
+   ]
+  },
+  {
+   "term": "super",
+   "could_mean": [
+    "superintendent",
+    "building super"
+   ],
+   "industries": [
+    "construction",
+    "property"
+   ]
+  },
+  {
+   "term": "hold",
+   "could_mean": [
+    "equipment on hold",
+    "pay app on hold",
+    "tenant hold"
+   ],
+   "industries": [
+    "fleet",
+    "construction",
+    "property"
+   ]
+  },
+  {
+   "term": "down",
+   "could_mean": [
+    "out of service",
+    "down payment"
+   ],
+   "industries": [
+    "fleet",
+    "construction"
+   ]
+  },
+  {
+   "term": "out",
+   "could_mean": [
+    "on rent",
+    "out of service"
+   ],
+   "industries": [
+    "fleet"
+   ]
+  },
+  {
+   "term": "claim",
+   "could_mean": [
+    "damage claim",
+    "lien claim",
+    "insurance claim",
+    "payment claim"
+   ],
+   "industries": [
+    "fleet",
+    "construction",
+    "property"
+   ]
+  },
+  {
+   "term": "extra",
+   "could_mean": [
+    "extra work / change order",
+    "extra charge"
+   ],
+   "industries": [
+    "construction"
+   ]
+  },
+  {
+   "term": "bid",
+   "could_mean": [
+    "bid proposal",
+    "bid bond"
+   ],
+   "industries": [
+    "construction"
+   ]
+  },
+  {
+   "term": "scale",
+   "could_mean": [
+    "union wage scale",
+    "weigh scale",
+    "scale (drawing)"
+   ],
+   "industries": [
+    "construction"
+   ]
+  },
+  {
+   "term": "plate",
+   "could_mean": [
+    "license plate",
+    "equipment data plate",
+    "compactor plate"
+   ],
+   "industries": [
+    "fleet"
+   ]
+  },
+  {
+   "term": "title",
+   "could_mean": [
+    "vehicle title",
+    "document title",
+    "title company"
+   ],
+   "industries": [
+    "fleet",
+    "property"
+   ]
+  },
+  {
+   "term": "current",
+   "could_mean": [
+    "not past due",
+    "current payment due",
+    "current tenant"
+   ],
+   "industries": [
+    "property",
+    "construction"
+   ]
+  },
+  {
+   "term": "net",
+   "could_mean": [
+    "net 30 terms",
+    "net amount",
+    "net lease"
+   ],
+   "industries": [
+    "property",
+    "fleet",
+    "construction"
+   ]
+  },
+  {
+   "term": "lead",
+   "could_mean": [
+    "lead (foreman)",
+    "sales lead",
+    "lead paint"
+   ],
+   "industries": [
+    "construction",
+    "property"
+   ]
+  },
+  {
+   "term": "local",
+   "could_mean": [
+    "local union",
+    "local tax"
+   ],
+   "industries": [
+    "construction"
+   ]
+  }
+ ],
+ "new_concepts": [
+  {
+   "id": "retainage",
+   "why": "Held-back portion of each construction payment; very common on pay apps; no field id exists"
+  },
+  {
+   "id": "schedule_of_values",
+   "why": "G703 continuation sheet / SOV line items"
+  },
+  {
+   "id": "change-order",
+   "why": "Change order doc type: modifies contract sum or time; distinct from proposal-quote"
+  },
+  {
+   "id": "rfi",
+   "why": "Request for information doc type in construction"
+  },
+  {
+   "id": "submittal",
+   "why": "Submittal / shop drawing doc type in construction"
+  },
+  {
+   "id": "lien-waiver",
+   "why": "Conditional/unconditional lien waiver doc type"
+  },
+  {
+   "id": "lien_notice",
+   "why": "Preliminary notice, notice to owner, notice of intent to lien, mechanic lien"
+  },
+  {
+   "id": "closeout_document",
+   "why": "O&M manuals, as-builts, warranties, punch lists"
+  },
+  {
+   "id": "contract_sum / contract_sum_to_date / change_order_total / work_completed / stored_materials",
+   "why": "G702 summary line fields"
+  },
+  {
+   "id": "on_rent / off_rent / due_back / available / reserved / out_of_service",
+   "why": "Rental equipment lifecycle statuses"
+  },
+  {
+   "id": "on_rent_date / off_rent_date",
+   "why": "Rental start and return dates"
+  },
+  {
+   "id": "meter_hours / odometer / fuel_level",
+   "why": "Equipment usage readings at checkout and check-in"
+  },
+  {
+   "id": "damage_waiver",
+   "why": "Rental damage waiver fee (LDW/DW/RPP)"
+  },
+  {
+   "id": "rental_rate",
+   "why": "Day/week/4-week rate tiers"
+  },
+  {
+   "id": "delivery_charge",
+   "why": "Delivery, pickup, mobilization, freight"
+  },
+  {
+   "id": "cam_charge / pro_rata_share / base_year",
+   "why": "Commercial lease operating-expense pass-throughs"
+  },
+  {
+   "id": "square_footage / rent_psf",
+   "why": "Commercial rent measures"
+  },
+  {
+   "id": "late_fee / returned_payment / prepaid / concession / pet_deposit / hoa_dues / special_assessment",
+   "why": "Residential and HOA money words"
+  },
+  {
+   "id": "month_to_month / on_notice / eviction / abandoned",
+   "why": "Lease lifecycle statuses"
+  },
+  {
+   "id": "partial",
+   "why": "Partially paid status"
+  },
+  {
+   "id": "payment_terms",
+   "why": "Net 30, due on receipt, pay-when-paid"
+  },
+  {
+   "id": "billing_period",
+   "why": "Billing cycle / period-to date"
+  },
+  {
+   "id": "tax",
+   "why": "Sales tax, rental tax line"
+  },
+  {
+   "id": "discount",
+   "why": "Discounts and credits line"
+  },
+  {
+   "id": "property_manager / project_manager / design_professional",
+   "why": "Roles not mapped to a DeepWell role id"
+  },
+  {
+   "id": "ti_allowance / percentage_rent / management_fee",
+   "why": "Commercial lease and PM-company money terms"
+  },
+  {
+   "id": "rent_due_day / notice_period",
+   "why": "Lease clause fields"
+  }
+ ]
+}

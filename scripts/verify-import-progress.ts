@@ -89,7 +89,8 @@ check('a malformed progress body is ignored, never NaN', ring.includes('Number.i
 check('only one card (no second section in the panel)', (ring.match(/<section/g) || []).length === 1);
 check('long Inbox lists are capped', (intake.match(/slice\(0, LIST_ROW_LIMIT\)/g) || []).length === 2);
 const bell = readFileSync(resolve(root, 'src/components/NotificationsPanel.tsx'), 'utf8');
-check('read notifications leave the list', bell.includes('items.filter((i) => !i.readAt)') && bell.includes('visibleItems.map'));
+const groupsSrc = readFileSync(resolve(root, 'src/services/alertGroups.ts'), 'utf8');
+check('read notifications leave the list', bell.includes('groupAlerts(items, filter, Date.now(), showRead)') && groupsSrc.includes('return showEarlier || !item.readAt;'));
 check('bulk import waits for Start import', intake.includes('setPrecheck({') && !/walkZip\(files\[0\]\);\s*runBulkImport/.test(intake));
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -136,7 +136,7 @@ export function parsePeriod(q, today) {
 
 const TIME_STOP = new Set([
   // R32b: "how many invoices have we sent out last quarter / yr to date / in the last 6 weeks" must never read "out ..." as a customer
-  'versus', 'vs', 'compared', 'compare', 'against', 'than', 'quoted', 'invoiced', 'billed', 'charged', 'out', 'yr', 'yrs', 'weeks', 'years', 'quarters', 'lately', 'recently', 'over', 'since', 'during', 'ago', 'q1', 'q2', 'q3', 'q4', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'twelve',
+  'versus', 'vs', 'compared', 'compare', 'against', 'than', 'quoted', 'dated', 'invoiced', 'billed', 'charged', 'out', 'yr', 'yrs', 'weeks', 'years', 'quarters', 'lately', 'recently', 'over', 'since', 'during', 'ago', 'q1', 'q2', 'q3', 'q4', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'twelve',
   'for', 'at', 'about', 'did', 'do', 'does', 'have', 'has', 'had', 'is', 'are', 'was', 'what', 'how', 'who', 'which', 'whats', "what's", 'much', 'me', 'my',
   'last', 'this', 'next', 'month', 'year', 'week', 'quarter', 'ytd', 'all', 'time', 'so', 'far', 'today', 'yesterday', 'ever', 'total',
   'the', 'our', 'a', 'an', 'of', 'to', 'in', 'on', 'we', 'i', 'you', 'us', 'them', 'him', 'her', 'his', 'their', 'job', 'jobs', 'invoice',
@@ -268,7 +268,7 @@ const RE = {
   topCustomers: /\b(?:biggest|largest|top|best|highest)\b[^?]*\bcustomers?\b|\bcustomers?\b[^?]*\bby (?:revenue|sales|billing|spend)\b|\bwho(?:'s| is) our (?:biggest|best|top)\b/i,
   avg: /\baverage\s+(?:ticket|invoice|job|sale|bill|repair|quote|estimate|proposal)\b|\bavg\s+(?:ticket|invoice)\b|\bmedian\s+(?:invoice|quote|estimate|proposal)\b/i,
   last: /\b(?:last|latest|most recent|newest|previous)\s+(?:invoice|bill|job|ticket|charge|one|visit|service|repair|install(?:ation)?)\b/i,
-  totalInvoiced: /\b(?:how(?:'?s)? much|amount\s+(?:of|on|for)|(?:come|comes)\s+to|total|revenue|sales|invoiced|billed|billing|income|earn(?:ed)?|brought in|made)\b/i,
+  totalInvoiced: /\b(?:how(?:'?s)? much|amount\s+(?:of|on|for)|(?:come|comes)\s+to|total|sum\s+of|revenue|sales|invoiced|billed|billing|income|earn(?:ed)?|brought in|made)\b|\b(?:what|how much)\s+(?:did|have|do)\s+we\s+(?:bill|invoice|charge)\b/i,
   po: /\bpurchase orders?\b|\bpos?\b/i,
 };
 
@@ -373,7 +373,7 @@ const QUOTE_ASK_RE = /\b(?:how(?:'?s)? much|what|whats|what's|amount|price|price
 // Defect 19e: "which maintenance agreement costs the most" - a single-agreement superlative (the agreement FEE), not a document list.
 const AGREEMENT_NOUN_RE = /\b(?:(?:maintenance|service)\s+(?:agreements?|contracts?|plans?)|agreements?|contracts?)\b/i;
 const AGREEMENT_SUPERLATIVE_RE = /\b(?:costs?|priced?|worth|pays?|charges?)\s+(?:the\s+)?(?:most|least)\b|\b(?:most|least)\s+(?:expensive|costly)\b|\b(?:highest|lowest|biggest|largest|smallest|cheapest|priciest|top)\b|\bworth\s+the\s+(?:most|least)\b/i;
-const QUOTES_TOTAL_RE = /\btotal\s+(?:(?:value|amount)\s+)?(?:of|on|for)\s+(?:all\s+)?(?:(?:our|the)\s+)?(?:quotes?|estimates?|proposals?)\b/i;
+const QUOTES_TOTAL_RE = /\btotal\s+(?:(?:value|amount)\s+)?(?:of|on|for)\s+(?:all\s+)?(?:(?:our|the)\s+)?(?:quotes?|estimates?|proposals?)\b|\b(?:sum|total)\s+(?:of\s+)?(?:all\s+)?(?:our\s+)?(?:quotes?|estimates?|proposals?)(?:\s+(?:dollar\s+)?(?:value|amount|dollars?))?\b|\b(?:quotes?|estimates?|proposals?)\s+(?:total|dollar\s+value|total\s+value)\b/i;
 const AVG_AGREEMENT_FEE_RE = /\baverage\b[^?]*\b(?:annual\s+)?fee\b[^?]*\bagreements?\b|\bagreements?\b[^?]*\baverage\b[^?]*\bfee\b/i;
 /** "Is Mercer all paid up?" - a per-customer yes/no, always naming the unknown-status count too. */
 const CUSTOMER_PAID_UP_RE = /^is\s+(.+?)\s+(?:all\s+)?paid\s+up\b/i;
@@ -405,6 +405,14 @@ function docKindFromWord(w) {
  * @returns {{intent: string, period: object|null, subject: string|null}|null}  null when the
  *   question is not a money shape this file answers (caller falls through to the agent).
  */
+const OTHER_PAPER_RE = /\b(?:purchase orders?|pos|quotes?|estimates?|proposals?|work orders?|service tickets?|dispatch notes?|permits?|agreements?|delivery tickets?|packing lists?|price lists?|certificates? of insurance|cois?)\b/;
+const INVOICE_WORDS_RE = /\b(?:invoices?|bills?|billed|receivables?|owe|owes|owed|owing|balance|balances|revenue|payments?|collected|customers?|clients?)\b/;
+/** J1: the question's paper is a purchase order / quote / work order... and no invoice, bill or balance word anywhere. */
+export function namesOtherPaperOnly(q) {
+  const s = String(q ?? '').toLowerCase();
+  return OTHER_PAPER_RE.test(s) && !INVOICE_WORDS_RE.test(s);
+}
+
 export function dropRoleBeforeInvoices(question) {
   const fixed = repairKnownTypos(question);
   const cs = countSubject(fixed);
@@ -426,7 +434,8 @@ export function parseMoneyIntent(question, { today }) {
     if (/\b(?:over|above|more than|greater than|at least|exceeding)\s+\$?\d[^.?]*\b(?:and|but|yet|while)\b[^.?]*\b(?:under|below|less than|fewer than|at most|up to)\s+\$?\d|\b(?:under|below|less than|fewer than|at most|up to)\s+\$?\d[^.?]*\b(?:and|but|yet|while)\b[^.?]*\b(?:over|above|more than|greater than|at least|exceeding)\s+\$?\d/.test(q)) return null;
   }
   const period = parsePeriod(q, today);
-  const subject = extractSubjectPhrase(question);
+  // B3: a half / quarter / year-before-last phrase is a period, never a customer name
+  const subject = extractSubjectPhrase(String(question ?? '').replace(/\b(?:the\s+)?(?:first|second|third|fourth|1st|2nd|3rd|4th|last)\s+(?:half|quarter)\s+(?:of\s+)?(?:the\s+year\s+)?(?:\d{4}|this\s+year|last\s+year)\b/gi, ' ').replace(/\b(?:the\s+)?year\s+before\s+last\b/gi, ' '));
   // R7: the raw (lowercased) question text, so a handler can tell "how many invoices are unpaid"
   // (a plain count question) apart from "who owes us money" (a dollar-first narrative) even though
   // both parse to the same intent below.
@@ -515,7 +524,7 @@ export function parseMoneyIntent(question, { today }) {
       }
       // With a status word the amount part is not applied by the status-aware intents below; runMoneyIntent says so in the answer.
       if (!/\b(?:open|unpaid|outstanding|overdue|past[\s-]?due|paid|partial\w*|unsettled|owing|owed|delinquent)\b/.test(q)) {
-        return mk('threshold_invoices', { subject, thresholdDir: th.dir, thresholdInclusive: th.inclusive, thresholdAmount: th.amount, docScope: docScope && !docScope.invoiceOnly ? docScope : null });
+        return mk('threshold_invoices', { subject, thresholdDir: th.dir, thresholdInclusive: th.inclusive, thresholdAmount: th.amount, docScope: docScope && !docScope.invoiceOnly ? docScope : null, wantSum: /\b(?:total|totals|sum|worth|add(?:s|ed)?\s+up|combined|how\s+much|dollar\s+value|value)\b/.test(q.replace(THRESHOLD_RE, ' ')) });
       }
     }
   }
@@ -526,6 +535,8 @@ export function parseMoneyIntent(question, { today }) {
   // "how many invoices are paid/partially paid" - RE.open only ever covered "unpaid"; a bare
   // \bpaid\b never matches inside "unpaid" (no word boundary before its "p"), so this cannot
   // steal an "unpaid"/"overdue" question from the branches below.
+  // J1: "open POs", "unpaid quotes", "overdue work orders": a payment status next to another kind of paper is not an invoice question (those papers carry no payment status).
+  if (namesOtherPaperOnly(q) && (PAID_STATUS_RE.test(q) || RE.aging.test(q) || RE.overdue.test(q) || RE.open.test(q))) return null;
   if (PAID_STATUS_RE.test(q)) return mk('payment_status', { subject: null, statusTarget: /partial/i.test(q) ? 'partial' : 'paid' });
   if (RE.aging.test(q)) return mk('ar_aging', { subject: null });
   if (RE.overdue.test(q)) return mk('overdue', { subject, dayThreshold: (q.match(OVERDUE_DAYS_RE) || [])[1] ? Number(q.match(OVERDUE_DAYS_RE)[1]) : null });
@@ -962,6 +973,17 @@ async function receivables(db, intent, ctx, direction = 'receivable') {
     const [vb] = await q(db, `SELECT count(*)::int AS n FROM financials f WHERE f.direction = 'payable' AND f.doc_kind = 'invoice'`, [], ctx.hu);
     const [po] = await q(db, `SELECT count(*)::int AS n FROM financials f WHERE f.doc_kind = 'po'`, [], ctx.hu);
     if (!vb.n) return baseAnswer(`There are no vendor bills on file, so nothing is recorded as owed.${po.n ? ` (${plural(po.n, 'purchase order')} ${po.n === 1 ? "isn't a bill" : "aren't bills"}, so ${po.n === 1 ? 'it was' : 'they were'} not counted.)` : ''}`, [], { confidence: 1, ...zeroCite('Searched the vendor bills; there are none on file.') });
+  }
+  if (a.n_open === 0 && direction === 'receivable') {
+    // R3 B2: when no invoice in scope records a payment status, balance or due date, say so plainly instead of "No open invoices"
+    const [rec] = await q(db, `SELECT count(*)::int AS n, COALESCE(sum(f.total), 0) AS total,
+        count(*) FILTER (WHERE f.status IN ('paid','unpaid','partial') OR f.amount_paid IS NOT NULL OR f.due_date IS NOT NULL)::int AS k
+      FROM financials f WHERE ${scope} AND $2::date IS NOT NULL`, [today, g?.ids ?? null], ctx.hu);
+    if (rec && rec.k === 0) {
+      const has = rec.n ? `On file: ${plural(rec.n, 'invoice')}.` : `No invoices${who} are on file.`;
+      const a2 = baseAnswer(`Payment status isn't recorded on ${g ? `${g.name}'s` : 'these'} invoices, so I can't tell what is owed or past due. ${has}`, [], { confidence: 1, ...zeroCite(`Looked for payment status, balances and due dates on ${g ? `${g.name}'s ` : 'every '}invoice${g ? 's' : ''}; none is recorded.`) });
+      return a2;
+    }
   }
   if (a.n_open === 0) {
     // R35 brevity: "No open invoices — none is marked unpaid. Note: 120 show no payment status, so they aren't counted."
@@ -1516,7 +1538,13 @@ async function thresholdInvoices(db, intent, ctx) {
   const note = unapplied.length ? ` I could not also apply ${unapplied.join(' and ')} from your question, so that part is not reflected in this count.` : '';
   // R3 amount-basis loop (DONOVAN_AMOUNT_BASIS=0 turns it off): with no customer / city / period applied, say the count is every invoice on file, any date, paid or unpaid.
   const basis = process.env.DONOVAN_AMOUNT_BASIS === '0' || scopeText ? '' : (excluded > 0 ? ' That counts receivable invoices in US dollars, any date, paid or unpaid.' : ` That counts every ${nounPl} on file, any date, paid or unpaid.`);
-  const text = `${plural(nAll, nounPl)}${scopeText} ${nAll === 1 ? 'is' : 'are'} ${dirWord} ${amtText}.${basis}${note}${exclusionText({ noTotal: a.n_no_total, noun: nounPl })}`;
+  // R3 B2: "what's the total for invoices over $3000": the sum of the printed totals that pass the threshold, said beside the count
+  let sumText = '';
+  if (intent.wantSum && nAll > 0) {
+    const [{ s: sumAll }] = await q(db, `SELECT COALESCE(sum(f.total), 0) AS s FROM financials f WHERE ${shift(where)}`, params, ctx.hu);
+    sumText = `, totaling ${fmt(String(sumAll))}`;
+  }
+  const text = `${plural(nAll, nounPl)}${scopeText} ${nAll === 1 ? 'is' : 'are'} ${dirWord} ${amtText}${sumText}.${basis}${note}${exclusionText({ noTotal: a.n_no_total, noun: nounPl })}`;
   return baseAnswer(text, rows.slice(0, 40).map((r) => invoiceFact(r)), {
     sources: rows.slice(0, 25).map((r) => docSource(r.document_id, r.total_page)), interpretation: `${nounPl}s ${dirWord} ${amtText}${scopeText}`,
     cite: { records: financeRecords(rows), total: nAll, claimedCount: nAll, basis: `Counted ${nounPl}s with a printed total ${dirWord} ${amtText}${scopeText}.` },

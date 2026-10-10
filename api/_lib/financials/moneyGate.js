@@ -22,7 +22,7 @@
 import { withTenant as defaultWithTenant } from '../recordsStore.js';
 import { tenantHasFinancialRows } from './store.js';
 import { parseMoneyIntent, runMoneyIntent, dropRoleBeforeInvoices } from './answers.js';
-import { leftoverWords } from '../router/leftover.js';
+import { leftoverWords, unusedGrammar } from '../router/leftover.js';
 import { resolveContactCandidates } from '../contactLookup.js';
 import { parseAmountInvoiceQuestion, amountMentioned } from './amountInvoice.js';
 import { docLaneFromUnderstanding } from '../understanding/route.js';
@@ -37,6 +37,12 @@ function countLeftover(question, today) {
   const i0 = parseMoneyIntent(question, { today });
   const bare = Boolean(i0) && !i0.period && !i0.subject; // the whole-shop count: only right when nothing else was asked
   return leftoverWords(question, sig, { lane: 'money-count', plain: bare, entityKey: 'documents' });
+}
+
+function moneyGrammarUnused(question, today) {
+  if (process.env.DONOVAN_GRAMMAR === '0') return [];
+  const sig = (q) => { const i = parseMoneyIntent(q, { today }); if (!i) return null; const { raw, rawOriginal, ...rest } = i; return JSON.stringify(rest); };
+  try { return unusedGrammar(question, sig, undefined, { include: ['year', 'period'] }); } catch { return []; }
 }
 
 const SUBJECT_SCOPED = new Set(['open_invoices', 'overdue', 'ar_aging', 'total_invoiced', 'last_invoice', 'payment_status', 'customer_paid_up', 'avg_invoice']);
@@ -63,6 +69,8 @@ export async function answerMoneyQuestion({ withTenant = defaultWithTenant, ctxA
       if (!(await tenantHasFinancialRows(db))) return { handled: false, hasData: false };
       const intent = parseMoneyIntent(question, { today });
       if (!intent) return { handled: false, hasData: true };
+      // B3: grammar the money reading never used (a negation, a second year, "combined", "and their total value", a top-N ...) must not be silently dropped: a figure for a different question is not an answer
+      if (moneyGrammarUnused(question, today).length) return { handled: false, hasData: true, intent: intent.intent };
       // R40: a question that names an invoice amount is never answered with a shop-wide total / count / last-invoice that ignores the amount.
       if (intent.intent !== 'threshold_invoices' && amountMentioned(question)) return { handled: false, hasData: true, intent: intent.intent };
       // R3: "has Wyckoff Sandra paid us": a name-bearing collected-money question is never answered with the whole shop's figure; the named-customer lane (answerNamedMoneyQuestion) takes it

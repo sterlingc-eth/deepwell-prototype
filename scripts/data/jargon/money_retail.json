@@ -1,0 +1,4983 @@
+{
+ "group": "money_retail",
+ "entries": [
+  {
+   "term": "vendor bill",
+   "variants": [
+    "vendor bills",
+    "supplier bill",
+    "supplier bills",
+    "supplier invoice",
+    "vendor invoice",
+    "vendor invoices"
+   ],
+   "class": "doc_type",
+   "means": "invoice",
+   "industries": [
+    "all"
+   ],
+   "note": "invoice we RECEIVE from a vendor (accounts payable)",
+   "source": "https://quickbooks.intuit.com/r/bookkeeping/invoice-terms/"
+  },
+  {
+   "term": "tax invoice",
+   "variants": [
+    "tax invoices",
+    "vat invoice",
+    "gst invoice"
+   ],
+   "class": "doc_type",
+   "means": "invoice",
+   "industries": [
+    "all"
+   ],
+   "note": "AU/UK/EU label for invoice",
+   "source": "https://quickbooks.intuit.com/r/bookkeeping/invoice-terms/"
+  },
+  {
+   "term": "proforma invoice",
+   "variants": [
+    "pro forma invoice",
+    "pro-forma invoice",
+    "proforma",
+    "pro forma",
+    "proforma invoices"
+   ],
+   "class": "doc_type",
+   "means": "invoice",
+   "industries": [
+    "all"
+   ],
+   "note": "advance invoice before delivery; not yet a demand for payment",
+   "source": "https://quickbooks.intuit.com/r/bookkeeping/invoice-terms/"
+  },
+  {
+   "term": "commercial invoice",
+   "variants": [
+    "commercial invoices"
+   ],
+   "class": "doc_type",
+   "means": "invoice",
+   "industries": [
+    "all"
+   ],
+   "note": "shipping/customs invoice",
+   "source": "https://quickbooks.intuit.com/r/bookkeeping/invoice-terms/"
+  },
+  {
+   "term": "sales invoice",
+   "variants": [
+    "sales invoices",
+    "customer invoice",
+    "customer invoices",
+    "client invoice",
+    "client invoices"
+   ],
+   "class": "doc_type",
+   "means": "invoice",
+   "industries": [
+    "all"
+   ],
+   "note": "invoice we SEND to a customer (accounts receivable)",
+   "source": "https://quickbooks.intuit.com/r/bookkeeping/invoice-terms/"
+  },
+  {
+   "term": "recurring invoice",
+   "variants": [
+    "recurring invoices",
+    "repeat invoice",
+    "repeating invoice",
+    "standing invoice",
+    "subscription invoice"
+   ],
+   "class": "doc_type",
+   "means": "invoice",
+   "industries": [
+    "all"
+   ],
+   "note": "auto-repeating invoice",
+   "source": "https://quickbooks.intuit.com/r/bookkeeping/invoice-terms/"
+  },
+  {
+   "term": "progress invoice",
+   "variants": [
+    "progress billing",
+    "progress bill",
+    "draw invoice",
+    "pay app",
+    "pay application",
+    "application for payment",
+    "aia invoice",
+    "g702"
+   ],
+   "class": "doc_type",
+   "means": "invoice",
+   "industries": [
+    "all"
+   ],
+   "note": "construction/trades invoice for a % of the job",
+   "source": "https://quickbooks.intuit.com/r/bookkeeping/invoice-terms/"
+  },
+  {
+   "term": "deposit invoice",
+   "variants": [
+    "down payment invoice",
+    "retainer invoice",
+    "advance invoice",
+    "invoice for deposit"
+   ],
+   "class": "doc_type",
+   "means": "invoice",
+   "industries": [
+    "all"
+   ],
+   "note": "invoice that bills a deposit",
+   "source": "https://quickbooks.intuit.com/r/bookkeeping/invoice-terms/"
+  },
+  {
+   "term": "final invoice",
+   "variants": [
+    "final bill",
+    "final billing",
+    "closing invoice"
+   ],
+   "class": "doc_type",
+   "means": "invoice",
+   "industries": [
+    "all"
+   ],
+   "note": "last bill on a job",
+   "source": "https://quickbooks.intuit.com/r/bookkeeping/invoice-terms/"
+  },
+  {
+   "term": "amended invoice",
+   "variants": [
+    "corrected invoice",
+    "revised invoice",
+    "reissued invoice",
+    "replacement invoice",
+    "invoice adjustment",
+    "billing adjustment"
+   ],
+   "class": "doc_type",
+   "means": "invoice",
+   "industries": [
+    "all"
+   ],
+   "note": "supersedes an earlier invoice",
+   "source": "https://quickbooks.intuit.com/r/bookkeeping/invoice-terms/"
+  },
+  {
+   "term": "debit memo",
+   "variants": [
+    "debit memos",
+    "debit note",
+    "debit notes",
+    "debit adjustment"
+   ],
+   "class": "doc_type",
+   "means": "invoice",
+   "industries": [
+    "all"
+   ],
+   "note": "adds to balance owed; files under invoice",
+   "source": "https://quickbooks.intuit.com/r/bookkeeping/invoice-terms/"
+  },
+  {
+   "term": "invoce",
+   "variants": [
+    "invioce",
+    "invoise",
+    "invoicce",
+    "inovice",
+    "inovices",
+    "invoces",
+    "invioces",
+    "invocie",
+    "invocies",
+    "invoive"
+   ],
+   "class": "doc_type",
+   "means": "invoice",
+   "industries": [
+    "all"
+   ],
+   "note": "common misspellings of invoice",
+   "source": "https://quickbooks.intuit.com/r/bookkeeping/invoice-terms/"
+  },
+  {
+   "term": "inv",
+   "variants": [
+    "invs"
+   ],
+   "class": "doc_type",
+   "means": "invoice",
+   "industries": [
+    "all"
+   ],
+   "note": "abbreviation",
+   "source": "https://quickbooks.intuit.com/r/bookkeeping/invoice-terms/"
+  },
+  {
+   "term": "statement of charges",
+   "variants": [
+    "itemized bill",
+    "itemised bill",
+    "itemized statement of charges",
+    "bill of charges",
+    "charge sheet"
+   ],
+   "class": "doc_type",
+   "means": "invoice",
+   "industries": [
+    "all"
+   ],
+   "note": "itemised charges bill",
+   "source": "https://central.xero.com/s/article/Add-a-credit-note"
+  },
+  {
+   "term": "freight bill",
+   "variants": [
+    "freight invoice",
+    "carrier invoice",
+    "shipping invoice",
+    "shipping bill"
+   ],
+   "class": "doc_type",
+   "means": "invoice",
+   "industries": [
+    "all"
+   ],
+   "note": "bill from a carrier",
+   "source": "https://central.xero.com/s/article/Add-a-credit-note"
+  },
+  {
+   "term": "utility bill",
+   "variants": [
+    "utility bills",
+    "electric bill",
+    "water bill",
+    "gas bill",
+    "phone bill",
+    "internet bill",
+    "power bill",
+    "energy bill",
+    "sewer bill",
+    "trash bill"
+   ],
+   "class": "doc_type",
+   "means": "invoice",
+   "industries": [
+    "all"
+   ],
+   "note": "bill received from a utility; vendor bill",
+   "source": "https://central.xero.com/s/article/Add-a-credit-note"
+  },
+  {
+   "term": "sales receipt",
+   "variants": [
+    "sales receipts",
+    "cash receipt",
+    "cash receipts",
+    "cash sale receipt"
+   ],
+   "class": "doc_type",
+   "means": "receipt",
+   "industries": [
+    "all"
+   ],
+   "note": "proof of a sale paid at the time",
+   "source": "https://quickbooks.intuit.com/r/glossary/"
+  },
+  {
+   "term": "pos receipt",
+   "variants": [
+    "pos receipts",
+    "register receipt",
+    "till receipt",
+    "till slip",
+    "register tape",
+    "cash register receipt",
+    "store receipt",
+    "itemized receipt",
+    "itemised receipt",
+    "gift receipt",
+    "e-receipt",
+    "ereceipt",
+    "email receipt",
+    "digital receipt",
+    "emailed receipt"
+   ],
+   "class": "doc_type",
+   "means": "receipt",
+   "industries": [
+    "all"
+   ],
+   "note": "point-of-sale receipt",
+   "source": "https://quickbooks.intuit.com/r/glossary/"
+  },
+  {
+   "term": "proof of purchase",
+   "variants": [
+    "proof of payment",
+    "payment confirmation",
+    "payment slip",
+    "paid slip",
+    "paid receipt",
+    "paid in full receipt",
+    "confirmation of payment",
+    "acknowledgment of payment",
+    "acknowledgement of payment"
+   ],
+   "class": "doc_type",
+   "means": "receipt",
+   "industries": [
+    "all"
+   ],
+   "note": "POP is ambiguous with 'point of purchase' displays",
+   "source": "https://quickbooks.intuit.com/r/glossary/"
+  },
+  {
+   "term": "expense receipt",
+   "variants": [
+    "expense receipts",
+    "business receipt",
+    "business receipts",
+    "reimbursement receipt",
+    "receipts for taxes",
+    "receipts for tax"
+   ],
+   "class": "doc_type",
+   "means": "receipt",
+   "industries": [
+    "all"
+   ],
+   "note": "receipt kept as expense backup",
+   "source": "https://quickbooks.intuit.com/r/glossary/"
+  },
+  {
+   "term": "deposit receipt",
+   "variants": [
+    "deposit receipts",
+    "down payment receipt",
+    "retainer receipt",
+    "layaway receipt",
+    "earnest money receipt"
+   ],
+   "class": "doc_type",
+   "means": "receipt",
+   "industries": [
+    "all"
+   ],
+   "note": "proof a deposit was taken",
+   "source": "https://quickbooks.intuit.com/r/glossary/"
+  },
+  {
+   "term": "refund receipt",
+   "variants": [
+    "refund receipts",
+    "refund slip",
+    "refund slips",
+    "exchange receipt",
+    "exchange slip",
+    "store credit slip",
+    "store credit receipt",
+    "return receipt",
+    "return receipts"
+   ],
+   "class": "doc_type",
+   "means": "receipt",
+   "industries": [
+    "all"
+   ],
+   "note": "return/refund/exchange proof (return slip already in lexicon)",
+   "source": "https://quickbooks.intuit.com/r/glossary/"
+  },
+  {
+   "term": "card slip",
+   "variants": [
+    "credit card slip",
+    "card slips",
+    "card receipt",
+    "charge slip",
+    "merchant copy",
+    "customer copy",
+    "cardholder copy",
+    "signature slip",
+    "tip slip",
+    "terminal receipt",
+    "swipe receipt"
+   ],
+   "class": "doc_type",
+   "means": "receipt",
+   "industries": [
+    "all"
+   ],
+   "note": "card terminal slip",
+   "source": "https://quickbooks.intuit.com/r/glossary/"
+  },
+  {
+   "term": "rent receipt",
+   "variants": [
+    "rent receipts",
+    "rental receipt",
+    "rent payment receipt"
+   ],
+   "class": "doc_type",
+   "means": "receipt",
+   "industries": [
+    "all"
+   ],
+   "note": "tenant payment receipt",
+   "source": "https://quickbooks.intuit.com/r/glossary/"
+  },
+  {
+   "term": "donation receipt",
+   "variants": [
+    "donation receipts",
+    "gift acknowledgment",
+    "gift acknowledgement",
+    "contribution receipt"
+   ],
+   "class": "doc_type",
+   "means": "receipt",
+   "industries": [
+    "all"
+   ],
+   "note": "nonprofit receipt",
+   "source": "https://quickbooks.intuit.com/r/glossary/"
+  },
+  {
+   "term": "recibo",
+   "variants": [
+    "recibos"
+   ],
+   "class": "doc_type",
+   "means": "receipt",
+   "industries": [
+    "all"
+   ],
+   "note": "Spanish for receipt",
+   "source": "https://quickbooks.intuit.com/r/glossary/"
+  },
+  {
+   "term": "recipt",
+   "variants": [
+    "reciept",
+    "reciepts",
+    "recipts",
+    "receit",
+    "receits",
+    "reciet"
+   ],
+   "class": "doc_type",
+   "means": "receipt",
+   "industries": [
+    "all"
+   ],
+   "note": "common misspellings of receipt",
+   "source": "https://quickbooks.intuit.com/r/glossary/"
+  },
+  {
+   "term": "customer statement",
+   "variants": [
+    "customer statements",
+    "client statement",
+    "client statements",
+    "statement of account",
+    "statements of account",
+    "account summary",
+    "billing statement",
+    "monthly statement",
+    "open item statement",
+    "balance forward statement",
+    "ar statement"
+   ],
+   "class": "doc_type",
+   "means": "statement",
+   "industries": [
+    "all"
+   ],
+   "note": "what a customer owes us over a period",
+   "source": "https://quickbooks.intuit.com/r/glossary/"
+  },
+  {
+   "term": "vendor statement",
+   "variants": [
+    "vendor statements",
+    "supplier statement",
+    "supplier statements",
+    "statement from vendor",
+    "statement from supplier",
+    "creditor statement"
+   ],
+   "class": "doc_type",
+   "means": "statement",
+   "industries": [
+    "all"
+   ],
+   "note": "what we owe a vendor; used to reconcile bills",
+   "source": "https://quickbooks.intuit.com/r/glossary/"
+  },
+  {
+   "term": "bank statement",
+   "variants": [
+    "bank statements",
+    "checking statement",
+    "savings statement",
+    "account statement bank"
+   ],
+   "class": "doc_type",
+   "means": "statement",
+   "industries": [
+    "all"
+   ],
+   "note": "bank account statement",
+   "source": "https://quickbooks.intuit.com/r/glossary/"
+  },
+  {
+   "term": "credit card statement",
+   "variants": [
+    "card statement",
+    "card statements",
+    "cc statement",
+    "cc statements",
+    "visa statement",
+    "amex statement",
+    "mastercard statement",
+    "fuel card statement",
+    "fleet card statement",
+    "business card statement"
+   ],
+   "class": "doc_type",
+   "means": "statement",
+   "industries": [
+    "all"
+   ],
+   "note": "card issuer statement",
+   "source": "https://quickbooks.intuit.com/r/glossary/"
+  },
+  {
+   "term": "consignor statement",
+   "variants": [
+    "consignor statements",
+    "consignment statement",
+    "consignment settlement",
+    "consignment payout statement",
+    "consignor payout",
+    "consignment sales report",
+    "consignment report"
+   ],
+   "class": "doc_type",
+   "means": "statement",
+   "industries": [
+    "all"
+   ],
+   "note": "what consigned goods sold and what the consignor is owed",
+   "source": "https://quickbooks.intuit.com/r/glossary/"
+  },
+  {
+   "term": "merchant statement",
+   "variants": [
+    "merchant statements",
+    "processor statement",
+    "processing statement",
+    "card processing statement",
+    "payment processor statement",
+    "payout report",
+    "payouts report",
+    "settlement report",
+    "settlement statement",
+    "deposit report",
+    "batch settlement",
+    "stripe payout report",
+    "square payout report",
+    "paypal activity report",
+    "shopify payout report"
+   ],
+   "class": "doc_type",
+   "means": "statement",
+   "industries": [
+    "all"
+   ],
+   "note": "payment processor settlement/statement",
+   "source": "https://quickbooks.intuit.com/r/glossary/"
+  },
+  {
+   "term": "loan statement",
+   "variants": [
+    "mortgage statement",
+    "line of credit statement",
+    "loc statement",
+    "loan payoff statement"
+   ],
+   "class": "doc_type",
+   "means": "statement",
+   "industries": [
+    "all"
+   ],
+   "note": "lender statement",
+   "source": "https://quickbooks.intuit.com/r/glossary/"
+  },
+  {
+   "term": "stmt",
+   "variants": [
+    "stmts"
+   ],
+   "class": "doc_type",
+   "means": "statement",
+   "industries": [
+    "all"
+   ],
+   "note": "abbreviation",
+   "source": "https://quickbooks.intuit.com/r/glossary/"
+  },
+  {
+   "term": "aging report",
+   "variants": [
+    "ar aging",
+    "a/r aging",
+    "ar aging report",
+    "aging summary",
+    "aging detail",
+    "accounts receivable aging",
+    "receivables aging",
+    "aged receivables",
+    "aged debtors",
+    "ap aging",
+    "a/p aging",
+    "accounts payable aging",
+    "payables aging",
+    "aged payables",
+    "aged creditors",
+    "open invoices report",
+    "unpaid invoices report",
+    "open bills report",
+    "unpaid bills report"
+   ],
+   "class": "doc_type",
+   "means": "statement",
+   "industries": [
+    "all"
+   ],
+   "note": "report listing unpaid items by age bucket (current, 1-30, 31-60, 61-90, 90+)",
+   "source": "https://www.investopedia.com/terms/a/accountsreceivable.asp"
+  },
+  {
+   "term": "po",
+   "variants": [
+    "p.o.",
+    "p/o",
+    "po#",
+    "purchase ord"
+   ],
+   "class": "doc_type",
+   "means": "purchase-order",
+   "industries": [
+    "all"
+   ],
+   "note": "'POS' is ambiguous: purchase orders vs point of sale; see ambiguous",
+   "source": "https://www.investopedia.com/terms/p/purchase-order.asp"
+  },
+  {
+   "term": "purchase requisition",
+   "variants": [
+    "requisition",
+    "requisitions",
+    "purchase request",
+    "purchase requests",
+    "material request",
+    "materials request",
+    "buy request"
+   ],
+   "class": "doc_type",
+   "means": "purchase-order",
+   "industries": [
+    "all"
+   ],
+   "note": "internal request before a PO exists",
+   "source": "https://www.investopedia.com/terms/p/purchase-order.asp"
+  },
+  {
+   "term": "blanket po",
+   "variants": [
+    "blanket purchase order",
+    "blanket order",
+    "blanket orders",
+    "standing order",
+    "open po",
+    "open purchase order",
+    "master po"
+   ],
+   "class": "doc_type",
+   "means": "purchase-order",
+   "industries": [
+    "all"
+   ],
+   "note": "one PO covering many releases",
+   "source": "https://www.investopedia.com/terms/p/purchase-order.asp"
+  },
+  {
+   "term": "vendor order",
+   "variants": [
+    "supplier order",
+    "supplier orders",
+    "order form",
+    "parts order",
+    "parts orders",
+    "material order",
+    "materials order",
+    "reorder",
+    "re-order",
+    "restock order",
+    "replenishment order",
+    "stock order",
+    "stock orders",
+    "buy order"
+   ],
+   "class": "doc_type",
+   "means": "purchase-order",
+   "industries": [
+    "all"
+   ],
+   "note": "order placed with a vendor",
+   "source": "https://www.investopedia.com/terms/p/purchase-order.asp"
+  },
+  {
+   "term": "drop ship order",
+   "variants": [
+    "dropship order",
+    "drop-ship order",
+    "drop shipment",
+    "dropship",
+    "drop ship"
+   ],
+   "class": "doc_type",
+   "means": "purchase-order",
+   "industries": [
+    "all"
+   ],
+   "note": "vendor ships directly to the customer",
+   "source": "https://www.investopedia.com/terms/p/purchase-order.asp"
+  },
+  {
+   "term": "backorder",
+   "variants": [
+    "back order",
+    "backorders",
+    "back orders",
+    "back-order",
+    "backordered",
+    "back ordered",
+    "on backorder",
+    "b/o"
+   ],
+   "class": "doc_type",
+   "means": "purchase-order",
+   "industries": [
+    "all"
+   ],
+   "note": "item not yet shipped by vendor; also a status",
+   "source": "https://www.investopedia.com/terms/p/purchase-order.asp"
+  },
+  {
+   "term": "sales order",
+   "variants": [
+    "sales orders",
+    "customer order",
+    "customer orders",
+    "order confirmation",
+    "order confirmations",
+    "order acknowledgment",
+    "order acknowledgement",
+    "order ack"
+   ],
+   "class": "doc_type",
+   "means": "purchase-order",
+   "industries": [
+    "all"
+   ],
+   "note": "'SO' is ambiguous: sales order vs service order; the order a CUSTOMER placed with us",
+   "source": "https://www.investopedia.com/terms/p/purchase-order.asp"
+  },
+  {
+   "term": "quotation request",
+   "variants": [
+    "rfq",
+    "request for quote",
+    "request for quotation",
+    "request for quotes",
+    "bid request",
+    "request for proposal"
+   ],
+   "class": "doc_type",
+   "means": "purchase-order",
+   "industries": [
+    "all"
+   ],
+   "note": "request sent to vendors for a price; closest type proposal-quote",
+   "source": "https://www.investopedia.com/terms/p/purchase-order.asp"
+  },
+  {
+   "term": "packing list",
+   "variants": [
+    "packing lists",
+    "pack list",
+    "packlist",
+    "packing sheet",
+    "shipping list",
+    "shipment list",
+    "contents list",
+    "manifest",
+    "shipping manifest",
+    "cargo manifest",
+    "enclosed items"
+   ],
+   "class": "doc_type",
+   "means": "delivery-ticket",
+   "industries": [
+    "all"
+   ],
+   "note": "packing slip family",
+   "source": "https://www.shopify.com/blog/packing-slip"
+  },
+  {
+   "term": "pick list",
+   "variants": [
+    "pick lists",
+    "picklist",
+    "picking slip",
+    "pick ticket",
+    "pick tickets",
+    "picking list"
+   ],
+   "class": "doc_type",
+   "means": "delivery-ticket",
+   "industries": [
+    "all"
+   ],
+   "note": "warehouse pick sheet",
+   "source": "https://www.shopify.com/blog/packing-slip"
+  },
+  {
+   "term": "proof of delivery",
+   "variants": [
+    "pod slip",
+    "delivery receipt",
+    "delivery receipts",
+    "delivery confirmation",
+    "signed delivery",
+    "signed pod",
+    "drop ticket",
+    "drop tickets",
+    "signed for"
+   ],
+   "class": "doc_type",
+   "means": "delivery-ticket",
+   "industries": [
+    "all"
+   ],
+   "note": "POD is ambiguous (print on demand); delivery receipts differ from sales receipts",
+   "source": "https://www.shopify.com/blog/packing-slip"
+  },
+  {
+   "term": "will call",
+   "variants": [
+    "will-call",
+    "will call ticket",
+    "will-call ticket",
+    "will call slip",
+    "will call order",
+    "pickup order",
+    "pick up order",
+    "curbside pickup",
+    "order pickup slip",
+    "counter pickup"
+   ],
+   "class": "doc_type",
+   "means": "delivery-ticket",
+   "industries": [
+    "all"
+   ],
+   "note": "goods held at counter for customer pickup",
+   "source": "https://www.shopify.com/blog/packing-slip"
+  },
+  {
+   "term": "bill of lading",
+   "variants": [
+    "bol",
+    "b/l",
+    "bills of lading",
+    "freight bill of lading",
+    "straight bill of lading",
+    "vics bol"
+   ],
+   "class": "doc_type",
+   "means": "delivery-ticket",
+   "industries": [
+    "all"
+   ],
+   "note": "carrier shipping document",
+   "source": "https://www.shopify.com/blog/packing-slip"
+  },
+  {
+   "term": "waybill",
+   "variants": [
+    "way bill",
+    "waybills",
+    "airway bill",
+    "awb",
+    "pro number",
+    "pro #",
+    "freight pro"
+   ],
+   "class": "doc_type",
+   "means": "delivery-ticket",
+   "industries": [
+    "all"
+   ],
+   "note": "carrier tracking document",
+   "source": "https://www.shopify.com/blog/packing-slip"
+  },
+  {
+   "term": "receiving report",
+   "variants": [
+    "receiving reports",
+    "goods received note",
+    "grn",
+    "receiving slip",
+    "receiving ticket",
+    "receiving record",
+    "goods receipt",
+    "received goods",
+    "stock received",
+    "inbound receipt",
+    "receiving log"
+   ],
+   "class": "doc_type",
+   "means": "delivery-ticket",
+   "industries": [
+    "all"
+   ],
+   "note": "proof goods arrived; compared with PO and vendor bill (3-way match)",
+   "source": "https://www.shopify.com/blog/packing-slip"
+  },
+  {
+   "term": "advance ship notice",
+   "variants": [
+    "asn",
+    "ship notice",
+    "shipping notice",
+    "shipment notice",
+    "dispatch advice",
+    "despatch advice"
+   ],
+   "class": "doc_type",
+   "means": "delivery-ticket",
+   "industries": [
+    "all"
+   ],
+   "note": "notice that an order is on the way",
+   "source": "https://www.shopify.com/blog/packing-slip"
+  },
+  {
+   "term": "transfer slip",
+   "variants": [
+    "stock transfer",
+    "inventory transfer",
+    "store transfer",
+    "transfer order",
+    "transfer ticket",
+    "location transfer",
+    "branch transfer",
+    "warehouse transfer",
+    "transfer sheet"
+   ],
+   "class": "doc_type",
+   "means": "delivery-ticket",
+   "industries": [
+    "all"
+   ],
+   "note": "goods moved between our own locations",
+   "source": "https://www.shopify.com/blog/packing-slip"
+  },
+  {
+   "term": "return to vendor",
+   "variants": [
+    "rtv",
+    "rtv slip",
+    "vendor return",
+    "vendor returns",
+    "return to supplier",
+    "supplier return",
+    "vendor rma",
+    "rma slip",
+    "rma form",
+    "return merchandise authorization",
+    "return material authorization",
+    "return authorization",
+    "ra number"
+   ],
+   "class": "doc_type",
+   "means": "delivery-ticket",
+   "industries": [
+    "all"
+   ],
+   "note": "goods going back to a vendor; RMA also means customer return approval",
+   "source": "https://www.shopify.com/blog/packing-slip"
+  },
+  {
+   "term": "damage report",
+   "variants": [
+    "damage claim",
+    "damage claims",
+    "shortage report",
+    "osd report",
+    "discrepancy report",
+    "claim form",
+    "freight claim"
+   ],
+   "class": "doc_type",
+   "means": "delivery-ticket",
+   "industries": [
+    "all"
+   ],
+   "note": "goods arrived short/damaged",
+   "source": "https://www.shopify.com/blog/packing-slip"
+  },
+  {
+   "term": "price book",
+   "variants": [
+    "price books",
+    "pricebook",
+    "catalogs",
+    "catalogue",
+    "product catalog",
+    "parts catalog",
+    "line sheet",
+    "line sheets",
+    "linesheet",
+    "wholesale price list",
+    "wholesale pricing",
+    "dealer price list",
+    "dealer pricing",
+    "dealer net",
+    "distributor price list",
+    "trade price list",
+    "trade pricing",
+    "cost sheet",
+    "cost list",
+    "price schedule",
+    "fee schedule",
+    "schedule of fees",
+    "schedule of charges",
+    "rate schedule",
+    "menu prices",
+    "service menu",
+    "pricelist",
+    "pricelists",
+    "price update",
+    "price change notice",
+    "price increase notice",
+    "price increase letter",
+    "new pricing",
+    "pricing update"
+   ],
+   "class": "doc_type",
+   "means": "price-list",
+   "industries": [
+    "retail"
+   ],
+   "note": "any list of items and prices; 'catalog' can be a product catalog",
+   "source": "https://www.lightspeedhq.com/blog/retail-glossary/"
+  },
+  {
+   "term": "msrp list",
+   "variants": [
+    "msrp",
+    "msrp sheet",
+    "map pricing",
+    "map list",
+    "suggested retail",
+    "suggested retail price list",
+    "srp",
+    "list prices"
+   ],
+   "class": "doc_type",
+   "means": "price-list",
+   "industries": [
+    "retail"
+   ],
+   "note": "manufacturer's suggested pricing",
+   "source": "https://www.lightspeedhq.com/blog/retail-glossary/"
+  },
+  {
+   "term": "price tag list",
+   "variants": [
+    "shelf label list",
+    "shelf labels",
+    "price tag file",
+    "label file",
+    "label export",
+    "barcode list",
+    "barcode sheet"
+   ],
+   "class": "doc_type",
+   "means": "price-list",
+   "industries": [
+    "retail"
+   ],
+   "note": "labels/tags to print",
+   "source": "https://www.lightspeedhq.com/blog/retail-glossary/"
+  },
+  {
+   "term": "inventory count",
+   "variants": [
+    "inventory counts",
+    "stock count",
+    "stock counts",
+    "stocktake",
+    "stock take",
+    "stock-take",
+    "physical inventory",
+    "physical count",
+    "cycle count",
+    "cycle counts",
+    "count sheet",
+    "count sheets",
+    "inventory audit",
+    "stock audit",
+    "inventory check",
+    "stock check",
+    "year end inventory",
+    "year-end inventory",
+    "annual inventory",
+    "yearly inventory",
+    "inventory snapshot",
+    "on hand count",
+    "on-hand count"
+   ],
+   "class": "doc_type",
+   "means": "internal",
+   "industries": [
+    "retail"
+   ],
+   "note": "company-only record of what is on the shelf",
+   "source": "https://squareup.com/help/us/en/article/5004-manage-inventory-with-square-for-retail"
+  },
+  {
+   "term": "inventory report",
+   "variants": [
+    "inventory reports",
+    "inventory list",
+    "inventory lists",
+    "inventory sheet",
+    "inventory spreadsheet",
+    "stock report",
+    "stock list",
+    "stock sheet",
+    "stock on hand",
+    "stock on hand report",
+    "on hand report",
+    "on-hand report",
+    "inventory valuation",
+    "inventory valuation report",
+    "stock valuation",
+    "inventory export",
+    "inventory csv",
+    "item list",
+    "item master",
+    "product list",
+    "product export",
+    "products csv"
+   ],
+   "class": "doc_type",
+   "means": "internal",
+   "industries": [
+    "retail"
+   ],
+   "note": "stock levels/value listing; with prices could be price-list",
+   "source": "https://squareup.com/help/us/en/article/5004-manage-inventory-with-square-for-retail"
+  },
+  {
+   "term": "inventory adjustment",
+   "variants": [
+    "inventory adjustments",
+    "stock adjustment",
+    "stock adjustments",
+    "adjustment log",
+    "write-off log",
+    "write off log",
+    "shrink report",
+    "shrinkage report",
+    "shrinkage log",
+    "shrink log",
+    "damage log",
+    "spoilage log",
+    "waste log",
+    "breakage log",
+    "count variance",
+    "variance report",
+    "inventory variance",
+    "inventory reconciliation"
+   ],
+   "class": "doc_type",
+   "means": "internal",
+   "industries": [
+    "retail"
+   ],
+   "note": "changes to counts: shrink, damage, loss",
+   "source": "https://squareup.com/help/us/en/article/5004-manage-inventory-with-square-for-retail"
+  },
+  {
+   "term": "gift card log",
+   "variants": [
+    "gift card logs",
+    "gift card register",
+    "gift card ledger",
+    "gift card tracker",
+    "gift card balance log",
+    "gift card sales log",
+    "gift certificate log",
+    "gift certificate register",
+    "gift certificates sold",
+    "gift card liability"
+   ],
+   "class": "doc_type",
+   "means": "internal",
+   "industries": [
+    "retail"
+   ],
+   "note": "DeepWell internal-type example already; log of gift cards sold/redeemed",
+   "source": "https://squareup.com/help/us/en/article/5004-manage-inventory-with-square-for-retail"
+  },
+  {
+   "term": "store credit log",
+   "variants": [
+    "store credit ledger",
+    "store credit register",
+    "credit on account log",
+    "customer credit log",
+    "credits issued"
+   ],
+   "class": "doc_type",
+   "means": "internal",
+   "industries": [
+    "retail"
+   ],
+   "note": "store credit issued",
+   "source": "https://squareup.com/help/us/en/article/5004-manage-inventory-with-square-for-retail"
+  },
+  {
+   "term": "layaway log",
+   "variants": [
+    "layaway ledger",
+    "layaways",
+    "layaway register",
+    "hold list",
+    "holds list",
+    "customer holds",
+    "reserved items list"
+   ],
+   "class": "doc_type",
+   "means": "internal",
+   "industries": [
+    "retail"
+   ],
+   "note": "items held for a customer pending payment",
+   "source": "https://squareup.com/help/us/en/article/5004-manage-inventory-with-square-for-retail"
+  },
+  {
+   "term": "special order log",
+   "variants": [
+    "special orders log",
+    "special order list",
+    "special order board",
+    "special order tracker",
+    "backorder log"
+   ],
+   "class": "doc_type",
+   "means": "internal",
+   "industries": [
+    "retail"
+   ],
+   "note": "tracker of special/back orders",
+   "source": "https://squareup.com/help/us/en/article/5004-manage-inventory-with-square-for-retail"
+  },
+  {
+   "term": "consignment log",
+   "variants": [
+    "consignment ledger",
+    "consignment inventory",
+    "consignment inventory list",
+    "consigned items list",
+    "consignment tracker",
+    "consignment register",
+    "consignment intake",
+    "consignment intake log",
+    "intake sheet",
+    "intake log",
+    "consignor list",
+    "consignor ledger"
+   ],
+   "class": "doc_type",
+   "means": "internal",
+   "industries": [
+    "retail"
+   ],
+   "note": "list of items we hold on consignment",
+   "source": "https://squareup.com/help/us/en/article/5004-manage-inventory-with-square-for-retail"
+  },
+  {
+   "term": "trade-in log",
+   "variants": [
+    "trade in log",
+    "buy log",
+    "buys log",
+    "buy sheet",
+    "buylist",
+    "buy list",
+    "buying log",
+    "purchase log",
+    "trade log"
+   ],
+   "class": "doc_type",
+   "means": "internal",
+   "industries": [
+    "retail"
+   ],
+   "note": "items bought from walk-in sellers (cards, games, used goods)",
+   "source": "https://squareup.com/help/us/en/article/5004-manage-inventory-with-square-for-retail"
+  },
+  {
+   "term": "cash drawer count",
+   "variants": [
+    "cash drawer log",
+    "cash drop log",
+    "till count",
+    "till counts",
+    "till reconciliation",
+    "drawer reconciliation",
+    "drawer count",
+    "cash count",
+    "cash counts",
+    "cash count sheet",
+    "opening count",
+    "closing count",
+    "float count",
+    "opening float",
+    "starting float",
+    "starting cash",
+    "cash float",
+    "paid in paid out",
+    "paid-in paid-out",
+    "paid ins",
+    "paid outs"
+   ],
+   "class": "doc_type",
+   "means": "internal",
+   "industries": [
+    "retail"
+   ],
+   "note": "till/cash drawer counts",
+   "source": "https://squareup.com/help/us/en/article/5004-manage-inventory-with-square-for-retail"
+  },
+  {
+   "term": "z report",
+   "variants": [
+    "z-report",
+    "z tape",
+    "z-tape",
+    "zreport",
+    "end of day report",
+    "end-of-day report",
+    "eod report",
+    "end of shift report",
+    "shift report",
+    "shift close",
+    "shift closing report",
+    "register close",
+    "register close report",
+    "closing report",
+    "closeout report",
+    "day close",
+    "day end report",
+    "daily sales report",
+    "daily sales summary",
+    "daily summary",
+    "sales summary",
+    "daily cash report",
+    "x report",
+    "x-report"
+   ],
+   "class": "doc_type",
+   "means": "internal",
+   "industries": [
+    "retail"
+   ],
+   "note": "POS end-of-day totals; company record",
+   "source": "https://squareup.com/help/us/en/article/5004-manage-inventory-with-square-for-retail"
+  },
+  {
+   "term": "deposit log",
+   "variants": [
+    "bank deposit log",
+    "daily deposit log",
+    "deposit book",
+    "deposit slip",
+    "deposit slips",
+    "bank deposit slip",
+    "deposit ticket",
+    "deposit tickets",
+    "deposit receipt bank",
+    "deposit bag"
+   ],
+   "class": "doc_type",
+   "means": "internal",
+   "industries": [
+    "retail"
+   ],
+   "note": "what was taken to the bank; NOT a customer deposit",
+   "source": "https://squareup.com/help/us/en/article/5004-manage-inventory-with-square-for-retail"
+  },
+  {
+   "term": "petty cash log",
+   "variants": [
+    "petty cash voucher",
+    "petty cash vouchers",
+    "petty cash slip",
+    "petty cash record",
+    "petty cash book",
+    "petty cash report",
+    "petty cash ledger"
+   ],
+   "class": "doc_type",
+   "means": "internal",
+   "industries": [
+    "retail"
+   ],
+   "note": "small cash expenses",
+   "source": "https://squareup.com/help/us/en/article/5004-manage-inventory-with-square-for-retail"
+  },
+  {
+   "term": "sales journal",
+   "variants": [
+    "sales log",
+    "sales book",
+    "sales register",
+    "cash book",
+    "cashbook",
+    "day book",
+    "daybook"
+   ],
+   "class": "doc_type",
+   "means": "internal",
+   "industries": [
+    "retail"
+   ],
+   "note": "book of daily sales",
+   "source": "https://squareup.com/help/us/en/article/5004-manage-inventory-with-square-for-retail"
+  },
+  {
+   "term": "expense log",
+   "variants": [
+    "expense logs",
+    "expense report",
+    "expense reports",
+    "expense sheet",
+    "expense tracker",
+    "spending log",
+    "mileage log",
+    "mileage logs",
+    "expense summary",
+    "expenses summary",
+    "spend report",
+    "spend summary"
+   ],
+   "class": "doc_type",
+   "means": "internal",
+   "industries": [
+    "retail"
+   ],
+   "note": "company expense records",
+   "source": "https://squareup.com/help/us/en/article/5004-manage-inventory-with-square-for-retail"
+  },
+  {
+   "term": "check register",
+   "variants": [
+    "check registers",
+    "checkbook register",
+    "checkbook",
+    "check stub",
+    "check stubs",
+    "cheque register",
+    "payment log",
+    "payments log",
+    "payment register",
+    "payment ledger"
+   ],
+   "class": "doc_type",
+   "means": "internal",
+   "industries": [
+    "retail"
+   ],
+   "note": "record of checks written",
+   "source": "https://squareup.com/help/us/en/article/5004-manage-inventory-with-square-for-retail"
+  },
+  {
+   "term": "invoice log",
+   "variants": [
+    "invoice register",
+    "invoice tracker",
+    "bill tracker",
+    "bills tracker",
+    "bill log",
+    "receivables log",
+    "ar log",
+    "a/r log",
+    "payables log",
+    "ap log",
+    "a/p log"
+   ],
+   "class": "doc_type",
+   "means": "internal",
+   "industries": [
+    "retail"
+   ],
+   "note": "tracker of invoices/bills",
+   "source": "https://squareup.com/help/us/en/article/5004-manage-inventory-with-square-for-retail"
+  },
+  {
+   "term": "ledger",
+   "variants": [
+    "ledgers",
+    "general ledger",
+    "gl detail",
+    "gl report",
+    "vendor ledger",
+    "customer ledger",
+    "sub ledger",
+    "subledger",
+    "journal",
+    "journals",
+    "journal entry",
+    "journal entries"
+   ],
+   "class": "doc_type",
+   "means": "internal",
+   "industries": [
+    "retail"
+   ],
+   "note": "accounting ledger",
+   "source": "https://squareup.com/help/us/en/article/5004-manage-inventory-with-square-for-retail"
+  },
+  {
+   "term": "financial statements",
+   "variants": [
+    "financial statement",
+    "financials",
+    "profit and loss",
+    "profit & loss",
+    "p&l",
+    "pnl",
+    "p and l",
+    "income statement",
+    "balance sheet",
+    "cash flow statement",
+    "cash flow report",
+    "trial balance",
+    "chart of accounts",
+    "financial report",
+    "financial reports"
+   ],
+   "class": "doc_type",
+   "means": "internal",
+   "industries": [
+    "retail"
+   ],
+   "note": "reports from the books; internal; NOT an account statement",
+   "source": "https://squareup.com/help/us/en/article/5004-manage-inventory-with-square-for-retail"
+  },
+  {
+   "term": "the books",
+   "variants": [
+    "books",
+    "bookkeeping",
+    "bookkeeping records",
+    "accounting records",
+    "accounting report",
+    "accounting reports"
+   ],
+   "class": "doc_type",
+   "means": "internal",
+   "industries": [
+    "retail"
+   ],
+   "note": "slang for the accounting records",
+   "source": "https://squareup.com/help/us/en/article/5004-manage-inventory-with-square-for-retail"
+  },
+  {
+   "term": "asset register",
+   "variants": [
+    "fixed asset register",
+    "fixed asset list",
+    "asset list",
+    "depreciation schedule",
+    "equipment list ledger",
+    "asset schedule"
+   ],
+   "class": "doc_type",
+   "means": "internal",
+   "industries": [
+    "retail"
+   ],
+   "note": "fixed assets list",
+   "source": "https://squareup.com/help/us/en/article/5004-manage-inventory-with-square-for-retail"
+  },
+  {
+   "term": "consignment agreement",
+   "variants": [
+    "consignment agreements",
+    "consignment contract",
+    "consignor agreement",
+    "consignor contract",
+    "consignment form",
+    "consignment terms",
+    "consignment terms and conditions",
+    "consignment policy",
+    "consignor application",
+    "consignor sign up",
+    "consignor signup",
+    "consignor registration",
+    "memo sale agreement",
+    "memo agreement",
+    "memo terms",
+    "sale or return agreement",
+    "sale-or-return agreement",
+    "sor agreement",
+    "sell on behalf agreement",
+    "commission sale agreement",
+    "commission agreement"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "retail"
+   ],
+   "note": "contract to sell goods owned by someone else",
+   "source": "https://www.investopedia.com/terms/c/consignment.asp"
+  },
+  {
+   "term": "booth agreement",
+   "variants": [
+    "booth rental agreement",
+    "booth lease",
+    "booth contract",
+    "vendor booth agreement",
+    "vendor space agreement",
+    "stall agreement",
+    "market vendor agreement",
+    "shelf rental",
+    "shelf rental agreement",
+    "case rental",
+    "case rental agreement",
+    "display case agreement"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "retail"
+   ],
+   "note": "renting retail space to a vendor",
+   "source": "https://www.investopedia.com/terms/c/consignment.asp"
+  },
+  {
+   "term": "vendor agreement",
+   "variants": [
+    "vendor agreements",
+    "vendor contract",
+    "vendor contracts",
+    "supplier agreement",
+    "supplier contract",
+    "supply agreement",
+    "supply contract",
+    "supply contracts",
+    "dealer agreement",
+    "dealership agreement",
+    "distributor agreement",
+    "reseller agreement",
+    "wholesale agreement",
+    "authorized dealer agreement",
+    "dealer application"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "retail"
+   ],
+   "note": "contract with a supplier",
+   "source": "https://www.investopedia.com/terms/c/consignment.asp"
+  },
+  {
+   "term": "sales agreement",
+   "variants": [
+    "sales agreements",
+    "sales contract",
+    "sales contracts",
+    "purchase agreement",
+    "purchase agreements",
+    "buy-sell agreement",
+    "bill of sale",
+    "bills of sale",
+    "terms of sale",
+    "terms and conditions of sale",
+    "terms & conditions",
+    "terms and conditions",
+    "t&c",
+    "t&cs",
+    "conditions of sale"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "retail"
+   ],
+   "note": "contract for a sale",
+   "source": "https://www.investopedia.com/terms/c/consignment.asp"
+  },
+  {
+   "term": "payment plan",
+   "variants": [
+    "payment plans",
+    "payment agreement",
+    "payment plan agreement",
+    "installment agreement",
+    "installment plan",
+    "installment contract",
+    "layaway agreement",
+    "layaway contract",
+    "layaway terms",
+    "financing agreement",
+    "finance agreement"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "retail"
+   ],
+   "note": "agreement to pay over time",
+   "source": "https://www.investopedia.com/terms/c/consignment.asp"
+  },
+  {
+   "term": "credit application",
+   "variants": [
+    "credit applications",
+    "credit app",
+    "credit apps",
+    "account application",
+    "new account application",
+    "new account form",
+    "customer account application",
+    "trade account application",
+    "trade credit application",
+    "open account application",
+    "net terms application",
+    "net 30 application",
+    "customer credit agreement",
+    "house account agreement",
+    "charge account agreement",
+    "charge account application"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "retail"
+   ],
+   "note": "customer applying for terms/credit",
+   "source": "https://www.investopedia.com/terms/c/consignment.asp"
+  },
+  {
+   "term": "personal guarantee",
+   "variants": [
+    "personal guaranty",
+    "guaranty",
+    "continuing guaranty",
+    "guarantor form"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "retail"
+   ],
+   "note": "owner guarantees the account",
+   "source": "https://www.investopedia.com/terms/c/consignment.asp"
+  },
+  {
+   "term": "lien waiver",
+   "variants": [
+    "lien waivers",
+    "conditional lien waiver",
+    "unconditional lien waiver",
+    "partial lien waiver",
+    "final lien waiver",
+    "lien release",
+    "release of lien",
+    "waiver and release"
+   ],
+   "class": "doc_type",
+   "means": "agreement",
+   "industries": [
+    "retail"
+   ],
+   "note": "construction: releases lien rights upon payment",
+   "source": "https://www.investopedia.com/terms/c/consignment.asp"
+  },
+  {
+   "term": "w-9",
+   "variants": [
+    "w9",
+    "w 9",
+    "form w-9",
+    "form w9",
+    "w-9 form",
+    "w9 form",
+    "w-9s",
+    "w9s",
+    "request for taxpayer identification number",
+    "request for taxpayer identification number and certification",
+    "vendor w9",
+    "vendor w-9",
+    "contractor w9",
+    "contractor w-9"
+   ],
+   "class": "doc_type",
+   "means": "other",
+   "industries": [
+    "all"
+   ],
+   "note": "vendor/contractor tax ID form collected before paying; stored as 'other'",
+   "source": "https://www.irs.gov/forms-pubs/about-form-w-9"
+  },
+  {
+   "term": "taxpayer id",
+   "variants": [
+    "taxpayer identification number",
+    "taxpayer id number",
+    "vendor tax id",
+    "vendor tax information",
+    "vendor tax info",
+    "vendor tax form",
+    "tax id form",
+    "tax id request",
+    "tax id"
+   ],
+   "class": "doc_type",
+   "means": "other",
+   "industries": [
+    "all"
+   ],
+   "note": "TIN is an SSN, EIN or ITIN; do not store the number in memory",
+   "source": "https://www.irs.gov/forms-pubs/about-form-w-9"
+  },
+  {
+   "term": "w-8ben",
+   "variants": [
+    "w8ben",
+    "w-8ben-e",
+    "w8bene",
+    "w-8",
+    "w8",
+    "foreign vendor form",
+    "foreign contractor form"
+   ],
+   "class": "doc_type",
+   "means": "other",
+   "industries": [
+    "all"
+   ],
+   "note": "tax form from non-US vendor",
+   "source": "https://www.irs.gov/forms-pubs/about-form-w-9"
+  },
+  {
+   "term": "1099-nec",
+   "variants": [
+    "1099nec",
+    "1099 nec",
+    "form 1099-nec",
+    "nonemployee compensation",
+    "non-employee compensation",
+    "nonemployee comp",
+    "1099 contractor",
+    "1099 contractors"
+   ],
+   "class": "doc_type",
+   "means": "other",
+   "industries": [
+    "all"
+   ],
+   "note": "1099 for $600+ paid to a contractor (threshold rises to $2,000 for payments made after 2025)",
+   "source": "https://www.irs.gov/forms-pubs/about-form-1099-nec"
+  },
+  {
+   "term": "1099-misc",
+   "variants": [
+    "1099misc",
+    "1099 misc",
+    "form 1099-misc",
+    "misc income",
+    "rent payments 1099",
+    "royalties 1099"
+   ],
+   "class": "doc_type",
+   "means": "other",
+   "industries": [
+    "all"
+   ],
+   "note": "1099 for rents, royalties, prizes, other income",
+   "source": "https://www.irs.gov/forms-pubs/about-form-1099-misc"
+  },
+  {
+   "term": "1099-k",
+   "variants": [
+    "1099k",
+    "1099 k",
+    "form 1099-k",
+    "payment card and third party network transactions",
+    "third party network transactions"
+   ],
+   "class": "doc_type",
+   "means": "other",
+   "industries": [
+    "all"
+   ],
+   "note": "processor-issued summary of card/app payments (Stripe, Square, PayPal)",
+   "source": "https://www.irs.gov/forms-pubs/about-form-1099-k"
+  },
+  {
+   "term": "1099-int",
+   "variants": [
+    "1099int",
+    "1099-div",
+    "1099div",
+    "1099-r",
+    "1099-b",
+    "1099-g",
+    "1099-s",
+    "1099-a",
+    "1099-c"
+   ],
+   "class": "doc_type",
+   "means": "other",
+   "industries": [
+    "all"
+   ],
+   "note": "other 1099 series forms (interest, dividends, etc.)",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/information-return-penalties"
+  },
+  {
+   "term": "w-2",
+   "variants": [
+    "w2",
+    "w 2",
+    "form w-2",
+    "form w2",
+    "w-2s",
+    "w2s",
+    "wage and tax statement",
+    "wage statement",
+    "w-3",
+    "w3"
+   ],
+   "class": "doc_type",
+   "means": "hr-letter",
+   "industries": [
+    "all"
+   ],
+   "note": "year-end employee wage form",
+   "source": "https://www.irs.gov/forms-pubs/about-form-w-2"
+  },
+  {
+   "term": "w-4",
+   "variants": [
+    "w4",
+    "form w-4",
+    "form w4",
+    "employee withholding certificate",
+    "employee withholding allowance certificate",
+    "withholding form",
+    "withholding certificate"
+   ],
+   "class": "doc_type",
+   "means": "hr-letter",
+   "industries": [
+    "all"
+   ],
+   "note": "new-hire tax withholding form",
+   "source": "https://www.irs.gov/forms-pubs/about-form-w-4"
+  },
+  {
+   "term": "i-9",
+   "variants": [
+    "i9",
+    "form i-9",
+    "form i9",
+    "employment eligibility verification",
+    "work eligibility form"
+   ],
+   "class": "doc_type",
+   "means": "hr-letter",
+   "industries": [
+    "all"
+   ],
+   "note": "new-hire work authorization form; do not store ID numbers",
+   "source": "https://www.uscis.gov/i-9"
+  },
+  {
+   "term": "resale certificate",
+   "variants": [
+    "resale certificates",
+    "resale cert",
+    "resale certs",
+    "reseller permit",
+    "reseller's permit",
+    "reseller certificate",
+    "resale license",
+    "resale permit",
+    "seller's permit",
+    "sellers permit",
+    "seller permit",
+    "certificate of resale"
+   ],
+   "class": "doc_type",
+   "means": "other",
+   "industries": [
+    "all"
+   ],
+   "note": "buyer buys for resale and pays no sales tax; collected from customers/ours from vendors",
+   "source": "https://www.avalara.com/us/en/learn/guides/resale-certificate.html"
+  },
+  {
+   "term": "tax exempt certificate",
+   "variants": [
+    "tax exemption certificate",
+    "tax-exempt certificate",
+    "tax exempt form",
+    "tax exempt forms",
+    "exemption certificate",
+    "exemption certificates",
+    "exempt certificate",
+    "exempt cert",
+    "exempt form",
+    "sales tax exemption",
+    "sales tax exemption certificate",
+    "tax exempt id",
+    "tax-exempt id",
+    "tax exempt number",
+    "exemption number",
+    "exempt number",
+    "nonprofit exemption",
+    "501c3 letter",
+    "501(c)(3) letter",
+    "determination letter"
+   ],
+   "class": "doc_type",
+   "means": "other",
+   "industries": [
+    "all"
+   ],
+   "note": "customer proof they do not pay sales tax",
+   "source": "https://www.avalara.com/us/en/learn/guides/resale-certificate.html"
+  },
+  {
+   "term": "sales tax license",
+   "variants": [
+    "sales tax permit",
+    "sales tax certificate",
+    "sales tax id",
+    "sales tax number",
+    "sales and use tax permit",
+    "use tax certificate",
+    "vendor's license",
+    "vendors license",
+    "vendor license",
+    "transaction privilege tax license",
+    "tpt license",
+    "tpt number",
+    "privilege tax license",
+    "state tax id",
+    "state tax license",
+    "state tax permit"
+   ],
+   "class": "doc_type",
+   "means": "other",
+   "industries": [
+    "all"
+   ],
+   "note": "our registration to collect sales tax (AZ calls it TPT)",
+   "source": "https://www.avalara.com/us/en/learn/guides/resale-certificate.html"
+  },
+  {
+   "term": "business license",
+   "variants": [
+    "business licenses",
+    "biz license",
+    "city license",
+    "city business license",
+    "county license",
+    "occupational license",
+    "occupational licence",
+    "business registration",
+    "dba",
+    "dba certificate",
+    "fictitious name",
+    "assumed name certificate",
+    "articles of organization",
+    "articles of incorporation",
+    "operating agreement",
+    "ein letter",
+    "ein confirmation",
+    "cp 575",
+    "cp575",
+    "147c",
+    "147c letter"
+   ],
+   "class": "doc_type",
+   "means": "other",
+   "industries": [
+    "all"
+   ],
+   "note": "entity and licensing paperwork",
+   "source": "https://www.avalara.com/us/en/learn/guides/resale-certificate.html"
+  },
+  {
+   "term": "sales tax return",
+   "variants": [
+    "sales tax returns",
+    "sales tax report",
+    "sales tax filing",
+    "sales tax worksheet",
+    "sales tax summary",
+    "tax collected report",
+    "taxes collected report",
+    "tax liability report",
+    "sales tax liability",
+    "sales tax payable",
+    "sales tax due",
+    "sales tax remittance",
+    "tpt return",
+    "tpt filing",
+    "tpt report",
+    "vat return",
+    "gst return",
+    "bas",
+    "bas statement",
+    "business activity statement"
+   ],
+   "class": "doc_type",
+   "means": "other",
+   "industries": [
+    "all"
+   ],
+   "note": "periodic sales tax filing",
+   "source": "https://www.avalara.com/us/en/learn/sales-tax.html"
+  },
+  {
+   "term": "payroll tax form",
+   "variants": [
+    "form 941",
+    "941",
+    "941 report",
+    "941 filing",
+    "form 940",
+    "940",
+    "form 944",
+    "944",
+    "payroll tax return",
+    "payroll tax filing",
+    "payroll taxes report",
+    "payroll tax deposit",
+    "eftps"
+   ],
+   "class": "doc_type",
+   "means": "other",
+   "industries": [
+    "all"
+   ],
+   "note": "payroll tax filings",
+   "source": "https://www.irs.gov/forms-pubs/about-form-941"
+  },
+  {
+   "term": "tax return",
+   "variants": [
+    "tax returns",
+    "business tax return",
+    "business tax returns",
+    "corporate tax return",
+    "personal tax return",
+    "tax filing",
+    "tax filings",
+    "schedule c",
+    "sched c",
+    "schedule se",
+    "form 1120",
+    "1120",
+    "1120-s",
+    "1120s",
+    "form 1065",
+    "1065",
+    "k-1",
+    "k1",
+    "schedule k-1",
+    "1040"
+   ],
+   "class": "doc_type",
+   "means": "other",
+   "industries": [
+    "all"
+   ],
+   "note": "income tax filings",
+   "source": "https://www.irs.gov/forms-pubs/about-schedule-c-form-1040"
+  },
+  {
+   "term": "tax prep documents",
+   "variants": [
+    "tax documents",
+    "tax docs",
+    "tax paperwork",
+    "tax papers",
+    "tax forms",
+    "tax package",
+    "tax packet",
+    "tax organizer",
+    "tax prep",
+    "tax prep docs",
+    "accountant docs",
+    "cpa docs",
+    "documents for accountant",
+    "documents for cpa",
+    "documents for taxes",
+    "documents for tax",
+    "tax workpapers",
+    "tax worksheet"
+   ],
+   "class": "doc_type",
+   "means": "other",
+   "industries": [
+    "all"
+   ],
+   "note": "documents gathered for the accountant",
+   "source": "https://www.irs.gov/forms-pubs/about-schedule-c-form-1040"
+  },
+  {
+   "term": "estimated tax payment",
+   "variants": [
+    "estimated tax payments",
+    "estimated taxes",
+    "quarterly estimates",
+    "quarterly estimated taxes",
+    "quarterly taxes",
+    "1040-es",
+    "1040es",
+    "estimated tax voucher",
+    "quarterly tax payment",
+    "q1 taxes",
+    "q2 taxes",
+    "q3 taxes",
+    "q4 taxes"
+   ],
+   "class": "doc_type",
+   "means": "other",
+   "industries": [
+    "all"
+   ],
+   "note": "payments toward income tax during the year",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/estimated-taxes"
+  },
+  {
+   "term": "invoice number",
+   "variants": [
+    "invoice no",
+    "invoice no.",
+    "invoice #",
+    "inv no",
+    "inv no.",
+    "inv #",
+    "inv#",
+    "invoice num",
+    "invoice id",
+    "bill no",
+    "bill number",
+    "bill #",
+    "document no",
+    "doc no",
+    "doc #",
+    "document number"
+   ],
+   "class": "field",
+   "means": "invoice_number",
+   "industries": [
+    "all"
+   ],
+   "note": "DeepWell field invoice_number is the document number for any paper",
+   "source": "https://quickbooks.intuit.com/r/bookkeeping/invoice-terms/"
+  },
+  {
+   "term": "receipt number",
+   "variants": [
+    "receipt no",
+    "receipt #",
+    "rcpt #",
+    "rcpt no",
+    "receipt id",
+    "sales receipt #",
+    "sale #",
+    "sale no",
+    "sale number",
+    "transaction #",
+    "transaction no",
+    "transaction number",
+    "txn #",
+    "txn id",
+    "trans #",
+    "ticket no",
+    "ticket #",
+    "tkt #",
+    "slip #",
+    "slip no"
+   ],
+   "class": "field",
+   "means": "invoice_number",
+   "industries": [
+    "all"
+   ],
+   "note": "receipt/transaction/ticket number",
+   "source": "https://quickbooks.intuit.com/r/bookkeeping/invoice-terms/"
+  },
+  {
+   "term": "reference number",
+   "variants": [
+    "reference no",
+    "reference #",
+    "ref #",
+    "ref no",
+    "ref.",
+    "your ref",
+    "our ref",
+    "confirmation #",
+    "confirmation number",
+    "confirmation code",
+    "conf #"
+   ],
+   "class": "field",
+   "means": "invoice_number",
+   "industries": [
+    "all"
+   ],
+   "note": "generic reference/confirmation number",
+   "source": "https://quickbooks.intuit.com/r/bookkeeping/invoice-terms/"
+  },
+  {
+   "term": "credit memo number",
+   "variants": [
+    "credit memo #",
+    "credit memo no",
+    "credit note no",
+    "credit note #",
+    "credit note number",
+    "cm #",
+    "cm no",
+    "cn #",
+    "cn no",
+    "debit memo #",
+    "debit memo no"
+   ],
+   "class": "field",
+   "means": "invoice_number",
+   "industries": [
+    "all"
+   ],
+   "note": "credit/debit memo number",
+   "source": "https://quickbooks.intuit.com/r/bookkeeping/invoice-terms/"
+  },
+  {
+   "term": "packing slip number",
+   "variants": [
+    "packing slip #",
+    "packing slip no",
+    "pack slip #",
+    "delivery #",
+    "delivery no",
+    "delivery number",
+    "delivery note no",
+    "dn #",
+    "shipment #",
+    "shipment number",
+    "tracking #",
+    "tracking number",
+    "bol #",
+    "bol number",
+    "bill of lading number"
+   ],
+   "class": "field",
+   "means": "invoice_number",
+   "industries": [
+    "all"
+   ],
+   "note": "delivery paperwork number",
+   "source": "https://quickbooks.intuit.com/r/bookkeeping/invoice-terms/"
+  },
+  {
+   "term": "statement number",
+   "variants": [
+    "statement no",
+    "statement no.",
+    "statement #",
+    "stmt #",
+    "stmt no"
+   ],
+   "class": "field",
+   "means": "invoice_number",
+   "industries": [
+    "all"
+   ],
+   "note": "statement number",
+   "source": "https://quickbooks.intuit.com/r/bookkeeping/invoice-terms/"
+  },
+  {
+   "term": "check number",
+   "variants": [
+    "check no",
+    "check no.",
+    "check #",
+    "chk #",
+    "cheque no",
+    "cheque number",
+    "ach ref",
+    "wire ref",
+    "payment reference",
+    "payment ref"
+   ],
+   "class": "field",
+   "means": "payment_reference",
+   "industries": [
+    "all"
+   ],
+   "note": "how a payment was made/identified; no DeepWell field yet (new_concept payment_reference)",
+   "source": "https://quickbooks.intuit.com/r/bookkeeping/invoice-terms/"
+  },
+  {
+   "term": "return number",
+   "variants": [
+    "return #",
+    "return no",
+    "refund #",
+    "refund number",
+    "rma #",
+    "rma number",
+    "rma no"
+   ],
+   "class": "field",
+   "means": "invoice_number",
+   "industries": [
+    "all"
+   ],
+   "note": "return/refund/RMA number",
+   "source": "https://quickbooks.intuit.com/r/bookkeeping/invoice-terms/"
+  },
+  {
+   "term": "po number",
+   "variants": [
+    "po #",
+    "po no",
+    "po no.",
+    "p.o. number",
+    "purchase order number",
+    "purchase order no",
+    "purchase order #",
+    "customer po",
+    "customer po #",
+    "cust po",
+    "buyer po",
+    "your po",
+    "your po #",
+    "client po",
+    "po ref",
+    "po reference"
+   ],
+   "class": "field",
+   "means": "po_number",
+   "industries": [
+    "all"
+   ],
+   "note": "NO DeepWell field key yet for PO number; see new_concepts. 'order number' also appears on receipts",
+   "source": "https://www.investopedia.com/terms/p/purchase-order.asp"
+  },
+  {
+   "term": "payee",
+   "variants": [
+    "pay to",
+    "payable to",
+    "pay to the order of",
+    "make checks payable to",
+    "make check payable to",
+    "remit to",
+    "remit payment to",
+    "remittance address",
+    "remit address",
+    "send payment to",
+    "mail payment to"
+   ],
+   "class": "role",
+   "means": "vendor",
+   "industries": [
+    "all"
+   ],
+   "note": "who gets the money",
+   "source": "https://quickbooks.intuit.com/r/bookkeeping/invoice-terms/"
+  },
+  {
+   "term": "supplier",
+   "variants": [
+    "suppliers",
+    "vendors",
+    "vendor name",
+    "supplier name",
+    "merchant",
+    "merchant name",
+    "seller",
+    "sold by",
+    "issued by",
+    "billed by",
+    "invoiced by",
+    "bill from",
+    "ordered from",
+    "purchased from",
+    "bought from",
+    "distributor",
+    "wholesaler",
+    "manufacturer"
+   ],
+   "class": "role",
+   "means": "vendor",
+   "industries": [
+    "all"
+   ],
+   "note": "vendor on a bill/receipt/PO; 'from' is weak",
+   "source": "https://quickbooks.intuit.com/r/bookkeeping/invoice-terms/"
+  },
+  {
+   "term": "our vendor",
+   "variants": [
+    "our vendors",
+    "vendor list",
+    "supplier list",
+    "vendor directory",
+    "vendors we use",
+    "who we buy from",
+    "who do we buy from",
+    "who we pay",
+    "who do we pay",
+    "who we order from",
+    "where we buy",
+    "who supplies us",
+    "where we get parts"
+   ],
+   "class": "role",
+   "means": "vendor",
+   "industries": [
+    "all"
+   ],
+   "note": "question words: who sells to us",
+   "source": "https://quickbooks.intuit.com/r/bookkeeping/invoice-terms/"
+  },
+  {
+   "term": "bill to",
+   "variants": [
+    "billed to",
+    "bill-to",
+    "invoice to",
+    "invoiced to",
+    "sold to",
+    "sold-to",
+    "customer name",
+    "client name",
+    "account name",
+    "account holder",
+    "purchaser",
+    "buyer",
+    "ordered by",
+    "ordered for",
+    "received from",
+    "payer",
+    "paid by",
+    "remitted by"
+   ],
+   "class": "role",
+   "means": "customer_name",
+   "industries": [
+    "all"
+   ],
+   "note": "who is billed / who bought",
+   "source": "https://quickbooks.intuit.com/r/bookkeeping/invoice-terms/"
+  },
+  {
+   "term": "our customers",
+   "variants": [
+    "customers",
+    "clients",
+    "who bought",
+    "who buys from us",
+    "who do we sell to",
+    "who we sell to",
+    "who we bill",
+    "who we invoice",
+    "buyers",
+    "our accounts",
+    "our clients",
+    "repeat customers",
+    "top customers",
+    "best customers",
+    "biggest customers",
+    "biggest accounts",
+    "key accounts"
+   ],
+   "class": "role",
+   "means": "customer",
+   "industries": [
+    "all"
+   ],
+   "note": "question words: the other party we sell to",
+   "source": "https://quickbooks.intuit.com/r/bookkeeping/invoice-terms/"
+  },
+  {
+   "term": "cardholder",
+   "variants": [
+    "card holder",
+    "name on card",
+    "cardholder name"
+   ],
+   "class": "role",
+   "means": "customer",
+   "industries": [
+    "all"
+   ],
+   "note": "name printed on a card slip",
+   "source": "https://quickbooks.intuit.com/r/bookkeeping/invoice-terms/"
+  },
+  {
+   "term": "invoice date",
+   "variants": [
+    "inv date",
+    "billing date",
+    "bill date",
+    "date billed",
+    "date invoiced",
+    "date issued",
+    "issue date",
+    "date of issue",
+    "date of invoice",
+    "document date",
+    "credit memo date",
+    "memo date"
+   ],
+   "class": "date_phrase",
+   "means": "service_date",
+   "industries": [
+    "all"
+   ],
+   "note": "document date",
+   "source": "https://quickbooks.intuit.com/r/bookkeeping/invoice-terms/"
+  },
+  {
+   "term": "transaction date",
+   "variants": [
+    "txn date",
+    "date of transaction",
+    "trans date",
+    "purchase date",
+    "date of purchase",
+    "sale date",
+    "date of sale",
+    "sold on",
+    "order date",
+    "date ordered",
+    "po date",
+    "p.o. date",
+    "payment date",
+    "date of payment",
+    "date paid",
+    "paid on",
+    "receipt date",
+    "date received",
+    "received on",
+    "delivery date",
+    "date of delivery",
+    "ship date",
+    "date shipped",
+    "pickup date",
+    "return date",
+    "date of return",
+    "refund date",
+    "statement date",
+    "as of",
+    "as of date",
+    "billing period",
+    "period ending"
+   ],
+   "class": "date_phrase",
+   "means": "service_date",
+   "industries": [
+    "all"
+   ],
+   "note": "the date a document is about; each can differ. DeepWell treats them as service_date for the document",
+   "source": "https://quickbooks.intuit.com/r/bookkeeping/invoice-terms/"
+  },
+  {
+   "term": "due date",
+   "variants": [
+    "due on",
+    "date due",
+    "payment due date",
+    "payable by",
+    "pay by",
+    "pay by date",
+    "pay on or before",
+    "payment deadline",
+    "due by",
+    "due no later than",
+    "please pay by",
+    "remit by",
+    "invoice due date",
+    "bill due date",
+    "bills due this week",
+    "bills due this month",
+    "due soon",
+    "coming due",
+    "due today",
+    "due tomorrow"
+   ],
+   "class": "date_phrase",
+   "means": "due_date",
+   "industries": [
+    "all"
+   ],
+   "note": "date payment is due; DeepWell has no due_date field yet, see new_concepts",
+   "source": "https://www.investopedia.com/terms/c/credit-terms.asp"
+  },
+  {
+   "term": "expiration",
+   "variants": [
+    "expires",
+    "expiry",
+    "expiry date",
+    "expiration date",
+    "exp date",
+    "valid until",
+    "valid through",
+    "valid thru",
+    "good until",
+    "void after",
+    "use by",
+    "expires on"
+   ],
+   "class": "date_phrase",
+   "means": "expiry",
+   "industries": [
+    "all"
+   ],
+   "note": "expiry of a gift card, quote, credit, coupon, certificate",
+   "source": "https://www.investopedia.com/terms/c/credit-terms.asp"
+  },
+  {
+   "term": "net 15",
+   "variants": [
+    "net15",
+    "net-15",
+    "net 15 days",
+    "n15",
+    "n/15",
+    "due in 15 days",
+    "15 days net",
+    "15 day terms"
+   ],
+   "class": "money",
+   "means": "payment_terms",
+   "industries": [
+    "all"
+   ],
+   "note": "pay within 15 days",
+   "source": "https://www.investopedia.com/terms/c/credit-terms.asp"
+  },
+  {
+   "term": "net 45",
+   "variants": [
+    "net45",
+    "net-45",
+    "net 45 days",
+    "n45",
+    "n/45",
+    "due in 45 days",
+    "45 days net",
+    "45 day terms"
+   ],
+   "class": "money",
+   "means": "payment_terms",
+   "industries": [
+    "all"
+   ],
+   "note": "pay within 45 days",
+   "source": "https://www.investopedia.com/terms/c/credit-terms.asp"
+  },
+  {
+   "term": "net 60",
+   "variants": [
+    "net60",
+    "net-60",
+    "net 60 days",
+    "n60",
+    "n/60",
+    "due in 60 days",
+    "60 days net",
+    "60 day terms"
+   ],
+   "class": "money",
+   "means": "payment_terms",
+   "industries": [
+    "all"
+   ],
+   "note": "pay within 60 days",
+   "source": "https://www.investopedia.com/terms/c/credit-terms.asp"
+  },
+  {
+   "term": "net 90",
+   "variants": [
+    "net90",
+    "net-90",
+    "net 90 days",
+    "n90",
+    "n/90",
+    "due in 90 days",
+    "90 days net",
+    "90 day terms"
+   ],
+   "class": "money",
+   "means": "payment_terms",
+   "industries": [
+    "all"
+   ],
+   "note": "pay within 90 days",
+   "source": "https://www.investopedia.com/terms/c/credit-terms.asp"
+  },
+  {
+   "term": "net 7",
+   "variants": [
+    "net7",
+    "net-7",
+    "net 7 days",
+    "n7",
+    "net 10",
+    "net10",
+    "net 10 days",
+    "net 14",
+    "net14",
+    "net 14 days",
+    "net 20",
+    "net20",
+    "net 21",
+    "net21",
+    "net 21 days"
+   ],
+   "class": "money",
+   "means": "payment_terms",
+   "industries": [
+    "all"
+   ],
+   "note": "short net terms",
+   "source": "https://www.investopedia.com/terms/c/credit-terms.asp"
+  },
+  {
+   "term": "due on receipt",
+   "variants": [
+    "due upon receipt",
+    "payable on receipt",
+    "payable upon receipt",
+    "payment due on receipt",
+    "dor",
+    "due immediately",
+    "pay on receipt",
+    "pay upon receipt",
+    "upon receipt",
+    "on receipt"
+   ],
+   "class": "money",
+   "means": "payment_terms",
+   "industries": [
+    "all"
+   ],
+   "note": "no grace period: pay at once",
+   "source": "https://www.investopedia.com/terms/c/credit-terms.asp"
+  },
+  {
+   "term": "cod",
+   "variants": [
+    "c.o.d.",
+    "cash on delivery",
+    "collect on delivery",
+    "pay on delivery",
+    "cash on pickup",
+    "cash with order",
+    "cwo",
+    "cash in advance",
+    "cia",
+    "prepay",
+    "payment in advance",
+    "advance payment",
+    "pay upfront",
+    "payment up front",
+    "upfront payment",
+    "payment before delivery",
+    "payment before service"
+   ],
+   "class": "money",
+   "means": "payment_terms",
+   "industries": [
+    "all"
+   ],
+   "note": "payment due at or before delivery. CIA/prepaid also covered",
+   "source": "https://www.investopedia.com/terms/c/credit-terms.asp"
+  },
+  {
+   "term": "2/10 net 30",
+   "variants": [
+    "2/10 n30",
+    "2/10 n 30",
+    "2/10, n/30",
+    "2/10 net30",
+    "2% 10 net 30",
+    "1/10 net 30",
+    "early pay discount",
+    "early payment discount",
+    "prompt pay discount",
+    "prompt payment discount",
+    "cash discount",
+    "settlement discount"
+   ],
+   "class": "money",
+   "means": "payment_terms",
+   "industries": [
+    "all"
+   ],
+   "note": "discount if paid early; otherwise net 30",
+   "source": "https://www.investopedia.com/terms/c/credit-terms.asp"
+  },
+  {
+   "term": "eom",
+   "variants": [
+    "end of month",
+    "e.o.m.",
+    "net eom",
+    "net 30 eom",
+    "30 eom",
+    "due end of month",
+    "due eom",
+    "eom 30",
+    "10th prox",
+    "net 10th prox"
+   ],
+   "class": "money",
+   "means": "payment_terms",
+   "industries": [
+    "all"
+   ],
+   "note": "terms measured from end of month",
+   "source": "https://www.investopedia.com/terms/c/credit-terms.asp"
+  },
+  {
+   "term": "progress payments",
+   "variants": [
+    "stage payments",
+    "milestone payments",
+    "milestone billing",
+    "payment schedule",
+    "payment milestones",
+    "draw schedule",
+    "draw request",
+    "installments",
+    "installment payments",
+    "monthly payments",
+    "deferred payment"
+   ],
+   "class": "money",
+   "means": "payment_terms",
+   "industries": [
+    "all"
+   ],
+   "note": "paying in portions",
+   "source": "https://www.investopedia.com/terms/c/credit-terms.asp"
+  },
+  {
+   "term": "retainage",
+   "variants": [
+    "retention money",
+    "retainage held",
+    "holdback",
+    "hold back",
+    "10% retention",
+    "retainage release",
+    "release of retainage"
+   ],
+   "class": "money",
+   "means": "retainage",
+   "industries": [
+    "all"
+   ],
+   "note": "portion withheld until job completion (construction)",
+   "source": "https://www.investopedia.com/terms/c/credit-terms.asp"
+  },
+  {
+   "term": "net terms",
+   "variants": [
+    "on terms",
+    "on acct",
+    "on credit",
+    "charge account",
+    "house account",
+    "open account",
+    "bill me",
+    "invoice me",
+    "credit account",
+    "trade account",
+    "credit limit",
+    "account limit"
+   ],
+   "class": "money",
+   "means": "payment_terms",
+   "industries": [
+    "all"
+   ],
+   "note": "customer buys now, pays later",
+   "source": "https://www.investopedia.com/terms/c/credit-terms.asp"
+  },
+  {
+   "term": "amount due",
+   "variants": [
+    "amt due",
+    "amount due now",
+    "amount to pay",
+    "please pay",
+    "total due",
+    "total amount due",
+    "payment due now",
+    "net due",
+    "balance due",
+    "balance owing",
+    "balance owed",
+    "bal due",
+    "remit this amount",
+    "please remit",
+    "new balance",
+    "new charges",
+    "current charges"
+   ],
+   "class": "money",
+   "means": "balance_due",
+   "industries": [
+    "all"
+   ],
+   "note": "what must be paid now",
+   "source": "https://quickbooks.intuit.com/r/glossary/"
+  },
+  {
+   "term": "amount paid",
+   "variants": [
+    "paid amount",
+    "payment amount",
+    "amount received",
+    "total received",
+    "payment received",
+    "amount tendered",
+    "cash tendered",
+    "amount remitted",
+    "amount enclosed",
+    "total paid",
+    "payments received",
+    "payments applied",
+    "payments and credits"
+   ],
+   "class": "money",
+   "means": "amount_paid",
+   "industries": [
+    "all"
+   ],
+   "note": "amount actually paid or received; DeepWell costPaid synonyms (cost when no total)",
+   "source": "https://quickbooks.intuit.com/r/glossary/"
+  },
+  {
+   "term": "change",
+   "variants": [
+    "change due",
+    "change given",
+    "cash change",
+    "your change"
+   ],
+   "class": "money",
+   "means": "change_given",
+   "industries": [
+    "all"
+   ],
+   "note": "retail: cash handed back at the register; not an expense",
+   "source": "https://quickbooks.intuit.com/r/glossary/"
+  },
+  {
+   "term": "subtotal",
+   "variants": [
+    "sub total",
+    "sub-total",
+    "subtotals",
+    "pre-tax total",
+    "before tax",
+    "total before tax",
+    "total excl tax",
+    "net sales",
+    "merchandise total",
+    "parts total",
+    "labor total",
+    "parts and labor"
+   ],
+   "class": "money",
+   "means": "subtotal",
+   "industries": [
+    "all"
+   ],
+   "note": "amount before tax/shipping; never the document total when a total exists",
+   "source": "https://quickbooks.intuit.com/r/glossary/"
+  },
+  {
+   "term": "discount",
+   "variants": [
+    "discounts",
+    "disc",
+    "disc.",
+    "discount amount",
+    "total discount",
+    "trade discount",
+    "volume discount",
+    "rebate",
+    "markdown",
+    "coupon",
+    "promo code",
+    "promo discount",
+    "total savings",
+    "you saved",
+    "member discount",
+    "military discount",
+    "employee discount",
+    "price override",
+    "price adjustment",
+    "price match"
+   ],
+   "class": "money",
+   "means": "discount",
+   "industries": [
+    "all"
+   ],
+   "note": "reduction from list price",
+   "source": "https://quickbooks.intuit.com/r/glossary/"
+  },
+  {
+   "term": "tip",
+   "variants": [
+    "tips",
+    "gratuity",
+    "tip amount"
+   ],
+   "class": "money",
+   "means": "tip",
+   "industries": [
+    "all"
+   ],
+   "note": "retail/service tip line",
+   "source": "https://quickbooks.intuit.com/r/glossary/"
+  },
+  {
+   "term": "shipping",
+   "variants": [
+    "shipping cost",
+    "shipping charge",
+    "shipping charges",
+    "shipping fee",
+    "shipping and handling",
+    "shipping & handling",
+    "s&h",
+    "s/h",
+    "freight",
+    "freight charge",
+    "delivery charge",
+    "delivery fee",
+    "handling fee",
+    "postage"
+   ],
+   "class": "money",
+   "means": "shipping",
+   "industries": [
+    "all"
+   ],
+   "note": "shipping line; keep separate from merchandise",
+   "source": "https://quickbooks.intuit.com/r/glossary/"
+  },
+  {
+   "term": "surcharge",
+   "variants": [
+    "surcharges",
+    "service charge",
+    "convenience fee",
+    "processing fee",
+    "card fee",
+    "credit card fee",
+    "cc fee",
+    "credit card surcharge",
+    "fuel surcharge",
+    "environmental fee",
+    "disposal fee",
+    "recycling fee",
+    "trip charge",
+    "trip fee",
+    "diagnostic fee",
+    "call out fee",
+    "callout fee",
+    "after hours fee",
+    "rush fee",
+    "setup fee",
+    "cancellation fee",
+    "nsf fee",
+    "returned check fee"
+   ],
+   "class": "money",
+   "means": "fee",
+   "industries": [
+    "all"
+   ],
+   "note": "extra fee lines",
+   "source": "https://quickbooks.intuit.com/r/glossary/"
+  },
+  {
+   "term": "late fee",
+   "variants": [
+    "late fees",
+    "late charge",
+    "late charges",
+    "late payment fee",
+    "finance charge",
+    "finance charges",
+    "interest charge",
+    "past due fee",
+    "overdue fee",
+    "penalty"
+   ],
+   "class": "money",
+   "means": "late_fee",
+   "industries": [
+    "all"
+   ],
+   "note": "fee for paying late; added to balance",
+   "source": "https://quickbooks.intuit.com/r/glossary/"
+  },
+  {
+   "term": "restocking fee",
+   "variants": [
+    "restocking charge",
+    "restock fee",
+    "re-stocking fee",
+    "return fee",
+    "exchange fee"
+   ],
+   "class": "money",
+   "means": "fee",
+   "industries": [
+    "all"
+   ],
+   "note": "retail fee deducted from a return",
+   "source": "https://quickbooks.intuit.com/r/glossary/"
+  },
+  {
+   "term": "store credit",
+   "variants": [
+    "store credits",
+    "credit on account",
+    "account credit",
+    "credit balance",
+    "credit on file",
+    "merchandise credit",
+    "merchandise credit slip",
+    "credit voucher",
+    "return credit",
+    "customer credit balance",
+    "unapplied credit",
+    "unapplied payment",
+    "overpayment",
+    "overpaid"
+   ],
+   "class": "money",
+   "means": "store_credit",
+   "industries": [
+    "all"
+   ],
+   "note": "money held for the customer as credit (not cash). Unapplied/overpayment means a customer paid more than owed",
+   "source": "https://squareup.com/help/us/en/article/5020-refund-a-payment"
+  },
+  {
+   "term": "security deposit",
+   "variants": [
+    "security deposits",
+    "sec deposit",
+    "sec dep",
+    "sec. deposit",
+    "security dep",
+    "refundable deposit",
+    "damage deposit",
+    "cleaning deposit",
+    "pet deposit",
+    "key deposit",
+    "rental deposit",
+    "rent deposit",
+    "first and last",
+    "first last and security",
+    "last month's rent",
+    "last months rent",
+    "move-in deposit",
+    "move in deposit",
+    "move-in funds",
+    "move in funds"
+   ],
+   "class": "field",
+   "means": "deposit_amount",
+   "industries": [
+    "all"
+   ],
+   "note": "property: tenant deposit held (property pack already has prop-distinct-security-deposit)",
+   "source": "https://quickbooks.intuit.com/learn-support/en-us/help-article/customer-management/record-customer-deposits/L2yqiOzcn_US_en_US"
+  },
+  {
+   "term": "bottle deposit",
+   "variants": [
+    "can deposit",
+    "container deposit",
+    "core charge",
+    "core deposit",
+    "core fee",
+    "cores",
+    "core return",
+    "core refund",
+    "keg deposit",
+    "tank deposit",
+    "cylinder deposit",
+    "pallet deposit",
+    "crate deposit",
+    "shell deposit",
+    "container fee"
+   ],
+   "class": "field",
+   "means": "deposit_amount",
+   "industries": [
+    "all"
+   ],
+   "note": "refundable charge on returnable item (auto parts cores, kegs, cylinders)",
+   "source": "https://quickbooks.intuit.com/learn-support/en-us/help-article/customer-management/record-customer-deposits/L2yqiOzcn_US_en_US"
+  },
+  {
+   "term": "unpaid",
+   "variants": [
+    "not paid",
+    "not yet paid",
+    "hasn't paid",
+    "haven't paid",
+    "never paid",
+    "awaiting payment",
+    "waiting on payment",
+    "payment pending",
+    "still owes",
+    "still owe",
+    "owes us",
+    "owe us",
+    "owes me",
+    "owed to us",
+    "money owed to us",
+    "money we're owed",
+    "outstanding invoices",
+    "open invoices",
+    "unpaid invoices",
+    "uncollected",
+    "receivable",
+    "receivables",
+    "accounts receivable",
+    "chasing invoices",
+    "chase payment"
+   ],
+   "class": "status",
+   "means": "unpaid",
+   "industries": [
+    "all"
+   ],
+   "note": "customer owes us money (accounts receivable)",
+   "source": "https://www.investopedia.com/terms/a/accountsreceivable.asp"
+  },
+  {
+   "term": "who owes us",
+   "variants": [
+    "who owes us money",
+    "who owes me",
+    "who still owes us",
+    "who hasn't paid",
+    "who is behind",
+    "who's behind",
+    "who is late",
+    "who's late",
+    "who is overdue",
+    "who's overdue",
+    "who is past due",
+    "slow payers",
+    "slow payer",
+    "late payers",
+    "deadbeats",
+    "who do we need to chase",
+    "who needs a reminder",
+    "who needs a statement"
+   ],
+   "class": "status",
+   "means": "unpaid",
+   "industries": [
+    "all"
+   ],
+   "note": "question: list customers with unpaid/overdue balances",
+   "source": "https://www.investopedia.com/terms/a/accountsreceivable.asp"
+  },
+  {
+   "term": "past due",
+   "variants": [
+    "past-due",
+    "pastdue",
+    "overdue",
+    "over due",
+    "late payment",
+    "late invoices",
+    "delinquent",
+    "behind on payments",
+    "past terms",
+    "beyond terms",
+    "30 days late",
+    "60 days late",
+    "90 days late",
+    "30 days overdue",
+    "60 days overdue",
+    "90 days overdue",
+    "30 days past due",
+    "60 days past due",
+    "90 days past due",
+    "in collections",
+    "sent to collections",
+    "final notice",
+    "demand letter"
+   ],
+   "class": "status",
+   "means": "overdue",
+   "industries": [
+    "all"
+   ],
+   "note": "invoice/account not paid by its due date. Past due is the standard phrasing",
+   "source": "https://www.investopedia.com/terms/d/dunning-letter.asp"
+  },
+  {
+   "term": "overdue notice",
+   "variants": [
+    "overdue notices",
+    "past due notice",
+    "past due notices",
+    "past-due notice",
+    "late notice",
+    "late notices",
+    "payment reminder",
+    "payment reminders",
+    "friendly reminder",
+    "gentle reminder",
+    "second notice",
+    "final notice",
+    "dunning letter",
+    "dunning notice",
+    "dunning email"
+   ],
+   "class": "status",
+   "means": "overdue",
+   "industries": [
+    "all"
+   ],
+   "note": "letter about unpaid invoice; filed as correspondence",
+   "source": "https://www.investopedia.com/terms/d/dunning-letter.asp"
+  },
+  {
+   "term": "what we owe",
+   "variants": [
+    "what do we owe",
+    "what do i owe",
+    "what we still owe",
+    "how much do we owe",
+    "how much do i owe",
+    "how much do we still owe",
+    "bills due",
+    "bills due soon",
+    "upcoming bills",
+    "unpaid bills",
+    "open bills",
+    "bills to pay",
+    "bills we owe",
+    "accounts payable",
+    "payables",
+    "who do we owe",
+    "who do i owe",
+    "which bills are due",
+    "which bills are unpaid",
+    "which bills are overdue",
+    "which vendors do we owe",
+    "what bills are due this week",
+    "what bills are due this month"
+   ],
+   "class": "status",
+   "means": "owed_by_us",
+   "industries": [
+    "all"
+   ],
+   "note": "question: what we owe vendors (accounts payable)",
+   "source": "https://www.investopedia.com/terms/a/accountspayable.asp"
+  },
+  {
+   "term": "spent with",
+   "variants": [
+    "what did we spend with",
+    "what have we spent with",
+    "how much did we spend with",
+    "how much have we spent with",
+    "how much have we paid",
+    "how much did we pay",
+    "total spent with",
+    "total paid to",
+    "spend by vendor",
+    "spend per vendor",
+    "spending by vendor",
+    "spent at",
+    "purchases from",
+    "how much did we buy from",
+    "what did i spend with",
+    "how much did i spend with"
+   ],
+   "class": "money",
+   "means": "vendor_spend_total",
+   "industries": [
+    "all"
+   ],
+   "note": "question: totals of what we spent with a vendor; the vendor-total lane",
+   "source": "https://www.investopedia.com/terms/a/accountspayable.asp"
+  },
+  {
+   "term": "draft",
+   "variants": [
+    "drafts",
+    "draft invoice",
+    "draft invoices",
+    "draft bill",
+    "draft po",
+    "unsent invoice",
+    "unsent invoices",
+    "not yet sent",
+    "pending approval",
+    "awaiting approval",
+    "unapproved invoice",
+    "on hold",
+    "parked sale",
+    "not yet signed",
+    "unsigned",
+    "awaiting signature"
+   ],
+   "class": "status",
+   "means": "draft",
+   "industries": [
+    "all"
+   ],
+   "note": "not final yet",
+   "source": "https://quickbooks.intuit.com/r/glossary/"
+  },
+  {
+   "term": "part number",
+   "variants": [
+    "part no",
+    "part no.",
+    "part #",
+    "p/n",
+    "pn",
+    "part num",
+    "part numbers",
+    "mfr part",
+    "mfr part number",
+    "mpn",
+    "manufacturer part number",
+    "oem part number",
+    "oem number",
+    "oe number",
+    "interchange number",
+    "cross reference number"
+   ],
+   "class": "field",
+   "means": "part_number",
+   "industries": [
+    "all"
+   ],
+   "note": "part_number is the DeepWell field for this",
+   "source": "https://www.investopedia.com/terms/s/stock-keeping-unit-sku.asp"
+  },
+  {
+   "term": "quantity",
+   "variants": [
+    "qty",
+    "qty.",
+    "qtys",
+    "quantities",
+    "q'ty",
+    "pieces",
+    "pcs",
+    "number of units",
+    "qty on hand",
+    "qty ordered",
+    "qty shipped",
+    "qty received",
+    "qty returned",
+    "qty sold",
+    "qty backordered",
+    "qty open"
+   ],
+   "class": "field",
+   "means": "quantity",
+   "industries": [
+    "retail"
+   ],
+   "note": "how many of an item; DeepWell has no quantity field; 'each'/'ea' also unit-of-measure",
+   "source": "https://help.shopify.com/en/manual/products/inventory"
+  },
+  {
+   "term": "reorder point",
+   "variants": [
+    "reorder level",
+    "reorder qty",
+    "reorder quantity",
+    "re-order point",
+    "rop",
+    "par level",
+    "minimum stock",
+    "min stock",
+    "min qty",
+    "safety stock",
+    "low stock",
+    "low stock alert",
+    "running low",
+    "running out of",
+    "out of stock",
+    "out-of-stock",
+    "oos",
+    "sold out",
+    "stockout",
+    "stock out",
+    "need to reorder",
+    "need to restock",
+    "what do we need to reorder",
+    "what do we need to order",
+    "what's low",
+    "what's running low",
+    "what's out of stock"
+   ],
+   "class": "field",
+   "means": "reorder_point",
+   "industries": [
+    "retail"
+   ],
+   "note": "stock-level terms; reorder_point is a new concept",
+   "source": "https://squareup.com/help/us/en/article/5004-manage-inventory-with-square-for-retail"
+  },
+  {
+   "term": "cogs",
+   "variants": [
+    "cost of goods sold",
+    "cost of goods",
+    "cost of sales",
+    "product cost",
+    "item cost",
+    "unit cost",
+    "cost per unit",
+    "cost each",
+    "landed cost",
+    "purchase cost",
+    "purchase price",
+    "buy price",
+    "wholesale cost",
+    "our cost",
+    "what we paid",
+    "what i paid"
+   ],
+   "class": "money",
+   "means": "cost_price",
+   "industries": [
+    "retail"
+   ],
+   "note": "what the shop paid for an item",
+   "source": "https://www.shopify.com/retail/glossary"
+  },
+  {
+   "term": "markup",
+   "variants": [
+    "mark-up",
+    "mark up",
+    "markups",
+    "margins",
+    "gross margin",
+    "gross profit",
+    "profit margin",
+    "keystone",
+    "keystone markup",
+    "cost plus",
+    "cost-plus",
+    "markup percentage",
+    "margin percentage",
+    "what's the margin",
+    "what's the markup",
+    "consignment split",
+    "consignor split",
+    "consignor share",
+    "shop split",
+    "house split",
+    "60/40",
+    "70/30",
+    "50/50",
+    "60/40 split",
+    "70/30 split",
+    "50/50 split"
+   ],
+   "class": "money",
+   "means": "markup_margin",
+   "industries": [
+    "retail"
+   ],
+   "note": "margin/markup/profit; consignment split is the % kept by shop vs consignor",
+   "source": "https://www.shopify.com/retail/glossary"
+  },
+  {
+   "term": "retail price",
+   "variants": [
+    "list price",
+    "sticker price",
+    "selling price",
+    "sale price",
+    "ticket price",
+    "shelf price",
+    "tag price",
+    "price tag",
+    "asking price",
+    "our price",
+    "unit price",
+    "price per unit",
+    "price each",
+    "extended price",
+    "ext price",
+    "line total"
+   ],
+   "class": "money",
+   "means": "unit_price",
+   "industries": [
+    "retail"
+   ],
+   "note": "the price a customer pays. DeepWell has no price field (cost = document amount); new concept unit_price",
+   "source": "https://www.investopedia.com/terms/m/msrp.asp"
+  },
+  {
+   "term": "on consignment",
+   "variants": [
+    "consigned",
+    "consignment item",
+    "consignment items",
+    "consignment stock",
+    "consignment goods",
+    "consigned item",
+    "consigned items",
+    "consigned goods",
+    "memo item",
+    "memo items",
+    "sale or return",
+    "sale-or-return",
+    "sor",
+    "owner's goods",
+    "owner goods",
+    "not our stock",
+    "not our inventory"
+   ],
+   "class": "status",
+   "means": "consigned",
+   "industries": [
+    "retail"
+   ],
+   "note": "goods in the shop owned by someone else; shop is paid a commission on sale",
+   "source": "https://www.shopify.com/retail/glossary"
+  },
+  {
+   "term": "sold",
+   "variants": [
+    "sold-out",
+    "has sold",
+    "did it sell",
+    "did that sell",
+    "did it sell yet",
+    "sold yet",
+    "already sold",
+    "been sold",
+    "sell-through",
+    "sell through",
+    "sellthrough",
+    "sell-through rate",
+    "slow mover",
+    "slow movers",
+    "slow moving",
+    "slow-moving",
+    "fast mover",
+    "fast movers",
+    "fast moving",
+    "dead stock",
+    "deadstock",
+    "dead inventory",
+    "shelf warmer",
+    "shelf warmers",
+    "stale stock",
+    "old stock",
+    "aged inventory",
+    "obsolete stock",
+    "overstock",
+    "overstocked",
+    "excess inventory",
+    "clearance items",
+    "liquidation stock"
+   ],
+   "class": "status",
+   "means": "sold_status",
+   "industries": [
+    "retail"
+   ],
+   "note": "retail status of an item: sold, slow, dead stock; sell-through percentage",
+   "source": "https://www.shopify.com/retail/glossary"
+  },
+  {
+   "term": "gift card",
+   "variants": [
+    "gift cards",
+    "giftcard",
+    "giftcards",
+    "gift certificate",
+    "gift certificates",
+    "gc",
+    "g/c",
+    "gift voucher",
+    "e-gift card",
+    "egift card",
+    "e-gift cards",
+    "digital gift card",
+    "physical gift card",
+    "stored value",
+    "stored-value",
+    "stored value card",
+    "store card",
+    "merchant gift card",
+    "prepaid card",
+    "gift card balance",
+    "gift balance",
+    "balance on card",
+    "remaining on card",
+    "redeemed",
+    "redemption",
+    "activate gift card",
+    "reloadable",
+    "card balance",
+    "check card balance",
+    "gift card number",
+    "gift card #",
+    "gc number",
+    "gift card pin",
+    "scratch off code"
+   ],
+   "class": "money",
+   "means": "gift_card",
+   "industries": [
+    "retail"
+   ],
+   "note": "DeepWell 'internal' type already lists gift card log; gift card is the item (new concept gift_card, liability until redeemed)",
+   "source": "https://squareup.com/help/us/en/article/5080-square-gift-cards"
+  },
+  {
+   "term": "return an item",
+   "variants": [
+    "returning",
+    "returned item",
+    "returned items",
+    "item return",
+    "item returns",
+    "customer return",
+    "customer returns",
+    "return policy",
+    "return window",
+    "exchange policy",
+    "exchange an item",
+    "exchanged",
+    "item exchange",
+    "trade in",
+    "trade-in",
+    "traded in",
+    "trade in value",
+    "trade-in credit",
+    "buyback",
+    "buy back",
+    "buy-back",
+    "buyback price",
+    "return to stock",
+    "returned to stock",
+    "restock",
+    "restocked",
+    "restocking"
+   ],
+   "class": "action",
+   "means": "return_item",
+   "industries": [
+    "retail"
+   ],
+   "note": "customer brings goods back; resolves to refund/exchange/store credit",
+   "source": "https://www.shopify.com/retail/glossary"
+  },
+  {
+   "term": "bill the customer",
+   "variants": [
+    "bill them",
+    "bill customer",
+    "bill the client",
+    "invoice them",
+    "invoice customer",
+    "invoice the customer",
+    "send an invoice",
+    "send the invoice",
+    "send invoices",
+    "send out invoices",
+    "send bills",
+    "send a statement",
+    "send statements",
+    "create an invoice",
+    "make an invoice",
+    "write an invoice",
+    "write up an invoice",
+    "cut an invoice",
+    "generate an invoice",
+    "issue an invoice",
+    "raise an invoice",
+    "unbilled",
+    "not billed",
+    "not yet billed",
+    "haven't billed",
+    "not invoiced",
+    "not yet invoiced",
+    "ready to bill",
+    "ready to invoice",
+    "completed not billed",
+    "completed not invoiced",
+    "jobs not billed",
+    "jobs not invoiced",
+    "jobs to bill",
+    "unbilled jobs",
+    "unbilled work",
+    "work done not billed",
+    "wip"
+   ],
+   "class": "action",
+   "means": "create_invoice",
+   "industries": [
+    "all"
+   ],
+   "note": "raise an invoice; unbilled = work done not yet invoiced (revenue that has not been billed)",
+   "source": "https://www.investopedia.com/terms/a/accountsreceivable.asp"
+  },
+  {
+   "term": "pay the bill",
+   "variants": [
+    "pay bill",
+    "pay bills",
+    "pay the bills",
+    "pay invoice",
+    "pay invoices",
+    "pay the invoice",
+    "pay vendor",
+    "pay vendors",
+    "pay the vendor",
+    "pay supplier",
+    "pay suppliers",
+    "pay run",
+    "payment run",
+    "bill run",
+    "bill pay",
+    "billpay",
+    "online bill pay",
+    "cut a check",
+    "cut checks",
+    "write a check",
+    "write checks",
+    "send a check",
+    "mail a check",
+    "ach payment",
+    "wire payment",
+    "wire transfer",
+    "settle the bill",
+    "settle the invoice",
+    "settle up",
+    "pay down the balance",
+    "pay the card",
+    "pay the credit card"
+   ],
+   "class": "action",
+   "means": "pay_bill",
+   "industries": [
+    "all"
+   ],
+   "note": "pay a bill we owe",
+   "source": "https://www.investopedia.com/terms/a/accountspayable.asp"
+  },
+  {
+   "term": "record a payment",
+   "variants": [
+    "receive payment",
+    "receive a payment",
+    "record payment",
+    "log a payment",
+    "log payment",
+    "mark paid",
+    "mark as paid",
+    "mark it paid",
+    "mark the invoice paid",
+    "mark the invoice as paid",
+    "mark invoice paid",
+    "apply payment",
+    "apply a payment",
+    "apply the payment",
+    "post payment",
+    "post a payment",
+    "enter payment",
+    "deposit the check",
+    "deposit the checks",
+    "deposit a check",
+    "take payment",
+    "take a payment",
+    "collect payment",
+    "collect a payment",
+    "got the check",
+    "check came in",
+    "check arrived",
+    "payment came in",
+    "payment landed",
+    "payment posted"
+   ],
+   "class": "action",
+   "means": "record_payment",
+   "industries": [
+    "all"
+   ],
+   "note": "the incoming-payment action",
+   "source": "https://www.investopedia.com/terms/a/accountspayable.asp"
+  }
+ ],
+ "ambiguous": [
+  {
+   "term": "bill",
+   "could_mean": [
+    "invoice (vendor bill we receive)",
+    "invoice (bill we send a customer)",
+    "banknote",
+    "verb: to bill = to invoice"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "pos",
+   "could_mean": [
+    "purchase orders (plural)",
+    "point of sale"
+   ],
+   "industries": [
+    "retail",
+    "all"
+   ]
+  },
+  {
+   "term": "pop",
+   "could_mean": [
+    "proof of purchase",
+    "proof of payment",
+    "point of purchase display"
+   ],
+   "industries": [
+    "retail"
+   ]
+  },
+  {
+   "term": "pod",
+   "could_mean": [
+    "proof of delivery",
+    "print on demand",
+    "pay on delivery"
+   ],
+   "industries": [
+    "retail",
+    "all"
+   ]
+  },
+  {
+   "term": "so",
+   "could_mean": [
+    "sales order",
+    "service order",
+    "standing order",
+    "special order"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "statement",
+   "could_mean": [
+    "account statement",
+    "bank statement",
+    "financial statement (P&L, balance sheet)",
+    "IRS statement"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "deposit",
+   "could_mean": [
+    "customer deposit/down payment",
+    "security deposit (lease)",
+    "bank deposit (money taken to the bank)",
+    "returnable container/core deposit"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "credit",
+   "could_mean": [
+    "credit memo",
+    "store credit",
+    "credit card",
+    "credit terms",
+    "a credit entry (accounting)"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "balance",
+   "could_mean": [
+    "amount a customer owes",
+    "amount we owe a vendor",
+    "gift card balance",
+    "bank balance",
+    "store credit balance"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "total",
+   "could_mean": [
+    "document grand total",
+    "subtotal",
+    "total paid to date",
+    "year-to-date total for a vendor/customer"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "order",
+   "could_mean": [
+    "sales order",
+    "purchase order",
+    "work order",
+    "special order",
+    "order number on a receipt"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "consignee",
+   "could_mean": [
+    "receiver of a shipment",
+    "shop holding goods on consignment"
+   ],
+   "industries": [
+    "retail"
+   ]
+  },
+  {
+   "term": "consignor",
+   "could_mean": [
+    "shipper",
+    "owner who places goods in a shop on consignment"
+   ],
+   "industries": [
+    "retail"
+   ]
+  },
+  {
+   "term": "rma",
+   "could_mean": [
+    "customer return authorization",
+    "return to vendor authorization"
+   ],
+   "industries": [
+    "retail"
+   ]
+  },
+  {
+   "term": "write-off",
+   "could_mean": [
+    "bad debt we will never collect",
+    "inventory loss/shrink",
+    "asset depreciation or tax write-off (deduction)"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "void",
+   "could_mean": [
+    "cancelled before payment",
+    "reversed after payment"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "chargeback",
+   "could_mean": [
+    "card dispute filed by the cardholder",
+    "internal charge back of cost to a department",
+    "vendor debit memo"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "refund",
+   "could_mean": [
+    "money returned to customer",
+    "money returned by vendor to us"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "net",
+   "could_mean": [
+    "net terms (net 30)",
+    "net amount after tax/discount",
+    "net profit"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "paid",
+   "could_mean": [
+    "customer paid us",
+    "we paid a vendor",
+    "paid out of pocket by employee (reimbursable)"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "due",
+   "could_mean": [
+    "amount due now",
+    "due date",
+    "due in (days)"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "terms",
+   "could_mean": [
+    "payment terms (net 30)",
+    "terms and conditions",
+    "contract term (length)"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "cost",
+   "could_mean": [
+    "what the shop paid for an item",
+    "document total amount",
+    "expense amount"
+   ],
+   "industries": [
+    "retail",
+    "all"
+   ]
+  },
+  {
+   "term": "margin",
+   "could_mean": [
+    "gross margin %",
+    "markup",
+    "page margin"
+   ],
+   "industries": [
+    "retail"
+   ]
+  },
+  {
+   "term": "on account",
+   "could_mean": [
+    "customer buys on credit terms",
+    "payment applied to account balance without a specific invoice"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "prepaid",
+   "could_mean": [
+    "customer paid in advance",
+    "prepaid expense (we paid a vendor ahead)",
+    "prepaid freight"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "memo",
+   "could_mean": [
+    "credit/debit memo",
+    "memo consignment (goods on approval)",
+    "internal memo",
+    "memo line on a check"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "tax",
+   "could_mean": [
+    "sales tax line",
+    "income tax",
+    "payroll tax",
+    "property tax"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "1099",
+   "could_mean": [
+    "IRS Form 1099 document",
+    "contractor who receives a 1099",
+    "report of 1099 totals per vendor"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "tin",
+   "could_mean": [
+    "taxpayer identification number (SSN/EIN/ITIN)",
+    "tin metal"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "retainer",
+   "could_mean": [
+    "advance payment held against future work",
+    "dental/orthodontic retainer",
+    "ongoing monthly fee"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "retention",
+   "could_mean": [
+    "retainage withheld on a construction job",
+    "customer retention",
+    "document retention"
+   ],
+   "industries": [
+    "construction",
+    "all"
+   ]
+  },
+  {
+   "term": "count",
+   "could_mean": [
+    "inventory count",
+    "quantity of an item",
+    "number of documents"
+   ],
+   "industries": [
+    "retail",
+    "all"
+   ]
+  },
+  {
+   "term": "sku",
+   "could_mean": [
+    "shop's own item number",
+    "manufacturer part number",
+    "UPC barcode number"
+   ],
+   "industries": [
+    "retail"
+   ]
+  },
+  {
+   "term": "tab",
+   "could_mean": [
+    "customer's open account balance",
+    "restaurant bill",
+    "browser tab"
+   ],
+   "industries": [
+    "retail",
+    "all"
+   ]
+  },
+  {
+   "term": "float",
+   "could_mean": [
+    "starting cash in the till",
+    "time between payment issue and clearing",
+    "floating balance"
+   ],
+   "industries": [
+    "retail"
+   ]
+  },
+  {
+   "term": "short",
+   "could_mean": [
+    "till/cash drawer short of expected cash",
+    "vendor shipment short of quantity ordered",
+    "short-paid invoice"
+   ],
+   "industries": [
+    "retail",
+    "all"
+   ]
+  },
+  {
+   "term": "over",
+   "could_mean": [
+    "till over expected cash",
+    "overpayment",
+    "shipment overage"
+   ],
+   "industries": [
+    "retail",
+    "all"
+   ]
+  },
+  {
+   "term": "cash",
+   "could_mean": [
+    "cash payment method",
+    "cash on hand/bank balance",
+    "cash discount"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "check",
+   "could_mean": [
+    "paper check payment",
+    "verify/review",
+    "restaurant check (bill)"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "receipt",
+   "could_mean": [
+    "proof of payment",
+    "receiving of goods (receiving report)",
+    "verb: receive payment"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "credit memo",
+   "could_mean": [
+    "customer credit we issue",
+    "vendor credit we receive"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "statement balance",
+   "could_mean": [
+    "balance at statement date",
+    "balance including later activity"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "estimate",
+   "could_mean": [
+    "quote for work (proposal-quote)",
+    "estimated tax payment",
+    "estimated amount of an unfinished invoice"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "net 30",
+   "could_mean": [
+    "pay within 30 days of invoice date",
+    "pay within 30 days of receipt/delivery"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "due in",
+   "could_mean": [
+    "days until due",
+    "days after invoice date"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "vendor",
+   "could_mean": [
+    "company we buy from",
+    "booth/market seller who rents space from us",
+    "contractor/sub paid by us"
+   ],
+   "industries": [
+    "retail",
+    "all"
+   ]
+  },
+  {
+   "term": "customer",
+   "could_mean": [
+    "person who buys from us",
+    "tenant",
+    "patient",
+    "donor"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "client",
+   "could_mean": [
+    "customer",
+    "account",
+    "side we work for"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "account",
+   "could_mean": [
+    "customer account/balance",
+    "bank account",
+    "chart-of-accounts account",
+    "account with a vendor (account number)"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "po box",
+   "could_mean": [
+    "remit-to address",
+    "post office box in customer address"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "rent",
+   "could_mean": [
+    "lease rent charge",
+    "booth/shelf rental fee paid to the shop",
+    "equipment rental"
+   ],
+   "industries": [
+    "retail",
+    "all"
+   ]
+  },
+  {
+   "term": "ap",
+   "could_mean": [
+    "accounts payable",
+    "accounts payable aging"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "ar",
+   "could_mean": [
+    "accounts receivable",
+    "aging report"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "cm",
+   "could_mean": [
+    "credit memo",
+    "centimeter"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "amt",
+   "could_mean": [
+    "amount"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "map",
+   "could_mean": [
+    "minimum advertised price",
+    "map (document)"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "par",
+   "could_mean": [
+    "par level (reorder point)"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "ea",
+   "could_mean": [
+    "each (unit of measure)",
+    "quantity of one"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "ttl",
+   "could_mean": [
+    "total"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "nec",
+   "could_mean": [
+    "nonemployee compensation 1099-NEC",
+    "electrical code"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "dp",
+   "could_mean": [
+    "down payment",
+    "deposit"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "sh",
+   "could_mean": [
+    "shipping and handling",
+    "short"
+   ],
+   "industries": [
+    "all"
+   ]
+  }
+ ],
+ "new_concepts": [
+  {
+   "id": "vendor-bill-vs-customer-invoice",
+   "why": "DeepWell has one 'invoice' type; people ask separately for bills we owe (AP) vs invoices customers owe us (AR). Needs a direction flag (payable/receivable) so 'what do we owe' and 'who owes us' route correctly."
+  },
+  {
+   "id": "balance_due",
+   "why": "Outstanding balance on an invoice or account; today only 'cost' (document total) exists, so 'who still owes us' and 'balance' can't be answered from the amount printed as Balance Due."
+  },
+  {
+   "id": "amount_paid",
+   "why": "Amount actually paid/received (partial payments, deposits applied); separate from the document total."
+  },
+  {
+   "id": "due_date",
+   "why": "Printed Due Date / Pay By; needed for past due, 'bills due this week'. DeepWell has only service_date."
+  },
+  {
+   "id": "payment_terms",
+   "why": "Net 15/30/45/60, due on receipt, COD, 2/10 net 30, EOM; drives due_date and past due."
+  },
+  {
+   "id": "po_number",
+   "why": "PO number printed on invoices, receipts and delivery tickets; used to match bill to purchase order; no field today."
+  },
+  {
+   "id": "deposit_amount",
+   "why": "Deposit/down payment/retainer/layaway/special-order deposit taken before completion; ambiguous with bank and security deposits."
+  },
+  {
+   "id": "refund_amount",
+   "why": "Refund/return amount on a return slip or refund receipt; and 'what did we refund' questions."
+  },
+  {
+   "id": "credit_memo_amount",
+   "why": "Credit memo / credit note total (negative); needs to reduce the balance, not add to spend totals."
+  },
+  {
+   "id": "sales_tax",
+   "why": "Tax line on receipts and invoices; questions like 'how much sales tax did we collect/pay'."
+  },
+  {
+   "id": "subtotal",
+   "why": "Pre-tax subtotal on invoices and receipts; must not be mistaken for the total."
+  },
+  {
+   "id": "unit_price",
+   "why": "Per-item price on price lists, POS receipts, packing slips; no price field today (cost = document amount)."
+  },
+  {
+   "id": "quantity",
+   "why": "Quantity on hand, ordered, shipped or received; needed for inventory counts and receiving reports."
+  },
+  {
+   "id": "sku",
+   "why": "Item identifier on price lists, receipts, packing slips, inventory counts (SKU, UPC, item #); different from part_number."
+  },
+  {
+   "id": "reorder_point",
+   "why": "Par level / reorder point / low stock; owners ask 'what's running low'."
+  },
+  {
+   "id": "gift_card",
+   "why": "Gift card/certificate/store credit as an item with a balance and a liability; 'how many gift cards are outstanding'."
+  },
+  {
+   "id": "store_credit",
+   "why": "Credit held for a customer (returns, overpayments, credit memos) usable later; distinct from refund."
+  },
+  {
+   "id": "consignment_split",
+   "why": "Consignor/shop percentage split and consignor payout owed; consignment tracking is a common retail question."
+  },
+  {
+   "id": "consignor",
+   "why": "Role: person who owns goods the shop sells on commission; payee on consignor statements."
+  },
+  {
+   "id": "special_order",
+   "why": "Customer-requested item ordered from a vendor, usually with deposit; status (ordered, arrived, picked up, never picked up)."
+  },
+  {
+   "id": "payment_method",
+   "why": "Cash, check, card, ACH, wire, Venmo, Zelle on receipts and payments; last-4 digits; questions 'who paid by check'."
+  },
+  {
+   "id": "payment_reference",
+   "why": "Check number / ACH or wire reference / authorization code tying a payment to an invoice."
+  },
+  {
+   "id": "tax-form",
+   "why": "W-9, 1099-NEC, 1099-K, W-2, W-4, I-9, resale/exemption certificates: vendor/contractor onboarding paperwork, checked for presence and expiry, not a bill. Today they fall to 'other'. Never store TIN/SSN values."
+  },
+  {
+   "id": "vendor_1099_total",
+   "why": "Total paid to a contractor/vendor in a calendar year for 1099 reporting ($600 threshold; raised to $2,000 for payments after 2025)."
+  },
+  {
+   "id": "ar_aging_bucket",
+   "why": "Age buckets current/1-30/31-60/61-90/90+ used in past-due questions."
+  },
+  {
+   "id": "write_off",
+   "why": "Bad debt / uncollectible / comped balance; status distinct from paid and void."
+  },
+  {
+   "id": "unbilled_work",
+   "why": "Completed jobs with no invoice yet; owners ask 'what haven't we billed'."
+  },
+  {
+   "id": "shrink",
+   "why": "Inventory shrinkage/loss/damage adjustments in retail count records."
+  },
+  {
+   "id": "markup_margin",
+   "why": "Margin/markup percentage and what-we-paid vs sell-price questions in retail."
+  },
+  {
+   "id": "tip",
+   "why": "Tip/gratuity line on receipts; excluded from sales totals and expense totals."
+  },
+  {
+   "id": "statement_period",
+   "why": "Start/end of the period covered by a statement; 'as of' date."
+  },
+  {
+   "id": "retainage",
+   "why": "Withheld portion of a construction payment until job completion."
+  },
+  {
+   "id": "core_charge",
+   "why": "Refundable core/container deposit on returnable parts, kegs, cylinders (auto, HVAC refrigerant)."
+  },
+  {
+   "id": "exemption_certificate",
+   "why": "Customer sales-tax exemption or resale certificate on file; may expire; relevant to whether to charge sales tax."
+  },
+  {
+   "id": "owed_by_us",
+   "why": "Question 'what do we owe / who do we owe': vendor-bill balances (AP)."
+  },
+  {
+   "id": "vendor_spend_total",
+   "why": "Total spent with or paid to a vendor over a period."
+  },
+  {
+   "id": "fee",
+   "why": "Extra fee lines (convenience, trip, disposal, restocking) that are not goods or tax."
+  },
+  {
+   "id": "late_fee",
+   "why": "Late-payment fee/finance charge added to a balance."
+  },
+  {
+   "id": "change_given",
+   "why": "Cash change handed back at register; not an expense."
+  },
+  {
+   "id": "discount",
+   "why": "Discount/coupon/markdown amount on a receipt or invoice."
+  },
+  {
+   "id": "shipping",
+   "why": "Shipping/freight/handling charge line."
+  },
+  {
+   "id": "cost_price",
+   "why": "What the shop paid for an item (cost of goods)."
+  },
+  {
+   "id": "consigned",
+   "why": "Status: item held on consignment, owned by consignor."
+  },
+  {
+   "id": "sold_status",
+   "why": "Retail item sold / slow / dead-stock status and sell-through."
+  },
+  {
+   "id": "return_item",
+   "why": "Action: customer returns/exchanges an item."
+  },
+  {
+   "id": "create_invoice",
+   "why": "Action: raise/send an invoice; plus unbilled-work questions."
+  },
+  {
+   "id": "pay_bill",
+   "why": "Action: pay a vendor bill."
+  },
+  {
+   "id": "record_payment",
+   "why": "Action: record/receive a customer payment."
+  },
+  {
+   "id": "expiry",
+   "why": "Expiration/valid-until date on gift cards, quotes, certificates."
+  }
+ ]
+}

@@ -21,6 +21,9 @@
 import { stripConversationalFrame } from "./frame.js";
 import { attachCitations } from "../citations/records.js";
 import { buildOutOfDomainAnswer, buildUntrackedFieldAnswer } from "../contactLookup.js";
+import { untrackedConcept, jargonEnabled, untrackedPhrases } from "../lexicon/jargon.js";
+import { TENANT_SQL } from "../scope.js";
+import { classifyCoverage, coverageTraceTerms } from "./coverage.js";
 
 export const RECORD_ANCHOR_RE = new RegExp(
   String.raw`\b(?:customers?|clients?|accounts?|units?|systems?|equipment|hvac|e-?mails?|furnaces?|ac|a/c|air\s+conditioner|heat\s+pumps?|condensers?|air\s+handlers?|rtus?|mini[- ]?splits?|` +
@@ -285,6 +288,8 @@ const norm = (s) => String(s ?? "").trim().replace(/[?!.]+$/, "").replace(FILLER
  * "is fenwick still covered", "who called about a leak") because lower-case names, abbreviations and typos hide the anchor. Category
  * lexicons plus a customer-name veto are the safe design; open-domain trivia beyond them still defers to the model. */
 
+const PAPER_STATUS_RE = /\b(?:open|outstanding|unpaid|pending|unfilled|overdue|unreceived)\s+(?:purchase\s+orders?|pos)\b|\b(?:purchase\s+orders?|pos)\b(?:\s+\w+){0,4}?\s+(?:are|is|were)\s+(?:still\s+)?(?:open|outstanding|unpaid|pending|unfilled|overdue|unreceived)\b/i;
+
 /** @returns {null | { kind: "off_domain" | "untracked_component" | "dangling", trigger?: string }} */
 export function classifyEarlyDecline(question, { hasConversation = false, contextHasEntity = false } = {}) {
   const raw = String(question ?? "").trim();
@@ -297,6 +302,19 @@ export function classifyEarlyDecline(question, { hasConversation = false, contex
   }
   for (const q of [stripped, full]) {
     if (isUntrackedComponent(q)) return { kind: "untracked_component" };
+  }
+  // B3: a measure/attribute the tracked schema has no home for (satisfaction, fuel, bank balance, birthday, pay, fleet, complaints, no-shows, clock hours,
+  // warehouse stock, lead sources). Its own kind so a person named in the question does not hide it; ask.js should veto it by tenant trace only.
+  for (const q of [stripped, full]) { const cov = classifyCoverage(q); if (cov) return { kind: "off_domain", trigger: cov.trigger, cls: cov.cls, measure: true }; }
+  // J1: known-but-not-tracked jargon (retainage, commissions, change orders, payroll...). Reported as kind "off_domain" with the matched phrase as the
+  // trigger so ask.js applies the SAME vetoes it applies to every off-domain decline (a customer or record named in the question, or a customer whose
+  // name contains the phrase, keeps the question out of this path). A how-to/app question, a street address or a document/invoice number is never declined here.
+  if (jargonEnabled() && !APP_WORD_RE.test(stripped) && !NOT_CONTEXT_RE.test(stripped) && !STREET_RE.test(full) && !ID_DIGITS_RE.test(full) && !SPOKEN_NUM_RE.test(full)) {
+    const u = untrackedConcept(stripped) ?? untrackedConcept(full);
+    if (u) return { kind: "off_domain", trigger: u.phrase, untracked: u.id };
+    // a payment/open status asked of a paper that carries none: purchase orders have no open/paid status in the records (invoices do)
+    const st = PAPER_STATUS_RE.exec(stripped) ?? PAPER_STATUS_RE.exec(full);
+    if (st) return { kind: "off_domain", trigger: st[0], untracked: "paper_status" };
   }
   if (!hasConversation) {
     for (const q of [stripped, full]) {
@@ -323,6 +341,7 @@ export function buildDanglingAnswer(noun) {
 export function buildEarlyDeclineAnswer(kind, early) {
   if (kind === "off_domain") return buildOutOfDomainAnswer();
   if (kind === "untracked_component") return buildUntrackedFieldAnswer();
+  if (kind === "untracked_measure") return buildOutOfDomainAnswer();
   return buildDanglingAnswer(early?.noun);
 }
 
@@ -333,7 +352,31 @@ export const earlyDeclineEnabled = () => process.env.DONOVAN_EARLY_DECLINE !== "
 export function triggerNameTerms(trigger) {
   return [...new Set(String(trigger ?? "").toLowerCase().match(/[a-z]{4,}/g) ?? [])].slice(0, 4);
 }
+/** J1: does THIS tenant's own data (entity values, extracted values, filenames) mention a known-but-not-tracked concept? One tenant-scoped query. */
+export async function tenantHasTrace(db, trigger) {
+  const u = untrackedConcept(trigger);
+  const extra = u ? [] : coverageTraceTerms(trigger);
+  if (!u && !extra.length) return false;
+  const pats = [
+    ...[...new Set(u ? [u.phrase, ...untrackedPhrases(u.id)] : [])]
+      .map((p) => String(p).toLowerCase().match(/[a-z0-9]+/g) ?? [])
+      .filter((t) => t.join("").length >= 6)
+      .slice(0, 80)
+      .map((t) => `\\m${t.join("[ _-]+")}`),
+    // B3 coverage roots: any length, whole-word start with a short inflection tail (fuel, fuels; wage, wages; complain, complained)
+    ...extra.map((r) => `\\m${String(r).toLowerCase().replace(/[^a-z0-9]/g, "")}[a-z]{0,3}\\M`),
+  ];
+  if (!pats.length) return false;
+  const { rows } = await db.raw(
+    `SELECT 1 WHERE EXISTS (SELECT 1 FROM entities WHERE ${TENANT_SQL} AND merged_into IS NULL AND data::text ~* ANY($1::text[]))
+         OR EXISTS (SELECT 1 FROM extractions WHERE ${TENANT_SQL} AND COALESCE(NULLIF(corrected_value, ''), value) ~* ANY($1::text[]))
+         OR EXISTS (SELECT 1 FROM documents WHERE ${TENANT_SQL} AND original_filename ~* ANY($1::text[]))`,
+    [pats]
+  );
+  return rows.length > 0;
+}
 export async function triggerMatchesCustomerName(db, trigger) {
+  if (await tenantHasTrace(db, trigger)) return true;
   const terms = triggerNameTerms(trigger);
   if (!terms.length) return false;
   const { rows } = await db.raw(

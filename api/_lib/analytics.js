@@ -1201,6 +1201,16 @@ export function withLearnedOverlay(overlay, fn) {
  */
 const AGREEMENT_END_ADMIT_RE = /\b(?:agreements?|contracts?)\b(?=[\s\S]*\b(?:expir\w*|ends?|ending|renew\w*|(?:run|runs|running|good|valid|active|effective|in\s+effect)\s+(?:through|thru|until|till|to))\b)(?=[\s\S]*\b(?:19|20|21)\d{2}\b)/i;
 
+const BP_MON = "(?:january|february|march|april|may|june|july|august|september|october|november|december)";
+const BP_PERIOD = `(?:(?:first|second|third|fourth|1st|2nd|3rd|4th)\\s+(?:half|quarter)\\s+(?:of\\s+)?|q[1-4]\\s+(?:of\\s+)?|${BP_MON}\\s+(?:(?:through|to|thru)\\s+${BP_MON}\\s+)?)?(?:19|20)\\d{2}`;
+const BARE_NOUN_PERIOD_RE = new RegExp(`^(?:the\\s+)?(?:total\\s+)?(?:number\\s+of\\s+)?((?:[a-z]+\\s+){0,2}[a-z]+)\\s+(?:in|during|from|for|dated|between|issued|logged|written|created)\\s+(?:the\\s+)?(?:from\\s+)?${BP_PERIOD}(?:\\s+(?:to|through|thru|and)\\s+${BP_PERIOD})?$`, "i");
+/** The counted noun phrase of a bare "<kind of paper> in <period>" question (nothing else in the sentence), or null. */
+function bareNounPeriodNoun(q, cr) {
+  const m = BARE_NOUN_PERIOD_RE.exec(String(q).trim().replace(/[?.!]+$/, ""));
+  if (!m) return null;
+  // only kinds of paper that carry a date the window can be read from (a service date, an invoice or quote date): an undated kind is the date lane's honest "not dated" answer, not a count of zero
+  return m[1] && /^(?:(?:service|repair|pm|maintenance)\s+)?(?:tickets?|calls?|visits?|jobs?)$|^(?:invoices?|quotes?|proposals?|estimates?|bills?)$/i.test(m[1].trim()) && cr.aggregateNoun.test(m[1]) ? m[1] : null;
+}
 export function preClassifyAnalytics(question, opts = {}) {
   const overlay = opts?.overlay;
   const q = String(question ?? '').trim();
@@ -1226,6 +1236,8 @@ export function preClassifyAnalytics(question, opts = {}) {
       WHO_WARRANTY_RE.test(q) ||
       // "clients out of warranty" / "customers under warranty" — a bare noun + warranty-status
       // phrase with no quantifier word (QUANTIFIER below requires "how many"/"which"/etc).
+      // B3: a bare "<kind of paper> in <period>" ("service tickets in the second half of 2025", "invoices dated in 2019"): no question word, but a counted noun plus a window is a count
+      (bareNounPeriodNoun(q, cr) != null && Boolean(resolveAnyTimeRange(q, new Date().toISOString().slice(0, 10)))) ||
       (cr.aggregateNoun.test(q) && WARRANTY_STATUS_WORD_RE.test(q)) ||
       (cr.aggregateNoun.test(q) && AGE_FILTER_RE.test(q)) ||
       (cr.aggregateNoun.test(q) && SUPERLATIVE_RE.test(q)) ||
@@ -1754,6 +1766,10 @@ export function missingConditions(plan, question) {
     if (c === 'brand' && plan?.filters?.some((f) => f.field === 'linkedEquipmentBrand')) continue;
     // D8: a permit's issuing city is its own filter (permitCity), not the customer-geo `city`.
     if (c === 'city' && plan?.filters?.some((f) => f.field === 'permitCity')) continue;
+    // E1: "Maricopa County" names the COUNTY. When the plan already filters on the county and the question says "county", the same word read as a city is that
+    // county (the router stamps plan.placeReading when it resolved a county/city twin), not a dropped city condition (bolting it on as a second filter turned "customers in Maricopa County" into a confident 0).
+    if (c === 'city' && plan?.placeReading === 'county' && plan?.filters?.some((f) => f.field === 'county')) continue;
+    if (c === 'county' && plan?.placeReading === 'city' && plan?.filters?.some((f) => f.field === 'city')) continue;
     if (!plan?.filters?.some((f) => f.field === field)) missing.add(c);
   }
   return missing;

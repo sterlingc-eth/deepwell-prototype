@@ -344,6 +344,7 @@ function stripTrailingFillerWord(phrase) {
   return stripped || p;
 }
 
+const SUMMARY_NOT_A_NAME_RE = /\b(?:newest|oldest|latest|earliest|newer|older|biggest|largest|smallest|most recent)\b/i;
 function isRealNameOrAddressPhrase(phrase, { trailingJob = false } = {}) {
   const p = String(phrase ?? "").trim();
   if (!p) return false;
@@ -358,6 +359,8 @@ function isRealNameOrAddressPhrase(phrase, { trailingJob = false } = {}) {
   if (MONTH_NAMES.has(firstWord) && p.split(/\s+/).length <= 2) return false; // "for august", "for august 2024"
   if (TIME_WORDS.has(firstWord)) return false;
   if (AGGREGATE_WORD_RE.test(p)) return false;
+  // R2 B2: a ranking word or a "date of ..." / "when ..." opener is a question about a document ("date of the newest proposal"), never a customer's name.
+  if (SUMMARY_NOT_A_NAME_RE.test(p) || /^(?:dates?|when)\b/i.test(p)) return false;
   // A bare, single-word phrase that's a known city name is a geo scope, not a
   // customer/address — "for Gilbert"/"for Chandler" — never a customer named
   // after their own city, so this errs toward the far more common case —
@@ -805,6 +808,15 @@ async function runDocLookupCore(db, question, opts = {}) {
         facts: [], sources: [], confidence: 0.5, verifiedCount: 0, unverifiedCount: 0, closest: [],
       }, { records: [], total: 0, kind: "searched", basis: "The question had no customer name in it, so nothing was searched." });
     }
+    if (candidates.length === 0 && /\b(?:documents?|docs?|paperwork|files?|records?)\b/i.test(question)) {
+      // R3 B2: a technician's name is not a missing customer: the technician count lane answers (and says the documents are the ones that list her as technician)
+      try {
+        const { loadTechnicianVocab, parseTechnician, runTechnician } = await import("./lookups/technician.js");
+        const vocab = await loadTechnicianVocab(db);
+        const tp = parseTechnician(question, vocab, {});
+        if (tp?.docNoun) { const ans = await runTechnician(db, tp); if (ans) return ans; }
+      } catch { /* keep the decline */ }
+    }
     if (candidates.length === 0) {
       return denyOr(db, namePhrase, attachCitations({
         kind: "answer", text: `I couldn't find a customer named ${titleCase(namePhrase)}.`,
@@ -987,6 +999,23 @@ async function runDocLookupCore(db, question, opts = {}) {
   const unitNote = missingUnits.length
     ? ` Nothing on file names ${missingUnits.map((u) => `Apt ${u.toUpperCase()}`).join(" or ")}${scope.unitNarrowed ? ", so only the other unit(s) you named are shown" : ", so this covers every unit at the address"}.`
     : "";
+  // R42: a unit the address scope could not narrow ("unit 3A at 853 E Broadway") is a condition on the documents' own unit_number field when the organization stores one; apply it, never the whole building
+  if (missingUnits.length && !scope.unitNarrowed && rows.length && process.env.DONOVAN_DOC_UNIT_FILTER !== "off") {
+    try {
+      const { rows: un } = await db.raw(
+        `SELECT x.document_id, upper(regexp_replace(trim(COALESCE(NULLIF(x.corrected_value, ''), x.value)), '^(apt\\.?|unit|suite|ste|#)\\s*', '', 'i')) AS value FROM extractions x
+          WHERE x.document_id = ANY($1::uuid[]) AND x.field_key = 'unit_number' AND x.${TENANT_SQL}`, [rows.map((r) => r.id)]);
+      if (un.length) {
+        const want = new Set(missingUnits.map((u) => String(u).toUpperCase().trim()));
+        const keep = new Set(un.filter((u) => want.has(u.value)).map((u) => u.document_id));
+        const rest = rows.filter((r) => keep.has(r.id));
+        if (!rest.length) {
+          return attachCitations({ kind: "answer", text: `No ${docLabelLower} on file for ${missingUnits.map((u) => `unit ${u.toUpperCase()}`).join(" or ")} at ${subject}; ${rows.length === 1 ? "the one" : `the ${rows.length}`} ${docLabelLower}${rows.length === 1 ? "" : "s"} on file for the address ${rows.length === 1 ? "names" : "name"} other units.`, facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [] }, { records: [], total: 0, claimedCount: 0, basis: `Checked the unit number printed on each ${docLabelLower} at ${subject}; none is for ${missingUnits.join(", ")}.` });
+        }
+        rows = rest;
+      }
+    } catch { /* unit filter unreadable: the whole-address answer below stands, with its note */ }
+  }
   const multi = customers.length > 1;
   const plural = rows.length === 1 ? docLabelLower : `${docLabelLower}${docLabelLower.endsWith("s") ? "" : "s"}`;
   const line = (r) => `${formatDateLabel(r.service_date ?? r.created_at)} · ${r.original_filename ?? r.id}${multi && r.customer_name ? ` · ${r.customer_name}` : ""}`;

@@ -1,13 +1,9 @@
 /**
  * Proactive insights — repeat-failure detectors (R17 contract, item 4).
  *
- *   a. same part replaced 2+ times on one unit — reuses
- *      api/_lib/relations/connect2.js's own exported HANDLERS.partReplacedUnitsCount
- *      (the exact proximity-regex/grouping query the "how many units have had
- *      the X replaced more than once" chat answer already uses) for each of
- *      the closed 6-part list that file's own header documents
- *      (capacitor/contactor/motor/filter/coil/thermostat) rather than
- *      re-deriving the regex or the query.
+ *   a. same part replaced 2+ times on one unit — api/_lib/relations/connect2.js's
+ *      exported repeatPartUnits (the same function Donovan's "which units have had a
+ *      part replaced more than once" answer runs), so the two never disagree.
  *   b. a callback within 30 days of a service visit for the same customer —
  *      built on api/_lib/relations/timeline.js's own exported fetchAllVisits
  *      (the SAME visit list questions.js's callbackSet/callbackCount chat
@@ -18,42 +14,30 @@
  *      become a literal call instead of a parallel copy; noted in the round
  *      report as the hook for whoever owns that file next.
  *
- * Neither HANDLERS.partReplacedUnitsCount nor fetchAllVisits ever opens its
+ * Neither repeatPartUnits nor fetchAllVisits ever opens its
  * own withTenant — both operate directly on `db`, so calling them from
  * inside the insights route's own transaction is safe.
  */
 import { TENANT_SQL } from '../../scope.js';
-import { HANDLERS as CONNECT2_HANDLERS } from '../../relations/connect2.js';
+import { repeatPartUnits } from '../../relations/connect2.js';
 import { fetchAllVisits, addDaysIso } from '../../relations/timeline.js';
 
 const MAX_ITEMS = 8;
 const CALLBACK_WINDOW_DAYS = 30;
 
-/** The same closed 6-part list connect2.js's own anyPartReplacedYesNo uses
- *  for "has this customer had any part replaced twice" — kept as a small,
- *  documented local copy (see this file's own header) rather than importing
- *  an unexported constant. */
-const PARTS = ['capacitor', 'contactor', 'motor', 'filter', 'coil', 'thermostat'];
-
-/** Item 4a: units with the same part replaced 2+ times, across every part in
- *  the closed list — dedupes a unit that qualifies on more than one part. */
+/** Item 4a: units with the same part replaced 2+ times. Uses connect2.js's exported repeatPartUnits - the very function
+ *  Donovan's chat answer runs - so the dashboard number and the answer cannot drift. */
 async function detectRepeatPartFailures(db) {
-  const byUnit = new Map(); // unitId -> {unit, parts: Set, docIds: Set}
-  for (const part of PARTS) {
-    let answer;
-    try {
-      answer = await CONNECT2_HANDLERS.partReplacedUnitsCount(db, { part });
-    } catch {
-      continue; // one part's query failing never blocks the others
-    }
-    const units = (answer?.records ?? []).filter((r) => r.type === 'unit');
-    const docIds = (answer?.records ?? []).filter((r) => r.type === 'document' || r.type === 'invoice').map((r) => r.id);
-    for (const u of units) {
-      const entry = byUnit.get(u.id) ?? { id: u.id, label: u.label, customerId: u.customerId ?? null, parts: new Set(), docIds: new Set() };
-      entry.parts.add(part);
-      for (const d of docIds) entry.docIds.add(d);
-      byUnit.set(u.id, entry);
-    }
+  let found;
+  try {
+    found = await repeatPartUnits(db);
+  } catch {
+    return null;
+  }
+  const docIds = [...new Set((found.docs ?? []).map((d) => d.id))];
+  const byUnit = new Map();
+  for (const u of found.units ?? []) {
+    byUnit.set(u.rec.id, { id: u.rec.id, label: u.rec.label, customerId: u.rec.customerId ?? null, parts: u.parts, docIds: new Set(docIds) });
   }
   if (!byUnit.size) return null;
   const units = [...byUnit.values()].sort((a, b) => b.parts.size - a.parts.size);

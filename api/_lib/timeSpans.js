@@ -155,6 +155,26 @@ export function resolveCalendarSpan(question, today) {
     return quarter(nq, yy);
   }
 
+  // B3 halves: "the first half of 2025", "second half 2025", "H1 2025", "first half of last year" (a half is its own window, never the whole year).
+  {
+    const HALF = { first: 1, '1st': 1, h1: 1, second: 2, '2nd': 2, h2: 2, last: 2 };
+    const hm = q.match(/\b(first|1st|second|2nd|last)\s+half\s+(?:of\s+)?(?:the\s+year\s+)?(\d{4}|this\s+year|last\s+year)\b/) || q.match(/\b(h1|h2)\s*(?:of\s+)?(?:fy\s*)?(\d{4})\b/);
+    if (hm) {
+      const yy = /^\d{4}$/.test(hm[2]) ? year4(hm[2]) : /last/.test(hm[2]) ? Y - 1 : Y;
+      const h = HALF[hm[1]];
+      const [a, b] = h === 1 ? [iso(yy, 1, 1), iso(yy, 6, 30)] : [iso(yy, 7, 1), iso(yy, 12, 31)];
+      const nm = h === 1 ? 'first' : 'second';
+      return { from: a, to: b, label: `in the ${nm} half of ${yy}`, bare: `the ${nm} half of ${yy}` };
+    }
+  }
+  // "the year before last" = two calendar years back.
+  if (/\b(?:the\s+)?year\s+before\s+last\b/.test(q)) return { from: iso(Y - 2, 1, 1), to: iso(Y - 2, 12, 31), label: `in ${Y - 2}`, bare: String(Y - 2) };
+  // Two consecutive years taken together: "2021 and 2022 combined", "2021 and 2022 all together" (non-consecutive years are two windows, not one: left alone).
+  if ((m = q.match(/\b((?:19|20)\d{2})\s+(?:and|&|plus)\s+((?:19|20)\d{2})\s+(?:combined|together|all\s+together|in\s+total|altogether)\b/)) && Math.abs(Number(m[1]) - Number(m[2])) === 1) {
+    const a = Math.min(Number(m[1]), Number(m[2])); const b = Math.max(Number(m[1]), Number(m[2]));
+    return { from: iso(a, 1, 1), to: iso(b, 12, 31), label: `${a} through ${b}`, bare: `${a} through ${b}` };
+  }
+
   // Quarters: "Q1 2026", "q3 of 2025", "the first quarter of 2026", "second quarter 2025".
   if ((m = q.match(/\bq([1-4])\s*(?:of\s+)?(?:fy\s*)?(\d{4})\b/))) return quarter(Number(m[1]), year4(m[2]));
   const ORD = { first: 1, '1st': 1, second: 2, '2nd': 2, third: 3, '3rd': 3, fourth: 4, '4th': 4 };

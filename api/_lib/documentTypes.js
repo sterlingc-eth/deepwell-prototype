@@ -446,22 +446,82 @@ const BASE_DOCUMENT_TYPE_SYNONYMS = {
  *  "insurance" or "letter" must not become typo-correction targets ("last visit" -> "list visit"). */
 const EXTRA_DOCUMENT_TYPE_SYNONYMS = {
   receipt: ['receipt', 'receipts', 'sales slip', 'sales slips', 'payment receipt', 'payment receipts', 'return slip', 'return slips'],
-  'delivery-ticket': ['delivery ticket', 'delivery tickets', 'delivery note', 'delivery notes', 'delivery slip', 'delivery slips', 'pickup ticket', 'pickup tickets', 'pick-up ticket', 'pick-up tickets', 'pick up ticket', 'pick up tickets', 'pickup slip', 'pickup slips', 'packing slip', 'packing slips', 'bill of lading', 'bills of lading'],
+  // Jargon round (J2): a pay application and a credit memo are invoices (a bill for work done / a negative invoice).
+  invoice: ['pay app', 'pay apps', 'pay application', 'pay applications', 'payment application', 'payment applications', 'application for payment', 'progress invoice', 'progress invoices', 'progress billing', 'draw request', 'draw requests', 'credit memo', 'credit memos', 'credit note', 'credit notes'],
+  agreement: [
+    'lease', 'leases', 'lease agreement', 'lease agreements', 'rental agreement', 'rental agreements', 'residential lease', 'tenancy agreement', 'rental contract',
+    'subcontract', 'subcontracts', 'subcontract agreement', 'subcontractor agreement', 'nda', 'ndas', 'non-disclosure agreement', 'nondisclosure agreement', 'confidentiality agreement',
+    'mou', 'mous', 'memorandum of understanding', 'award letter', 'award letters', 'grant award letter', 'notice of award', 'grant agreement',
+  ],
+  'delivery-ticket': ['delivery ticket', 'delivery tickets', 'delivery note', 'delivery notes', 'delivery slip', 'delivery slips', 'pickup ticket', 'pickup tickets', 'pick-up ticket', 'pick-up tickets', 'pick up ticket', 'pick up tickets', 'pickup slip', 'pickup slips', 'packing slip', 'packing slips', 'bill of lading', 'bills of lading', 'packing list', 'packing lists', 'pack list', 'packlist', 'will call', 'will-call', 'will call ticket', 'will-call ticket', 'will call slip'],
   schedule: ['schedule', 'schedules'],
   'price-list': ['price list', 'price lists', 'pricing sheet', 'pricing sheets', 'price sheet', 'price sheets', 'rate sheet', 'rate sheets', 'rate card', 'rate cards'],
-  statement: ['statement', 'statements', 'account statement', 'account statements'],
-  'insurance-certificate': ['insurance certificate', 'insurance certificates', 'certificate of insurance', 'certificates of insurance', 'insurance cert', 'insurance certs', 'insurance policy', 'insurance policies', 'coi', 'cois'],
-  'hr-letter': ['hr letter', 'hr letters', 'hr document', 'hr documents', 'hr paperwork', 'employment letter', 'employment letters', 'offer letter', 'offer letters'],
+  // EOB and superbill are filed as statements: both list charges and what was paid for one person without asking for payment
+  // (an invoice would demand a total due; "other" would make them unfindable by type).
+  statement: ['statement', 'statements', 'account statement', 'account statements', 'rent roll', 'rent rolls', 'tenant ledger', 'tenant ledgers', 'resident ledger', 'rent ledger', 'tenant statement', 'owner statement', 'owner statements', 'eob', 'eobs', 'explanation of benefits', 'superbill', 'superbills'],
+  'insurance-certificate': ['insurance certificate', 'insurance certificates', 'certificate of insurance', 'certificates of insurance', 'insurance cert', 'insurance certs', 'insurance policy', 'insurance policies', 'coi', 'cois', 'acord 25', 'acord certificate', 'proof of insurance'],
+  'hr-letter': ['hr letter', 'hr letters', 'hr document', 'hr documents', 'hr paperwork', 'employment letter', 'employment letters', 'offer letter', 'offer letters', 'job offer', 'w-4', 'w4', 'form w-4', 'i-9', 'i9', 'form i-9', 'new hire paperwork'],
   'maintenance-agreement': [
     'service plan', 'service plans', 'service agreement', 'service agreements', 'service contract', 'service contracts',
     'maintenance contract', 'maintenance contracts', 'membership', 'memberships', 'maintenance membership', 'maintenance memberships',
   ],
 };
 
-export const DOCUMENT_TYPE_SYNONYMS = Object.fromEntries(
+/**
+ * Vocabulary round 1 (B2): aliases DERIVED from the type slugs, so a new type gets the everyday spellings without a hand-typed list.
+ * A two-part slug is MODIFIER + HEAD ("dispatch-note", "nameplate-photo", "inspection-report"). People swap the head for any noun of the
+ * same family (note/ticket/slip/sheet/form/report, photo/pic/picture/image, agreement/contract/plan) and often drop the head altogether
+ * ("the inspections", "dispatch"). Rules:
+ *  - a derived phrase never overrides one the hand-written tables already map (so "service ticket" stays a service ticket);
+ *  - when two types would derive the same phrase, neither gets it;
+ *  - the bare modifier is only derived for heads that name a paper by itself and never for generic modifiers (service, work, price...).
+ * Phrase matching only: NOT fed to DOCTYPE_TRIGGER_WORDS (typo-correction targets).
+ */
+const HEAD_FAMILIES = [
+  { heads: ['note', 'ticket', 'slip', 'sheet', 'form', 'report'], bare: true },
+  { heads: ['photo', 'picture', 'pic', 'image'], bare: true },
+  { heads: ['agreement', 'contract', 'plan', 'program'], bare: false },
+  { heads: ['order'], bare: false },
+];
+const GENERIC_MODIFIERS = new Set(['service', 'work', 'equipment', 'price', 'purchase', 'proposal', 'delivery', 'insurance', 'hr', 'company', 'shop', 'maintenance', 'warranty', 'startup']);
+const pluralOf = (w) => (/(s|x|ch|sh)$/.test(w) ? `${w}es` : `${w}s`);
+function deriveSlugAliases(handWritten) {
+  const taken = new Map();
+  for (const [id, words] of Object.entries(handWritten)) for (const w of words) taken.set(w, id);
+  const proposals = new Map();
+  const propose = (phrase, id) => { for (const ph of [phrase, pluralOf(phrase)]) { const prev = proposals.get(ph); proposals.set(ph, prev && prev !== id ? null : id); } };
+  for (const { id } of DOCUMENT_TYPES) {
+    const parts = id.split('-');
+    if (parts.length !== 2) continue;
+    const [modifier, head] = parts;
+    const family = HEAD_FAMILIES.find((f) => f.heads.includes(head));
+    if (!family) continue;
+    for (const h of family.heads) propose(`${modifier} ${h}`, id);
+    if (family.bare && !GENERIC_MODIFIERS.has(modifier)) propose(modifier, id);
+  }
+  const out = {};
+  for (const [phrase, id] of proposals) if (id && !taken.has(phrase)) (out[id] ??= []).push(phrase);
+  return out;
+}
+const HAND_WRITTEN_SYNONYMS = Object.fromEntries(
   [...new Set([...Object.keys(BASE_DOCUMENT_TYPE_SYNONYMS), ...Object.keys(EXTRA_DOCUMENT_TYPE_SYNONYMS)])].map((id) => [
     id, [...(BASE_DOCUMENT_TYPE_SYNONYMS[id] ?? []), ...(EXTRA_DOCUMENT_TYPE_SYNONYMS[id] ?? [])],
   ])
+);
+const DERIVED_SYNONYMS = deriveSlugAliases(HAND_WRITTEN_SYNONYMS);
+
+/** [phrase, canonicalId, kind] for every derived alias; kind 'bare' = the modifier alone in its plural ("inspections"), else 'phrase'.
+ *  lookups/lexicon.js respells these to the type's own name so every lane reads one spelling. The singular bare modifier is left out
+ *  on purpose ("dispatch" is also a verb, "inspection" is also a date or a fee). */
+export const DERIVED_DOCUMENT_TYPE_REWRITES = Object.entries(DERIVED_SYNONYMS).flatMap(([id, phrases]) => phrases
+  .filter((ph) => ph.includes(' ') || /s$/.test(ph))
+  .map((ph) => [ph, id, ph.includes(' ') ? 'phrase' : 'bare']));
+
+/** The hand-written spellings only (what scripts/build-lexicon.mjs treats as already read by the lanes). */
+export const DOCUMENT_TYPE_SYNONYMS = HAND_WRITTEN_SYNONYMS;
+/** Hand-written plus derived: what the phrase matchers below read. */
+export const DOCUMENT_TYPE_SYNONYMS_ALL = Object.fromEntries(
+  Object.entries(HAND_WRITTEN_SYNONYMS).map(([id, words]) => [id, [...words, ...(DERIVED_SYNONYMS[id] ?? [])]])
 );
 
 /** Canonical id for a single matched word/phrase (already lowercase from the
@@ -471,7 +531,7 @@ export const DOCUMENT_TYPE_SYNONYMS = Object.fromEntries(
 export function docTypeFromWord(word) {
   const w = String(word ?? '').trim().toLowerCase();
   if (!w) return null;
-  for (const [id, words] of Object.entries(DOCUMENT_TYPE_SYNONYMS)) {
+  for (const [id, words] of Object.entries(DOCUMENT_TYPE_SYNONYMS_ALL)) {
     if (words.includes(w)) return id;
   }
   return DOCUMENT_TYPE_IDS.has(w) ? w : null;
@@ -482,7 +542,7 @@ export function docTypeFromWord(word) {
  *  before a shorter word that happens to be its own suffix could. */
 export function docTypeSynonymAlternation() {
   const all = [];
-  for (const words of Object.values(DOCUMENT_TYPE_SYNONYMS)) all.push(...words);
+  for (const words of Object.values(DOCUMENT_TYPE_SYNONYMS_ALL)) all.push(...words);
   return [...new Set(all)]
     .sort((a, b) => b.length - a.length)
     .map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
@@ -580,15 +640,18 @@ const word = (w) => new RegExp(`(?:^|[^a-z])(?:${w})(?:[^a-z]|$)`, 'i');
 const FILENAME_PATTERNS = [
   [/purchase[-_ ]?order|\bpo[-_]?\d+\b/i, 'purchase-order'],
   // Generic business paperwork. More specific phrases first so "rental agreement receipt" style names resolve sanely.
-  [/packing[-_ ]?slip|delivery[-_ ](?:ticket|note|slip|receipt)|pick[-_ ]?up[-_ ](?:ticket|slip|receipt)|bill[-_ ]of[-_ ]lading/i, 'delivery-ticket'],
+  [/packing[-_ ]?slip|delivery[-_ ](?:ticket|note|slip|receipt)|pick[-_ ]?up[-_ ](?:ticket|slip|receipt)|bill[-_ ]of[-_ ]lading|packing[-_ ]list|will[-_ ]?call/i, 'delivery-ticket'],
   [code('ps|pt|dt|pk'), 'delivery-ticket'],
   [/certificate[-_ ]of[-_ ]insurance|insurance[-_ ](?:certificate|policy)/i, 'insurance-certificate'],
   [word('coi|policy'), 'insurance-certificate'],
+  [/acord[-_ ]?25|proof[-_ ]of[-_ ]insurance/i, 'insurance-certificate'],
   [/equipment[-_ ]floater|inland[-_ ]marine|\bfloater\b/i, 'insurance-certificate'],
   [/offer[-_ ]letter|employment|termination[-_ ]letter|new[-_ ]hire|job[-_ ]offer|onboarding[-_ ]letter/i, 'hr-letter'],
-  [/statement|ledger|account[-_ ]summary|remittance/i, 'statement'],
+  [word('w-?4|i-?9'), 'hr-letter'],
+  [/statement|ledger|account[-_ ]summary|remittance|rent[-_ ]?roll|superbill|explanation[-_ ]of[-_ ]benefits/i, 'statement'],
+  [word('eob'), 'statement'],
   [code('cs'), 'statement'],
-  [/credit[-_ ]?(?:memo|note)|debit[-_ ]?memo/i, 'invoice'],
+  [/credit[-_ ]?(?:memo|note)|debit[-_ ]?memo|pay[-_ ]?app(?:lication)?|application[-_ ]for[-_ ]payment|progress[-_ ]billing/i, 'invoice'],
   [code('cm'), 'invoice'],
   [/receipt|return[-_ ]?slip|sales[-_ ]slip/i, 'receipt'],
   [code('rc|rcpt|r'), 'receipt'],
@@ -615,13 +678,13 @@ const FILENAME_PATTERNS = [
  *  classifyFromText and by the one-time re-sort. Lowercase, trailing punctuation already stripped. */
 export const GENERIC_TITLE_PATTERNS = [
   ['receipt', /^(?:sales\s+|payment\s+|retainer\s+|cash\s+|donation\s+|rent\s+|gift\s+|official\s+|customer\s+)?receipt(?:\s*(?:#|no\.?|number)\s*[\w-]+)?$|^return\s+slip$/],
-  ['agreement', /^(?:rental|consignment|lease|subcontract(?:or)?|grant|service|vendor|independent\s+contractor)\s+(?:agreement|contract)$|^(?:non[-\s]?disclosure|confidentiality)\s+agreement$|^(?:mutual\s+)?nda$|^memorandum\s+of\s+understanding$|^(?:grant\s+)?award\s+letter$|^agreement$/],
-  ['delivery-ticket', /^(?:packing\s+slip|delivery\s+(?:ticket|note|receipt)|pick[-\s]?up\s+(?:ticket|slip)|bill\s+of\s+lading)$/],
+  ['agreement', /^(?:rental|consignment|lease|subcontract(?:or)?|grant|service|vendor|independent\s+contractor)\s+(?:agreement|contract)$|^(?:residential\s+|commercial\s+)?lease$|^(?:notice\s+of\s+)?(?:grant\s+)?award$|^(?:non[-\s]?disclosure|confidentiality)\s+agreement$|^(?:mutual\s+)?nda$|^memorandum\s+of\s+understanding$|^(?:grant\s+)?award\s+letter$|^agreement$/],
+  ['delivery-ticket', /^(?:packing\s+(?:slip|list)|delivery\s+(?:ticket|note|receipt)|pick[-\s]?up\s+(?:ticket|slip)|will[-\s]?call\s+(?:ticket|slip|order)|bill\s+of\s+lading)$/],
   ['schedule', /^(?:weekly\s+|monthly\s+|daily\s+|staff\s+|work\s+)?(?:schedule|roster)$/],
   ['price-list', /^(?:price\s+list|rate\s+(?:card|sheet)|fee\s+schedule|product\s+catalog(?:ue)?)$/],
-  ['statement', /^(?:account\s+|monthly\s+|consignor\s+|card\s+)?statement(?:\s+of\s+account)?$|^rent\s+ledger$/],
-  ['insurance-certificate', /^certificate\s+of\s+(?:liability\s+)?insurance$|^insurance\s+(?:certificate|policy)$/],
-  ['hr-letter', /^(?:offer|employment|termination)\s+letter$|^employment\s+(?:agreement|offer)$/],
+  ['statement', /^(?:account\s+|monthly\s+|consignor\s+|card\s+)?statement(?:\s+of\s+account)?$|^rent\s+ledger$|^(?:tenant|resident)\s+ledger$|^rent\s+roll$|^owner(?:'s)?\s+statement$|^explanation\s+of\s+benefits$|^superbill$/],
+  ['insurance-certificate', /^(?:acord\s+25\s+)?certificate\s+of\s+(?:liability\s+)?insurance$|^insurance\s+(?:certificate|policy)$|^acord\s+25(?:\s*[-:(].*)?$|^proof\s+of\s+insurance$/],
+  ['hr-letter', /^(?:offer|employment|termination)\s+letter$|^employment\s+(?:agreement|offer)$|^(?:form\s+)?w-?4(?:\s*[-:(].*)?$|^(?:form\s+)?i-?9(?:\s*[-:(].*)?$|^employee'?s?\s+withholding\s+certificate$/],
 ];
 
 /** Types a one-time re-sort may move a document INTO when the rule is confident (a name or title says so). */

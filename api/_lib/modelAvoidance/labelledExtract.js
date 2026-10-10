@@ -32,7 +32,7 @@
 import { isFragmentName } from "../integrity.js";
 import { REQUIRED_FIELDS, DOCUMENT_TYPE_IDS } from "../documentTypes.js";
 import { FIELD_KEYS } from "../extractFields.js";
-import { FIELD_SYNONYMS, labelSrc } from "./fieldSynonyms.js";
+import { FIELD_SYNONYMS, LABEL_RANK, labelSrc } from "./fieldSynonyms.js";
 import { detectLetterhead, isOwnName, counterpartyFromParties } from "./ownCompany.js";
 
 export const HIGH_CONFIDENCE = 0.9;
@@ -114,7 +114,7 @@ const NUMOPT = `${NUM}?`;
 // kind: name | person | date | money | id | address | phone | email | term
 const L = (field, kind, src, extra = {}) => ({ field, kind, re: new RegExp(`^(?:${src})\\s*:\\s*`, "i"), bare: new RegExp(`^(?:${src})$`, "i"), src, ...extra });
 
-const SERVICE_DATE_SRC = "date\\s+of\\s+service|service\\s+date|date\\s+serviced|date\\s+performed|serviced\\s+on|visit\\s+date|completion\\s+date|date\\s+completed|job\\s+date|svc\\.?\\s*date|d\\.?o\\.?s\\.?";
+const SERVICE_DATE_SRC = "date\\s+of\\s+service|service\\s+date|date\\s+serviced|date\\s+performed|serviced\\s+on|visit\\s+date|completion\\s+date|date\\s+completed|job\\s+date|svc\\.?\\s*date|d\\.?o\\.?s\\.?" + ((LABEL_RANK.serviceDate ?? []).length ? `|${labelSrc(LABEL_RANK.serviceDate)}` : "");
 // Document-date labels. rank: 3 explicit service date, 2 the type's own date label, 1 a generic document date, 0 not a document date here.
 const DATE_DEFS = [
   { src: SERVICE_DATE_SRC, rank: () => 3 },
@@ -299,7 +299,7 @@ export function extractLabelled(ctx) {
       }
       case "term": {
         if (!v) return;
-        if (v.length > 90 || !/\d/.test(v)) { bad("agreement_term"); return; }
+        if (v.length > 90 || !/\d/.test(v) || !/(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}|\d{4}-\d{2}-\d{2}|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d|\b\d+\s*(?:-\s*)?(?:day|week|month|year|yr|mo)s?\b)/i.test(v)) { bad("agreement_term"); return; }
         push("agreement_term", { value: v, conf, line });
         return;
       }

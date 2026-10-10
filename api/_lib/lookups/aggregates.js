@@ -144,8 +144,8 @@ function parseAggregateCore(question, opts = {}) {
     // R3 nameyear: "which tech did the most calls in 2012" must apply the year (a bare number used to be ignored as glue). Kill switch DONOVAN_NAME_YEAR=0.
     const win = process.env.DONOVAN_NAME_YEAR === "0" ? null : extractWindow(q);
     const dirOf = /\b(?:fewest|least|lowest)\b/.test(q) ? "asc" : "desc";
-    if (win && closed(win.rest, vocab)) return { kind: "tech-extreme", dir: dirOf, window: { from: win.from, to: win.to, label: win.label, open: !!win.open, range: !!win.range } };
-    if (!win && closed(q, vocab) && !(process.env.DONOVAN_NAME_YEAR !== "0" && /\b(?:19|20)\d\d\b/.test(q))) return { kind: "tech-extreme", dir: dirOf };
+    if (win && closed(win.rest, vocab)) return { kind: "tech-extreme", dir: dirOf, ...ticketScope(q), window: { from: win.from, to: win.to, label: win.label, open: !!win.open, range: !!win.range } };
+    if (!win && closed(q, vocab) && !(process.env.DONOVAN_NAME_YEAR !== "0" && /\b(?:19|20)\d\d\b/.test(q))) return { kind: "tech-extreme", dir: dirOf, ...ticketScope(q) };
   }
 
   // --- per-technician typed count: "repair count for Danny Ochoa" / "PM count for Denise Ford"
@@ -517,14 +517,21 @@ async function openInPeriod(db, intent, today) {
     { records: rows.slice(0, 100).map((r) => documentRecord({ id: r.id, original_filename: r.original_filename, document_type: "invoice" })), total: rows.length, kind: "searched", basis: `Checked the payment status of every invoice dated ${label}; none states one.` });
 }
 
-async function techRows(db) {
+/** B3: "the fewest tickets" / "the most invoices" counts that kind of document, not every document that names the technician. */
+function ticketScope(q) {
+  if (/\btickets?\b/.test(q)) return { docType: "service-ticket", docWord: "service tickets" };
+  if (/\binvoices?\b/.test(q)) return { docType: "invoice", docWord: "invoices" };
+  return {};
+}
+async function techRows(db, docType = null) {
   const { rows } = await db.raw(`SELECT t.value AS tech, t.document_id AS id, s.value AS stype FROM extractions t LEFT JOIN extractions s ON s.document_id = t.document_id AND s.field_key = 'service_type' AND s.${TENANT_SQL}
-    WHERE t.field_key = 'technician' AND coalesce(t.value, '') <> '' AND t.${TENANT_SQL}`, []);
+    ${docType ? "JOIN documents dd ON dd.id = t.document_id AND dd.document_type = $1" : ""}
+    WHERE t.field_key = 'technician' AND coalesce(t.value, '') <> '' AND t.${TENANT_SQL}`, docType ? [docType] : []);
   return rows;
 }
 
 async function techExtreme(db, intent) {
-  let rows = await techRows(db);
+  let rows = await techRows(db, intent.docType ?? null);
   const W = intent.window;
   if (W) {
     const { rows: sd } = await db.raw(`SELECT document_id AS id, coalesce(nullif(corrected_value, ''), value) AS v FROM extractions WHERE field_key = 'service_date' AND ${TENANT_SQL}`, []);
@@ -542,7 +549,7 @@ async function techExtreme(db, intent) {
   const best = entries[0].n; const winners = entries.filter((e) => e.n === best);
   const names = winners.map((w) => w.name).join(" and ");
   const word = intent.dir === "asc" ? "fewest" : "most";
-  const text = `${names} ${winners.length > 1 ? "are tied for the" : "has the"} ${word} jobs ${intent.whenText ? `${intent.whenText}, ` : "on file, "}with ${best}${winners.length > 1 ? " each" : ""} (counting every document that names the technician${intent.whenText ? " and is dated in that window" : ""}).`;
+  const text = `${names} ${winners.length > 1 ? "are tied for the" : "has the"} ${word} ${intent.docWord ?? "jobs"} ${intent.whenText ? `${intent.whenText}, ` : "on file, "}with ${best}${winners.length > 1 ? " each" : ""} (counting ${intent.docWord ? `the ${intent.docWord} that name` : "every document that names"} the technician${intent.whenText ? " and is dated in that window" : ""}).`;
   const docIds = [...new Set(winners.flatMap((w) => w.ids))].slice(0, 150);
   return attachCitations(answerEnvelope({ text, facts: winners.map((w) => ({ label: w.name, value: String(w.n), sources: [{ documentId: w.ids[0], location: {} }] })), extra: { fastIntent: "tech_extreme" } }),
     { records: docIds.map((id) => documentRecord({ id })), total: docIds.length, kind: "searched", basis: `Counted the documents naming each of the ${entries.length} technicians (${entries.map((e) => `${e.name} ${e.n}`).join(", ")}); the ${word} are listed.` });

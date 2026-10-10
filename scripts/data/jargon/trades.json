@@ -1,0 +1,6667 @@
+{
+ "group": "trades",
+ "note": "src_confidence=fetched: term read directly from the cited ServiceTitan page. general-knowledge: common trade usage, source is the nearest reference page. Web glossary search returned mostly spam so most coverage is from domain knowledge.",
+ "entries": [
+  {
+   "term": "service call",
+   "variants": [
+    "service calls",
+    "svc call",
+    "service visit",
+    "trouble call",
+    "repair call",
+    "call out",
+    "callout"
+   ],
+   "class": "doc_type",
+   "means": "service-ticket",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "a visit to fix a problem",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "repair ticket",
+   "variants": [
+    "repair tickets",
+    "repair slip",
+    "repair order",
+    "RO",
+    "repair invoice"
+   ],
+   "class": "doc_type",
+   "means": "service-ticket",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "completed repair record",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "job ticket",
+   "variants": [
+    "job tickets",
+    "job sheet",
+    "job card",
+    "job report"
+   ],
+   "class": "doc_type",
+   "means": "service-ticket",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "service report",
+   "variants": [
+    "service reports",
+    "field report",
+    "tech report",
+    "visit report",
+    "service slip"
+   ],
+   "class": "doc_type",
+   "means": "service-ticket",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "trip ticket",
+   "variants": [
+    "trip tickets",
+    "trip sheet"
+   ],
+   "class": "doc_type",
+   "means": "service-ticket",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "work ticket",
+   "variants": [
+    "work tickets",
+    "work slip"
+   ],
+   "class": "doc_type",
+   "means": "work-order",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "job order",
+   "variants": [
+    "job orders",
+    "WO",
+    "w/o",
+    "wo#",
+    "work order #"
+   ],
+   "class": "doc_type",
+   "means": "work-order",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "service order",
+   "variants": [
+    "service orders",
+    "SO"
+   ],
+   "class": "doc_type",
+   "means": "work-order",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "install order",
+   "variants": [
+    "install orders",
+    "installation order",
+    "install ticket",
+    "change-out order"
+   ],
+   "class": "doc_type",
+   "means": "work-order",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "dispatch ticket",
+   "variants": [
+    "dispatch tickets",
+    "dispatch slip",
+    "call slip",
+    "call sheet",
+    "trouble ticket"
+   ],
+   "class": "doc_type",
+   "means": "dispatch-note",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "estimate",
+   "variants": [
+    "estimates",
+    "est",
+    "bid",
+    "bids",
+    "written estimate",
+    "free estimate",
+    "price quote"
+   ],
+   "class": "doc_type",
+   "means": "proposal-quote",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "work not yet performed",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "good better best",
+   "variants": [
+    "gbb",
+    "good-better-best",
+    "option sheet",
+    "options proposal",
+    "3-option proposal",
+    "three options"
+   ],
+   "class": "doc_type",
+   "means": "proposal-quote",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "flat-rate tiered proposal",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "repair quote",
+   "variants": [
+    "repair quotes",
+    "repair estimate",
+    "repair proposal"
+   ],
+   "class": "doc_type",
+   "means": "proposal-quote",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "replacement quote",
+   "variants": [
+    "replacement quotes",
+    "changeout quote",
+    "system replacement proposal"
+   ],
+   "class": "doc_type",
+   "means": "proposal-quote",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "service agreement",
+   "variants": [
+    "service agreements",
+    "SA",
+    "service contract"
+   ],
+   "class": "doc_type",
+   "means": "maintenance-agreement",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "maintenance plan",
+   "variants": [
+    "maintenance plans",
+    "PM plan",
+    "pm agreement",
+    "PMA",
+    "preventive maintenance agreement",
+    "preventive maintenance plan"
+   ],
+   "class": "doc_type",
+   "means": "maintenance-agreement",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "membership",
+   "variants": [
+    "memberships",
+    "member plan",
+    "club membership",
+    "comfort club",
+    "comfort plan",
+    "care plan",
+    "peace of mind plan",
+    "priority plan",
+    "VIP plan",
+    "tune-up plan",
+    "annual plan",
+    "protection plan"
+   ],
+   "class": "doc_type",
+   "means": "maintenance-agreement",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "recurring plan with discounts and visits",
+   "source": "https://help.servicetitan.com/docs/memberships-concepts",
+   "src_confidence": "fetched"
+  },
+  {
+   "term": "recurring service",
+   "variants": [
+    "recurring services",
+    "recurring visits",
+    "recurring maintenance",
+    "scheduled maintenance"
+   ],
+   "class": "doc_type",
+   "means": "maintenance-agreement",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/memberships-concepts",
+   "src_confidence": "fetched"
+  },
+  {
+   "term": "start-up report",
+   "variants": [
+    "start up report",
+    "startup report",
+    "commissioning report",
+    "commissioning sheet",
+    "start-up checklist",
+    "startup checklist",
+    "system startup",
+    "new install checkout",
+    "checkout sheet",
+    "start-up form"
+   ],
+   "class": "doc_type",
+   "means": "startup-sheet",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "commissioning",
+   "variants": [
+    "comm report",
+    "test and balance",
+    "TAB report",
+    "air balance report",
+    "TAB"
+   ],
+   "class": "doc_type",
+   "means": "startup-sheet",
+   "industries": [
+    "hvac"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "equipment registration",
+   "variants": [
+    "registration form",
+    "warranty reg",
+    "product registration",
+    "online registration",
+    "register the unit"
+   ],
+   "class": "doc_type",
+   "means": "warranty-registration",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "warranty certificate",
+   "variants": [
+    "warranty certificates",
+    "warranty card",
+    "warranty paperwork",
+    "warranty form",
+    "parts warranty certificate"
+   ],
+   "class": "doc_type",
+   "means": "warranty-registration",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "building permit",
+   "variants": [
+    "building permits",
+    "mechanical permit",
+    "plumbing permit",
+    "electrical permit",
+    "permit card",
+    "permit sheet",
+    "job permit",
+    "permit application",
+    "permit packet",
+    "permit pulled"
+   ],
+   "class": "doc_type",
+   "means": "permit",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "inspection sheet",
+   "variants": [
+    "inspection sheets",
+    "inspection card",
+    "inspection record",
+    "inspection results",
+    "final inspection",
+    "rough-in inspection",
+    "city inspection",
+    "AHJ inspection",
+    "inspection sticker"
+   ],
+   "class": "doc_type",
+   "means": "inspection-report",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "gas leak check",
+   "variants": [
+    "gas pressure test",
+    "CO test",
+    "carbon monoxide test",
+    "combustion analysis",
+    "combustion test",
+    "heat exchanger inspection",
+    "CO check"
+   ],
+   "class": "doc_type",
+   "means": "inspection-report",
+   "industries": [
+    "hvac"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "load calculation",
+   "variants": [
+    "load calc",
+    "manual J",
+    "manual S",
+    "manual D",
+    "load study"
+   ],
+   "class": "doc_type",
+   "means": "inspection-report",
+   "industries": [
+    "hvac"
+   ],
+   "note": "design doc; weak fit",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "pressure test report",
+   "variants": [
+    "pressure test",
+    "leak test report",
+    "gauge test",
+    "air test",
+    "hydro test",
+    "hydrostatic test"
+   ],
+   "class": "doc_type",
+   "means": "inspection-report",
+   "industries": [
+    "plumbing"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "nameplate",
+   "variants": [
+    "name plate",
+    "data plate",
+    "rating plate",
+    "unit sticker",
+    "data tag",
+    "serial plate",
+    "serial tag",
+    "unit label",
+    "model tag"
+   ],
+   "class": "doc_type",
+   "means": "nameplate-photo",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "PO",
+   "variants": [
+    "POs",
+    "P.O.",
+    "purchase orders",
+    "parts order",
+    "material order",
+    "supply house order"
+   ],
+   "class": "doc_type",
+   "means": "purchase-order",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "pickup ticket",
+   "variants": [
+    "supply house ticket",
+    "counter ticket",
+    "parts counter receipt",
+    "will call ticket",
+    "will-call",
+    "packing list",
+    "packing slip",
+    "bill of lading",
+    "BOL"
+   ],
+   "class": "doc_type",
+   "means": "delivery-ticket",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "price book",
+   "variants": [
+    "pricebook",
+    "flat rate book",
+    "flat-rate price book",
+    "rate book",
+    "service price list",
+    "menu pricing",
+    "menu price"
+   ],
+   "class": "doc_type",
+   "means": "price-list",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "flat-rate pricing",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "COI",
+   "variants": [
+    "certificate of insurance",
+    "insurance cert",
+    "liability cert",
+    "GL certificate",
+    "workers comp cert",
+    "proof of insurance"
+   ],
+   "class": "doc_type",
+   "means": "insurance-certificate",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "statement of account",
+   "variants": [
+    "account statement",
+    "customer statement",
+    "vendor statement",
+    "monthly statement",
+    "supplier statement",
+    "open invoices list"
+   ],
+   "class": "doc_type",
+   "means": "statement",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "technician schedule",
+   "variants": [
+    "tech schedule",
+    "dispatch schedule",
+    "daily schedule",
+    "route sheet",
+    "route",
+    "schedule board",
+    "daily route"
+   ],
+   "class": "doc_type",
+   "means": "schedule",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "renewal notice",
+   "variants": [
+    "renewal letter",
+    "reminder letter",
+    "expiration notice",
+    "maintenance reminder",
+    "service letter",
+    "customer letter",
+    "follow up letter"
+   ],
+   "class": "doc_type",
+   "means": "correspondence",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "backflow certificate",
+   "variants": [
+    "backflow test report",
+    "backflow cert",
+    "BFP test",
+    "RPZ test",
+    "RP test",
+    "DCVA test",
+    "cross-connection test",
+    "annual backflow"
+   ],
+   "class": "doc_type",
+   "means": "backflow-test-certificate",
+   "industries": [
+    "plumbing"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "camera inspection",
+   "variants": [
+    "sewer scope",
+    "sewer camera",
+    "camera report",
+    "drain camera",
+    "video inspection",
+    "scope report",
+    "line inspection"
+   ],
+   "class": "doc_type",
+   "means": "sewer-camera-report",
+   "industries": [
+    "plumbing"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "panel schedule",
+   "variants": [
+    "panel directory",
+    "breaker directory",
+    "circuit directory",
+    "load schedule",
+    "circuit schedule"
+   ],
+   "class": "doc_type",
+   "means": "panel-schedule",
+   "industries": [
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "invoice",
+   "variants": [
+    "invoices",
+    "bill",
+    "bills",
+    "billing",
+    "final bill",
+    "final invoice",
+    "tax invoice",
+    "customer invoice",
+    "service invoice",
+    "job invoice"
+   ],
+   "class": "doc_type",
+   "means": "invoice",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "receipt",
+   "variants": [
+    "receipts",
+    "proof of payment",
+    "payment receipt",
+    "paid receipt"
+   ],
+   "class": "doc_type",
+   "means": "receipt",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "tune-up",
+   "variants": [
+    "tune up",
+    "tuneup",
+    "precision tune-up",
+    "seasonal tune-up",
+    "AC tune-up",
+    "furnace tune-up",
+    "spring checkup",
+    "fall checkup",
+    "annual checkup",
+    "seasonal maintenance"
+   ],
+   "class": "action",
+   "means": "service_type:preventive-maintenance",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "PM",
+   "variants": [
+    "PMs",
+    "pm visit",
+    "preventive maintenance",
+    "preventative maintenance",
+    "planned maintenance",
+    "PPM"
+   ],
+   "class": "action",
+   "means": "service_type:preventive-maintenance",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "PM also means property manager: see ambiguous",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "technician",
+   "variants": [
+    "tech",
+    "techs",
+    "technicians",
+    "service tech",
+    "service technician",
+    "field tech",
+    "field technician",
+    "service guy",
+    "service man",
+    "repairman",
+    "repair man",
+    "repair guy",
+    "repair person",
+    "the guy",
+    "mechanic",
+    "HVAC tech",
+    "wrench",
+    "journeyman",
+    "journeyperson",
+    "licensed tech"
+   ],
+   "class": "role",
+   "means": "technician",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "installer",
+   "variants": [
+    "installers",
+    "install tech",
+    "install crew",
+    "install team",
+    "changeout crew",
+    "replacement crew",
+    "install guys",
+    "lead installer",
+    "crew lead",
+    "foreman",
+    "crew chief",
+    "install foreman"
+   ],
+   "class": "role",
+   "means": "technician",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "may differ from service tech",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "apprentice",
+   "variants": [
+    "apprentices",
+    "helper",
+    "helpers",
+    "ride along",
+    "trainee",
+    "tech in training",
+    "second man",
+    "laborer",
+    "ground man"
+   ],
+   "class": "role",
+   "means": "technician",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "assistant",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "plumber",
+   "variants": [
+    "plumbers",
+    "master plumber",
+    "journeyman plumber",
+    "drain tech",
+    "rooter guy",
+    "sewer tech",
+    "leak tech"
+   ],
+   "class": "role",
+   "means": "technician",
+   "industries": [
+    "plumbing"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "electrician",
+   "variants": [
+    "electricians",
+    "sparky",
+    "sparks",
+    "master electrician",
+    "journeyman electrician",
+    "lineman",
+    "wireman",
+    "low voltage tech"
+   ],
+   "class": "role",
+   "means": "technician",
+   "industries": [
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "comfort advisor",
+   "variants": [
+    "comfort consultant",
+    "sales tech",
+    "sales rep",
+    "sales person",
+    "salesman",
+    "estimator",
+    "comfort specialist",
+    "sales advisor",
+    "project advisor"
+   ],
+   "class": "role",
+   "means": "technician",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "sells replacements; may not turn wrenches",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "dispatcher",
+   "variants": [
+    "dispatch",
+    "dispatchers",
+    "scheduler",
+    "office scheduler",
+    "call taker"
+   ],
+   "class": "role",
+   "means": "dispatcher",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "CSR",
+   "variants": [
+    "csrs",
+    "customer service rep",
+    "customer service representative",
+    "call center",
+    "office staff",
+    "front desk",
+    "receptionist",
+    "office manager",
+    "admin",
+    "the office",
+    "booking agent"
+   ],
+   "class": "role",
+   "means": "office-staff",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "service manager",
+   "variants": [
+    "service managers",
+    "ops manager",
+    "operations manager",
+    "field supervisor",
+    "dispatch manager",
+    "branch manager",
+    "GM",
+    "general manager"
+   ],
+   "class": "role",
+   "means": "manager",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "owner",
+   "variants": [
+    "owners",
+    "boss",
+    "company owner",
+    "the owner",
+    "business owner"
+   ],
+   "class": "role",
+   "means": "owner",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "sub",
+   "variants": [
+    "subs",
+    "subcontractor",
+    "subcontractors",
+    "1099 tech",
+    "contract tech",
+    "outside contractor",
+    "sub-contractor",
+    "3rd party"
+   ],
+   "class": "role",
+   "means": "vendor",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "supply house",
+   "variants": [
+    "supply houses",
+    "distributor",
+    "wholesaler",
+    "parts house",
+    "parts counter",
+    "Ferguson",
+    "Johnstone",
+    "Johnstone Supply",
+    "Watsco",
+    "Gemaire",
+    "Carrier Enterprise",
+    "Lennox Stores",
+    "ABC Supply",
+    "Hajoca",
+    "Home Depot Pro",
+    "Graybar",
+    "Wesco",
+    "Border States",
+    "CED",
+    "Platt"
+   ],
+   "class": "role",
+   "means": "vendor",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "manufacturer rep",
+   "variants": [
+    "factory rep",
+    "OEM rep",
+    "territory manager"
+   ],
+   "class": "role",
+   "means": "vendor",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "rep is ambiguous",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "homeowner",
+   "variants": [
+    "home owner",
+    "residential customer",
+    "resi customer",
+    "resi",
+    "residential",
+    "HO",
+    "owner occupant",
+    "consumer"
+   ],
+   "class": "role",
+   "means": "customer",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "commercial customer",
+   "variants": [
+    "commercial account",
+    "commercial",
+    "light commercial",
+    "property manager",
+    "PM company",
+    "building owner",
+    "facility manager",
+    "facilities",
+    "GC",
+    "general contractor",
+    "builder",
+    "national account",
+    "key account"
+   ],
+   "class": "role",
+   "means": "customer",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "PM ambiguous",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "tenant",
+   "variants": [
+    "tenants",
+    "renter",
+    "occupant",
+    "resident"
+   ],
+   "class": "role",
+   "means": "customer",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "customer",
+   "variants": [
+    "customers",
+    "client",
+    "clients",
+    "account",
+    "accounts",
+    "caller"
+   ],
+   "class": "role",
+   "means": "customer",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "lead tech",
+   "variants": [
+    "lead technician",
+    "senior tech",
+    "senior technician",
+    "top tech",
+    "tech lead"
+   ],
+   "class": "role",
+   "means": "technician",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "inspector",
+   "variants": [
+    "inspectors",
+    "city inspector",
+    "building inspector",
+    "AHJ",
+    "authority having jurisdiction",
+    "code official",
+    "county inspector",
+    "utility inspector"
+   ],
+   "class": "role",
+   "means": "inspector",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "external role",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "warranty administrator",
+   "variants": [
+    "warranty admin",
+    "warranty claims",
+    "warranty processor"
+   ],
+   "class": "role",
+   "means": "office-staff",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "open",
+   "variants": [
+    "still open",
+    "opened",
+    "active",
+    "in progress",
+    "pending",
+    "not done",
+    "not closed",
+    "unfinished",
+    "outstanding job"
+   ],
+   "class": "status",
+   "means": "open",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "scheduled",
+   "variants": [
+    "booked",
+    "set up",
+    "on the books",
+    "appointment set",
+    "confirmed appointment",
+    "on the schedule"
+   ],
+   "class": "status",
+   "means": "scheduled",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "dispatched",
+   "variants": [
+    "en route",
+    "on the way",
+    "on route",
+    "sent out",
+    "assigned"
+   ],
+   "class": "status",
+   "means": "dispatched",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "on site",
+   "variants": [
+    "onsite",
+    "arrived",
+    "job started",
+    "working"
+   ],
+   "class": "status",
+   "means": "in-progress",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "completed",
+   "variants": [
+    "complete",
+    "done",
+    "finished",
+    "closed out",
+    "closed",
+    "wrapped up",
+    "resolved",
+    "fixed"
+   ],
+   "class": "status",
+   "means": "completed",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "on hold",
+   "variants": [
+    "hold",
+    "held",
+    "waiting on parts",
+    "awaiting parts",
+    "parts on order",
+    "back ordered",
+    "backordered",
+    "B/O",
+    "waiting for approval",
+    "waiting for customer",
+    "needs approval"
+   ],
+   "class": "status",
+   "means": "on-hold",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "canceled",
+   "variants": [
+    "cancelled",
+    "cancel",
+    "canceled job",
+    "CXL",
+    "no longer needed",
+    "called off",
+    "scrapped"
+   ],
+   "class": "status",
+   "means": "canceled",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "no show",
+   "variants": [
+    "no-show",
+    "nobody home",
+    "no one home",
+    "no access",
+    "could not access",
+    "unable to access",
+    "locked out",
+    "gate locked",
+    "customer not home"
+   ],
+   "class": "status",
+   "means": "no-access",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "rescheduled",
+   "variants": [
+    "reschedule",
+    "resched",
+    "moved",
+    "bumped",
+    "pushed back",
+    "push out"
+   ],
+   "class": "status",
+   "means": "rescheduled",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "unpaid",
+   "variants": [
+    "not paid",
+    "hasnt paid",
+    "hasn't paid",
+    "no payment",
+    "still owes",
+    "owing",
+    "owes us",
+    "outstanding",
+    "balance due",
+    "open balance",
+    "open invoice",
+    "A/R",
+    "AR",
+    "accounts receivable",
+    "on account"
+   ],
+   "class": "status",
+   "means": "unpaid",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "paid in full",
+   "variants": [
+    "paid",
+    "PIF",
+    "settled",
+    "paid up",
+    "zero balance",
+    "collected",
+    "payment received"
+   ],
+   "class": "status",
+   "means": "paid",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "past due",
+   "variants": [
+    "pastdue",
+    "overdue",
+    "late",
+    "delinquent",
+    "late payment",
+    "aging",
+    "aged receivables",
+    "90+",
+    "collections",
+    "in collections"
+   ],
+   "class": "status",
+   "means": "overdue",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "partially paid",
+   "variants": [
+    "partial payment",
+    "deposit paid",
+    "down payment paid",
+    "progress payment",
+    "half down",
+    "balance remaining"
+   ],
+   "class": "status",
+   "means": "partial",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "deposit paid, balance open",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "void",
+   "variants": [
+    "voided",
+    "void invoice",
+    "voided invoice",
+    "deleted invoice",
+    "cancelled invoice",
+    "written off",
+    "write-off",
+    "bad debt"
+   ],
+   "class": "status",
+   "means": "voided",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "approved",
+   "variants": [
+    "accepted",
+    "signed",
+    "sold",
+    "won",
+    "authorized",
+    "go ahead",
+    "green light",
+    "said yes",
+    "bought",
+    "sold estimate",
+    "approved estimate"
+   ],
+   "class": "status",
+   "means": "approved",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "declined",
+   "variants": [
+    "declined repair",
+    "turned down",
+    "rejected",
+    "lost",
+    "denied",
+    "said no",
+    "passed on",
+    "not sold",
+    "dismissed",
+    "deferred"
+   ],
+   "class": "status",
+   "means": "declined",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "expired",
+   "variants": [
+    "lapsed",
+    "ran out",
+    "out of warranty",
+    "out-of-warranty",
+    "OOW",
+    "no longer covered",
+    "coverage ended",
+    "past warranty",
+    "expired plan",
+    "membership expired"
+   ],
+   "class": "status",
+   "means": "expired",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "renewed",
+   "variants": [
+    "renewal",
+    "renew",
+    "auto renew",
+    "auto-renewed",
+    "renews",
+    "re-enrolled",
+    "extended",
+    "continued"
+   ],
+   "class": "status",
+   "means": "renewed",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/memberships-concepts",
+   "src_confidence": "fetched"
+  },
+  {
+   "term": "in warranty",
+   "variants": [
+    "under warranty",
+    "covered",
+    "IW",
+    "still covered",
+    "warranty active",
+    "within warranty"
+   ],
+   "class": "status",
+   "means": "in-warranty",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "installed",
+   "variants": [
+    "install",
+    "put in",
+    "changed out",
+    "changeout",
+    "change-out",
+    "swapped",
+    "new system",
+    "set the unit"
+   ],
+   "class": "status",
+   "means": "installed",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "replaced",
+   "variants": [
+    "swapped out",
+    "changed",
+    "exchanged",
+    "new part",
+    "replacement",
+    "R&R",
+    "remove and replace",
+    "R and R"
+   ],
+   "class": "status",
+   "means": "replaced",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "repaired",
+   "variants": [
+    "repair",
+    "mended",
+    "patched",
+    "got it running",
+    "got it working",
+    "band-aid",
+    "bandaid"
+   ],
+   "class": "status",
+   "means": "repaired",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "recommended",
+   "variants": [
+    "recommendation",
+    "recommendations",
+    "recommend",
+    "suggested repair",
+    "upsell",
+    "found an issue",
+    "deferred maintenance"
+   ],
+   "class": "status",
+   "means": "recommended",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "emergency",
+   "variants": [
+    "emergency call",
+    "after hours",
+    "after-hours",
+    "weekend call",
+    "overtime call",
+    "24/7",
+    "24 hour",
+    "no heat",
+    "no cool",
+    "no AC",
+    "no A/C",
+    "no power",
+    "urgent",
+    "same day"
+   ],
+   "class": "status",
+   "means": "service_type:emergency",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "callback",
+   "variants": [
+    "callbacks",
+    "call back",
+    "call-back",
+    "comeback",
+    "come back",
+    "come-back",
+    "recall",
+    "recalls",
+    "return trip",
+    "return visit",
+    "redo",
+    "rework",
+    "repeat visit",
+    "repeat call",
+    "revisit",
+    "go back",
+    "warranty callback"
+   ],
+   "class": "action",
+   "means": "callback",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "repeat visit for same issue; no charge job",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "fetched"
+  },
+  {
+   "term": "recall job",
+   "variants": [
+    "recall jobs",
+    "recall visit",
+    "warranty recall"
+   ],
+   "class": "action",
+   "means": "callback",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "ServiceTitan term",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "fetched"
+  },
+  {
+   "term": "no charge",
+   "variants": [
+    "no-charge",
+    "NC",
+    "n/c",
+    "nocharge",
+    "comp",
+    "complimentary",
+    "on the house",
+    "goodwill",
+    "courtesy",
+    "free of charge",
+    "FOC",
+    "warranty work",
+    "warranty labor"
+   ],
+   "class": "money",
+   "means": "no_charge",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "job not billed",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "fetched"
+  },
+  {
+   "term": "dispatch fee",
+   "variants": [
+    "trip charge",
+    "trip fee",
+    "service charge",
+    "service fee",
+    "diagnostic fee",
+    "diagnostic",
+    "diag fee",
+    "service call fee",
+    "truck charge",
+    "truck roll",
+    "show-up fee",
+    "call fee",
+    "consultation fee",
+    "minimum charge",
+    "travel charge"
+   ],
+   "class": "money",
+   "means": "dispatch_fee",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "fee for coming out; often credited to repair",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "labor",
+   "variants": [
+    "labor charge",
+    "labor cost",
+    "labor rate",
+    "hourly rate",
+    "shop rate",
+    "billing rate",
+    "man hours",
+    "man-hours",
+    "time and materials",
+    "T&M",
+    "T and M"
+   ],
+   "class": "money",
+   "means": "labor",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "dollars vs hours: see labor_hours",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "materials",
+   "variants": [
+    "material",
+    "parts and materials",
+    "parts charge",
+    "parts cost",
+    "material cost",
+    "parts total"
+   ],
+   "class": "money",
+   "means": "materials",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "flat rate",
+   "variants": [
+    "flat-rate",
+    "flatrate",
+    "flat fee",
+    "fixed price",
+    "set price",
+    "upfront price",
+    "up-front pricing",
+    "upfront pricing",
+    "task-based pricing"
+   ],
+   "class": "money",
+   "means": "flat_rate",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "markup",
+   "variants": [
+    "mark up",
+    "margin",
+    "GP",
+    "gross profit",
+    "gross margin",
+    "multiplier",
+    "parts markup",
+    "matrix pricing",
+    "cost plus"
+   ],
+   "class": "money",
+   "means": "markup",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "discount",
+   "variants": [
+    "discounts",
+    "member discount",
+    "senior discount",
+    "military discount",
+    "veteran discount",
+    "promo",
+    "coupon",
+    "promo code",
+    "percent off"
+   ],
+   "class": "money",
+   "means": "discount",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/memberships-concepts",
+   "src_confidence": "fetched"
+  },
+  {
+   "term": "rebate",
+   "variants": [
+    "rebates",
+    "utility rebate",
+    "manufacturer rebate",
+    "mfr rebate",
+    "instant rebate",
+    "SRP rebate",
+    "APS rebate",
+    "tax credit",
+    "25C",
+    "federal tax credit",
+    "IRA rebate",
+    "HEAR rebate",
+    "HOMES rebate"
+   ],
+   "class": "money",
+   "means": "rebate",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "incentive tied to equipment install",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "financing",
+   "variants": [
+    "finance",
+    "financing offer",
+    "same as cash",
+    "0% financing",
+    "interest-free",
+    "Synchrony",
+    "GreenSky",
+    "Wisetack",
+    "Service Finance",
+    "Hearth",
+    "monthly payment",
+    "lease to own",
+    "payment plan"
+   ],
+   "class": "money",
+   "means": "financing",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "deposit",
+   "variants": [
+    "deposits",
+    "down payment",
+    "retainer",
+    "advance",
+    "prepayment",
+    "progress billing",
+    "draw",
+    "draws"
+   ],
+   "class": "money",
+   "means": "deposit",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "security deposit differs in property work",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "balance due",
+   "variants": [
+    "amount due",
+    "total due",
+    "grand total",
+    "amount owed",
+    "due now",
+    "please remit",
+    "pay this amount"
+   ],
+   "class": "field",
+   "means": "cost",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "subtotal",
+   "variants": [
+    "sub total",
+    "sub-total",
+    "pre-tax",
+    "before tax",
+    "net amount"
+   ],
+   "class": "money",
+   "means": "subtotal",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "sales tax",
+   "variants": [
+    "tax",
+    "taxes",
+    "TPT",
+    "transaction privilege tax",
+    "state tax",
+    "city tax",
+    "tax rate",
+    "use tax",
+    "tax exempt",
+    "exempt",
+    "resale certificate"
+   ],
+   "class": "money",
+   "means": "tax",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "AZ uses TPT",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "invoice total",
+   "variants": [
+    "total",
+    "job total",
+    "ticket total",
+    "repair total",
+    "price",
+    "cost",
+    "charges",
+    "charged",
+    "billed",
+    "bill amount",
+    "how much was it",
+    "how much did we charge",
+    "revenue",
+    "sales",
+    "gross",
+    "invoiced",
+    "amount invoiced"
+   ],
+   "class": "field",
+   "means": "cost",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "average ticket",
+   "variants": [
+    "avg ticket",
+    "average invoice",
+    "avg invoice",
+    "ticket average",
+    "average sale",
+    "average job value",
+    "ticket size",
+    "avg sale",
+    "average repair ticket"
+   ],
+   "class": "money",
+   "means": "average_ticket",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "net 30",
+   "variants": [
+    "net30",
+    "net 15",
+    "net 45",
+    "net 60",
+    "due on receipt",
+    "DOR",
+    "COD",
+    "cash on delivery",
+    "payment terms",
+    "due upon completion",
+    "due at completion",
+    "payable within 30 days"
+   ],
+   "class": "date_phrase",
+   "means": "payment_terms",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "late fee",
+   "variants": [
+    "late fees",
+    "finance charge",
+    "interest charge",
+    "service charge on balance",
+    "1.5% per month",
+    "penalty"
+   ],
+   "class": "money",
+   "means": "late_fee",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "membership fee",
+   "variants": [
+    "membership dues",
+    "monthly fee",
+    "monthly membership",
+    "annual fee",
+    "annual dues",
+    "enrollment fee",
+    "sign up fee",
+    "plan price",
+    "plan cost",
+    "membership price"
+   ],
+   "class": "money",
+   "means": "membership_fee",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/memberships-concepts",
+   "src_confidence": "fetched"
+  },
+  {
+   "term": "credit memo",
+   "variants": [
+    "credit",
+    "credit note",
+    "credit invoice",
+    "refund",
+    "refunds",
+    "chargeback",
+    "return credit",
+    "customer credit",
+    "credit on account",
+    "account credit"
+   ],
+   "class": "money",
+   "means": "credit",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "doc type invoice per documentTypes",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "commission",
+   "variants": [
+    "spiff",
+    "spiffs",
+    "bonus",
+    "sales commission",
+    "tech commission",
+    "pay per job",
+    "piece rate",
+    "flat rate pay"
+   ],
+   "class": "money",
+   "means": "commission",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "job cost",
+   "variants": [
+    "job costing",
+    "cost of goods",
+    "COGS",
+    "cost basis",
+    "actual cost",
+    "burden",
+    "overhead",
+    "overhead rate"
+   ],
+   "class": "money",
+   "means": "job_cost",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "progress billing",
+   "variants": [
+    "WIP",
+    "work in progress",
+    "billed to date",
+    "percent complete",
+    "pay app",
+    "pay application",
+    "schedule of values",
+    "SOV",
+    "retainage",
+    "retention"
+   ],
+   "class": "money",
+   "means": "progress_billing",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "commercial jobs",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "lien waiver",
+   "variants": [
+    "lien release",
+    "notice to owner",
+    "preliminary notice",
+    "mechanics lien",
+    "mechanic's lien"
+   ],
+   "class": "document_label",
+   "means": "lien_notice",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "customer_name",
+   "variants": [
+    "bill to",
+    "sold to",
+    "customer",
+    "client",
+    "account name",
+    "homeowner",
+    "job site contact",
+    "site contact",
+    "contact name",
+    "ordered by",
+    "requested by",
+    "caller",
+    "owner name",
+    "property owner",
+    "billing name"
+   ],
+   "class": "field",
+   "means": "customer_name",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "service_address",
+   "variants": [
+    "job site",
+    "jobsite",
+    "job address",
+    "site address",
+    "location",
+    "service location",
+    "property address",
+    "install address",
+    "install location",
+    "premises",
+    "job location",
+    "work location",
+    "address of service",
+    "street address",
+    "service to"
+   ],
+   "class": "field",
+   "means": "service_address",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "service_date",
+   "variants": [
+    "date of service",
+    "svc date",
+    "job date",
+    "visit date",
+    "appointment date",
+    "appt date",
+    "arrival date",
+    "date completed",
+    "completion date",
+    "completed on",
+    "date serviced",
+    "work date",
+    "scheduled date",
+    "last visit",
+    "last serviced",
+    "last service"
+   ],
+   "class": "field",
+   "means": "service_date",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "work_performed",
+   "variants": [
+    "work done",
+    "work completed",
+    "description of work",
+    "work description",
+    "scope of work",
+    "SOW",
+    "services performed",
+    "service performed",
+    "repairs made",
+    "repairs performed",
+    "what was done",
+    "resolution",
+    "cause and correction",
+    "tech notes",
+    "job description",
+    "summary of work",
+    "actions taken"
+   ],
+   "class": "field",
+   "means": "work_performed",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "service_type",
+   "variants": [
+    "job type",
+    "call type",
+    "type of service",
+    "visit type",
+    "work type",
+    "job class",
+    "business unit",
+    "reason for call",
+    "problem",
+    "chief complaint",
+    "customer complaint",
+    "complaint",
+    "symptom",
+    "reason for visit"
+   ],
+   "class": "field",
+   "means": "service_type",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "serial_number",
+   "variants": [
+    "serial",
+    "serial #",
+    "serial no",
+    "S/N",
+    "SN",
+    "ser#",
+    "ser no",
+    "unit serial",
+    "equipment serial",
+    "indoor serial",
+    "outdoor serial",
+    "coil serial",
+    "furnace serial",
+    "condenser serial",
+    "mfg serial"
+   ],
+   "class": "field",
+   "means": "serial_number",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "model",
+   "variants": [
+    "model #",
+    "model no",
+    "M/N",
+    "mod#",
+    "model number",
+    "unit model",
+    "equipment model",
+    "indoor model",
+    "outdoor model",
+    "catalog number",
+    "cat no",
+    "cat #"
+   ],
+   "class": "field",
+   "means": "model",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "manufacturer",
+   "variants": [
+    "mfr",
+    "mfg",
+    "brand",
+    "make",
+    "maker",
+    "equipment brand",
+    "unit brand",
+    "OEM",
+    "made by",
+    "what brand"
+   ],
+   "class": "field",
+   "means": "manufacturer",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "equipment_type",
+   "variants": [
+    "equip type",
+    "type of equipment",
+    "unit type",
+    "system type",
+    "equipment",
+    "system",
+    "asset type",
+    "appliance"
+   ],
+   "class": "field",
+   "means": "equipment_type",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "tonnage",
+   "variants": [
+    "tons",
+    "ton",
+    "system size",
+    "unit size",
+    "cooling capacity",
+    "how many tons",
+    "2 ton",
+    "3 ton",
+    "3.5 ton",
+    "4 ton",
+    "5 ton"
+   ],
+   "class": "field",
+   "means": "tonnage",
+   "industries": [
+    "hvac"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "refrigerant",
+   "variants": [
+    "refrig",
+    "freon",
+    "refrigerant type",
+    "R22",
+    "R-22",
+    "R410A",
+    "R-410A",
+    "puron",
+    "R454B",
+    "R-454B",
+    "R32",
+    "R-32",
+    "R134a",
+    "R404A",
+    "R407C",
+    "refrigerant charge",
+    "lbs of refrigerant",
+    "pounds of freon"
+   ],
+   "class": "field",
+   "means": "refrigerant",
+   "industries": [
+    "hvac"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "installation_date",
+   "variants": [
+    "install date",
+    "date installed",
+    "installed on",
+    "date of install",
+    "in service date",
+    "in-service date",
+    "placed in service",
+    "year installed",
+    "unit age",
+    "how old",
+    "manufacture date",
+    "date of manufacture",
+    "DOM",
+    "mfg date"
+   ],
+   "class": "field",
+   "means": "installation_date",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "warranty_expires",
+   "variants": [
+    "warranty end",
+    "warranty expiration",
+    "warranty expiry",
+    "warranty exp",
+    "warranty through",
+    "covered until",
+    "coverage ends",
+    "parts warranty ends",
+    "labor warranty ends",
+    "warranty valid until",
+    "warranty ends"
+   ],
+   "class": "field",
+   "means": "warranty_expires",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "warranty_term",
+   "variants": [
+    "warranty length",
+    "warranty period",
+    "warranty years",
+    "10 year warranty",
+    "10-year parts",
+    "5 year parts",
+    "1 year labor",
+    "parts warranty",
+    "labor warranty",
+    "compressor warranty",
+    "heat exchanger warranty",
+    "limited lifetime",
+    "lifetime warranty",
+    "warranty coverage",
+    "warranty type"
+   ],
+   "class": "field",
+   "means": "warranty_term",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "agreement_term",
+   "variants": [
+    "plan term",
+    "plan length",
+    "membership term",
+    "membership length",
+    "contract term",
+    "contract length",
+    "agreement length",
+    "agreement period",
+    "coverage period",
+    "plan period",
+    "membership year",
+    "term of agreement",
+    "1 year plan",
+    "month to month",
+    "month-to-month"
+   ],
+   "class": "field",
+   "means": "agreement_term",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/docs/memberships-concepts",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "invoice_number",
+   "variants": [
+    "invoice #",
+    "invoice no",
+    "inv#",
+    "inv no",
+    "ticket #",
+    "work order number",
+    "WO#",
+    "job #",
+    "job number",
+    "job no",
+    "order #",
+    "reference number",
+    "confirmation number",
+    "service ticket number",
+    "doc #",
+    "bill #",
+    "RO #"
+   ],
+   "class": "field",
+   "means": "invoice_number",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "permit_number",
+   "variants": [
+    "permit #",
+    "permit no",
+    "permit id",
+    "permit num",
+    "application number",
+    "case number",
+    "case #",
+    "building permit number",
+    "mechanical permit number",
+    "plumbing permit number",
+    "electrical permit number"
+   ],
+   "class": "field",
+   "means": "permit_number",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "part_number",
+   "variants": [
+    "part #",
+    "part no",
+    "p/n",
+    "PN",
+    "item number",
+    "item #",
+    "sku",
+    "SKU",
+    "catalog #",
+    "stock number",
+    "mfr part number",
+    "manufacturer part number",
+    "MPN",
+    "OEM part number",
+    "parts used",
+    "parts list"
+   ],
+   "class": "field",
+   "means": "part_number",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "labor_hours",
+   "variants": [
+    "hours",
+    "hrs",
+    "labor hrs",
+    "time on site",
+    "time on job",
+    "man hours",
+    "tech hours",
+    "billable hours",
+    "time in",
+    "time out",
+    "drive time",
+    "travel time",
+    "on-site time",
+    "job duration"
+   ],
+   "class": "field",
+   "means": "labor_hours",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "vendor",
+   "variants": [
+    "supplier",
+    "payee",
+    "remit to",
+    "sold by",
+    "business name",
+    "dba",
+    "contractor",
+    "contractor name",
+    "licensed contractor",
+    "contractor license"
+   ],
+   "class": "field",
+   "means": "vendor",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "customer_phone",
+   "variants": [
+    "phone",
+    "phone #",
+    "tel",
+    "telephone",
+    "cell",
+    "cell #",
+    "mobile",
+    "mobile #",
+    "contact number",
+    "call back number",
+    "callback number",
+    "best number",
+    "home phone",
+    "primary phone",
+    "alt phone",
+    "text number"
+   ],
+   "class": "field",
+   "means": "customer_phone",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "customer_email",
+   "variants": [
+    "email",
+    "e-mail",
+    "email address",
+    "contact email",
+    "billing email",
+    "send invoice to",
+    "receipt email"
+   ],
+   "class": "field",
+   "means": "customer_email",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "notes",
+   "variants": [
+    "note",
+    "comments",
+    "comment",
+    "remarks",
+    "internal notes",
+    "tech remarks",
+    "special instructions",
+    "instructions",
+    "job notes",
+    "customer notes",
+    "gate code",
+    "access notes",
+    "pet warning",
+    "lockbox"
+   ],
+   "class": "field",
+   "means": "notes",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "status",
+   "variants": [
+    "job status",
+    "ticket status",
+    "order status",
+    "invoice status",
+    "payment status",
+    "current status",
+    "disposition",
+    "outcome",
+    "job outcome",
+    "call outcome"
+   ],
+   "class": "field",
+   "means": "status",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "voltage",
+   "variants": [
+    "volts",
+    "volt",
+    "208/230",
+    "230V",
+    "240V",
+    "120V",
+    "460V",
+    "line voltage",
+    "control voltage",
+    "24V",
+    "24 volt"
+   ],
+   "class": "field",
+   "means": "voltage",
+   "industries": [
+    "electrical",
+    "hvac"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "amperage",
+   "variants": [
+    "amps",
+    "amp",
+    "amp rating",
+    "breaker size",
+    "breaker amps",
+    "MCA",
+    "MOCP",
+    "max overcurrent",
+    "min circuit amps",
+    "FLA",
+    "RLA",
+    "LRA",
+    "service size",
+    "service amps",
+    "200 amp",
+    "100 amp",
+    "400 amp"
+   ],
+   "class": "field",
+   "means": "amperage",
+   "industries": [
+    "electrical",
+    "hvac"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "phase",
+   "variants": [
+    "1 phase",
+    "single phase",
+    "3 phase",
+    "three phase",
+    "3ph",
+    "1ph",
+    "3-phase",
+    "1-phase"
+   ],
+   "class": "field",
+   "means": "phase",
+   "industries": [
+    "electrical",
+    "hvac"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "fixture_type",
+   "variants": [
+    "fixture",
+    "fixtures",
+    "faucet",
+    "toilet",
+    "sink",
+    "tub",
+    "shower",
+    "disposal",
+    "hose bib",
+    "spigot",
+    "bibb",
+    "angle stop",
+    "supply line",
+    "p-trap",
+    "lavatory",
+    "commode",
+    "water closet"
+   ],
+   "class": "field",
+   "means": "fixture_type",
+   "industries": [
+    "plumbing"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "pipe_material",
+   "variants": [
+    "pipe",
+    "piping",
+    "copper",
+    "PEX",
+    "CPVC",
+    "PVC",
+    "ABS",
+    "galvanized",
+    "cast iron",
+    "polybutylene",
+    "poly b",
+    "orangeburg",
+    "black iron",
+    "CSST",
+    "Kitec"
+   ],
+   "class": "field",
+   "means": "pipe_material",
+   "industries": [
+    "plumbing"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "gallons",
+   "variants": [
+    "gal",
+    "gallon",
+    "tank size",
+    "tank capacity",
+    "40 gallon",
+    "50 gallon",
+    "75 gallon",
+    "GPM",
+    "gpm",
+    "flow rate"
+   ],
+   "class": "field",
+   "means": "gallons",
+   "industries": [
+    "plumbing"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "backflow_test_result",
+   "variants": [
+    "backflow result",
+    "test result",
+    "pass/fail",
+    "tested ok",
+    "repaired and retested",
+    "retest",
+    "test passed",
+    "test failed"
+   ],
+   "class": "field",
+   "means": "backflow_test_result",
+   "industries": [
+    "plumbing"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "next_test_due",
+   "variants": [
+    "next test",
+    "retest due",
+    "next inspection",
+    "annual due",
+    "test due",
+    "recert date"
+   ],
+   "class": "field",
+   "means": "next_test_due",
+   "industries": [
+    "plumbing"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "afci_gfci",
+   "variants": [
+    "AFCI",
+    "GFCI",
+    "GFI",
+    "ground fault",
+    "arc fault",
+    "dual function",
+    "CAFCI",
+    "GFCI outlet",
+    "GFCI breaker",
+    "AFCI breaker"
+   ],
+   "class": "field",
+   "means": "afci_gfci",
+   "industries": [
+    "electrical"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "equipment_id",
+   "variants": [
+    "unit id",
+    "unit #",
+    "unit no",
+    "asset id",
+    "asset tag",
+    "asset #",
+    "equipment #",
+    "equip id",
+    "tag #",
+    "tag number",
+    "rtu #",
+    "RTU-1",
+    "AHU-1",
+    "unit tag",
+    "equipment tag",
+    "unit name",
+    "system id",
+    "system 1",
+    "system 2"
+   ],
+   "class": "field",
+   "means": "equipment_id",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "shop_phone",
+   "variants": [
+    "office phone",
+    "company phone",
+    "main number",
+    "our number",
+    "dispatch number",
+    "service line",
+    "after hours line",
+    "24 hour line"
+   ],
+   "class": "field",
+   "means": "shop_phone",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "shop_address",
+   "variants": [
+    "company address",
+    "office address",
+    "shop address",
+    "our address",
+    "remit address",
+    "mail payments to"
+   ],
+   "class": "field",
+   "means": "shop_address",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "cost",
+   "variants": [
+    "amount",
+    "amt",
+    "fee",
+    "balance",
+    "invoice amount",
+    "paid amount",
+    "amount paid",
+    "tendered"
+   ],
+   "class": "field",
+   "means": "cost",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed label / casual phrase",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "air conditioner",
+   "variants": [
+    "AC",
+    "A/C",
+    "air conditioning",
+    "AC unit",
+    "aircon",
+    "cooling",
+    "condenser",
+    "outside unit",
+    "outdoor unit",
+    "compressor unit",
+    "condensing unit",
+    "split system",
+    "central air"
+   ],
+   "class": "equipment",
+   "means": "equipment_type:condenser",
+   "industries": [
+    "hvac"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "furnace",
+   "variants": [
+    "furnaces",
+    "heater",
+    "gas furnace",
+    "heating unit",
+    "heat",
+    "forced air",
+    "gas heat",
+    "heating system",
+    "upflow",
+    "downflow",
+    "oil furnace",
+    "electric furnace"
+   ],
+   "class": "equipment",
+   "means": "equipment_type:furnace",
+   "industries": [
+    "hvac"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "heat pump",
+   "variants": [
+    "heat pumps",
+    "HP",
+    "heatpump",
+    "heat-pump",
+    "mini split",
+    "mini-split",
+    "minisplit",
+    "ductless",
+    "multi-split",
+    "VRF",
+    "VRV",
+    "dual fuel",
+    "geothermal",
+    "water source heat pump",
+    "WSHP"
+   ],
+   "class": "equipment",
+   "means": "equipment_type:heat-pump",
+   "industries": [
+    "hvac"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "air handler",
+   "variants": [
+    "AHU",
+    "air handlers",
+    "fan coil",
+    "fan coil unit",
+    "FCU",
+    "blower unit",
+    "indoor unit",
+    "inside unit"
+   ],
+   "class": "equipment",
+   "means": "equipment_type:air-handler",
+   "industries": [
+    "hvac"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "evaporator coil",
+   "variants": [
+    "evap coil",
+    "evap",
+    "a-coil",
+    "A coil",
+    "indoor coil",
+    "cased coil",
+    "slab coil"
+   ],
+   "class": "part",
+   "means": "part:evaporator-coil",
+   "industries": [
+    "hvac"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "package unit",
+   "variants": [
+    "packaged unit",
+    "package system",
+    "packaged system",
+    "rooftop unit",
+    "RTU",
+    "rooftop",
+    "roof top",
+    "roof unit",
+    "gas pack",
+    "heat pack",
+    "package AC"
+   ],
+   "class": "equipment",
+   "means": "equipment_type:package-unit",
+   "industries": [
+    "hvac"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "boiler",
+   "variants": [
+    "boilers",
+    "hydronic",
+    "hydronic heat",
+    "radiant heat",
+    "baseboard",
+    "hot water heat",
+    "steam boiler",
+    "combi boiler",
+    "radiators"
+   ],
+   "class": "equipment",
+   "means": "equipment_type:boiler",
+   "industries": [
+    "hvac",
+    "plumbing"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "thermostat",
+   "variants": [
+    "t-stat",
+    "tstat",
+    "t stat",
+    "thermostats",
+    "Nest",
+    "ecobee",
+    "Honeywell",
+    "smart thermostat",
+    "programmable thermostat",
+    "wifi thermostat"
+   ],
+   "class": "equipment",
+   "means": "equipment_type:thermostat",
+   "industries": [
+    "hvac"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "ductwork",
+   "variants": [
+    "ducts",
+    "duct work",
+    "trunk line",
+    "plenum",
+    "return plenum",
+    "supply plenum",
+    "flex duct",
+    "ductboard",
+    "sheet metal",
+    "duct cleaning",
+    "duct sealing",
+    "registers",
+    "grilles",
+    "diffusers"
+   ],
+   "class": "equipment",
+   "means": "equipment_type:ductwork",
+   "industries": [
+    "hvac"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "water heater",
+   "variants": [
+    "WH",
+    "hot water heater",
+    "hot water tank",
+    "HWH",
+    "tank heater",
+    "tankless",
+    "tankless water heater",
+    "on-demand",
+    "heat pump water heater",
+    "HPWH",
+    "electric water heater",
+    "gas water heater",
+    "power vent",
+    "Rheem",
+    "AO Smith",
+    "Bradford White"
+   ],
+   "class": "equipment",
+   "means": "equipment_type:water-heater",
+   "industries": [
+    "plumbing"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "expansion tank",
+   "variants": [
+    "thermal expansion tank",
+    "exp tank",
+    "expansion vessel"
+   ],
+   "class": "part",
+   "means": "part:expansion-tank",
+   "industries": [
+    "plumbing"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "water softener",
+   "variants": [
+    "softener",
+    "water conditioner",
+    "reverse osmosis",
+    "whole house filter",
+    "filtration",
+    "UV system",
+    "water treatment",
+    "salt system"
+   ],
+   "class": "equipment",
+   "means": "equipment_type:water-treatment",
+   "industries": [
+    "plumbing"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "sump pump",
+   "variants": [
+    "sump",
+    "sump pit",
+    "ejector pump",
+    "sewage ejector",
+    "lift station",
+    "grinder pump",
+    "battery backup pump"
+   ],
+   "class": "equipment",
+   "means": "equipment_type:sump-pump",
+   "industries": [
+    "plumbing"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "PRV",
+   "variants": [
+    "pressure reducing valve",
+    "pressure regulator",
+    "water pressure regulator",
+    "Watts regulator"
+   ],
+   "class": "part",
+   "means": "part:prv",
+   "industries": [
+    "plumbing"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "backflow preventer",
+   "variants": [
+    "backflow device",
+    "backflow assembly",
+    "BFP",
+    "RPZ",
+    "DCVA",
+    "PVB",
+    "double check",
+    "reduced pressure zone",
+    "vacuum breaker",
+    "irrigation backflow"
+   ],
+   "class": "equipment",
+   "means": "equipment_type:backflow",
+   "industries": [
+    "plumbing"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "shutoff valve",
+   "variants": [
+    "shut-off valve",
+    "main shutoff",
+    "main water shutoff",
+    "meter valve",
+    "ball valve",
+    "gate valve",
+    "stop valve",
+    "isolation valve",
+    "curb stop",
+    "main valve"
+   ],
+   "class": "part",
+   "means": "part:valve",
+   "industries": [
+    "plumbing"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "circuit breaker",
+   "variants": [
+    "breaker",
+    "breakers",
+    "main breaker",
+    "double pole",
+    "single pole",
+    "tandem breaker",
+    "tripped breaker",
+    "breaker box",
+    "panel breaker"
+   ],
+   "class": "part",
+   "means": "part:breaker",
+   "industries": [
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "electrical panel",
+   "variants": [
+    "panel",
+    "main panel",
+    "service panel",
+    "breaker panel",
+    "load center",
+    "sub panel",
+    "subpanel",
+    "fuse box",
+    "fuse panel",
+    "Federal Pacific",
+    "FPE",
+    "Zinsco",
+    "Challenger",
+    "Stab-Lok",
+    "panel upgrade",
+    "panel change",
+    "panel swap",
+    "200 amp upgrade",
+    "service upgrade",
+    "service change",
+    "meter base",
+    "meter socket",
+    "mast",
+    "weatherhead",
+    "service entrance"
+   ],
+   "class": "equipment",
+   "means": "equipment_type:electrical-panel",
+   "industries": [
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "generator",
+   "variants": [
+    "gen",
+    "standby generator",
+    "whole house generator",
+    "whole-home generator",
+    "backup generator",
+    "portable generator",
+    "Generac",
+    "Kohler",
+    "Cummins",
+    "transfer switch",
+    "ATS",
+    "automatic transfer switch"
+   ],
+   "class": "equipment",
+   "means": "equipment_type:generator",
+   "industries": [
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "EV charger",
+   "variants": [
+    "EVSE",
+    "EV charging",
+    "car charger",
+    "level 2 charger",
+    "Level 2",
+    "Tesla wall connector",
+    "wall connector",
+    "NEMA 14-50",
+    "14-50",
+    "Wallbox",
+    "ChargePoint"
+   ],
+   "class": "equipment",
+   "means": "equipment_type:ev-charger",
+   "industries": [
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "outlet",
+   "variants": [
+    "outlets",
+    "receptacle",
+    "receptacles",
+    "plug",
+    "socket",
+    "duplex",
+    "USB outlet",
+    "240 outlet",
+    "dryer outlet",
+    "range outlet"
+   ],
+   "class": "part",
+   "means": "part:receptacle",
+   "industries": [
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "switch",
+   "variants": [
+    "switches",
+    "light switch",
+    "dimmer",
+    "dimmers",
+    "3-way",
+    "three way",
+    "smart switch",
+    "timer switch",
+    "occupancy sensor",
+    "motion sensor"
+   ],
+   "class": "part",
+   "means": "part:switch",
+   "industries": [
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "lighting",
+   "variants": [
+    "light",
+    "lights",
+    "recessed",
+    "can lights",
+    "recessed light",
+    "LED retrofit",
+    "ceiling fan",
+    "chandelier",
+    "exterior lights",
+    "landscape lighting",
+    "sconce",
+    "under cabinet"
+   ],
+   "class": "equipment",
+   "means": "equipment_type:lighting",
+   "industries": [
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "smoke detector",
+   "variants": [
+    "smoke alarm",
+    "smoke detectors",
+    "CO detector",
+    "carbon monoxide detector",
+    "CO alarm",
+    "combo detector",
+    "hardwired smoke",
+    "interconnected smoke"
+   ],
+   "class": "equipment",
+   "means": "equipment_type:detector",
+   "industries": [
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "surge protector",
+   "variants": [
+    "surge protection",
+    "whole house surge",
+    "whole-home surge",
+    "SPD",
+    "surge arrester",
+    "TVSS"
+   ],
+   "class": "equipment",
+   "means": "equipment_type:surge-protector",
+   "industries": [
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "capacitor",
+   "variants": [
+    "caps",
+    "run cap",
+    "run capacitor",
+    "start cap",
+    "start capacitor",
+    "dual run",
+    "dual run cap",
+    "dual capacitor",
+    "fan capacitor",
+    "bad cap",
+    "blown cap",
+    "mfd",
+    "microfarad"
+   ],
+   "class": "part",
+   "means": "part:capacitor",
+   "industries": [
+    "hvac"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "contactor",
+   "variants": [
+    "contactors",
+    "relay",
+    "contact relay",
+    "pitted contactor",
+    "burnt contactor"
+   ],
+   "class": "part",
+   "means": "part:contactor",
+   "industries": [
+    "hvac"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "compressor",
+   "variants": [
+    "comp",
+    "comps",
+    "compressors",
+    "scroll compressor",
+    "reciprocating compressor",
+    "rotary compressor",
+    "locked rotor",
+    "seized compressor",
+    "Copeland",
+    "Bristol"
+   ],
+   "class": "part",
+   "means": "part:compressor",
+   "industries": [
+    "hvac"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "blower motor",
+   "variants": [
+    "blower",
+    "blower wheel",
+    "squirrel cage",
+    "ECM",
+    "ECM motor",
+    "PSC motor",
+    "variable speed motor",
+    "fan motor",
+    "condenser fan motor",
+    "indoor motor",
+    "inducer",
+    "inducer motor",
+    "draft inducer"
+   ],
+   "class": "part",
+   "means": "part:motor",
+   "industries": [
+    "hvac"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "igniter",
+   "variants": [
+    "ignitor",
+    "hot surface igniter",
+    "HSI",
+    "glow bar",
+    "pilot",
+    "pilot light",
+    "thermocouple",
+    "thermopile",
+    "flame sensor",
+    "flame rod",
+    "gas valve",
+    "pressure switch",
+    "limit switch",
+    "rollout switch",
+    "high limit"
+   ],
+   "class": "part",
+   "means": "part:ignition",
+   "industries": [
+    "hvac"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "control board",
+   "variants": [
+    "circuit board",
+    "main board",
+    "furnace board",
+    "integrated furnace control",
+    "IFC",
+    "defrost board",
+    "defrost control",
+    "PCB",
+    "control module",
+    "sequencer",
+    "transformer",
+    "24v transformer"
+   ],
+   "class": "part",
+   "means": "part:control-board",
+   "industries": [
+    "hvac"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "filter",
+   "variants": [
+    "air filter",
+    "filters",
+    "MERV",
+    "MERV 8",
+    "MERV 11",
+    "MERV 13",
+    "pleated",
+    "1 inch filter",
+    "4 inch filter",
+    "media filter",
+    "media cabinet",
+    "HEPA",
+    "filter change",
+    "replace filter",
+    "16x25x1",
+    "20x25x1"
+   ],
+   "class": "part",
+   "means": "part:filter",
+   "industries": [
+    "hvac"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "line set",
+   "variants": [
+    "lineset",
+    "linesets",
+    "suction line",
+    "liquid line",
+    "copper lines",
+    "refrigerant lines",
+    "line hide"
+   ],
+   "class": "part",
+   "means": "part:line-set",
+   "industries": [
+    "hvac"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "TXV",
+   "variants": [
+    "TXV valve",
+    "metering device",
+    "piston",
+    "fixed orifice",
+    "expansion valve",
+    "TEV",
+    "EEV",
+    "thermal expansion valve"
+   ],
+   "class": "part",
+   "means": "part:txv",
+   "industries": [
+    "hvac"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "condensate drain",
+   "variants": [
+    "drain pan",
+    "condensate pan",
+    "secondary pan",
+    "float switch",
+    "condensate float",
+    "condensate line",
+    "condensate pump",
+    "drain line",
+    "AC drain",
+    "clogged drain line",
+    "wet switch"
+   ],
+   "class": "part",
+   "means": "part:condensate",
+   "industries": [
+    "hvac"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "heat exchanger",
+   "variants": [
+    "HX",
+    "cracked heat exchanger",
+    "cracked HX",
+    "condemned furnace",
+    "red tagged",
+    "red-tagged",
+    "condemned"
+   ],
+   "class": "part",
+   "means": "part:heat-exchanger",
+   "industries": [
+    "hvac"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "faucet cartridge",
+   "variants": [
+    "cartridge",
+    "faucet stem",
+    "washer",
+    "o-ring",
+    "gasket",
+    "wax ring",
+    "flapper",
+    "fill valve",
+    "ballcock",
+    "flush valve",
+    "toilet fill valve",
+    "supply stop",
+    "aerator"
+   ],
+   "class": "part",
+   "means": "part:plumbing-trim",
+   "industries": [
+    "plumbing"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "flex connector",
+   "variants": [
+    "braided line",
+    "braided supply",
+    "supply hose",
+    "washing machine hose",
+    "flexible connector",
+    "gas flex",
+    "gas connector",
+    "dryer vent"
+   ],
+   "class": "part",
+   "means": "part:connector",
+   "industries": [
+    "plumbing",
+    "hvac"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "anode rod",
+   "variants": [
+    "anode",
+    "anode replacement",
+    "sacrificial rod"
+   ],
+   "class": "part",
+   "means": "part:anode-rod",
+   "industries": [
+    "plumbing"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "drain clog",
+   "variants": [
+    "clog",
+    "clogged",
+    "stoppage",
+    "stopped up",
+    "backup",
+    "backed up",
+    "slow drain",
+    "blockage",
+    "snake",
+    "snaked",
+    "rodded",
+    "rooter",
+    "hydro jet",
+    "hydrojet",
+    "jetting",
+    "drain cleaning",
+    "main line",
+    "sewer line",
+    "sewer lateral",
+    "cleanout",
+    "clean out"
+   ],
+   "class": "action",
+   "means": "action:drain-clearing",
+   "industries": [
+    "plumbing"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "diagnose",
+   "variants": [
+    "diagnosed",
+    "diagnostic",
+    "diag",
+    "troubleshoot",
+    "troubleshooting",
+    "trouble shoot",
+    "checked out",
+    "look at",
+    "take a look",
+    "come look",
+    "evaluated",
+    "assessment",
+    "inspect",
+    "inspected"
+   ],
+   "class": "action",
+   "means": "action:diagnose",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "recharge",
+   "variants": [
+    "recharged",
+    "top off",
+    "topped off",
+    "added freon",
+    "add freon",
+    "add refrigerant",
+    "added refrigerant",
+    "evacuate",
+    "pull a vacuum",
+    "recover",
+    "reclaim",
+    "recovered"
+   ],
+   "class": "action",
+   "means": "action:recharge",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "leak repair",
+   "variants": [
+    "leak check",
+    "leak search",
+    "found leak",
+    "leak detection",
+    "brazed",
+    "braze",
+    "soldered",
+    "sweat",
+    "patched leak",
+    "fixed leak",
+    "repaired leak",
+    "nitrogen test"
+   ],
+   "class": "action",
+   "means": "action:leak-repair",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "clean",
+   "variants": [
+    "cleaned",
+    "cleaning",
+    "coil cleaning",
+    "coil wash",
+    "condenser wash",
+    "cleaned coil",
+    "descale",
+    "descaled",
+    "cleaned burners",
+    "burner cleaning"
+   ],
+   "class": "action",
+   "means": "action:clean",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "flush",
+   "variants": [
+    "water heater flush",
+    "flush tank",
+    "flushed tank",
+    "drain tank",
+    "drained tank",
+    "sediment flush",
+    "annual flush"
+   ],
+   "class": "action",
+   "means": "action:flush",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "rough-in",
+   "variants": [
+    "rough in",
+    "roughin",
+    "rough plumbing",
+    "rough electrical",
+    "trim out",
+    "trim-out"
+   ],
+   "class": "action",
+   "means": "action:rough-in",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "retrofit",
+   "variants": [
+    "retro fit",
+    "retro-fit",
+    "upgrade",
+    "upgraded",
+    "modernization",
+    "conversion kit",
+    "add-on"
+   ],
+   "class": "action",
+   "means": "action:retrofit",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "repipe",
+   "variants": [
+    "re-pipe",
+    "re pipe",
+    "repiped",
+    "whole house repipe",
+    "re-plumb",
+    "replumb",
+    "pipe replacement",
+    "PEX repipe"
+   ],
+   "class": "action",
+   "means": "action:repipe",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "rewire",
+   "variants": [
+    "re-wire",
+    "re wire",
+    "rewired",
+    "whole house rewire",
+    "knob and tube",
+    "K&T",
+    "aluminum wiring",
+    "pigtail",
+    "pigtailed"
+   ],
+   "class": "action",
+   "means": "action:rewire",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "trenchless",
+   "variants": [
+    "pipe lining",
+    "CIPP",
+    "pipe bursting",
+    "relined",
+    "epoxy liner"
+   ],
+   "class": "action",
+   "means": "action:trenchless",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "winterize",
+   "variants": [
+    "winterization",
+    "winterized",
+    "freeze protection",
+    "blow out lines",
+    "blowout",
+    "irrigation blowout",
+    "de-winterize",
+    "spring startup",
+    "spring start-up",
+    "seasonal startup"
+   ],
+   "class": "action",
+   "means": "action:winterize",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "shutdown",
+   "variants": [
+    "shut down",
+    "shut off",
+    "shutoff",
+    "turned off",
+    "locked out",
+    "tagged out",
+    "LOTO"
+   ],
+   "class": "action",
+   "means": "action:shutdown",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "warranty claim",
+   "variants": [
+    "warranty claims",
+    "file claim",
+    "filed claim",
+    "claim submitted",
+    "RMA",
+    "defective part",
+    "DOA",
+    "dead on arrival",
+    "return to supplier",
+    "core return",
+    "core charge"
+   ],
+   "class": "action",
+   "means": "action:warranty-claim",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "follow up",
+   "variants": [
+    "follow-up",
+    "followup",
+    "followed up",
+    "check in",
+    "touch base",
+    "callback request",
+    "call me back",
+    "remind me",
+    "reminder"
+   ],
+   "class": "action",
+   "means": "action:follow-up",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "quote requested",
+   "variants": [
+    "need a quote",
+    "need an estimate",
+    "give me a price",
+    "ballpark",
+    "rough price",
+    "what would it cost",
+    "how much to replace",
+    "price to replace",
+    "second opinion"
+   ],
+   "class": "action",
+   "means": "action:request-quote",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "fall maintenance",
+   "variants": [
+    "fall tune-up",
+    "fall tuneup",
+    "fall checkup",
+    "heating season prep",
+    "pre-winter check",
+    "furnace check",
+    "heat check",
+    "winter prep"
+   ],
+   "class": "date_phrase",
+   "means": "season:fall",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "spring maintenance",
+   "variants": [
+    "spring tune-up",
+    "spring tuneup",
+    "spring checkup",
+    "cooling season prep",
+    "AC check",
+    "pre-summer check",
+    "summer prep"
+   ],
+   "class": "date_phrase",
+   "means": "season:spring",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "shoulder season",
+   "variants": [
+    "slow season",
+    "off season",
+    "off-season",
+    "peak season",
+    "busy season",
+    "heating season",
+    "cooling season",
+    "summer rush",
+    "winter rush"
+   ],
+   "class": "date_phrase",
+   "means": "season",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://www.energy.gov/energysaver/energy-saver",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "due for service",
+   "variants": [
+    "due for maintenance",
+    "due for a tune-up",
+    "overdue for maintenance",
+    "overdue for service",
+    "haven't been serviced",
+    "hasn't been serviced",
+    "not serviced in a year",
+    "needs service",
+    "needs maintenance",
+    "visit due",
+    "next visit",
+    "next service",
+    "next service date",
+    "next maintenance",
+    "next PM",
+    "upcoming visits",
+    "upcoming maintenance"
+   ],
+   "class": "date_phrase",
+   "means": "due_for_service",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/memberships-concepts",
+   "src_confidence": "fetched"
+  },
+  {
+   "term": "last visit",
+   "variants": [
+    "last service",
+    "previous visit",
+    "most recent visit",
+    "last tech visit",
+    "when were we last there",
+    "last call"
+   ],
+   "class": "date_phrase",
+   "means": "last_service_date",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "annual",
+   "variants": [
+    "yearly",
+    "every year",
+    "once a year",
+    "1x per year",
+    "12 months",
+    "twelve months",
+    "year term",
+    "one year"
+   ],
+   "class": "date_phrase",
+   "means": "interval:annual",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/memberships-concepts",
+   "src_confidence": "fetched"
+  },
+  {
+   "term": "semi-annual",
+   "variants": [
+    "semiannual",
+    "twice a year",
+    "2x per year",
+    "every 6 months",
+    "biannual",
+    "bi-annual",
+    "spring and fall",
+    "two visits a year"
+   ],
+   "class": "date_phrase",
+   "means": "interval:semiannual",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/memberships-concepts",
+   "src_confidence": "fetched"
+  },
+  {
+   "term": "quarterly",
+   "variants": [
+    "every 3 months",
+    "4x per year",
+    "four times a year",
+    "every quarter"
+   ],
+   "class": "date_phrase",
+   "means": "interval:quarterly",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/memberships-concepts",
+   "src_confidence": "fetched"
+  },
+  {
+   "term": "monthly",
+   "variants": [
+    "every month",
+    "12x per year",
+    "each month",
+    "monthly visits",
+    "monthly billing"
+   ],
+   "class": "date_phrase",
+   "means": "interval:monthly",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/memberships-concepts",
+   "src_confidence": "fetched"
+  },
+  {
+   "term": "billing cycle",
+   "variants": [
+    "billing period",
+    "bill cycle",
+    "billing frequency",
+    "pay monthly",
+    "pay annually",
+    "billed monthly",
+    "billed annually",
+    "auto pay",
+    "autopay",
+    "recurring billing",
+    "auto-bill",
+    "recurring charge"
+   ],
+   "class": "date_phrase",
+   "means": "billing_cycle",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/memberships-concepts",
+   "src_confidence": "fetched"
+  },
+  {
+   "term": "renewal date",
+   "variants": [
+    "renews on",
+    "renewal due",
+    "anniversary date",
+    "plan anniversary",
+    "expiration date",
+    "expiry",
+    "expires on",
+    "expires",
+    "ends on",
+    "end date",
+    "plan end",
+    "valid through",
+    "valid thru"
+   ],
+   "class": "date_phrase",
+   "means": "term_end",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/memberships-concepts",
+   "src_confidence": "fetched"
+  },
+  {
+   "term": "start date",
+   "variants": [
+    "effective date",
+    "plan start",
+    "membership start",
+    "starts on",
+    "enrolled on",
+    "sign up date",
+    "signed up on",
+    "purchase date",
+    "date purchased"
+   ],
+   "class": "date_phrase",
+   "means": "term_start",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/memberships-concepts",
+   "src_confidence": "fetched"
+  },
+  {
+   "term": "service window",
+   "variants": [
+    "arrival window",
+    "time window",
+    "ETA",
+    "estimated arrival",
+    "arrive between",
+    "morning window",
+    "afternoon window",
+    "first call",
+    "first available",
+    "same day",
+    "next day"
+   ],
+   "class": "date_phrase",
+   "means": "service_window",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "this year",
+   "variants": [
+    "YTD",
+    "year to date",
+    "this calendar year",
+    "so far this year",
+    "last 12 months",
+    "L12M",
+    "trailing twelve months",
+    "past year",
+    "rolling year"
+   ],
+   "class": "date_phrase",
+   "means": "range:ytd",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "last month",
+   "variants": [
+    "previous month",
+    "prior month",
+    "past month",
+    "last 30 days",
+    "this month",
+    "MTD",
+    "month to date",
+    "last quarter",
+    "this quarter",
+    "QTD",
+    "last week",
+    "this week",
+    "yesterday",
+    "today"
+   ],
+   "class": "date_phrase",
+   "means": "range",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "lead time",
+   "variants": [
+    "turnaround",
+    "turn around time",
+    "parts ETA",
+    "parts lead time",
+    "delivery time",
+    "ship time",
+    "back order date"
+   ],
+   "class": "date_phrase",
+   "means": "lead_time",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "inspection date",
+   "variants": [
+    "reinspection date",
+    "re-inspection date",
+    "inspection scheduled",
+    "inspection booked",
+    "inspector coming"
+   ],
+   "class": "date_phrase",
+   "means": "inspection_date",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "permit expiration",
+   "variants": [
+    "permit expires",
+    "permit expiry",
+    "permit void",
+    "permit lapsed",
+    "180 days",
+    "permit extension"
+   ],
+   "class": "date_phrase",
+   "means": "permit_expires",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "registration deadline",
+   "variants": [
+    "register within 60 days",
+    "90 days to register",
+    "registration window",
+    "register within 90 days",
+    "register by"
+   ],
+   "class": "date_phrase",
+   "means": "warranty_registration_deadline",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "bill to block",
+   "variants": [
+    "customer information",
+    "customer info",
+    "customer details",
+    "client info",
+    "account info"
+   ],
+   "class": "document_label",
+   "means": "customer_name",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed on paperwork",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "job address block",
+   "variants": [
+    "service address",
+    "work location",
+    "jobsite address",
+    "install at"
+   ],
+   "class": "document_label",
+   "means": "service_address",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed on paperwork",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "terms and conditions",
+   "variants": [
+    "T&C",
+    "terms & conditions",
+    "fine print",
+    "disclaimer",
+    "limited warranty statement",
+    "cancellation policy",
+    "right to cancel",
+    "three day right to cancel",
+    "3-day rescission",
+    "notice of cancellation"
+   ],
+   "class": "document_label",
+   "means": "legal_terms",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed on paperwork",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "signature",
+   "variants": [
+    "signed by",
+    "customer signature",
+    "sign here",
+    "authorized signature",
+    "accepted by",
+    "date signed",
+    "tech signature",
+    "customer sign-off",
+    "sign off",
+    "signoff",
+    "acceptance"
+   ],
+   "class": "document_label",
+   "means": "signature",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed on paperwork",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "description",
+   "variants": [
+    "desc",
+    "item description",
+    "line item",
+    "line items",
+    "details",
+    "service description"
+   ],
+   "class": "document_label",
+   "means": "line_item_description",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed on paperwork",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "qty",
+   "variants": [
+    "quantity",
+    "qty.",
+    "ea",
+    "each",
+    "pcs",
+    "pieces"
+   ],
+   "class": "document_label",
+   "means": "quantity",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed on paperwork",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "unit price",
+   "variants": [
+    "price each",
+    "rate",
+    "rate/hr",
+    "each price",
+    "list price",
+    "MSRP",
+    "net price",
+    "sell price",
+    "retail price"
+   ],
+   "class": "document_label",
+   "means": "unit_price",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed on paperwork",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "line total",
+   "variants": [
+    "extended",
+    "ext price",
+    "extended price",
+    "line amount"
+   ],
+   "class": "document_label",
+   "means": "line_total",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed on paperwork",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "contractor license",
+   "variants": [
+    "license #",
+    "license number",
+    "lic",
+    "lic #",
+    "ROC license",
+    "ROC#",
+    "CSLB license",
+    "state license",
+    "C-20",
+    "C-36",
+    "C-10",
+    "master license",
+    "journeyman license",
+    "EPA 608",
+    "608 cert",
+    "NATE",
+    "NATE certified",
+    "bonded",
+    "insured",
+    "bonded and insured"
+   ],
+   "class": "document_label",
+   "means": "license_number",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed on paperwork",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "manufacturer warranty",
+   "variants": [
+    "factory warranty",
+    "mfr warranty",
+    "manufacturers warranty",
+    "OEM warranty",
+    "parts only warranty",
+    "parts-only",
+    "limited parts warranty"
+   ],
+   "class": "document_label",
+   "means": "warranty_term",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed on paperwork",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "labor warranty",
+   "variants": [
+    "workmanship warranty",
+    "workmanship guarantee",
+    "installation warranty",
+    "install warranty",
+    "contractor warranty",
+    "our warranty",
+    "labor guarantee",
+    "satisfaction guarantee",
+    "2 year labor",
+    "10 year labor"
+   ],
+   "class": "document_label",
+   "means": "labor_warranty",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed on paperwork",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "extended warranty",
+   "variants": [
+    "extended service plan",
+    "ESP",
+    "home warranty",
+    "American Home Shield",
+    "AHS",
+    "Choice Home Warranty",
+    "First American",
+    "Frontdoor",
+    "Select Home Warranty",
+    "third party warranty",
+    "third-party warranty"
+   ],
+   "class": "document_label",
+   "means": "extended_warranty",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed on paperwork",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "authorization number",
+   "variants": [
+    "auth #",
+    "auth number",
+    "authorization code",
+    "preauth",
+    "pre-authorization",
+    "warranty auth",
+    "claim #",
+    "claim number",
+    "dispatch #",
+    "work authorization",
+    "NTE",
+    "not to exceed",
+    "not-to-exceed"
+   ],
+   "class": "document_label",
+   "means": "authorization_number",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed on paperwork",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "payment method",
+   "variants": [
+    "paid by",
+    "form of payment",
+    "pay type",
+    "tender",
+    "cash",
+    "credit card",
+    "visa",
+    "mastercard",
+    "amex",
+    "ACH",
+    "e-check",
+    "venmo",
+    "zelle",
+    "apple pay"
+   ],
+   "class": "document_label",
+   "means": "payment_method",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed on paperwork",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "recommended repairs",
+   "variants": [
+    "recommended work",
+    "items needing attention",
+    "deficiencies",
+    "deficiency list",
+    "issues found",
+    "findings",
+    "observations",
+    "punch list",
+    "punchlist"
+   ],
+   "class": "document_label",
+   "means": "recommended_repairs",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed on paperwork",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "readings",
+   "variants": [
+    "measurements",
+    "system readings",
+    "static pressure",
+    "delta T",
+    "delta-T",
+    "superheat",
+    "subcooling",
+    "suction pressure",
+    "head pressure",
+    "amp draw",
+    "temp split",
+    "temperature split",
+    "supply temp",
+    "return temp",
+    "CO ppm",
+    "manifold pressure",
+    "gas pressure",
+    "water pressure psi",
+    "PSI",
+    "megger"
+   ],
+   "class": "document_label",
+   "means": "readings",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed on paperwork",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "checklist",
+   "variants": [
+    "check list",
+    "tune-up checklist",
+    "maintenance checklist",
+    "PM checklist",
+    "inspection checklist",
+    "job checklist",
+    "multi-point inspection",
+    "multipoint",
+    "21 point",
+    "50 point",
+    "85-point",
+    "tech checklist"
+   ],
+   "class": "document_label",
+   "means": "checklist",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "printed on paperwork",
+   "source": "https://help.servicetitan.com/residential-s-r/docs/create-and-edit-invoice-and-billing-templates",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "lead",
+   "variants": [
+    "leads",
+    "new lead",
+    "inbound lead",
+    "web lead",
+    "LSA",
+    "local services ads",
+    "Angi",
+    "HomeAdvisor",
+    "Thumbtack",
+    "Yelp",
+    "Nextdoor",
+    "referral",
+    "referrals"
+   ],
+   "class": "status",
+   "means": "lead",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "fetched"
+  },
+  {
+   "term": "conversion rate",
+   "variants": [
+    "close rate",
+    "closing rate",
+    "booking rate",
+    "CBR",
+    "call booking rate",
+    "sold rate",
+    "win rate",
+    "converted",
+    "opportunity",
+    "opps",
+    "sales opps"
+   ],
+   "class": "money",
+   "means": "metric:conversion_rate",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "fetched"
+  },
+  {
+   "term": "callback rate",
+   "variants": [
+    "comeback rate",
+    "recall rate",
+    "redo rate",
+    "repeat rate",
+    "first time fix",
+    "first-time fix rate",
+    "FTF",
+    "FTFR",
+    "fix rate"
+   ],
+   "class": "money",
+   "means": "metric:callback_rate",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "first-time fix is the inverse",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "membership count",
+   "variants": [
+    "member count",
+    "members",
+    "active members",
+    "active memberships",
+    "memberships sold",
+    "membership sales",
+    "plan holders",
+    "enrolled"
+   ],
+   "class": "money",
+   "means": "metric:membership_count",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/memberships-concepts",
+   "src_confidence": "fetched"
+  },
+  {
+   "term": "membership attach",
+   "variants": [
+    "membership offered",
+    "attach rate",
+    "membership attach rate",
+    "sold a plan"
+   ],
+   "class": "status",
+   "means": "metric:membership_attach",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/memberships-concepts",
+   "src_confidence": "fetched"
+  },
+  {
+   "term": "revenue per tech",
+   "variants": [
+    "rev per tech",
+    "revenue per technician",
+    "sales per tech",
+    "tech production",
+    "billed per tech"
+   ],
+   "class": "money",
+   "means": "metric:revenue_per_tech",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "capacity",
+   "variants": [
+    "schedule capacity",
+    "booked out",
+    "booked solid",
+    "backlog",
+    "backlogged",
+    "weeks out",
+    "slammed",
+    "open slots",
+    "availability",
+    "openings"
+   ],
+   "class": "status",
+   "means": "metric:capacity",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "truck",
+   "variants": [
+    "trucks",
+    "van",
+    "vans",
+    "service vehicle",
+    "service truck",
+    "company vehicle",
+    "truck number",
+    "vehicle #",
+    "fleet"
+   ],
+   "class": "equipment",
+   "means": "equipment_type:vehicle",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "general-knowledge"
+  },
+  {
+   "term": "zone",
+   "variants": [
+    "zones",
+    "service area",
+    "territory",
+    "zip codes",
+    "service zone",
+    "coverage area",
+    "dispatch zone"
+   ],
+   "class": "field",
+   "means": "service_zone",
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ],
+   "note": "",
+   "source": "https://help.servicetitan.com/docs/servicetitan-glossary-commonly-used-servicetitan-terms",
+   "src_confidence": "fetched"
+  }
+ ],
+ "ambiguous": [
+  {
+   "term": "PM",
+   "could_mean": [
+    "preventive maintenance",
+    "property manager",
+    "project manager",
+    "afternoon (p.m.)"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "AC",
+   "could_mean": [
+    "air conditioner",
+    "alternating current"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "hold",
+   "could_mean": [
+    "job on hold",
+    "payment hold",
+    "membership paused"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "rough",
+   "could_mean": [
+    "rough-in stage",
+    "rough estimate"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "final",
+   "could_mean": [
+    "final inspection",
+    "final invoice",
+    "final payment"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "check",
+   "could_mean": [
+    "inspect a unit",
+    "paper check payment",
+    "check valve"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "charge",
+   "could_mean": [
+    "refrigerant charge",
+    "fee charged",
+    "credit card charge",
+    "EV charging"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "trip",
+   "could_mean": [
+    "trip charge fee",
+    "breaker trip",
+    "service trip or visit"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "stat",
+   "could_mean": [
+    "thermostat",
+    "status",
+    "urgent"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "cap",
+   "could_mean": [
+    "capacitor",
+    "price cap",
+    "pipe end cap"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "coil",
+   "could_mean": [
+    "evaporator coil",
+    "condenser coil",
+    "heating coil or element"
+   ],
+   "industries": [
+    "hvac"
+   ]
+  },
+  {
+   "term": "unit",
+   "could_mean": [
+    "HVAC equipment unit",
+    "apartment or rental unit",
+    "unit of measure"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "plan",
+   "could_mean": [
+    "maintenance plan or membership",
+    "floor plan or blueprint",
+    "financing plan"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "contract",
+   "could_mean": [
+    "maintenance agreement",
+    "construction contract with GC",
+    "home warranty contract"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "warranty",
+   "could_mean": [
+    "manufacturer parts warranty",
+    "labor or workmanship warranty",
+    "extended or home warranty plan"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "estimate",
+   "could_mean": [
+    "sales quote for replacement",
+    "ballpark price over phone",
+    "ETA (arrival estimate)"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "ticket",
+   "could_mean": [
+    "service ticket",
+    "invoice",
+    "citation",
+    "support ticket"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "job",
+   "could_mean": [
+    "work order",
+    "service ticket",
+    "job site or project"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "service",
+   "could_mean": [
+    "service call",
+    "maintenance",
+    "service plan",
+    "service entrance (electrical)"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "rep",
+   "could_mean": [
+    "manufacturer rep",
+    "sales rep",
+    "repair"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "lead",
+   "could_mean": [
+    "sales lead",
+    "lead pipe or lead test",
+    "lead tech",
+    "electrical lead wire"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "pressure",
+   "could_mean": [
+    "water pressure psi",
+    "refrigerant pressure",
+    "gas manifold pressure",
+    "static pressure"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "tag",
+   "could_mean": [
+    "red/yellow/green inspection tag",
+    "equipment asset tag",
+    "warranty tag"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "ground",
+   "could_mean": [
+    "electrical ground",
+    "ground floor",
+    "ground-source geothermal",
+    "ground man (helper)"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "panel",
+   "could_mean": [
+    "electrical panel",
+    "access panel",
+    "solar panel",
+    "control panel"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "tank",
+   "could_mean": [
+    "water heater tank",
+    "expansion tank",
+    "septic tank",
+    "refrigerant cylinder"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "licensed",
+   "could_mean": [
+    "contractor licensed",
+    "insured and bonded",
+    "technician certified"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "biannual",
+   "could_mean": [
+    "twice a year",
+    "every two years"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "rating",
+   "could_mean": [
+    "SEER rating",
+    "BTU rating",
+    "amp rating",
+    "AFUE rating",
+    "review rating"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "age",
+   "could_mean": [
+    "age of unit",
+    "date of manufacture",
+    "install date"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "balance",
+   "could_mean": [
+    "amount owed",
+    "system balance (air or hydronic)",
+    "account balance"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "terms",
+   "could_mean": [
+    "payment terms (net 30)",
+    "terms and conditions"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "deposit",
+   "could_mean": [
+    "customer down payment",
+    "security deposit (property)",
+    "refundable deposit"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "hours",
+   "could_mean": [
+    "labor hours billed",
+    "business hours",
+    "hour meter"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "sold",
+   "could_mean": [
+    "estimate accepted",
+    "sold-by label",
+    "equipment sold or delivered"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "install",
+   "could_mean": [
+    "new equipment installation",
+    "install date field",
+    "install crew"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "start up",
+   "could_mean": [
+    "equipment commissioning",
+    "membership start",
+    "start of season"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "tune up",
+   "could_mean": [
+    "preventive maintenance visit",
+    "engine or vehicle tune-up"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "repair",
+   "could_mean": [
+    "fix a problem",
+    "repair ticket or repair order"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "credit",
+   "could_mean": [
+    "credit memo",
+    "credit card",
+    "account credit"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "closed",
+   "could_mean": [
+    "job completed",
+    "estimate closed (sold)",
+    "business closed"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "scope",
+   "could_mean": [
+    "scope of work",
+    "sewer scope (camera)"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "line",
+   "could_mean": [
+    "refrigerant line set",
+    "drain line",
+    "sewer line",
+    "phone line",
+    "line item"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "RO",
+   "could_mean": [
+    "repair order",
+    "reverse osmosis"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "TAB",
+   "could_mean": [
+    "test and balance",
+    "tab on invoice"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "sub",
+   "could_mean": [
+    "subcontractor",
+    "subpanel",
+    "substitute"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "HP",
+   "could_mean": [
+    "heat pump",
+    "horsepower"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "CO",
+   "could_mean": [
+    "carbon monoxide",
+    "cleanout",
+    "change order"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "RP",
+   "could_mean": [
+    "reduced pressure backflow",
+    "retail price"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  },
+  {
+   "term": "NC",
+   "could_mean": [
+    "no charge",
+    "normally closed",
+    "north carolina"
+   ],
+   "industries": [
+    "hvac",
+    "plumbing",
+    "electrical"
+   ]
+  }
+ ],
+ "new_concepts": [
+  {
+   "id": "callback",
+   "why": "Repeat visit for a problem a prior visit was meant to fix; linked to the original ticket; usually no charge. Basis for callback rate by tech/brand/model."
+  },
+  {
+   "id": "no_charge",
+   "why": "Visits not billed (warranty, goodwill, callback, courtesy): excluded from revenue averages but counted as visits."
+  },
+  {
+   "id": "dispatch_fee",
+   "why": "Diagnostic/trip charge, often credited toward repair; distinct from invoice total."
+  },
+  {
+   "id": "flat_rate_price",
+   "why": "Price-book/menu price for a task independent of time, versus hourly T&M."
+  },
+  {
+   "id": "membership_plan",
+   "why": "Plan type with discount %, visits/year, priority service, price, billing cycle; renewal and active/lapsed status."
+  },
+  {
+   "id": "recurring_visit",
+   "why": "Scheduled visit under a membership: due, completed, missed."
+  },
+  {
+   "id": "estimate_option",
+   "why": "Good/better/best option on one proposal and which option sold."
+  },
+  {
+   "id": "sold_status",
+   "why": "Whether a quote was approved, declined or pending; close rate."
+  },
+  {
+   "id": "rebate_incentive",
+   "why": "Utility/manufacturer/federal incentive tied to equipment install; amount and paperwork."
+  },
+  {
+   "id": "financing_plan",
+   "why": "Customer financing provider, term, APR, monthly payment on a proposal or invoice."
+  },
+  {
+   "id": "home_warranty_company",
+   "why": "Third-party payer (AHS, Choice) that authorizes and pays warranty jobs; authorization number and NTE limit."
+  },
+  {
+   "id": "authorization_number",
+   "why": "Claim/dispatch/auth # and not-to-exceed amount from a warranty company or property manager."
+  },
+  {
+   "id": "inspection_result",
+   "why": "Pass/fail/correction-required and tag color with inspector and reinspection date."
+  },
+  {
+   "id": "readings",
+   "why": "Measured values (superheat, subcooling, delta-T, static pressure, amp draw, CO ppm) from startup/PM sheets."
+  },
+  {
+   "id": "service_window",
+   "why": "Arrival window/ETA and appointment slot."
+  },
+  {
+   "id": "job_priority",
+   "why": "Emergency/same-day/standard; no heat/no cool flags and after-hours."
+  },
+  {
+   "id": "lien_notice",
+   "why": "Mechanics lien, notice to owner, lien waiver, retainage on commercial/new construction jobs."
+  },
+  {
+   "id": "license_certification",
+   "why": "Contractor license number, EPA 608, NATE for company and technician credentials."
+  },
+  {
+   "id": "first_time_fix",
+   "why": "Resolved on first visit; inverse of callback."
+  },
+  {
+   "id": "equipment_age",
+   "why": "Age/replacement-age from install date or date of manufacture decoded from serial."
+  },
+  {
+   "id": "part_warranty_claim",
+   "why": "Warranty claim/RMA on a defective part, return status, core return."
+  },
+  {
+   "id": "tech_commission",
+   "why": "Spiff/commission/pay-per-job and revenue per tech."
+  },
+  {
+   "id": "labor_warranty",
+   "why": "Installer's workmanship warranty, separate from manufacturer parts warranty."
+  },
+  {
+   "id": "payment_terms",
+   "why": "Net 30, due on receipt, COD printed on invoices."
+  },
+  {
+   "id": "interval",
+   "why": "Visit frequency (annual, semi-annual, quarterly, monthly) on a maintenance plan."
+  }
+ ]
+}

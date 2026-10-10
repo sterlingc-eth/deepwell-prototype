@@ -60,6 +60,7 @@ import { isGivenName } from "./lookups/commonWords.js";
 import { stripConversationalFrame } from "./router/frame.js";
 import { parseSlotFill, runSlotFill } from "./lookups/slotFill.js";
 import { parseTechnician, runTechnician, loadTechnicianVocab } from "./lookups/technician.js";
+import { parseSummaryQuestion } from "./summary/parse.js";
 
 /* ============================================================ shape detection */
 
@@ -2033,6 +2034,15 @@ export function runContactLookup(db, question, opts = {}) {
 async function runContactLookupCore(db, question, opts = {}) {
   const overlay = opts?.overlay;
   const today = opts?.today ?? null;
+  // R2 B2: a summary of one subject ("rundown on X", "what do we have on file for X", "tell me about our purchase orders") is answered from stored facts
+  // by the summary lane. A name it cannot resolve is handed back to the lookup below (which answers or declines honestly); any other unresolved subject
+  // makes no claim.
+  if (parseSummaryQuestion(question, { today })) {
+    const { runSummary } = await import("./summary/index.js");
+    const s = await runSummary(db, question, { today });
+    if (s.answer) return s.answer;
+    if (s.release === "none") return null;
+  }
   let tenantVocab = opts?.tenantVocab;
   if (!tenantVocab && /\b(?:jobs?|visits?|calls?|techs?|technicians?|busier|work(?:ed)?)\b/i.test(question)) {
     // The caller did not thread the tenant vocabulary through: read the technician names once (only for questions
@@ -2580,6 +2590,11 @@ async function buildResolvedAnswerCore(db, field, row, opts, trail) {
       // Team A (2026-09-24): "what do we have on file for X" is the whole file, not just the contact card.
       try {
         const fileData = await fetchFileData(db, row);
+        // internal (team-only) and People-and-HR papers are not part of a customer's file summary
+        const { visibleDocumentIds } = await import("./summary/read.js");
+        const okIds = await visibleDocumentIds(db, (fileData.docs ?? []).map((d) => d.id));
+        fileData.docs = (fileData.docs ?? []).filter((d) => okIds.has(String(d.id)));
+        fileData.visits = (fileData.visits ?? []).filter((v) => okIds.has(String(v.documentId)));
         trail.file = fileData; // TEAM C: the documents behind the file summary are its citation records
         return attachFileSummary(withUnits, row, fileData, opts.today);
       } catch (err) {

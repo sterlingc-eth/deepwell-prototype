@@ -1,0 +1,6150 @@
+{
+ "group": "hr_insurance_time_people",
+ "entries": [
+  {
+   "term": "offer letter",
+   "variants": [
+    "job offer",
+    "offer of employment",
+    "employment offer",
+    "offer ltr",
+    "job offer letter",
+    "offer packet"
+   ],
+   "class": "document_label",
+   "means": "hr-letter",
+   "industries": [
+    "all"
+   ],
+   "note": "HR paper; app has hr-letter doc type",
+   "source": "https://www.shrm.org/topics-tools/tools/forms"
+  },
+  {
+   "term": "employment agreement",
+   "variants": [
+    "employment contract",
+    "employee contract",
+    "work contract",
+    "hire agreement"
+   ],
+   "class": "document_label",
+   "means": "hr-letter",
+   "industries": [
+    "all"
+   ],
+   "note": "HR paper; app has hr-letter doc type",
+   "source": "https://www.shrm.org/topics-tools/tools/forms"
+  },
+  {
+   "term": "new hire paperwork",
+   "variants": [
+    "onboarding paperwork",
+    "new hire packet",
+    "new-hire forms",
+    "onboarding packet",
+    "hiring paperwork",
+    "new employee forms",
+    "new hire docs"
+   ],
+   "class": "document_label",
+   "means": "hr-letter",
+   "industries": [
+    "all"
+   ],
+   "note": "HR paper; app has hr-letter doc type",
+   "source": "https://www.shrm.org/topics-tools/tools/forms"
+  },
+  {
+   "term": "termination letter",
+   "variants": [
+    "termination notice",
+    "notice of termination",
+    "separation letter",
+    "separation notice",
+    "firing letter",
+    "dismissal letter",
+    "pink slip",
+    "layoff notice",
+    "let go letter"
+   ],
+   "class": "document_label",
+   "means": "hr-letter",
+   "industries": [
+    "all"
+   ],
+   "note": "HR paper; app has hr-letter doc type",
+   "source": "https://www.shrm.org/topics-tools/tools/forms"
+  },
+  {
+   "term": "resignation letter",
+   "variants": [
+    "notice of resignation",
+    "two weeks notice",
+    "2 weeks notice",
+    "two week notice",
+    "quit letter",
+    "resignation notice"
+   ],
+   "class": "document_label",
+   "means": "hr-letter",
+   "industries": [
+    "all"
+   ],
+   "note": "HR paper; app has hr-letter doc type",
+   "source": "https://www.shrm.org/topics-tools/tools/forms"
+  },
+  {
+   "term": "disciplinary notice",
+   "variants": [
+    "write-up",
+    "write up",
+    "writeup",
+    "written warning",
+    "verbal warning",
+    "corrective action",
+    "disciplinary action",
+    "pip",
+    "performance improvement plan",
+    "employee warning"
+   ],
+   "class": "document_label",
+   "means": "hr-letter",
+   "industries": [
+    "all"
+   ],
+   "note": "HR paper; app has hr-letter doc type",
+   "source": "https://www.shrm.org/topics-tools/tools/forms"
+  },
+  {
+   "term": "performance review",
+   "variants": [
+    "annual review",
+    "employee evaluation",
+    "performance evaluation",
+    "appraisal",
+    "90 day review",
+    "90-day review"
+   ],
+   "class": "document_label",
+   "means": "hr-letter",
+   "industries": [
+    "all"
+   ],
+   "note": "HR paper; app has hr-letter doc type",
+   "source": "https://www.shrm.org/topics-tools/tools/forms"
+  },
+  {
+   "term": "employee handbook",
+   "variants": [
+    "staff handbook",
+    "employee manual",
+    "policy manual",
+    "company handbook",
+    "handbook acknowledgment",
+    "handbook acknowledgement",
+    "personnel policies"
+   ],
+   "class": "document_label",
+   "means": "hr-letter",
+   "industries": [
+    "all"
+   ],
+   "note": "HR paper; app has hr-letter doc type",
+   "source": "https://www.shrm.org/topics-tools/tools/forms"
+  },
+  {
+   "term": "job description",
+   "variants": [
+    "jd",
+    "position description",
+    "role description",
+    "job posting"
+   ],
+   "class": "document_label",
+   "means": "hr-letter",
+   "industries": [
+    "all"
+   ],
+   "note": "HR paper; app has hr-letter doc type",
+   "source": "https://www.shrm.org/topics-tools/tools/forms"
+  },
+  {
+   "term": "verification of employment",
+   "variants": [
+    "voe",
+    "employment verification",
+    "proof of employment",
+    "employment letter for lender",
+    "income verification letter"
+   ],
+   "class": "document_label",
+   "means": "hr-letter",
+   "industries": [
+    "all"
+   ],
+   "note": "HR paper; app has hr-letter doc type",
+   "source": "https://www.shrm.org/topics-tools/tools/forms"
+  },
+  {
+   "term": "promotion letter",
+   "variants": [
+    "raise letter",
+    "pay increase letter",
+    "compensation change",
+    "wage change notice",
+    "salary adjustment letter"
+   ],
+   "class": "document_label",
+   "means": "hr-letter",
+   "industries": [
+    "all"
+   ],
+   "note": "HR paper; app has hr-letter doc type",
+   "source": "https://www.shrm.org/topics-tools/tools/forms"
+  },
+  {
+   "term": "non-compete agreement",
+   "variants": [
+    "noncompete",
+    "non compete",
+    "non-solicitation agreement",
+    "nda employee",
+    "confidentiality agreement employee"
+   ],
+   "class": "document_label",
+   "means": "hr-letter",
+   "industries": [
+    "all"
+   ],
+   "note": "HR paper; app has hr-letter doc type",
+   "source": "https://www.shrm.org/topics-tools/tools/forms"
+  },
+  {
+   "term": "direct deposit form",
+   "variants": [
+    "direct deposit authorization",
+    "dd form",
+    "bank info form"
+   ],
+   "class": "document_label",
+   "means": "hr-letter",
+   "industries": [
+    "all"
+   ],
+   "note": "HR paper; app has hr-letter doc type",
+   "source": "https://www.shrm.org/topics-tools/tools/forms"
+  },
+  {
+   "term": "employee acknowledgment",
+   "variants": [
+    "acknowledgment form",
+    "signed acknowledgement",
+    "policy acknowledgment"
+   ],
+   "class": "document_label",
+   "means": "hr-letter",
+   "industries": [
+    "all"
+   ],
+   "note": "HR paper; app has hr-letter doc type",
+   "source": "https://www.shrm.org/topics-tools/tools/forms"
+  },
+  {
+   "term": "W-4",
+   "variants": [
+    "w4",
+    "form w-4",
+    "w 4",
+    "employee's withholding certificate",
+    "withholding certificate",
+    "withholding form"
+   ],
+   "class": "document_label",
+   "means": "hr-letter",
+   "industries": [
+    "all"
+   ],
+   "note": "Employee tax withholding form",
+   "source": "https://www.irs.gov/forms-pubs/about-form-w-4"
+  },
+  {
+   "term": "I-9",
+   "variants": [
+    "i9",
+    "form i-9",
+    "i 9",
+    "employment eligibility verification",
+    "work eligibility form",
+    "eligibility verification"
+   ],
+   "class": "document_label",
+   "means": "hr-letter",
+   "industries": [
+    "all"
+   ],
+   "note": "Work authorization verification form",
+   "source": "https://www.uscis.gov/i-9"
+  },
+  {
+   "term": "W-2",
+   "variants": [
+    "w2",
+    "form w-2",
+    "wage and tax statement"
+   ],
+   "class": "document_label",
+   "means": "hr-letter",
+   "industries": [
+    "all"
+   ],
+   "note": "Annual employee wage statement",
+   "source": "https://www.irs.gov/forms-pubs/about-form-w-2"
+  },
+  {
+   "term": "W-9",
+   "variants": [
+    "w9",
+    "form w-9",
+    "request for taxpayer identification number"
+   ],
+   "class": "document_label",
+   "means": "hr-letter",
+   "industries": [
+    "all"
+   ],
+   "note": "Taxpayer ID form for vendors/subs; collected, not the same as a W-4",
+   "source": "https://www.irs.gov/forms-pubs/about-form-w-9"
+  },
+  {
+   "term": "1099",
+   "variants": [
+    "1099-nec",
+    "1099 nec",
+    "1099-misc",
+    "1099 form",
+    "form 1099",
+    "1099s"
+   ],
+   "class": "document_label",
+   "means": "hr-letter",
+   "industries": [
+    "all"
+   ],
+   "note": "Annual payment statement to contractors/subs",
+   "source": "https://www.irs.gov/forms-pubs/about-form-1099-nec"
+  },
+  {
+   "term": "state withholding form",
+   "variants": [
+    "a-4",
+    "az a-4",
+    "state w-4",
+    "de 4",
+    "state tax withholding"
+   ],
+   "class": "document_label",
+   "means": "hr-letter",
+   "industries": [
+    "all"
+   ],
+   "note": "State withholding election",
+   "source": "https://azdor.gov/forms/withholding"
+  },
+  {
+   "term": "pay stub",
+   "variants": [
+    "paystub",
+    "pay slip",
+    "payslip",
+    "earnings statement",
+    "check stub",
+    "paycheck stub",
+    "pay advice"
+   ],
+   "class": "document_label",
+   "means": "hr-letter",
+   "industries": [
+    "all"
+   ],
+   "note": "Per-pay-period earnings statement",
+   "source": "https://www.dol.gov/general/topic/wages/wagepayment"
+  },
+  {
+   "term": "payroll register",
+   "variants": [
+    "payroll report",
+    "payroll summary",
+    "payroll journal",
+    "payroll run report"
+   ],
+   "class": "document_label",
+   "means": "statement",
+   "industries": [
+    "all"
+   ],
+   "note": "Payroll totals by period",
+   "source": "https://quickbooks.intuit.com/learn-support/en-us/help-article/payroll"
+  },
+  {
+   "term": "workers comp claim form",
+   "variants": [
+    "first report of injury",
+    "froi",
+    "incident report",
+    "injury report",
+    "accident report",
+    "osha 301",
+    "osha 300 log",
+    "osha 300"
+   ],
+   "class": "document_label",
+   "means": "hr-letter",
+   "industries": [
+    "all"
+   ],
+   "note": "Injury paperwork",
+   "source": "https://www.osha.gov/recordkeeping"
+  },
+  {
+   "term": "direct deposit",
+   "variants": [
+    "ach deposit"
+   ],
+   "class": "document_label",
+   "means": "hr-letter",
+   "industries": [
+    "all"
+   ],
+   "note": "Pay delivery method",
+   "source": "https://www.irs.gov/payments"
+  },
+  {
+   "term": "e-verify",
+   "variants": [
+    "everify",
+    "e verify"
+   ],
+   "class": "document_label",
+   "means": "hr-letter",
+   "industries": [
+    "all"
+   ],
+   "note": "Federal employment eligibility check",
+   "source": "https://www.e-verify.gov/"
+  },
+  {
+   "term": "background check authorization",
+   "variants": [
+    "bgc",
+    "background check consent",
+    "fcra authorization",
+    "mvr",
+    "motor vehicle record check",
+    "drug test consent"
+   ],
+   "class": "document_label",
+   "means": "hr-letter",
+   "industries": [
+    "all"
+   ],
+   "note": "Hiring screening consent",
+   "source": "https://www.ftc.gov/business-guidance/resources/background-checks-what-employers-need-know"
+  },
+  {
+   "term": "emergency contact form",
+   "variants": [
+    "emergency contact",
+    "next of kin form"
+   ],
+   "class": "document_label",
+   "means": "hr-letter",
+   "industries": [
+    "all"
+   ],
+   "note": "Employee emergency contact",
+   "source": "https://www.shrm.org/topics-tools/tools/forms"
+  },
+  {
+   "term": "timesheet",
+   "variants": [
+    "time sheet",
+    "time card",
+    "timecard",
+    "time sheets",
+    "timesheets",
+    "hours sheet",
+    "weekly hours",
+    "daily time log",
+    "time log",
+    "clock sheet",
+    "punch card",
+    "punch sheet"
+   ],
+   "class": "document_label",
+   "means": "hr-letter",
+   "industries": [
+    "all"
+   ],
+   "note": "Hours worked record",
+   "source": "https://www.dol.gov/agencies/whd/fact-sheets/21-flsa-recordkeeping"
+  },
+  {
+   "term": "time off request",
+   "variants": [
+    "pto request",
+    "vacation request",
+    "leave request",
+    "day off request",
+    "request off",
+    "sick day request",
+    "time-off request",
+    "tor"
+   ],
+   "class": "document_label",
+   "means": "hr-letter",
+   "industries": [
+    "all"
+   ],
+   "note": "Employee leave request",
+   "source": "https://www.dol.gov/agencies/whd/fmla"
+  },
+  {
+   "term": "work schedule",
+   "variants": [
+    "shift schedule",
+    "crew schedule",
+    "duty roster",
+    "roster",
+    "on-call schedule",
+    "on call rotation",
+    "rota",
+    "weekly schedule",
+    "shift sheet",
+    "staff schedule"
+   ],
+   "class": "document_label",
+   "means": "schedule",
+   "industries": [
+    "all"
+   ],
+   "note": "Who works when",
+   "source": "https://www.dol.gov/agencies/whd/flsa"
+  },
+  {
+   "term": "hire date",
+   "variants": [
+    "date of hire",
+    "start date employee",
+    "first day",
+    "date hired",
+    "hired on",
+    "employment start date"
+   ],
+   "class": "field",
+   "means": "employment_start_date",
+   "industries": [
+    "all"
+   ],
+   "note": "HR/payroll field label; no DeepWell field key yet",
+   "source": "https://quickbooks.intuit.com/learn-support/en-us/help-article/payroll"
+  },
+  {
+   "term": "termination date",
+   "variants": [
+    "last day worked",
+    "last day",
+    "separation date",
+    "date terminated",
+    "date of separation",
+    "end of employment",
+    "term date"
+   ],
+   "class": "field",
+   "means": "employment_end_date",
+   "industries": [
+    "all"
+   ],
+   "note": "HR/payroll field label; no DeepWell field key yet",
+   "source": "https://quickbooks.intuit.com/learn-support/en-us/help-article/payroll"
+  },
+  {
+   "term": "hourly rate",
+   "variants": [
+    "pay rate",
+    "hourly wage",
+    "rate of pay",
+    "base rate",
+    "per hour rate",
+    "$/hr"
+   ],
+   "class": "field",
+   "means": "pay_rate",
+   "industries": [
+    "all"
+   ],
+   "note": "HR/payroll field label; no DeepWell field key yet",
+   "source": "https://quickbooks.intuit.com/learn-support/en-us/help-article/payroll"
+  },
+  {
+   "term": "salary",
+   "variants": [
+    "annual salary",
+    "yearly pay",
+    "base salary",
+    "annual comp"
+   ],
+   "class": "field",
+   "means": "pay_rate",
+   "industries": [
+    "all"
+   ],
+   "note": "HR/payroll field label; no DeepWell field key yet",
+   "source": "https://quickbooks.intuit.com/learn-support/en-us/help-article/payroll"
+  },
+  {
+   "term": "overtime",
+   "variants": [
+    "time and a half",
+    "1.5x",
+    "double time",
+    "overtime hours",
+    "ot hours"
+   ],
+   "class": "field",
+   "means": "overtime_hours",
+   "industries": [
+    "all"
+   ],
+   "note": "HR/payroll field label; no DeepWell field key yet",
+   "source": "https://quickbooks.intuit.com/learn-support/en-us/help-article/payroll"
+  },
+  {
+   "term": "regular hours",
+   "variants": [
+    "straight time"
+   ],
+   "class": "field",
+   "means": "regular_hours",
+   "industries": [
+    "all"
+   ],
+   "note": "HR/payroll field label; no DeepWell field key yet",
+   "source": "https://quickbooks.intuit.com/learn-support/en-us/help-article/payroll"
+  },
+  {
+   "term": "hours worked",
+   "variants": [
+    "total hours",
+    "labor hours",
+    "hrs worked",
+    "total hrs"
+   ],
+   "class": "field",
+   "means": "labor_hours",
+   "industries": [
+    "all"
+   ],
+   "note": "HR/payroll field label; no DeepWell field key yet",
+   "source": "https://quickbooks.intuit.com/learn-support/en-us/help-article/payroll"
+  },
+  {
+   "term": "pay period",
+   "variants": [
+    "pay cycle",
+    "payroll period",
+    "period ending",
+    "pay period ending",
+    "pp",
+    "pay week",
+    "payroll week"
+   ],
+   "class": "field",
+   "means": "pay_period",
+   "industries": [
+    "all"
+   ],
+   "note": "HR/payroll field label; no DeepWell field key yet",
+   "source": "https://quickbooks.intuit.com/learn-support/en-us/help-article/payroll"
+  },
+  {
+   "term": "pay date",
+   "variants": [
+    "payday",
+    "check date",
+    "pay day",
+    "date paid employee"
+   ],
+   "class": "field",
+   "means": "pay_date",
+   "industries": [
+    "all"
+   ],
+   "note": "HR/payroll field label; no DeepWell field key yet",
+   "source": "https://quickbooks.intuit.com/learn-support/en-us/help-article/payroll"
+  },
+  {
+   "term": "gross pay",
+   "variants": [
+    "gross wages",
+    "gross earnings"
+   ],
+   "class": "field",
+   "means": "gross_pay",
+   "industries": [
+    "all"
+   ],
+   "note": "HR/payroll field label; no DeepWell field key yet",
+   "source": "https://quickbooks.intuit.com/learn-support/en-us/help-article/payroll"
+  },
+  {
+   "term": "net pay",
+   "variants": [
+    "take home",
+    "take-home pay",
+    "net wages",
+    "net check",
+    "net earnings"
+   ],
+   "class": "field",
+   "means": "net_pay",
+   "industries": [
+    "all"
+   ],
+   "note": "HR/payroll field label; no DeepWell field key yet",
+   "source": "https://quickbooks.intuit.com/learn-support/en-us/help-article/payroll"
+  },
+  {
+   "term": "withholding",
+   "variants": [
+    "tax withheld",
+    "fed tax",
+    "federal withholding",
+    "social security tax",
+    "suta",
+    "futa",
+    "payroll taxes",
+    "payroll tax"
+   ],
+   "class": "field",
+   "means": "payroll_tax",
+   "industries": [
+    "all"
+   ],
+   "note": "HR/payroll field label; no DeepWell field key yet",
+   "source": "https://quickbooks.intuit.com/learn-support/en-us/help-article/payroll"
+  },
+  {
+   "term": "deductions",
+   "variants": [
+    "payroll deductions",
+    "pre-tax deductions",
+    "401k contribution",
+    "401(k)",
+    "health premium",
+    "garnishment",
+    "wage garnishment"
+   ],
+   "class": "field",
+   "means": "payroll_deduction",
+   "industries": [
+    "all"
+   ],
+   "note": "HR/payroll field label; no DeepWell field key yet",
+   "source": "https://quickbooks.intuit.com/learn-support/en-us/help-article/payroll"
+  },
+  {
+   "term": "pto balance",
+   "variants": [
+    "vacation balance",
+    "accrued pto",
+    "pto accrual",
+    "leave balance",
+    "sick balance",
+    "vacation days left",
+    "pto hours",
+    "accrued leave",
+    "comp time balance"
+   ],
+   "class": "field",
+   "means": "pto_balance",
+   "industries": [
+    "all"
+   ],
+   "note": "HR/payroll field label; no DeepWell field key yet",
+   "source": "https://quickbooks.intuit.com/learn-support/en-us/help-article/payroll"
+  },
+  {
+   "term": "job title",
+   "variants": [
+    "classification",
+    "job class",
+    "occupation"
+   ],
+   "class": "field",
+   "means": "job_title",
+   "industries": [
+    "all"
+   ],
+   "note": "HR/payroll field label; no DeepWell field key yet",
+   "source": "https://quickbooks.intuit.com/learn-support/en-us/help-article/payroll"
+  },
+  {
+   "term": "employment type",
+   "variants": [
+    "full time",
+    "full-time",
+    "part time",
+    "part-time",
+    "ft",
+    "seasonal worker",
+    "per diem",
+    "prn",
+    "w2 employee",
+    "1099 contractor",
+    "exempt",
+    "non-exempt",
+    "nonexempt",
+    "hourly employee",
+    "salaried"
+   ],
+   "class": "field",
+   "means": "employment_type",
+   "industries": [
+    "all"
+   ],
+   "note": "HR/payroll field label; no DeepWell field key yet",
+   "source": "https://quickbooks.intuit.com/learn-support/en-us/help-article/payroll"
+  },
+  {
+   "term": "probationary period",
+   "variants": [
+    "probation",
+    "introductory period",
+    "90 day probation",
+    "trial period",
+    "orientation period"
+   ],
+   "class": "field",
+   "means": "probation_period",
+   "industries": [
+    "all"
+   ],
+   "note": "HR/payroll field label; no DeepWell field key yet",
+   "source": "https://quickbooks.intuit.com/learn-support/en-us/help-article/payroll"
+  },
+  {
+   "term": "at-will",
+   "variants": [
+    "at will employment",
+    "employment at will"
+   ],
+   "class": "field",
+   "means": "employment_type",
+   "industries": [
+    "all"
+   ],
+   "note": "HR/payroll field label; no DeepWell field key yet",
+   "source": "https://quickbooks.intuit.com/learn-support/en-us/help-article/payroll"
+  },
+  {
+   "term": "reports to",
+   "variants": [
+    "supervisor",
+    "direct supervisor",
+    "manager name",
+    "reporting manager",
+    "boss",
+    "foreman"
+   ],
+   "class": "field",
+   "means": "supervisor",
+   "industries": [
+    "all"
+   ],
+   "note": "HR/payroll field label; no DeepWell field key yet",
+   "source": "https://quickbooks.intuit.com/learn-support/en-us/help-article/payroll"
+  },
+  {
+   "term": "benefits",
+   "variants": [
+    "health insurance employee",
+    "dental",
+    "vision",
+    "401k match",
+    "benefit enrollment",
+    "open enrollment",
+    "cobra",
+    "hsa",
+    "fsa"
+   ],
+   "class": "field",
+   "means": "benefits",
+   "industries": [
+    "all"
+   ],
+   "note": "HR/payroll field label; no DeepWell field key yet",
+   "source": "https://quickbooks.intuit.com/learn-support/en-us/help-article/payroll"
+  },
+  {
+   "term": "workers comp class code",
+   "variants": [
+    "class code",
+    "wc code",
+    "ncci code",
+    "workers compensation code",
+    "governing class",
+    "gov class"
+   ],
+   "class": "field",
+   "means": "wc_class_code",
+   "industries": [
+    "all"
+   ],
+   "note": "HR/payroll field label; no DeepWell field key yet",
+   "source": "https://quickbooks.intuit.com/learn-support/en-us/help-article/payroll"
+  },
+  {
+   "term": "employee id",
+   "variants": [
+    "emp id",
+    "employee number",
+    "emp #",
+    "badge number",
+    "staff id",
+    "payroll id",
+    "employee no"
+   ],
+   "class": "field",
+   "means": "employee_id",
+   "industries": [
+    "all"
+   ],
+   "note": "HR/payroll field label; no DeepWell field key yet",
+   "source": "https://quickbooks.intuit.com/learn-support/en-us/help-article/payroll"
+  },
+  {
+   "term": "pay frequency",
+   "variants": [
+    "weekly pay",
+    "biweekly",
+    "bi-weekly",
+    "semi-monthly",
+    "semimonthly",
+    "monthly pay",
+    "paid every other week"
+   ],
+   "class": "field",
+   "means": "pay_frequency",
+   "industries": [
+    "all"
+   ],
+   "note": "HR/payroll field label; no DeepWell field key yet",
+   "source": "https://quickbooks.intuit.com/learn-support/en-us/help-article/payroll"
+  },
+  {
+   "term": "clock in",
+   "variants": [
+    "clock-in",
+    "punch in",
+    "start time",
+    "time in",
+    "in time"
+   ],
+   "class": "field",
+   "means": "clock_in",
+   "industries": [
+    "all"
+   ],
+   "note": "HR/payroll field label; no DeepWell field key yet",
+   "source": "https://quickbooks.intuit.com/learn-support/en-us/help-article/payroll"
+  },
+  {
+   "term": "clock out",
+   "variants": [
+    "clock-out",
+    "punch out",
+    "end time",
+    "time out",
+    "out time"
+   ],
+   "class": "field",
+   "means": "clock_out",
+   "industries": [
+    "all"
+   ],
+   "note": "HR/payroll field label; no DeepWell field key yet",
+   "source": "https://quickbooks.intuit.com/learn-support/en-us/help-article/payroll"
+  },
+  {
+   "term": "break",
+   "variants": [
+    "lunch",
+    "meal break",
+    "unpaid lunch",
+    "30 min lunch",
+    "rest break"
+   ],
+   "class": "field",
+   "means": "break_minutes",
+   "industries": [
+    "all"
+   ],
+   "note": "HR/payroll field label; no DeepWell field key yet",
+   "source": "https://quickbooks.intuit.com/learn-support/en-us/help-article/payroll"
+  },
+  {
+   "term": "per diem",
+   "variants": [
+    "travel pay",
+    "mileage reimbursement",
+    "expense reimbursement",
+    "reimbursement",
+    "truck allowance",
+    "phone allowance"
+   ],
+   "class": "field",
+   "means": "reimbursement",
+   "industries": [
+    "all"
+   ],
+   "note": "HR/payroll field label; no DeepWell field key yet",
+   "source": "https://quickbooks.intuit.com/learn-support/en-us/help-article/payroll"
+  },
+  {
+   "term": "hired",
+   "variants": [
+    "onboarded",
+    "brought on",
+    "new hire",
+    "started",
+    "came on board",
+    "joined"
+   ],
+   "class": "action",
+   "means": "hired",
+   "industries": [
+    "all"
+   ],
+   "note": "HR action/status",
+   "source": "https://www.dol.gov/agencies/whd/fmla"
+  },
+  {
+   "term": "terminated",
+   "variants": [
+    "fired",
+    "let go",
+    "laid off",
+    "separated",
+    "dismissed",
+    "released",
+    "cut loose"
+   ],
+   "class": "action",
+   "means": "terminated",
+   "industries": [
+    "all"
+   ],
+   "note": "HR action/status",
+   "source": "https://www.dol.gov/agencies/whd/fmla"
+  },
+  {
+   "term": "resigned",
+   "variants": [
+    "quit",
+    "gave notice",
+    "left the company",
+    "walked off",
+    "walked out",
+    "put in notice"
+   ],
+   "class": "action",
+   "means": "resigned",
+   "industries": [
+    "all"
+   ],
+   "note": "HR action/status",
+   "source": "https://www.dol.gov/agencies/whd/fmla"
+  },
+  {
+   "term": "furloughed",
+   "variants": [
+    "furlough",
+    "temporary layoff",
+    "laid off seasonally",
+    "seasonal layoff"
+   ],
+   "class": "status",
+   "means": "furloughed",
+   "industries": [
+    "all"
+   ],
+   "note": "HR action/status",
+   "source": "https://www.dol.gov/agencies/whd/fmla"
+  },
+  {
+   "term": "on leave",
+   "variants": [
+    "fmla",
+    "family leave",
+    "medical leave",
+    "maternity leave",
+    "paternity leave",
+    "parental leave",
+    "leave of absence",
+    "out on leave",
+    "bereavement",
+    "jury duty",
+    "military leave",
+    "usera",
+    "drill weekend",
+    "reserve duty"
+   ],
+   "class": "status",
+   "means": "on_leave",
+   "industries": [
+    "all"
+   ],
+   "note": "HR action/status",
+   "source": "https://www.dol.gov/agencies/whd/fmla"
+  },
+  {
+   "term": "approved",
+   "variants": [
+    "okayed",
+    "signed off",
+    "ok'd",
+    "greenlit",
+    "approved by manager"
+   ],
+   "class": "status",
+   "means": "approved",
+   "industries": [
+    "all"
+   ],
+   "note": "HR action/status",
+   "source": "https://www.dol.gov/agencies/whd/fmla"
+  },
+  {
+   "term": "denied",
+   "variants": [
+    "rejected",
+    "declined request",
+    "turned down"
+   ],
+   "class": "status",
+   "means": "denied",
+   "industries": [
+    "all"
+   ],
+   "note": "HR action/status",
+   "source": "https://www.dol.gov/agencies/whd/fmla"
+  },
+  {
+   "term": "pending approval",
+   "variants": [
+    "awaiting approval",
+    "submitted",
+    "waiting on approval",
+    "needs approval",
+    "pending"
+   ],
+   "class": "status",
+   "means": "pending",
+   "industries": [
+    "all"
+   ],
+   "note": "HR action/status",
+   "source": "https://www.dol.gov/agencies/whd/fmla"
+  },
+  {
+   "term": "clocked in",
+   "variants": [
+    "on the clock",
+    "punched in",
+    "working now"
+   ],
+   "class": "status",
+   "means": "clocked_in",
+   "industries": [
+    "all"
+   ],
+   "note": "HR action/status",
+   "source": "https://www.dol.gov/agencies/whd/fmla"
+  },
+  {
+   "term": "no call no show",
+   "variants": [
+    "ncns",
+    "no show",
+    "no-show",
+    "called out",
+    "call out",
+    "called in sick",
+    "absent",
+    "tardy",
+    "late to work"
+   ],
+   "class": "status",
+   "means": "absent",
+   "industries": [
+    "all"
+   ],
+   "note": "HR action/status",
+   "source": "https://www.dol.gov/agencies/whd/fmla"
+  },
+  {
+   "term": "signed",
+   "variants": [
+    "executed",
+    "countersigned",
+    "e-signed",
+    "docusigned",
+    "signed copy",
+    "wet signature"
+   ],
+   "class": "status",
+   "means": "signed",
+   "industries": [
+    "all"
+   ],
+   "note": "HR action/status",
+   "source": "https://www.dol.gov/agencies/whd/fmla"
+  },
+  {
+   "term": "unsigned",
+   "variants": [
+    "not signed",
+    "awaiting signature",
+    "needs signature",
+    "pending signature",
+    "sign here"
+   ],
+   "class": "status",
+   "means": "unsigned",
+   "industries": [
+    "all"
+   ],
+   "note": "HR action/status",
+   "source": "https://www.dol.gov/agencies/whd/fmla"
+  },
+  {
+   "term": "certificate of insurance",
+   "variants": [
+    "coi",
+    "cois",
+    "cert of insurance",
+    "insurance cert",
+    "insurance certificate",
+    "proof of insurance",
+    "proof of coverage",
+    "evidence of insurance",
+    "evidence of coverage",
+    "acord 25",
+    "acord 25 form",
+    "acord certificate",
+    "liability certificate",
+    "insurance card",
+    "poi"
+   ],
+   "class": "document_label",
+   "means": "insurance-certificate",
+   "industries": [
+    "all"
+   ],
+   "note": "ACORD 25 is the standard COI form",
+   "source": "https://www.acord.org/standards-architecture/acord-forms"
+  },
+  {
+   "term": "declarations page",
+   "variants": [
+    "dec page",
+    "decs page",
+    "declaration page",
+    "dec sheet",
+    "declarations",
+    "policy declarations",
+    "dec pages",
+    "declaration sheet"
+   ],
+   "class": "document_label",
+   "means": "insurance-certificate",
+   "industries": [
+    "all"
+   ],
+   "note": "Summary page of a policy: insured, period, limits, premium",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "insurance policy",
+   "variants": [
+    "policy",
+    "policy document",
+    "policy packet",
+    "policy booklet",
+    "policy jacket",
+    "insurance contract",
+    "coverage contract"
+   ],
+   "class": "document_label",
+   "means": "insurance-certificate",
+   "industries": [
+    "all"
+   ],
+   "note": "Full policy",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "endorsement",
+   "variants": [
+    "policy endorsement",
+    "rider",
+    "policy rider",
+    "amendment to policy",
+    "ai endorsement",
+    "cg 20 10",
+    "cg 20 37",
+    "cg2010",
+    "cg2037",
+    "blanket additional insured endorsement",
+    "waiver of subrogation endorsement",
+    "endorsements"
+   ],
+   "class": "document_label",
+   "means": "insurance-certificate",
+   "industries": [
+    "all"
+   ],
+   "note": "Change/add-on to policy; CG 20 10 and CG 20 37 are additional insured forms",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "binder",
+   "variants": [
+    "insurance binder",
+    "binder of insurance",
+    "temporary proof of coverage",
+    "coverage binder"
+   ],
+   "class": "document_label",
+   "means": "insurance-certificate",
+   "industries": [
+    "all"
+   ],
+   "note": "Temporary evidence before policy issues",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "renewal notice",
+   "variants": [
+    "renewal offer",
+    "renewal quote",
+    "renewal letter",
+    "policy renewal",
+    "renewal packet",
+    "renewal invoice",
+    "notice of renewal",
+    "renewal statement"
+   ],
+   "class": "document_label",
+   "means": "insurance-certificate",
+   "industries": [
+    "all"
+   ],
+   "note": "Carrier notice of upcoming renewal",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "cancellation notice",
+   "variants": [
+    "notice of cancellation",
+    "non-renewal notice",
+    "nonrenewal",
+    "notice of non-renewal",
+    "cancel notice",
+    "lapse notice",
+    "notice of intent to cancel",
+    "pending cancellation",
+    "nopc"
+   ],
+   "class": "document_label",
+   "means": "insurance-certificate",
+   "industries": [
+    "all"
+   ],
+   "note": "Carrier notice that coverage will end",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "loss run",
+   "variants": [
+    "loss runs",
+    "loss history",
+    "claims history",
+    "currently valued loss run",
+    "claim history report"
+   ],
+   "class": "document_label",
+   "means": "statement",
+   "industries": [
+    "all"
+   ],
+   "note": "Carrier report of past claims",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "insurance invoice",
+   "variants": [
+    "premium invoice",
+    "premium notice",
+    "premium bill",
+    "insurance bill",
+    "billing statement insurance",
+    "installment notice",
+    "premium statement"
+   ],
+   "class": "document_label",
+   "means": "invoice",
+   "industries": [
+    "all"
+   ],
+   "note": "Bill for premium",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "claim form",
+   "variants": [
+    "claim packet",
+    "proof of loss",
+    "notice of loss",
+    "first notice of loss",
+    "fnol",
+    "claim report",
+    "incident claim"
+   ],
+   "class": "document_label",
+   "means": "other",
+   "industries": [
+    "all"
+   ],
+   "note": "Filing a claim",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "audit notice",
+   "variants": [
+    "premium audit",
+    "payroll audit",
+    "insurance audit",
+    "final audit",
+    "audit worksheet"
+   ],
+   "class": "document_label",
+   "means": "statement",
+   "industries": [
+    "all"
+   ],
+   "note": "WC/GL premium audit by payroll or revenue",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "surety bond",
+   "variants": [
+    "bond",
+    "license bond",
+    "contractor bond",
+    "bid bond",
+    "performance bond",
+    "payment bond",
+    "notary bond",
+    "bonding certificate"
+   ],
+   "class": "document_label",
+   "means": "insurance-certificate",
+   "industries": [
+    "all"
+   ],
+   "note": "Bond paperwork often asked for with COI",
+   "source": "https://content.naic.org/insurance-topics"
+  },
+  {
+   "term": "policy number",
+   "variants": [
+    "policy #",
+    "policy no",
+    "pol #",
+    "policy num",
+    "policy id",
+    "pol no",
+    "policy no."
+   ],
+   "class": "field",
+   "means": "policy_number",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "policy period",
+   "variants": [
+    "policy term",
+    "coverage period",
+    "period of coverage",
+    "policy dates",
+    "policy from to",
+    "policy effective to expiration",
+    "policy effective period"
+   ],
+   "class": "field",
+   "means": "agreement_term",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "policy effective date",
+   "variants": [
+    "eff date",
+    "effective date policy",
+    "policy eff",
+    "inception date",
+    "policy inception",
+    "policy start",
+    "policy start date",
+    "policy begins",
+    "coverage begins",
+    "coverage effective"
+   ],
+   "class": "field",
+   "means": "term_start",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "policy expiration date",
+   "variants": [
+    "exp date",
+    "policy exp",
+    "policy expiry",
+    "policy end",
+    "coverage ends",
+    "expiration policy",
+    "valid through",
+    "valid until",
+    "good through",
+    "coi expiration",
+    "coi expires",
+    "cert expires",
+    "coverage expires",
+    "policy ends"
+   ],
+   "class": "field",
+   "means": "coi_expires",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "named insured",
+   "variants": [
+    "insured",
+    "the insured",
+    "first named insured",
+    "name of insured",
+    "insured name",
+    "policyholder",
+    "policy holder",
+    "policy owner",
+    "covered party",
+    "insured business"
+   ],
+   "class": "field",
+   "means": "insured",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.acord.org/standards-architecture/acord-forms"
+  },
+  {
+   "term": "additional insured",
+   "variants": [
+    "addl insured",
+    "addtl insured",
+    "additionally insured",
+    "also insured",
+    "ai status",
+    "additional insured status",
+    "named as additional insured",
+    "listed as additional insured",
+    "additional named insured"
+   ],
+   "class": "field",
+   "means": "additional_insured",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "certificate holder",
+   "variants": [
+    "cert holder",
+    "certificate holder name",
+    "holder of certificate",
+    "who the cert is for",
+    "requesting party",
+    "cert recipient"
+   ],
+   "class": "field",
+   "means": "certificate_holder",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.acord.org/standards-architecture/acord-forms"
+  },
+  {
+   "term": "insurer",
+   "variants": [
+    "carrier",
+    "insurance company",
+    "insurance carrier",
+    "underwriter",
+    "insurer affording coverage",
+    "insurers affording coverage",
+    "naic number",
+    "naic #",
+    "naic no",
+    "underwriting company",
+    "company name insurance",
+    "provider insurance"
+   ],
+   "class": "field",
+   "means": "insurer",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "insurance agent",
+   "variants": [
+    "insurance rep",
+    "producer",
+    "insurance agency",
+    "our agent",
+    "agent of record",
+    "aor",
+    "agent contact",
+    "local agent",
+    "captive agent"
+   ],
+   "class": "field",
+   "means": "insurance_agent",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "insurance broker",
+   "variants": [
+    "broker",
+    "brokerage",
+    "insurance brokerage",
+    "independent agent",
+    "wholesale broker",
+    "retail broker",
+    "commercial broker"
+   ],
+   "class": "field",
+   "means": "insurance_broker",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "general liability",
+   "variants": [
+    "cgl",
+    "commercial general liability",
+    "gen liability",
+    "general liab",
+    "liability insurance",
+    "gl policy",
+    "gl coverage",
+    "premises liability"
+   ],
+   "class": "field",
+   "means": "coverage_type",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.acord.org/standards-architecture/acord-forms"
+  },
+  {
+   "term": "workers compensation",
+   "variants": [
+    "workers comp",
+    "work comp",
+    "workman's comp",
+    "workmans comp",
+    "workmen's comp",
+    "wc policy",
+    "comp insurance",
+    "wc insurance"
+   ],
+   "class": "field",
+   "means": "coverage_type",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.acord.org/standards-architecture/acord-forms"
+  },
+  {
+   "term": "commercial auto",
+   "variants": [
+    "business auto",
+    "auto liability",
+    "commercial vehicle insurance",
+    "fleet insurance",
+    "bap",
+    "commercial auto policy",
+    "hired and non-owned",
+    "hnoa",
+    "fleet policy"
+   ],
+   "class": "field",
+   "means": "coverage_type",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.acord.org/standards-architecture/acord-forms"
+  },
+  {
+   "term": "umbrella",
+   "variants": [
+    "excess liability",
+    "umbrella liability",
+    "excess policy",
+    "umbrella policy",
+    "excess coverage",
+    "excess/umbrella"
+   ],
+   "class": "field",
+   "means": "coverage_type",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.acord.org/standards-architecture/acord-forms"
+  },
+  {
+   "term": "professional liability",
+   "variants": [
+    "e&o",
+    "errors and omissions",
+    "errors & omissions",
+    "eo insurance",
+    "malpractice",
+    "pl insurance",
+    "professional indemnity"
+   ],
+   "class": "field",
+   "means": "coverage_type",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.acord.org/standards-architecture/acord-forms"
+  },
+  {
+   "term": "inland marine",
+   "variants": [
+    "tools and equipment coverage",
+    "contractors equipment",
+    "installation floater",
+    "equipment floater",
+    "tool coverage",
+    "contractor's equipment"
+   ],
+   "class": "field",
+   "means": "coverage_type",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.acord.org/standards-architecture/acord-forms"
+  },
+  {
+   "term": "property insurance",
+   "variants": [
+    "commercial property",
+    "building coverage",
+    "bpp",
+    "business personal property",
+    "contents coverage",
+    "special form",
+    "cause of loss"
+   ],
+   "class": "field",
+   "means": "coverage_type",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.acord.org/standards-architecture/acord-forms"
+  },
+  {
+   "term": "cyber liability",
+   "variants": [
+    "cyber insurance",
+    "cyber coverage",
+    "data breach insurance",
+    "cyber policy"
+   ],
+   "class": "field",
+   "means": "coverage_type",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.acord.org/standards-architecture/acord-forms"
+  },
+  {
+   "term": "builders risk",
+   "variants": [
+    "builder's risk",
+    "course of construction",
+    "construction project insurance"
+   ],
+   "class": "field",
+   "means": "coverage_type",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.acord.org/standards-architecture/acord-forms"
+  },
+  {
+   "term": "pollution liability",
+   "variants": [
+    "environmental liability",
+    "cpl",
+    "contractors pollution",
+    "epl pollution"
+   ],
+   "class": "field",
+   "means": "coverage_type",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.acord.org/standards-architecture/acord-forms"
+  },
+  {
+   "term": "employment practices liability",
+   "variants": [
+    "epli",
+    "epl",
+    "employment practices",
+    "employment practices insurance"
+   ],
+   "class": "field",
+   "means": "coverage_type",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.acord.org/standards-architecture/acord-forms"
+  },
+  {
+   "term": "each occurrence limit",
+   "variants": [
+    "per occurrence",
+    "occurrence limit",
+    "each occurrence",
+    "per claim limit",
+    "limit per occurrence",
+    "each accident"
+   ],
+   "class": "field",
+   "means": "coverage_limit",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.acord.org/standards-architecture/acord-forms"
+  },
+  {
+   "term": "general aggregate",
+   "variants": [
+    "aggregate limit",
+    "gen agg",
+    "general agg",
+    "annual aggregate",
+    "policy aggregate",
+    "aggregate",
+    "products completed ops aggregate",
+    "products-comp/op agg"
+   ],
+   "class": "field",
+   "means": "coverage_limit",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.acord.org/standards-architecture/acord-forms"
+  },
+  {
+   "term": "coverage limit",
+   "variants": [
+    "limit of liability",
+    "policy limit",
+    "coverage amount",
+    "limits of insurance",
+    "coverage limits",
+    "amount of insurance",
+    "sum insured",
+    "$1m/$2m",
+    "1m 2m",
+    "1/2 million",
+    "one million",
+    "2 million aggregate"
+   ],
+   "class": "field",
+   "means": "coverage_limit",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.acord.org/standards-architecture/acord-forms"
+  },
+  {
+   "term": "deductible",
+   "variants": [
+    "sir",
+    "self-insured retention",
+    "out of pocket",
+    "deductible amount",
+    "ded amount",
+    "per claim deductible"
+   ],
+   "class": "field",
+   "means": "deductible",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "premium",
+   "variants": [
+    "premium amount",
+    "annual premium",
+    "total premium",
+    "policy premium",
+    "monthly premium",
+    "installment",
+    "down payment insurance",
+    "deposit premium",
+    "minimum premium",
+    "est premium",
+    "estimated annual premium"
+   ],
+   "class": "field",
+   "means": "premium",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "occurrence",
+   "variants": [
+    "occurrence form",
+    "occ",
+    "claims-made",
+    "claims made",
+    "retro date",
+    "retroactive date",
+    "tail coverage",
+    "extended reporting period",
+    "erp"
+   ],
+   "class": "field",
+   "means": "coverage_basis",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.acord.org/standards-architecture/acord-forms"
+  },
+  {
+   "term": "waiver of subrogation",
+   "variants": [
+    "wos",
+    "wavier of subrogation",
+    "waiver subrogation",
+    "subrogation waived",
+    "waiver of subro",
+    "subro waiver",
+    "w/s",
+    "waived subrogation"
+   ],
+   "class": "field",
+   "means": "waiver_of_subrogation",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "primary and non-contributory",
+   "variants": [
+    "primary non-contributory",
+    "p&nc",
+    "primary & noncontributory",
+    "primary noncontributory",
+    "primary/non-contrib",
+    "primary wording"
+   ],
+   "class": "field",
+   "means": "primary_noncontributory",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "per project aggregate",
+   "variants": [
+    "project aggregate",
+    "aggregate per project",
+    "gen agg applies per project",
+    "per location aggregate"
+   ],
+   "class": "field",
+   "means": "coverage_limit",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.acord.org/standards-architecture/acord-forms"
+  },
+  {
+   "term": "notice of cancellation to holder",
+   "variants": [
+    "30 day notice",
+    "30 days notice of cancellation",
+    "10 day notice nonpayment",
+    "notice to certificate holder",
+    "cancellation notice to holder"
+   ],
+   "class": "field",
+   "means": "cancellation_notice",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "description of operations",
+   "variants": [
+    "desc of operations",
+    "description of operations / locations / vehicles",
+    "operations description",
+    "job description coi",
+    "project description coi",
+    "location on cert"
+   ],
+   "class": "field",
+   "means": "operations_description",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "claim number",
+   "variants": [
+    "claim #",
+    "claim no",
+    "claim id",
+    "file number",
+    "claim file #",
+    "loss number",
+    "claim ref",
+    "claim reference"
+   ],
+   "class": "field",
+   "means": "claim_number",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "date of loss",
+   "variants": [
+    "loss date",
+    "date of incident",
+    "incident date",
+    "date of accident",
+    "date of occurrence",
+    "accident date",
+    "loss occurred",
+    "date of injury"
+   ],
+   "class": "field",
+   "means": "loss_date",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "adjuster",
+   "variants": [
+    "claims adjuster",
+    "claim adjuster",
+    "field adjuster",
+    "desk adjuster",
+    "independent adjuster",
+    "ia",
+    "adj",
+    "insurance adjuster",
+    "claims rep",
+    "claim handler"
+   ],
+   "class": "field",
+   "means": "adjuster",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "insurance premium due",
+   "variants": [
+    "premium due date",
+    "payment due insurance",
+    "next installment due",
+    "due date premium"
+   ],
+   "class": "field",
+   "means": "due_date",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "loss payee",
+   "variants": [
+    "lienholder",
+    "mortgagee",
+    "lender loss payable",
+    "lender's loss payable",
+    "loss payable",
+    "mortgagee clause",
+    "lienholder name"
+   ],
+   "class": "field",
+   "means": "loss_payee",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance field; maps to coi_expires/term_start/agreement_term where the app has them, else new concept",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "renewed",
+   "variants": [
+    "renewal done",
+    "policy renewed",
+    "renewed policy",
+    "auto-renewed",
+    "auto renew",
+    "autorenew",
+    "rolled over"
+   ],
+   "class": "action",
+   "means": "renewed",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance status/action",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "lapsed",
+   "variants": [
+    "lapse",
+    "coverage lapsed",
+    "let it lapse",
+    "policy lapsed",
+    "uninsured",
+    "no coverage",
+    "expired policy"
+   ],
+   "class": "status",
+   "means": "expired",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance status/action",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "expired",
+   "variants": [
+    "out of date",
+    "past expiration",
+    "expired cert",
+    "expired coi",
+    "coi expired",
+    "insurance expired",
+    "outdated coi",
+    "stale coi",
+    "cert is expired",
+    "expired insurance",
+    "insurance is up"
+   ],
+   "class": "status",
+   "means": "expired",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance status/action",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "active policy",
+   "variants": [
+    "in force",
+    "inforce",
+    "in-force",
+    "current coverage",
+    "coverage active",
+    "valid coi",
+    "current coi",
+    "covered",
+    "insurance current",
+    "good standing insurance"
+   ],
+   "class": "status",
+   "means": "active",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance status/action",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "cancelled policy",
+   "variants": [
+    "canceled policy",
+    "policy cancelled",
+    "policy canceled",
+    "cancelled coverage",
+    "nonrenewed",
+    "non-renewed",
+    "terminated coverage"
+   ],
+   "class": "status",
+   "means": "cancelled",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance status/action",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "claim filed",
+   "variants": [
+    "filed a claim",
+    "open claim",
+    "claim open",
+    "submitted claim",
+    "reported a claim",
+    "claim reported",
+    "made a claim"
+   ],
+   "class": "status",
+   "means": "claim_open",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance status/action",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "claim closed",
+   "variants": [
+    "claim settled",
+    "closed claim",
+    "claim paid",
+    "claim resolved",
+    "claim denied",
+    "claim withdrawn"
+   ],
+   "class": "status",
+   "means": "claim_closed",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance status/action",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "expiring soon",
+   "variants": [
+    "about to expire",
+    "coming due for renewal",
+    "up for renewal",
+    "renewing soon",
+    "expires this month",
+    "expires next month",
+    "expiring",
+    "needs renewal",
+    "due for renewal"
+   ],
+   "class": "status",
+   "means": "expiring",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance status/action",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "requested coi",
+   "variants": [
+    "need a coi",
+    "send me a coi",
+    "coi request",
+    "please send coi",
+    "need proof of insurance",
+    "request certificate",
+    "coi needed",
+    "send a cert"
+   ],
+   "class": "action",
+   "means": "request_coi",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance status/action",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "added as additional insured",
+   "variants": [
+    "add as ai",
+    "add them to the policy",
+    "name them on the policy",
+    "add to policy as additional insured",
+    "adding holder"
+   ],
+   "class": "action",
+   "means": "add_additional_insured",
+   "industries": [
+    "all"
+   ],
+   "note": "Insurance status/action",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "today",
+   "variants": [
+    "right now",
+    "as of today",
+    "this day",
+    "todays",
+    "today's"
+   ],
+   "class": "date_phrase",
+   "means": "day:0",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "yesterday",
+   "variants": [
+    "last night",
+    "the day before",
+    "yday",
+    "yest"
+   ],
+   "class": "date_phrase",
+   "means": "day:-1",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "tomorrow",
+   "variants": [
+    "tmrw",
+    "tmr",
+    "next day"
+   ],
+   "class": "date_phrase",
+   "means": "day:+1",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "this week",
+   "variants": [
+    "so far this week",
+    "current week",
+    "wtd",
+    "week to date",
+    "this wk",
+    "thus far this week"
+   ],
+   "class": "date_phrase",
+   "means": "week:current (Mon-today)",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "last week",
+   "variants": [
+    "previous week",
+    "past week",
+    "prior week",
+    "the week before",
+    "last wk",
+    "prev week"
+   ],
+   "class": "date_phrase",
+   "means": "week:previous (Mon-Sun)",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "next week",
+   "variants": [
+    "upcoming week",
+    "coming week",
+    "following week",
+    "next wk"
+   ],
+   "class": "date_phrase",
+   "means": "week:next",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "past 7 days",
+   "variants": [
+    "last 7 days",
+    "last seven days",
+    "past week rolling",
+    "previous 7 days",
+    "trailing 7 days",
+    "past 7d",
+    "l7d"
+   ],
+   "class": "date_phrase",
+   "means": "rolling:7d ending today",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "past 30 days",
+   "variants": [
+    "last 30 days",
+    "previous 30 days",
+    "trailing 30 days",
+    "past 30",
+    "last 30",
+    "last thirty days",
+    "past month rolling",
+    "l30d",
+    "30d",
+    "past thirty days"
+   ],
+   "class": "date_phrase",
+   "means": "rolling:30d ending today",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "past 60 days",
+   "variants": [
+    "last 60 days",
+    "previous 60 days",
+    "trailing 60 days",
+    "past 60",
+    "last 60",
+    "l60d"
+   ],
+   "class": "date_phrase",
+   "means": "rolling:60d ending today",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "past 90 days",
+   "variants": [
+    "last 90 days",
+    "previous 90 days",
+    "trailing 90 days",
+    "past 90",
+    "last 90",
+    "last ninety days",
+    "l90d",
+    "90d",
+    "past ninety days",
+    "trailing 3 months"
+   ],
+   "class": "date_phrase",
+   "means": "rolling:90d ending today",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "past 6 months",
+   "variants": [
+    "last 6 months",
+    "last six months",
+    "trailing 6 months",
+    "previous six months",
+    "past half year",
+    "last half year",
+    "past 180 days",
+    "last 180 days"
+   ],
+   "class": "date_phrase",
+   "means": "rolling:6mo ending today",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "past 12 months",
+   "variants": [
+    "last 12 months",
+    "trailing twelve months",
+    "ttm",
+    "l12m",
+    "last year rolling",
+    "past year",
+    "over the last year",
+    "previous 12 months",
+    "trailing 12 months",
+    "last 365 days",
+    "past 365 days",
+    "rolling 12",
+    "rolling 12 months"
+   ],
+   "class": "date_phrase",
+   "means": "rolling:12mo ending today",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "this month",
+   "variants": [
+    "current month",
+    "month to date",
+    "mtd",
+    "so far this month",
+    "this mo",
+    "so far in october"
+   ],
+   "class": "date_phrase",
+   "means": "month:current (1st-today)",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "last month",
+   "variants": [
+    "previous month",
+    "prior month",
+    "the month before",
+    "last mo",
+    "prev month",
+    "last calendar month"
+   ],
+   "class": "date_phrase",
+   "means": "month:previous",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "next month",
+   "variants": [
+    "upcoming month",
+    "coming month",
+    "following month"
+   ],
+   "class": "date_phrase",
+   "means": "month:next",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "this quarter",
+   "variants": [
+    "current quarter",
+    "quarter to date",
+    "qtd",
+    "so far this quarter",
+    "this qtr"
+   ],
+   "class": "date_phrase",
+   "means": "quarter:current (calendar unless fiscal set)",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "last quarter",
+   "variants": [
+    "previous quarter",
+    "prior quarter",
+    "last qtr",
+    "prev quarter",
+    "the quarter before",
+    "past quarter"
+   ],
+   "class": "date_phrase",
+   "means": "quarter:previous",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "next quarter",
+   "variants": [
+    "upcoming quarter",
+    "coming quarter",
+    "following quarter",
+    "next qtr"
+   ],
+   "class": "date_phrase",
+   "means": "quarter:next",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "q1",
+   "variants": [
+    "first quarter",
+    "1st quarter",
+    "quarter 1",
+    "q 1",
+    "qtr 1"
+   ],
+   "class": "date_phrase",
+   "means": "quarter:1 Jan-Mar (calendar) or fiscal Q1",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "q2",
+   "variants": [
+    "second quarter",
+    "2nd quarter",
+    "quarter 2",
+    "q 2",
+    "qtr 2"
+   ],
+   "class": "date_phrase",
+   "means": "quarter:2 Apr-Jun (calendar)",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "q3",
+   "variants": [
+    "third quarter",
+    "3rd quarter",
+    "quarter 3",
+    "q 3",
+    "qtr 3"
+   ],
+   "class": "date_phrase",
+   "means": "quarter:3 Jul-Sep (calendar)",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "q4",
+   "variants": [
+    "fourth quarter",
+    "4th quarter",
+    "quarter 4",
+    "q 4",
+    "qtr 4",
+    "holiday quarter"
+   ],
+   "class": "date_phrase",
+   "means": "quarter:4 Oct-Dec (calendar)",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "this year",
+   "variants": [
+    "current year",
+    "year to date",
+    "ytd",
+    "so far this year",
+    "this yr",
+    "this calendar year",
+    "calendar year to date",
+    "ytd to date",
+    "yr to date"
+   ],
+   "class": "date_phrase",
+   "means": "year:current (Jan 1-today)",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "last year",
+   "variants": [
+    "previous year",
+    "prior year",
+    "last yr",
+    "the year before",
+    "prev year",
+    "last calendar year",
+    "year over year prior"
+   ],
+   "class": "date_phrase",
+   "means": "year:previous",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "next year",
+   "variants": [
+    "upcoming year",
+    "coming year",
+    "following year",
+    "next yr"
+   ],
+   "class": "date_phrase",
+   "means": "year:next",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "this time last year",
+   "variants": [
+    "same time last year",
+    "a year ago",
+    "year ago",
+    "one year ago",
+    "12 months ago",
+    "this week last year",
+    "same week last year",
+    "same month last year",
+    "yoy",
+    "year over year",
+    "y/y",
+    "last year same period",
+    "prior year same period",
+    "same period last year",
+    "sply"
+   ],
+   "class": "date_phrase",
+   "means": "offset:-1y same period",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "fiscal year",
+   "variants": [
+    "fy to date",
+    "fytd",
+    "current fiscal year",
+    "this fiscal year",
+    "budget year",
+    "financial year",
+    "accounting year",
+    "business year",
+    "fy25",
+    "fy26",
+    "fy 2026",
+    "fy2026"
+   ],
+   "class": "date_phrase",
+   "means": "fiscal_year (needs company FY start; default calendar)",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.investopedia.com/terms/f/fiscalyear.asp"
+  },
+  {
+   "term": "last fiscal year",
+   "variants": [
+    "prior fiscal year",
+    "previous fiscal year",
+    "last fy",
+    "prior fy",
+    "fy-1",
+    "previous fy"
+   ],
+   "class": "date_phrase",
+   "means": "fiscal_year:previous",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.investopedia.com/terms/f/fiscalyear.asp"
+  },
+  {
+   "term": "tax year",
+   "variants": [
+    "taxable year",
+    "filing year",
+    "2025 taxes",
+    "last tax year",
+    "tax season",
+    "ty2025",
+    "ty 2025"
+   ],
+   "class": "date_phrase",
+   "means": "year:calendar (tax year = calendar for most; note fiscal filers)",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "since we opened",
+   "variants": [
+    "since opening",
+    "since we started",
+    "since inception",
+    "since day one",
+    "since the beginning",
+    "since launch",
+    "all time",
+    "lifetime",
+    "since we started the business",
+    "since founding",
+    "since we began",
+    "life to date",
+    "ltd",
+    "all-time",
+    "since forever",
+    "over the life of the business",
+    "from the start"
+   ],
+   "class": "date_phrase",
+   "means": "range:business_start-today (needs company start date)",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "since last visit",
+   "variants": [
+    "since last service",
+    "since the last time",
+    "since last time we were out",
+    "since we last visited",
+    "since the last call",
+    "since last tune-up",
+    "since last pm",
+    "since last inspection",
+    "since last cleaning",
+    "since our last visit",
+    "since last service call"
+   ],
+   "class": "date_phrase",
+   "means": "range:last_event_of_type-today",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "last service",
+   "variants": [
+    "last visit",
+    "most recent visit",
+    "latest visit",
+    "last time we were out",
+    "last call",
+    "most recent service",
+    "previous visit",
+    "last time",
+    "last time we serviced",
+    "last time we were there",
+    "last job",
+    "recent job",
+    "most recent job",
+    "last appointment"
+   ],
+   "class": "date_phrase",
+   "means": "event:latest_of_type",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "next service",
+   "variants": [
+    "next visit",
+    "next appointment",
+    "upcoming service",
+    "next due",
+    "next pm",
+    "next scheduled",
+    "next maintenance",
+    "next tune-up",
+    "due next",
+    "service due",
+    "what's due next",
+    "coming up next",
+    "next up",
+    "next call"
+   ],
+   "class": "date_phrase",
+   "means": "event:next_scheduled",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "overdue for service",
+   "variants": [
+    "past due for service",
+    "service overdue",
+    "behind on maintenance",
+    "due for service",
+    "needs service",
+    "due for a visit",
+    "haven't been serviced",
+    "hasn't been serviced",
+    "not serviced in a year",
+    "missed service",
+    "overdue pm",
+    "skipped maintenance",
+    "lapsed on maintenance"
+   ],
+   "class": "date_phrase",
+   "means": "filter:next_due < today",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "last 12 months of service",
+   "variants": [
+    "service in the past year",
+    "serviced this past year",
+    "serviced within the year",
+    "any visit in last year"
+   ],
+   "class": "date_phrase",
+   "means": "rolling:12mo",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "spring tune-up season",
+   "variants": [
+    "spring season",
+    "spring startup",
+    "spring tuneup",
+    "spring maintenance",
+    "ac tune-up season",
+    "spring cooling season",
+    "a/c season",
+    "cooling season",
+    "summer prep season",
+    "pre-summer",
+    "pre season",
+    "preseason",
+    "spring pm",
+    "spring rush"
+   ],
+   "class": "date_phrase",
+   "means": "season:spring Mar-May (northern hemisphere); HVAC cooling tune-ups Mar-May",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.energy.gov/energysaver/maintaining-your-air-conditioner"
+  },
+  {
+   "term": "fall tune-up season",
+   "variants": [
+    "fall season",
+    "fall startup",
+    "fall heating check",
+    "heating season prep",
+    "furnace season",
+    "fall maintenance",
+    "fall tuneup",
+    "fall pm",
+    "pre-winter",
+    "fall rush",
+    "autumn tune-up",
+    "heating tune-up season",
+    "winterization"
+   ],
+   "class": "date_phrase",
+   "means": "season:fall Sep-Nov; heating tune-ups Sep-Nov",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.energy.gov/energysaver/maintaining-your-air-conditioner"
+  },
+  {
+   "term": "peak season",
+   "variants": [
+    "busy season",
+    "high season",
+    "rush season",
+    "heavy season",
+    "slammed season",
+    "our busy time",
+    "peak months",
+    "on season",
+    "in season"
+   ],
+   "class": "date_phrase",
+   "means": "season:business_peak (industry-dependent, needs profile)",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.energy.gov/energysaver/maintaining-your-air-conditioner"
+  },
+  {
+   "term": "slow season",
+   "variants": [
+    "off season",
+    "off-season",
+    "slow time",
+    "dead season",
+    "low season",
+    "shoulder season",
+    "offseason",
+    "slow months",
+    "slow period",
+    "down season",
+    "dead of winter"
+   ],
+   "class": "date_phrase",
+   "means": "season:business_low",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.energy.gov/energysaver/maintaining-your-air-conditioner"
+  },
+  {
+   "term": "cooling season",
+   "variants": [
+    "summer season",
+    "a/c season",
+    "ac season",
+    "air conditioning season",
+    "hot season",
+    "summer rush",
+    "summer months",
+    "the summer"
+   ],
+   "class": "date_phrase",
+   "means": "season:Jun-Sep (US South: Apr-Oct)",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.energy.gov/energysaver/maintaining-your-air-conditioner"
+  },
+  {
+   "term": "heating season",
+   "variants": [
+    "winter season",
+    "furnace season",
+    "cold season",
+    "winter months",
+    "the winter",
+    "heat season",
+    "winter rush"
+   ],
+   "class": "date_phrase",
+   "means": "season:Nov-Mar",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.energy.gov/energysaver/maintaining-your-air-conditioner"
+  },
+  {
+   "term": "holiday season",
+   "variants": [
+    "christmas season",
+    "the holidays",
+    "holiday rush",
+    "year-end giving",
+    "giving season",
+    "end-of-year campaign",
+    "year end appeal",
+    "giving tuesday season"
+   ],
+   "class": "date_phrase",
+   "means": "season:Nov-Dec",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "tax season",
+   "variants": [
+    "tax time",
+    "filing season",
+    "busy tax season",
+    "april 15",
+    "tax deadline",
+    "tax day"
+   ],
+   "class": "date_phrase",
+   "means": "season:Jan-Apr15",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "back to school",
+   "variants": [
+    "back-to-school",
+    "bts",
+    "school season",
+    "start of school"
+   ],
+   "class": "date_phrase",
+   "means": "season:Aug-Sep",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "monsoon season",
+   "variants": [
+    "storm season",
+    "hurricane season",
+    "rainy season",
+    "wet season",
+    "hail season"
+   ],
+   "class": "date_phrase",
+   "means": "season:regional (AZ Jun 15-Sep 30 monsoon; Atlantic hurricane Jun 1-Nov 30)",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.weather.gov/psr/monsoon"
+  },
+  {
+   "term": "the first of the month",
+   "variants": [
+    "1st of the month",
+    "first of month",
+    "start of the month",
+    "beginning of month",
+    "month start",
+    "first of the mo",
+    "the 1st"
+   ],
+   "class": "date_phrase",
+   "means": "day:month_start",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "end of month",
+   "variants": [
+    "eom",
+    "month end",
+    "month-end",
+    "end of the month",
+    "last day of the month",
+    "by end of month",
+    "last of the month",
+    "eomonth",
+    "the 30th",
+    "the 31st"
+   ],
+   "class": "date_phrase",
+   "means": "day:month_end",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "end of quarter",
+   "variants": [
+    "eoq",
+    "quarter end",
+    "quarter-end",
+    "end of the quarter",
+    "q-end"
+   ],
+   "class": "date_phrase",
+   "means": "day:quarter_end",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "end of year",
+   "variants": [
+    "eoy",
+    "year end",
+    "year-end",
+    "end of the year",
+    "dec 31",
+    "12/31",
+    "new years",
+    "by year end",
+    "calendar year end"
+   ],
+   "class": "date_phrase",
+   "means": "day:year_end",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "end of week",
+   "variants": [
+    "end of the week",
+    "by friday",
+    "friday close",
+    "close of week",
+    "weekend"
+   ],
+   "class": "date_phrase",
+   "means": "day:week_end",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "end of day",
+   "variants": [
+    "eod",
+    "close of business",
+    "by close",
+    "end of business",
+    "tonight",
+    "by tonight",
+    "by end of business"
+   ],
+   "class": "date_phrase",
+   "means": "time:day_end",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "start of year",
+   "variants": [
+    "boy",
+    "beginning of the year",
+    "first of the year",
+    "jan 1",
+    "new year",
+    "1/1",
+    "start of the year",
+    "beginning of year"
+   ],
+   "class": "date_phrase",
+   "means": "day:year_start",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "mid-year",
+   "variants": [
+    "midyear",
+    "mid year",
+    "halfway through the year",
+    "midpoint of year",
+    "june 30",
+    "6/30",
+    "h1",
+    "first half",
+    "1h",
+    "first half of the year",
+    "h2",
+    "second half",
+    "2h",
+    "second half of the year"
+   ],
+   "class": "date_phrase",
+   "means": "period:half_year (H1 Jan-Jun, H2 Jul-Dec)",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "net 30",
+   "variants": [
+    "net30",
+    "net thirty",
+    "due in 30 days",
+    "30 days net",
+    "payable in 30 days",
+    "30 day terms",
+    "terms 30",
+    "due within 30 days",
+    "net 30 days"
+   ],
+   "class": "date_phrase",
+   "means": "payment_terms:30d",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://quickbooks.intuit.com/r/invoicing/what-does-net-30-mean/"
+  },
+  {
+   "term": "net 15",
+   "variants": [
+    "net15",
+    "net fifteen",
+    "due in 15 days",
+    "15 day terms",
+    "net 15 days"
+   ],
+   "class": "date_phrase",
+   "means": "payment_terms:15d",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://quickbooks.intuit.com/r/invoicing/what-does-net-30-mean/"
+  },
+  {
+   "term": "net 45",
+   "variants": [
+    "net45",
+    "due in 45 days",
+    "45 day terms"
+   ],
+   "class": "date_phrase",
+   "means": "payment_terms:45d",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://quickbooks.intuit.com/r/invoicing/what-does-net-30-mean/"
+  },
+  {
+   "term": "net 60",
+   "variants": [
+    "net60",
+    "due in 60 days",
+    "60 day terms"
+   ],
+   "class": "date_phrase",
+   "means": "payment_terms:60d",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://quickbooks.intuit.com/r/invoicing/what-does-net-30-mean/"
+  },
+  {
+   "term": "due on receipt",
+   "variants": [
+    "due upon receipt",
+    "payable on receipt",
+    "upon receipt",
+    "net 0",
+    "cash on delivery",
+    "payment due now",
+    "due immediately",
+    "pay on receipt",
+    "due at time of service",
+    "due at service",
+    "pay at completion",
+    "due on completion",
+    "due at completion",
+    "pay now",
+    "immediate payment"
+   ],
+   "class": "date_phrase",
+   "means": "payment_terms:0d",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://quickbooks.intuit.com/r/invoicing/what-does-net-30-mean/"
+  },
+  {
+   "term": "2/10 net 30",
+   "variants": [
+    "2/10 n30",
+    "2%/10 net 30",
+    "2 10 net 30",
+    "early pay discount",
+    "early payment discount",
+    "prompt pay discount",
+    "2% 10 net 30",
+    "1/10 net 30",
+    "discount terms"
+   ],
+   "class": "date_phrase",
+   "means": "payment_terms:discount 2% if paid within 10d else net 30",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://quickbooks.intuit.com/r/invoicing/what-does-net-30-mean/"
+  },
+  {
+   "term": "eom terms",
+   "variants": [
+    "net 30 eom",
+    "net eom",
+    "end of month terms",
+    "30 days eom",
+    "net 10 eom",
+    "due end of month following"
+   ],
+   "class": "date_phrase",
+   "means": "payment_terms:eom",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://quickbooks.intuit.com/r/invoicing/what-does-net-30-mean/"
+  },
+  {
+   "term": "billing cycle",
+   "variants": [
+    "bill cycle",
+    "billing period",
+    "billing frequency",
+    "invoice cycle",
+    "statement cycle",
+    "cycle date",
+    "billing date cycle",
+    "billing interval",
+    "billed monthly",
+    "billed annually",
+    "billed quarterly"
+   ],
+   "class": "date_phrase",
+   "means": "billing_period",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "monthly",
+   "variants": [
+    "every month",
+    "per month",
+    "/mo",
+    "a month",
+    "each month",
+    "once a month",
+    "per mo",
+    "monthly basis",
+    "12 times a year"
+   ],
+   "class": "date_phrase",
+   "means": "cadence:1mo",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "quarterly",
+   "variants": [
+    "every quarter",
+    "each quarter",
+    "4 times a year",
+    "per quarter",
+    "every 3 months",
+    "every three months",
+    "once a quarter",
+    "/qtr"
+   ],
+   "class": "date_phrase",
+   "means": "cadence:3mo",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "semi-annual",
+   "variants": [
+    "semiannual",
+    "twice a year",
+    "2x a year",
+    "every 6 months",
+    "biannual",
+    "bi-annual",
+    "every six months",
+    "twice yearly",
+    "semi annual",
+    "two visits a year",
+    "2 visits a year",
+    "spring and fall",
+    "spring/fall"
+   ],
+   "class": "date_phrase",
+   "means": "cadence:6mo",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "annual",
+   "variants": [
+    "annually",
+    "yearly",
+    "once a year",
+    "every year",
+    "per year",
+    "/yr",
+    "a year",
+    "each year",
+    "1x a year",
+    "every 12 months",
+    "once yearly",
+    "per annum",
+    "p.a.",
+    "12 month"
+   ],
+   "class": "date_phrase",
+   "means": "cadence:12mo",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "weekly",
+   "variants": [
+    "every week",
+    "per week",
+    "once a week",
+    "/wk",
+    "each week",
+    "weekly basis",
+    "every wk",
+    "wkly"
+   ],
+   "class": "date_phrase",
+   "means": "cadence:1w",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "biweekly",
+   "variants": [
+    "bi-weekly",
+    "every other week",
+    "every two weeks",
+    "fortnightly",
+    "every 2 weeks",
+    "every 14 days",
+    "2 weeks",
+    "once every two weeks",
+    "bi weekly"
+   ],
+   "class": "date_phrase",
+   "means": "cadence:2w (also ambiguous with twice a week)",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "daily",
+   "variants": [
+    "every day",
+    "each day",
+    "per day",
+    "/day",
+    "day to day",
+    "7 days a week",
+    "once a day",
+    "daily basis"
+   ],
+   "class": "date_phrase",
+   "means": "cadence:1d",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "lease term",
+   "variants": [
+    "term of lease",
+    "length of lease",
+    "lease length",
+    "lease duration",
+    "term length",
+    "lease period",
+    "lease years",
+    "12 month lease",
+    "month to month",
+    "month-to-month",
+    "mtm",
+    "m2m",
+    "year lease",
+    "1 year lease",
+    "2 year lease",
+    "one year lease",
+    "annual lease",
+    "6 month lease"
+   ],
+   "class": "date_phrase",
+   "means": "lease_period (use agreement_term)",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.nolo.com/legal-encyclopedia/lease-terms"
+  },
+  {
+   "term": "warranty period",
+   "variants": [
+    "warranty term",
+    "warranty length",
+    "warranty duration",
+    "years of warranty",
+    "warranty years",
+    "parts warranty",
+    "labor warranty",
+    "10 year warranty",
+    "5 year warranty",
+    "1 year labor",
+    "extended warranty",
+    "under warranty",
+    "out of warranty",
+    "in warranty",
+    "warranty expired",
+    "warranty status"
+   ],
+   "class": "date_phrase",
+   "means": "warranty_term (field key exists)",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "grace period",
+   "variants": [
+    "grace",
+    "late period",
+    "days late allowed",
+    "late fee grace",
+    "grace days",
+    "cure period",
+    "notice period"
+   ],
+   "class": "date_phrase",
+   "means": "period:after due date before penalty",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://quickbooks.intuit.com/r/invoicing/what-does-net-30-mean/"
+  },
+  {
+   "term": "notice period",
+   "variants": [
+    "days notice",
+    "30 day notice",
+    "60 day notice",
+    "notice to vacate",
+    "notice of intent",
+    "notice required",
+    "advance notice",
+    "required notice",
+    "written notice",
+    "notice to quit",
+    "pay or quit",
+    "3 day notice",
+    "3-day notice"
+   ],
+   "class": "date_phrase",
+   "means": "period:required notice",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.nolo.com/legal-encyclopedia/lease-terms"
+  },
+  {
+   "term": "net days past due",
+   "variants": [
+    "days past due",
+    "days overdue",
+    "days late",
+    "dpd",
+    "aging",
+    "aged",
+    "30 days past due",
+    "60 days past due",
+    "90 days past due",
+    "90+ days",
+    "over 90",
+    "over 60",
+    "over 30",
+    "1-30",
+    "31-60",
+    "61-90",
+    "91+",
+    "current 1-30 31-60 61-90",
+    "a/r aging",
+    "ar aging",
+    "aging bucket"
+   ],
+   "class": "date_phrase",
+   "means": "aging_bucket",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://quickbooks.intuit.com/r/invoicing/what-does-net-30-mean/"
+  },
+  {
+   "term": "business days",
+   "variants": [
+    "working days",
+    "business day",
+    "workdays",
+    "work days",
+    "weekdays",
+    "banking days",
+    "excluding weekends",
+    "excl weekends",
+    "excluding holidays"
+   ],
+   "class": "date_phrase",
+   "means": "calendar:excludes weekends/holidays",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/help/ita/what-are-business-days"
+  },
+  {
+   "term": "calendar days",
+   "variants": [
+    "regular days",
+    "consecutive days",
+    "natural days",
+    "including weekends"
+   ],
+   "class": "date_phrase",
+   "means": "calendar:all days",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/help/ita/what-are-business-days"
+  },
+  {
+   "term": "within the year",
+   "variants": [
+    "within a year",
+    "inside a year",
+    "in the last year",
+    "in the past year",
+    "in the last 12",
+    "this past year",
+    "over the past year",
+    "during the last year"
+   ],
+   "class": "date_phrase",
+   "means": "rolling:12mo",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "last couple of weeks",
+   "variants": [
+    "last two weeks",
+    "past two weeks",
+    "past couple weeks",
+    "last 2 weeks",
+    "previous two weeks",
+    "past 14 days",
+    "last 14 days",
+    "last fortnight",
+    "last couple weeks",
+    "past couple of weeks"
+   ],
+   "class": "date_phrase",
+   "means": "rolling:14d",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "last few months",
+   "variants": [
+    "past few months",
+    "last couple months",
+    "recent months",
+    "last couple of months",
+    "past couple of months",
+    "past several months",
+    "last few mos",
+    "previous few months"
+   ],
+   "class": "date_phrase",
+   "means": "rolling:~3mo (assume 90d, confirm)",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "recently",
+   "variants": [
+    "lately",
+    "recent",
+    "as of late",
+    "not long ago",
+    "of late",
+    "newly",
+    "just recently",
+    "the other day",
+    "a while back",
+    "a while ago",
+    "some time ago",
+    "few days ago",
+    "couple days ago",
+    "a few days ago"
+   ],
+   "class": "date_phrase",
+   "means": "vague: assume rolling 30d, confirm",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "on the weekend",
+   "variants": [
+    "this weekend",
+    "weekend",
+    "sat sun",
+    "saturday and sunday",
+    "over the weekend",
+    "weekends",
+    "last weekend",
+    "weekend work",
+    "weekend call"
+   ],
+   "class": "date_phrase",
+   "means": "day_of_week:Sat-Sun",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "after hours",
+   "variants": [
+    "afterhours",
+    "after-hours",
+    "off hours",
+    "off-hours",
+    "nights and weekends",
+    "overtime hours service",
+    "emergency hours",
+    "evening call",
+    "night call",
+    "outside business hours",
+    "after 5",
+    "after five",
+    "emergency call",
+    "24/7",
+    "24 7",
+    "on-call"
+   ],
+   "class": "date_phrase",
+   "means": "time_of_day:outside business hours (billing surcharge flag)",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "annual maintenance anniversary",
+   "variants": [
+    "renewal anniversary",
+    "anniversary date",
+    "member anniversary",
+    "plan anniversary",
+    "contract anniversary",
+    "sign up date",
+    "enrollment anniversary",
+    "agreement anniversary",
+    "renews on"
+   ],
+   "class": "date_phrase",
+   "means": "date:agreement_term anniversary",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "calendar year",
+   "variants": [
+    "january to december",
+    "jan-dec",
+    "jan through dec",
+    "jan 1 to dec 31"
+   ],
+   "class": "date_phrase",
+   "means": "year:calendar",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "school year",
+   "variants": [
+    "academic year",
+    "school yr",
+    "semester",
+    "fall semester",
+    "spring semester",
+    "academic yr"
+   ],
+   "class": "date_phrase",
+   "means": "period:Aug-May",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "fiscal quarter",
+   "variants": [
+    "fiscal qtr",
+    "fy q1",
+    "fq1",
+    "fq2",
+    "fq3",
+    "fq4",
+    "fy qtr"
+   ],
+   "class": "date_phrase",
+   "means": "quarter:fiscal (needs FY start)",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.investopedia.com/terms/f/fiscalyear.asp"
+  },
+  {
+   "term": "pay period ending",
+   "variants": [
+    "ppe",
+    "period end date",
+    "week ending",
+    "w/e",
+    "week end",
+    "weekending",
+    "week of",
+    "wk of",
+    "w/o",
+    "for the week of",
+    "wk ending",
+    "week ending date"
+   ],
+   "class": "date_phrase",
+   "means": "week:ending/starting date; 'week of' = start, 'week ending' = end",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "rolling",
+   "variants": [
+    "trailing",
+    "rolling basis",
+    "running total",
+    "last n",
+    "over the trailing"
+   ],
+   "class": "date_phrase",
+   "means": "rolling window",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "by the end of the season",
+   "variants": [
+    "end of season",
+    "season end",
+    "close of season",
+    "season close",
+    "when the season ends",
+    "after the season"
+   ],
+   "class": "date_phrase",
+   "means": "season:end",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "opening day",
+   "variants": [
+    "opening",
+    "grand opening",
+    "open date",
+    "first day open",
+    "date we opened",
+    "founding date",
+    "start of business",
+    "business start date",
+    "date established",
+    "year founded",
+    "founded"
+   ],
+   "class": "date_phrase",
+   "means": "business_start_date (new concept)",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "one-time",
+   "variants": [
+    "one time",
+    "onetime",
+    "single payment",
+    "one-off",
+    "one off",
+    "lump sum",
+    "single visit",
+    "one visit",
+    "non-recurring",
+    "nonrecurring",
+    "not recurring"
+   ],
+   "class": "date_phrase",
+   "means": "cadence:once",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "recurring",
+   "variants": [
+    "repeating",
+    "subscription",
+    "auto-pay",
+    "autopay",
+    "auto pay",
+    "every cycle",
+    "evergreen",
+    "automatic renewal",
+    "auto-renewal",
+    "auto renewal"
+   ],
+   "class": "date_phrase",
+   "means": "cadence:recurring",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "trial period",
+   "variants": [
+    "free trial",
+    "intro offer",
+    "introductory period",
+    "30 day trial",
+    "free month",
+    "promo period",
+    "trial run"
+   ],
+   "class": "date_phrase",
+   "means": "period:trial",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "a month ago",
+   "variants": [
+    "30 days ago",
+    "about a month ago",
+    "1 month ago",
+    "one month ago",
+    "month ago",
+    "a mo ago",
+    "last month this day"
+   ],
+   "class": "date_phrase",
+   "means": "offset:-1mo",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "a week ago",
+   "variants": [
+    "7 days ago",
+    "one week ago",
+    "1 week ago",
+    "week ago",
+    "a wk ago",
+    "last week this day"
+   ],
+   "class": "date_phrase",
+   "means": "offset:-7d",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "2 years ago",
+   "variants": [
+    "two years ago",
+    "couple years ago",
+    "a couple of years ago",
+    "few years ago",
+    "2 yrs ago",
+    "two yrs ago",
+    "24 months ago",
+    "back in 2023"
+   ],
+   "class": "date_phrase",
+   "means": "offset:-2y (vague for 'couple')",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "last summer",
+   "variants": [
+    "this past summer",
+    "previous summer",
+    "summer last year",
+    "last summer season"
+   ],
+   "class": "date_phrase",
+   "means": "season:summer previous year",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "last winter",
+   "variants": [
+    "this past winter",
+    "previous winter",
+    "winter last year",
+    "last winter season"
+   ],
+   "class": "date_phrase",
+   "means": "season:winter previous",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "last spring",
+   "variants": [
+    "this past spring",
+    "previous spring",
+    "spring last year"
+   ],
+   "class": "date_phrase",
+   "means": "season:spring previous",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "last fall",
+   "variants": [
+    "this past fall",
+    "previous fall",
+    "last autumn",
+    "fall last year"
+   ],
+   "class": "date_phrase",
+   "means": "season:fall previous",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "this summer",
+   "variants": [
+    "current summer",
+    "summer so far",
+    "this summer season"
+   ],
+   "class": "date_phrase",
+   "means": "season:summer current",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "this winter",
+   "variants": [
+    "current winter",
+    "winter so far",
+    "this winter season"
+   ],
+   "class": "date_phrase",
+   "means": "season:winter current",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "business hours",
+   "variants": [
+    "office hours",
+    "hours of operation",
+    "open hours",
+    "normal hours",
+    "regular hours business",
+    "working hours",
+    "operating hours",
+    "store hours",
+    "shop hours",
+    "opening hours"
+   ],
+   "class": "date_phrase",
+   "means": "time_of_day:business window",
+   "industries": [
+    "all"
+   ],
+   "note": "normalized meaning in 'means'",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/tax-years"
+  },
+  {
+   "term": "owner",
+   "variants": [
+    "boss",
+    "the boss",
+    "business owner",
+    "company owner",
+    "proprietor",
+    "principal",
+    "founder",
+    "ceo",
+    "president",
+    "the old man",
+    "big boss",
+    "shop owner",
+    "owner operator",
+    "owner-operator",
+    "gm",
+    "general manager",
+    "managing member",
+    "partner"
+   ],
+   "class": "role",
+   "means": "owner",
+   "industries": [
+    "all"
+   ],
+   "note": "Runs/owns the company; approver. Note: also property owner (ambiguous)",
+   "source": "https://www.sba.gov/business-guide/launch-your-business/choose-business-structure"
+  },
+  {
+   "term": "office manager",
+   "variants": [
+    "office admin",
+    "office mgr",
+    "administrator",
+    "office staff",
+    "front office",
+    "front desk",
+    "receptionist",
+    "csr",
+    "customer service rep",
+    "customer service",
+    "back office",
+    "bookkeeper",
+    "office girl",
+    "office lady",
+    "admin assistant",
+    "administrative assistant",
+    "secretary",
+    "office person",
+    "office coordinator",
+    "billing clerk",
+    "billing person",
+    "accounts receivable",
+    "ar clerk"
+   ],
+   "class": "role",
+   "means": "office_staff",
+   "industries": [
+    "all"
+   ],
+   "note": "Back-office staff who invoice, schedule, answer phones",
+   "source": "https://www.servicetitan.com/glossary"
+  },
+  {
+   "term": "dispatcher",
+   "variants": [
+    "dispatch",
+    "dispatching",
+    "call taker",
+    "scheduling coordinator",
+    "service coordinator",
+    "service manager",
+    "operations manager",
+    "ops manager",
+    "dispatch desk",
+    "service desk"
+   ],
+   "class": "role",
+   "means": "dispatcher",
+   "industries": [
+    "all"
+   ],
+   "note": "Assigns jobs to techs",
+   "source": "https://www.servicetitan.com/blog/dispatcher"
+  },
+  {
+   "term": "technician",
+   "variants": [
+    "tech",
+    "techs",
+    "service tech",
+    "service technician",
+    "field tech",
+    "field technician",
+    "hvac tech",
+    "repair tech",
+    "mechanic",
+    "service guy",
+    "service man",
+    "repairman",
+    "repair guy",
+    "journeyman",
+    "journeyman tech",
+    "apprentice",
+    "helper",
+    "lead tech",
+    "senior tech",
+    "tradesman",
+    "service person",
+    "field service tech",
+    "service engineer",
+    "field engineer"
+   ],
+   "class": "role",
+   "means": "technician",
+   "industries": [
+    "all"
+   ],
+   "note": "Does the work; app already uses technician",
+   "source": "https://www.servicetitan.com/blog/hvac-technician"
+  },
+  {
+   "term": "installer",
+   "variants": [
+    "install tech",
+    "installation tech",
+    "install crew",
+    "installers",
+    "install guy",
+    "installation team",
+    "new construction crew",
+    "changeout crew",
+    "change-out crew",
+    "replacement crew",
+    "install team",
+    "installer team"
+   ],
+   "class": "role",
+   "means": "technician",
+   "industries": [
+    "all"
+   ],
+   "note": "Installs equipment; treat as technician w/ install job type",
+   "source": "https://www.servicetitan.com/glossary"
+  },
+  {
+   "term": "crew",
+   "variants": [
+    "crew lead",
+    "crew leader",
+    "foreman",
+    "crew chief",
+    "team lead",
+    "crew member",
+    "crew members",
+    "the crew",
+    "work crew",
+    "job crew",
+    "field crew",
+    "crews",
+    "gang",
+    "squad",
+    "the guys",
+    "our guys",
+    "our people",
+    "labor crew",
+    "laborers",
+    "laborer",
+    "crew 1",
+    "crew 2"
+   ],
+   "class": "role",
+   "means": "crew",
+   "industries": [
+    "all"
+   ],
+   "note": "Group of workers on a job; foreman = lead",
+   "source": "https://www.servicetitan.com/glossary"
+  },
+  {
+   "term": "subcontractor",
+   "variants": [
+    "sub",
+    "subs",
+    "subbed out",
+    "subbed",
+    "sub contractor",
+    "sub-contractor",
+    "subcontracted",
+    "1099 sub",
+    "outside contractor",
+    "independent contractor",
+    "contract labor",
+    "contractor",
+    "trade partner",
+    "outsourced",
+    "farmed out",
+    "third party contractor",
+    "3rd party",
+    "freelancer",
+    "contract tech"
+   ],
+   "class": "role",
+   "means": "subcontractor",
+   "industries": [
+    "all"
+   ],
+   "note": "Paid by us; not an employee; 1099",
+   "source": "https://www.irs.gov/businesses/small-businesses-self-employed/independent-contractor-self-employed-or-employee"
+  },
+  {
+   "term": "general contractor",
+   "variants": [
+    "gc",
+    "prime contractor",
+    "builder",
+    "the builder",
+    "construction manager",
+    "contractor of record",
+    "gc company"
+   ],
+   "class": "role",
+   "means": "general_contractor",
+   "industries": [
+    "all"
+   ],
+   "note": "Hires subs; often the customer of an HVAC/plumbing sub",
+   "source": "https://www.procore.com/library/general-contractor"
+  },
+  {
+   "term": "vendor",
+   "variants": [
+    "supplier",
+    "suppliers",
+    "vendors",
+    "distributor",
+    "wholesaler",
+    "supply house",
+    "supply store",
+    "parts house",
+    "parts store",
+    "manufacturer rep",
+    "mfr rep",
+    "sales rep",
+    "wholesale",
+    "payee",
+    "remit to",
+    "who we buy from",
+    "who we pay",
+    "merchant",
+    "provider",
+    "parts supplier",
+    "material supplier",
+    "lumber yard",
+    "home depot",
+    "ferguson",
+    "johnstone",
+    "carrier enterprise",
+    "watsco",
+    "grainger"
+   ],
+   "class": "role",
+   "means": "vendor",
+   "industries": [
+    "all"
+   ],
+   "note": "Someone we pay for goods/services; app role vendor",
+   "source": "https://quickbooks.intuit.com/r/bookkeeping/what-is-a-vendor/"
+  },
+  {
+   "term": "customer",
+   "variants": [
+    "client",
+    "clients",
+    "customers",
+    "homeowner",
+    "home owner",
+    "resident",
+    "end user",
+    "end-user",
+    "consumer",
+    "patron",
+    "buyer",
+    "purchaser",
+    "bill to",
+    "ship to",
+    "sold to",
+    "site contact",
+    "job site contact",
+    "on-site contact",
+    "the customer",
+    "caller",
+    "who called",
+    "customer name"
+   ],
+   "class": "role",
+   "means": "customer",
+   "industries": [
+    "all"
+   ],
+   "note": "App role customer; homeowner = residential customer",
+   "source": "https://quickbooks.intuit.com/learn-support/en-us/help-article/customer-management/"
+  },
+  {
+   "term": "homeowner",
+   "variants": [
+    "home owner",
+    "owner occupant",
+    "owner-occupant",
+    "residential customer",
+    "residential client",
+    "property owner residential",
+    "house owner",
+    "the homeowner",
+    "homeowner name"
+   ],
+   "class": "role",
+   "means": "customer",
+   "industries": [
+    "all"
+   ],
+   "note": "Residential customer; sometimes also the property owner",
+   "source": "https://www.housecallpro.com/resources/"
+  },
+  {
+   "term": "commercial customer",
+   "variants": [
+    "commercial account",
+    "business customer",
+    "b2b customer",
+    "commercial client",
+    "corporate account",
+    "national account",
+    "facility manager",
+    "facilities manager",
+    "facilities",
+    "building engineer",
+    "chief engineer",
+    "maintenance director",
+    "maintenance manager",
+    "maintenance supervisor",
+    "plant manager",
+    "store manager",
+    "site manager"
+   ],
+   "class": "role",
+   "means": "customer",
+   "industries": [
+    "all"
+   ],
+   "note": "Business customer; contact person is a facility/maintenance manager",
+   "source": "https://www.servicetitan.com/glossary"
+  },
+  {
+   "term": "property manager",
+   "variants": [
+    "property mgr",
+    "property management",
+    "property management company",
+    "building manager",
+    "community manager",
+    "site manager apartments",
+    "apartment manager",
+    "manager on site",
+    "leasing agent",
+    "leasing office",
+    "management company",
+    "mgmt company",
+    "hoa manager",
+    "hoa",
+    "hoa board",
+    "condo association",
+    "onsite manager",
+    "resident manager",
+    "portfolio manager",
+    "asset manager"
+   ],
+   "class": "role",
+   "means": "property_manager",
+   "industries": [
+    "property",
+    "all"
+   ],
+   "note": "Manages property for owner; often the one ordering and paying; new role",
+   "source": "https://www.appfolio.com/blog/property-management-terms"
+  },
+  {
+   "term": "landlord",
+   "variants": [
+    "lessor",
+    "owner of building",
+    "building owner",
+    "property owner",
+    "rental owner",
+    "landlady",
+    "lessor name",
+    "rental property owner",
+    "investor owner",
+    "owner (landlord)",
+    "absentee owner",
+    "slumlord",
+    "the landlord"
+   ],
+   "class": "role",
+   "means": "landlord",
+   "industries": [
+    "property",
+    "all"
+   ],
+   "note": "Property owner who leases to tenants; bill-to is often landlord, site contact is tenant",
+   "source": "https://www.nolo.com/legal-encyclopedia/landlord-tenant-law"
+  },
+  {
+   "term": "tenant",
+   "variants": [
+    "renter",
+    "lessee",
+    "resident",
+    "occupant",
+    "tenants",
+    "renters",
+    "leaseholder",
+    "lease holder",
+    "occupier",
+    "roommate",
+    "co-tenant",
+    "cotenant",
+    "tenant name",
+    "resident name",
+    "unit resident",
+    "tenant on site",
+    "person living there"
+   ],
+   "class": "role",
+   "means": "tenant",
+   "industries": [
+    "property",
+    "all"
+   ],
+   "note": "Occupies the unit; usually not the payer for repairs",
+   "source": "https://www.nolo.com/legal-encyclopedia/landlord-tenant-law"
+  },
+  {
+   "term": "donor",
+   "variants": [
+    "contributor",
+    "giver",
+    "supporter",
+    "benefactor",
+    "patron donor",
+    "gift giver",
+    "sponsor",
+    "major donor",
+    "monthly donor",
+    "recurring donor",
+    "member donor",
+    "pledger",
+    "funder",
+    "philanthropist",
+    "donor name",
+    "friend of the org",
+    "angel"
+   ],
+   "class": "role",
+   "means": "customer",
+   "industries": [
+    "all"
+   ],
+   "note": "Nonprofit payer; maps to customer role (DeepWell customer_name already covers donor)",
+   "source": "https://bloomerang.com/blog/nonprofit-terminology/"
+  },
+  {
+   "term": "patient",
+   "variants": [
+    "patients",
+    "client patient",
+    "guarantor",
+    "responsible party",
+    "patient name",
+    "insured patient",
+    "subscriber",
+    "policyholder patient",
+    "self-pay",
+    "self pay",
+    "copay",
+    "insurance payer",
+    "payer",
+    "third-party payer",
+    "guarantor of account",
+    "financially responsible party"
+   ],
+   "class": "role",
+   "means": "customer",
+   "industries": [
+    "all"
+   ],
+   "note": "In healthcare the patient or guarantor is the payer-customer; insurance payer is separate",
+   "source": "https://www.healthcare.gov/glossary/"
+  },
+  {
+   "term": "payer",
+   "variants": [
+    "paid by",
+    "paying party",
+    "who pays",
+    "bill payer",
+    "responsible party",
+    "party responsible for payment",
+    "bill to party",
+    "account holder",
+    "remitter",
+    "payor",
+    "payer name",
+    "the one paying",
+    "payment responsibility",
+    "who's paying",
+    "who is paying"
+   ],
+   "class": "role",
+   "means": "customer",
+   "industries": [
+    "all"
+   ],
+   "note": "The party who pays; may differ from the person at the site",
+   "source": "https://www.servicetitan.com/glossary"
+  },
+  {
+   "term": "student",
+   "variants": [
+    "pupil",
+    "learner",
+    "enrollee",
+    "trainee",
+    "member student",
+    "parent guardian",
+    "guardian",
+    "parent/guardian"
+   ],
+   "class": "role",
+   "means": "customer",
+   "industries": [
+    "all"
+   ],
+   "note": "Education customer; parent/guardian is usually the payer",
+   "source": "https://www.servicetitan.com/glossary"
+  },
+  {
+   "term": "member",
+   "variants": [
+    "membership holder",
+    "plan holder",
+    "plan member",
+    "club member",
+    "maintenance member",
+    "member name",
+    "subscriber member",
+    "agreement holder",
+    "service plan customer",
+    "comfort club member",
+    "preferred customer",
+    "vip",
+    "priority customer",
+    "loyalty member"
+   ],
+   "class": "role",
+   "means": "customer",
+   "industries": [
+    "all"
+   ],
+   "note": "Customer with a maintenance agreement/membership",
+   "source": "https://www.servicetitan.com/glossary"
+  },
+  {
+   "term": "employee",
+   "variants": [
+    "staff",
+    "worker",
+    "team member",
+    "hourly worker",
+    "w2 worker",
+    "crew employee",
+    "associate",
+    "staff member",
+    "personnel",
+    "workforce",
+    "headcount",
+    "our employees",
+    "new hire person"
+   ],
+   "class": "role",
+   "means": "employee",
+   "industries": [
+    "all"
+   ],
+   "note": "On payroll; superset of technician/office staff; new role",
+   "source": "https://www.servicetitan.com/glossary"
+  },
+  {
+   "term": "supervisor",
+   "variants": [
+    "super",
+    "superintendent",
+    "site super",
+    "field supervisor",
+    "team lead",
+    "shift lead",
+    "shift supervisor",
+    "line lead",
+    "area manager",
+    "regional manager",
+    "district manager",
+    "branch manager",
+    "service lead",
+    "working foreman"
+   ],
+   "class": "role",
+   "means": "supervisor",
+   "industries": [
+    "all"
+   ],
+   "note": "Directs employees; reports-to",
+   "source": "https://www.servicetitan.com/glossary"
+  },
+  {
+   "term": "estimator",
+   "variants": [
+    "sales estimator",
+    "comfort advisor",
+    "comfort consultant",
+    "sales tech",
+    "sales rep estimate",
+    "salesman",
+    "salesperson",
+    "sales person",
+    "sales guy",
+    "project estimator",
+    "bidder",
+    "comfort specialist",
+    "sales advisor",
+    "design consultant",
+    "project manager",
+    "pm project",
+    "project coordinator",
+    "account exec",
+    "account manager"
+   ],
+   "class": "role",
+   "means": "sales_rep",
+   "industries": [
+    "all"
+   ],
+   "note": "Quotes/sells the job; new role distinct from technician",
+   "source": "https://www.servicetitan.com/glossary"
+  },
+  {
+   "term": "inspector",
+   "variants": [
+    "building inspector",
+    "city inspector",
+    "code inspector",
+    "county inspector",
+    "permit inspector",
+    "fire marshal",
+    "ahj",
+    "authority having jurisdiction",
+    "inspection official",
+    "third party inspector",
+    "home inspector",
+    "insp",
+    "inspector name",
+    "city official",
+    "plan reviewer",
+    "code enforcement"
+   ],
+   "class": "role",
+   "means": "inspector",
+   "industries": [
+    "all"
+   ],
+   "note": "Government or third-party reviewer; sign-off on permits",
+   "source": "https://www.servicetitan.com/glossary"
+  },
+  {
+   "term": "manufacturer",
+   "variants": [
+    "mfr",
+    "mfg",
+    "oem",
+    "brand",
+    "maker",
+    "factory",
+    "manufacturer rep",
+    "factory rep",
+    "manufacturer's rep",
+    "manufacturer warranty",
+    "equipment maker",
+    "who makes it",
+    "carrier lennox trane"
+   ],
+   "class": "role",
+   "means": "manufacturer",
+   "industries": [
+    "all"
+   ],
+   "note": "Equipment maker; field manufacturer exists",
+   "source": "https://www.servicetitan.com/glossary"
+  },
+  {
+   "term": "insured",
+   "variants": [
+    "named insured",
+    "policyholder",
+    "covered party",
+    "insured party",
+    "the insured"
+   ],
+   "class": "role",
+   "means": "insured",
+   "industries": [
+    "all"
+   ],
+   "note": "Party covered by the policy",
+   "source": "https://www.acord.org/standards-architecture/acord-forms"
+  },
+  {
+   "term": "additional insured",
+   "variants": [
+    "also insured",
+    "additionally insured"
+   ],
+   "class": "role",
+   "means": "additional_insured",
+   "industries": [
+    "all"
+   ],
+   "note": "Third party given coverage via endorsement; often the GC, landlord or property owner",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "certificate holder",
+   "variants": [
+    "cert holder",
+    "requesting party",
+    "coi requester"
+   ],
+   "class": "role",
+   "means": "certificate_holder",
+   "industries": [
+    "all"
+   ],
+   "note": "Party who receives the COI; not necessarily covered",
+   "source": "https://www.acord.org/standards-architecture/acord-forms"
+  },
+  {
+   "term": "insurer",
+   "variants": [
+    "carrier",
+    "insurance company",
+    "underwriter"
+   ],
+   "class": "role",
+   "means": "insurer",
+   "industries": [
+    "all"
+   ],
+   "note": "Company bearing the risk",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "insurance agent",
+   "variants": [
+    "producer"
+   ],
+   "class": "role",
+   "means": "insurance_agent",
+   "industries": [
+    "all"
+   ],
+   "note": "Sells for one or more carriers",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "insurance broker",
+   "variants": [
+    "broker",
+    "brokerage"
+   ],
+   "class": "role",
+   "means": "insurance_broker",
+   "industries": [
+    "all"
+   ],
+   "note": "Represents the insured; shops carriers",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "adjuster",
+   "variants": [
+    "claims adjuster",
+    "claim rep",
+    "ia",
+    "loss adjuster"
+   ],
+   "class": "role",
+   "means": "adjuster",
+   "industries": [
+    "all"
+   ],
+   "note": "Evaluates claims",
+   "source": "https://www.iii.org/publications/a-firm-foundation-how-insurance-supports-the-economy/glossary"
+  },
+  {
+   "term": "accountant",
+   "variants": [
+    "cpa",
+    "bookkeeper",
+    "tax preparer",
+    "tax guy",
+    "tax person",
+    "accounting firm",
+    "our cpa",
+    "the cpa",
+    "bookkeeping service",
+    "payroll provider",
+    "payroll company",
+    "adp",
+    "gusto",
+    "paychex",
+    "quickbooks payroll"
+   ],
+   "class": "role",
+   "means": "accountant",
+   "industries": [
+    "all"
+   ],
+   "note": "Outside books/tax/payroll provider; new role",
+   "source": "https://www.servicetitan.com/glossary"
+  },
+  {
+   "term": "attorney",
+   "variants": [
+    "lawyer",
+    "legal counsel",
+    "law firm",
+    "counsel",
+    "attorney name",
+    "our lawyer",
+    "the lawyer",
+    "legal rep",
+    "paralegal",
+    "registered agent"
+   ],
+   "class": "role",
+   "means": "attorney",
+   "industries": [
+    "all"
+   ],
+   "note": "Law firm; vendor-label in app",
+   "source": "https://www.servicetitan.com/glossary"
+  },
+  {
+   "term": "lender",
+   "variants": [
+    "creditor",
+    "financing company",
+    "finance company",
+    "loan officer",
+    "mortgagee",
+    "lienholder",
+    "financing partner",
+    "wisetack",
+    "greensky",
+    "synchrony",
+    "bank rep",
+    "line of credit",
+    "sba lender",
+    "lender name"
+   ],
+   "class": "role",
+   "means": "lender",
+   "industries": [
+    "all"
+   ],
+   "note": "Provides financing; customer financing partners in HVAC",
+   "source": "https://www.servicetitan.com/glossary"
+  },
+  {
+   "term": "utility",
+   "variants": [
+    "utility company",
+    "power company",
+    "electric company",
+    "gas company",
+    "water company",
+    "aps",
+    "srp",
+    "southwest gas",
+    "utility rebate",
+    "utility provider",
+    "energy provider",
+    "utility inspector",
+    "salt river project",
+    "utility rep"
+   ],
+   "class": "role",
+   "means": "utility",
+   "industries": [
+    "all"
+   ],
+   "note": "Rebates, meters, inspections",
+   "source": "https://www.servicetitan.com/glossary"
+  },
+  {
+   "term": "referral source",
+   "variants": [
+    "referred by",
+    "referral",
+    "referrer",
+    "lead source",
+    "how did you hear",
+    "word of mouth",
+    "angi",
+    "angie's list",
+    "homeadvisor",
+    "thumbtack",
+    "nextdoor",
+    "networx",
+    "lead vendor",
+    "lead provider",
+    "marketing source",
+    "source of lead"
+   ],
+   "class": "role",
+   "means": "lead_source",
+   "industries": [
+    "all"
+   ],
+   "note": "Where the customer came from; new field",
+   "source": "https://www.servicetitan.com/glossary"
+  },
+  {
+   "term": "emergency contact",
+   "variants": [
+    "secondary contact",
+    "alt contact",
+    "alternate contact",
+    "backup contact",
+    "after hours contact",
+    "24 hour contact",
+    "emergency number",
+    "emergency phone",
+    "on call contact"
+   ],
+   "class": "role",
+   "means": "emergency_contact",
+   "industries": [
+    "all"
+   ],
+   "note": "Alternate person to call",
+   "source": "https://www.servicetitan.com/glossary"
+  },
+  {
+   "term": "authorized signer",
+   "variants": [
+    "signatory",
+    "signer",
+    "authorized agent",
+    "authorized rep",
+    "authorized representative",
+    "decision maker",
+    "approver",
+    "purchasing agent",
+    "buyer (company)",
+    "purchasing manager",
+    "ap contact",
+    "accounts payable",
+    "ap department",
+    "bill payer contact",
+    "who approves",
+    "who signs"
+   ],
+   "class": "role",
+   "means": "authorized_signer",
+   "industries": [
+    "all"
+   ],
+   "note": "Person who can sign/approve; AP contact for payment",
+   "source": "https://www.servicetitan.com/glossary"
+  },
+  {
+   "term": "bill-to contact",
+   "variants": [
+    "billing contact",
+    "billing address contact",
+    "accounts payable contact",
+    "invoice recipient",
+    "send invoice to",
+    "invoice contact",
+    "send bill to",
+    "billing email",
+    "ap email",
+    "remit contact",
+    "billing dept",
+    "billing department"
+   ],
+   "class": "role",
+   "means": "billing_contact",
+   "industries": [
+    "all"
+   ],
+   "note": "Where invoices go; often differs from site contact",
+   "source": "https://www.servicetitan.com/glossary"
+  },
+  {
+   "term": "site contact",
+   "variants": [
+    "onsite contact",
+    "on-site contact",
+    "job contact",
+    "contact on site",
+    "point of contact",
+    "poc",
+    "day-of contact",
+    "access contact",
+    "who meets tech",
+    "who lets us in",
+    "key holder",
+    "keyholder",
+    "gate code contact",
+    "contact person",
+    "contact name"
+   ],
+   "class": "role",
+   "means": "site_contact",
+   "industries": [
+    "all"
+   ],
+   "note": "Person on-site; may be tenant while customer is landlord",
+   "source": "https://www.servicetitan.com/glossary"
+  }
+ ],
+ "ambiguous": [
+  {
+   "term": "owner",
+   "could_mean": [
+    "owner (company owner/boss)",
+    "property_owner (landlord)",
+    "homeowner (customer)",
+    "equipment owner"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "tech",
+   "could_mean": [
+    "technician",
+    "technology/IT"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "pm",
+   "could_mean": [
+    "preventive maintenance",
+    "property manager",
+    "project manager",
+    "post meridiem",
+    "payroll manager"
+   ],
+   "industries": [
+    "hvac",
+    "property",
+    "construction"
+   ]
+  },
+  {
+   "term": "ai",
+   "could_mean": [
+    "additional insured",
+    "artificial intelligence"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "holder",
+   "could_mean": [
+    "certificate holder",
+    "policyholder",
+    "lienholder",
+    "key holder"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "policy",
+   "could_mean": [
+    "insurance policy",
+    "company policy (handbook)",
+    "warranty policy"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "term",
+   "could_mean": [
+    "lease/agreement term",
+    "payment terms",
+    "school term",
+    "termination (abbr)"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "agent",
+   "could_mean": [
+    "insurance agent",
+    "real estate agent",
+    "leasing agent",
+    "registered agent",
+    "customer service agent"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "cert",
+   "could_mean": [
+    "certificate of insurance",
+    "certification (tech license)",
+    "SSL cert"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "contract",
+   "could_mean": [
+    "maintenance agreement (app word class today)",
+    "lease",
+    "subcontract",
+    "employment contract"
+   ],
+   "industries": [
+    "all"
+   ],
+   "_note": "app lexicon currently rewrites every 'contract' to maintenance agreement"
+  },
+  {
+   "term": "sub",
+   "could_mean": [
+    "subcontractor",
+    "substitute",
+    "subscription",
+    "subtotal"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "fy",
+   "could_mean": [
+    "fiscal year",
+    "FY abbreviation of a specific year like FY26"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "last year",
+   "could_mean": [
+    "previous calendar year",
+    "past 12 months"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "last quarter",
+   "could_mean": [
+    "previous calendar quarter",
+    "previous fiscal quarter",
+    "past 3 months"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "this season",
+   "could_mean": [
+    "current calendar season",
+    "current business peak season",
+    "current sports/school season"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "week of",
+   "could_mean": [
+    "week starting on date",
+    "week containing date"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "biweekly",
+   "could_mean": [
+    "every two weeks",
+    "twice a week"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "semi-monthly",
+   "could_mean": [
+    "twice a month (24x)",
+    "every two weeks (26x) when confused with biweekly"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "bimonthly",
+   "could_mean": [
+    "every two months",
+    "twice a month"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "member",
+   "could_mean": [
+    "maintenance-plan customer",
+    "LLC member (owner)",
+    "employee/team member",
+    "nonprofit member"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "client",
+   "could_mean": [
+    "customer",
+    "law/accounting client",
+    "software client"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "resident",
+   "could_mean": [
+    "tenant",
+    "medical resident",
+    "state resident"
+   ],
+   "industries": [
+    "property",
+    "healthcare"
+   ]
+  },
+  {
+   "term": "occupant",
+   "could_mean": [
+    "tenant",
+    "owner-occupant homeowner"
+   ],
+   "industries": [
+    "property"
+   ]
+  },
+  {
+   "term": "rep",
+   "could_mean": [
+    "manufacturer rep",
+    "sales rep",
+    "customer service rep",
+    "insurance rep"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "provider",
+   "could_mean": [
+    "vendor/supplier",
+    "healthcare provider",
+    "insurance carrier",
+    "service provider"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "payer",
+   "could_mean": [
+    "customer who pays",
+    "insurance payer (healthcare)",
+    "third party payer"
+   ],
+   "industries": [
+    "healthcare",
+    "all"
+   ]
+  },
+  {
+   "term": "lead",
+   "could_mean": [
+    "sales lead",
+    "lead technician",
+    "lead (metal)",
+    "crew lead"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "effective date",
+   "could_mean": [
+    "policy effective date",
+    "lease start",
+    "agreement date",
+    "hire date"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "expiration",
+   "could_mean": [
+    "policy expiry",
+    "warranty expiry",
+    "license expiry",
+    "quote expiry",
+    "coi expiry"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "break",
+   "could_mean": [
+    "unpaid meal break",
+    "equipment failure (break-fix)"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "comp",
+   "could_mean": [
+    "compensation",
+    "workers comp",
+    "comp time",
+    "complimentary",
+    "comparable (real estate)"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "limit",
+   "could_mean": [
+    "insurance coverage limit",
+    "credit limit",
+    "limit switch (part)"
+   ],
+   "industries": [
+    "hvac",
+    "all"
+   ]
+  },
+  {
+   "term": "ded",
+   "could_mean": [
+    "deductible",
+    "deduction"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "retention",
+   "could_mean": [
+    "insurance self-insured retention",
+    "customer retention",
+    "retainage (construction)",
+    "document retention"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "the 1st",
+   "could_mean": [
+    "first of this month",
+    "first of next month if past"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "est",
+   "could_mean": [
+    "estimate (quote)",
+    "established",
+    "eastern time",
+    "estimated"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "cob",
+   "could_mean": [
+    "close of business",
+    "coordination of benefits"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "cod",
+   "could_mean": [
+    "cash on delivery",
+    "collect on delivery"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "dd",
+   "could_mean": [
+    "direct deposit",
+    "due date",
+    "double dip"
+   ],
+   "industries": [
+    "all"
+   ]
+  },
+  {
+   "term": "ot",
+   "could_mean": [
+    "overtime",
+    "operational technology"
+   ],
+   "industries": [
+    "all"
+   ]
+  }
+ ],
+ "new_concepts": [
+  {
+   "id": "employee",
+   "why": "Payroll/HR questions (hours, PTO, pay rate, hire date) need a person-on-payroll concept distinct from technician; app only has technician."
+  },
+  {
+   "id": "owner",
+   "why": "People ask 'ask the owner' / 'who owns'; role needed, and it must be separate from property_owner/landlord."
+  },
+  {
+   "id": "office_staff",
+   "why": "Office manager/admin/CSR/bookkeeper who is not a field tech; routing 'who invoiced / who scheduled' questions."
+  },
+  {
+   "id": "dispatcher",
+   "why": "'Who dispatched this' / 'dispatcher notes' ; dispatch-note doc type has no dispatcher field."
+  },
+  {
+   "id": "crew",
+   "why": "Jobs done by a named crew or foreman rather than one tech; technician field alone can't hold 'Crew 2'."
+  },
+  {
+   "id": "subcontractor",
+   "why": "Sub/1099 vs W-2 distinction, needed for COI/W-9 compliance questions."
+  },
+  {
+   "id": "general_contractor",
+   "why": "Prime contractor who is customer for subs; also additional insured on COIs."
+  },
+  {
+   "id": "landlord",
+   "why": "Bill-to/payer often landlord while site contact is tenant; app only has tenant_name."
+  },
+  {
+   "id": "property_manager",
+   "why": "Orders and pays on behalf of owner; frequent contact on property work."
+  },
+  {
+   "id": "site_contact",
+   "why": "Person who meets the tech, distinct from billing customer."
+  },
+  {
+   "id": "billing_contact",
+   "why": "Where invoices are sent / AP contact, distinct from customer and site contact."
+  },
+  {
+   "id": "sales_rep",
+   "why": "Estimator/comfort advisor who wrote the quote; commissions and quote follow-up questions."
+  },
+  {
+   "id": "inspector",
+   "why": "Permit/inspection sign-off party (AHJ)."
+  },
+  {
+   "id": "insured",
+   "why": "COI named insured; app maps to vendor today but 'who is insured' differs from 'who issued'."
+  },
+  {
+   "id": "additional_insured",
+   "why": "COI question 'are we listed as additional insured' has no field."
+  },
+  {
+   "id": "certificate_holder",
+   "why": "Who the COI was issued to."
+  },
+  {
+   "id": "insurer",
+   "why": "Carrier name and NAIC number distinct from insurance agent."
+  },
+  {
+   "id": "insurance_agent",
+   "why": "Agent/broker contact for COI requests and renewals."
+  },
+  {
+   "id": "insurance_broker",
+   "why": "Broker vs agent distinction for renewals."
+  },
+  {
+   "id": "policy_number",
+   "why": "COI/dec page key; no field in packs besides coi_expires."
+  },
+  {
+   "id": "coverage_type",
+   "why": "GL/WC/auto/umbrella lines on one COI; questions like 'do they have workers comp'."
+  },
+  {
+   "id": "coverage_limit",
+   "why": "Each occurrence / aggregate limits; 'do they carry $1M'."
+  },
+  {
+   "id": "deductible",
+   "why": "Policy or claim deductible."
+  },
+  {
+   "id": "premium",
+   "why": "Premium amount and installments."
+  },
+  {
+   "id": "waiver_of_subrogation",
+   "why": "Yes/no endorsement flag commonly requested by GCs."
+  },
+  {
+   "id": "primary_noncontributory",
+   "why": "Yes/no endorsement flag commonly requested by GCs."
+  },
+  {
+   "id": "claim_number",
+   "why": "Insurance/warranty claim reference."
+  },
+  {
+   "id": "loss_date",
+   "why": "Date of loss for claims."
+  },
+  {
+   "id": "adjuster",
+   "why": "Claims contact."
+  },
+  {
+   "id": "loss_payee",
+   "why": "Lienholder/mortgagee on policy."
+  },
+  {
+   "id": "employment_start_date",
+   "why": "Hire date for HR questions."
+  },
+  {
+   "id": "employment_end_date",
+   "why": "Termination/last day."
+  },
+  {
+   "id": "pay_rate",
+   "why": "Hourly/salary rate."
+  },
+  {
+   "id": "overtime_hours",
+   "why": "OT hours on timesheets/payroll."
+  },
+  {
+   "id": "pay_period",
+   "why": "Pay period start/end on timesheets and stubs."
+  },
+  {
+   "id": "pto_balance",
+   "why": "Accrued/used leave."
+  },
+  {
+   "id": "job_title",
+   "why": "Position label."
+  },
+  {
+   "id": "employment_type",
+   "why": "FT/PT/seasonal/exempt/1099 classification."
+  },
+  {
+   "id": "wc_class_code",
+   "why": "Workers comp class codes on audits and COIs."
+  },
+  {
+   "id": "employee_id",
+   "why": "Employee number on stubs."
+  },
+  {
+   "id": "lead_source",
+   "why": "Referral/lead origin, marketing questions."
+  },
+  {
+   "id": "business_start_date",
+   "why": "'Since we opened' needs a company opening date in the tenant profile."
+  },
+  {
+   "id": "fiscal_year_start",
+   "why": "Fiscal year/quarter phrases need tenant FY start month; default calendar."
+  },
+  {
+   "id": "season_calendar",
+   "why": "'Spring tune-up season', 'peak season' need tenant/industry season date ranges."
+  },
+  {
+   "id": "payment_terms",
+   "why": "Net 30 / due on receipt as a field and as a normalized day count."
+  },
+  {
+   "id": "cadence",
+   "why": "Monthly/quarterly/semi-annual/annual visit or billing frequency."
+  },
+  {
+   "id": "aging_bucket",
+   "why": "'30/60/90 days past due' buckets for receivables."
+  },
+  {
+   "id": "lender",
+   "why": "Financing partners and lienholders."
+  },
+  {
+   "id": "accountant",
+   "why": "Outside CPA/bookkeeper/payroll provider."
+  },
+  {
+   "id": "utility",
+   "why": "Utility company for rebates/inspections."
+  },
+  {
+   "id": "business_days",
+   "why": "Calendar math that skips weekends/holidays for 'within 5 business days'."
+  }
+ ]
+}

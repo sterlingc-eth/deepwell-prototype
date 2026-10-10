@@ -41,6 +41,7 @@ import { classifyDeterministic } from "../deterministicRouter.js";
 import { classifyDecompose } from "../decompose/index.js";
 import { classifyFastPath, isFastPathEnabled } from "../fastPath.js";
 import { parseContactLookupQuestion } from "../contactLookup.js";
+import { parseSummaryQuestion, canonicalSummaryQuestion } from "../summary/parse.js";
 import { parseDocLookupQuestion } from "../docLookup.js";
 import { parseContentCountQuestion } from "../contentCount.js";
 import { preClassifyAnalytics, looksLikeSingleRecordReference, isMoneyQuestion } from "../analytics.js";
@@ -49,13 +50,14 @@ import { parseMoneyIntent } from "../financials/answers.js";
 import { extraDocTypeAlternation, stemWord } from "../lookups/lexicon.js";
 import { detectAnalyticsPlan } from "../analytics/detPlan.js";
 import { ENTITY_SYNONYMS } from "../analytics.js";
-import { leftoverWords, leftoverEnabled, domainWordsFromVocab } from "./leftover.js";
+import { leftoverWords, leftoverEnabled, domainWordsFromVocab, NEGATION_WORDS, unusedGrammar, grammarSpans, yearPairRewrite } from "./leftover.js";
 import { normalizeQuestion as normalizeQuestionFull } from "../nlNormalize.js";
 import { isUnitRankingQuestion, isReasoningQuestion } from "../agent/intents.js";
 import { isInstallDateExtremeQuestion } from "../analytics/detPlan.js";
 import { normalizeQuestion as normalizeQuestionForAnalytics } from "../nlNormalize.js";
 import { stripConversationalFrame } from "./frame.js";
 import { rewriteQuestion, rewriteRelWindow } from "./rewrite.js";
+import { respellJargon, jargonEnabled } from "../lexicon/jargon.js";
 import { detectAmbiguousSurname, clarifyEnabled } from "../lookups/clarify.js";
 import { isFutureRecordQuestion } from "./futureDate.js";
 import { performance } from "node:perf_hooks";
@@ -74,6 +76,7 @@ const FUTURE_OVERRIDES = new Set(["fastPath", "docLookup", "contentCount", "mone
 
 export const TRIAL_ORDER = [
   "meta",
+  "summary",
   "relations",
   "deterministic",
   "decompose",
@@ -104,6 +107,16 @@ export const PRECEDENCE_TABLE = [
       "recorded conflicts (r16_d1_pipeline.json: claimCount === winCount === 8) — nothing else needs " +
       "to run once it fires, and nothing here re-derives it (ask.js still owns classifyMetaQuestion).",
     gate: () => true,
+  },
+  {
+    name: "summary",
+    trialOrder: 0.3,
+    reason:
+      "R2 B2: a summary of ONE subject (\"rundown on X\", \"what do we have on file for X\", \"tell me about our purchase orders\") - a summary verb plus a subject " +
+      "that is fully explained (summary/parse.js). It is tried before every lookup because those read a document-type noun as a customer name and answer " +
+      "the last job or a stub count. It runs through the contactLookup dispatch in ask.js (the intent is handed over as contactLookup with field 'summary'; " +
+      "contactLookup.js runs summary/index.js first), so no other stage is consulted once it claims. Gated on meta alone.",
+    gate: (raw) => !raw.meta,
   },
   {
     name: "relations",
@@ -281,6 +294,7 @@ async function classifyAllOnce(question, ctx = {}) {
     return result;
   };
   const raw = {
+    summary: timed("summary", () => parseSummaryQuestion(question, { today: ctx?.today })),
     relations: timed("relations", () => classifyRelationsQuestion(question)),
     deterministic: timed("deterministic", () => classifyDeterministic(question, { overlay, tenantVocab })),
     decompose: timed("decompose", () => classifyDecompose(question, { pack })),
@@ -304,7 +318,7 @@ async function classifyAllOnce(question, ctx = {}) {
   let analyticsEnabled = false;
   let agentEnabled = false;
   const analyticsOtherGatesHold =
-    !raw.meta && !raw.contactLookup && !raw.docLookup && !raw.contentCount && !raw.money && (!fastPathEnabled || !raw.fastPath);
+    !raw.meta && !raw.summary && !raw.contactLookup && !raw.docLookup && !raw.contentCount && !raw.money && (!fastPathEnabled || !raw.fastPath);
   if (analyticsOtherGatesHold) {
     const analyticsRouteModule = await loadAnalyticsRouteModule();
     analyticsEnabled = analyticsRouteModule.isAnalyticsEnabled(env);
@@ -334,6 +348,13 @@ async function classifyAllOnce(question, ctx = {}) {
     if (stage.name === "meta") continue;
     const eligible = stage.gate(raw, flags) && Boolean(raw[stage.name]);
     gated[stage.name] = BOOLEAN_STAGES.has(stage.name) ? eligible : (eligible ? raw[stage.name] : null);
+  }
+
+  // R2 B2: a claimed summary owns the question outright. ask.js has no summary branch of its own, so the intent travels as the contactLookup
+  // claim (contactLookup.js's runContactLookup runs the summary lane first); every other stage is switched off.
+  if (gated.summary) {
+    for (const stage of PRECEDENCE_TABLE) if (stage.name !== "meta" && stage.name !== "summary") gated[stage.name] = BOOLEAN_STAGES.has(stage.name) ? false : null;
+    gated.contactLookup = { field: "summary", summary: gated.summary };
   }
 
   // ---- winner: first TRIAL_ORDER stage with a truthy gated value -------------------------------------
@@ -379,7 +400,7 @@ async function classifyAllOnce(question, ctx = {}) {
  */
 async function leftoverDecline(out, question, ctx) {
   try {
-    if (process.env.DONOVAN_F4_GUARD === "0" || out?.winner?.name !== "analytics" || out.winner.futureDate || !leftoverEnabled()) return null;
+    if (process.env.DONOVAN_F4_GUARD === "0" || !(out?.winner?.name === "analytics" || (out?.winner?.name === "deterministic" && out?.raw?.deterministic?.route === "compose")) || out.winner.futureDate || !leftoverEnabled()) return null;
     const text = out.effectiveQuestion ?? question;
     const { overlay, pack, tenantVocab } = ctx ?? {};
     const today = ctx?.today ?? new Date().toISOString().slice(0, 10);
@@ -388,7 +409,29 @@ async function leftoverDecline(out, question, ctx) {
     const mod = await (ctx.loadAnalyticsRouteModule ?? defaultLoadAnalyticsRouteModule)();
     const planOf = (q) => { const raw = detectAnalyticsPlan(norm(q), tenantVocab, today); return raw ? mod.finalizePlanInput(raw, q, today) : null; };
     const plan = planOf(text);
-    if (!plan || plan.entity !== "customers" || !["count", "list"].includes(plan.op) || plan.filters?.length || plan.timeRange || plan.groupBy || plan.countDistinct) return null;
+    if (!plan || !["count", "list"].includes(plan.op) || plan.groupBy || plan.countDistinct) return null;
+    // B3: the guard also covers document counts, service-visit counts and "customers with <document type>" (filtered only by the document type).
+    // On those, only a dropped NEGATION / exclusion releases the claim ("service tickets that were not repairs" must not answer the total);
+    // the name-like word test below stays customers-only.
+    const composeWin = out.winner.name === "deterministic";
+    const typeOnly = (plan.filters ?? []).every((f) => ["documentType", "hasDocType"].includes(f.field) && f.op === "eq");
+    if (typeOnly && (["documents", "visits", "serviceVisits"].includes(plan.entity) || (plan.entity === "customers" && (plan.filters ?? []).length > 0 && !plan.timeRange))) {
+      const base = JSON.stringify(plan);
+      const toks = [...String(text).matchAll(/[A-Za-z']+/g)];
+      const neg = [];
+      for (let i = 0; i < toks.length; i++) {
+        const w = toks[i][0].toLowerCase().replace(/’/g, "'");
+        if (!NEGATION_WORDS.has(w)) continue;
+        // ablation: delete the negation and the word it points at; if the lane reads the question the same way, the negation was never used
+        const cut = toks[i + 1] ? toks[i + 1].index + toks[i + 1][0].length : toks[i].index + toks[i][0].length;
+        const without = (text.slice(0, toks[i].index) + " " + text.slice(cut)).replace(/\s+/g, " ").trim();
+        let same = false;
+        try { same = JSON.stringify(planOf(without) ?? null) === base; } catch { same = true; }
+        if (same) neg.push(w);
+      }
+      return neg.length ? { reason: "negation", words: neg } : null;
+    }
+    if (composeWin || plan.entity !== "customers" || plan.filters?.length || plan.timeRange) return null;
     // 1. the entity being counted must be named in the question by one of its own words
     const syn = ENTITY_SYNONYMS?.[plan.entity];
     if (syn?.length) {
@@ -404,8 +447,58 @@ async function leftoverDecline(out, question, ctx) {
   } catch { return null; }
 }
 
+/**
+ * B3 (round 2): grammar the winning deterministic lane never read. A question that asks two things ("how many Trane units and how many Daikin
+ * units") and that decompose reads as two clauses goes to decompose, not to the single-count lane that merged them. A winner whose reading is
+ * identical with a negation / top-N / second-measure phrase deleted never used that phrase: it is released (no winner) instead of answering a
+ * different question.
+ */
+const SIMPLE_COUNT_ROUTES = new Set(["personamt", "countqual", "tonnage", "brandunits", "vocabcount", "datequal", "datedocs"]);
+function grammarDecline(out, question, ctx) {
+  try {
+    if (process.env.DONOVAN_GRAMMAR === "0" || !leftoverEnabled()) return null;
+    const name = out?.winner?.name;
+    if (name !== "deterministic" && name !== "decompose") return null;
+    if (name === "decompose" && out.winner.intent?.mode === "compound") return null; // each clause runs through its own lane's checks (decompose/compound.js)
+    const text = out.effectiveQuestion ?? question;
+    if (!grammarSpans(text, ["period", "money-measure"]).length) return null;
+    const { overlay, pack, tenantVocab } = ctx ?? {};
+    const sig = name === "deterministic"
+      ? (q) => JSON.stringify(classifyDeterministic(q, { overlay, tenantVocab }) ?? null)
+      : (q) => JSON.stringify(classifyDecompose(q, { pack }) ?? null);
+    // the single-slot count lanes read one positive condition each: when the question stops being theirs without the marker, the marker had no place in their reading
+    const simple = name === "deterministic" && SIMPLE_COUNT_ROUTES.has(out.winner.intent?.route);
+    const words = unusedGrammar(text, sig, undefined, { nullUnused: simple, alwaysSecond: simple, topnAlways: simple || ["docextreme", "custdocrank", "rank"].includes(out.winner.intent?.route), include: name === "deterministic" ? (simple ? ["period", "money-measure"] : ["period"]) : [] });
+    return words.length ? { reason: "grammar", words } : null;
+  } catch { return null; }
+}
+
 export async function classifyAll(question, ctx = {}) {
-  const out = await classifyAllInner(question, ctx);
+  // two bare years joined by "and" ("total of invoices in 2024 and 2025"): the second is spelled as its own window so no lane reads it as a dollar amount ($2,025)
+  if (process.env.DONOVAN_GRAMMAR !== "0") {
+    const yp = yearPairRewrite(question);
+    if (yp) { const o2 = await classifyAll(yp, ctx); return { ...o2, effectiveQuestion: o2.effectiveQuestion ?? yp }; }
+  }
+  let out = await classifyAllInner(question, ctx);
+  // R2 B2: a summary claim travels under its one canonical spelling (summary/parse.js explains why): the older records-first lane answers
+  // "rundown / recap / overview" wording with the last job only, and reads nothing in the canonical form.
+  if (out?.winner?.name === "summary") {
+    const canon = canonicalSummaryQuestion(out.winner.intent, out.effectiveQuestion ?? question, { today: ctx?.today });
+    if (canon) out = { ...out, effectiveQuestion: canon };
+  }
+  // two clauses that decompose reads cleanly beat a single-count lane that merged them (the merged lane would answer one number for two questions)
+  if (out?.winner?.name === "deterministic" && SIMPLE_COUNT_ROUTES.has(out.winner.intent?.route) && out.gated?.decompose?.mode === "compound" && process.env.DONOVAN_GRAMMAR !== "0" && grammarSpans(out.effectiveQuestion ?? question).some((s) => s.kind === "second-head" || s.kind === "second-measure" || s.kind === "pair-extreme")) {
+    out = { ...out, winner: { name: "decompose", intent: out.gated.decompose }, gated: { ...out.gated, deterministic: null } };
+  }
+  const gd = grammarDecline(out, question, ctx);
+  // a negated count that decompose can answer as a complement (all minus the excluded) beats releasing the question
+  if (gd && out?.winner?.name !== "decompose" && out.gated?.decompose?.ratio && gd.words.some((w) => /^(?:percent|percentage|share|proportion|fraction|portion|ratio)\s+of$/i.test(w))) {
+    return { ...out, winner: { name: "decompose", intent: out.gated.decompose }, gated: { ...out.gated, deterministic: null, analytics: false } };
+  }
+  if (gd && out?.winner?.name !== "decompose" && out.gated?.decompose?.negation && gd.words.some((w) => NEGATION_WORDS.has(String(w).toLowerCase().replace(/’/g, "'")) || /n't$|^(?:other than|excluding|except|but|aside from|apart from|besides)$/i.test(w))) {
+    return { ...out, winner: { name: "decompose", intent: out.gated.decompose }, gated: { ...out.gated, deterministic: null, analytics: false } };
+  }
+  if (gd) return { ...out, winner: null, claimed: (out.claimed ?? []).filter((n) => n !== "deterministic" && n !== "decompose" && n !== "analytics"), gated: { ...out.gated, deterministic: null, decompose: null, analytics: false }, leftoverDeclined: gd };
   const lo = await leftoverDecline(out, question, ctx);
   if (lo) return { ...out, winner: null, claimed: (out.claimed ?? []).filter((n) => n !== "analytics"), gated: { ...out.gated, analytics: false }, leftoverDeclined: lo };
   // R32: an analytics claim on a bare surname shared by 2+ customers ("whens the winslow warranty up" -> a customers-in-Winslow count) is a wrong
@@ -433,6 +526,25 @@ async function classifyAllInner(question, ctx = {}) {
       // ("units with no warranty end date on file" was respelled to "... warranty expires date ..." and lost its exact count).
       const firstName = first.winner?.name ?? null;
       if (thirdName && !(thirdName === "analytics" && firstName && firstName !== "analytics")) return { ...third, effectiveQuestion: rewritten, frameStripped: Boolean(stripped), rewritten: true };
+    }
+  }
+  // J1: jargon respell. People say "pay app", "packing list", "comfort club", "foreman", "prior month"; the lanes read "invoice", "delivery ticket",
+  // "maintenance agreement", "technician", "last month". The jargon table (lexicon/jargon.js, built from the research dictionary) respells those
+  // phrases and the result is adopted only when a deterministic lane claims it, exactly like the vocabulary rewrite above. It never overrides
+  // a deterministic claim on the text as typed, and a phrase made of a customer or technician name is left alone (tenantVocab).
+  if (jargonEnabled()) {
+    const jr = respellJargon(stripped ?? question, { tenantVocab: ctx?.tenantVocab });
+    if (jr) {
+      const cand = rewriteQuestion(jr.text, ctx?.today) ?? jr.text;
+      const jt = await classifyAllOnce(cand, ctx);
+      const jName = jt.winner?.name ?? null;
+      const fName = first.winner?.name ?? null;
+      // a respelled phrase read as a person's name (contactLookup) is no understanding; a typed phrase read as a name IS the failure this fixes
+      // a date-phrase-only respell ("prior month" -> "last month") says the same thing in the words the date parsers read, so it is adopted like the
+      // vocabulary rewrite above (any deterministic claim, never trading a deterministic one for the looser analytics stage)
+      const dateOnly = jr.hits.every((h) => h.date);
+      const adopt = dateOnly ? !(jName === "analytics" && fName && fName !== "analytics") : (!fName || fName === "contactLookup" || fName === "analytics" || (fName === "deterministic" && jName !== "deterministic" && jName !== "analytics") || (fName === "deterministic" && first.winner?.intent?.route === "tenantcount" && jName === "deterministic"));
+      if (jName && jName !== "contactLookup" && adopt) return { ...jt, effectiveQuestion: cand, frameStripped: Boolean(stripped), jargon: jr.hits };
     }
   }
   if (!stripped) return { ...first, effectiveQuestion: question };

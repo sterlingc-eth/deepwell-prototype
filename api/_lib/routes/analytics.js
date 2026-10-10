@@ -112,6 +112,7 @@ import { overlayFewShotHash } from '../learning/overlay.js';
 // model call — see planAnalyticsQuestion below and detPlan.js's own doc
 // comment for the "never guess" contract.
 import { detectAnalyticsPlan } from '../analytics/detPlan.js';
+import { mentionsPlainUnits, tenantHasRentalUnits, resolveCountyCityTwin, markUnitsAsked } from '../lookups/rentalUnits.js';
 import { leftoverWords, leftoverEnabled, domainWordsFromVocab } from '../router/leftover.js';
 
 export const ANALYTICS_MODEL = process.env.ANALYTICS_MODEL || process.env.ASK_MODEL || 'claude-haiku-4-5';
@@ -125,7 +126,7 @@ export function isAnalyticsEnabled(env = process.env) {
  * half of the pipeline on a question with one word deleted.
  */
 /** A plan that reads as the whole-entity total: a plain count with no filter, no time window, no grouping. Such an answer is only right when the question named NO other condition. */
-function isBarePlan(plan) {
+export function isBarePlan(plan) {
   return Boolean(plan) && plan.op === 'count' && !(plan.filters?.length) && !plan.timeRange && !plan.groupBy && !plan.countDistinct;
 }
 export function finalizePlanInput(rawInput, question, today) {
@@ -2106,8 +2107,14 @@ export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today
     // after — that fallback's own model call is the one actually counted
     // for the question (see api/ask.js's own doc comment at its call site),
     // so this file never double-reports one question as two.
-    const plan = await planAnalyticsQuestion(question_n, { today, overlay, tenantVocab, withTenant, ctxArg, originalQuestion: question });
+    let plan = await planAnalyticsQuestion(question_n, { today, overlay, tenantVocab, withTenant, ctxArg, originalQuestion: question });
     if (!plan) return { ...EMPTY, modelCalled: true };
+    // E1 hook: the same place as county AND city filter ("Maricopa"): resolve by the wording or decline.
+    plan = resolveCountyCityTwin(plan, question);
+    if (!plan) return { ...EMPTY, modelCalled: true };
+    // E1 hook: in an organization that keeps rental-unit records, plain "units" is not equipment: decline instead of counting the wrong thing.
+    plan = markUnitsAsked(question, plan);
+    if (mentionsPlainUnits(question, plan) && await withTenant(ctxArg, (db) => tenantHasRentalUnits(db))) return { ...EMPTY, modelCalled: true };
 
     // A1(b): a question that named something specific (a street number, a
     // ZIP, a serial fragment) but produced an unfiltered customers list/count

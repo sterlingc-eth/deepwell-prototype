@@ -108,6 +108,31 @@ export const FIELD_SYNONYMS = {
   notIgnorable: ["amount paid", "invoice date", "order date", "deposit"],
 };
 
+// BEGIN GENERATED LABELS (scripts/build-field-labels.mjs)
+// Generated 5 research files, 277 field/document_label entries. Do not edit by hand: re-run the script.
+const GENERATED_LABELS = {
+  cost: ["pay this amount","due now","job total","legal fees","please remit","repair total","ticket total","amount payable","invoice amount","amount invoiced","professional fees","total professional fees"],
+  costPaid: ["gift total","paid amount","amount donated","amount of gift"],
+  customer: ["billing name","name of donor","contributor name"],
+  documentNumber: ["doc #","cm #","cn #","ro #","cm no","cn no","req #","rma #","tkt #","txn #","conf #","doc no","draw #","rcpt #","req no","rma no","sale #","slip #","stmt #","txn id","award #","bill no","claim #","draw no","gift id","inv no.","our ref","rcpt no","sale no","slip no","stmt no","trans #","award no","claim id","claim no","refund #","return #","your ref","pay app #","return no","delivery #","invoice id","pay app no","receipt id","rma number","delivery no","document no","donation id","draw number","gift number","invoice no.","invoice num","pack slip #","sale number","claim number","debit memo #","reference no","statement no","application #","credit memo #","credit note #","debit memo no","refund number","requisition #","application no","credit memo no","credit note no","packing slip #","pay app number","transaction no","delivery number","packing slip no","sales receipt #","delivery note no","statement number","confirmation code","work order number","application number","credit memo number","credit note number","requisition number","transaction number"],
+  insured: ["first named insured"],
+  invoiceDate: ["pay app date","application date","date of application"],
+  receiptDate: ["contribution date"],
+  serviceDate: ["date svc","encounter date","treatment date","date of procedure"],
+  term: ["plan term","grant term","plan length","plan period","award period","grant period","lease length","policy dates","rental length","coverage dates","funding period","lease duration","project period","contract length","membership term","rental duration","agreement length","membership length","performance period","period of coverage","length of agreement","period of performance"],
+  termEnd: ["coi expires","coi expiration","exp date","term end","lease exp","lease ends","policy end","policy exp","rental end","end of term","policy ends","vacate date","valid until","cert expires","good through","coverage ends","date off rent","move-out date","off hire date","off rent date","off-rent date","valid through","lease end date","coverage expires","insurance expiry","lease expiration","end date of rental","insurance expiration"],
+  termStart: ["eff date","policy eff","term start","lease begins","move-in date","on hire date","on rent date","on-rent date","rental start","policy begins","start of term","inception date","occupancy date","coverage begins","possession date","start of rental","lease start date","policy inception","policy start date","rental start date","coverage effective"],
+  vendor: ["make checks payable to","check payable to","checks payable to"],
+};
+/** Per role, generated labels from most to least widely listed in the research (the prompt takes the head of each list). */
+export const LABEL_RANK = GENERATED_LABELS;
+/** Generated labels that 2+ research entries list: the candidates for the compact model prompt (extractFields.js via synonymGuide). */
+export const LABEL_COMMON = {"cost":["pay this amount"],"documentNumber":["doc #"],"termEnd":["coi expires","coi expiration"],"vendor":["make checks payable to"]};
+for (const [role, list] of Object.entries(GENERATED_LABELS)) {
+  FIELD_SYNONYMS[role] = [...new Set([...(FIELD_SYNONYMS[role] ?? []), ...list])];
+}
+// END GENERATED LABELS
+
 const ESC = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** One phrase -> regex source (no anchors, no colon). "#" accepts #, no, no., number, num. */
@@ -137,15 +162,20 @@ const quoteList = (arr) => arr.map((x) => `"${title(x)}"`).join(", ");
  * The plain-language block the model prompt carries: which printed labels mean which field. Built from the same table
  * the scanners use. Kept short on purpose: it is part of every extraction call.
  */
+/** Up to `n` extra labels for the prompt: generated labels that several research entries list (LABEL_COMMON), skipping
+ *  any in `skip`. PO labels never go in the prompt: a PO number is not the number of an invoice that quotes it. */
+function extra(role, n, skip = []) {
+  return (LABEL_COMMON[role] ?? []).filter((p) => !skip.includes(p) && !/^(p\.?o\.?|purchase order)\b/.test(p)).slice(0, n);
+}
+
 export function synonymGuide() {
-  const S = FIELD_SYNONYMS;
   return [
     `- customer_name = the other party the paperwork is about, however labelled: ${quoteList(["bill to", "sold to", "received from", "payer", "paid by", "donor", "tenant", "client", "patron", "member", "purchaser", "patient", "student"])}.`,
     `- vendor = the business that issued the paper or was paid / supplied the goods or services: ${quoteList(["vendor", "supplier", "sold by", "seller", "merchant", "store", "payee", "pay to", "remit to", "issued by", "landlord", "provider", "law firm", "insured"])}, or the business name printed as the letterhead at the top of the page (when it is not our own company).`,
     `- service_date = the date the document is about: ${quoteList(["date of service", "invoice date", "date received", "date paid", "payment date", "date of sale", "transaction date", "statement date", "delivery date", "pickup date", "effective date", "issue date"])} (a lone "Date:" counts too). Never a due date, expiry, next-service or printed-on date.`,
-    `- cost = the document's amount in dollars, however labelled: ${quoteList(["total", "total due", "amount due", "balance due", "amount received", "amount paid", "total paid", "payment amount", "donation amount"])}. Prefer the total over line items, subtotals and tax.`,
-    `- invoice_number = any document number: ${quoteList(["receipt #", "invoice #", "ticket #", "reference #", "confirmation #", "transaction id", "order #"])}.`,
-    `- agreement_term = the agreement, lease or policy period: ${quoteList(["term", "agreement period", "lease term", "policy period", "effective date to end date"])}; for an agreement, "Parties" / "Between" name the customer_name and vendor.`,
+    `- cost = the document's amount in dollars, however labelled: ${quoteList(["total", "total due", "amount due", "balance due", "amount received", "amount paid", "total paid", "payment amount", "donation amount", ...extra("cost", 2)])}. Prefer the total over line items, subtotals and tax.`,
+    `- invoice_number = any document number: ${quoteList(["receipt #", "invoice #", "ticket #", "reference #", "confirmation #", "transaction id", "order #", ...extra("documentNumber", 2)])}.`,
+    `- agreement_term = the agreement, lease or policy period: ${quoteList(["term", "agreement period", "lease term", "policy period", "effective date to end date", ...extra("term", 1), ...extra("termStart", 1)])}; for an agreement, "Parties" / "Between" name the customer_name and vendor.`,
   ].join("\n");
 }
 

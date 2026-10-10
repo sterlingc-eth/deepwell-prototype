@@ -1,5 +1,5 @@
 import type { DomainSchema } from '../../core/types';
-import { DOCUMENT_TYPES, REQUIRED_FIELDS, COMPANY_RECORD_TYPES, COMPANY_RECORD_IF_NO_CUSTOMER_TYPES, LINK_OPTIONAL_TYPES } from './documentTypes';
+import { DOCUMENT_TYPES, REQUIRED_FIELDS, COMPANY_RECORD_TYPES, COMPANY_RECORD_IF_NO_CUSTOMER_TYPES, COMPANY_RECORD_IF_NO_CUSTOMER_OR_ADDRESS_TYPES, LINK_OPTIONAL_TYPES } from './documentTypes';
 
 export { FIELD_LABELS, fieldLabel, requirementLabel } from './documentTypes';
 
@@ -91,6 +91,7 @@ export const hvacSchema: DomainSchema = {
     requiredFields: REQUIRED_FIELDS[t.id] ?? [],
     ...(COMPANY_RECORD_TYPES.has(t.id) ? { companyRecord: true } : {}),
     ...(COMPANY_RECORD_IF_NO_CUSTOMER_TYPES.has(t.id) ? { companyRecordIfNoCustomer: true } : {}),
+    ...(COMPANY_RECORD_IF_NO_CUSTOMER_OR_ADDRESS_TYPES.has(t.id) ? { companyRecordIfNoCustomerOrAddress: true } : {}),
     ...(LINK_OPTIONAL_TYPES.has(t.id) ? { linkOptional: true } : {}),
   })),
 };

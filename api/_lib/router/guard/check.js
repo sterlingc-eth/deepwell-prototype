@@ -91,6 +91,7 @@ function consumedFromDecomposeIntent(intent) {
  */
 export function guardDecomposeAnswer({ question, data, intent, tenantVocab } = {}) {
   if (isDeclineOrAskWhich(data)) return { blocked: false };
+  if (intent?.mode === 'compound') return { blocked: false }; // each clause already went through its own lane's guard
   const constraints = extractConstraints(question, { tenantVocab })
     // 'namedEntity' is measured, not enforced, here — see this file's own doc comment for why: verified
     // against r19_blind3_clusters.json's F1 "purchase order on file for <Name> account" cluster
