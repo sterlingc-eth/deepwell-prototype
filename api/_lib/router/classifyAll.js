@@ -45,6 +45,12 @@ import { parseDocLookupQuestion } from "../docLookup.js";
 import { parseContentCountQuestion } from "../contentCount.js";
 import { preClassifyAnalytics, looksLikeSingleRecordReference, isMoneyQuestion } from "../analytics.js";
 import { isFinancialQuestion } from "../financials/classify.js";
+import { parseMoneyIntent } from "../financials/answers.js";
+import { extraDocTypeAlternation, stemWord } from "../lookups/lexicon.js";
+import { detectAnalyticsPlan } from "../analytics/detPlan.js";
+import { ENTITY_SYNONYMS } from "../analytics.js";
+import { leftoverWords, leftoverEnabled, domainWordsFromVocab } from "./leftover.js";
+import { normalizeQuestion as normalizeQuestionFull } from "../nlNormalize.js";
 import { isUnitRankingQuestion, isReasoningQuestion } from "../agent/intents.js";
 import { isInstallDateExtremeQuestion } from "../analytics/detPlan.js";
 import { normalizeQuestion as normalizeQuestionForAnalytics } from "../nlNormalize.js";
@@ -236,6 +242,19 @@ async function defaultLoadAgentModule() {
  *                                      DONOVAN_AGENT-gated exclusions.
  * @param {object} [ctx.env]            process.env override, for tests (isFastPathEnabled/isAnalyticsEnabled).
  */
+/** "documents over $500" / "receipts under 50": a threshold on ANY money-document noun is a money question (the money reader owns the document-type scope). */
+function isDocumentThreshold(question, today) {
+  try { return parseMoneyIntent(String(question ?? ""), { today: today ?? new Date().toISOString().slice(0, 10) })?.intent === "threshold_invoices"; } catch { return false; }
+}
+
+const EXTRA_DOC_NOUN = new RegExp(`\\b(?:${extraDocTypeAlternation()})\\b`, "i");
+const MONEYISH = /[$]|\b(?:total|totals|amount|amounts|worth|owe|owes|owed|paid|unpaid|revenue|sales|cost|costs|price|priced|billed|invoiced|over|under|above|below|more than|less than|at least|spent|spend|balance|due)\b/i;
+/** "how many price lists" / "list our COIs": a plain count or list of a document type people name in other words. The document-type reader owns it, not the money reader. */
+function isPlainExtraDocCount(q) {
+  const s = String(q ?? "");
+  return /\b(?:how many|number of|count|list|which|show|any)\b/i.test(s) && EXTRA_DOC_NOUN.test(s) && !MONEYISH.test(s.replace(EXTRA_DOC_NOUN, " "));
+}
+
 async function classifyAllOnce(question, ctx = {}) {
   const {
     meta = null,
@@ -269,8 +288,8 @@ async function classifyAllOnce(question, ctx = {}) {
     contactLookup: timed("contactLookup", () => parseContactLookupQuestion(question, { overlay, tenantVocab: ctx.tenantVocab })),
     docLookup: timed("docLookup", () => parseDocLookupQuestion(question, { overlay })),
     contentCount: timed("contentCount", () => parseContentCountQuestion(question, pack)),
-    money: timed("money", () => isMoneyQuestion(normalizedForAnalytics) || isFinancialQuestion(normalizedForAnalytics)),
-    analytics: timed("analytics", () => preClassifyAnalytics(normalizedForAnalytics, { overlay })),
+    money: timed("money", () => !isPlainExtraDocCount(normalizedForAnalytics) && (isMoneyQuestion(normalizedForAnalytics) || isFinancialQuestion(normalizedForAnalytics) || isDocumentThreshold(question, ctx?.today))),
+    analytics: timed("analytics", () => preClassifyAnalytics(normalizedForAnalytics, { overlay }) || isPlainExtraDocCount(normalizedForAnalytics)),
     meta: Boolean(meta),
   };
 
@@ -352,8 +371,43 @@ async function classifyAllOnce(question, ctx = {}) {
  * text is returned as `effectiveQuestion` so ask.js hands the SAME text to the run* function that
  * re-parses it (runContactLookup/runDocLookup/runFastPath take the question string, not the intent).
  */
+/**
+ * F4 leftover-word guard (central). A deterministic analytics reading that is a PLAIN whole-entity count or list (no filter, no window, no grouping) is only right
+ * when every meaningful word of the question is explained by it: the entity noun is one of that entity's own words, and no other content word was left unused
+ * ("which homeowners signed a service plan" must not become "120 customers", "list the technicians we use" must not become the customer list).
+ * A question that fails is released (no winner), so it falls through to the other lanes or the honest decline, never a nearby generic answer.
+ */
+async function leftoverDecline(out, question, ctx) {
+  try {
+    if (process.env.DONOVAN_F4_GUARD === "0" || out?.winner?.name !== "analytics" || out.winner.futureDate || !leftoverEnabled()) return null;
+    const text = out.effectiveQuestion ?? question;
+    const { overlay, pack, tenantVocab } = ctx ?? {};
+    const today = ctx?.today ?? new Date().toISOString().slice(0, 10);
+    const norm = (q) => normalizeQuestionFull(q, { overlay, pack, tenantVocab }).normalized;
+    // the same plan the analytics lane will run: the deterministic reading plus its own post-processing (dates, service visits...)
+    const mod = await (ctx.loadAnalyticsRouteModule ?? defaultLoadAnalyticsRouteModule)();
+    const planOf = (q) => { const raw = detectAnalyticsPlan(norm(q), tenantVocab, today); return raw ? mod.finalizePlanInput(raw, q, today) : null; };
+    const plan = planOf(text);
+    if (!plan || plan.entity !== "customers" || !["count", "list"].includes(plan.op) || plan.filters?.length || plan.timeRange || plan.groupBy || plan.countDistinct) return null;
+    // 1. the entity being counted must be named in the question by one of its own words
+    const syn = ENTITY_SYNONYMS?.[plan.entity];
+    if (syn?.length) {
+      const stems = new Set(syn.flatMap((p) => String(p).toLowerCase().split(/[^a-z]+/)).filter(Boolean).map(stemWord));
+      const words = (norm(text).toLowerCase().match(/[a-z]+/g) ?? []).map(stemWord);
+      if (!words.some((w) => stems.has(w)) && !(tenantVocab?.industryWords ?? []).some((w) => words.includes(stemWord(String(w).toLowerCase())))) return { reason: "entity", words: [plan.entity] };
+    }
+    // 2. no other content word left unused
+    const left = leftoverWords(text, (q) => JSON.stringify(planOf(q) ?? null), { lane: "classifyAll", plain: true, entityKey: plan.entity, domainWords: domainWordsFromVocab(tenantVocab), normalized: norm(text) });
+    // numbers and ages are applied by the analytics lane itself at run time ("older than 15 years"), so they are not unused conditions here
+    const unused = left.filter((w) => !/^\$?\d[\d,.]*%?$/.test(w) && !/^(?:years?|yrs?|months?|days?|weeks?|old|older|newer|younger|units?|systems?)$/i.test(w));
+    return unused.length ? { reason: "leftover", words: unused } : null;
+  } catch { return null; }
+}
+
 export async function classifyAll(question, ctx = {}) {
   const out = await classifyAllInner(question, ctx);
+  const lo = await leftoverDecline(out, question, ctx);
+  if (lo) return { ...out, winner: null, claimed: (out.claimed ?? []).filter((n) => n !== "analytics"), gated: { ...out.gated, analytics: false }, leftoverDeclined: lo };
   // R32: an analytics claim on a bare surname shared by 2+ customers ("whens the winslow warranty up" -> a customers-in-Winslow count) is a wrong
   // reading of a customer reference; release it so the clarify path can ask "which one?".
   if (out?.winner?.name === "analytics" && clarifyEnabled() && ctx?.tenantVocab && detectAmbiguousSurname(out.effectiveQuestion ?? question, ctx.tenantVocab)) {

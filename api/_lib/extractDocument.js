@@ -22,6 +22,7 @@ import {
   completenessFor,
   isShopInternalDocument,
   mayVerifyWithoutLink,
+  moneyAmountsConfident,
   AI_VERIFY_MIN_CONFIDENCE,
 } from "./documentTypes.js";
 import { integrityFixDocument } from "./routes/integrity.js";
@@ -31,9 +32,12 @@ import { completeIntake } from "./intake/autofill.js";
 import { classifyDocumentAudience } from "./audience/store.js";
 // R32 (model avoidance): a plain labelled form is a lookup, not reasoning — see modelAvoidance/textExtract.js.
 import { extractFromText } from "./modelAvoidance/textExtract.js";
-import { isDeterministicExtractEnabled } from "./modelAvoidance/switches.js";
+import { isDeterministicExtractEnabled, isGenericExtractEnabled } from "./modelAvoidance/switches.js";
 // R33: a REQUIRED field the extraction left empty is looked up on the page by its printed label — see labelFill.js.
-import { planLabelFill } from "./modelAvoidance/labelFill.js";
+import { planLabelFill, corroborateFields } from "./modelAvoidance/labelFill.js";
+import { loadOwnNames, applyOwnCompanyGuard, isOwnName } from "./modelAvoidance/ownCompany.js";
+import { planStoredTextRead, NOTHING_READ_ACTION, readableChars, setNothingReadMarker, clearNothingReadMarker } from "./modelAvoidance/storedTextReread.js";
+export { reextractFromStoredText, NOTHING_READ_ACTION } from "./modelAvoidance/storedTextReread.js";
 
 /**
  * buildExtractPrompt() (extractFields.js — not owned by this change, left
@@ -116,12 +120,14 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
     // ones. packForTenant is itself cached per tenant, so this is not a
     // second query on the hot path for a tenant it has already resolved.
     const pack = await packForTenant(db);
-    return { doc, pages: await db.listPages(documentId), pack };
+    // F1: who "we" are (tenants.name / settings / outreach shop name), so our own name is never read as the other party.
+    const ownNames = await loadOwnNames(db, ctx);
+    return { doc, pages: await db.listPages(documentId), pack, ownNames };
   });
 
   if (!loaded) throw new IngestError("Document not found", 404);
 
-  const { doc, pages, pack } = loaded;
+  const { doc, pages, pack, ownNames } = loaded;
   if (!pages.length || !pages.some((p) => (p.text ?? "").trim())) {
     // Two different situations, not one: a document read carries its own
     // extract_error (see readDocument.js's hasReadableText/NO_READABLE_TEXT_MESSAGE)
@@ -137,10 +143,12 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
 
   // R32: deterministic extraction FIRST (EXTRACT_DETERMINISTIC=0 disables). extractFromText accepts a document only
   // when its title names a template type, every line is explained, every validator passes and every field the type
-  // requires was found; anything else returns {accepted:false} and the model runs exactly as it always did. An explicit
-  // `documentType` override, a truncated document, or a non-HVAC industry pack never takes this path.
+  // requires was found; anything else returns {accepted:false} and the model runs exactly as it always did. The
+  // validated-label path (labelledExtract.js, any industry pack, EXTRACT_GENERIC=0 switches it off) widens that to
+  // receipts, statements, POs, agreements ... read only from confidently labelled lines. An explicit `documentType`
+  // override or a truncated document never takes this path.
   const det = !documentType && !truncated && isDeterministicExtractEnabled()
-    ? extractFromText(selected, { pack })
+    ? extractFromText(selected, { pack, ownNames, generic: isGenericExtractEnabled() })
     : null;
   let extractMethod = "model";
   let extractModelLabel = EXTRACT_MODEL;
@@ -170,7 +178,7 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
   // R34: `documentType` is a caller-supplied string (POST /api/extract) and doc.document_type was, until R34, whatever a member
   // typed; either was interpolated into the prompt text verbatim. Only a plain type-id shape reaches the prompt.
   const promptType = [documentType, doc.document_type].find((t) => typeof t === 'string' && /^[a-z][a-z0-9_-]{0,39}$/i.test(t.trim()))?.trim();
-  const fullPrompt = buildExtractPrompt(selected, promptType, pack);
+  const fullPrompt = buildExtractPrompt(selected, promptType, pack, { ownNames });
   const { dynamic: dynamicPrompt, stable: stablePrompt } = splitExtractPrompt(fullPrompt);
 
   const startedAt = Date.now();
@@ -225,6 +233,27 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
   // "Group") is a parse fragment, not a name: never store it as an identity.
   fields = fields.filter((f) => !(f.field_key === 'customer_name' && isFragmentName(f.value)));
 
+  // F1: our own company is never the customer (a bill addressed TO us used to create us as a customer) and never the vendor.
+  const ownGuard = applyOwnCompanyGuard(fields, ownNames);
+  fields = ownGuard.fields;
+  const ownRemoved = ownGuard.removed;
+
+  // F1: NEVER SILENTLY ACCEPT AN EMPTY EXTRACTION. A readable page that yielded zero fields gets the labelled scan on the stored
+  // page text ($0); if that is still empty a machine-readable "nothing read" marker is written (audit_log
+  // action 'document.nothing_read', see modelAvoidance/storedTextReread.js) instead of passing as a real answer.
+  let storedTextFilled = [];
+  let nothingRead = null;
+  if (!fields.length) {
+    try {
+      const rr = planStoredTextRead({ documentType, storedType: doc.document_type, filename: doc.original_filename, pages: selected, ownNames, pack, pageCount: highestPage });
+      if (rr.add.length) { fields = rr.add; storedTextFilled = rr.add; }
+      else if (rr.readable) nothingRead = { chars: rr.chars, pages: selected.length, type: rr.type };
+    } catch (err) {
+      console.error("stored-text re-read failed (extraction kept as is):", err?.message);
+      nothingRead = readableChars(selected) >= 20 ? { chars: readableChars(selected), pages: selected.length, type: null } : null;
+    }
+  }
+
   // A document that states nothing extractable is a real answer, not a failure.
   // The write still happens, so an empty result replaces stale rows from an
   // earlier run rather than leaving them there to look current.
@@ -270,9 +299,10 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
   // vocabulary only; never throws (a scan failure leaves the extraction exactly as it was).
   let labelFilled = [];
   let labelFillAmbiguous = [];
+  let corroborated = [];
   if (!pack || pack.id === 'hvac') {
     try {
-      const plan = planLabelFill({ type: resolvedType, fields, pages: selected, method: 'label-fill', pageCount: highestPage });
+      const plan = planLabelFill({ type: resolvedType, fields, pages: selected, method: 'label-fill', pageCount: highestPage, ownNames });
       labelFillAmbiguous = plan.ambiguous;
       if (plan.add.length) {
         labelFilled = plan.add;
@@ -283,6 +313,18 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
       console.error("label-fill failed (extraction kept as is):", err?.message);
     }
   }
+  // F1: CORROBORATION. A value the model gave that the page's own labels print identically (same normalized date, amount within a
+  // cent, fuzzy-equal name, same number) is confirmed by two independent readers: confidence >= 0.9. No global bar is lowered.
+  try {
+    const co = corroborateFields({ type: resolvedType, fields, pages: selected, ownNames });
+    fields = co.fields;
+    corroborated = co.corroborated;
+    if (corroborated.length) facts = Object.fromEntries(fields.map((f) => [f.field_key, f.value]));
+  } catch (err) {
+    console.error("corroboration failed (extraction kept as is):", err?.message);
+  }
+  fields = applyOwnCompanyGuard(fields, ownNames).fields;
+  facts = Object.fromEntries(fields.map((f) => [f.field_key, f.value]));
 
   // CUSTOMER REMINDERS (2026-09-22): reminder_text/reminder_customer_name/
   // reminder_trigger only mean anything on a memo-like document — see
@@ -494,8 +536,14 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
     // SQL, forward-only — this is a cheap pre-check, not the source of truth.
     const completeness = completenessFor(resolvedType, fields, pack);
     let aiVerified = false;
-    if (completeness.complete && completeness.minConfidence >= AI_VERIFY_MIN_CONFIDENCE) {
-      aiVerified = (await db.verifyByAi(documentId, { allowUnlinked: mayVerifyWithoutLink(resolvedType, fields) })) > 0;
+    // F1: a document that had NO fields and was typed only by a re-read of its own page text is not auto-verified as an untyped
+    // ("other") document: nothing about it was ever required, so "complete" proves nothing.
+    const untypedReread = storedTextFilled.length > 0 && (!resolvedType || resolvedType === 'other');
+    // Money guard (documentTypes.js moneyAmountsConfident): an amount below the bar that the page does not corroborate
+    // blocks the automatic check on the linked path too, not only on the unlinked one.
+    const pageHasText = pages.some((p) => String(p.text ?? '').trim() !== '');
+    if (!untypedReread && completeness.complete && completeness.minConfidence >= AI_VERIFY_MIN_CONFIDENCE && moneyAmountsConfident(fields)) {
+      aiVerified = (await db.verifyByAi(documentId, { allowUnlinked: mayVerifyWithoutLink(resolvedType, fields, { hasText: pageHasText, filename: doc.original_filename }) })) > 0;
     }
 
     await db.logAction({
@@ -546,6 +594,10 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
         unconfirmed_dates: fields.filter((f) => f.flags?.includes('far_future')).map((f) => ({ field_key: f.unconfirmed_of, value: f.value })),
         label_filled: labelFilled.map((f) => ({ field_key: f.field_key, value: f.value, page_no: f.page_no, method: 'label-fill' })),
         ...(labelFillAmbiguous.length ? { label_fill_ambiguous: labelFillAmbiguous.slice(0, 10) } : {}),
+        ...(nothingRead ? { nothing_read: true } : {}),
+        ...(storedTextFilled.length ? { stored_text_filled: storedTextFilled.map((f) => ({ field_key: f.field_key, value: f.value, page_no: f.page_no, method: 'text-reread' })) } : {}),
+        ...(corroborated.length ? { corroborated } : {}),
+        ...(ownRemoved.length ? { own_company_removed: ownRemoved } : {}),
         dropped_fields: dropped.slice(0, 20).map((d) => ({ key: String(d.key ?? '').slice(0, 60), reason: String(d.reason ?? '').slice(0, 160) })),
         // Round 4: shop-internal documents (see isShopInternalDocument) carry
         // no customer at all, by design — recorded here (again, no DDL) so
@@ -554,6 +606,19 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
         ...(classification.source === 'shop-internal' ? { no_customer: true } : {}),
       },
     });
+
+    // F1: the machine-readable "nothing read" marker (existing storage: audit_log). Cleared implicitly by any later
+    // document.fields_extracted / fields_reread / fields_rechecked row for the document that carries fields.
+    // Also an `_nothing_read` extraction row (like '_audience') so the client entity graph, which only sees extraction
+    // rows, can tell; removed again as soon as a read finds fields.
+    if (nothingRead) await setNothingReadMarker(db, documentId);
+    else await clearNothingReadMarker(db, documentId);
+    if (nothingRead) {
+      await db.logAction({
+        action: NOTHING_READ_ACTION, resource_type: "document", resource_id: documentId, clerk_user_id: userId,
+        changes: { reason: "no_fields_after_text_scan", chars: nothingRead.chars, pages: nothingRead.pages, type: nothingRead.type ?? resolvedType ?? null, source: "ingest", model: extractModelLabel },
+      });
+    }
 
     // AUDIENCE (round 18, part 2, owner ask (a)): right after the type and fields this pass
     // resolved are persisted, and deliberately AFTER every customer/equipment link above rather

@@ -7,6 +7,12 @@
  *   { op: 'accept', entityIds, keepId?, suggestionId? }      -> merge         admin
  *   { op: 'reject', entityIds, clusterId? }                  -> dismiss       admin
  *   { op: 'undo', suggestionId }                             -> revert        admin
+ *   { op: 'review' }                                         -> every duplicate group, whole tenant   admin
+ *   { op: 'merge-exact' }                                    -> merge all safe exact groups (call again while remaining > 0)   admin
+ *   { op: 'this-is-us', entityIds }                          -> mark records as the company's own name   admin
+ *   { op: 'undo-this-is-us', logId }                         -> put that back   admin
+ *   { op: 'recent' }                                         -> merge-all / "This is us" from the last 14 days, each undoable   admin
+ *   { op: 'undo-merge-all', logId }                          -> put back every group of one merge-all run   admin
  *
  * Admin-only throughout — a duplicate-customer merge changes shared records
  * every technician relies on, same bar as routes/graph.js's refresh or
@@ -23,6 +29,7 @@ import { limit as rateLimit } from "../rateLimit.js";
 import {
   listMergeSuggestions, acceptMergeSuggestion, rejectMergeSuggestion, undoMergeSuggestion, EntityMergeError,
 } from "../entities/resolve.js";
+import { reviewDuplicates, mergeAllExact, markAsCompany, undoCompanyMark, recentChanges, undoMergeAll } from "../entities/bulkMerge.js";
 
 export const config = { api: { bodyParser: { sizeLimit: "16kb" } }, maxDuration: 60 };
 
@@ -81,7 +88,31 @@ export default async function handler(req, res) {
       return ok(result);
     }
 
-    return res.status(400).json({ error: "op must be one of: list, accept, reject, undo" });
+    if (op === "review") {
+      return ok(await withTenant(ctx, (db) => reviewDuplicates(db)));
+    }
+
+    if (op === "merge-exact") {
+      return ok(await mergeAllExact(ctx, auth.userId));
+    }
+
+    if (op === "this-is-us") {
+      return ok(await markAsCompany(ctx, { entityIds: uuids(body.entityIds) }, auth.userId));
+    }
+
+    if (op === "undo-this-is-us") {
+      return ok(await undoCompanyMark(ctx, { logId: typeof body.logId === "string" ? body.logId : null }, auth.userId));
+    }
+
+    if (op === "recent") {
+      return ok(await withTenant(ctx, (db) => recentChanges(db)));
+    }
+
+    if (op === "undo-merge-all") {
+      return ok(await undoMergeAll(ctx, { logId: typeof body.logId === "string" ? body.logId : null }, auth.userId));
+    }
+
+    return res.status(400).json({ error: "op must be one of: list, accept, reject, undo, review, merge-exact, this-is-us, undo-this-is-us, recent, undo-merge-all" });
   } catch (error) {
     if (error instanceof AuthError) return handleCors(res, req).status(error.status).json({ error: error.message });
     if (error instanceof EntityMergeError) return handleCors(res, req).status(error.status).json({ error: error.message });

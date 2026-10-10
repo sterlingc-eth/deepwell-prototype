@@ -210,15 +210,15 @@ eq('permit_number still wins over a conflicting filename', inferDocumentType({ p
 
 {
   // Blank / whitespace-only values do not count as present.
-  const c = completenessFor('statement', [{ field_key: 'vendor', value: '   ', confidence: 0.9 }]);
+  const c = completenessFor('equipment-record', [{ field_key: 'serial_number', value: '   ', confidence: 0.9 }]);
   eq('whitespace-only value does not satisfy a requirement', c.complete, false);
 }
 
 {
   // Highest-confidence duplicate wins when a field_key appears twice.
-  const c = completenessFor('statement', [
-    { field_key: 'vendor', value: 'Jane', confidence: 0.4 },
-    { field_key: 'vendor', value: 'Jane', confidence: 0.95 },
+  const c = completenessFor('equipment-record', [
+    { field_key: 'serial_number', value: 'SN1', confidence: 0.4 },
+    { field_key: 'serial_number', value: 'SN1', confidence: 0.95 },
   ]);
   eq('duplicate field_key uses the higher confidence', c.minConfidence, 0.95);
 }

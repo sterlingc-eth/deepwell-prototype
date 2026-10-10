@@ -26,14 +26,19 @@
  */
 import { withTenant, FIELD_RECHECK_SEGMENT } from "./recordsStore.js";
 import { planLabelFill, LABEL_FILL_VERSION } from "./modelAvoidance/labelFill.js";
-import { completenessFor, toCompletenessFields, normalizeDocumentType, mayVerifyWithoutLink, AI_VERIFY_MIN_CONFIDENCE } from "./documentTypes.js";
+import { completenessFor, toCompletenessFields, normalizeDocumentType, autoCheckDecision } from "./documentTypes.js";
 import { deriveWarranty } from "./warrantyRules.js";
 import { packForTenant } from "./industry/index.js";
+import { loadOwnNames } from "./modelAvoidance/ownCompany.js";
+import { clearNothingReadMarker } from "./modelAvoidance/storedTextReread.js";
 
 export const RECHECK_VERSION = LABEL_FILL_VERSION;
 export const RECHECK_ACTION = "document.fields_rechecked";
 const TENANT = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 const REPEATABLE = new Set(["work_performed", "part_number"]);
+/** True when the document already has a customer or unit link (the same test verifyByAi applies in SQL). */
+const HAS_LINK_SQL = `(EXISTS (SELECT 1 FROM extractions x WHERE x.document_id = d.id AND x.entity_id IS NOT NULL)
+                    OR EXISTS (SELECT 1 FROM document_entity_links l WHERE l.document_id = d.id))`;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** One document, inside an already-open tenant transaction (`db` = recordsStore's makeStore). */
@@ -54,7 +59,9 @@ export async function recheckDocumentTx(db, documentId, { actorClerkId = null, s
   const fieldsBefore = toCompletenessFields(rows);
   const before = completenessFor(type, fieldsBefore);
   const highestPage = pages.reduce((n, p) => Math.max(n, Number(p.page_no) || 0), 0);
+  const ownNames = await loadOwnNames(db, {}).catch(() => []);
   const plan = planLabelFill({
+    ownNames,
     type, fields: rows.map((r) => ({ field_key: r.field_key, value: r.value, corrected_value: r.corrected_value, confidence: Number(r.confidence ?? 0) })),
     pages: pages.map((p) => ({ page_no: p.page_no, text: p.text ?? "" })), today, method: "recheck", pageCount: highestPage,
   });
@@ -81,6 +88,7 @@ export async function recheckDocumentTx(db, documentId, { actorClerkId = null, s
     if (r.rowCount > 0) written.push({ field_key: f.field_key, value: f.value, page_no: f.page_no ?? null, method: "recheck", ...(f.flags ? { flags: f.flags } : {}) });
   }
 
+  if (written.length) await clearNothingReadMarker(db, documentId);
   const fieldsAfter = [...fieldsBefore, ...written.map((w) => ({ field_key: w.field_key, value: w.value, confidence: plan.add.find((a) => a.field_key === w.field_key)?.confidence ?? 0.9 }))];
   const after = completenessFor(type, fieldsAfter);
 
@@ -97,9 +105,16 @@ export async function recheckDocumentTx(db, documentId, { actorClerkId = null, s
     }
   }
 
+  // Automatic check under today's rules (documentTypes.js autoCheckDecision), whether or not this run filled anything:
+  // a complete document that an older rule left unchecked is judged again here.
   let aiVerified = false;
-  if (written.length && after.complete && after.minConfidence >= AI_VERIFY_MIN_CONFIDENCE) {
-    aiVerified = (await db.verifyByAi(documentId, { allowUnlinked: mayVerifyWithoutLink(type, fieldsAfter) })) > 0;
+  let checkReason = null;
+  {
+    const hasText = pages.some((p) => String(p.text ?? '').trim() !== '');
+    const link = await db.raw(`SELECT ${HAS_LINK_SQL} AS linked, d.original_filename AS filename FROM documents d WHERE d.id = $1::uuid`, [documentId]);
+    const verdict = autoCheckDecision(type, fieldsAfter, { hasText, hasLink: !!link.rows?.[0]?.linked, filename: link.rows?.[0]?.filename ?? null });
+    checkReason = verdict.reason;
+    if (verdict.ok) aiVerified = (await db.verifyByAi(documentId, { allowUnlinked: verdict.allowUnlinked })) > 0;
   }
 
   await db.logAction({
@@ -118,6 +133,7 @@ export async function recheckDocumentTx(db, documentId, { actorClerkId = null, s
       unconfirmed: after.unconfirmed ?? [],
       warranty_rederived: warrantyRederived,
       ai_verified: aiVerified,
+      ai_check_reason: checkReason,
     },
   });
 
@@ -150,29 +166,30 @@ export async function recheckDocument(ctx, documentId, opts = {}) {
  * @returns {Promise<{scanned:number, candidates:number, rechecked:number, filled:number, fields:number, verified:number, leftForNextRun:number}>}
  */
 export async function recheckTenantMissing(ctx, { limit = 40, today, deadlineAt = Infinity, actorClerkId = null, source = "cron", documentIds = null, force = false } = {}) {
-  const cap = Math.max(1, Math.min(200, Number(limit) || 40));
+  const cap = Math.max(1, Math.min(500, Number(limit) || 40));
   const ids = Array.isArray(documentIds) ? documentIds.filter((x) => typeof x === "string" && UUID_RE.test(x)).slice(0, 500) : null;
   const candidates = await withTenant(ctx, async (db) => {
     // The label dictionary is HVAC vocabulary: another industry pack's tenant is skipped whole (nothing written, so
     // nothing to re-scan tomorrow either).
     const pack = await packForTenant(db).catch(() => null);
     if (pack && pack.id && pack.id !== "hvac") return [];
-    // A document qualifies when a REQUIRED field is missing, or when its page prints an install / registration date
-    // label and the extraction has no such date at all (the warranty clock's inputs — the same drop, one field over).
+    // A document qualifies when a REQUIRED field is missing, when its page prints an install / registration date
+    // label and the extraction has no such date at all (the warranty clock's inputs), or when it is complete and
+    // would be checked automatically under today's rules but is not yet (an older, stricter rule left it open).
     const { rows: docs } = await db.raw(
-      `SELECT d.id, d.document_type,
+      `SELECT d.id, d.document_type, d.stage, d.original_filename,
+              ${HAS_LINK_SQL} AS has_link,
+              EXISTS (SELECT 1 FROM document_pages p WHERE p.document_id = d.id AND p.${TENANT} AND COALESCE(p.text, '') <> '') AS has_text,
               EXISTS (SELECT 1 FROM document_pages p2 WHERE p2.document_id = d.id AND p2.${TENANT}
-                        AND p2.text ~* '(install(ed|ation)?[[:space:]]*(date|dt|on)|date[[:space:]]+installed|registered|registration[[:space:]]+date)') AS has_warranty_date_label
+                        AND p2.text ~* '(install(ed|ation)?[[:space:]]*(date|dt|on)|date[[:space:]]+installed|registered|registration[[:space:]]+date)') AS has_warranty_date_label,
+              EXISTS (SELECT 1 FROM audit_log a
+                       WHERE a.resource_id = d.id AND a.${TENANT} AND a.action = '${RECHECK_ACTION}'
+                         AND COALESCE((a.changes->>'recheck_version')::int, 0) >= $1) AS already_rechecked
          FROM documents d
         WHERE d.${TENANT} AND d.stage IN ('read', 'mapped', 'linked') AND d.document_type IS NOT NULL
           ${ids ? "AND d.id = ANY($3::uuid[])" : ""}
-          AND EXISTS (SELECT 1 FROM document_pages p WHERE p.document_id = d.id AND p.${TENANT} AND COALESCE(p.text, '') <> '')
-          AND ($2::boolean OR NOT EXISTS (
-                SELECT 1 FROM audit_log a
-                 WHERE a.resource_id = d.id AND a.${TENANT} AND a.action = '${RECHECK_ACTION}'
-                   AND COALESCE((a.changes->>'recheck_version')::int, 0) >= $1))
         ORDER BY d.created_at DESC
-        LIMIT 500`,
+        LIMIT 3000`,
       ids ? [RECHECK_VERSION, !!force, ids] : [RECHECK_VERSION, !!force]
     );
     if (!docs.length) return [];
@@ -181,7 +198,13 @@ export async function recheckTenantMissing(ctx, { limit = 40, today, deadlineAt 
     for (const e of ex) { if (!byDoc.has(e.document_id)) byDoc.set(e.document_id, []); byDoc.get(e.document_id).push(e); }
     return docs.filter((d) => {
       const fields = toCompletenessFields(byDoc.get(d.id) ?? []);
-      if (completenessFor(normalizeDocumentType(d.document_type), fields).missing.length > 0) return true;
+      const type = normalizeDocumentType(d.document_type);
+      const c = completenessFor(type, fields);
+      // Would the automatic check pass today? Always worth a pass (it writes nothing but the verified stamp).
+      if (autoCheckDecision(type, fields, { hasText: d.has_text, hasLink: d.has_link, filename: d.original_filename }).ok) return true;
+      if (!force && d.already_rechecked) return false;
+      if (!d.has_text) return false;
+      if (c.missing.length > 0) return true;
       if (!d.has_warranty_date_label) return false;
       const keys = new Set(fields.filter((f) => f.value != null && String(f.value).trim() !== '').map((f) => String(f.field_key).replace(/_unconfirmed$/, '')));
       return !keys.has('installation_date') || !keys.has('warranty_registered_date');

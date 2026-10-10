@@ -1,6 +1,8 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useLauncherPulse } from './useLauncherPulse';
+import { useOrganization } from '@clerk/clerk-react';
 import { SupportLogo } from './SupportLogo';
+import { SupportAccessBanner } from './SupportAccess';
 import './support.css';
 
 // The chat itself loads on first open: AppShell wraps every screen and must stay light for startup speed.
@@ -42,6 +44,7 @@ export function SupportWidget({ page, userEmail, userName, onAskDonovan }: { pag
   const launcherRef = useRef<HTMLButtonElement>(null);
   const wasOpen = useRef(false);
   const pulsing = useLauncherPulse(open);
+  const { organization } = useOrganization();
 
   const close = useCallback(() => setOpen(false), []);
   // The Ask screen's "Open DeepWell Help" button (a how-to answer from the Help guide) opens this same panel.
@@ -58,6 +61,7 @@ export function SupportWidget({ page, userEmail, userName, onAskDonovan }: { pag
   const pos = { right: 'max(1rem, env(safe-area-inset-right))', bottom: 'max(1rem, env(safe-area-inset-bottom))' } as const;
   return (
     <>
+      <SupportAccessBanner surface="app" />
       {!open && (
         <div className="fixed z-30 print:hidden" style={pos}>
           <SupportLauncherButton
@@ -83,6 +87,7 @@ export function SupportWidget({ page, userEmail, userName, onAskDonovan }: { pag
             onClose={close}
             userEmail={userEmail}
             userName={userName}
+            companyName={organization?.name ?? ''}
             onAskDonovan={
               onAskDonovan
                 ? (q) => {

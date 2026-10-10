@@ -47,7 +47,7 @@ const TOP_LEVEL = [
 ];
 const DISPATCH_TARGETS = [
   // api/account.js ACTIONS
-  'api/_lib/routes/keys.js', 'api/_lib/routes/tenant-export.js', 'api/_lib/routes/tenant-delete.js',
+  'api/_lib/routes/keys.js', 'api/_lib/routes/tenant-export.js', 'api/_lib/routes/account-export.js', 'api/_lib/routes/tenant-delete.js',
   'api/_lib/routes/cron-sweep.js', 'api/_lib/routes/merge-tenant.js', 'api/_lib/routes/notifications.js',
   'api/_lib/routes/outreach.js', 'api/_lib/routes/followups.js', 'api/_lib/routes/expenses.js',
   'api/_lib/routes/financials.js', 'api/_lib/routes/graph.js', 'api/_lib/routes/entity-merge.js',

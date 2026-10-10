@@ -191,6 +191,9 @@ export function DashboardScreen() {
   // Skipped in demo mode, which has no backend to call.
   const [attention, setAttention] = useState<AttentionResponse | null>(null);
   const [openCard, setOpenCard] = useState<AlertCardKey | null>(null);
+  // A long tier list shows its first few units; "Show all" opens the rest (reset whenever another card opens).
+  const [showAllUnits, setShowAllUnits] = useState(false);
+  const UNIT_PREVIEW = 5;
   useEffect(() => {
     if (DEMO_MODE) return;
     let cancelled = false;
@@ -456,7 +459,7 @@ export function DashboardScreen() {
                   <button
                     key={key}
                     type="button"
-                    onClick={() => setOpenCard((k) => (k === key ? null : key))}
+                    onClick={() => { setShowAllUnits(false); setOpenCard((k) => (k === key ? null : key)); }}
                     className={`dw-card p-4 text-left hover:shadow-lift transition-shadow duration-quick ${isOpen ? 'ring-2 ring-accent' : ''}`}
                     aria-expanded={isOpen}
                   >
@@ -496,7 +499,7 @@ export function DashboardScreen() {
                     </button>
                   </li>
                 )}
-                {itemsForCard(attention?.items ?? [], openCard).map((item) => (
+                {(showAllUnits ? itemsForCard(attention?.items ?? [], openCard) : itemsForCard(attention?.items ?? [], openCard).slice(0, UNIT_PREVIEW)).map((item) => (
                   <li key={item.entityId} className="dw-card p-3 flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex items-start gap-2">
                       <label className="inline-flex items-center justify-center w-8 h-8 -m-1 mt-0.5 cursor-pointer shrink-0">
@@ -529,14 +532,14 @@ export function DashboardScreen() {
                       </div>
                       </div>
                     </div>
-                    <div className="flex flex-col items-end gap-1 shrink-0">
-                      <div className="flex gap-1.5">
+                    <div className="flex flex-col items-start sm:items-end gap-1 max-w-full sm:shrink-0">
+                      <div className="flex flex-wrap sm:justify-end gap-1.5">
                         {item.customerName && (
                           <button
                             type="button"
                             onClick={() => void viewCustomer(item)}
                             disabled={customerLookup[item.entityId] === 'loading'}
-                            className="dw-btn-tertiary !min-h-[36px] !py-1"
+                            className="dw-btn-tertiary !min-h-[44px] sm:!min-h-[36px] !py-1"
                           >
                             {customerLookup[item.entityId] === 'loading' ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <User className="w-3.5 h-3.5" aria-hidden="true" />}
                             View customer
@@ -545,14 +548,14 @@ export function DashboardScreen() {
                         <button
                           type="button"
                           onClick={() => askQuestion(item.serialNumber ? `Is ${item.serialNumber} under warranty?` : 'Which units are out of warranty?')}
-                          className="dw-btn-tertiary !min-h-[36px] !py-1"
+                          className="dw-btn-tertiary !min-h-[44px] sm:!min-h-[36px] !py-1"
                         >
                           Ask about this unit
                         </button>
-                        <button type="button" onClick={() => openOutreach(item.entityId)} className="dw-btn-secondary !min-h-[36px] !py-1">
+                        <button type="button" onClick={() => openOutreach(item.entityId)} className="dw-btn-secondary !min-h-[44px] sm:!min-h-[36px] !py-1">
                           <Mail className="w-3.5 h-3.5" aria-hidden="true" /> Open in Outreach
                         </button>
-                        <button type="button" onClick={() => dismissAlert(item)} className="dw-btn-tertiary !min-h-[36px] !py-1" title="Dismiss this alert">
+                        <button type="button" onClick={() => dismissAlert(item)} className="dw-btn-tertiary !min-h-[44px] sm:!min-h-[36px] !py-1" title="Dismiss this alert">
                           <X className="w-3.5 h-3.5" aria-hidden="true" /> Dismiss
                         </button>
                       </div>
@@ -562,6 +565,13 @@ export function DashboardScreen() {
                     </div>
                   </li>
                 ))}
+                {itemsForCard(attention?.items ?? [], openCard).length > UNIT_PREVIEW && (
+                  <li>
+                    <button type="button" className="dw-btn-tertiary !min-h-[44px] sm:!min-h-[36px]" aria-expanded={showAllUnits} onClick={() => setShowAllUnits((v) => !v)}>
+                      {showAllUnits ? `Show first ${UNIT_PREVIEW}` : `Show all ${itemsForCard(attention?.items ?? [], openCard).length}`}
+                    </button>
+                  </li>
+                )}
                 {itemsForCard(attention?.items ?? [], openCard).length === 0 && (
                   <li className="text-body text-ink-3">{ALERT_EMPTY_LABEL[openCard]}</li>
                 )}

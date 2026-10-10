@@ -2,6 +2,7 @@ import { armResponseDeadline } from "./_lib/util/deadline.js";
 import healthHandler from "./_lib/health.js";
 import keys from "./_lib/routes/keys.js";
 import tenantExport from "./_lib/routes/tenant-export.js";
+import accountExport from "./_lib/routes/account-export.js";
 import tenantDelete from "./_lib/routes/tenant-delete.js";
 import cronSweep from "./_lib/routes/cron-sweep.js";
 import mergeTenant from "./_lib/routes/merge-tenant.js";
@@ -26,6 +27,7 @@ import audience from "./_lib/audience/route.js";
  *   POST /api/keys            -> ?action=keys     (create / list / revoke API keys)
  *   GET  /api/account?action=health -> uptime check: { ok, db, time } only, NO auth (see _lib/health.js)
  *   POST /api/tenant-export   -> ?action=export   (everything, as JSON)
+ *   POST export-files         -> ?action=export-files (every original file as zip parts + CSVs; background job; admin only)
  *   POST /api/tenant-delete   -> ?action=delete   (everything, gone; needs confirm)
  *   GET  /api/cron-sweep      -> ?action=sweep    (find stuck documents; cron only)
  *   POST /api/merge-tenant    -> ?action=merge    (fold solo uploads into the shop)
@@ -65,7 +67,7 @@ import audience from "./_lib/audience/route.js";
  */
 export const config = { api: { bodyParser: { sizeLimit: "64kb" } }, maxDuration: 300 };
 
-const ACTIONS = { keys, export: tenantExport, delete: tenantDelete, sweep: cronSweep, merge: mergeTenant, notifications, outreach, followups, expenses, financials, graph, "entity-merge": entityMerge, naming, intake, grid, "ask-suggest": askSuggest, "unit-address": unitAddress, insights, audience, support: (q, s) => import("./_lib/support/route.js").then((m) => m.default(q, s)) };
+const ACTIONS = { keys, export: tenantExport, "export-files": accountExport, delete: tenantDelete, sweep: cronSweep, merge: mergeTenant, notifications, outreach, followups, expenses, financials, graph, "entity-merge": entityMerge, naming, intake, grid, "ask-suggest": askSuggest, "unit-address": unitAddress, insights, audience, support: (q, s) => import("./_lib/support/route.js").then((m) => m.default(q, s)) };
 
 export default async function handler(req, res) {
   const action = String(req.query?.action ?? "");

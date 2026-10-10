@@ -98,8 +98,10 @@ async function readBody(res: Response): Promise<unknown> {
 }
 
 function errorFromResponse(res: Response, body: unknown): SupportError {
-  const b = (body ?? {}) as { error?: unknown; retryAfterSec?: unknown };
+  const b = (body ?? {}) as { error?: unknown; retryAfterSec?: unknown; code?: unknown };
   const serverMessage = asString(b.error);
+  // Support-access answers carry their own plain-language message.
+  if (serverMessage && (b.code === 'not-admin' || b.code === 'unavailable')) return { kind: res.status === 403 ? 'auth' : 'server', status: res.status, message: serverMessage };
   if (res.status === 429) {
     const fromBody = typeof b.retryAfterSec === 'number' ? b.retryAfterSec : undefined;
     const retryAfterSec = fromBody ?? parseRetryAfterSeconds(res.headers.get('Retry-After'));
@@ -188,3 +190,51 @@ export const FALLBACK_STARTER: SupportStarter = {
   greeting: "Hi, I'm DeepWell Help. Ask me how DeepWell works: plans, uploads, scanning, your team, billing or privacy.",
   suggestions: ['How do I upload documents?', 'What plans are available?', 'How do I add a teammate?'],
 };
+
+/* ---------------------------------------------------------------- support access (Help chat button + banner) */
+
+export interface SupportAccessStatus {
+  /** The active time-boxed grant, if any. Members see only the expiry. */
+  active: { id: string; expiresAt: string } | null;
+  /** Only a company admin can turn access on or end it. */
+  isAdmin: boolean;
+}
+
+/** Tells the banner (and anything else listening in this tab) to re-read the status. */
+export const SUPPORT_ACCESS_CHANGED = 'deepwell:support-access-changed';
+
+function announceAccessChanged() {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(SUPPORT_ACCESS_CHANGED));
+}
+
+const postJson = (body: Record<string, unknown>): RequestInit => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+
+export function fetchSupportAccessStatus(surface: SupportSurface): Promise<SupportResult<SupportAccessStatus>> {
+  return call(postJson({ action: 'access-status', surface }), API_URL, (b) => {
+    const s = b as { active?: { id?: unknown; expiresAt?: unknown } | null; isAdmin?: unknown } | null;
+    if (!s || typeof s.isAdmin !== 'boolean') return null;
+    const a = s.active;
+    const active = a && typeof a.id === 'string' && typeof a.expiresAt === 'string' && Number.isFinite(Date.parse(a.expiresAt)) ? { id: a.id, expiresAt: a.expiresAt } : null;
+    return { active, isAdmin: s.isAdmin };
+  });
+}
+
+/** "Let DeepWell support look for 24 hours." Only the optional note the person chose to type is sent as extra context. */
+export async function grantSupportAccessFromChat(req: { surface: SupportSurface; note?: string; companyName?: string }): Promise<SupportResult<{ id: string; expiresAt: string }>> {
+  const r = await call(
+    postJson({ action: 'access-grant', surface: req.surface, ...(req.note?.trim() ? { note: capUnits(req.note.trim(), 200) } : {}), ...(req.companyName ? { companyName: req.companyName.slice(0, 80) } : {}) }),
+    API_URL,
+    (b) => {
+      const g = (b as { ok?: unknown; grant?: { id?: unknown; expiresAt?: unknown } } | null)?.grant;
+      return (b as { ok?: unknown } | null)?.ok === true && g && typeof g.id === 'string' && typeof g.expiresAt === 'string' ? { id: g.id, expiresAt: g.expiresAt } : null;
+    },
+  );
+  if (r.ok) announceAccessChanged();
+  return r;
+}
+
+export async function endSupportAccess(surface: SupportSurface, grantId: string): Promise<SupportResult<{ ok: true }>> {
+  const r = await call(postJson({ action: 'access-end', surface, grantId }), API_URL, (b) => ((b as { ok?: unknown } | null)?.ok === true ? { ok: true as const } : null));
+  if (r.ok) announceAccessChanged();
+  return r;
+}

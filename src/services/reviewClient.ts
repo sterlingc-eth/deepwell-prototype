@@ -642,6 +642,21 @@ export interface SemanticBackfillResult {
   status: SemanticStatus;
 }
 
+export interface DonovanScores {
+  configured: boolean;
+  unavailable?: boolean;
+  days: number;
+  total: number;
+  tenantsReporting: number;
+  tenantsOptedIn: number;
+  rates: Record<'answered_from_records' | 'declined' | 'ai_fallback' | 'marked_wrong', number | null>;
+  byOutcome: Record<string, number>;
+  byShape: Array<{ shape: string; n: number; answeredRate: number | null }>;
+  trend: Array<{ day: string; n: number; answeredRate: number | null; declinedRate: number | null; aiRate: number | null; wrongRate: number | null; avgLatencyMs: number | null; costUsd: number }>;
+  latencyMs: { p50: number | null; p95: number | null };
+  costUsd: number;
+}
+
 export const reviewClient = {
   /** Owner/admin: how many pages are searchable by meaning. */
   semanticStatus() {
@@ -773,12 +788,26 @@ export const reviewClient = {
   /** One-time owner re-sort (admin): moves documents typed Invoice/Other/Correspondence to a better type when their
    *  title or file name clearly says so, then checks the ones that need no link. $0, no model. Loop while `done` is false,
    *  passing back `nextAfterId`. */
-  resortDocuments(afterId: string | null = null, limit = 100) {
-    return postJson<{ scanned: number; retyped: number; checked: number; byType: Record<string, number>; errors: number; done: boolean; nextAfterId: string | null }>({
+  resortDocuments(afterId: string | null = null, limit = 100, opts: { dryRun?: boolean; runId?: string } = {}) {
+    return postJson<{
+      scanned: number; retyped: number; checked: number; byType: Record<string, number>; errors: number; done: boolean; nextAfterId: string | null;
+      /** dryRun only: nothing was written. */
+      dryRun?: boolean; wouldMove?: number; wouldCheck?: number;
+      moves?: { documentId: string; filename: string | null; from: string; to: string }[];
+      checks?: { documentId: string; filename: string | null; type: string }[];
+      skippedCounts?: Record<string, number>;
+    }>({
       action: 'resortDocuments',
       ...(afterId ? { afterId } : {}),
       limit,
+      ...(opts.dryRun ? { dryRun: true } : {}),
+      ...(opts.runId ? { runId: opts.runId } : {}),
     });
+  },
+
+  /** Undo one re-sort run (admin): restores the earlier types and un-checks what that run checked, unless a person touched it since. */
+  undoResort(runId: string) {
+    return postJson<{ runId: string; restoredTypes: number; uncheckedPapers: number; leftAlone: number }>({ action: 'undoResort', runId });
   },
 
   /** Batch reclassification of legacy/unknown/'other' document_type values
@@ -820,6 +849,17 @@ export const reviewClient = {
    *  `days`, when passed, additionally restricts to the last N days (the
    *  Team screen's card passes 7). Owner/admin only (the server enforces
    *  this too). */
+  /** Admin: read (no argument) or set the opt-in "Share Donovan performance scores with DeepWell" switch. Off by default.
+   *  `isOperator` is true only for DeepWell platform operators (decides whether the Donovan screen exists at all). */
+  donovanSharing(enabled?: boolean) {
+    return postJson<{ sharing: boolean; isOperator: boolean }>({ action: 'donovanSharing', ...(typeof enabled === 'boolean' ? { enabled } : {}) });
+  },
+
+  /** Operator only: redacted performance scores from every organization that opted in (no questions, answers or names). */
+  donovanScores(days?: number) {
+    return postJson<DonovanScores>({ action: 'donovanScores', days });
+  },
+
   missReport(days?: number) {
     return postJson<MissReport>({ action: 'missReport', days });
   },
@@ -963,7 +1003,7 @@ export const reviewClient = {
 
   /** Round 22 (S2, privacy): admin-only, this tenant's own grant/revoke of time-boxed DeepWell
    *  staff support access — see api/_lib/privacy/supportAccess.js's module doc. */
-  supportAccessGrant(opts: { hours?: number; reason?: string }) {
+  supportAccessGrant(opts: { hours?: number; reason?: string; companyName?: string }) {
     return postJson<{ ok: boolean; grant: SupportAccessGrant }>({ action: 'supportAccessGrant', ...opts });
   },
   supportAccessRevoke(grantId: string) {

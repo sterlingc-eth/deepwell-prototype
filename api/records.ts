@@ -26,6 +26,7 @@ import { getAsksThisMonth, resetsOnIso } from './_lib/usage.js';
 import { normalizeContentType, sanitizeUploadFilename } from './_lib/r2.js';
 import { checkUploadFile } from './_lib/uploadTypes.js';
 import { DOCUMENT_TYPE_IDS } from './_lib/documentTypes.js';
+import { hrGateSql } from './_lib/companyFilesStore.js';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '1mb' } },
@@ -54,8 +55,11 @@ export const RECORDS_READ_ACTIONS: ReadonlySet<string> = new Set([
   'getEntity', 'listEntities',
   'getProposal', 'listProposals',
   'getSchemaVersion', 'bootstrap',
+  // Company Files (read): folder counts, a folder, search, Check these, Coming up. People and HR is left out for anyone without access.
+  'companyFiles',
 ]);
-export const RECORDS_MEMBER_WRITE_ACTIONS: ReadonlySet<string> = new Set(['createDocument']);
+// Filing a paper into a company folder (and undoing it) is everyday work for any member; People and HR needs HR access (checked below).
+export const RECORDS_MEMBER_WRITE_ACTIONS: ReadonlySet<string> = new Set(['createDocument', 'moveCompanyFile', 'undoCompanyFileMove']);
 export const RECORDS_ADMIN_ACTIONS: ReadonlySet<string> = new Set([
   'updateDocument',
   'createFacet', 'updateFacet',
@@ -64,6 +68,8 @@ export const RECORDS_ADMIN_ACTIONS: ReadonlySet<string> = new Set([
   'createProposal', 'updateProposal',
   'logAction', 'getAuditLog',
   'incrementSchemaVersion',
+  // Company Files: who besides admins may open People and HR.
+  'setCompanyFilesHrAccess',
 ]);
 
 /** Pure: is this action allowed for this caller? Returns 'ok' | 'forbidden' | 'unknown'. */
@@ -72,6 +78,13 @@ export function recordsActionAccess(action: string, auth: { orgId?: string | nul
   if (RECORDS_ADMIN_ACTIONS.has(action)) return !auth?.orgId || auth.orgRole === 'admin' ? 'ok' : 'forbidden';
   return 'unknown';
 }
+
+/** Actions whose result can contain a document, its fields or its text: they all take `hideHr` (see processRecords). */
+export const HR_AWARE_ACTIONS: ReadonlySet<string> = new Set([
+  'getDocument', 'getDocumentPage', 'listDocuments', 'browseDocuments', 'browseFacets', 'listUnverifiedDocuments',
+  'getFacet', 'listFacetsByDocument', 'getExtraction', 'listExtractionsByDocument', 'listExtractionsByDocuments', 'listExtractionsByEntity',
+  'bootstrap', 'companyFiles', 'moveCompanyFile', 'undoCompanyFileMove',
+]);
 
 const MAX_CREATE_BYTES = 100 * 1024 * 1024;
 const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -142,7 +155,7 @@ const TENANT_PRED = "tenant_id = (current_setting('app.tenant_id', true))::uuid"
  * `.catch` on each below — so this degrades exactly like the old
  * per-endpoint calls did when one of them failed.
  */
-async function runBootstrap(db: any, auth: any, payload: any): Promise<any> {
+async function runBootstrap(db: any, auth: any, payload: any, hideHr = false): Promise<any> {
   const recordsLimit = Math.min(Math.max(Number(payload?.recordsLimit) || BOOTSTRAP_RECORDS_LIMIT, 1), 100);
   const monthStartIso = new Date(Date.now() - MONTH_MS).toISOString();
 
@@ -155,7 +168,7 @@ async function runBootstrap(db: any, auth: any, payload: any): Promise<any> {
     db.countDocuments().catch(() => 0),
     db.countPagesSince(monthStartIso).catch(() => 0),
     getAsksThisMonth(db).catch(() => 0),
-    db.raw(`SELECT * FROM documents WHERE ${TENANT_PRED} ORDER BY created_at DESC LIMIT $1`, [recordsLimit])
+    db.raw(`SELECT * FROM documents WHERE ${TENANT_PRED}${hideHr ? ` AND ${hrGateSql('documents')}` : ''} ORDER BY created_at DESC LIMIT $1`, [recordsLimit])
       .then((r: any) => r.rows).catch(() => []),
     db.raw(
       `WITH items AS (
@@ -259,51 +272,56 @@ export async function processRecords(req: VercelRequest, res: VercelResponse, au
     const result = await withTenant(
       { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId },
       async (db) => {
+        // Company Files: People and HR is admin-only unless the admin granted more. Admins and solo owners skip the lookup;
+        // everyone else's access comes from tenants.settings (never from the payload). Every read below that can return a
+        // document passes `hideHr`, so an HR paper never reaches a caller without access.
+        const isAdmin = !auth.orgId || auth.orgRole === 'admin';
+        const hideHr = isAdmin || !HR_AWARE_ACTIONS.has(String(action)) ? false : !(await db.hrAllowed(auth));
         switch (action) {
           // ---- documents ----
           case 'createDocument': {
             await assertUploadRoomInTx(db, recheckRow);
             return { id: (await db.createDocument(payload))?.id };
           }
-          case 'getDocument': return await db.getDocument(payload.id);
+          case 'getDocument': return await db.getDocument(payload.id, { hideHr });
           // The cited page's extracted text (Word/Excel/CSV have no picture): ONE page, bounded, tenant-scoped by RLS + the query.
           case 'getDocumentPage': {
             const n = Math.trunc(Number(payload.page_no));
             if (typeof payload.id !== 'string' || !Number.isInteger(n) || n < 1 || n > 100000) return null;
-            const pg = await db.getPage(payload.id, n);
+            const pg = await db.getPage(payload.id, n, { hideHr });
             return pg ? { page_no: pg.page_no, text: String(pg.text ?? '').slice(0, 60000) } : null;
           }
-          case 'listDocuments': return await db.listDocuments(payload.filters);
+          case 'listDocuments': return await db.listDocuments(payload.filters, { hideHr });
           // Records Browse (round 12 contract): the paginated/filtered/faceted
           // list behind the records screen. `payload.filters` is caller input,
           // normalized and validated inside browseDocuments itself — nothing
           // here is trusted directly. `currentUserId` comes from the verified
           // token (never the payload) so "My uploads" can't be spoofed.
-          case 'browseDocuments': return await db.browseDocuments(payload.filters, { currentUserId: auth.userId, facets: payload.facets === false ? 'none' : 'inline' });
+          case 'browseDocuments': return await db.browseDocuments(payload.filters, { currentUserId: auth.userId, facets: payload.facets === false ? 'none' : 'inline', hideHr });
           // R36: the filter-chip counts on their own (one pass, 60 s cache), so the first page need not wait for them.
-          case 'browseFacets': return await db.browseFacets(payload.filters, { currentUserId: auth.userId });
+          case 'browseFacets': return await db.browseFacets(payload.filters, { currentUserId: auth.userId, hideHr });
           // R36: shop-wide counts and the uncapped needs-review list (the client graph only holds the newest 500).
           case 'reviewSummary': return await db.reviewSummary();
           // Live import progress for the Inbox panel (what is still being read, the pace, recent failures).
           case 'importProgress': return await db.importProgress();
-          case 'listUnverifiedDocuments': return await db.listUnverifiedDocuments({ cursor: payload.cursor ?? null, limit: payload.limit });
+          case 'listUnverifiedDocuments': return await db.listUnverifiedDocuments({ cursor: payload.cursor ?? null, limit: payload.limit, hideHr });
           case 'listEntitiesByIds': return await db.listEntitiesByIds(payload.ids);
           case 'updateDocument':
             await db.updateDocument(payload.id, payload.updates); return { success: true };
 
           // ---- facets ----
           case 'createFacet': return { id: (await db.createFacet(payload))?.id };
-          case 'getFacet': return await db.getFacet(payload.id);
-          case 'listFacetsByDocument': return await db.listFacetsByDocument(payload.documentId);
+          case 'getFacet': return await db.getFacet(payload.id, { hideHr });
+          case 'listFacetsByDocument': return await db.listFacetsByDocument(payload.documentId, { hideHr });
           case 'updateFacet':
             await db.updateFacet(payload.id, payload.updates); return { success: true };
 
           // ---- extractions ----
           case 'createExtraction': return { id: (await db.createExtraction(payload))?.id };
-          case 'getExtraction': return await db.getExtraction(payload.id);
-          case 'listExtractionsByDocument': return await db.listExtractionsByDocument(payload.documentId);
-          case 'listExtractionsByDocuments': return await db.listExtractionsByDocuments(payload.documentIds);
-          case 'listExtractionsByEntity': return await db.listExtractionsByEntity(payload.entityId);
+          case 'getExtraction': return await db.getExtraction(payload.id, { hideHr });
+          case 'listExtractionsByDocument': return await db.listExtractionsByDocument(payload.documentId, { hideHr });
+          case 'listExtractionsByDocuments': return await db.listExtractionsByDocuments(payload.documentIds, { hideHr });
+          case 'listExtractionsByEntity': return await db.listExtractionsByEntity(payload.entityId, { hideHr });
           case 'updateExtraction':
             await db.updateExtraction(payload.id, payload.updates); return { success: true };
 
@@ -334,7 +352,39 @@ export async function processRecords(req: VercelRequest, res: VercelResponse, au
           // ---- bootstrap (perf: one round trip / one tenant transaction for
           // everything the app shell needs before it can show anything real —
           // see handoffs/STARTUP_PERF_R13.md) ----
-          case 'bootstrap': return await runBootstrap(db, auth, payload);
+          case 'bootstrap': return await runBootstrap(db, auth, payload, hideHr);
+
+          // ---- Company Files (no new table; see api/_lib/companyFilesStore.js) ----
+          case 'companyFiles': {
+            const view = ['home', 'folder', 'search'].includes(payload.view) ? payload.view : 'home';
+            const out: any = await db.companyFiles({
+              view,
+              folder: typeof payload.folder === 'string' ? payload.folder.slice(0, 40) : null,
+              q: typeof payload.q === 'string' ? payload.q.slice(0, 200) : null,
+              canHr: !hideHr,
+              todayIso: new Date().toISOString().slice(0, 10),
+            });
+            if (view === 'home') {
+              out.canEditHrAccess = isAdmin;
+              if (isAdmin) out.hrAccess = (await db.getCompanyFilesHrAccess()).hrAccess;
+            }
+            return out;
+          }
+          case 'moveCompanyFile':
+            return await db.moveCompanyFile({
+              documentId: payload.documentId, to: payload.to, alwaysFile: payload.alwaysFile !== false, canHr: !hideHr,
+            });
+          case 'undoCompanyFileMove':
+            return await db.undoCompanyFileMove({
+              documentId: payload.documentId, previousOverride: payload.previousOverride ?? null,
+              ruleKey: typeof payload.ruleKey === 'string' ? payload.ruleKey.slice(0, 120) : null,
+              previousRule: payload.previousRule ?? null, ruleFolder: payload.ruleFolder ?? null, canHr: !hideHr,
+            });
+          case 'setCompanyFilesHrAccess': {
+            const roles = Array.isArray(payload.roles) ? payload.roles.filter((x: unknown) => typeof x === 'string').slice(0, 5) : [];
+            const members = Array.isArray(payload.members) ? payload.members.filter((x: unknown) => typeof x === 'string').slice(0, 100) : [];
+            return await db.setCompanyFilesHrAccess({ roles, members });
+          }
 
           default:
             return { __unknownAction: true };
@@ -353,6 +403,8 @@ export async function processRecords(req: VercelRequest, res: VercelResponse, au
     }
     // Log the detail, return none of it — raw messages leak schema and
     // connection internals to anonymous callers.
+    // Company Files raises a few plain-spoken errors (not found, not allowed) that are safe to show.
+    if (err?.expose === true && Number.isInteger(err.status)) return handleCors(res, req).status(err.status).json({ error: String(err.message) });
     console.error('API error:', scrubErrorForLog(err));
     return res.status(500).json({ error: 'Internal server error' });
   }

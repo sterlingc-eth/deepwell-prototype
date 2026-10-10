@@ -21,6 +21,7 @@
  */
 import { serializeClient, assertTenantUuid, isNonBlankId, explicitPgSsl } from './util/pgClient.js';
 import pg from 'pg';
+import { loadOwnNames, isOwnName } from './modelAvoidance/ownCompany.js';
 import { keyBelongsToTenant } from './r2.js';
 import { DOCX_CONTENT_TYPE, XLSX_CONTENT_TYPE } from './uploadTypes.js';
 import {
@@ -28,7 +29,7 @@ import {
 } from './office/limits.js';
 import { staffImportWindowFor, noteDatabaseClock } from './staffImport.js';
 import {
-  customerMatchScore, CUSTOMER_MATCH_THRESHOLD, normalizeSurname, normalizeAddressKey, normalizeUnitKey,
+  customerMatchScore, findExistingCustomerForCreate, isBusinessName, CUSTOMER_MATCH_THRESHOLD, normalizeSurname, normalizeAddressKey, normalizeUnitKey,
   addressOnlyCustomerName, isAddressOnlyCustomer, isLikelyShopAddress, houseNumberOf,
   normalizePhoneKey, normalizeEmailKey, compareNamesStrict, isFragmentName, chooseUpgradedCustomerName,
   extractNameMention, matchNameMention,
@@ -44,6 +45,10 @@ import { financialsTableExists } from './financials/store.js';
 // audience/probe.js's own header on why this imports THAT file and never audience/store.js).
 import { documentsHaveAudience } from './audience/probe.js';
 import { AUDIENCE_FALLBACK_FIELD_KEY } from './audience/sql.js';
+import {
+  hrGateSql, hrDocGate, hrAllowed as cfHrAllowed, companyFilesView as cfView, moveCompanyFile as cfMove,
+  undoCompanyFileMove as cfUndo, setHrAccess as cfSetHr, readHrAccess as cfReadHr,
+} from './companyFilesStore.js';
 // Round 22 (S2, privacy): the skip-shop-address log below used to print the raw tenant id and a
 // normalized ADDRESS out of the request — a real (if the shop's own) street address — into the log.
 import { hashForLog } from './privacy/redact.js';
@@ -534,7 +539,7 @@ export function decodeBrowseKeysetCursor(cursor, filtersKey) {
 
 /** Filter dimensions that read only `documents` columns (so a page and its total can be answered from `documents` alone,
  *  with no per-document joins). Everything else needs the linked customer / extracted fields / financials. */
-const BROWSE_DOC_LOCAL_DIMS = new Set(['documentType', 'stageBucket', 'uploadedByMe', 'uploadDateFrom', 'uploadDateTo', 'q']);
+const BROWSE_DOC_LOCAL_DIMS = new Set(['documentType', 'stageBucket', 'uploadedByMe', 'uploadDateFrom', 'uploadDateTo', 'q', 'hrGate']);
 
 /**
  * One WHERE fragment, keyed by the filter dimension it came from so a facet
@@ -546,6 +551,10 @@ const BROWSE_DOC_LOCAL_DIMS = new Set(['documentType', 'stageBucket', 'uploadedB
 function buildBrowseFragments(f, hasDisplayName, hasFinancials, hasAudienceColumn, searchFn = false) {
   const frags = [];
   const add = (dim, template, ...values) => frags.push({ dim, template, values });
+
+  // Company Files: a caller without People and HR access never gets an HR paper in a browse, a count or a facet. This fragment
+  // is on every query form (page, count, facets, search) and belongs to no facet dimension, so no facet ever removes it.
+  if (f.hideHr) add('hrGate', hrGateSql('d'));
 
   // Round 18, part 2 (owner ask (a)): 'all' means no restriction at all (the exact same "no
   // fragment for this dimension" idiom every other filter here already uses when unset).
@@ -837,8 +846,9 @@ async function customerSummaryReady(db) {
 const SEARCH_WALK_WINDOW = 1000;
 
 /** Normalises the caller's filters and runs the once-per-process schema probes every browse query needs. */
-async function browseContext(db, rawFilters, currentUserId) {
+async function browseContext(db, rawFilters, currentUserId, hideHr = false) {
   const f = normalizeBrowseFilters(rawFilters);
+  f.hideHr = hideHr === true;
   f.currentUserId = f.uploadedByMe ? currentUserId : null;
   const hasDisplayName = await documentsHaveDisplayName(db);
   // financialsTableExists expects a store-shaped object with `.raw` (that is how api/_lib/financials/store.js's own callers
@@ -1166,12 +1176,12 @@ export function linkedByForMatchBasis(matchBasis) {
  *   `name` enables the fuzzy path below.
  */
 export function selectCustomerMatch(candidates, incoming) {
-  const { name = '', address = '' } = typeof incoming === 'string' ? { address: incoming } : (incoming ?? {});
+  const { name = '', address = '', phone = '', email = '' } = typeof incoming === 'string' ? { address: incoming } : (incoming ?? {});
 
   if (!address) {
     // No address to disambiguate with. Only a single same-named candidate is
     // safe, and even that is a judgement call — see the header note.
-    return candidates.length === 1 ? candidates[0] : null;
+    return candidates.length === 1 ? candidates[0] : (sameCustomerTwin(candidates, { name, phone, email }) ?? null);
   }
 
   // The incoming document HAS an address, so require a positive match on it.
@@ -1226,7 +1236,31 @@ export function selectCustomerMatch(candidates, incoming) {
     }
     return false;
   });
-  return eligible.length === 1 ? eligible[0] : null;
+  if (eligible.length === 1) return eligible[0];
+  return sameCustomerTwin(candidates, { name, phone, email });
+}
+
+/**
+ * Last resort for selectCustomerMatch, so the same customer is not created a
+ * second time: a BUSINESS with the same name (case, punctuation and Inc/LLC/Co
+ * ignored) is one customer even when a document shows another site or none,
+ * and any customer whose name matches AND whose phone or email matches is the
+ * same person. Two people of one name with no contact detail still stay apart
+ * (the privacy rule above), and a phone/email that disagrees always blocks.
+ * Several equal candidates -> the lowest customer number (the main record).
+ */
+export function sameCustomerTwin(candidates, { name = '', phone = '', email = '' } = {}) {
+  if (!name || !candidates?.length) return null;
+  const found = findExistingCustomerForCreate(
+    { name, phone, email },
+    candidates.map((c) => ({
+      id: c.id, name: c.data?.customer_name, address: c.data?.service_address,
+      phone: c.data?.phone, email: c.data?.email, customerNumber: c.customer_number,
+    }))
+  );
+  if (!found || found.kind !== 'duplicate') return null;
+  if (found.basis === 'name' && !isBusinessName(name)) return null;
+  return candidates.find((c) => c.id === found.match.id) ?? null;
 }
 
 /**
@@ -1855,6 +1889,7 @@ async function findOrCreateCustomerByAddress(db, tenantId, address, facts, shopC
 }
 
 function makeStore(db, tenantId) {
+  let ownNamesPromise = null; // this tenant's own names, read once (findOrCreateCustomer own-company guard)
   const one = async (sql, params) => (await db.query(sql, params)).rows[0] ?? null;
   const ownedBy = (table, param) => `EXISTS (SELECT 1 FROM ${table} WHERE id = ${param} AND ${TENANT})`;
   const notFound = (msg) => Object.assign(new Error(msg), { status: 404, statusCode: 404, code: 'NOT_FOUND' });
@@ -1881,6 +1916,8 @@ function makeStore(db, tenantId) {
       [id, ...values]
     );
   };
+
+  const cfCtx = async () => ({ query: (sql, p) => db.query(sql, p), tenantId, hasDisplayName: await documentsHaveDisplayName(db) });
 
   return {
     tenantId,
@@ -1926,7 +1963,7 @@ function makeStore(db, tenantId) {
          d.storage_key ?? null, d.content_type ?? null]
       );
     },
-    getDocument: (id) => one(`SELECT * FROM documents WHERE id = $1 AND ${TENANT}`, [id]),
+    getDocument: (id, { hideHr = false } = {}) => one(`SELECT * FROM documents WHERE id = $1 AND ${TENANT}${hideHr ? ` AND ${hrGateSql('documents')}` : ''}`, [id]),
     // Cascades to document_pages, facets and extractions through their FKs.
     // The tenant predicate is belt-and-braces next to RLS: a delete that
     // silently crossed a tenant boundary is not a bug you find later.
@@ -1934,8 +1971,9 @@ function makeStore(db, tenantId) {
       const r = await db.query(`DELETE FROM documents WHERE id = $1 AND ${TENANT}`, [id]);
       return r.rowCount;
     },
-    listDocuments: (f = {}) => {
+    listDocuments: (f = {}, { hideHr = false } = {}) => {
       const where = [TENANT];
+      if (hideHr) where.push(hrGateSql('documents'));
       const vals = [];
       for (const [k, col] of [['stage', 'stage'], ['document_type', 'document_type'], ['batch_id', 'batch_id']]) {
         if (f[k] != null) { vals.push(f[k]); where.push(`${col} = $${vals.length}`); }
@@ -1958,13 +1996,14 @@ function makeStore(db, tenantId) {
                 count(*) FILTER (WHERE stage = 'read')::int AS read,
                 count(*) FILTER (WHERE stage = 'mapped')::int AS mapped,
                 count(*) FILTER (WHERE stage = 'linked')::int AS linked,
-                count(*) FILTER (WHERE stage = 'verified')::int AS verified
+                count(*) FILTER (WHERE stage = 'verified')::int AS verified,
+                count(*) FILTER (WHERE stage = 'verified' AND verified_by = 'ai')::int AS ai_verified
            FROM documents WHERE ${TENANT}`,
         []
       );
       const byStage = { received: r?.received ?? 0, read: r?.read ?? 0, mapped: r?.mapped ?? 0, linked: r?.linked ?? 0, verified: r?.verified ?? 0 };
       const total = r?.total ?? 0;
-      return { total, byStage, needsReview: total - byStage.verified, verified: byStage.verified };
+      return { total, byStage, needsReview: total - byStage.verified, verified: byStage.verified, aiVerified: Math.min(r?.ai_verified ?? 0, byStage.verified) };
     },
 
     /**
@@ -2005,9 +2044,10 @@ function makeStore(db, tenantId) {
      * cursor after that). Rows are the plain `documents` rows listDocuments returns, so the client turns them into graph
      * documents exactly as it does for the newest 500. The "newest 500" cap is why a needs-review document older than that
      * was invisible; this has no cap.
-     * @param {{cursor?: string|null, limit?: number}} [opts]
+     * @param {{cursor?: string|null, limit?: number, hideHr?: boolean}} [opts]
      */
-    listUnverifiedDocuments: async ({ cursor = null, limit = 200 } = {}) => {
+    listUnverifiedDocuments: async ({ cursor = null, limit = 200, hideHr = false } = {}) => {
+      const hrSql = hideHr ? ` AND ${hrGateSql('documents')}` : '';
       const n = Number.isFinite(Number(limit)) && Number(limit) >= 1 ? Math.min(Math.trunc(Number(limit)), 200) : 200;
       const key = decodeBrowseKeysetCursor(cursor, 'unverified');
       const vals = [];
@@ -2015,14 +2055,14 @@ function makeStore(db, tenantId) {
       if (key) { vals.push(key.ts, key.id); keysetSql = 'AND (created_at, id) < ($1::timestamptz, $2::uuid)'; }
       const rows = await many(
         `SELECT *, created_at::text AS _created_at_raw FROM documents
-          WHERE ${TENANT} AND stage <> 'verified' ${keysetSql}
+          WHERE ${TENANT} AND stage <> 'verified'${hrSql} ${keysetSql}
           ORDER BY created_at DESC, id DESC LIMIT ${n + 1}`,
         vals
       );
       const more = rows.length > n;
       const page = more ? rows.slice(0, n) : rows;
       let total = key?.total ?? null;
-      if (total == null) total = (await one(`SELECT count(*)::int AS n FROM documents WHERE ${TENANT} AND stage <> 'verified'`, []))?.n ?? 0;
+      if (total == null) total = (await one(`SELECT count(*)::int AS n FROM documents WHERE ${TENANT} AND stage <> 'verified'${hrSql}`, []))?.n ?? 0;
       const last = page[page.length - 1];
       const nextCursor = more && last ? encodeBrowseKeysetCursor(last._created_at_raw, last.id, 'unverified', total) : null;
       return { rows: page.map(({ _created_at_raw, ...row }) => row), total, nextCursor };
@@ -2044,9 +2084,9 @@ function makeStore(db, tenantId) {
      * counted with every OTHER active filter applied but never its own, so
      * picking a facet option never removes it (or its siblings) from view.
      */
-    /** @param {Record<string, unknown>} [rawFilters] @param {{currentUserId?: string|null, facets?: 'inline'|'none'}} [opts] */
-    browseDocuments: async (rawFilters = {}, { currentUserId = null, facets: facetMode = 'inline' } = {}) => {
-      const ctxB = await browseContext(db, rawFilters, currentUserId);
+    /** @param {Record<string, unknown>} [rawFilters] @param {{currentUserId?: string|null, facets?: 'inline'|'none', hideHr?: boolean}} [opts] */
+    browseDocuments: async (rawFilters = {}, { currentUserId = null, facets: facetMode = 'inline', hideHr = false } = {}) => {
+      const ctxB = await browseContext(db, rawFilters, currentUserId, hideHr);
       const { f, hasDisplayName, hasFinancials, hasAudienceColumn, baseParams, filtersKey, allFrags } = ctxB;
       const limit = f.limit;
       const sortDef = BROWSE_SORTS[f.sort] ?? BROWSE_SORTS[DEFAULT_BROWSE_SORT];
@@ -2140,9 +2180,9 @@ function makeStore(db, tenantId) {
      * set instead of ten, and a 60 s per-tenant cache for the same filters (they describe the whole set, change only when
      * documents arrive, and nobody needs them to the second).
      */
-    /** @param {Record<string, unknown>} [rawFilters] @param {{currentUserId?: string|null, cache?: boolean}} [opts] */
-    browseFacets: async (rawFilters = {}, { currentUserId = null, cache = true } = {}) => {
-      const ctxB = await browseContext(db, rawFilters, currentUserId);
+    /** @param {Record<string, unknown>} [rawFilters] @param {{currentUserId?: string|null, cache?: boolean, hideHr?: boolean}} [opts] */
+    browseFacets: async (rawFilters = {}, { currentUserId = null, cache = true, hideHr = false } = {}) => {
+      const ctxB = await browseContext(db, rawFilters, currentUserId, hideHr);
       const key = `${tenantId}|${ctxB.filtersKey}|${currentUserId ?? ''}`;
       if (cache) {
         const hit = browseFacetCache.get(key);
@@ -2152,6 +2192,15 @@ function makeStore(db, tenantId) {
       if (cache) browseFacetCache.set(key, facets);
       return { facets, cached: false };
     },
+
+    // ---- Company Files (api/_lib/companyFilesStore.js; no new table: see that file's header) ----
+    /** May this caller (from the verified token) open People and HR? One small read of tenants.settings. */
+    hrAllowed: (auth) => cfHrAllowed((sql, p) => db.query(sql, p), auth),
+    companyFiles: async (opts) => cfView(await cfCtx(), opts),
+    moveCompanyFile: async (opts) => cfMove(await cfCtx(), opts),
+    undoCompanyFileMove: async (opts) => cfUndo(await cfCtx(), opts),
+    setCompanyFilesHrAccess: async (opts) => cfSetHr(await cfCtx(), opts),
+    getCompanyFilesHrAccess: async () => cfReadHr(await cfCtx()),
 
     // ---- billing read helpers (api/_lib/billing.js, api/_lib/plan.js) -------
     // Real COUNT queries, not listDocuments' capped-at-500 rows — billing caps
@@ -2364,9 +2413,9 @@ function makeStore(db, tenantId) {
       if (!row) throw notFound('document not found');
       return row;
     },
-    getFacet: (id) => one(`SELECT * FROM facets WHERE id = $1 AND ${TENANT}`, [id]),
-    listFacetsByDocument: (documentId) =>
-      many(`SELECT * FROM facets WHERE document_id = $1 AND ${TENANT} ORDER BY page_no, id`, [documentId]),
+    getFacet: (id, { hideHr = false } = {}) => one(`SELECT * FROM facets WHERE id = $1 AND ${TENANT}${hideHr ? ` AND ${hrDocGate('facets.document_id')}` : ''}`, [id]),
+    listFacetsByDocument: (documentId, { hideHr = false } = {}) =>
+      many(`SELECT * FROM facets WHERE document_id = $1 AND ${TENANT}${hideHr ? ` AND ${hrDocGate('facets.document_id')}` : ''} ORDER BY page_no, id`, [documentId]),
     updateFacet: updater('facets', ['mapped_entity_type', 'mapped_field_key', 'mapping_confidence', 'mapping_method', 'value_raw']),
 
     // ---- extractions ----
@@ -2398,11 +2447,11 @@ function makeStore(db, tenantId) {
       if (!row) throw notFound('document, entity or facet not found');
       return row;
     },
-    getExtraction: (id) => one(`SELECT * FROM extractions WHERE id = $1 AND ${TENANT}`, [id]),
-    listExtractionsByDocument: (documentId) =>
-      many(`SELECT * FROM extractions WHERE document_id = $1 AND ${TENANT} ORDER BY id`, [documentId]),
-    listExtractionsByEntity: (entityId) =>
-      many(`SELECT * FROM extractions WHERE entity_id = $1 AND ${TENANT} ORDER BY id`, [entityId]),
+    getExtraction: (id, { hideHr = false } = {}) => one(`SELECT * FROM extractions WHERE id = $1 AND ${TENANT}${hideHr ? ` AND ${hrDocGate('extractions.document_id')}` : ''}`, [id]),
+    listExtractionsByDocument: (documentId, { hideHr = false } = {}) =>
+      many(`SELECT * FROM extractions WHERE document_id = $1 AND ${TENANT}${hideHr ? ` AND ${hrDocGate('extractions.document_id')}` : ''} ORDER BY id`, [documentId]),
+    listExtractionsByEntity: (entityId, { hideHr = false } = {}) =>
+      many(`SELECT * FROM extractions WHERE entity_id = $1 AND ${TENANT}${hideHr ? ` AND ${hrDocGate('extractions.document_id')}` : ''} ORDER BY id`, [entityId]),
 
     /**
      * Every extraction for many documents in ONE query.
@@ -2415,7 +2464,7 @@ function makeStore(db, tenantId) {
      * linked" about the document that created it. One query, capped so a
      * document dense with repeatable fields cannot blow up the response.
      */
-    listExtractionsByDocuments: async (documentIds) => {
+    listExtractionsByDocuments: async (documentIds, { hideHr = false } = {}) => {
       const ids = [...new Set((documentIds ?? []).filter((x) => typeof x === 'string'))].slice(0, 500);
       if (!ids.length) return [];
       // Guarded select (M3-config/19): NULL AS unit_index on a warm instance
@@ -2425,7 +2474,7 @@ function makeStore(db, tenantId) {
       return many(
         `SELECT id, document_id, entity_id, field_key, value, confidence, corrected_value, ${unitIndexCol}
            FROM extractions
-          WHERE document_id = ANY($1::uuid[]) AND ${TENANT}
+          WHERE document_id = ANY($1::uuid[]) AND ${TENANT}${hideHr ? ` AND ${hrDocGate('extractions.document_id')}` : ''}
           ORDER BY document_id, id
           LIMIT 8000`,
         [ids]
@@ -2546,8 +2595,8 @@ function makeStore(db, tenantId) {
     },
 
     // One page's text (the cited page/sheet chunk of a Word/Excel/CSV file shown in the app). Tenant-scoped like every read here.
-    getPage: (documentId, pageNo) => one(
-      `SELECT page_no, text FROM document_pages WHERE document_id = $1 AND page_no = $2 AND ${TENANT}`,
+    getPage: (documentId, pageNo, { hideHr = false } = {}) => one(
+      `SELECT page_no, text FROM document_pages WHERE document_id = $1 AND page_no = $2 AND ${TENANT}${hideHr ? ` AND ${hrDocGate('document_pages.document_id')}` : ''}`,
       [documentId, pageNo]
     ),
 
@@ -3108,6 +3157,12 @@ function makeStore(db, tenantId) {
     findOrCreateCustomer: async (facts, shopContext) => {
       const name = normalizeCustomerNameText(facts?.customer_name);
       const address = normalizeMatchText(facts?.service_address);
+      // Our own company is never a customer (a bill addressed TO the tenant used to create the tenant as its own customer).
+      // Same rule as T4's is_company skip below, by name; read once per store (RLS-scoped, never throws).
+      if (name) {
+        ownNamesPromise ??= loadOwnNames({ raw: (sql, p) => db.query(sql, p) }, {}).catch(() => []);
+        if (isOwnName(name, await ownNamesPromise)) return null;
+      }
       if (!name) {
         if (address) return findOrCreateCustomerByAddress(db, tenantId, address, facts, shopContext);
 
@@ -3193,7 +3248,7 @@ function makeStore(db, tenantId) {
       let candidates = await many(
         `SELECT id, data, customer_number FROM entities
           WHERE entity_type = 'customer' AND ${TENANT}
-            AND merged_into IS NULL
+            AND merged_into IS NULL AND COALESCE(data->>'is_company', '') <> 'true'
             AND ( lower(data->>'customer_name') = lower($1)
                OR ($2::text <> '' AND lower(data->>'customer_name') LIKE '%' || $2 || '%' ESCAPE '\\') )
           ORDER BY created_at LIMIT 200`,
@@ -3233,7 +3288,7 @@ function makeStore(db, tenantId) {
         }
       }
 
-      const existing = selectCustomerMatch(candidates, { name, address });
+      const existing = selectCustomerMatch(candidates, { name, address, phone: incoming.phone, email: incoming.email });
 
       if (!existing) {
         // Upgrade-by-fuller-name (owner root-cause fix, 2026-09-20): before
@@ -3298,6 +3353,11 @@ function makeStore(db, tenantId) {
       // fill-only loop above only ever fills a BLANK customer_name, never
       // upgrades a non-blank one. chooseUpgradedCustomerName pins the exact
       // upgrade rule as a plain function (see scripts/verify-integrity.mjs).
+      // A document showing another site of the same customer keeps that site on the record.
+      if (address && existing.data?.service_address && normalizeAddressKey(existing.data.service_address) !== normalizeAddressKey(address)) {
+        const others = Array.isArray(data.other_addresses) ? data.other_addresses.map(String) : [];
+        if (!others.some((o) => normalizeAddressKey(o) === normalizeAddressKey(address))) { data.other_addresses = [...others, address]; changed = true; }
+      }
       const storedName = String(existing.data?.customer_name ?? '').trim();
       const incomingName = String(incoming.customer_name ?? '').trim();
       const upgradedName = chooseUpgradedCustomerName(storedName, incomingName);
@@ -3564,13 +3624,13 @@ function makeStore(db, tenantId) {
           ? `SELECT c.id, c.customer_number, c.data, ca.last_activity, ca.doc_count
                FROM entities c
                LEFT JOIN customer_activity ca ON ca.customer_id = c.id AND ${caTenant}
-              WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND ${cTenant} ${filter}
+              WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND COALESCE(c.data->>'is_company', '') <> 'true' AND ${cTenant} ${filter}
               ORDER BY c.data->>'customer_name' ASC NULLS LAST, c.id
               LIMIT $2 OFFSET $3`
           : `SELECT c.id, c.customer_number, c.data, ca.last_activity, ca.doc_count
                FROM customer_activity ca
                JOIN entities c ON c.id = ca.customer_id
-              WHERE ${caTenant} AND c.entity_type = 'customer' AND c.merged_into IS NULL AND ${cTenant} ${filter}
+              WHERE ${caTenant} AND c.entity_type = 'customer' AND c.merged_into IS NULL AND COALESCE(c.data->>'is_company', '') <> 'true' AND ${cTenant} ${filter}
               ORDER BY ${sort === 'docs' ? 'ca.doc_count DESC, ca.customer_id' : 'ca.last_activity DESC NULLS LAST, ca.customer_id'}
               LIMIT $2 OFFSET $3`;
         const outerOrder = sort === 'name' ? "p.data->>'customer_name' ASC NULLS LAST, p.id"
@@ -3601,7 +3661,7 @@ function makeStore(db, tenantId) {
         `WITH c AS (
            SELECT id, customer_number, data, updated_at
              FROM entities
-            WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT}
+            WHERE entity_type = 'customer' AND merged_into IS NULL AND COALESCE(data->>'is_company', '') <> 'true' AND ${TENANT}
               AND ($1::text IS NULL OR data->>'customer_name' ILIKE $1
                                     OR data->>'service_address' ILIKE $1
                                     OR customer_number ILIKE $1)
@@ -3670,7 +3730,7 @@ function makeStore(db, tenantId) {
     countCustomersSummary: async ({ like = null } = {}) => {
       const { rows } = await db.query(
         `SELECT COUNT(*)::int AS n FROM entities
-          WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT}
+          WHERE entity_type = 'customer' AND merged_into IS NULL AND COALESCE(data->>'is_company', '') <> 'true' AND ${TENANT}
             AND ($1::text IS NULL OR data->>'customer_name' ILIKE $1
                                   OR data->>'service_address' ILIKE $1
                                   OR customer_number ILIKE $1)`,

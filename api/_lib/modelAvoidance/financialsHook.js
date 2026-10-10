@@ -17,34 +17,46 @@ import { extractFinancialsBestEffort, isFinancialsEnabled } from "../financials/
 import { extractFinancialsForDocument } from "../financials/extract.js";
 import { isFinancialDocumentType } from "../financials/normalize.js";
 import { extractFromText } from "./textExtract.js";
-import { isDeterministicFinancialsEnabled } from "./switches.js";
+import { isDeterministicFinancialsEnabled, isGenericExtractEnabled } from "./switches.js";
+import { packForTenant } from "../industry/index.js";
 import { normalizeDate } from "../extractFields.js";
 import { canonicalTypeId } from "../documentTypes.js";
 
-const KIND_BY_TYPE = { invoice: "invoice", "proposal-quote": "estimate", "maintenance-agreement": "agreement" };
+const KIND_BY_TYPE = { invoice: "invoice", "proposal-quote": "estimate", "maintenance-agreement": "agreement", "purchase-order": "po" };
 
 /**
  * Pure. The `extract_financials` tool input for one stored document, or null when the text is not a fully
  * understood labelled money form of `docType`.
  * @param {{page_no:number,text:string}[]} pages
  * @param {string} docType  the document's stored type
+ * @param {{pack?: object|null}} [opts]  the tenant's industry pack (same acceptance rule as field extraction: every
+ *   field the type requires found with high confidence, else null and the model reads the money)
  */
-export function financialsInputFromText(pages, docType) {
+export function financialsInputFromText(pages, docType, opts = {}) {
   const type = canonicalTypeId(docType);
-  const kind = KIND_BY_TYPE[type];
+  let kind = KIND_BY_TYPE[type];
   if (!kind) return null;
-  const det = extractFromText(pages, { skipInstallGuard: true });
+  // The strict HVAC-template reading first, exactly as before (the hook never passed a pack, so it ran for every
+  // industry); then the validated-label reading (receipt / PO / statement-shaped money documents, any pack).
+  let det = extractFromText(pages, { skipInstallGuard: true, generic: false });
+  if (!det.accepted && isGenericExtractEnabled()) det = extractFromText(pages, { skipInstallGuard: true, pack: opts.pack ?? null });
   if (!det.accepted || det.type !== type) return null;
+  if (det.variant === "credit_memo" && type === "invoice") kind = "credit_memo";
   const f = (key) => det.toolInput.fields.find((x) => x.key === key);
   const cost = f("cost");
   if (!cost) return null;
   const money = (fld) => ({ value: fld.value, page_no: fld.page_no, verbatim: fld.verbatim, confidence: 0.9 });
-  const input = { kind, direction: "receivable", currency: "USD", printed_status: "none", total: money(cost), line_items: [], confidence: 0.9 };
+  const isPo = kind === "po";
+  const input = { kind, direction: isPo ? "payable" : "receivable", currency: "USD", printed_status: "none", total: money(cost), line_items: [], confidence: 0.9 };
   const inv = f("invoice_number");
-  if (inv) input.invoice_number = inv.value;
+  if (inv) { if (isPo) input.po_number = inv.value; else input.invoice_number = inv.value; }
+  const dateFld = f("service_date");
   if (det.docDate) input.invoice_date = det.docDate;
+  else if (isPo && dateFld) input.invoice_date = dateFld.value;
   const cust = f("customer_name");
-  if (cust) input.customer_name = cust.value;
+  if (cust && !isPo) input.customer_name = cust.value;
+  const vend = f("vendor");
+  if (vend && isPo) input.vendor_name = vend.value;
   const addr = f("service_address");
   if (addr) input.job_address = addr.value;
   const term = f("agreement_term");
@@ -73,10 +85,10 @@ export async function extractFinancialsDeterministicFirst(ctx, documentId, opts 
     const loaded = await withTenant(ctx, async (db) => {
       const doc = await db.getDocument(documentId);
       if (!doc) return null;
-      return { type: opts.documentType || doc.document_type, pages: await db.listPages(documentId) };
+      return { type: opts.documentType || doc.document_type, pages: await db.listPages(documentId), pack: await packForTenant(db) };
     });
     if (loaded && isFinancialDocumentType(loaded.type)) {
-      const input = financialsInputFromText(loaded.pages, loaded.type);
+      const input = financialsInputFromText(loaded.pages, loaded.type, { pack: loaded.pack });
       if (input) {
         const res = await extractFinancialsForDocument(ctx, documentId, {
           withTenant, documentType: loaded.type, modelAttempts: opts.modelAttempts, skipBudget: true,

@@ -131,7 +131,8 @@ export const DOCUMENT_TYPE_DEFINITIONS = {
 export const REQUIRED_FIELDS = {
   // Address is required only where work happened at a place (work order, service ticket, inspection, permit).
   'work-order': ['service_address', 'service_date'],
-  'service-ticket': ['service_address', 'service_date', 'work_performed'],
+  // A fleet or shop-owned unit is identified by its serial number, and a ticket can name a part instead of describing the work.
+  'service-ticket': ['service_address|serial_number', 'service_date', 'work_performed|part_number'],
   'invoice': ['customer_name|vendor', 'service_date', 'cost'],
   'warranty-registration': ['serial_number', 'model', 'warranty_expires|warranty_term'],
   'startup-sheet': ['serial_number', 'service_date'],
@@ -150,8 +151,9 @@ export const REQUIRED_FIELDS = {
   'delivery-ticket': ['customer_name|vendor', 'service_date'],
   'schedule': [],
   'price-list': [],
-  'statement': ['vendor|customer_name'],
-  'insurance-certificate': ['vendor|customer_name'],
+  // Company paperwork: page text is what makes these readable, so no party is demanded of them.
+  'statement': [],
+  'insurance-certificate': [],
   'hr-letter': [],
   'other': [],
 };
@@ -169,14 +171,21 @@ export const COMPANY_RECORD_IF_NO_CUSTOMER_TYPES = new Set(['agreement']);
 /** Types that need no customer/equipment link when they also carry no service address (an address means a job at a
  *  place, which should link). */
 export const LINK_OPTIONAL_TYPES = new Set(['invoice', 'receipt', 'delivery-ticket', 'correspondence']);
+/** Company paperwork only while NO customer and NO address is named on it ("other": filed as company paper, needs no
+ *  link; with a customer or an address it is a customer document and still needs one). */
+export const COMPANY_RECORD_IF_NO_CUSTOMER_OR_ADDRESS_TYPES = new Set(['other']);
 
 const hasKey = (present, k) => (present instanceof Set ? present.has(k) : !!present?.[k]);
+
+/** Synthetic bookkeeping rows (e.g. `_audience_notified`) are not facts about the document: ignored everywhere. */
+export const isSyntheticKey = (k) => typeof k === 'string' && k.startsWith('_');
 
 /** True when the document is company paperwork. `present` = Set (or object) of non-empty extracted field keys. */
 export function isCompanyRecordType(typeId, present = new Set()) {
   const t = canonicalTypeId(typeId);
   if (COMPANY_RECORD_TYPES.has(t)) return true;
-  return COMPANY_RECORD_IF_NO_CUSTOMER_TYPES.has(t) && !hasKey(present, 'customer_name');
+  if (COMPANY_RECORD_IF_NO_CUSTOMER_TYPES.has(t) && !hasKey(present, 'customer_name')) return true;
+  return COMPANY_RECORD_IF_NO_CUSTOMER_OR_ADDRESS_TYPES.has(t) && !hasKey(present, 'customer_name') && !hasKey(present, 'service_address');
 }
 
 /** True when a missing customer/equipment link must NOT be flagged and must not stop an automatic check. */
@@ -186,24 +195,110 @@ export function linkNotRequired(typeId, present = new Set()) {
   return LINK_OPTIONAL_TYPES.has(t) && !hasKey(present, 'service_address');
 }
 
-/** Facts-array convenience: may this document be checked automatically with no link? Needs something readable
- *  (at least one non-empty fact) and never applies to the undecided 'other' type. */
-export function mayVerifyWithoutLink(typeId, fields) {
-  const t = canonicalTypeId(typeId);
-  if (t === 'other') return false;
-  const present = new Set();
-  let lowest = 1;
+const MONEY_KEYS = ['cost'];
+const NAME_KEYS = ['customer_name', 'vendor'];
+
+/** Real facts only: non-empty value, no synthetic `_` keys. Confidence is a finite number (else 0). */
+function realFacts(fields) {
+  const out = [];
   for (const f of Array.isArray(fields) ? fields : []) {
-    if (f && typeof f.field_key === 'string' && f.value != null && String(f.value).trim() !== '') {
-      present.add(f.field_key);
-      const c = Number(f.confidence);
-      lowest = Math.min(lowest, Number.isFinite(c) ? c : 0);
-    }
+    if (!f || typeof f.field_key !== 'string' || isSyntheticKey(f.field_key)) continue;
+    if (f.value == null || String(f.value).trim() === '') continue;
+    const c = Number(f.confidence);
+    out.push({ key: f.field_key, conf: Number.isFinite(c) ? c : 0, corroborated: f.corroborated === true });
   }
-  // Readable enough: two facts, or a name fact. And every fact used is confident (types that require nothing
-  // would otherwise count a 0.1-confidence fact as complete).
-  const readable = present.size >= 2 || present.has('customer_name') || present.has('vendor');
-  return readable && lowest >= AI_VERIFY_MIN_CONFIDENCE && linkNotRequired(t, present);
+  return out;
+}
+const bestOf = (facts, keys) => facts.filter((f) => keys.includes(f.key)).reduce((b, f) => (!b || f.conf > b.conf ? f : b), null);
+
+/** A money amount is auto-checkable only at AI_VERIFY_MIN_CONFIDENCE or better, or when the page corroborates it. */
+export function moneyAmountsConfident(fields) {
+  return realFacts(fields).filter((f) => MONEY_KEYS.includes(f.key)).every((f) => f.corroborated || f.conf >= AI_VERIFY_MIN_CONFIDENCE);
+}
+
+/** Names that look like a second copy of a paper already on file: "(copy)", " (2)", "copy of", or a "v2"-style suffix. */
+export function isLikelyCopyName(name) {
+  const base = String(name ?? '').trim().replace(/\.[A-Za-z0-9]{2,5}$/, '');
+  if (!base) return false;
+  return /\(\s*copy\s*\)|\bcopy\s+of\b/i.test(base) || /\s\(\d{1,2}\)\s*$/.test(base) || /[\s_-]v\d{1,2}\s*$/i.test(base);
+}
+
+/** True when the file name or the title line says the paper is this type (existing filename and title patterns). */
+export function nameSupportsType(typeId, filename, title) {
+  const t = canonicalTypeId(typeId);
+  if (filename && inferTypeFromFilename(filename) === t) return true;
+  if (title) {
+    const line = String(title).toLowerCase().replace(/[\s.:;,-]+$/, '').trim();
+    if (inferTypeFromFilename(line) === t && line.length <= 60) return true;
+    for (const [type, re] of GENERIC_TITLE_PATTERNS) if (type === t && re.test(line)) return true;
+  }
+  return false;
+}
+
+/**
+ * The automatic check, as one pure verdict (used by upload, re-check, the Inbox button and the re-sort, and by the
+ * simulation). Judges ONLY the required facts plus the name fact (customer_name / vendor): a low-confidence
+ * letterhead or invoice-number row on the side never blocks a document whose own required facts are solid.
+ *
+ *   opts.hasText  page text is stored (makes a COMPANY document readable even with zero facts)
+ *   opts.hasLink  the document is already linked to a customer / unit
+ *   opts.filename / opts.title  the file name and title line: a paper with NO facts is checked only when one of them
+ *                 supports its type, and a likely copy ("(copy)", " (2)", "v2") is never checked
+ *   opts.pack     a non-hvac industry pack
+ *
+ * @returns {{ok:boolean, allowUnlinked:boolean, reason:string|null, detail?:string}}
+ *   reason: unreadable | barely-readable | needs-type | needs-link | missing-required | date-unconfirmed |
+ *           low-confidence | amount-not-confirmed | likely-copy
+ */
+export function autoCheckDecision(typeId, fields, opts = {}) {
+  const { hasText = false, hasLink = false, pack = null, filename = null, title = null } = opts;
+  const t = canonicalTypeId(typeId);
+  const facts = realFacts(fields);
+  const present = new Set(facts.map((f) => f.key));
+  const fail = (reason, detail) => ({ ok: false, allowUnlinked: false, reason, ...(detail ? { detail } : {}) });
+  if (!facts.length && !hasText) return fail('unreadable');
+  // A likely copy ("(copy)", " (2)", "copy of", "v2") is never checked automatically: a person decides which one stays.
+  if (isLikelyCopyName(filename) || isLikelyCopyName(title)) return fail('likely-copy');
+  // Page text alone is not enough to check a paper that has no facts: its file name or title must also say it is this type.
+  if (!facts.length && !nameSupportsType(t, filename, title)) return fail('needs-type');
+  if (!moneyAmountsConfident(fields)) return fail('amount-not-confirmed', MONEY_KEYS.find((k) => present.has(k)));
+  const company = isCompanyRecordType(t, present);
+  const noLink = linkNotRequired(t, present);
+
+  if (t === 'other') {
+    // Undecided type. No customer and no address: company paper, checked on one confident fact. Otherwise a person picks the type.
+    if (!noLink) return hasLink ? { ok: true, allowUnlinked: false, reason: null } : fail('needs-link');
+    if (!facts.some((f) => f.conf >= AI_VERIFY_MIN_CONFIDENCE)) return fail('needs-type');
+    const name = bestOf(facts, NAME_KEYS);
+    if (name && name.conf < AI_VERIFY_MIN_CONFIDENCE) return fail('needs-type');
+    return { ok: true, allowUnlinked: true, reason: null };
+  }
+
+  const c = completenessFor(t, facts.map((f) => ({ field_key: f.key, value: 'x', confidence: f.conf })), pack);
+  if (!c.complete) return fail(c.unconfirmed?.length && !c.missing.length ? 'date-unconfirmed' : 'missing-required', c.missing.join(', '));
+  // Judge the required facts (best alternative each) plus the name fact.
+  const required = pack && pack.id !== 'hvac' ? (pack.documentTypes?.find((x) => x.id === t)?.requires ?? []) : (REQUIRED_FIELDS[t] ?? []);
+  const judged = [];
+  for (const req of required) { const h = bestOf(facts, req.split('|')); if (h) judged.push(h); }
+  const name = bestOf(facts, NAME_KEYS);
+  if (name) judged.push(name);
+  const weak = judged.find((f) => f.conf < AI_VERIFY_MIN_CONFIDENCE);
+  if (weak) return fail('low-confidence', weak.key);
+
+  if (noLink) {
+    const readable = present.size >= 2 || present.has('customer_name') || present.has('vendor') || (hasText && company);
+    if (!readable) return fail('barely-readable');
+    return { ok: true, allowUnlinked: true, reason: null };
+  }
+  return hasLink ? { ok: true, allowUnlinked: false, reason: null } : fail('needs-link');
+}
+
+/** Facts-array convenience: may this document be checked automatically with no link? (See autoCheckDecision.)
+ *  Callers that know the page text exists should pass `{ hasText: true }` - it is what makes company paperwork
+ *  readable when the extractor found no facts. */
+export function mayVerifyWithoutLink(typeId, fields, opts = {}) {
+  const d = autoCheckDecision(typeId, fields, { ...opts, hasLink: false });
+  return d.ok && d.allowUnlinked;
 }
 
 /** Facts a shop-internal document is allowed to carry (see
@@ -257,7 +352,7 @@ export function extractTechnicianFromNotes(notes) {
 export function isShopInternalDocument(fields) {
   let hasShopFact = false;
   for (const f of Array.isArray(fields) ? fields : []) {
-    if (!f || typeof f.field_key !== 'string') continue;
+    if (!f || typeof f.field_key !== 'string' || isSyntheticKey(f.field_key)) continue;
     if (f.value == null || String(f.value).trim() === '') continue;
     if (!SHOP_INTERNAL_ALLOWED_FIELDS.has(f.field_key)) return false;
     if (f.field_key.startsWith('shop_')) hasShopFact = true;
@@ -324,7 +419,7 @@ export function fieldLabel(fieldKey, pack = null) {
  * Longest-phrase-first ordering is handled by docTypeSynonymAlternation()
  * below, not by the order words are listed here.
  */
-export const DOCUMENT_TYPE_SYNONYMS = {
+const BASE_DOCUMENT_TYPE_SYNONYMS = {
   'work-order': ['work order', 'work orders'],
   invoice: ['invoice', 'invoices'],
   'warranty-registration': ['warranty registration', 'warranty registrations', 'warranty reg', 'warranty regs'],
@@ -344,6 +439,30 @@ export const DOCUMENT_TYPE_SYNONYMS = {
   correspondence: ['correspondence'],
   internal: ['shop record', 'shop records'],
 };
+
+/** Document types beyond the original service-trade set, as people say them: the same words as lookups/lexicon.js
+ *  EXTRA_DOC_TYPE_WORDS, so a question and a filter agree. Used for PHRASE matching only (docTypeFromWord /
+ *  docTypeSynonymAlternation / planner validation). NOT fed to DOCTYPE_TRIGGER_WORDS: single words such as "list",
+ *  "insurance" or "letter" must not become typo-correction targets ("last visit" -> "list visit"). */
+const EXTRA_DOCUMENT_TYPE_SYNONYMS = {
+  receipt: ['receipt', 'receipts', 'sales slip', 'sales slips', 'payment receipt', 'payment receipts', 'return slip', 'return slips'],
+  'delivery-ticket': ['delivery ticket', 'delivery tickets', 'delivery note', 'delivery notes', 'delivery slip', 'delivery slips', 'pickup ticket', 'pickup tickets', 'pick-up ticket', 'pick-up tickets', 'pick up ticket', 'pick up tickets', 'pickup slip', 'pickup slips', 'packing slip', 'packing slips', 'bill of lading', 'bills of lading'],
+  schedule: ['schedule', 'schedules'],
+  'price-list': ['price list', 'price lists', 'pricing sheet', 'pricing sheets', 'price sheet', 'price sheets', 'rate sheet', 'rate sheets', 'rate card', 'rate cards'],
+  statement: ['statement', 'statements', 'account statement', 'account statements'],
+  'insurance-certificate': ['insurance certificate', 'insurance certificates', 'certificate of insurance', 'certificates of insurance', 'insurance cert', 'insurance certs', 'insurance policy', 'insurance policies', 'coi', 'cois'],
+  'hr-letter': ['hr letter', 'hr letters', 'hr document', 'hr documents', 'hr paperwork', 'employment letter', 'employment letters', 'offer letter', 'offer letters'],
+  'maintenance-agreement': [
+    'service plan', 'service plans', 'service agreement', 'service agreements', 'service contract', 'service contracts',
+    'maintenance contract', 'maintenance contracts', 'membership', 'memberships', 'maintenance membership', 'maintenance memberships',
+  ],
+};
+
+export const DOCUMENT_TYPE_SYNONYMS = Object.fromEntries(
+  [...new Set([...Object.keys(BASE_DOCUMENT_TYPE_SYNONYMS), ...Object.keys(EXTRA_DOCUMENT_TYPE_SYNONYMS)])].map((id) => [
+    id, [...(BASE_DOCUMENT_TYPE_SYNONYMS[id] ?? []), ...(EXTRA_DOCUMENT_TYPE_SYNONYMS[id] ?? [])],
+  ])
+);
 
 /** Canonical id for a single matched word/phrase (already lowercase from the
  *  regex the alternation below builds), or null. Falls back to a literal
@@ -380,7 +499,7 @@ export function docTypeSynonymAlternation() {
 // nlNormalize.js's own module-level VOCAB build, several hops away) before the other side of the
 // cycle has finished initializing. documentTypes.js has zero imports of its own, so it can never
 // be part of a cycle.
-export const DOCTYPE_TRIGGER_WORDS = [...new Set(Object.values(DOCUMENT_TYPE_SYNONYMS).flat().flatMap((phrase) => phrase.split(' ')))];
+export const DOCTYPE_TRIGGER_WORDS = [...new Set(Object.values(BASE_DOCUMENT_TYPE_SYNONYMS).flat().flatMap((phrase) => phrase.split(' ')))];
 
 export const AI_VERIFY_MIN_CONFIDENCE = 0.85;
 
@@ -465,7 +584,8 @@ const FILENAME_PATTERNS = [
   [code('ps|pt|dt|pk'), 'delivery-ticket'],
   [/certificate[-_ ]of[-_ ]insurance|insurance[-_ ](?:certificate|policy)/i, 'insurance-certificate'],
   [word('coi|policy'), 'insurance-certificate'],
-  [/offer[-_ ]letter|award[-_ ]letter|employment|termination[-_ ]letter|new[-_ ]hire|job[-_ ]offer|onboarding[-_ ]letter/i, 'hr-letter'],
+  [/equipment[-_ ]floater|inland[-_ ]marine|\bfloater\b/i, 'insurance-certificate'],
+  [/offer[-_ ]letter|employment|termination[-_ ]letter|new[-_ ]hire|job[-_ ]offer|onboarding[-_ ]letter/i, 'hr-letter'],
   [/statement|ledger|account[-_ ]summary|remittance/i, 'statement'],
   [code('cs'), 'statement'],
   [/credit[-_ ]?(?:memo|note)|debit[-_ ]?memo/i, 'invoice'],
@@ -480,7 +600,7 @@ const FILENAME_PATTERNS = [
   [/dispatch/i, 'dispatch-note'],
   [/work[-_ ]?order/i, 'work-order'],
   [/(maintenance|service)[-_ ](?:agreement|contract|plan)|\bmsa\b/i, 'maintenance-agreement'],
-  [/rental[-_ ]agreement|consign\w*[-_ ]agreement|grant[-_ ]agreement|non[-_ ]?disclosure|memorandum[-_ ]of|sub[-_ ]?contract|agreement|contract/i, 'agreement'],
+  [/award[-_ ]letter|grant[-_ ]award|rental[-_ ]agreement|consign\w*[-_ ]agreement|grant[-_ ]agreement|non[-_ ]?disclosure|memorandum[-_ ]of|sub[-_ ]?contract|agreement|contract/i, 'agreement'],
   [code('ra|ca|sc'), 'agreement'],
   [word('lease|nda|mou'), 'agreement'],
   [/proposal|quote|estimate/i, 'proposal-quote'],
@@ -494,30 +614,46 @@ const FILENAME_PATTERNS = [
 /** Title-line patterns (a document announcing its own type), tried against short lines in modelAvoidance/textExtract.js
  *  classifyFromText and by the one-time re-sort. Lowercase, trailing punctuation already stripped. */
 export const GENERIC_TITLE_PATTERNS = [
-  ['receipt', /^(?:sales\s+|payment\s+|retainer\s+|cash\s+)?receipt(?:\s*(?:#|no\.?|number)\s*[\w-]+)?$|^return\s+slip$/],
-  ['agreement', /^(?:rental|consignment|lease|subcontract(?:or)?|grant|service|vendor|independent\s+contractor)\s+(?:agreement|contract)$|^(?:non[-\s]?disclosure|confidentiality)\s+agreement$|^(?:mutual\s+)?nda$|^memorandum\s+of\s+understanding$|^agreement$/],
+  ['receipt', /^(?:sales\s+|payment\s+|retainer\s+|cash\s+|donation\s+|rent\s+|gift\s+|official\s+|customer\s+)?receipt(?:\s*(?:#|no\.?|number)\s*[\w-]+)?$|^return\s+slip$/],
+  ['agreement', /^(?:rental|consignment|lease|subcontract(?:or)?|grant|service|vendor|independent\s+contractor)\s+(?:agreement|contract)$|^(?:non[-\s]?disclosure|confidentiality)\s+agreement$|^(?:mutual\s+)?nda$|^memorandum\s+of\s+understanding$|^(?:grant\s+)?award\s+letter$|^agreement$/],
   ['delivery-ticket', /^(?:packing\s+slip|delivery\s+(?:ticket|note|receipt)|pick[-\s]?up\s+(?:ticket|slip)|bill\s+of\s+lading)$/],
   ['schedule', /^(?:weekly\s+|monthly\s+|daily\s+|staff\s+|work\s+)?(?:schedule|roster)$/],
   ['price-list', /^(?:price\s+list|rate\s+(?:card|sheet)|fee\s+schedule|product\s+catalog(?:ue)?)$/],
   ['statement', /^(?:account\s+|monthly\s+|consignor\s+|card\s+)?statement(?:\s+of\s+account)?$|^rent\s+ledger$/],
   ['insurance-certificate', /^certificate\s+of\s+(?:liability\s+)?insurance$|^insurance\s+(?:certificate|policy)$/],
-  ['hr-letter', /^(?:offer|award|employment|termination)\s+letter$|^employment\s+(?:agreement|offer)$/],
+  ['hr-letter', /^(?:offer|employment|termination)\s+letter$|^employment\s+(?:agreement|offer)$/],
 ];
 
 /** Types a one-time re-sort may move a document INTO when the rule is confident (a name or title says so). */
 export const RESORT_TARGET_TYPES = new Set(['receipt', 'agreement', 'delivery-ticket', 'schedule', 'price-list', 'statement', 'insurance-certificate', 'hr-letter', 'purchase-order', 'internal']);
-/** Types a re-sort may move a document OUT of (the catch-alls the old rules over-used). */
-export const RESORT_SOURCE_TYPES = new Set(['invoice', 'other', 'correspondence', 'dispatch-note']);
+/** Types a re-sort may move a document OUT of (the catch-alls the old rules over-used, plus the types things get
+ *  misfiled into: a COI or licence read as a warranty registration, a memo typed internal, an award letter typed HR). */
+export const RESORT_SOURCE_TYPES = new Set(['invoice', 'other', 'correspondence', 'dispatch-note', 'warranty-registration', 'internal', 'schedule']);
+/** HR papers are never moved out of People and HR, with one exception: a grant or contract "award letter" typed HR. */
+const AWARD_LETTER_RE = /award[-_ ]letter/i;
+/** A licence or permit-to-practise filed as a warranty registration has no better type than company paper. */
+const LICENCE_RE = /\blicen[cs]e\b/i;
 
-/** Pure re-sort rule. `titleType` = type a title line announced (or null). Returns the new type, or null to leave it. */
-export function resortDecision({ currentType, filename, titleType = null }) {
+/**
+ * Pure re-sort rule. `titleType` = type a title line announced (or null).
+ * `humanChosen` = a person set the current type: never overridden. `hasEquipmentFacts` = serial/model on file: a real
+ * warranty card is never moved. Returns the new type, or null to leave it.
+ */
+export function resortDecision({ currentType, filename, titleType = null, titleText = null, humanChosen = false, hasEquipmentFacts = false, hrOverride = false, verified = false }) {
   const cur = canonicalTypeId(currentType || 'other');
+  if (humanChosen || hrOverride || verified) return null; // a person's choice, a People and HR paper, a checked paper: never moved
+  if (cur === 'hr-letter') {
+    // The only HR paper that may move: an award letter (grant or contract), by its file name or title.
+    return AWARD_LETTER_RE.test(String(filename ?? '')) || AWARD_LETTER_RE.test(String(titleText ?? '')) ? 'agreement' : null;
+  }
   if (!RESORT_SOURCE_TYPES.has(cur)) return null;
+  if (cur === 'warranty-registration' && hasEquipmentFacts) return null;
   const nameType = inferTypeFromFilename(filename);
   const t1 = titleType && RESORT_TARGET_TYPES.has(titleType) ? titleType : null;
   const t2 = nameType && RESORT_TARGET_TYPES.has(nameType) ? nameType : null;
   if (t1 && t2 && t1 !== t2) return null; // the title and the name disagree: not confident
-  const next = t1 || t2;
+  let next = t1 || t2;
+  if (!next && cur === 'warranty-registration' && LICENCE_RE.test(String(filename ?? ''))) next = 'other';
   return next && next !== cur ? next : null;
 }
 
@@ -551,7 +687,8 @@ export function inferDocumentType(facts = {}, filename = '') {
     // A term/expiry attached to a customer+address with no serial reads as a
     // recurring service contract, not a one-time manufacturer registration.
     if (has('customer_name') && has('service_address') && !has('serial_number')) return 'maintenance-agreement';
-    return 'warranty-registration';
+    // A lone expiry date (no serial, model or maker) is a COI, licence or policy, not a manufacturer registration.
+    if (has('serial_number') || has('model') || has('manufacturer')) return 'warranty-registration';
   }
   // A specific name ("Packing slip PS-31", "Rent ledger", "Offer letter") beats the blanket "has a cost -> invoice"
   // guess: stores, landlords and vendors print amounts on documents that are not invoices. A generic "invoice" name
@@ -636,7 +773,7 @@ export function completenessFor(typeId, fields, pack = null) {
 
   const byKey = new Map();
   for (const f of Array.isArray(fields) ? fields : []) {
-    if (!f || typeof f.field_key !== 'string') continue;
+    if (!f || typeof f.field_key !== 'string' || isSyntheticKey(f.field_key)) continue;
     if (f.value == null || String(f.value).trim() === '') continue;
     const confidence = Number(f.confidence);
     const entry = { field_key: f.field_key, confidence: Number.isFinite(confidence) ? confidence : 0 };
@@ -655,7 +792,8 @@ export function completenessFor(typeId, fields, pack = null) {
 
   for (const requirement of required) {
     const alts = requirement.split('|');
-    const hit = alts.map((k) => byKey.get(k)).find(Boolean);
+    // The alternative the document reads best wins (not the first one listed).
+    const hit = alts.map((k) => byKey.get(k)).filter(Boolean).reduce((b, h) => (!b || h.confidence > b.confidence ? h : b), null);
     if (hit) {
       present.push(hit.field_key);
       satisfiedConfidences.push(hit.confidence);

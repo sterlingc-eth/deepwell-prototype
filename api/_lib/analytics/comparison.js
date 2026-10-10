@@ -182,3 +182,19 @@ export function detectCountComparison(question, today) {
     detectServiceTypeComparison(q, left, right)
   );
 }
+
+/**
+ * R45: the two sides of an "A vs B" / "compare A and B" / "A versus B" question, as raw text (no dimension decided here). Shared by the
+ * aggregation templates (lookups/aggTemplates.js), which resolve each side against the tenant's own brands / cities / technicians and
+ * answer from the same count and average primitives. Pure. @returns [leftText, rightText] | null
+ */
+export function splitVersus(question) {
+  const q = String(question ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
+  let m = /^(.*?)\b(?:versus|vs\.?|against|compared (?:to|with))\b(.*)$/.exec(q);
+  if (!m) m = /\b(?:compare|comparison of|difference between)\b\s*(.*?)\s+\band\b\s+(.*)$/.exec(q);
+  if (!m) return null;
+  const clean = (s) => s.replace(/\b(?:compare|comparison|unit|units|customers?|counts?|totals?|and say.*|which is.*|who has.*|then say.*)\b/g, ' ').replace(/\s+/g, ' ').trim();
+  const left = clean(m[1]);
+  const right = clean(m[2]);
+  return left && right ? [left, right] : null;
+}

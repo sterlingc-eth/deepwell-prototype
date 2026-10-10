@@ -45,7 +45,10 @@ import {
   SERVICE_TYPE_PHRASE_RE,
   serviceTypeValueOf,
 } from '../analytics.js';
-import { docTypeFromWord, docTypeSynonymAlternation } from '../documentTypes.js';
+import { docTypeFromWord as baseDocTypeFromWord, docTypeSynonymAlternation } from '../documentTypes.js';
+import { extraDocTypeFromWord, extraDocTypeAlternation } from '../lookups/lexicon.js';
+/** F4: the base table plus the document types people name in other words (receipt, delivery/pickup ticket, price list, COI, HR letter, service plan ...). */
+const docTypeFromWord = (w) => baseDocTypeFromWord(w) ?? extraDocTypeFromWord(w);
 
 /* ============================================================ small helpers */
 
@@ -72,7 +75,8 @@ const EQUIPMENT_NOUN_RE = new RegExp(`\\b(${altOf(ENTITY_SYNONYMS.equipment)})\\
 const DOCUMENT_NOUN_RE = new RegExp(`\\b(${altOf(ENTITY_SYNONYMS.documents)})\\b`, 'i');
 const SERVICE_VISIT_NOUN_RE = new RegExp(`\\b(${altOf(ENTITY_SYNONYMS.serviceVisits)})\\b`, 'i');
 const WARRANTY_NOUN_RE = /\bwarrant(?:y|ies)\b/i;
-const DOC_TYPE_WORD_RE = new RegExp(`\\b(${docTypeSynonymAlternation()})\\b`, 'i');
+const EXTRA_DOC_NOUN_RE = new RegExp(`\\b(?:${extraDocTypeAlternation()})\\b`, 'i');
+const DOC_TYPE_WORD_RE = new RegExp(`\\b(${extraDocTypeAlternation()}|${docTypeSynonymAlternation()})\\b`, 'i');
 
 const HOW_MANY_RE = /\bhow many\b/i;
 const LIST_VERB_RE = /\b(which|list|show me|give me)\b/i;
@@ -102,7 +106,7 @@ function firstIndex(re, q) {
 function entityFromNouns(q) {
   const candidates = [
     { entity: 'customers', idx: firstIndex(CUSTOMER_NOUN_RE, q) },
-    { entity: 'documents', idx: firstIndex(DOCUMENT_NOUN_RE, q) },
+    { entity: 'documents', idx: Math.min(firstIndex(DOCUMENT_NOUN_RE, q), firstIndex(EXTRA_DOC_NOUN_RE, q)) },
     { entity: 'equipment', idx: firstIndex(EQUIPMENT_NOUN_RE, q) },
     { entity: 'serviceVisits', idx: firstIndex(SERVICE_VISIT_NOUN_RE, q) },
   ];

@@ -6,6 +6,7 @@
  *   node scripts/gen-property-tenant.mjs -> test-docs/tenants/property/export.json + test-docs/scorecard/blind/prop-owner-1.json
  */
 import fs from "node:fs";
+import { assertUniqueRoster } from "./lib/sampleRoster.mjs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
@@ -42,13 +43,14 @@ const vendors = VENDORS.map(([name, trade], i) => { const id = ent("technician",
 const coiRows = [];
 for (const v of vendors) { const exp = rdate(2026, 2027); const d = rdate(2025, 2026); const date = d > MAXD ? MAXD : d; const t = `${head("CERTIFICATE OF INSURANCE")}\nVendor: ${v.name}\nPolicy period ends: ${us(exp)}\nCoverage: general liability $1,000,000`; const id = mkDoc("certificate-of-insurance", date, t, [v.id]); ex(id, v.id, "vendor", v.name, date); ex(id, v.id, "coi_expires", exp, date); coiRows.push({ v: v.name, exp }); }
 const owners = [], units = [], leases = [], wos = [], invoices = [];
-const nameSeen = new Set(); let n = 0;
+const nameSeen = new Set(); const phoneSeen = new Set(); let n = 0;
 const uniq = (pool1, pool2) => { let nm, t = 0; do { nm = `${pick(pool1)} ${t > 20 ? String.fromCharCode(65 + int(0, 25)) + ". " : ""}${pick(pool2)}`; t++; } while (nameSeen.has(nm)); nameSeen.add(nm); return nm; };
 let invN = 52000, woN = 8800;
 for (let o = 0; o < 60; o++) {
   const name = uniq(FIRST, LAST) ; let r = rnd(), a = 0, city = CITIES[0]; for (const c of CITIES) { a += c[2]; if (r < a) { city = c; break; } }
   const addr = `${int(100, 9899)} ${pick(STREETS)}, ${city[0]}, AZ ${pick(city[1])}`;
-  const oid = ent("customer", { customer_name: name, service_address: addr, phone: `(520) 555-${int(1000, 9999)}`, email: `${name.toLowerCase().replace(/ /g, ".")}${o}@example.com` }, { customer_number: `O-${String(o + 1).padStart(4, "0")}` });
+  let ph = int(1000, 9999); while (phoneSeen.has(ph)) ph = ph >= 9999 ? 1000 : ph + 1; phoneSeen.add(ph); // one phone per owner
+  const oid = ent("customer", { customer_name: name, service_address: addr, phone: `(520) 555-${ph}`, email: `${name.toLowerCase().replace(/ /g, ".")}${o}@example.com` }, { customer_number: `O-${String(o + 1).padStart(4, "0")}` });
   const ow = { id: oid, name, addr, city: city[0], units: [] }; owners.push(ow);
   const nU = int(3, 8);
   for (let u = 0; u < nU; u++) {
@@ -80,6 +82,7 @@ for (let o = 0; o < 60; o++) {
 }
 const exportData = { tenantKey: "property-synth-r38", tenantName: CO, exportedAt: "2026-09-27T00:00:00Z", documents, pages, extractions, entities, document_entity_links: links, facets: [], audit_log: [], truncated: false, financials, financial_lines: lines };
 fs.mkdirSync(path.join(ROOT, "test-docs/tenants/property"), { recursive: true });
+assertUniqueRoster("property tenant", owners.map((o) => { const e = entities.find((x) => x.id === o.id); return { name: o.name, address: o.addr, phone: e?.data?.phone, email: e?.data?.email }; }), { ownNames: [CO] });
 fs.writeFileSync(path.join(ROOT, "test-docs/tenants/property/export.json"), JSON.stringify(exportData));
 console.log(`property tenant: ${owners.length} owners, ${units.length} units, ${leases.length} leases, ${documents.length} docs, ${extractions.length} extractions`);
 

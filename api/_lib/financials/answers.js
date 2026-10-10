@@ -286,6 +286,34 @@ const COLLECTED_RE = /\bhow\s+much\s+(?:have|has|did)\s+(?:we|customers?)\s+coll
 const QUOTES_WAITING_RE = /\b(?:quotes?|proposals?|estimates?)\b[^?]*\bwaiting\b|\bwaiting\b[^?]*\b(?:quotes?|proposals?|estimates?)\b/i;
 const NEEDS_VERIFY_RE = /\binvoices?\b[^?]*\bverify\b|\bverify\b[^?]*\bthe\s+numbers\b|\bneed(?:s)?\s+(?:someone\s+)?to\s+verify\b|\bunverified\s+invoices?\b|\binvoices?\b[^?]*\bunverified\b/i;
 const PAID_STATUS_RE = /\binvoices?\b[^?]*\b(paid|partial(?:ly\s+paid)?)\b|\b(paid|partially\s+paid)\b[^?]*\binvoices?\b/i;
+/** Document nouns a person uses for "a money document" and the document kinds each stands for. invoiceOnly = the long-standing invoice lane, unchanged. */
+const DOC_NOUN_KINDS = [
+  { label: 'invoice', re: /\binvoices?\b/, kinds: ['invoice'] },
+  { label: 'bill', re: /\bbills?\b/, kinds: ['invoice'], direction: 'payable' },
+  { label: 'receipt', re: /\breceipts?\b/, kinds: ['receipt'] },
+  { label: 'purchase order', re: /\bpurchase\s*orders?\b|\bpos?\b/, kinds: ['po'] },
+  { label: 'estimate', re: /\bestimates?\b|\bquotes?\b|\bproposals?\b|\bbids?\b/, kinds: ['estimate'] },
+  { label: 'statement', re: /\bstatements?\b/, kinds: ['statement'] },
+  { label: 'agreement', re: /\bagreements?\b|\bcontracts?\b|\b(?:service|maintenance)\s+plans?\b|\bmemberships?\b/, kinds: ['agreement'] },
+  { label: 'change order', re: /\bchange\s*orders?\b/, kinds: ['change_order'] },
+  { label: 'credit memo', re: /\bcredit\s*(?:memos?|notes?)\b/, kinds: ['credit_memo'] },
+];
+const GENERIC_DOC_RE = /\b(?:money\s+)?(?:documents?|docs?|paperwork|papers?|files?|records?)\b/;
+const MONEY_MARK_RE = /\$|\b(?:dollars?|bucks?|usd|grand)\b|\b\d+(?:\.\d+)?\s?k\b/i;
+/** "documents over $500" / "receipts above 50" / "POs of at least 1000": which document kinds the threshold applies to, taken from the noun the person used.
+ *  A generic noun (documents, paperwork, files) needs a money marker ($, dollars) so "files over 5" is never read as dollars. Returns null when no money-document noun is named. */
+export function thresholdDocScope(lowerQ, original = '') {
+  const hits = DOC_NOUN_KINDS.filter((n) => n.re.test(lowerQ));
+  if (hits.length === 1 && hits[0].label === 'invoice') return { invoiceOnly: true, label: 'invoice', kinds: ['invoice'], direction: null };
+  if (hits.length) {
+    const kinds = [...new Set(hits.flatMap((h) => h.kinds))];
+    const dirs = [...new Set(hits.map((h) => h.direction ?? null))];
+    return { label: hits.length === 1 ? hits[0].label : 'document', kinds, direction: dirs.length === 1 ? dirs[0] : null };
+  }
+  if (GENERIC_DOC_RE.test(lowerQ) && MONEY_MARK_RE.test(original || lowerQ)) return { label: 'money document', kinds: null, direction: null };
+  return null;
+}
+
 const THRESHOLD_RE = /\b(over|above|more than|greater than|under|below|less than)\s*\$?\s?([\d,]+(?:\.\d+)?)\b(?!\s*days?\b)/i;
 const SUPERLATIVE_WORD_RE = /\b(biggest|largest|smallest|highest|lowest)\b/i;
 const OVERDUE_DAYS_RE = /\b(?:more than|over)\s+(\d{1,4})\s+days?\b/i;
@@ -470,7 +498,8 @@ export function parseMoneyIntent(question, { today }) {
     // D10: amounts as people say them ("three thousand dollars", "ten grand", "3k", "2.5k") - see amountWords.js. A direction word followed by an
     // amount that cannot be read is never answered with the unfiltered invoice count: it falls through (returns null) instead.
     const th = parseThreshold(String(question ?? ''));
-    if (th && /\binvoices?\b/.test(q)) {
+    const docScope = th ? thresholdDocScope(q, String(question ?? '')) : null;
+    if (th && (/\binvoices?\b/.test(q) || docScope)) {
       // A payment-status qualifier ("open invoices over 5k", "unpaid ... over $3,000") is a second condition this count cannot apply (invoices rarely
       // print a status), so the plain "N invoices over X" is never given as if it were the answer - fall through to the status-aware intents instead.
       if (th.unparsed) return null;
@@ -486,7 +515,7 @@ export function parseMoneyIntent(question, { today }) {
       }
       // With a status word the amount part is not applied by the status-aware intents below; runMoneyIntent says so in the answer.
       if (!/\b(?:open|unpaid|outstanding|overdue|past[\s-]?due|paid|partial\w*|unsettled|owing|owed|delinquent)\b/.test(q)) {
-        return mk('threshold_invoices', { subject, thresholdDir: th.dir, thresholdInclusive: th.inclusive, thresholdAmount: th.amount });
+        return mk('threshold_invoices', { subject, thresholdDir: th.dir, thresholdInclusive: th.inclusive, thresholdAmount: th.amount, docScope: docScope && !docScope.invoiceOnly ? docScope : null });
       }
     }
   }
@@ -1447,6 +1476,12 @@ const titleCity = (c) => String(c).replace(/\b[a-z]/g, (x) => x.toUpperCase());
  *  applied through the customer's address; any other qualifier it cannot apply is named in the answer. */
 async function thresholdInvoices(db, intent, ctx) {
   const { thresholdDir, thresholdAmount, thresholdInclusive } = intent;
+  // Any money-document noun ("documents", "receipts", "POs", "contracts") scopes the count to that type; no docScope = the long-standing invoice lane.
+  const ds = intent.docScope ?? null;
+  const SCOPE = ds
+    ? `f.currency = 'USD'${ds.kinds ? ` AND f.doc_kind IN (${ds.kinds.map((k) => `'${String(k).replace(/[^a-z_]/g, '')}'`).join(',')})` : ` AND f.doc_kind IN ('invoice','credit_memo','statement','receipt','estimate','change_order','po','agreement')`}${ds.direction ? ` AND f.direction = '${ds.direction === 'payable' ? 'payable' : 'receivable'}'` : ''}`
+    : INVOICE_SCOPE;
+  const nounPl = ds ? (ds.label === 'money document' ? 'document' : ds.label) : 'invoice';
   const cmp = thresholdDir === 'over' ? (thresholdInclusive ? '>=' : '>') : (thresholdInclusive ? '<=' : '<');
   const p = intent.period;
   // Words that are part of a resolved customer's own name ("Sonoran Grill Restaurant") are not extra conditions.
@@ -1461,7 +1496,7 @@ async function thresholdInvoices(db, intent, ctx) {
   if (g?.unresolved) return null;
   if (g?.answer) return g.answer;
   const params = [thresholdAmount, p?.from ?? null, p?.to ?? null];
-  let where = `${INVOICE_SCOPE} AND f.total IS NOT NULL AND f.total ${cmp} $1::numeric AND (($2::date IS NULL AND $3::date IS NULL) OR (f.doc_date >= COALESCE($2::date, '0001-01-01') AND f.doc_date <= COALESCE($3::date, '9999-12-31')))`;
+  let where = `${SCOPE} AND f.total IS NOT NULL AND f.total ${cmp} $1::numeric AND (($2::date IS NULL AND $3::date IS NULL) OR (f.doc_date >= COALESCE($2::date, '0001-01-01') AND f.doc_date <= COALESCE($3::date, '9999-12-31')))`;
   if (g?.ids) { params.push(g.ids); where += ` AND f.customer_id = ANY($${params.length}::uuid[])`; }
   if (city) { params.push(city); where += ` AND f.customer_id IN (SELECT c.customer_id FROM customers c WHERE lower(c.address) LIKE '%, ' || $${params.length} || ', %')`; }
   // $1 is the first param after the views' own JSON param, which q() prepends - the shared helper numbers ours from $2, so shift.
@@ -1469,21 +1504,22 @@ async function thresholdInvoices(db, intent, ctx) {
   const rows = await q(db, `SELECT f.* FROM financials f WHERE ${shift(where)} ORDER BY f.total DESC LIMIT 200`, params, ctx.hu);
   // R39: the count is the SQL COUNT, never the length of the LIMITed list above.
   const [{ n: nAll }] = await q(db, `SELECT count(*)::int AS n FROM financials f WHERE ${shift(where)}`, params, ctx.hu);
-  const [a] = await q(db, `SELECT count(*) FILTER (WHERE f.total IS NULL)::int AS n_no_total FROM financials f WHERE ${INVOICE_SCOPE}`, [], ctx.hu);
+  const [a] = await q(db, `SELECT count(*) FILTER (WHERE f.total IS NULL)::int AS n_no_total FROM financials f WHERE ${SCOPE}`, [], ctx.hu);
   // R39: how many invoices exist outside this count's population (payable bills, non-USD). An organization with invoices but none receivable-USD never gets a "0".
   const [pop] = await q(db, `SELECT count(*) FILTER (WHERE ${INVOICE_SCOPE})::int AS n_in, count(*)::int AS n_all FROM financials f WHERE f.doc_kind = 'invoice'`, [], ctx.hu);
-  if (pop && pop.n_in === 0 && pop.n_all > 0) return null;
-  const excluded = pop ? pop.n_all - pop.n_in : 0;
+  if (!ds && pop && pop.n_in === 0 && pop.n_all > 0) return null;
+  if (ds && !nAll && !a.n_no_total && !(await q(db, `SELECT 1 FROM financials f WHERE ${SCOPE} LIMIT 1`, [], ctx.hu)).length) return baseAnswer(`No ${nounPl}s with financial details are on file yet.`, [], { confidence: 1, ...zeroCite(`Searched every ${nounPl} on file; none have financial details captured.`) });
+  const excluded = ds ? 0 : (pop ? pop.n_all - pop.n_in : 0);
   const dirWord = thresholdInclusive ? (thresholdDir === 'over' ? 'at least' : 'at most') : thresholdDir;
   const amtText = fmt(String(thresholdAmount));
   const scopeText = `${g?.name ? ` for ${g.name}` : ''}${city ? ` for ${titleCity(city)} customers` : ''}${p ? ` in ${p.label}` : ''}`;
   const note = unapplied.length ? ` I could not also apply ${unapplied.join(' and ')} from your question, so that part is not reflected in this count.` : '';
   // R3 amount-basis loop (DONOVAN_AMOUNT_BASIS=0 turns it off): with no customer / city / period applied, say the count is every invoice on file, any date, paid or unpaid.
-  const basis = process.env.DONOVAN_AMOUNT_BASIS === '0' || scopeText ? '' : (excluded > 0 ? ' That counts receivable invoices in US dollars, any date, paid or unpaid.' : ' That counts every invoice on file, any date, paid or unpaid.');
-  const text = `${plural(nAll, 'invoice')}${scopeText} ${nAll === 1 ? 'is' : 'are'} ${dirWord} ${amtText}.${basis}${note}${exclusionText({ noTotal: a.n_no_total })}`;
+  const basis = process.env.DONOVAN_AMOUNT_BASIS === '0' || scopeText ? '' : (excluded > 0 ? ' That counts receivable invoices in US dollars, any date, paid or unpaid.' : ` That counts every ${nounPl} on file, any date, paid or unpaid.`);
+  const text = `${plural(nAll, nounPl)}${scopeText} ${nAll === 1 ? 'is' : 'are'} ${dirWord} ${amtText}.${basis}${note}${exclusionText({ noTotal: a.n_no_total, noun: nounPl })}`;
   return baseAnswer(text, rows.slice(0, 40).map((r) => invoiceFact(r)), {
-    sources: rows.slice(0, 25).map((r) => docSource(r.document_id, r.total_page)), interpretation: `invoices ${dirWord} ${amtText}${scopeText}`,
-    cite: { records: financeRecords(rows), total: nAll, claimedCount: nAll, basis: `Counted invoices with a printed total ${dirWord} ${amtText}${scopeText}.` },
+    sources: rows.slice(0, 25).map((r) => docSource(r.document_id, r.total_page)), interpretation: `${nounPl}s ${dirWord} ${amtText}${scopeText}`,
+    cite: { records: financeRecords(rows), total: nAll, claimedCount: nAll, basis: `Counted ${nounPl}s with a printed total ${dirWord} ${amtText}${scopeText}.` },
   });
 }
 

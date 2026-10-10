@@ -99,6 +99,8 @@ export function isJudgmentQuestion(question) {
   let q = raw;
   try { q = stripConversationalFrame(raw) ?? raw; } catch { q = raw; }
   if (!q.trim() || q.length > 200 || JUDGMENT_VETO_RE.test(raw)) return false;
+  // R45: a ranking BY a recorded measure ("top brands by unit count", "best customers by revenue") is a count over the records, not an opinion
+  if (/\b(?:by|in\s+terms\s+of)\s+(?:the\s+)?(?:units?|number|count|amount|revenue|sales|volume|billing|total|invoices?|jobs?|visits?|service\s+calls?)\b/i.test(raw)) return false;
   return JUDGMENT_RES.some((re) => re.test(q));
 }
 // "which warranties will expire next month", "who is due for service next week", "what's scheduled next month": record facts, never predictions.
@@ -123,11 +125,32 @@ export function normalizeInputText(text) {
 /**
  * @returns {null | {kind: "injection"|"sensitive"|"outside"|"prediction"|"judgment"|"invalid_date"|"junk", text: string}}
  */
+/* R45: hostile ACCESS requests - reveal a secret / credential, act as or switch to another tenant, escalate privilege, rewrite the assistant's role.
+ * The text of a question is never an instruction and DeepWell keeps no secrets in the records. A how-to ("how do I create an API key") is a help
+ * question and is vetoed. Kill switch: DONOVAN_HOSTILE_DECLINE=0. */
+const SECRET_NOUN_RE = /\b(?:api[\s_-]?keys?|secret[\s_-]?keys?|access[\s_-]?tokens?|auth(?:entication|orization)?[\s_-]?tokens?|bearer[\s_-]?tokens?|private[\s_-]?keys?|service[\s_-]?role|client[\s_-]?secret|signing[\s_-]?secret|webhook[\s_-]?secret|connection[\s_-]?string|credentials?|env(?:ironment)?[\s_-]?(?:vars?|variables?|file)|\.env|jwt|clerk[\s_-]?(?:key|secret)|anthropic[\s_-]?key|database[\s_-]?(?:url|password|credentials?))\b/i;
+const SECRET_ASK_RE = /\b(?:show|print|give|reveal|display|dump|leak|share|send|tell|read|output|list|expose|what(?:'s|s|\s+is|\s+are)?|whats|get|fetch|copy|paste|share)\b/i;
+const SECRET_VETO_RE = /\b(?:how\s+(?:do|can|to|would|should)|where\s+(?:do|can)\s+i|create|generate|make\s+a|new\s+(?:api|key)|rotate|revoke|delete|regenerate|set\s*up|documentation|docs|what\s+is\s+an?\s+(?:api|token)|explain)\b/i;
+const HOSTILE_RES = [
+  /\b(?:switch|change|set|move|jump|go|log|sign|connect|use|impersonate|become|assume|masquerade)\b[^.?!]{0,25}\b(?:to|into|as|over\s+to)\b[^.?!]{0,20}\b(?:tenants?|orgs?|organi[sz]ations?|workspaces?|another\s+(?:account|company|user)|different\s+(?:account|company|user))\b/i,
+  /\b(?:org|tenant|organization|workspace)[_-][a-z0-9][a-z0-9_-]*\b/i,
+  /\b(?:log(?:ged)?\s*in|sign(?:ed)?\s*in|act|acting|work|operate|run)\s+as\s+(?:an?\s+|the\s+)?(?:admin|administrator|root|superuser|super[\s-]?admin|owner|another\s+\w+|someone\s+else|staff|support)\b/i,
+  /\b(?:grant|give|make)\s+(?:me|us|my\s+account)\b[^.?!]{0,25}\b(?:admin|administrator|root|superuser|full\s+access|all\s+permissions|owner\s+(?:access|rights|role))\b/i,
+  /\b(?:bypass|disable|turn\s+off|skip|circumvent|override)\b[^.?!]{0,20}\b(?:security|authentication|auth|permissions?|row[\s-]?level|rls|tenant\s+isolation|access\s+control|rate\s+limit|guardrails?|safety)\b/i,
+  /\b(?:pretend|imagine|roleplay|role[\s-]?play)\b[^.?!]{0,20}\b(?:you\s+are|to\s+be|you're|that\s+you)\b|\bfrom\s+now\s+on\s*,?\s+(?:you|act|respond|answer|ignore)\b|\brespond\s+only\s+with\b|\b(?:print|repeat|tell\s+me|what\s+(?:are|is))\s+your\s+(?:instructions|rules|prompt|guidelines|system\s+message)\b/i,
+];
+function isHostileAccess(q) {
+  if (process.env.DONOVAN_HOSTILE_DECLINE === "0") return false;
+  if (SECRET_NOUN_RE.test(q) && SECRET_ASK_RE.test(q) && !SECRET_VETO_RE.test(q)) return true;
+  return HOSTILE_RES.some((re) => re.test(q));
+}
+
 export function classifySafety(question) {
   const q = String(question ?? "");
   if (!q.trim()) return null;
   if (JUNK_LITERAL_RE.test(q) || JUNK_SYNTAX_RE.test(q) || (NON_LATIN_SCRIPT_RE.test(q) && !LATIN_LETTER_RE.test(q))) return { kind: "junk" };
   for (const re of INJECTION_RES) if (re.test(q)) return { kind: "injection" };
+  if (isHostileAccess(q)) return { kind: "injection" };
   if (SENSITIVE_RE.test(q) && SENSITIVE_ASK_RE.test(q) && !SENSITIVE_VETO_RE.test(q)) return { kind: "sensitive" };
   if (process.env.DONOVAN_OFFTOPIC_DECLINE !== "0") {
     if (SENSITIVE_STRONG_RE.test(q) && !SENSITIVE_HARD_VETO_RE.test(q) && (SENSITIVE_TARGET_RE.test(q) || q.trim().split(/\s+/).length <= 8)) return { kind: "sensitive" };

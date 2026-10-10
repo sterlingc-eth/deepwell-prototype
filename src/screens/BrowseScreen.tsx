@@ -1,23 +1,23 @@
 import { useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
-import { Download, FolderOpen, Grid3x3, Loader2, Network, Trash2, Users } from 'lucide-react';
+import { Briefcase, Download, FolderOpen, Grid3x3, Loader2, Trash2, Users } from 'lucide-react';
 import { downloadExportCsv } from '../services/exportClient';
 import { AppShell } from '../components/AppShell';
 import { DocumentPreview } from '../components/DocumentPreview';
-import { KnowledgeGraph } from '../components/KnowledgeGraph';
 import { documentTotalFor, useGraph } from '../core/entityGraph';
 import { deleteDocuments } from '../services/documentClient';
 import { CustomersScreen } from './CustomersScreen';
 import { useAppStore } from '../store/appStore';
 import { RecordsBrowser } from '../components/records/RecordsBrowser';
+import { CompanyFilesPanel } from '../components/companyFiles/CompanyFilesPanel';
 import { GridView } from '../components/grid/GridView';
 import { useCanAdmin, ASK_ADMIN_TITLE } from '../hooks/useCanAdmin';
 import { AskAdminNote } from '../components/AskAdminNote';
 
-export type RecordsTab = 'documents' | 'customers' | 'grid' | 'graph';
-const RECORDS_TABS: RecordsTab[] = ['documents', 'customers', 'grid', 'graph'];
+export type RecordsTab = 'documents' | 'customers' | 'company' | 'grid';
+const RECORDS_TABS: RecordsTab[] = ['documents', 'customers', 'company', 'grid'];
 const recordsTabKey = (userId: string | null | undefined) => `dw.records.tab.${userId ?? 'anon'}`;
-/** Last-used Records tab for this user; 'documents' when nothing valid is stored or storage is blocked. */
+/** Last-used Records tab for this user; 'documents' when nothing valid is stored (including a saved 'graph', which no longer exists) or storage is blocked. */
 export function readRecordsTab(userId: string | null | undefined): RecordsTab {
   try {
     const v = window.localStorage.getItem(recordsTabKey(userId));
@@ -155,8 +155,20 @@ function DocumentsTab() {
   );
 }
 
+/** Company Files tab: the panel plus an in-place preview, the same way the Documents tab opens a paper. */
+function CompanyFilesTab() {
+  const openDocument = useAppStore((s) => s.openDocument);
+  const [previewDocId, setPreviewDocId] = useState<string | null>(null);
+  return (
+    <>
+      <CompanyFilesPanel onOpenDocument={(id) => { openDocument(id); setPreviewDocId(id); }} />
+      {previewDocId && <DocumentPreview documentId={previewDocId} onClose={() => setPreviewDocId(null)} />}
+    </>
+  );
+}
+
 /**
- * Records — Documents (records browser), Customers, Grid and Graph tabs.
+ * Records — Documents (records browser), Customers, Company Files and Grid tabs.
  *
  * Round 17 (U2 top fix #7): used to be 5 tabs (Documents/Customers/Search/
  * Grid/Graph). "Search" was a generic client-side filter over property/
@@ -191,8 +203,8 @@ export function BrowseScreen() {
           {([
             { id: 'documents' as const, label: 'Documents', Icon: FolderOpen },
             { id: 'customers' as const, label: 'Customers', Icon: Users },
+            { id: 'company' as const, label: 'Company Files', Icon: Briefcase },
             { id: 'grid' as const, label: 'Grid', Icon: Grid3x3 },
-            { id: 'graph' as const, label: 'Graph', Icon: Network },
           ]).map((t) => (
             <button
               key={t.id}
@@ -210,10 +222,10 @@ export function BrowseScreen() {
           <DocumentsTab />
         ) : mainTab === 'customers' ? (
           <CustomersScreen />
-        ) : mainTab === 'grid' ? (
-          <GridView />
+        ) : mainTab === 'company' ? (
+          <CompanyFilesTab />
         ) : (
-          <KnowledgeGraph showSearch heading="DeepWell knowledge graph" />
+          <GridView />
         )}
       </div>
     </AppShell>

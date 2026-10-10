@@ -70,10 +70,10 @@ export function InboxScreen() {
     setStoreTab(t === 'needs' ? 'needs-person' : 'add');
   };
 
-  // The "Money to check" chip only appears once there's something in it (or
+  // The "Money to check", "Conflicts" and "Duplicates" chips only appear once there's something in it (or
   // it's already the active one) — same rule ReviewBody's own row used to
   // apply, just read here from the counts it now reports up.
-  const visibleFilters = FILTERS.filter((f) => f.id !== 'money' || (counts?.money ?? 0) > 0 || chip === 'money');
+  const visibleFilters = FILTERS.filter((f) => (f.id !== 'money' && f.id !== 'conflicts' && f.id !== 'duplicates') || (counts?.[f.id] ?? 0) > 0 || chip === f.id);
   // The five most-used groups stay on the bar; the rest live under "More" (opened automatically when one of
   // them is the active chip, so the selected group is never hidden).
   const primaryFilters = visibleFilters.filter((f) => PRIMARY_FILTERS.includes(f.id));

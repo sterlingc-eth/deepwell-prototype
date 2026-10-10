@@ -35,7 +35,7 @@ async function requireExportAuth(req) {
   return auth;
 }
 
-async function loadDocumentsCsv(db) {
+export async function loadDocumentsCsv(db, maxRows = MAX_ROWS) {
   const rows = await db.raw(
     `WITH cust AS (
        SELECT l.document_id, c.customer_number, c.data->>'customer_name' AS customer_name
@@ -83,7 +83,7 @@ async function loadDocumentsCsv(db) {
        LEFT JOIN addr ON addr.document_id = d.id
       WHERE d.${TENANT}
       ORDER BY d.created_at DESC
-      LIMIT ${MAX_ROWS}`,
+      LIMIT ${Math.trunc(maxRows)}`,
     []
   );
 
@@ -98,8 +98,8 @@ async function loadDocumentsCsv(db) {
   return out;
 }
 
-async function loadCustomersCsv(db) {
-  const rows = await db.listCustomersSummary({ limit: MAX_ROWS, cap: MAX_ROWS });
+export async function loadCustomersCsv(db, maxRows = MAX_ROWS) {
+  const rows = await db.listCustomersSummary({ limit: maxRows, cap: maxRows });
   let out = csvRow(['customer_number', 'name', 'service_address', 'phone', 'email', 'document_count', 'equipment_count', 'last_activity']);
   for (const r of rows) {
     out += csvRow([
@@ -110,7 +110,7 @@ async function loadCustomersCsv(db) {
   return out;
 }
 
-async function loadEquipmentCsv(db) {
+export async function loadEquipmentCsv(db, maxRows = MAX_ROWS) {
   const rows = await db.raw(
     `SELECT e.data->>'serial_number' AS serial, e.data->>'model' AS model, e.data->>'manufacturer' AS manufacturer,
             e.data->>'installation_date' AS installation_date, e.data->'warranty' AS warranty,
@@ -119,7 +119,7 @@ async function loadEquipmentCsv(db) {
        LEFT JOIN entities c ON c.id = e.customer_id
       WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.${TENANT}
       ORDER BY e.updated_at DESC
-      LIMIT ${MAX_ROWS}`,
+      LIMIT ${Math.trunc(maxRows)}`,
     []
   );
   const today = new Date().toISOString().slice(0, 10);

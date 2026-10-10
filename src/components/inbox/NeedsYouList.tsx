@@ -2,6 +2,8 @@ import { memo } from 'react';
 import { Bell } from 'lucide-react';
 import { StagePill } from '../StagePill';
 import type { Doc } from '../../core/types';
+import { isCompanyFileDoc } from '../../core/entityGraph';
+import { hvacSchema } from '../../domains/hvac/schema';
 import type { NeedInfo, Section } from '../../screens/reviewGrouping';
 
 export interface QueueRowData {
@@ -39,7 +41,7 @@ const QueueRow = memo(function QueueRow({ row, active, focusable, onSelect }: Ro
           active ? 'bg-forest-50 dark:bg-forest-800 border-forest-700 dark:border-brass-300' : 'border-transparent hover:bg-surface-2',
         ].join(' ')}
       >
-        <StagePill stage={doc.stage} compact />
+        <StagePill stage={doc.stage} compact companyFile={isCompanyFileDoc(doc, hvacSchema)} />
         <span className="min-w-0 flex-1">
           <span className="block font-mono text-data text-ink truncate">{row.name}</span>
           <span className="block text-body text-ink-3 truncate">{row.sub}</span>

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
 import { AlertTriangle, CreditCard, Inbox, Sparkles, Sun, Moon, LogOut, Globe, Users, Smartphone, X } from 'lucide-react';
 import { AskMark } from './AskMark';
 import { OrganizationSwitcher, useAuth, useClerk } from '@clerk/clerk-react';
@@ -6,6 +6,7 @@ import { Wordmark } from './Wordmark';
 import { useAppStore, selectIngestProgress } from '../store/appStore';
 import { billingBannerFor } from '../services/billingClient';
 import { isAdminRole } from '../services/teamClient';
+import { reviewClient } from '../services/reviewClient';
 import { NotificationsPanel } from './NotificationsPanel';
 import { useGraph } from '../core/entityGraph';
 import { needsPersonCount } from '../screens/ReviewScreen';
@@ -40,6 +41,15 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
   const prefillQuestion = useAppStore((s) => s.prefillQuestion);
   const isAdmin = isAdminRole(orgRole ?? null);
   const [donovanOpen, setDonovanOpen] = useState(false);
+  // The Donovan screen is DeepWell-operator-only (customers get nothing to review, approve or teach). The server says who
+  // is an operator; any failure means "not an operator", so a customer never sees the button.
+  const [isOperator, setIsOperator] = useState(false);
+  useEffect(() => {
+    if (!isAdmin) { setIsOperator(false); return; }
+    let live = true;
+    reviewClient.donovanSharing().then((r) => { if (live) setIsOperator(r.isOperator === true); }).catch(() => { if (live) setIsOperator(false); });
+    return () => { live = false; };
+  }, [isAdmin]);
 
   // Inbox nav badge (round 17, U2 top fix #8): one number, always visible,
   // for "is there open intake work" — no click required to find out. Same
@@ -201,7 +211,7 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
               one click from the same account row Team and Billing live in
               (not buried inside Team's own scroll). Opens as an overlay —
               see DonovanScreen.tsx's file comment for why. */}
-          {isAdmin && !billingGateActive && (
+          {isAdmin && isOperator && !billingGateActive && (
             <button
               aria-label="Donovan"
               title="Donovan"
@@ -326,7 +336,7 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
         </div>
       </footer>
 
-      {!billingGateActive && <CommandPalette isAdmin={isAdmin} onOpenDonovan={() => setDonovanOpen(true)} />}
+      {!billingGateActive && <CommandPalette isAdmin={isAdmin} showDonovan={isOperator} onOpenDonovan={() => setDonovanOpen(true)} />}
 
       <SupportWidget
         page={currentScreen}
@@ -335,7 +345,7 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
         onAskDonovan={prefillQuestion}
       />
 
-      {donovanOpen && (
+      {donovanOpen && isOperator && (
         <Suspense fallback={<div className="fixed inset-0 z-40 bg-bg" aria-busy="true" />}>
           <DonovanScreen onClose={() => setDonovanOpen(false)} />
         </Suspense>

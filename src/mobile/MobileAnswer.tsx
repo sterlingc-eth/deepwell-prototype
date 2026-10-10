@@ -1,6 +1,6 @@
 import { AnswerTrust } from '../components/answer/AnswerTrust'
 import { applyRole, currentRole } from '../core/role'
-import { memo, useId, useMemo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { ThumbsDown, ThumbsUp } from 'lucide-react'
 import type { Answer, Fact } from '../core/types'
 import { useGraph } from '../core/entityGraph'
@@ -63,74 +63,36 @@ function FactRow({ fact, onOpenCustomer }: { fact: Fact; onOpenCustomer: (ref: s
 }
 
 function Feedback({ question }: { question: string }) {
-  const [step, setStep] = useState<'idle' | 'asking' | 'sending' | 'done'>('idle')
-  const [note, setNote] = useState('')
+  // Optional and one tap each way: no note form (2026-10-10), so the customer never has to type or teach anything.
   const [message, setMessage] = useState<string | null>(null)
-  const noteId = useId()
-  const [upSending, setUpSending] = useState(false)
+  const [sending, setSending] = useState(false)
   const btn = 'w-11 h-11 -my-1.5 flex items-center justify-center rounded-full text-ink-3 active:bg-surface-2'
 
-  if (message) return <p className="m-0 text-caption text-ink-3">{message}</p>
-  if (step === 'asking' || step === 'sending') {
-    return (
-      <form
-        className="flex items-center gap-2 w-full"
-        onSubmit={async (e) => {
-          e.preventDefault()
-          setStep('sending')
-          try {
-            const r = await reviewClient.askFeedback(question, 'down', note.trim() || undefined)
-            setMessage(
-              r.budget
-                ? 'Logged. Donovan will re-check it later.'
-                : r.replay?.outcome === 'answered_now'
-                  ? `Checked again: ${r.replay.answer?.text ?? 'Donovan has a new answer.'}`
-                  : 'Logged for review. Thanks.'
-            )
-          } catch {
-            setMessage('Could not save that just now.')
-          }
-          setStep('done')
-        }}
-      >
-        <label className="sr-only" htmlFor={noteId}>
-          What was wrong?
-        </label>
-        <input
-          id={noteId}
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="What was wrong? (optional)"
-          autoFocus
-          className="flex-1 min-w-0 h-11 rounded-lg border border-line-2 bg-surface-2 px-3 text-ink placeholder:text-ink-3"
-        />
-        <button type="submit" disabled={step === 'sending'} className="h-11 px-4 rounded-lg bg-accent text-forest-950 font-semibold disabled:opacity-50">
-          Send
-        </button>
-      </form>
-    )
+  const send = async (rating: 'up' | 'down') => {
+    setSending(true)
+    try {
+      const r = await reviewClient.askFeedback(question, rating)
+      setMessage(
+        rating === 'up'
+          ? 'Thanks, noted.'
+          : r.budget
+            ? 'Logged. Donovan will re-check it later.'
+            : r.replay?.outcome === 'answered_now'
+              ? `Checked again: ${r.replay.answer?.text ?? 'Donovan has a new answer.'}`
+              : 'Logged for review. Thanks.'
+      )
+    } catch {
+      setMessage('Could not save that just now.')
+    }
   }
+
+  if (message) return <p className="m-0 text-caption text-ink-3">{message}</p>
   return (
     <span className="inline-flex items-center">
-      <button
-        type="button"
-        className={btn}
-        aria-label="This answer was right"
-        data-tap-target="true"
-        disabled={upSending}
-        onClick={async () => {
-          setUpSending(true)
-          try {
-            await reviewClient.askFeedback(question, 'up')
-            setMessage('Thanks, noted.')
-          } catch {
-            setMessage('Could not save that just now.')
-          }
-        }}
-      >
+      <button type="button" className={btn} aria-label="This answer was right" data-tap-target="true" disabled={sending} onClick={() => void send('up')}>
         <ThumbsUp className="w-4 h-4" />
       </button>
-      <button type="button" className={btn} aria-label="This answer was wrong" data-tap-target="true" onClick={() => setStep('asking')}>
+      <button type="button" className={btn} aria-label="This answer was wrong" data-tap-target="true" disabled={sending} onClick={() => void send('down')}>
         <ThumbsDown className="w-4 h-4" />
       </button>
     </span>

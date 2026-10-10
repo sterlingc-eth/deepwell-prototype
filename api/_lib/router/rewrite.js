@@ -11,6 +11,7 @@
  * address) so a rewrite can never turn a non-record question into a record one; spoken digits need >= 3 consecutive digit words.
  *   rewriteQuestion(q) -> rewritten string, or null when nothing changed. Pure.
  */
+import { canonicalizeWordClasses } from "../lookups/lexicon.js";
 import { withinEditDistance1, VOCAB } from "../nlNormalize.js";
 const DIGITS = { zero: "0", oh: "0", o: "0", one: "1", two: "2", three: "3", four: "4", five: "5", six: "6", seven: "7", eight: "8", nine: "9" };
 const DIGIT_SEQ_RE = /\b(?:(?:zero|oh|one|two|three|four|five|six|seven|eight|nine)\s+){2,}(?:zero|oh|one|two|three|four|five|six|seven|eight|nine)\b/gi;
@@ -361,12 +362,24 @@ export function rewriteTechRank(q, today) {
   return q;
 }
 
+/** F4: a bare 4-digit year next to a PLURAL document noun is a year, never an amount ("invoices 2025" -> "invoices in 2025"). A "$" or a money word anywhere keeps it an amount. */
+const YEAR_DOC_NOUN = "(?:invoices|bills|receipts|statements|estimates|quotes|proposals|orders|pos|agreements|contracts|documents|docs|paperwork|papers|files|schedules|letters|certificates|tickets|credit memos|change orders|purchase orders)";
+function rewriteBareYear(q) {
+  if (process.env.DONOVAN_F4_YEAR === "0") return q;
+  if (/[$]|\b(?:dollars?|bucks?|usd|grand|total|amount|worth|cost|costs|price|priced|over|under|above|below|than)\b/i.test(q)) return q;
+  return q
+    .replace(new RegExp(`\\b(${YEAR_DOC_NOUN})\\s+((?:19|20)\\d\\d)\\b(?![\\s,.]*\\d)`, "i"), "$1 in $2")
+    .replace(new RegExp(`^(\\s*(?:(?:show|list|give|get|pull)(?:\\s+me)?\\s+)?(?:all\\s+)?(?:the\\s+|our\\s+)?)((?:19|20)\\d\\d)\\s+(${YEAR_DOC_NOUN})\\b`, "i"), "$1$3 in $2");
+}
+
 export function rewriteQuestion(question, today) {
   const src = String(question ?? "");
   if (!src.trim() || src.length > 300) return null;
   let q = rewriteShorthand(src);
   q = q.replace(DIGIT_SEQ_RE, (m) => m.toLowerCase().split(/\s+/).map((w) => DIGITS[w] ?? w).join(""));
   for (const [re, rep] of RULES) q = q.replace(re, rep);
+  if (process.env.DONOVAN_F4_WORDS !== "0") q = canonicalizeWordClasses(q);
+  q = rewriteBareYear(q);
   q = rewriteCountPhrasing(q);
   q = rewriteWindowShapes(q);
   q = rewriteLoopR3(q);

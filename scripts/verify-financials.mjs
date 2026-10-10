@@ -407,6 +407,7 @@ const fakeModel = ({ prompt }) => {
   const b1 = await B.runFinancialsBackfill(ctxA, { maxCalls: 6, callModel: fakeModel, skipBudget: true, today: TODAY });
   eq('backfill batch 1: 6 model calls max, 6 written (doc 2 was already done, so it is never re-billed), stopped at the batch', [b1.modelCalls, b1.written, b1.processed, b1.stoppedReason], [6, 6, 6, 'batch_complete']);
   check('backfill batch 1: reports eligible/remaining and a paging cursor', b1.eligible === 15 && b1.remaining === 8 && typeof b1.nextCursor === 'string', JSON.stringify(b1));
+  check('backfill batch 1: lists what it added (one entry per document written, each with its id and filename keys)', Array.isArray(b1.added) && b1.added.length === 6 && b1.added.every((x) => typeof x.documentId === 'string' && 'filename' in x && 'total' in x), JSON.stringify(b1.added));
   const b2 = await B.runFinancialsBackfill(ctxA, { maxCalls: 20, afterId: b1.nextCursor, callModel: fakeModel, skipBudget: true, today: TODAY });
   eq('backfill batch 2 (after the cursor): the remaining 8 documents', [b2.written, b2.remaining, b2.modelCalls], [8, 0, 8]);
   check('backfill made exactly one model call per money document, none for the permit, none twice', modelCalls.length === 14 && new Set(modelCalls).size === 14 && !modelCalls.includes('a90'), modelCalls.join(','));

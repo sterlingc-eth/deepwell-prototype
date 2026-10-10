@@ -70,7 +70,7 @@ async function loadCustomerEntities(db) {
             data->>'customer_name' AS name, data->>'phone' AS phone,
             data->>'email' AS email, data->>'service_address' AS address
        FROM entities
-      WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT}`,
+      WHERE entity_type = 'customer' AND merged_into IS NULL AND COALESCE(data->>'is_company', '') <> 'true' AND ${TENANT}`,
     []
   );
   return rows;
@@ -376,6 +376,11 @@ export async function undoMergeSuggestion(db, { suggestionId }, actorClerkId) {
   // exactly, since the merge unconditionally deleted it regardless of
   // whether its copy onto keep succeeded or was skipped.
   const keepPreMergeDocIds = new Set((keep.links ?? []).map((l) => l.document_id));
+
+  // The merge may have handed the survivor a LOWER customer number that used to belong to a dropped record
+  // (mergeCustomers keeps the lowest). Free that number first, or restoring the dropped record's own number
+  // below collides with it on the unique customer-number index; the survivor's own number is put back after.
+  await db.raw(`UPDATE entities SET customer_number = NULL WHERE id = $1 AND ${TENANT}`, [keep.id]);
 
   for (const drop of drops) {
     // Bring the dropped entity back to life first — extractions/links below

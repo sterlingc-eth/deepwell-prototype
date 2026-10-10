@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { AlertTriangle, Loader2, Search } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AlertTriangle, Loader2 } from 'lucide-react';
 // cytoscape's own @types ship style/layout option unions far too narrow for
 // data()-mapped styles ("shape": "data(shape)" isn't a valid NodeShape
 // literal in its eyes even though the library reads it fine at runtime) — so,
@@ -285,15 +285,11 @@ export interface KnowledgeGraphProps {
   /** Seeds the view directly at this node id (a customer or entity's own
    *  graph id). Omit to start from the search box instead. */
   seedNodeId?: string;
-  /** Shows the "search to pick a start node" box (the standalone Graph
-   *  screen inside Records). Entry points that already know their node
-   *  (customer profile, entity screen) leave this off. */
-  showSearch?: boolean;
   /** aria-label for the whole widget; defaults to "Knowledge graph". */
   heading?: string;
 }
 
-export function KnowledgeGraph({ seedNodeId, showSearch = false, heading = 'Knowledge graph' }: KnowledgeGraphProps) {
+export function KnowledgeGraph({ seedNodeId, heading = 'Knowledge graph' }: KnowledgeGraphProps) {
   const fieldMode = useAppStore((s) => s.fieldMode); // true = Field (light); false = Office (dark)
   const dark = !fieldMode;
 
@@ -305,10 +301,6 @@ export function KnowledgeGraph({ seedNodeId, showSearch = false, heading = 'Know
   const [loadState, setLoadState] = useState<LoadState>('idle');
   const [error, setError] = useState<string | null>(null);
 
-  const [query, setQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<GraphNode[] | null>(null);
-  const [searching, setSearching] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
 
   const [preview, setPreview] = useState<{ documentId: string; location: SourceLocation } | null>(null);
   const [hoverEdge, setHoverEdge] = useState<{ x: number; y: number; label: string } | null>(null);
@@ -378,30 +370,6 @@ export function KnowledgeGraph({ seedNodeId, showSearch = false, heading = 'Know
   }, [depth]);
 
   const recenter = useCallback((nodeId: string) => { load(nodeId, depth); }, [load, depth]);
-
-  const runSearch = async (e?: FormEvent) => {
-    e?.preventDefault();
-    const q = query.trim();
-    if (!q) return;
-    setSearching(true);
-    setSearchError(null);
-    try {
-      const res = await graphClient.search(q);
-      setSearchResults(res.nodes);
-    } catch (err) {
-      setSearchError(err instanceof Error ? err.message : 'Search failed.');
-      setSearchResults(null);
-    } finally {
-      setSearching(false);
-    }
-  };
-
-  const pickSearchResult = (nodeId: string) => {
-    setSearchResults(null);
-    setQuery('');
-    setDepth(2);
-    load(nodeId, 2);
-  };
 
   const findCitedPage = useCallback(
     (docNodeId: string): number | undefined => {
@@ -553,45 +521,7 @@ export function KnowledgeGraph({ seedNodeId, showSearch = false, heading = 'Know
 
   return (
     <section aria-label={heading} className="space-y-3">
-      {showSearch && (
-        <form onSubmit={runSearch} className="space-y-2">
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-3" aria-hidden="true" />
-            <label htmlFor="graph-search-input" className="sr-only">Search records to start exploring</label>
-            <input
-              id="graph-search-input"
-              className="dw-input !pl-12"
-              placeholder="Search a customer, unit, technician, document…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              autoComplete="off"
-            />
-          </div>
-          {searchError && <p role="alert" className="text-body text-warn-ink dark:text-brass-200">{searchError}</p>}
-          {searching && <p className="text-ink-3 flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Searching…</p>}
-          {searchResults && (
-            <ul className="divide-y divide-line border border-line rounded-lg bg-surface max-h-64 overflow-y-auto" aria-label="Search results">
-              {searchResults.map((n) => (
-                <li key={n.id}>
-                  <button
-                    type="button"
-                    onClick={() => pickSearchResult(n.id)}
-                    className="w-full text-left flex items-center gap-2 px-3 py-2 min-h-touch hover:bg-surface-2 transition-colors duration-quick"
-                  >
-                    <span className="dw-pill-muted shrink-0 text-caption">{typeLabel(n.type)}</span>
-                    <span className="min-w-0 flex-1 truncate text-body text-ink">{n.label}</span>
-                    {n.subtitle && <span className="text-caption text-ink-3 truncate">{n.subtitle}</span>}
-                  </button>
-                </li>
-              ))}
-              {searchResults.length === 0 && <li className="px-4 py-6 text-center text-ink-3">No matches.</li>}
-            </ul>
-          )}
-        </form>
-      )}
-
-      {showEmptyStart && showSearch && <p className="text-ink-3">Search above to start exploring your knowledge graph.</p>}
-      {showEmptyStart && !showSearch && <p className="text-ink-3">Nothing to graph yet.</p>}
+      {showEmptyStart && <p className="text-ink-3">Nothing to graph yet.</p>}
 
       {centerId && (
         <>

@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent } 
 import { localYmd } from '../core/localDate';
 import { Plus, Upload, AlertTriangle, ChevronRight, X, FolderArchive, FileUp } from 'lucide-react';
 import { StagePill, STAGE_LABEL } from '../components/StagePill';
-import { docCountsByStage, documentTotalFor, useGraph } from '../core/entityGraph';
+import { hvacSchema } from '../domains/hvac/schema';
+import { docCountsByStage, documentTotalFor, isCompanyFileDoc, useGraph } from '../core/entityGraph';
 import { INTAKE_SOURCES, PIPELINE_STAGES, type Batch, type Doc, type IntakeSource, type PipelineStage } from '../core/types';
 import { classifyByFilename, fileTypeOf, SAMPLE_UPLOADS } from '../domains/hvac/intake';
 import { useAppStore } from '../store/appStore';
@@ -784,7 +785,7 @@ export function IntakeBody() {
                               <button type="button" className="dw-btn-tertiary !min-h-[44px] sm:!min-h-[32px] !py-0.5" onClick={() => openInboxNeedsPerson()}>{STILL_PROCESSING_LINK_LABEL}</button>
                             </span>
                           ) : (u.status === 'done' || u.status === 'queued') && liveDoc ? (
-                            <span className="shrink-0"><StagePill stage={liveDoc.stage} ai={liveDoc.verifiedBy === 'ai'} compact /></span>
+                            <span className="shrink-0"><StagePill stage={liveDoc.stage} ai={liveDoc.verifiedBy === 'ai'} compact companyFile={isCompanyFileDoc(liveDoc, hvacSchema)} /></span>
                           ) : (
                             <span className="shrink-0 text-ink-2">{UPLOAD_LABEL[u.status]}</span>
                           )}
@@ -806,7 +807,7 @@ export function IntakeBody() {
                       return (
                         <li key={d.id}>
                           <button type="button" onClick={() => review(d.id)} className="w-full text-left flex items-center gap-3 px-4 py-3 min-h-touch hover:bg-surface-2 transition-colors duration-quick">
-                            <StagePill stage={d.stage} compact />
+                            <StagePill stage={d.stage} compact companyFile={isCompanyFileDoc(d, hvacSchema)} />
                             <span className="min-w-0 flex-1">
                               <span className="block font-mono text-data text-ink truncate">{documentName(d)}</span>
                               <span className="block text-body text-ink-3 truncate">{[typeLabel, hasFriendlyName(d) ? d.filename : null].filter(Boolean).join(' · ')}{d.linkedEntityIds.length ? ` · linked to ${d.linkedEntityIds.length}` : ''}</span>

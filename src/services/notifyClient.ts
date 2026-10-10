@@ -35,6 +35,8 @@ export interface NotificationsResponse {
   emailDigest: boolean;
   /** This person's own "Mute my daily digest" choice (independent of the shop-wide switch). Older servers omit it. */
   digestMuted?: boolean;
+  /** This person's own saved screen choices (hidden Needs-attention rows, collapsed alert groups). Older servers omit it. */
+  uiPrefs?: Record<string, unknown>;
 }
 
 async function handle<T>(res: Response): Promise<T> {
@@ -79,6 +81,10 @@ export function markAllNotificationsRead(): Promise<{ updated: number }> {
 
 export function setDigestMutedPreference(digestMuted: boolean): Promise<{ digestMuted: boolean }> {
   return post({ settings: { digestMuted } });
+}
+
+export function saveUiPrefs(uiPrefs: Record<string, unknown>): Promise<{ uiPrefs: Record<string, unknown> }> {
+  return post({ uiPrefs });
 }
 
 export function setEmailDigestPreference(emailDigest: boolean): Promise<{ settings: Record<string, unknown> }> {

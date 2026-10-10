@@ -70,7 +70,7 @@ export function escapeRegExp(s) {
 // count as if it answered the brand question (see suspiciousUnfilteredCustomerPlan's
 // own doc comment for why an unrecognized-but-real condition must never be
 // silently dropped like this).
-const BRAND_WORDS = [
+export const BRAND_WORDS = [
   'trane', 'carrier', 'goodman', 'lennox', 'rheem', 'york', 'daikin', 'mitsubishi',
   'ruud', 'bryant', 'amana', 'american standard', 'heil', 'payne', 'coleman', 'maytag',
 ];

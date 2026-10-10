@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, ChevronDown, ChevronRight, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, BellOff, ChevronDown, ChevronRight, EyeOff, RotateCcw, ShieldCheck } from 'lucide-react';
 import { fetchInsights, type Insight, type InsightSeverity } from './insightsClient';
+import { hide, restore, splitHidden, ymd, SNOOZE_DAYS, type HideMode } from './attentionPrefs';
+import { useUiPrefs } from '../../services/uiPrefs';
 
 const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
 
@@ -33,6 +35,9 @@ function chip(insight: Insight): string {
 export function InsightsCard({ onAsk, onOpenInbox }: { onAsk: (question: string) => void; onOpenInbox?: () => void }) {
   const [state, setState] = useState<{ status: 'loading' | 'ready' | 'error'; items: Insight[] }>({ status: 'loading', items: [] });
   const [openId, setOpenId] = useState<string | null>(null);
+  const [prefs, updatePrefs] = useUiPrefs();
+  const [showHidden, setShowHidden] = useState(false);
+  const hiddenMap = prefs.needsAttention ?? {};
 
   useEffect(() => {
     if (DEMO_MODE) return;
@@ -55,6 +60,12 @@ export function InsightsCard({ onAsk, onOpenInbox }: { onAsk: (question: string)
 
   if (DEMO_MODE || state.status === 'error') return null;
 
+  const hideRow = (insight: Insight, mode: HideMode) => updatePrefs({ needsAttention: hide(hiddenMap, insight.id, mode, insight.count, new Date()) });
+  const restoreRow = (insight: Insight) => updatePrefs({ needsAttention: restore(hiddenMap, insight.id) });
+  const { visible, hidden } = splitHidden(state.items, hiddenMap, ymd(new Date()));
+  const shown = (showHidden ? [...visible, ...hidden] : visible).slice(0, showHidden ? 8 : 5);
+  const hiddenIds = new Set(hidden.map((h) => h.id));
+
   const runAction = (insight: Insight) => {
     if (insight.action.href === 'inbox') {
       onOpenInbox?.();
@@ -75,12 +86,18 @@ export function InsightsCard({ onAsk, onOpenInbox }: { onAsk: (question: string)
             <ShieldCheck className="w-4 h-4 text-ok-ink" aria-hidden="true" />
             <p className="text-body text-ink-2">All clear — nothing needs attention right now.</p>
           </div>
+        ) : shown.length === 0 && !showHidden ? (
+          <div className="flex items-center gap-2 px-1 py-2">
+            <ShieldCheck className="w-4 h-4 text-ok-ink" aria-hidden="true" />
+            <p className="text-body text-ink-2">Everything here is hidden for now.</p>
+          </div>
         ) : (
           <ul className="divide-y divide-line">
-            {state.items.slice(0, 5).map((insight) => {
+            {shown.map((insight) => {
+              const isHiddenRow = hiddenIds.has(insight.id);
               const isOpen = openId === insight.id;
               return (
-                <li key={insight.id}>
+                <li key={insight.id} className={isHiddenRow ? 'opacity-70' : undefined}>
                   <button
                     type="button"
                     onClick={() => setOpenId((id) => (id === insight.id ? null : insight.id))}
@@ -89,6 +106,7 @@ export function InsightsCard({ onAsk, onOpenInbox }: { onAsk: (question: string)
                   >
                     {insight.severity === 'high' && <AlertTriangle className="w-4 h-4 text-bad-ink shrink-0" aria-hidden="true" />}
                     <span className="flex-1 min-w-0 truncate text-body-lg text-ink">{insight.title}</span>
+                    {isHiddenRow && <span className="dw-pill-muted">Hidden</span>}
                     <span className={SEVERITY_PILL[insight.severity]}>{chip(insight)}</span>
                     {isOpen ? <ChevronDown className="w-4 h-4 text-ink-3 shrink-0" aria-hidden="true" /> : <ChevronRight className="w-4 h-4 text-ink-3 shrink-0" aria-hidden="true" />}
                   </button>
@@ -104,15 +122,38 @@ export function InsightsCard({ onAsk, onOpenInbox }: { onAsk: (question: string)
                           </li>
                         ))}
                       </ul>
-                      <button type="button" onClick={() => runAction(insight)} className="dw-btn-primary !min-h-touch">
-                        {insight.action.label}
-                      </button>
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" onClick={() => runAction(insight)} className="dw-btn-primary !min-h-touch">
+                          {insight.action.label}
+                        </button>
+                        {isHiddenRow ? (
+                          <button type="button" onClick={() => restoreRow(insight)} className="dw-btn-secondary !min-h-touch">
+                            <RotateCcw className="w-4 h-4" aria-hidden="true" /> Show again
+                          </button>
+                        ) : (
+                          <>
+                            <button type="button" onClick={() => hideRow(insight, 'dismiss')} title="Hide this row until the number on it changes" className="dw-btn-secondary !min-h-touch">
+                              <EyeOff className="w-4 h-4" aria-hidden="true" /> Dismiss
+                            </button>
+                            <button type="button" onClick={() => hideRow(insight, 'snooze')} title={`Hide this row for ${SNOOZE_DAYS} days`} className="dw-btn-secondary !min-h-touch">
+                              <BellOff className="w-4 h-4" aria-hidden="true" /> Snooze {SNOOZE_DAYS} days
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </div>
                   )}
                 </li>
               );
             })}
           </ul>
+        )}
+        {state.status === 'ready' && hidden.length > 0 && (
+          <div className="pt-1 px-1">
+            <button type="button" onClick={() => setShowHidden((v) => !v)} aria-pressed={showHidden} className="text-caption text-ink-2 hover:text-ink underline min-h-touch sm:min-h-0">
+              {showHidden ? 'Hide them again' : `Show hidden (${hidden.length})`}
+            </button>
+          </div>
         )}
       </div>
     </section>

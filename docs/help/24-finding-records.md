@@ -11,7 +11,7 @@ Records opens on **Documents** the first time you use it, then remembers the las
 ### Where are my documents and customers?
 ~ where are my documents, where are my customers, where are my records, records screen, records tab, where did my documents go, where do i see uploaded files, list of documents, find my files, browse documents, customers tab, documents tab, where did search go, search screen, old search
 !covers:A-RECORDS-TABS
-Open **Records**. The tabs are **Documents** (where a new user lands first), **Customers**, **Grid** and **Graph**. Records reopens on the tab you used last. Your uploaded files are under **Documents**. The old separate Search screen is gone: use the search boxes in Customers and Documents, or press Ctrl+K (Cmd+K on a Mac).
+Open **Records**. The tabs are **Documents** (where a new user lands first), **Customers**, **Company Files** and **Grid**. Records reopens on the tab you used last. Your uploaded files are under **Documents**. The old separate Search screen is gone: use the search boxes in Customers and Documents, or press Ctrl+K (Cmd+K on a Mac).
 
 ### How do I search my documents?
 ~ search documents, search my documents, find a document, search by serial, search filename, search by address, search by technician, search by brand, search contents, find a work order, find an invoice, find a file, look for a document, document search, table or cards
@@ -56,7 +56,7 @@ Click a customer row. Click a value (Name, Address, Phone, Email) to edit and sa
 ### What is the Graph?
 ~ graph, knowledge graph, records graph, relationship map, see connections, how are things connected, graph view, graph tab, map of customers and equipment, connections between customers and units
 !covers:A-GRAPH
-**Records → Graph** (and the **Graph** toggle on a customer or record) draws customers, properties, equipment and documents and how they connect. Click a node to open it. It's for exploring; for a specific answer use the Ask screen.
+The **Graph** toggle on a customer or record draws customers, properties, equipment and documents and how they connect. Click a node to open it. It's for exploring; for a specific answer use the Ask screen.
 
 ### Where is a unit's page?
 ~ unit page, equipment page, equipment record, open a unit, open a serial, unit details, unit history, service visits for a unit, documents for a unit, serial number page

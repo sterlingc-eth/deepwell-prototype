@@ -25,6 +25,7 @@ import { attachCitations, documentRecord, unitRecord, customerRecord } from "../
 import { answerEnvelope, TENANT_SQL, todayIso } from "../scope.js";
 import { formatDateHumanWithIso } from "../fastPath.js";
 import { resolveAnyTimeRange } from "../analytics.js";
+import { parseTemplate, runTemplate } from "./aggTemplates.js";
 
 const norm = (s) => String(s ?? "").toLowerCase().replace(/[’`]/g, "'").replace(/[^a-z0-9'\s#-]/g, " ").replace(/\s+/g, " ").trim();
 const words = (q) => q.split(/\s+/).filter(Boolean);
@@ -64,12 +65,12 @@ function closed(q, vocab, brands = new Set()) {
 /* ------------------------------------------------------------------ parse */
 
 /** Pure. @returns {kind, question, ...} or null. `question` may still carry a conversational frame. */
-export function parseAggregate(question) {
-  const hit = parseAggregateCore(question);
+export function parseAggregate(question, opts = {}) {
+  const hit = parseAggregateCore(question, opts);
   return hit ? { ...hit, question: norm(unframe(question)) } : null;
 }
 
-function parseAggregateCore(question) {
+function parseAggregateCore(question, opts = {}) {
   const raw = norm(unframe(question));
   if (!raw || raw.length > 170) return null;
   const q = raw.replace(/\bunits'?\b/g, "units");
@@ -187,6 +188,10 @@ function parseAggregateCore(question) {
   if (/\b(?:open|unpaid|outstanding|pending|unsettled)\b/.test(q) && /\binvoices?\b|\bbills?\b/.test(q) && /\b(?:last|this|past|in|during|from)\s+(?:the\s+)?(?:last\s+)?(?:\d+\s+)?(?:quarter|month|week|year|days?|weeks?|months?)\b|\bytd\b|\bq[1-4]\b/.test(q) && !/\bhow much\b|\btotal\b|\bdollar|\$/.test(q)) {
     if (closed(q, setOf(V.open))) return { kind: "open-in-period", question: q };
   }
+
+  // --- R45: general composable templates (share / average / top N / busiest / per-group / A vs B), last so every closed shape above keeps its answer
+  const tmpl = opts?.skipTemplate ? null : parseTemplate(question);
+  if (tmpl) return { kind: "template", intent: tmpl };
   return null;
 }
 
@@ -231,6 +236,7 @@ async function runAggregateCore(db, intent, { today } = {}) {
     case "history-skew": return historySkew(db, intent, t);
     case "date-extreme": return dateExtreme(db, intent);
     case "open-in-period": return openInPeriod(db, intent, t);
+    case "template": return runTemplate(db, intent.intent, { today: t });
     default: return null;
   }
 }

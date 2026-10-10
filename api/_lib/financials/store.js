@@ -241,7 +241,7 @@ export async function verifyFinancials(db, { documentId, by }) {
 export async function listBackfillCandidates(db, { afterId = null, limit = 25, documentTypes }) {
   if (!(await financialsTableExists(db))) return [];
   const r = await db.raw(
-    `SELECT d.id, d.document_type
+    `SELECT d.id, d.document_type, d.original_filename AS filename
        FROM documents d
       WHERE d.tenant_id = ${TENANT} AND d.document_type = ANY($1::text[])
         AND ($2::uuid IS NULL OR d.id > $2::uuid)

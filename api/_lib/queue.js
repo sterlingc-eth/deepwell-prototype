@@ -5,6 +5,7 @@ import { extractFinancialsDeterministicFirst as extractFinancialsBestEffort } fr
 import { getDailyModelBudgetStatus } from "./rateLimit.js";
 import { assertActiveBilling } from "./plan.js";
 import { notifyIfImportDone } from "./importDone.js";
+import { runExportStep, failExport, removeIfExpired, EXPORT_TTL_DAYS } from "./accountExport.js";
 
 /**
  * The ingestion queue.
@@ -39,6 +40,7 @@ import { notifyIfImportDone } from "./importDone.js";
 export const EVENTS = {
   uploaded: "deepwell/document.uploaded",
   read: "deepwell/document.read",
+  accountExport: "deepwell/account.export",
 };
 
 /**
@@ -132,6 +134,15 @@ export async function enqueueDocument({ documentId, tenantKey, tenantName, userI
     id: eventIdFor("read", documentId, requeueNonce),
     data: { documentId, tenantKey, tenantName, userId, autoExtract, ...(requeueNonce ? { nonce: requeueNonce } : {}) },
   });
+}
+
+/**
+ * Hand a "Download all my files" job to the queue (accountExport.js). The tenant and job id come from the verified admin's
+ * request at enqueue time; the worker only ever works under that tenant's own storage prefix.
+ */
+export async function enqueueAccountExport({ jobId, tenantKey, tenantName, userId }) {
+  const { client } = await load();
+  await client.send({ name: EVENTS.accountExport, id: `account-export-${jobId}`, data: { jobId, tenantKey, tenantName, userId } });
 }
 
 /** Pure: the Inngest event id. Same (kind, document) -> same id (dedupe) unless a nonce says "this is a re-queue". */
@@ -481,5 +492,38 @@ function buildFunctions(inngest, NonRetriableError) {
     }
   );
 
-  return [readDocument, extractFields];
+  // "Download all my files": one zip part per step, so no step is longer than the 60-second ceiling and a failed step is
+  // simply run again. Deliberately NOT billing-gated: a customer who cancelled still gets their own files. One job per
+  // tenant at a time. After the keep-for window the files are deleted.
+  const accountExport = inngest.createFunction(
+    {
+      id: "account-export",
+      name: "Pack a company's original files into download parts",
+      concurrency: [{ key: "event.data.tenantKey", limit: 1 }],
+      retries: RETRIES,
+      triggers: [{ event: EVENTS.accountExport }],
+    },
+    async ({ event, step, attempt, maxAttempts }) => {
+      const { jobId, tenantKey, tenantName } = event.data ?? {};
+      if (!jobId || !tenantKey) throw new NonRetriableError("jobId and tenantKey are required");
+      const ctx = { tenantKey, tenantName: tenantName ?? tenantKey };
+      for (let i = 0; i < 2000; i++) {
+        const out = await step.run(`pack-${i}`, async () => {
+          try {
+            const { job } = await runExportStep(ctx, jobId);
+            return { status: job.status };
+          } catch (err) {
+            if (attempt >= (maxAttempts ?? RETRIES) - 1 || fatal(err)) await failExport(ctx, jobId).catch(() => {});
+            if (fatal(err)) throw new NonRetriableError(err.message, { cause: err });
+            throw err;
+          }
+        });
+        if (out.status !== "running" && out.status !== "queued") break;
+      }
+      await step.sleep("keep-for-a-week", `${EXPORT_TTL_DAYS}d`);
+      await step.run("remove-expired-files", () => removeIfExpired(ctx, jobId));
+    }
+  );
+
+  return [readDocument, extractFields, accountExport];
 }

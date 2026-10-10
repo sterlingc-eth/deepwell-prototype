@@ -9,6 +9,7 @@
  *                                             test-docs/scorecard/blind/plumb-owner-1.json
  */
 import fs from "node:fs";
+import { assertUniqueRoster } from "./lib/sampleRoster.mjs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
@@ -46,6 +47,7 @@ const MAXD = "2026-09-20";
 const entities = [], documents = [], pages = [], extractions = [], links = [], financials = [], lines = [];
 const customers = [];
 const nameSeen = new Set();
+const phoneSeen = new Set();
 let invN = 40000, tkN = 7000, pmN = 91000;
 
 function mkDoc(type, date, text, c) {
@@ -72,7 +74,9 @@ for (let i = 0; i < N; i++) {
   const zip = pick(city[2]);
   const addr = `${int(100, 9899)} ${pick(STREETS)}, ${city[0]}, ${city[1]} ${zip}`;
   const em = `${name.toLowerCase().replace(/[^a-z]+/g, ".")}${i}@example.com`;
-  const phone = `(520) 555-${String(int(100, 999)).padStart(4, "0")}`;
+  // one phone per customer: a repeated number would make two customers look like the same person
+  let ph = int(100, 999); while (phoneSeen.has(ph)) ph = ph >= 999 ? 100 : ph + 1; phoneSeen.add(ph);
+  const phone = `(520) 555-${String(ph).padStart(4, "0")}`;
   const cid = duuid();
   const c = { id: cid, key: `c${i}`, name, addr, city: city[0], zip, phone, email: em, eq: [], docs: [] };
   entities.push({ id: cid, entity_type: "customer", merged_into: null, customer_number: `C-${String(i + 1).padStart(5, "0")}`, data: { customer_name: name, service_address: addr, phone, email: em }, created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z" });
@@ -154,6 +158,7 @@ for (let i = 0; i < N; i++) {
 const exportData = { tenantKey: "plumbing-synth-r38", tenantName: CO, exportedAt: "2026-09-27T00:00:00Z", documents, pages, extractions, entities, document_entity_links: links, facets: [], audit_log: [], truncated: false, financials, financial_lines: lines };
 fs.mkdirSync(path.join(ROOT, "test-docs/tenants/plumbing"), { recursive: true });
 fs.writeFileSync(path.join(ROOT, "test-docs/tenants/plumbing/export.json"), JSON.stringify(exportData));
+assertUniqueRoster("plumbing tenant", customers.map((c) => ({ name: c.name, address: c.addr, phone: c.phone, email: c.email })), { ownNames: [CO] });
 console.log(`plumbing tenant: ${customers.length} customers, ${documents.length} docs, ${extractions.length} extractions, ${financials.length} financials`);
 
 /* ------------------------------------------------------------ owner-voice questions (held out, written before any code change) */

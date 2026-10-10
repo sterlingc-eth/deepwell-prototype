@@ -78,6 +78,7 @@
  *                       whose type is null or a legacy id; never touches an
  *                       already-canonical value.
  */
+import { loadOwnNames, isOwnName } from './modelAvoidance/ownCompany.js';
 import { serializeClient, assertTenantUuid } from './util/pgClient.js';
 import Anthropic from '@anthropic-ai/sdk';
 import {
@@ -87,19 +88,19 @@ import {
 import { getApiKey, withBackoff } from './claude.js';
 import { getDailyModelBudgetStatus } from './rateLimit.js';
 import { withCache } from './promptCache.js';
-import { coalesceEntityData, normalizePhoneKey, normalizeEmailKey, normalizeAddressKey, possibleDuplicatePairKey } from './integrity.js';
+import { coalesceEntityData, normalizePhoneKey, normalizeEmailKey, normalizeAddressKey, possibleDuplicatePairKey, customerNameKey, findExistingCustomerForCreate } from './integrity.js';
 import {
   normalizeDocumentType,
   inferDocumentType,
   isReclassifiable,
   isShopInternalDocument,
-  mayVerifyWithoutLink,
+  autoCheckDecision,
   linkNotRequired,
+  RESORT_SOURCE_TYPES,
   resortDecision,
   inferTypeFromFilename,
   completenessFor,
   toCompletenessFields,
-  AI_VERIFY_MIN_CONFIDENCE,
   DOCUMENT_TYPES,
   DOCUMENT_TYPE_DEFINITIONS,
   DOCUMENT_TYPE_IDS,
@@ -109,8 +110,21 @@ import { isDeterministicClassifyEnabled } from './modelAvoidance/switches.js';
 import { listOpenReminders, REMINDER_ELIGIBLE_DOCUMENT_TYPES } from './reminders.js';
 import { normalizeReminderTrigger, normalizeDate, UNCONFIRMED_SUFFIX, validateCorrection } from './extractFields.js';
 import { recheckDocumentTx } from './recheck.js';
+import { COMPANY_FOLDER_FIELD_KEY, HR_FOLDER_ID } from './companyFiles.js';
 import { deriveWarranty } from './warrantyRules.js';
 import { packForTenant } from './industry/index.js';
+
+/** Same test verifyByAi applies in SQL: an equipment/unit link on an extraction, or a document_entity_links row. */
+async function documentHasLink(db, documentId) {
+  const r = await db.raw(
+    `SELECT (EXISTS (SELECT 1 FROM extractions x WHERE x.document_id = d.id AND x.entity_id IS NOT NULL)
+          OR EXISTS (SELECT 1 FROM document_entity_links l WHERE l.document_id = d.id)) AS linked
+       FROM documents d WHERE d.id = $1::uuid`, [documentId]);
+  return !!r.rows?.[0]?.linked;
+}
+async function documentHasText(db, documentId) {
+  return (await db.listPages(documentId)).some((p) => String(p.text ?? '').trim() !== '');
+}
 
 const TENANT = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 
@@ -855,9 +869,18 @@ export async function aiVerifyDocument(ctx, { documentId }, actorClerkId) {
     const type = normalizeDocumentType(doc.document_type);
     const completeness = completenessFor(type, completenessFields);
 
+    // Judged under today's rules (documentTypes.js autoCheckDecision): required facts plus the name fact, company
+    // paperwork readable on page text alone, an undecided "other" with no customer or address checked on one
+    // confident fact, and a money amount only when confident or corroborated. Also the bulk "Re-check all documents
+    // with AI" path, so complete-but-unverified documents are re-judged here.
     let verified = false;
-    if (completeness.complete && completeness.minConfidence >= AI_VERIFY_MIN_CONFIDENCE) {
-      verified = (await db.verifyByAi(documentId, { allowUnlinked: mayVerifyWithoutLink(type, completenessFields) })) > 0;
+    const verdict = autoCheckDecision(type, completenessFields, {
+      hasText: await documentHasText(db, documentId),
+      hasLink: await documentHasLink(db, documentId),
+      filename: doc.original_filename,
+    });
+    if (verdict.ok) {
+      verified = (await db.verifyByAi(documentId, { allowUnlinked: verdict.allowUnlinked })) > 0;
     }
 
     if (verified) {
@@ -1117,70 +1140,127 @@ export async function reclassifyDocuments(ctx, { documentIds } = {}, actorClerkI
  * Tenant-scoped (RLS + explicit tenant filters), no schema change, idempotent (a second run finds nothing to move and
  * nothing to check), keyset-paged: the caller passes back `nextAfterId` until `done`. $0.
  */
-export const RESORT_SOURCE_LIST = ['invoice', 'other', 'correspondence', 'dispatch-note'];
-export async function resortDocuments(ctx, { afterId = null, limit = 100 } = {}, actorClerkId) {
+export const RESORT_SOURCE_LIST = [...RESORT_SOURCE_TYPES];
+const SKIPPED_LIST_CAP = 50;
+/** Lazy, guarded load of F1's $0 re-extraction from stored page text. Absent (or throwing) = skipped quietly: the
+ *  label-fill re-check below still runs. */
+async function loadReextract() {
+  try {
+    // F1's $0 re-read of stored page text (re-exported by ./extractDocument.js from modelAvoidance/storedTextReread.js).
+    const m = await import('./extractDocument.js');
+    return typeof m.reextractFromStoredText === 'function' ? m.reextractFromStoredText : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function resortDocuments(ctx, { afterId = null, limit = 100, dryRun = false, runId = null } = {}, actorClerkId, deps = {}) {
+  if (runId != null && !isUuid(runId)) throw new ReviewError('runId must be a uuid', 400);
+  if (dryRun) return resortDryRun(ctx, { afterId, limit });
   const cap = Math.max(1, Math.min(200, Number(limit) || 100));
   if (afterId != null && !isUuid(afterId)) throw new ReviewError('afterId must be a uuid', 400);
-  const types = [...RESORT_SOURCE_LIST, 'proposal-quote', 'purchase-order', 'internal', 'receipt', 'agreement', 'delivery-ticket', 'schedule', 'price-list', 'statement', 'insurance-certificate', 'hr-letter'];
+  const reextract = deps.reextract !== undefined ? deps.reextract : await loadReextract();
 
+  // Every document that is not yet checked, plus every document in a type the sort may move out of (even a checked one).
   const page = await withRecordsTenant(ctx, async (db) => {
     const r = await db.raw(
       `SELECT id, document_type, original_filename, stage FROM documents
-        WHERE ${TENANT} AND document_type = ANY($1::text[]) AND ($2::uuid IS NULL OR id > $2::uuid)
-        ORDER BY id LIMIT $3`,
-      [types, afterId, cap + 1]
+        WHERE ${TENANT} AND stage <> 'verified' AND ($1::uuid IS NULL OR id > $1::uuid)
+        ORDER BY id LIMIT $2`,
+      [afterId, cap + 1]
     );
     return r.rows;
   });
   const hasMore = page.length > cap;
   const docs = page.slice(0, cap);
-  const summary = { scanned: docs.length, retyped: 0, checked: 0, byType: {}, errors: 0, done: !hasMore, nextAfterId: hasMore ? docs[docs.length - 1].id : null };
+  const summary = {
+    scanned: docs.length, retyped: 0, checked: 0, reextracted: 0, byType: {}, errors: 0,
+    runId, skipped: {}, skippedCounts: {}, done: !hasMore, nextAfterId: hasMore ? docs[docs.length - 1].id : null,
+  };
+  const skip = (reason, d, filename) => {
+    summary.skippedCounts[reason] = (summary.skippedCounts[reason] ?? 0) + 1;
+    const list = (summary.skipped[reason] ??= []);
+    if (list.length < SKIPPED_LIST_CAP) list.push({ documentId: d.id, filename: filename ?? d.original_filename ?? null });
+  };
   const changes = [];
 
   for (const d of docs) {
     try {
-      const out = await withRecordsTenant(ctx, async (db) => {
+      // 1. Retype (own transaction, committed before the re-extraction reads the new type).
+      const step1 = await withRecordsTenant(ctx, async (db) => {
         const doc = await db.getDocument(d.id);
         if (!doc) return null;
         let type = normalizeDocumentType(doc.document_type);
         let moved = null;
-        if (RESORT_SOURCE_LIST.includes(type)) {
+        let blocked = null;
+        // A paper a person or the AI already checked is never retyped; a People and HR choice is never moved.
+        const hrOverride = (await db.listExtractionsByDocument(d.id)).some((r) => r.field_key === COMPANY_FOLDER_FIELD_KEY && r.value === HR_FOLDER_ID);
+        if (doc.stage !== 'verified' && (RESORT_SOURCE_TYPES.has(type) || type === 'hr-letter')) {
           const classificationRows = await db.getAuditLog({ action: 'review.document_classified', resource_type: 'document', resource_id: d.id });
-          if (!wasClassifiedByHuman(doc.document_type, classificationRows)) {
-            const pages = await db.listPages(d.id);
-            const hit = classifyFromText(pages.map((p) => ({ page_no: p.page_no, text: p.text ?? '' })));
-            const next = resortDecision({ currentType: type, filename: doc.original_filename, titleType: hit?.type ?? null });
-            if (next) {
-              await db.updateDocument(d.id, { document_type: next });
-              await db.logAction({
-                clerk_user_id: actorClerkId, action: 'review.document_resorted', resource_type: 'document', resource_id: d.id,
-                changes: { from: type, to: next, source: hit?.type === next ? 'title' : 'filename', model_calls: 0 },
-              });
-              moved = { documentId: d.id, from: type, to: next };
-              type = next;
-            }
+          const humanChosen = wasClassifiedByHuman(doc.document_type, classificationRows);
+          const pages = await db.listPages(d.id);
+          const hit = classifyFromText(pages.map((p) => ({ page_no: p.page_no, text: p.text ?? '' })));
+          const rows = await db.listExtractionsByDocument(d.id);
+          const keys = new Set(toCompletenessFields(rows).filter((f) => f.value != null && String(f.value).trim() !== '').map((f) => f.field_key));
+          const args = { currentType: type, filename: doc.original_filename, titleType: hit?.type ?? null, titleText: hit?.evidence ?? null, hrOverride, hasEquipmentFacts: keys.has('serial_number') || keys.has('model') };
+          const next = resortDecision({ ...args, humanChosen });
+          if (next) {
+            await db.updateDocument(d.id, { document_type: next });
+            await db.logAction({
+              clerk_user_id: actorClerkId, action: 'review.document_resorted', resource_type: 'document', resource_id: d.id,
+              changes: { from: type, to: next, source: hit?.type === next ? 'title' : 'filename', model_calls: 0, had_fields: rows.length > 0, ...(runId ? { runId } : {}) },
+            });
+            moved = { documentId: d.id, from: type, to: next };
+            type = next;
+          } else if (humanChosen && resortDecision({ ...args, humanChosen: false })) {
+            blocked = 'type-chosen-by-person';
           }
         }
-        let checked = false;
-        if (doc.stage !== 'verified') {
-          const fields = toCompletenessFields(await db.listExtractionsByDocument(d.id));
-          const c = completenessFor(type, fields);
-          if (c.complete && c.minConfidence >= AI_VERIFY_MIN_CONFIDENCE && mayVerifyWithoutLink(type, fields)) {
-            checked = (await db.verifyByAi(d.id, { allowUnlinked: true })) > 0;
-            if (checked) {
-              await db.logAction({
-                clerk_user_id: actorClerkId, action: 'review.ai_verified', resource_type: 'document', resource_id: d.id,
-                changes: { completeness: c, source: 'resort' },
-              });
-            }
-          }
-        }
-        return { moved, checked };
+        return { doc, type, moved, blocked };
       });
-      if (out?.moved) { summary.retyped++; summary.byType[out.moved.to] = (summary.byType[out.moved.to] ?? 0) + 1; changes.push(out.moved); }
-      if (out?.checked) summary.checked++;
+      if (!step1) continue;
+      let { type } = step1;
+      const { doc, moved, blocked } = step1;
+
+      // 2. A retyped document is read again against its new type (F1's stored-text re-extraction, $0), then label-filled.
+      let reextracted = false;
+      if (moved && typeof reextract === 'function') {
+        try { await reextract(ctx, d.id); reextracted = true; } catch (err) { console.error('resortDocuments: re-extract failed, continuing:', d.id, err?.message); }
+      }
+
+      // 3. Automatic check under today's rules.
+      const step3 = await withRecordsTenant(ctx, async (db) => {
+        if (doc.stage === 'verified') return { checked: false, reason: null };
+        if (moved) { try { await recheckDocumentTx(db, d.id, { actorClerkId, source: 'resort' }); } catch (err) { console.error('resortDocuments: re-check failed:', d.id, err?.message); } }
+        const after = await db.getDocument(d.id);
+        if (after?.stage === 'verified') {
+          // The re-check above checked it: tag that check with this run so Undo can find it.
+          await db.logAction({
+            clerk_user_id: actorClerkId, action: 'review.ai_verified', resource_type: 'document', resource_id: d.id,
+            changes: { source: 'resort', ...(runId ? { runId } : {}) },
+          });
+          return { checked: true, reason: null };
+        }
+        const fields = toCompletenessFields(await db.listExtractionsByDocument(d.id));
+        const c = completenessFor(type, fields);
+        const verdict = autoCheckDecision(type, fields, { hasText: await documentHasText(db, d.id), hasLink: await documentHasLink(db, d.id), filename: doc.original_filename });
+        if (!verdict.ok) return { checked: false, reason: verdict.reason, detail: verdict.detail };
+        const checked = (await db.verifyByAi(d.id, { allowUnlinked: verdict.allowUnlinked })) > 0;
+        if (checked) {
+          await db.logAction({
+            clerk_user_id: actorClerkId, action: 'review.ai_verified', resource_type: 'document', resource_id: d.id,
+            changes: { completeness: c, source: 'resort', ...(runId ? { runId } : {}) },
+          });
+        }
+        return { checked, reason: checked ? null : 'not-checked' };
+      });
+      if (moved) { summary.retyped++; summary.byType[moved.to] = (summary.byType[moved.to] ?? 0) + 1; changes.push(moved); }
+      if (reextracted) summary.reextracted++;
+      if (step3.checked) summary.checked++;
+      if (!moved && !step3.checked && doc.stage !== 'verified') skip(blocked ?? step3.reason ?? 'not-checked', d, doc.original_filename);
     } catch (err) {
       summary.errors++;
+      skip('error', d);
       console.error('resortDocuments: document failed, continuing:', d.id, err?.message);
     }
   }
@@ -1191,6 +1271,101 @@ export async function resortDocuments(ctx, { afterId = null, limit = 100 } = {},
     });
   }
   return summary;
+}
+
+/**
+ * Dry run of the re-sort: the same decisions, nothing written. Returns the planned moves, the papers that would be
+ * checked and the papers that would be skipped, with counts. Papers already checked (by a person or the AI) are never
+ * in the plan. A moved paper is judged on the facts it has today (the real run re-reads it first, so it can only do better).
+ */
+async function resortDryRun(ctx, { afterId = null, limit = 100 } = {}) {
+  const cap = Math.max(1, Math.min(200, Number(limit) || 100));
+  if (afterId != null && !isUuid(afterId)) throw new ReviewError('afterId must be a uuid', 400);
+  return withRecordsTenant(ctx, async (db) => {
+    const r = await db.raw(
+      `SELECT id FROM documents WHERE ${TENANT} AND stage <> 'verified' AND ($1::uuid IS NULL OR id > $1::uuid) ORDER BY id LIMIT $2`,
+      [afterId, cap + 1]
+    );
+    const hasMore = r.rows.length > cap;
+    const ids = r.rows.slice(0, cap).map((x) => x.id);
+    const out = { dryRun: true, scanned: ids.length, wouldMove: 0, wouldCheck: 0, moves: [], checks: [], skippedCounts: {}, done: !hasMore, nextAfterId: hasMore ? ids[ids.length - 1] : null };
+    const skip = (k) => { out.skippedCounts[k] = (out.skippedCounts[k] ?? 0) + 1; };
+    for (const id of ids) {
+      const doc = await db.getDocument(id);
+      if (!doc || doc.stage === 'verified') continue;
+      let type = normalizeDocumentType(doc.document_type);
+      const rows = await db.listExtractionsByDocument(id);
+      const hrOverride = rows.some((x) => x.field_key === COMPANY_FOLDER_FIELD_KEY && x.value === HR_FOLDER_ID);
+      let to = null;
+      if (RESORT_SOURCE_TYPES.has(type) || type === 'hr-letter') {
+        const classificationRows = await db.getAuditLog({ action: 'review.document_classified', resource_type: 'document', resource_id: id });
+        const humanChosen = wasClassifiedByHuman(doc.document_type, classificationRows);
+        const hit = classifyFromText((await db.listPages(id)).map((p) => ({ page_no: p.page_no, text: p.text ?? '' })));
+        const fields0 = toCompletenessFields(rows);
+        const keys = new Set(fields0.filter((f) => f.value != null && String(f.value).trim() !== '').map((f) => f.field_key));
+        to = resortDecision({ currentType: type, filename: doc.original_filename, titleType: hit?.type ?? null, titleText: hit?.evidence ?? null, humanChosen, hrOverride, hasEquipmentFacts: keys.has('serial_number') || keys.has('model') });
+        if (!to && humanChosen) skip('type-chosen-by-person');
+      }
+      if (to) { out.wouldMove++; out.moves.push({ documentId: id, filename: doc.original_filename ?? null, from: type, to }); type = to; }
+      const verdict = autoCheckDecision(type, toCompletenessFields(rows), { hasText: await documentHasText(db, id), hasLink: await documentHasLink(db, id), filename: doc.original_filename });
+      if (verdict.ok) { out.wouldCheck++; out.checks.push({ documentId: id, filename: doc.original_filename ?? null, type }); }
+      else if (!to) skip(verdict.reason ?? 'not-checked');
+    }
+    out.moves = out.moves.slice(0, SKIPPED_LIST_CAP);
+    out.checks = out.checks.slice(0, SKIPPED_LIST_CAP);
+    return out;
+  });
+}
+
+/**
+ * Undo one re-sort run (admin, tenant-scoped). Restores each paper's previous type from the run's audit rows (only while
+ * the type is still the one the run set), and un-checks the papers that run checked, but only those still marked as
+ * checked by the AI with no later change from a person.
+ */
+export async function undoResort(ctx, { runId } = {}, actorClerkId) {
+  if (!isUuid(runId)) throw new ReviewError('runId must be a uuid', 400);
+  return withRecordsTenant(ctx, async (db) => {
+    const r = await db.raw(
+      `SELECT action, resource_id, created_at, changes FROM audit_log
+        WHERE ${TENANT} AND action IN ('review.document_resorted', 'review.ai_verified') AND changes->>'runId' = $1
+        ORDER BY created_at`,
+      [runId]
+    );
+    const out = { runId, restoredTypes: 0, uncheckedPapers: 0, leftAlone: 0 };
+    for (const row of r.rows) {
+      const id = row.resource_id;
+      if (!id) continue;
+      const doc = await db.getDocument(id);
+      if (!doc) continue;
+      if (row.action === 'review.document_resorted') {
+        const from = row.changes?.from;
+        if (from && normalizeDocumentType(doc.document_type) === normalizeDocumentType(row.changes?.to)) {
+          await db.updateDocument(id, { document_type: from });
+          await db.logAction({ clerk_user_id: actorClerkId, action: 'review.document_resort_undone', resource_type: 'document', resource_id: id, changes: { from: row.changes.to, to: from, runId } });
+          out.restoredTypes++;
+        } else out.leftAlone++;
+      } else {
+        // Only if still checked by the AI and nothing but this run (or its own re-check) has touched it since.
+        const later = await db.raw(
+          `SELECT 1 FROM audit_log WHERE ${TENANT} AND resource_id = $1 AND created_at > $2
+              AND action NOT IN ('review.document_resorted', 'review.ai_verified', 'review.document_resort_undone')
+              AND COALESCE(changes->>'runId', '') <> $3 AND COALESCE(changes->>'source', '') NOT IN ('resort') LIMIT 1`,
+          [id, row.created_at, runId]
+        );
+        if (doc.stage === 'verified' && doc.verified_by === 'ai' && !later.rows.length) {
+          const u = await db.raw(
+            `UPDATE documents SET stage = 'linked', verified_by = NULL, verified_at = NULL WHERE id = $1 AND ${TENANT} AND stage = 'verified' AND verified_by = 'ai'`,
+            [id]
+          );
+          if (u.rowCount) {
+            await db.logAction({ clerk_user_id: actorClerkId, action: 'review.document_resort_undone', resource_type: 'document', resource_id: id, changes: { unchecked: true, runId } });
+            out.uncheckedPapers++;
+          } else out.leftAlone++;
+        } else out.leftAlone++;
+      }
+    }
+    return out;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -1295,6 +1470,36 @@ export async function createCustomer(ctx, { name, serviceAddress, phone, email, 
           { existingCustomerId: existing.id, existingCustomerName: existing.name ?? null, existingCustomerNumber: existing.customer_number ?? null }
         );
       }
+    }
+  }
+
+  // Same customer already on file? (normalized name, plus email or phone when given — integrity.js
+  // findExistingCustomerForCreate.) "Add anyway" (confirmDuplicate) skips this, exactly as it skips the address check.
+  if (!confirmDuplicate) {
+    const dup = await withRecordsTenant(ctx, async (db) => {
+      const own = (await db.raw(`SELECT name FROM tenants WHERE id = (current_setting('app.tenant_id', true))::uuid`, [])).rows[0]?.name;
+      const first = customerNameKey(name).split(' ')[0] ?? '';
+      const rows = (await db.raw(
+        `SELECT id, customer_number, data->>'customer_name' AS name, data->>'service_address' AS address,
+                data->>'phone' AS phone, data->>'email' AS email
+           FROM entities
+          WHERE entity_type = 'customer' AND merged_into IS NULL AND COALESCE(data->>'is_company', '') <> 'true' AND ${TENANT}
+            AND ( ($1::text <> '' AND lower(data->>'customer_name') LIKE '%' || $1 || '%')
+               OR ($2::text <> '' AND lower(data->>'email') = $2) )
+          LIMIT 500`,
+        [first.replace(/[%_\\]/g, ''), String(email ?? '').trim().toLowerCase()]
+      )).rows.map((r) => ({ id: r.id, customerNumber: r.customer_number, name: r.name, address: r.address, phone: r.phone, email: r.email }));
+      return findExistingCustomerForCreate({ name, phone, email, address: trimmedAddress }, rows, { ownNames: own ? [own] : [] });
+    });
+    if (dup?.kind === 'self') {
+      throw new ReviewError('That is your own company name, so it is not added as a customer.', 409, { reason: 'self' });
+    }
+    if (dup?.kind === 'duplicate') {
+      throw new ReviewError(
+        `A customer with this name already exists: ${dup.match.name || dup.match.customerNumber || 'Unnamed'}`,
+        409,
+        { existingCustomerId: dup.match.id, existingCustomerName: dup.match.name ?? null, existingCustomerNumber: dup.match.customerNumber ?? null, reason: 'name' }
+      );
     }
   }
 
@@ -1686,6 +1891,9 @@ export async function createCustomerAndAttachReminder(ctx, { documentId, name } 
     let customerRow = candidates[0] ?? null;
     const usedExisting = !!customerRow;
     if (!customerRow) {
+      if (isOwnName(trimmedName, await loadOwnNames({ raw }, ctx).catch(() => []))) {
+        throw new ReviewError('That is your own company name, so it is not added as a customer.', 409, { reason: 'self' });
+      }
       const numRow = await client.query('SELECT next_customer_number($1) AS num', [tenantId]);
       const created = await client.query(
         `INSERT INTO entities (tenant_id, entity_type, data, customer_number, created_at, updated_at)

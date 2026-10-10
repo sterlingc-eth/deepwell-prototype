@@ -1017,7 +1017,7 @@ export function groupExtractionRowsByUnit(rows) {
 // ------------------------------------------------------------------- merge
 
 // Keys unioned as arrays rather than fill-or-keep scalars.
-const ARRAY_UNION_KEYS = ['aliases', 'former_numbers'];
+const ARRAY_UNION_KEYS = ['aliases', 'former_numbers', 'other_addresses'];
 const isBlank = (v) => v == null || String(v).trim() === '';
 
 /**
@@ -1063,6 +1063,13 @@ export function coalesceEntityData(keep, drop, ctx) {
     if (isBlank(k[key]) && !isBlank(value)) k[key] = value;
   }
 
+  // A dropped record at a DIFFERENT service address (a business with several
+  // sites) keeps that site on the survivor as `other_addresses` — merging two
+  // records must never lose a property.
+  if (!isBlank(k.service_address) && !isBlank(d.service_address)
+      && normalizeAddressKey(k.service_address) !== normalizeAddressKey(d.service_address)) {
+    k.other_addresses = [...new Set([...(Array.isArray(k.other_addresses) ? k.other_addresses : []).map(String), String(d.service_address).trim()])];
+  }
   for (const key of ADDRESS_KEYS) {
     if (!isBlank(d[key])) k[key] = preferFullerAddress(k[key], d[key]);
   }
@@ -1121,4 +1128,238 @@ export function csvCell(v) {
 
 export function csvRow(values) {
   return values.map(csvCell).join(',') + '\r\n';
+}
+
+// ------------------------------------------------- duplicate customer groups
+// Pure rules behind "Review duplicates" (entities/bulkMerge.js), the analysis
+// script and the "don't create it twice" check (recordsStore.js
+// selectCustomerMatch, reviewStore.js createCustomer). The business-suffix
+// words above (BUSINESS_SUFFIXES, isBusinessName) stay the single source of
+// truth for "is this a business"; the narrower LEGAL_SUFFIXES below only
+// decides which trailing words are ignored when two spellings of one name are
+// compared ("Jensen Framing Inc." = "Jensen Framing").
+
+const LEGAL_SUFFIXES = new Set([
+  'llc', 'inc', 'incorporated', 'co', 'corp', 'corporation', 'company', 'ltd', 'limited', 'lp', 'llp', 'pllc', 'pc', 'plc',
+]);
+
+/** Identical name apart from letter case and extra spaces. */
+export function exactNameKey(raw) {
+  return String(raw ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+/** Name identity once case, punctuation, "&"/"and", a leading "The" and a
+ *  trailing Inc/LLC/Co/Corp-style word are ignored. */
+export function customerNameKey(raw) {
+  const t = normalizeNamePlain(String(raw ?? '').replace(/&/g, ' and ')).split(' ').filter(Boolean);
+  if (t.length > 1 && t[0] === 'the') t.shift();
+  while (t.length > 1 && LEGAL_SUFFIXES.has(t[t.length - 1])) t.pop();
+  return t.join(' ');
+}
+
+/** True when `name` is the company's own name (any of `ownNames`). */
+export function isCompanyOwnName(name, ownNames = []) {
+  const k = customerNameKey(name);
+  if (!k) return false;
+  return (ownNames ?? []).some((n) => customerNameKey(n) === k);
+}
+
+/** A name that identifies a customer: not empty, not a bare "Inc."-style
+ *  fragment, not an address-only placeholder. */
+function isGroupableName(name) {
+  const n = String(name ?? '').trim();
+  return !!n && !isFragmentName(n) && !/^customer (at |\(address unknown\))/i.test(n);
+}
+
+/** City (with state) of "123 Main St, Mesa, AZ 85201" -> "mesa az". normalizeCityKey reads the state as the city
+ *  for that shape, so two towns in one state looked identical; this reads the part before the state. */
+function cityOfAddress(raw) {
+  const parts = String(raw ?? '').split(',').map((p) => p.trim()).filter(Boolean);
+  const tail = parts[parts.length - 1] ?? '';
+  const st = tail.match(/^([A-Za-z]{2})(?:\s+\d{5}(?:-\d{4})?)?$/);
+  if (st && parts.length >= 3) return `${parts[parts.length - 2].toLowerCase()} ${st[1].toLowerCase()}`;
+  return normalizeCityKey(raw);
+}
+
+const phoneKeyOf = (p) => { const k = normalizePhoneKey(p); return k.length >= 7 ? k.slice(-10) : ''; };
+
+/** Why two records that share a name still look like different customers:
+ *  both have a phone (or email) and they differ, or two people of the same
+ *  name sit in different cities. [] means nothing argues against merging. */
+export function customerConflicts(a, b) {
+  const out = [];
+  const pa = phoneKeyOf(a?.phone); const pb = phoneKeyOf(b?.phone);
+  if (pa && pb && pa !== pb) out.push('phone');
+  const ea = normalizeEmailKey(a?.email); const eb = normalizeEmailKey(b?.email);
+  if (ea && eb && ea !== eb) out.push('email');
+  if (!isBusinessName(a?.name) && !isBusinessName(b?.name)) {
+    const ca = cityOfAddress(a?.address); const cb = cityOfAddress(b?.address);
+    if (ca && cb && ca !== cb) out.push('city');
+  }
+  return out;
+}
+
+const fullness = (c) => ['address', 'phone', 'email'].filter((k) => String(c?.[k] ?? '').trim()).length;
+
+/** The record a group should be merged into: most documents, then most
+ *  contact detail, then the fuller name, then the lowest customer number. */
+export function chooseMainCustomer(records) {
+  return [...records].sort((a, b) =>
+    ((b.docCount ?? 0) - (a.docCount ?? 0))
+    || (fullness(b) - fullness(a))
+    || (nameTokenCount(b.name) - nameTokenCount(a.name))
+    || (customerNumberOrdinal(a.customerNumber) - customerNumberOrdinal(b.customerNumber))
+    || String(a.id).localeCompare(String(b.id))
+  )[0];
+}
+
+/**
+ * Group a tenant's customers.
+ *   customers: [{id, customerNumber, name, address, phone, email, docCount?, linkCount?, equipmentCount?}]
+ *   ownNames:  the company's own name(s) — records carrying one go to `self`
+ *              and are never offered for merging.
+ * Returns
+ *   exact: groups of identical names ({key, name, ids, mainId, conflicts, safe}); safe = nothing
+ *          argues against merging, so "Merge all exact duplicates" takes it.
+ *   near:  groups that differ only by case / punctuation / Inc-LLC-Co, one
+ *          letter typo, or a shared email / phone ({ids, mainId, reasons}).
+ *   self:  records that carry the company's own name.
+ * A pure suggestion list: nothing here merges anything.
+ */
+export function groupDuplicateCustomers(customers, { ownNames = [], shopCtx } = {}) {
+  const self = [];
+  const pool = [];
+  for (const c of customers ?? []) {
+    if (!c || !c.id) continue;
+    if (isCompanyOwnName(c.name, ownNames)) { self.push(c); continue; }
+    if (isGroupableName(c.name)) pool.push(c);
+  }
+
+  // 1. exact: identical name text.
+  const byExact = new Map();
+  for (const c of pool) {
+    const k = exactNameKey(c.name);
+    if (!byExact.has(k)) byExact.set(k, []);
+    byExact.get(k).push(c);
+  }
+  const exact = [];
+  const classes = []; // one entry per distinct exact name, for the near pass
+  for (const [key, members] of byExact) {
+    classes.push({ key, members });
+    if (members.length < 2) continue;
+    const conflicts = new Set();
+    for (let i = 0; i < members.length; i++) {
+      for (let j = i + 1; j < members.length; j++) customerConflicts(members[i], members[j]).forEach((x) => conflicts.add(x));
+    }
+    const main = chooseMainCustomer(members);
+    exact.push({ key, name: main.name, ids: members.map((m) => m.id), mainId: main.id, conflicts: [...conflicts], safe: conflicts.size === 0 });
+  }
+
+  // 2. near: union the exact-name classes that still look like one customer.
+  const parent = classes.map((_, i) => i);
+  const find = (i) => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
+  const reasonsOf = new Map(); // root -> Set
+  const addEdge = (i, j, reason) => {
+    const ri = find(i); const rj = find(j);
+    if (ri !== rj) parent[rj] = ri;
+    const r = find(i);
+    const set = reasonsOf.get(r) ?? new Set();
+    for (const old of [ri, rj]) { const s = reasonsOf.get(old); if (s && old !== r) s.forEach((x) => set.add(x)); }
+    set.add(reason);
+    reasonsOf.set(r, set);
+  };
+  const keyOf = classes.map((c) => customerNameKey(c.members[0].name));
+  const byKey = new Map();
+  classes.forEach((c, i) => { if (!byKey.has(keyOf[i])) byKey.set(keyOf[i], []); byKey.get(keyOf[i]).push(i); });
+  for (const idxs of byKey.values()) {
+    for (let n = 1; n < idxs.length; n++) {
+      const clash = classes[idxs[0]].members.some((a) => classes[idxs[n]].members.some((b) => customerConflicts(a, b).length));
+      if (!clash) addEdge(idxs[0], idxs[n], 'spelling');
+    }
+  }
+  if (classes.length <= 6000) {
+    const buckets = new Map();
+    classes.forEach((_, i) => {
+      const k = keyOf[i];
+      if (k.length < 8 || /\d/.test(k)) return;
+      const b = `${k[0]}`;
+      if (!buckets.has(b)) buckets.set(b, []);
+      buckets.get(b).push(i);
+    });
+    for (const idxs of buckets.values()) {
+      for (let x = 0; x < idxs.length; x++) {
+        for (let y = x + 1; y < idxs.length; y++) {
+          const a = keyOf[idxs[x]]; const b = keyOf[idxs[y]];
+          if (a === b || Math.abs(a.length - b.length) > 1) continue;
+          if (damerauLevenshteinDistance(a, b) !== 1) continue;
+          const clash = classes[idxs[x]].members.some((m) => classes[idxs[y]].members.some((o) => customerConflicts(m, o).length));
+          if (!clash) addEdge(idxs[x], idxs[y], 'typo');
+        }
+      }
+    }
+  }
+  // shared email / phone across different names (shop contacts never count)
+  const contactIndex = new Map();
+  classes.forEach((c, i) => {
+    for (const m of c.members) {
+      const keys = [];
+      const e = normalizeEmailKey(m.email); if (e && !isLikelyShopEmail(m.email, shopCtx)) keys.push(`e:${e}`);
+      const p = phoneKeyOf(m.phone); if (p && !isLikelyShopPhone(m.phone, shopCtx)) keys.push(`p:${p}`);
+      for (const k of keys) {
+        if (!contactIndex.has(k)) contactIndex.set(k, new Set());
+        contactIndex.get(k).add(i);
+      }
+    }
+  });
+  for (const [k, set] of contactIndex) {
+    const idxs = [...set];
+    if (idxs.length < 2 || idxs.length > 4) continue; // a number on many names is a shared line, not a person
+    // the names must still be related; two unrelated names on one phone are not offered
+    const [first, ...rest] = idxs;
+    for (const j of rest) {
+      const rel = compareNamesStrict(classes[first].members[0].name, classes[j].members[0].name);
+      if (rel !== 'no-match') addEdge(first, j, k.startsWith('e:') ? 'same email' : 'same phone');
+    }
+  }
+  const comps = new Map();
+  classes.forEach((c, i) => { const r = find(i); if (!comps.has(r)) comps.set(r, []); comps.get(r).push(i); });
+  const near = [];
+  for (const [root, idxs] of comps) {
+    if (idxs.length < 2) continue;
+    const members = idxs.flatMap((i) => classes[i].members);
+    const main = chooseMainCustomer(members);
+    near.push({ ids: members.map((m) => m.id), mainId: main.id, name: main.name, reasons: [...(reasonsOf.get(root) ?? [])] });
+  }
+  exact.sort((a, b) => b.ids.length - a.ids.length || a.key.localeCompare(b.key));
+  near.sort((a, b) => b.ids.length - a.ids.length || a.name.localeCompare(b.name));
+  return { exact, near, self };
+}
+
+/**
+ * "Don't create it twice" for a customer about to be created. `candidate` is
+ * {name, phone?, email?}; `existing` is [{id, name, address?, phone?, email?}].
+ * Returns {kind:'self'|'duplicate', match?, basis?} or null. Same normalized
+ * name -> the same customer unless a phone/email on both sides disagrees (or
+ * two people of one name sit in different cities); a different spelling of
+ * the name needs the same email or phone as well.
+ */
+export function findExistingCustomerForCreate(candidate, existing, { ownNames = [] } = {}) {
+  if (isCompanyOwnName(candidate?.name, ownNames)) return { kind: 'self' };
+  const key = customerNameKey(candidate?.name);
+  if (!key || !isGroupableName(candidate?.name)) return null;
+  const cand = { name: candidate.name, phone: candidate.phone, email: candidate.email, address: candidate.address };
+  const ce = normalizeEmailKey(cand.email); const cp = phoneKeyOf(cand.phone);
+  const hits = [];
+  for (const e of existing ?? []) {
+    if (!e?.id || !e.name) continue;
+    const sameName = customerNameKey(e.name) === key;
+    const sameContact = (ce && ce === normalizeEmailKey(e.email)) || (cp && cp === phoneKeyOf(e.phone));
+    if (!sameName && !(sameContact && compareNamesStrict(cand.name, e.name) !== 'no-match' && compareNamesStrict(cand.name, e.name) !== 'unknown')) continue;
+    if (customerConflicts(cand, e).length) continue;
+    hits.push({ e, basis: sameName ? (sameContact ? 'name-and-contact' : 'name') : 'contact' });
+  }
+  if (!hits.length) return null;
+  hits.sort((a, b) => (b.basis === 'name-and-contact') - (a.basis === 'name-and-contact')
+    || customerNumberOrdinal(a.e.customerNumber) - customerNumberOrdinal(b.e.customerNumber));
+  return { kind: 'duplicate', match: hits[0].e, basis: hits[0].basis };
 }

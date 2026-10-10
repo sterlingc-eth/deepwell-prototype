@@ -76,3 +76,57 @@ export async function deleteShopData(tenantId: string): Promise<void> {
   });
   if (!res.ok) throw new Error(await messageFromErrorResponse(res));
 }
+
+/**
+ * "Download all my files" (api/_lib/accountExport.js, POST /api/account?action=export-files): every original file as zip parts,
+ * plus a list of the files and the spreadsheets. Admin only (server-enforced). A background job: start it, then either poll
+ * for progress (the server's queue is building it) or call `step` until it finishes (no queue on this deployment).
+ */
+export type AccountExportStatus = 'queued' | 'running' | 'done' | 'failed' | 'expired' | 'stuck';
+export interface AccountExportJob {
+  jobId: string;
+  status: AccountExportStatus;
+  createdAt: string;
+  expiresAt: string;
+  totalFiles: number;
+  totalBytes: number;
+  filesDone: number;
+  includedFiles: number;
+  skippedFiles: number;
+  estimatedParts: number;
+  includesHr: boolean;
+  parts: { n: number; name: string; files: number; bytes: number }[];
+  index: { name: string } | null;
+  error: string | null;
+}
+
+export class AccountExportError extends Error {
+  status: number;
+  constructor(message: string, status: number) { super(message); this.status = status; }
+}
+
+async function accountExportCall<T>(body: Record<string, unknown>): Promise<T> {
+  const res = await fetch('/api/account?action=export-files', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new AccountExportError(await messageFromErrorResponse(res), res.status);
+  return (await res.json()) as T;
+}
+
+export const getAccountFilesExport = (jobId?: string) => accountExportCall<{ job: AccountExportJob | null }>({ op: 'status', ...(jobId ? { jobId } : {}) });
+export const startAccountFilesExport = () => accountExportCall<{ job: AccountExportJob; mode: 'background' | 'page' }>({ op: 'start' });
+export const stepAccountFilesExport = (jobId: string) => accountExportCall<{ job: AccountExportJob }>({ op: 'step', jobId });
+
+/** Ask for a fresh one-hour link and start the browser's download of that part ('index' = the list of files and spreadsheets). */
+export async function downloadAccountFilesPart(jobId: string, part: number | 'index'): Promise<void> {
+  const { url, name } = await accountExportCall<{ url: string; name: string }>({ op: 'link', jobId, part });
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}

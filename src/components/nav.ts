@@ -19,7 +19,7 @@ export interface NavItem {
 }
 
 // Exactly four primary destinations — Ask, Dashboard, Inbox, Records. Browse
-// merged into Records (as its Documents/Customers/Grid/Graph tabs — round 17
+// merged into Records (as its Documents/Customers/Company Files/Grid tabs — round 17
 // folded the old standalone Search tab into ⌘K and the Documents/Customers
 // tabs' own search boxes instead, see BrowseScreen.tsx); the old standalone
 // Records screen's health metrics moved into Dashboard's "Data health"

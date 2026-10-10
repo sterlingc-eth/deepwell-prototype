@@ -11,7 +11,7 @@ The desktop app has four main screens in the top bar (Ask, Dashboard, Inbox, Rec
 ### What are the main screens and where do I find things?
 ~ main screens, navigation, where is everything, where do i find, where is, menu, top bar, header, nav bar, screens, what are the tabs, app layout, how do i get around, find my way around, tour of the app, what does the app have, sections of the app, where is it, i cant find, cant find anything, what is on the dashboard vs records
 !covers:A-NAV
-Desktop top bar: **Ask** (questions to Donovan), **Dashboard** (warranty alerts and data health), **Inbox** (add files and things that need you), **Records** (customers, documents, grid, graph). At the right: the bell, **Billing**, **Team** and **Donovan** (admins only), Field/Office view, the company switcher and **Sign out**. On a narrow window only icons show. Phone: **Ask**, **Scan** and **Docs** tabs at the bottom.
+Desktop top bar: **Ask** (questions to Donovan), **Dashboard** (warranty alerts and data health), **Inbox** (add files and things that need you), **Records** (customers, documents, company files, grid). At the right: the bell, **Billing**, **Team** and **Donovan** (admins only), Field/Office view, the company switcher and **Sign out**. On a narrow window only icons show. Phone: **Ask**, **Scan** and **Docs** tabs at the bottom.
 
 ### What does the number on Inbox mean?
 ~ number on inbox, inbox badge, inbox number, red number, badge on inbox, what is the number next to inbox, count on inbox, items needing attention, why does inbox have a number, notification number, needs your attention count

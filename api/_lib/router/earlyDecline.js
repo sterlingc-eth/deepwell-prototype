@@ -22,7 +22,7 @@ import { stripConversationalFrame } from "./frame.js";
 import { attachCitations } from "../citations/records.js";
 import { buildOutOfDomainAnswer, buildUntrackedFieldAnswer } from "../contactLookup.js";
 
-const RECORD_ANCHOR_RE = new RegExp(
+export const RECORD_ANCHOR_RE = new RegExp(
   String.raw`\b(?:customers?|clients?|accounts?|units?|systems?|equipment|hvac|e-?mails?|furnaces?|ac|a/c|air\s+conditioner|heat\s+pumps?|condensers?|air\s+handlers?|rtus?|mini[- ]?splits?|` +
     String.raw`invoices?|bills?|billed|quotes?|estimates?|po|pos|purchase\s+orders?|permits?|warrant(?:y|ies)|services?|serviced|visits?|jobs?|work\s+orders?|calls?|appointments?|` +
     String.raw`tech(?:s|nicians?)?|installs?|installed|installation|repairs?|maintenance|pm|documents?|docs?|records?|files?|on\s+file|dispatch|notes?|addresses|address|phone|email|serial|model|` +
@@ -124,9 +124,13 @@ const TASK_VERB_RE = /\b(?:find|check|look|pull|show|tell\s+me|get\s+me|give|lis
 function isPersona(q) {
   return /\b(?:are|do|did|can|could|would|will|have|were|is|does)\s+you\b|\byou(?:'re|r)\b|\b(?:made|built|created|trained|named)\s+you\b/i.test(q) && q.split(/\s+/).length <= 9 && !TASK_VERB_RE.test(q) && !RECORD_ANCHOR_RE.test(q);
 }
+// R45: a request for OUTSIDE data (live weather, a supplier's lead time / stock / list price, the news, traffic, exchange rates). The records never hold it,
+// so it is declined even next to a record noun ("weather for installs tomorrow", "lead time on a Lennox coil"). A digit / street keeps a real lookup.
+const EXTERNAL_DATA_RE = /\b(?:weather|forecast|lead\s*times?|in\s+stock|stock\s+levels?|backorder(?:ed)?|availability\s+(?:of|for|on)|msrp|retail\s+price|list\s+price|market\s+price|current\s+price|price\s+of\s+(?:gas|diesel|copper|oil|freon|r-?\d+)|exchange\s+rate|stock\s+price|traffic|news|headlines)\b/i;
 function isOffDomain(q) {
   if (!q || q.length > 140) return null;
   if (STREET_RE.test(q)) return null;
+  if (process.env.DONOVAN_EXTERNAL_DECLINE !== "0" && !/\d/.test(q)) { const ext = EXTERNAL_DATA_RE.exec(q); if (ext && !/\b(?:our|we|my)\s+(?:lead\s+time|stock)\b|\bhow\s+many\b|\bwhich\b|\bcustomers?\b/i.test(q)) return ext[0]; }
   const selfApp = isSelfOrAppOrAnnounce(q);
   if (selfApp) return selfApp;
   const anchored = RECORD_ANCHOR_RE.test(q);

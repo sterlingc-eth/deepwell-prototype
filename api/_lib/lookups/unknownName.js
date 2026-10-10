@@ -17,6 +17,7 @@ import { stripConversationalFrame } from "../router/frame.js";
 import { isNonNameWord } from "./commonWords.js";
 import { damerauLevenshteinDistance } from "../integrity.js";
 import { isNicknamePair, formalsOf } from "../vocab/nicknames.js";
+import { buildNoAnchorDecline } from "./tenantWord.js";
 
 export const unknownNameEnabled = () => process.env.DONOVAN_UNKNOWN_NAME_DECLINE !== "0";
 
@@ -159,8 +160,17 @@ async function technicianContactDecline(db, question, phrase) {
   );
 }
 
-/** @returns the honest decline, or null when the name exists / is not an unknown-name question / anything is unsure. */
+/**
+ * R45: the honest decline for a question this tenant's records cannot be about. First the specific "unknown name" shapes below; then the GENERAL
+ * rule (lookups/tenantWord.js): no tenant entity, no tenant-vocabulary word and not a help question. Same hook point, still before any model.
+ * @returns the honest decline, or null when anything exists / is unsure.
+ */
 export async function buildUnknownNameDecline(db, question) {
+  return (await declineUnknownName(db, question)) ?? (await buildNoAnchorDecline(db, question));
+}
+
+/** @returns the honest decline, or null when the name exists / is not an unknown-name question / anything is unsure. */
+async function declineUnknownName(db, question) {
   if (!unknownNameEnabled()) return null;
   const phrase = extractNamePhrase(question);
   if (!phrase) return null;

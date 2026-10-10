@@ -53,6 +53,8 @@ export interface OutreachMessage {
   customerName: string | null;
   unit: string | null;
   serialLast4: string | null;
+  /** Warranty end date (YYYY-MM-DD) read from the unit, so the screen can say why this customer was picked. */
+  warrantyExpires?: string | null;
   createdAt: string;
   approvedAt: string | null;
   sentAt: string | null;
@@ -66,6 +68,16 @@ export interface GenerateResult {
   alreadyDrafted: number;
   outsideLeadWindow: number;
   candidates: number;
+  /** Customers looked at but not drafted, and why (up to 25). Absent on an older server. */
+  notDrafted?: NotDrafted[];
+}
+
+export interface NotDrafted {
+  equipmentId: string;
+  customerName: string | null;
+  unit: string | null;
+  reason: 'no-email' | 'opted-out' | 'outside-window';
+  daysLeft: number | null;
 }
 
 export interface SendResult {

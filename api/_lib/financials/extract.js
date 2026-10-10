@@ -200,7 +200,7 @@ export async function extractFinancialsForDocument(ctx, documentId, deps) {
     return w;
   });
   if (!res.written) return { status: 'skipped', reason: res.reason, modelCalls: 1, costUsd };
-  return { status: 'written', modelCalls: 1, costUsd, flags: norm.flags, hasTotal: norm.header.total != null };
+  return { status: 'written', modelCalls: 1, costUsd, flags: norm.flags, hasTotal: norm.header.total != null, total: norm.header.total ?? null, invoiceNumber: norm.header.invoice_number ?? null, docKind: norm.header.doc_kind ?? null, currency: norm.header.currency ?? null };
 }
 
 export { FINANCIAL_DOCUMENT_TYPES };

@@ -235,6 +235,9 @@ export function classifyCandidates(items, contacts, existingKeys, leadDays, days
   let optedOut = 0;
   let alreadyDrafted = 0;
   let outsideLeadWindow = 0;
+  // Who was NOT drafted and why, so the screen can say so instead of just counting. Additive: callers that
+  // only read the counters above are unaffected.
+  const skipped = [];
 
   for (const item of items ?? []) {
     if (!OUTREACH_TIERS.includes(item.tier)) continue;
@@ -243,6 +246,7 @@ export function classifyCandidates(items, contacts, existingKeys, leadDays, days
       const daysLeft = daysLeftByEntity?.get(item.entityId) ?? null;
       if (daysLeft != null && daysLeft > leadDays) {
         outsideLeadWindow++;
+        skipped.push({ item, reason: "outside-window", daysLeft });
         continue;
       }
     }
@@ -250,21 +254,24 @@ export function classifyCandidates(items, contacts, existingKeys, leadDays, days
     const key = dedupeKey(item.entityId, item.tier);
     if (existingKeys.has(key)) {
       alreadyDrafted++;
+      skipped.push({ item, reason: "already-drafted" });
       continue;
     }
 
     const contact = contacts?.get(item.entityId);
     if (contact?.optedOut === true) {
       optedOut++;
+      skipped.push({ item, reason: "opted-out" });
       continue;
     }
     if (!contact?.email) {
       needsEmail++;
+      skipped.push({ item, reason: "no-email" });
       continue;
     }
 
     eligible.push({ item, contact });
   }
 
-  return { eligible, needsEmail, optedOut, alreadyDrafted, outsideLeadWindow };
+  return { eligible, needsEmail, optedOut, alreadyDrafted, outsideLeadWindow, skipped };
 }

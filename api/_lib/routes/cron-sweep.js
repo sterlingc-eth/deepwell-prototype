@@ -72,6 +72,9 @@ const MAX_DOCS_PER_TENANT = 25;
 // model work. So the per-tenant cap is about how fast a backlog drains per night, not how long this function runs.
 // 25/night made a 1,500-document first import take 60 nights; 400/night x 5 sweeps/day clears it in a day.
 export const MAX_ENQUEUE_PER_TENANT = 400;
+// The $0 re-check (no model, label-fill + automatic check) was capped at 25 documents a night, so a 600-document inbox took
+// weeks to settle. It is cheap SQL, bounded by the shared deadline below; the rest carries to the next run (leftForNextRun).
+export const RECHECK_PER_TENANT_PER_NIGHT = 300;
 // Documents the read step finished that never got extracted (lost event, extract billing-gated, process killed).
 const UNEXTRACTED_MINUTES = 60;
 // R35: with the queue on, a document can legitimately wait hours behind a big import (e.g. 5,000 documents at the default
@@ -417,7 +420,7 @@ export default async function handler(req, res) {
     // not scanned again, so a backlog drains over successive nights instead of one tenant eating the deadline.
     if (Date.now() < deadlineAt) {
       try {
-        const rc = await recheckTenantMissing(ctx, { limit: 25, deadlineAt, source: "cron" });
+        const rc = await recheckTenantMissing(ctx, { limit: RECHECK_PER_TENANT_PER_NIGHT, deadlineAt, source: "cron" });
         summary.recheckScanned += rc.scanned;
         summary.recheckFilledDocuments += rc.filled;
         summary.recheckFilledFields += rc.fields;

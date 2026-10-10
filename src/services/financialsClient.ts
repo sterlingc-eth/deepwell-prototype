@@ -70,6 +70,16 @@ export interface FinancialsSummary {
 
 export interface BackfillStatus { enabled: boolean; eligible: number; done: number; remaining: number }
 
+export interface BackfillAdded {
+  documentId: string;
+  filename: string | null;
+  docKind: string | null;
+  invoiceNumber: string | null;
+  /** The total read off the document ("1240.50"), or null when the document prints none. */
+  total: string | null;
+  currency: string | null;
+}
+
 export interface BackfillResult {
   enabled: boolean;
   processed: number;
@@ -79,6 +89,8 @@ export interface BackfillResult {
   remaining: number;
   stoppedReason: string;
   nextCursor?: string | null;
+  /** Documents read in this batch, with the amount found. Older servers omit it. */
+  added?: BackfillAdded[];
 }
 
 async function call<T>(body: Record<string, unknown>): Promise<T> {
@@ -110,6 +122,20 @@ export const financialsClient = {
   backfillStatus: () => call<BackfillStatus>({ op: 'backfillStatus' }),
   backfill: (afterId?: string | null) => call<BackfillResult>({ op: 'backfill', ...(afterId ? { afterId } : {}) }),
 };
+
+/** What a "Read amounts now" click added, summed across its batches. Money is added in whole cents; non-USD amounts are listed but left out of the total (as everywhere else). */
+export interface BackfillSummary { documentsRead: number; amountsAdded: number; totalCents: number; items: BackfillAdded[] }
+export function summarizeBackfill(results: BackfillResult[]): BackfillSummary {
+  const items = results.flatMap((r) => r.added ?? []);
+  const withAmount = items.filter((i) => i.total != null && i.total !== '');
+  let totalCents = 0;
+  for (const i of withAmount) {
+    const n = Number(i.total);
+    if (Number.isFinite(n) && (i.currency == null || i.currency === 'USD')) totalCents += Math.round(n * 100);
+  }
+  const written = results.reduce((n, r) => n + (r.written || 0), 0);
+  return { documentsRead: Math.max(written, items.length), amountsAdded: withAmount.length, totalCents, items };
+}
 
 /** "1240.50" -> "$1,240.50" (display only; never used to add amounts up). */
 export function formatMoney(v: string | null | undefined): string {

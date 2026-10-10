@@ -16,6 +16,7 @@ import {
 import { buildDiagnostics } from '../../services/errorReporter';
 import { SupportLogo } from './SupportLogo';
 import { SupportText } from './SupportText';
+import { SupportAccessOffer } from './SupportAccess';
 import './support.css';
 
 /**
@@ -129,9 +130,11 @@ export interface SupportAssistantProps {
   /** Clerk user's primary email, to prefill the hand-off form. */
   userEmail?: string;
   userName?: string;
+  /** The company's name as the signed-in person sees it; labels the note DeepWell staff get when support access is turned on. */
+  companyName?: string;
 }
 
-export function SupportAssistant({ surface, page, variant = 'panel', active = true, onClose, onAskDonovan, userEmail = '', userName = '' }: SupportAssistantProps) {
+export function SupportAssistant({ surface, page, variant = 'panel', active = true, onClose, onAskDonovan, userEmail = '', userName = '', companyName = '' }: SupportAssistantProps) {
   const panel = variant === 'panel';
   const online = useOnline();
   const [{ msgs, handoffSent }, setChat] = useState<Persisted>(() => loadChat(surface));
@@ -371,6 +374,7 @@ export function SupportAssistant({ surface, page, variant = 'panel', active = tr
                       <Mail className="w-4 h-4" aria-hidden="true" /> Send this to a person
                     </button>
                   )}
+                  {m.handoffOffered && i === lastIdx && !handoffOpen && <SupportAccessOffer surface={surface} companyName={companyName} />}
                 </AssistantRow>
               </div>
             ),
@@ -417,6 +421,9 @@ export function SupportAssistant({ surface, page, variant = 'panel', active = tr
           <div role="status" className="mt-3 ml-9 rounded-xl border border-ok/40 bg-ok-bg text-ok-ink px-3.5 py-2.5 text-body">
             <strong>Sent to the DeepWell team.</strong> We'll reply by email.
           </div>
+        )}
+        {handoffOpen && !handoffSent && handoffKind === 'help' && (
+          <div className="mt-3 ml-9"><SupportAccessOffer surface={surface} companyName={companyName} /></div>
         )}
         {handoffOpen && !handoffSent && (
           <HandoffForm

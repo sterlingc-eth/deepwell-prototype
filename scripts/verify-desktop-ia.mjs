@@ -106,11 +106,28 @@ async function main() {
     check('Team Settings: notifications toggle reachable', (await page.getByText('Mute my daily digest').first().count()) > 0);
     check('Team Settings: data export reachable', (await page.getByText('Download data export (JSON)').count()) > 0);
 
-    // ---- Donovan: reachable by admin from the account row ----
+    // ---- Donovan (2026-10-10): customers get NO Donovan tab; only a platform operator does ----
+    let operator = false;
+    await page.route('**/api/review', async (route) => {
+      const body = JSON.parse(route.request().postData() || '{}');
+      if (body.action === 'donovanSharing') return route.fulfill({ json: { sharing: false, isOperator: operator } });
+      if (body.action === 'donovanScores') return route.fulfill({ json: { configured: true, days: 30, total: 120, tenantsReporting: 3, tenantsOptedIn: 3, rates: { answered_from_records: 0.7, declined: 0.1, ai_fallback: 0.15, marked_wrong: 0.05 }, byOutcome: { answered_from_records: 84, declined: 12, ai_fallback: 18, marked_wrong: 6 }, byShape: [{ shape: 'count', n: 50, answeredRate: 0.8 }, { shape: 'list', n: 40, answeredRate: 0.7 }, { shape: 'date', n: 30, answeredRate: 0.5 }], trend: [{ day: '2026-10-08', n: 40, answeredRate: 0.7, declinedRate: 0.1, aiRate: 0.15, wrongRate: 0.05, avgLatencyMs: 900, costUsd: 0.2 }, { day: '2026-10-09', n: 80, answeredRate: 0.71, declinedRate: 0.09, aiRate: 0.15, wrongRate: 0.05, avgLatencyMs: 850, costUsd: 0.4 }], latencyMs: { p50: 700, p95: 2400 }, costUsd: 0.6 } });
+      return route.fulfill({ status: 404, json: { error: 'mock' } });
+    });
+    await setAdmin(page, false);
+    await setAdmin(page, true);
+    await go(page, 'team');
+    await page.waitForTimeout(400);
+    check('Donovan: account-row button HIDDEN for a customer admin (not an operator)', (await page.getByRole('button', { name: 'Donovan', exact: true }).count()) === 0);
+    operator = true;
+    await setAdmin(page, false);
+    await setAdmin(page, true);
+    await page.waitForTimeout(400);
     const donovanButton = page.getByRole('button', { name: 'Donovan', exact: true });
-    check('Donovan: account-row button visible for an admin', (await donovanButton.count()) > 0);
+    check('Donovan: account-row button visible for a platform operator', (await donovanButton.count()) > 0);
     await donovanButton.click();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(400);
+    check('Donovan: operator screen shows the shared performance scores', (await page.getByText('Shared performance scores').count()) > 0);
     check('Donovan: opens with Donovan misses reachable', (await page.getByText('Donovan misses').count()) > 0);
     check('Donovan: opens with Donovan learning reachable', (await page.getByText('Donovan learning').count()) > 0);
     check('Donovan: opens with Search by meaning reachable', (await page.getByText('Search by meaning').count()) > 0);
@@ -126,6 +143,16 @@ async function main() {
     check('Donovan: account-row button hidden for a non-admin', (await page.getByRole('button', { name: 'Donovan', exact: true }).count()) === 0);
     check('Team (non-admin): admin-only Settings section hidden', (await page.getByRole('button', { name: 'Settings', exact: true }).count()) === 0);
     await setAdmin(page, true);
+    operator = false;
+
+    // ---- Opt-in sharing switch lives in Team > Settings, off by default, one control ----
+    await go(page, 'team');
+    await page.waitForTimeout(300);
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await page.waitForTimeout(200);
+    const sw = page.getByRole('switch', { name: 'Share Donovan performance scores with DeepWell' });
+    check('Settings: "Share Donovan performance scores with DeepWell" switch exists', (await sw.count()) === 1);
+    check('Settings: the sharing switch is OFF by default', (await sw.getAttribute('aria-checked')) === 'false');
 
     // ---- Customers: whole-shop duplicate scan folded in (admin) ----
     await go(page, 'browse');
@@ -137,7 +164,9 @@ async function main() {
 
     // ---- Records: 5 tabs -> 4, no standalone Search tab ----
     const recordTabs = await page.getByRole('tablist', { name: 'Records view' }).getByRole('tab').allTextContents();
-    check('Records: exactly 4 tabs (Documents/Customers/Grid/Graph)', recordTabs.length === 4, `got: ${JSON.stringify(recordTabs)}`);
+    // Graph was removed (round T2); Company Files was added. The intended set, in order:
+    const wantTabs = ['Documents', 'Customers', 'Company Files', 'Grid'];
+    check('Records: exactly 4 tabs (Documents/Customers/Company Files/Grid)', recordTabs.length === 4 && wantTabs.every((w, i) => (recordTabs[i] ?? '').trim() === w), `got: ${JSON.stringify(recordTabs)}`);
     check('Records: no standalone "Search" tab', !recordTabs.some((t) => t.trim() === 'Search'));
 
     // ---- Inbox: 2 tabs, one merged "Needs you" chip row ----
@@ -148,14 +177,14 @@ async function main() {
     check('Inbox: no separate "Needs a decision" tab', !inboxTabs.some((t) => t.includes('Needs a decision')));
     await page.getByRole('tab', { name: /^Needs you/ }).click();
     await page.waitForTimeout(400);
-    // Needs-you redesign: the 5 most-used groups sit on the bar; Conflicts / Duplicates / Company records / Money / All
+    // Needs-you redesign: the 5 most-used groups sit on the bar; Conflicts / Duplicates / Company files / Money / All
     // are one click away under "More" (every filter is still reachable, just not all on screen at once).
     await page.getByRole('button', { name: /^More/ }).click();
     await page.waitForTimeout(150);
     const chipTexts = await page.getByRole('tablist', { name: 'Needs you filters' }).getByRole('tab').allTextContents();
     check('Inbox "Needs you": one row has "Decisions" + the original 9 filters (Money hidden when empty)', chipTexts.length >= 9, `got ${chipTexts.length}: ${JSON.stringify(chipTexts)}`);
     check('Inbox "Needs you": "Decisions" chip present (folds in the old Add-files-adjacent decision queue)', chipTexts.some((t) => t.includes('Decisions')));
-    for (const label of ['Needs a person', 'Missing info', 'Needs linking', 'Conflicts', 'Duplicates', 'Ready to verify', 'Company records', 'All']) {
+    for (const label of ['Needs a person', 'Missing info', 'Needs linking', 'Conflicts', 'Duplicates', 'Ready to verify', 'Company files', 'All']) {
       check(`Inbox "Needs you": "${label}" filter still reachable`, chipTexts.some((t) => t.includes(label)));
     }
     await page.screenshot({ path: path.join(SHOT_DIR, 'inbox_office-dark_1440x900.png'), fullPage: true });

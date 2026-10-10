@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { ArrowLeft, Sparkles } from 'lucide-react';
 import { DonovanMissesCard } from '../components/DonovanMissesCard';
 import { DonovanLearningCard } from '../components/DonovanLearningCard';
+import { DonovanScoresCard } from '../components/DonovanScoresCard';
 import { SemanticSearchCard } from '../components/SemanticSearchCard';
 
 interface DonovanScreenProps {
@@ -26,7 +27,10 @@ interface DonovanScreenProps {
  * return <DonovanScreen onClose={() => setCurrentScreen('dashboard')} />`
  * in App.tsx's switch, and `'donovan'` to useDeepLink.ts's SCREENS list.
  *
- * Gating: the exact same admin/operator checks the three cards already used
+ * 2026-10-10: customers no longer get this screen at all (owner: no extra work or stress for the client). AppShell only
+ * shows the button, and the command palette only lists it, for a platform operator (the server's `isOperator`).
+ *
+ * Gating (earlier): the exact same admin/operator checks the three cards already used
  * on Team (isAdminRole for the section, `report.isOperator` from the server
  * inside DonovanMissesCard for the operator-only actions) — moving them
  * doesn't loosen or duplicate that gate, AppShell only ever renders the
@@ -58,7 +62,7 @@ export function DonovanScreen({ onClose }: DonovanScreenProps) {
           <h1 className="flex items-center gap-2 text-body-lg font-semibold">
             <Sparkles className="w-5 h-5" aria-hidden="true" /> Donovan
           </h1>
-          <span className="dw-pill-muted !text-forest-100 !bg-forest-800 hidden sm:inline-flex">Admin only</span>
+          <span className="dw-pill-muted !text-forest-100 !bg-forest-800 hidden sm:inline-flex">DeepWell team only</span>
         </div>
       </div>
 
@@ -66,10 +70,11 @@ export function DonovanScreen({ onClose }: DonovanScreenProps) {
         <div>
           <h2 className="text-h2">Answer quality</h2>
           <p className="text-ink-2 mt-1">
-            What Donovan got wrong, what it's learned since, and how much of your document library it can now search
-            by meaning instead of exact words. Moved off Team (2026-09-26) — this is about the AI, not your people.
+            Shared performance scores from organizations that opted in, plus this account's own misses, learning and
+            search-by-meaning status. DeepWell team only.
           </p>
         </div>
+        <DonovanScoresCard />
         <DonovanMissesCard />
         <DonovanLearningCard />
         <SemanticSearchCard />

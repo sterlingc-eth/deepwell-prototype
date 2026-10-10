@@ -36,6 +36,8 @@ interface CommandPaletteProps {
   /** Opens the Donovan overlay (AppShell owns that toggle — see its file
    *  comment on why Donovan isn't a `Screen` id). */
   onOpenDonovan: () => void;
+  /** Only DeepWell operators get the Donovan screen; customers never see this jump target. */
+  showDonovan?: boolean;
 }
 
 /**
@@ -53,7 +55,7 @@ interface CommandPaletteProps {
  * out — never customers. This covers all five, from anywhere in the app,
  * not only from Records, in 0 mouse clicks (⌘K, type, Enter).
  */
-export function CommandPalette({ isAdmin, onOpenDonovan }: CommandPaletteProps) {
+export function CommandPalette({ isAdmin, onOpenDonovan, showDonovan = false }: CommandPaletteProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
@@ -117,6 +119,8 @@ export function CommandPalette({ isAdmin, onOpenDonovan }: CommandPaletteProps) 
     if (isAdmin) {
       const teamScore = fuzzyScoreAny(q, ['Team']);
       if (teamScore !== null) rows.push({ id: 'screen-team', group: 'Screens', title: 'Team', icon: Users, score: teamScore + 100, run: () => openScreen('team') });
+    }
+    if (showDonovan) {
       const donovanScore = fuzzyScoreAny(q, ['Donovan', 'Donovan misses', 'Donovan learning', 'Search by meaning']);
       if (donovanScore !== null) rows.push({ id: 'screen-donovan', group: 'Screens', title: 'Donovan (admin)', subtitle: 'Misses, learning, search by meaning', icon: Sparkles, score: donovanScore + 100, run: () => { onOpenDonovan(); close(); } });
     }
@@ -186,7 +190,7 @@ export function CommandPalette({ isAdmin, onOpenDonovan }: CommandPaletteProps) 
     if (q) out.push({ id: 'ask-fallback', group: 'Ask', title: `Ask Donovan: "${q}"`, icon: Sparkles, score: 0, run: () => runAsk(q) });
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, graph, isAdmin]);
+  }, [query, graph, isAdmin, showDonovan]);
 
   useEffect(() => setActiveIndex(0), [query]);
 

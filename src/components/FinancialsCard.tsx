@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Loader2, Receipt } from 'lucide-react';
+import { DocumentPreview } from './DocumentPreview';
+import { useAppStore } from '../store/appStore';
 import { useCanAdmin } from '../hooks/useCanAdmin';
-import { financialsClient, formatMoney, type BackfillStatus, type FinancialsSummary } from '../services/financialsClient';
+import { financialsClient, formatMoney, summarizeBackfill, type BackfillResult, type BackfillStatus, type BackfillSummary, type FinancialsSummary } from '../services/financialsClient';
 
 /**
  * Dashboard "Money" summary (owner / admin only): invoiced this month and year to date, what is
@@ -15,6 +17,9 @@ export function FinancialsCard() {
   const [status, setStatus] = useState<BackfillStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [result, setResult] = useState<BackfillSummary | null>(null);
+  const [previewDocId, setPreviewDocId] = useState<string | null>(null);
+  const openDocument = useAppStore((st) => st.openDocument);
 
   const load = useCallback(() => {
     financialsClient.summary().then(setS).catch(() => setS(null));
@@ -27,17 +32,20 @@ export function FinancialsCard() {
   const runBackfill = async () => {
     setBusy(true);
     setMsg(null);
+    setResult(null);
     try {
       let cursor: string | null | undefined = null;
-      let written = 0;
+      const runs: BackfillResult[] = [];
       // A few bounded batches per click; the server caps model calls per invocation and never redoes finished documents.
       for (let i = 0; i < 5; i++) {
         const r = await financialsClient.backfill(cursor);
-        written += r.written;
+        runs.push(r);
         cursor = r.nextCursor;
         if (!cursor || r.remaining === 0 || r.stoppedReason === 'daily_budget' || r.stoppedReason === 'cost_cap') break;
       }
-      setMsg(`Read ${written} more document${written === 1 ? '' : 's'}.`);
+      const sum = summarizeBackfill(runs);
+      setResult(sum);
+      setMsg(sum.documentsRead === 0 ? 'No more documents could be read this time.' : null);
       load();
     } catch (e) {
       setMsg(e instanceof Error ? e.message : 'Could not run that.');
@@ -75,6 +83,24 @@ export function FinancialsCard() {
         </div>
       )}
       {msg && <p role="status" className="text-caption text-ink-3">{msg}</p>}
+      {result && result.documentsRead > 0 && (
+        <div role="status" className="rounded-md border border-line bg-surface-2 p-3 space-y-2" data-testid="backfill-result">
+          <p className="text-body text-ink">
+            Read {result.documentsRead} document{result.documentsRead === 1 ? '' : 's'}. Added {result.amountsAdded} amount{result.amountsAdded === 1 ? '' : 's'}, {formatMoney((result.totalCents / 100).toFixed(2))} in total.
+          </p>
+          <ul className="divide-y divide-line">
+            {result.items.map((it) => (
+              <li key={it.documentId} className="flex items-center justify-between gap-3 py-1.5 min-h-touch sm:min-h-0">
+                <button type="button" className="min-w-0 text-left text-body text-ink underline decoration-line-2 underline-offset-4 truncate" onClick={() => { openDocument(it.documentId); setPreviewDocId(it.documentId); }}>
+                  {it.filename || it.invoiceNumber || 'Document'}
+                </button>
+                <span className="font-mono text-data text-ink-2 shrink-0">{it.total != null && it.total !== '' ? formatMoney(it.total) : 'No total printed'}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {previewDocId && <DocumentPreview documentId={previewDocId} onClose={() => setPreviewDocId(null)} />}
     </div>
   );
 }

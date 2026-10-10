@@ -86,6 +86,7 @@ import {
 } from '../analytics.js';
 import { normalizeQuestion } from '../nlNormalize.js';
 import { detectCountComparison } from '../analytics/comparison.js';
+import { shouldSkipPlanner } from '../analytics/agentBound.js';
 // R19 (I2, task 5): team-only (internal) documents never count toward a customer-scoped analytics
 // answer — same fragment/probe search/store.js and search/knowledge.js already adopt.
 import { documentsHaveAudience } from '../audience/probe.js';
@@ -233,6 +234,9 @@ export async function planAnalyticsQuestion(question, { today, overlay, tenantVo
     let rawInput = detectAnalyticsPlan(question, tenantVocab, today);
     let fromModel = false;
     if (!rawInput) {
+      // R45: a question whose shape the planner's closed vocabulary cannot express goes straight to the research agent when that is enabled
+      // (the agent ran right after the planner anyway). Agent off => unchanged.
+      if (shouldSkipPlanner(originalQuestion ?? question)) return null;
       fromModel = true;
       // ROUND 20 (J4), task 2: per-tenant daily $ cap for this route, on top of (never instead of)
       // ask.js's own call-count assertModelBudget. Throws ModelBudgetExceededError when exceeded,

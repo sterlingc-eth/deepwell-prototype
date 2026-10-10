@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, AlertTriangle, ArrowLeft, Bell, Link2, GitMerge, Copy, Loader2, Plus, Search, Sparkles, Trash2, UserCog } from 'lucide-react';
-import { StagePill, STAGE_LABEL } from '../components/StagePill';
+import { StagePill, stageLabel } from '../components/StagePill';
 import { DocumentPreview } from '../components/DocumentPreview';
-import { conflictDocs, entitiesOfType, gapDocs, isCompanyRecordDoc, isRequirementMet, maxStageFor, unlinkedDocs, useGraph, type GraphSnapshot } from '../core/entityGraph';
+import { conflictDocs, entitiesOfType, companyFileNeedsLook, gapDocs, isCompanyFileDoc, isNothingRead, isRequirementMet, maxStageFor, unlinkedDocs, useGraph, type GraphSnapshot } from '../core/entityGraph';
 import type { Conflict, Doc, Entity, SourceRef } from '../core/types';
 import { targetFor } from '../domains/hvac/intake';
 import { fieldLabel, hvacSchema, requirementLabel } from '../domains/hvac/schema';
@@ -15,6 +15,7 @@ import { documentName, hasFriendlyName, originalFilename } from '../core/documen
 import { useAppStore } from '../store/appStore';
 import { deleteDocuments } from '../services/documentClient';
 import { reviewClient } from '../services/reviewClient';
+import { CUSTOMER_AUTOLOAD_MAX, CUSTOMER_PAGE_SIZE, mergeCustomerPages, mergeDuplicatePairs } from '../core/customerPaging';
 import { customerClient, type CustomerSummary, type CustomerDuplicatePair, type CustomerPossibleDuplicatePair } from '../services/customerClient';
 import { loadGraphFromServer } from '../hooks/usePostgresSync';
 import { useWorkFilter } from '../hooks/useWorkFilter';
@@ -80,6 +81,8 @@ export type { Filter };
  *  person" always means the exact same set of documents everywhere it's
  *  offered — never a second, slightly different definition. */
 export function isAttention(doc: Doc): boolean {
+  // A company file needs a person only for a real reason (unreadable, no total, a copy, unsure folder).
+  if (isCompanyFileDoc(doc, hvacSchema)) return doc.stage !== 'verified' && companyFileNeedsLook(doc, hvacSchema);
   return doc.stage !== 'verified' && (doc.issues.length > 0 || doc.stage === 'received');
 }
 
@@ -104,9 +107,10 @@ function matches(doc: Doc, f: Filter, sets: QueueSets): boolean {
     case 'gaps': return sets.gaps.has(doc.id);
     case 'unlinked': return sets.unlinked.has(doc.id);
     case 'conflicts': return sets.conflicts.has(doc.id);
-    case 'duplicates': return doc.issues.some((i) => i.kind === 'duplicate');
-    case 'ready': return doc.stage === 'linked' && doc.issues.length === 0;
-    case 'shop-records': return isCompanyRecordDoc(doc, hvacSchema);
+    case 'duplicates': return doc.issues.some((i) => i.kind === 'duplicate' || i.kind === 'possible-copy');
+    // Only substantive documents are listed (something was read), and there is no verify-all: each one is checked by a person.
+    case 'ready': return doc.stage === 'linked' && doc.issues.length === 0 && !isNothingRead(doc);
+    case 'shop-records': return doc.stage !== 'verified' && companyFileNeedsLook(doc, hvacSchema);
     case 'money': return sets.money.has(doc.id);
     case 'all': return true;
   }
@@ -427,14 +431,25 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
   const [customerDupBusyKey, setCustomerDupBusyKey] = useState<string | null>(null);
   const loadCustomerDuplicates = () => {
     if (REVIEW_IS_DEMO_ONLY) return;
-    void customerClient
-      .listFull({ sort: 'recent', limit: 200 })
-      .then((data) => {
-        setCustomerDuplicates(data.duplicates ?? []);
-        setCustomerPossibleDuplicates(data.possibleDuplicates ?? []);
-        setCustomerRowsById(new Map(data.customers.map((c) => [c.id, c])));
-      })
-      .catch((e) => setCustomerDupErr(e instanceof Error ? e.message : 'Could not load duplicate customers.'));
+    // Page through EVERY customer (the server finds duplicate pairs one page at a time), not just the first 200.
+    void (async () => {
+      let customers: CustomerSummary[] = [];
+      let dups: CustomerDuplicatePair[] = [];
+      let possible: CustomerPossibleDuplicatePair[] = [];
+      let cursor: string | null = null;
+      for (let guard = 0; guard < Math.ceil(CUSTOMER_AUTOLOAD_MAX / CUSTOMER_PAGE_SIZE); guard++) {
+        const page = await customerClient.listPage({ sort: 'recent', limit: CUSTOMER_PAGE_SIZE, cursor });
+        customers = mergeCustomerPages(customers, page.customers);
+        dups = mergeDuplicatePairs(dups, page.duplicates ?? []);
+        const seen = new Set(possible.map((p) => `${p.aId}|${p.bId}`));
+        possible = [...possible, ...(page.possibleDuplicates ?? []).filter((p) => !seen.has(`${p.aId}|${p.bId}`))];
+        cursor = page.nextCursor;
+        if (!cursor) break;
+      }
+      setCustomerDuplicates(dups);
+      setCustomerPossibleDuplicates(possible);
+      setCustomerRowsById(new Map(customers.map((c) => [c.id, c])));
+    })().catch((e) => setCustomerDupErr(e instanceof Error ? e.message : 'Could not load duplicate customers.'));
   };
   useEffect(() => {
     loadCustomerDuplicates();
@@ -512,7 +527,7 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
   // Hiding never applies to the "Shop records" tab itself (see the state
   // comment above) — everywhere else, an internal document is excluded
   // while the toggle is on.
-  const notHiddenShop = (d: Doc, f: Filter) => f === 'shop-records' || !hideShopRecords || !isCompanyRecordDoc(d, hvacSchema);
+  const notHiddenShop = (d: Doc, f: Filter) => f === 'shop-records' || !hideShopRecords || !isCompanyFileDoc(d, hvacSchema);
   const matchesTechFilter = (d: Doc, f: Filter) => f !== 'shop-records' || !shopTechFilter || shopRecordTechnician(d) === shopTechFilter;
 
   const queue = useMemo(
@@ -599,22 +614,69 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
   // customer link are checked. Runs on the server in bounded pages ($0, no model; reviewStore.resortDocuments).
   const [resortBusy, setResortBusy] = useState(false);
   const [resortMsg, setResortMsg] = useState<string | null>(null);
-  const runResort = async () => {
+  const [resortPlan, setResortPlan] = useState<{ move: number; check: number } | null>(null);
+  const [resortUndoId, setResortUndoId] = useState<string | null>(() => {
+    try { return window.localStorage.getItem('dw.resortUndoRun'); } catch { return null; }
+  });
+  const rememberUndo = (id: string | null) => {
+    setResortUndoId(id);
+    try { if (id) window.localStorage.setItem('dw.resortUndoRun', id); else window.localStorage.removeItem('dw.resortUndoRun'); } catch { /* storage may be blocked */ }
+  };
+  const papers = (n: number) => `${n} paper${n === 1 ? '' : 's'}`;
+  // Step 1: a dry run (writes nothing) to count what would change; the dialog then asks for a go-ahead.
+  const startResort = async () => {
     setResortBusy(true);
     setResortMsg(null);
+    try {
+      let move = 0, check = 0;
+      let after: string | null = null;
+      for (let guard = 0; guard < 200; guard++) {
+        const r = await reviewClient.resortDocuments(after, 200, { dryRun: true });
+        move += r.wouldMove ?? 0; check += r.wouldCheck ?? 0;
+        if (r.done || !r.nextAfterId) break;
+        after = r.nextAfterId;
+      }
+      setResortPlan({ move, check });
+    } catch (e) {
+      setResortMsg(e instanceof Error ? e.message : 'Could not sort these documents.');
+    } finally {
+      setResortBusy(false);
+    }
+  };
+  // Step 2: the real run, tagged with one run id so it can be undone.
+  const runResort = async () => {
+    setResortPlan(null);
+    setResortBusy(true);
+    setResortMsg(null);
+    const runId = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : '';
     try {
       let scanned = 0, retyped = 0, checked = 0, errors = 0;
       let after: string | null = null;
       for (let guard = 0; guard < 200; guard++) {
-        const r = await reviewClient.resortDocuments(after, 100);
+        const r = await reviewClient.resortDocuments(after, 100, runId ? { runId } : {});
         scanned += r.scanned; retyped += r.retyped; checked += r.checked; errors += r.errors;
         if (r.done || !r.nextAfterId) break;
         after = r.nextAfterId;
       }
       try { await loadGraphFromServer(); } catch { /* keep last-good data */ }
+      if (runId && (retyped > 0 || checked > 0)) rememberUndo(runId);
       setResortMsg(`Sorted ${scanned} document${scanned === 1 ? '' : 's'}: ${retyped} moved to a better type and ${checked} checked automatically.${errors > 0 ? ` ${errors} couldn't be sorted this time.` : ''}`);
     } catch (e) {
       setResortMsg(e instanceof Error ? e.message : 'Could not sort these documents.');
+    } finally {
+      setResortBusy(false);
+    }
+  };
+  const undoResortRun = async () => {
+    if (!resortUndoId) return;
+    setResortBusy(true);
+    try {
+      const r = await reviewClient.undoResort(resortUndoId);
+      try { await loadGraphFromServer(); } catch { /* keep last-good data */ }
+      rememberUndo(null);
+      setResortMsg(`Undone: ${r.restoredTypes} back to their earlier type and ${r.uncheckedPapers} no longer checked.${r.leftAlone > 0 ? ` ${r.leftAlone} left as they are because a person has changed them since.` : ''}`);
+    } catch (e) {
+      setResortMsg(e instanceof Error ? e.message : 'Could not undo this sort.');
     } finally {
       setResortBusy(false);
     }
@@ -890,12 +952,12 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
           {work.hasShop && <WorkFilterControl choice={work.choice} onChange={work.setChoice} showHint={work.showHint} />}
           <label className="inline-flex items-center gap-2 min-h-[44px] text-body text-ink-2 cursor-pointer">
-            <input type="checkbox" className="w-5 h-5" checked={hideShopRecords} onChange={toggleHideShopRecords} aria-label="Hide company records" />
-            Hide company records
+            <input type="checkbox" className="w-5 h-5" checked={hideShopRecords} onChange={toggleHideShopRecords} aria-label="Hide company files" />
+            Hide company files
           </label>
           {(filter === 'gaps' || filter === 'attention' || filter === 'unlinked') && !REVIEW_IS_DEMO_ONLY && (
             <div className="flex flex-wrap items-center gap-2">
-              <button type="button" className="dw-btn-tertiary !min-h-[44px] !py-1.5" disabled={resortBusy || !canAdmin} title={canAdmin ? 'Moves receipts, statements, agreements and similar paperwork out of Invoice, then checks what is complete.' : ASK_ADMIN_TITLE} onClick={() => void runResort()}>
+              <button type="button" className="dw-btn-tertiary !min-h-[44px] !py-1.5" disabled={resortBusy || !canAdmin} title={canAdmin ? 'Moves receipts, statements, agreements and similar paperwork out of Invoice, then checks what is complete.' : ASK_ADMIN_TITLE} onClick={() => void startResort()}>
                 {resortBusy ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Sparkles className="w-4 h-4" aria-hidden="true" />} Sort my documents
               </button>
               {!canAdmin && <AskAdminNote />}
@@ -912,7 +974,30 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
           <span className="hidden lg:inline text-caption text-ink-3 lg:ml-auto">Tip: j / k to move, Enter to open</span>
         </div>
         {recheckAllMsg && <p className="text-caption text-ink-3">{recheckAllMsg}</p>}
-        {resortMsg && <p className="text-caption text-ink-3">{resortMsg}</p>}
+        {resortMsg && (
+          <p className="text-caption text-ink-3">
+            {resortMsg}
+            {resortUndoId && canAdmin && (
+              <> <button type="button" className="underline text-accent min-h-[44px] px-2" disabled={resortBusy} onClick={() => void undoResortRun()}>Undo</button></>
+            )}
+          </p>
+        )}
+        {resortPlan && (
+          <div role="dialog" aria-modal="true" aria-label="Sort my documents" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setResortPlan(null)}>
+            <div className="dw-card w-full max-w-md p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+              <h2 className="text-h3">Sort my documents</h2>
+              <p className="text-body text-ink-2">
+                {resortPlan.move + resortPlan.check === 0
+                  ? 'Nothing needs sorting right now.'
+                  : `This will move ${papers(resortPlan.move)} to a better type and check ${resortPlan.check} that ${resortPlan.check === 1 ? 'is' : 'are'} complete. Nothing a person chose or checked is changed.`}
+              </p>
+              <div className="flex flex-wrap justify-end gap-2">
+                <button type="button" className="dw-btn-secondary !min-h-[44px]" onClick={() => setResortPlan(null)}>Cancel</button>
+                {resortPlan.move + resortPlan.check > 0 && <button type="button" className="dw-btn-primary !min-h-[44px]" onClick={() => void runResort()}>Confirm</button>}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Filter chips: rendered by InboxScreen now, in the same row as its
             "Decisions" chip (round 17 merge) — see this file's own header
@@ -1145,8 +1230,10 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
   const missing = (type?.requiredFields ?? []).filter((r) => !isRequirementMet(present, r));
   const unlinked = doc.issues.find((i) => i.kind === 'unlinked');
   const duplicate = doc.issues.find((i) => i.kind === 'duplicate');
+  const companyFile = isCompanyFileDoc(doc, graph.schema);
+  // A company file skips Matched: its next step is Checked, never "Advance to Matched" (a dispute blocks it instead).
   const next = maxStageFor(doc, graph.schema);
-  const canAdvance = next !== doc.stage && !duplicate;
+  const canAdvance = next !== doc.stage && !duplicate && !(companyFile && next === 'linked');
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [linkChoice, setLinkChoice] = useState<string>(unlinked?.kind === 'unlinked' && unlinked.bestGuess ? unlinked.bestGuess : '');
   // Single-flight guard lives in the graph store (entityGraph.ts's
@@ -1269,11 +1356,11 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
       <header className="p-5 space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-ink-3">Currently:</span>
-          <StagePill stage={doc.stage} ai={doc.verifiedBy === 'ai'} />
-          {doc.stage !== 'verified' && next !== doc.stage && (
+          <StagePill stage={doc.stage} ai={doc.verifiedBy === 'ai'} companyFile={companyFile} />
+          {doc.stage !== 'verified' && next !== doc.stage && !(companyFile && next === 'linked') && (
             <>
               <span className="text-ink-3">· Next step:</span>
-              <StagePill stage={next} />
+              <StagePill stage={next} companyFile={companyFile} />
             </>
           )}
         </div>
@@ -1483,7 +1570,7 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
           <div className="text-body text-ink-3">
             <p>
               {canAdvance
-                ? `Approving moves this document to ${STAGE_LABEL[next]}.`
+                ? `Approving moves this document to ${stageLabel(next, companyFile)}.`
                 : doc.stage === 'verified'
                   ? `${doc.verifiedBy === 'ai' ? 'AI verified' : `Verified${doc.verifiedBy ? ` by ${doc.verifiedBy}` : ''}`}${doc.verifiedAt ? ` on ${doc.verifiedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}. Counts toward accuracy and answers.`
                   : 'Resolve the items above to advance.'}
@@ -1506,7 +1593,7 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
               </button>
             )}
             <button type="button" className="dw-btn-primary" disabled={!canAdvance} onClick={onApprove}>
-              <Check className="w-4 h-4" aria-hidden="true" /> {next === 'verified' ? 'Mark checked' : `Advance to ${STAGE_LABEL[next]}`}
+              <Check className="w-4 h-4" aria-hidden="true" /> {next === 'verified' ? 'Mark checked' : `Advance to ${stageLabel(next, companyFile)}`}
             </button>
           </div>
         </footer>

@@ -249,7 +249,7 @@ async function generateDraftsFromItems(client, tenantId, { shopName, settings },
     fetchExistingKeys(client, tenantId, equipmentIds),
   ]);
   const daysLeftByEntity = new Map(candidateItems.map((i) => [i.entityId, i.daysLeft ?? null]));
-  const { eligible, needsEmail, optedOut, alreadyDrafted, outsideLeadWindow } = classifyCandidates(
+  const { eligible, needsEmail, optedOut, alreadyDrafted, outsideLeadWindow, skipped } = classifyCandidates(
     candidateItems,
     contacts,
     existingKeys,
@@ -284,7 +284,20 @@ async function generateDraftsFromItems(client, tenantId, { shopName, settings },
     if (rows[0]) created++;
   }
 
-  return { created, needsEmail, optedOut, alreadyDrafted, outsideLeadWindow, candidates: candidateItems.length };
+  // Up to 25 customers who were looked at but not drafted, with the reason (the screen lists them so "why not her?"
+  // has an answer). 'already-drafted' is left out: that one is already in the list below.
+  const notDrafted = skipped
+    .filter((s) => s.reason !== "already-drafted")
+    .slice(0, 25)
+    .map(({ item, reason, daysLeft }) => ({
+      equipmentId: item.entityId,
+      customerName: item.customerName ?? null,
+      unit: [item.manufacturer, item.model].filter(Boolean).join(" ") || null,
+      reason,
+      daysLeft: daysLeft ?? null,
+    }));
+
+  return { created, needsEmail, optedOut, alreadyDrafted, outsideLeadWindow, candidates: candidateItems.length, notDrafted };
 }
 
 async function approveDrafts(client, tenantId, ids, approvedBy) {
@@ -392,7 +405,8 @@ async function listMessages(client, tenantId, { status, limitRaw }) {
   const { rows } = await client.query(
     `SELECT m.id, m.tier, m.to_email, m.subject, m.body_text, m.status, m.created_at, m.approved_at, m.sent_at, m.error,
             m.equipment_id, c.customer_number, c.data->>'customer_name' AS customer_name,
-            e.data->>'model' AS model, e.data->>'manufacturer' AS manufacturer, e.data->>'serial_number' AS serial_number
+            e.data->>'model' AS model, e.data->>'manufacturer' AS manufacturer, e.data->>'serial_number' AS serial_number,
+            e.data->'warranty'->>'expires' AS warranty_expires
        FROM outreach_messages m
        LEFT JOIN entities c ON c.id = m.customer_id AND c.tenant_id = m.tenant_id
        LEFT JOIN entities e ON e.id = m.equipment_id AND e.tenant_id = m.tenant_id
@@ -417,6 +431,7 @@ function shapeMessage(r) {
     customerName: r.customer_name,
     unit: [r.manufacturer, r.model].filter(Boolean).join(" ") || null,
     serialLast4: maskSerial(r.serial_number),
+    warrantyExpires: r.warranty_expires ?? null,
     createdAt: r.created_at,
     approvedAt: r.approved_at,
     sentAt: r.sent_at,

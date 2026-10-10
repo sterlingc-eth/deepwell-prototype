@@ -50,7 +50,8 @@ export const DOCUMENT_TYPE_IDS = new Set(DOCUMENT_TYPES.map((t) => t.id));
 export const REQUIRED_FIELDS: Record<string, string[]> = {
   // Address is required only where work happened at a place (work order, service ticket, inspection, permit).
   'work-order': ['service_address', 'service_date'],
-  'service-ticket': ['service_address', 'service_date', 'work_performed'],
+  // A fleet or shop-owned unit is identified by its serial number, and a ticket can name a part instead of describing the work.
+  'service-ticket': ['service_address|serial_number', 'service_date', 'work_performed|part_number'],
   invoice: ['customer_name|vendor', 'service_date', 'cost'],
   'warranty-registration': ['serial_number', 'model', 'warranty_expires|warranty_term'],
   'startup-sheet': ['serial_number', 'service_date'],
@@ -69,8 +70,9 @@ export const REQUIRED_FIELDS: Record<string, string[]> = {
   'delivery-ticket': ['customer_name|vendor', 'service_date'],
   schedule: [],
   'price-list': [],
-  statement: ['vendor|customer_name'],
-  'insurance-certificate': ['vendor|customer_name'],
+  // Company paperwork: page text is what makes these readable, so no party is demanded of them.
+  statement: [],
+  'insurance-certificate': [],
   'hr-letter': [],
   other: [],
 };
@@ -84,12 +86,15 @@ export const COMPANY_RECORD_TYPES = new Set([
 export const COMPANY_RECORD_IF_NO_CUSTOMER_TYPES = new Set(['agreement']);
 /** Types that need no link when they carry no service address. */
 export const LINK_OPTIONAL_TYPES = new Set(['invoice', 'receipt', 'delivery-ticket', 'correspondence']);
+/** Company paperwork only while NO customer and NO address is named on it. */
+export const COMPANY_RECORD_IF_NO_CUSTOMER_OR_ADDRESS_TYPES = new Set(['other']);
 
 /** True when the document is company paperwork. `present` = set of non-empty extracted field keys. */
 export function isCompanyRecordType(typeId: string | undefined | null, present: ReadonlySet<string> = new Set()): boolean {
   const t = String(typeId ?? '');
   if (COMPANY_RECORD_TYPES.has(t)) return true;
-  return COMPANY_RECORD_IF_NO_CUSTOMER_TYPES.has(t) && !present.has('customer_name');
+  if (COMPANY_RECORD_IF_NO_CUSTOMER_TYPES.has(t) && !present.has('customer_name')) return true;
+  return COMPANY_RECORD_IF_NO_CUSTOMER_OR_ADDRESS_TYPES.has(t) && !present.has('customer_name') && !present.has('service_address');
 }
 
 /** True when a missing customer/equipment link must not be flagged or stop an automatic check. */
@@ -203,7 +208,7 @@ export function completenessFor(typeId: string, fields: CompletenessField[]): Co
 
   const byKey = new Map<string, { field_key: string; confidence: number }>();
   for (const f of Array.isArray(fields) ? fields : []) {
-    if (!f || typeof f.field_key !== 'string') continue;
+    if (!f || typeof f.field_key !== 'string' || f.field_key.startsWith('_')) continue;
     if (f.value == null || String(f.value).trim() === '') continue;
     const confidence = Number(f.confidence);
     const entry = { field_key: f.field_key, confidence: Number.isFinite(confidence) ? confidence : 0 };
@@ -220,7 +225,11 @@ export function completenessFor(typeId: string, fields: CompletenessField[]): Co
   const unconfirmed: string[] = [];
   for (const requirement of required) {
     const alts = requirement.split('|');
-    const hit = alts.map((k) => byKey.get(k)).find((x): x is { field_key: string; confidence: number } => !!x);
+    // The alternative the document reads best wins (not the first one listed).
+    const hit = alts
+      .map((k) => byKey.get(k))
+      .filter((x): x is { field_key: string; confidence: number } => !!x)
+      .reduce<{ field_key: string; confidence: number } | null>((b, h) => (!b || h.confidence > b.confidence ? h : b), null);
     if (hit) {
       present.push(hit.field_key);
       satisfiedConfidences.push(hit.confidence);

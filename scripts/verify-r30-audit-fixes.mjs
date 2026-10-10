@@ -180,7 +180,9 @@ const newTenant = async (key, sql = '', params = []) => {
   const used = new Set();
   const walk = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (/\.(ts|tsx)$/.test(e.name) && !/services\/(postgresRecordsStore|recordsStoreClient)\.ts$/.test(p)) { const s = fs.readFileSync(p, 'utf8'); for (const a of RECORDS_ADMIN_ACTIONS) if (new RegExp(`\\.${a}\\(|action:\\s*['"]${a}['"]`).test(s)) used.add(a); } } };
   walk(path.join(ROOT, 'src'));
-  eq('L2 no UI code calls an admin-only records action (members unaffected)', [...used], []);
+  // Company Files: the "who can open People and HR" setting is an admin control (shown only when useCanAdmin() is true).
+  const ADMIN_ONLY_UI_ACTIONS = new Set(['setCompanyFilesHrAccess']);
+  eq('L2 no UI code calls an admin-only records action (members unaffected)', [...used].filter((a) => !ADMIN_ONLY_UI_ACTIONS.has(a)), []);
   const res = mkRes();
   await quiet(() => RECORDS.processRecords({ method: 'POST', headers: {}, body: { action: 'logAction', action_name: 'x' } }, res, { userId: 'u', tenantId: 'org_r30_a', orgId: 'org_r30_a', orgRole: 'member' }));
   check('L2 processRecords: a member calling logAction gets 403 before any DB work', res.statusCode === 403);

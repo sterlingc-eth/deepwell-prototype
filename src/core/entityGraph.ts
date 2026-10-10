@@ -25,6 +25,7 @@ import { reviewClient, type Correction, type DocumentLink } from '../services/re
 import { recordsStore } from '../services/recordsStoreClient';
 import { authHeader } from '../services/authToken';
 import { normalizeDocumentType } from '../domains/hvac/documentTypes';
+import { isCompanyFile } from './companyFiles';
 
 /**
  * Demo mode keeps the whole graph in memory on purpose (its own fixture data
@@ -86,6 +87,8 @@ export interface ServerCounts {
   /** Every document the shop has. */
   documents: number;
   verified: number;
+  /** Verified by the AI reader (a subset of `verified`). Optional: older servers do not send it. */
+  aiVerified?: number;
   /** Every document that is not verified (the server cannot see client-derived issues, so this is a superset of "Needs a person"). */
   needsReview: number;
   /** Raw database stage counts: received -> read -> mapped -> linked -> verified. */
@@ -200,13 +203,73 @@ function presentFieldNames(doc: Doc): Set<string> {
   return new Set(doc.extracted.filter((f) => (f.correctedValue ?? f.value).trim()).map((f) => f.name));
 }
 
+/** The reader's "nothing read" marker fact: an `_nothing_read` extraction row written by api/_lib/modelAvoidance/storedTextReread.js. */
+export const NOTHING_READ_MARKER = '_nothing_read';
+
+/** Real facts on a document: non-empty and not an underscore-prefixed bookkeeping row (`_audience_notified`, `_company_folder`...). */
+export function substantiveFactNames(doc: Doc): string[] {
+  return [...presentFieldNames(doc)].filter((n) => !n.startsWith('_'));
+}
+
+/** True when nothing useful was read: no real facts, or the reader's marker. */
+export function isNothingRead(doc: Doc): boolean {
+  return substantiveFactNames(doc).length === 0 || doc.extracted.some((f) => f.name === NOTHING_READ_MARKER);
+}
+
 /** True when this document is company paperwork (purchase order, schedule, price list, statement, HR letter,
  *  insurance certificate, company record, or an agreement naming no customer). Exported for Review's filters. */
 export function isCompanyRecordDoc(doc: Doc, schema: DomainSchema): boolean {
   const type = schema.documentTypes.find((t) => t.id === doc.typeId);
   if (!type) return false;
   if (type.companyRecord) return true;
-  return !!type.companyRecordIfNoCustomer && !presentFieldNames(doc).has('customer_name');
+  const present = presentFieldNames(doc);
+  if (type.companyRecordIfNoCustomer && !present.has('customer_name')) return true;
+  return !!type.companyRecordIfNoCustomerOrAddress && !present.has('customer_name') && !present.has('service_address');
+}
+
+/** The ONE client-side test for "this paper is a company file" (filed by what it is, never linked to a customer).
+ *  Delegates to `isCompanyFile` in src/core/companyFiles.ts (the folder logic shared with the server), fed the document's
+ *  type, its facts and whether it is linked. Every call site in the pipeline labels, Needs you, ring and dashboard goes
+ *  through this helper. */
+export function isCompanyFileDoc(doc: Doc, _schema?: DomainSchema): boolean {
+  const fields: Record<string, string> = {};
+  for (const f of doc.extracted) {
+    const v = (f.correctedValue ?? f.value).trim();
+    if (v && !(f.name in fields)) fields[f.name] = v;
+  }
+  return isCompanyFile({ type: doc.typeId, fields, title: doc.displayName || doc.filename, linkedCustomer: doc.linkedEntityIds.length > 0 });
+}
+
+export type CompanyFileReason = 'hard-to-read' | 'no-total' | 'copy' | 'unsure-folder';
+
+/** Approved short row labels for why a company file still needs a look. */
+export const COMPANY_FILE_REASON_LABEL: Record<CompanyFileReason, string> = {
+  'hard-to-read': 'Hard to read',
+  'no-total': 'No total found',
+  copy: 'Might be a copy',
+  'unsure-folder': 'Not sure this is the right folder',
+};
+
+/** Money documents that must show a total to be filed without a person looking. */
+const MONEY_FILE_TYPES: ReadonlySet<string> = new Set(['receipt', 'invoice', 'statement', 'purchase-order']);
+
+/** Real issues on a company file. Empty means it is filed and needs nothing: a missing vendor, date or link is not a
+ *  reason. Signals: no text and no facts read (hard to read), a money type with no total, a duplicate issue, or a type
+ *  read with low confidence (the server's lowest field confidence below 0.5 on a document that has facts). */
+export function companyFileReasons(doc: Doc, schema: DomainSchema): CompanyFileReason[] {
+  if (!isCompanyFileDoc(doc, schema)) return [];
+  const out: CompanyFileReason[] = [];
+  const present = presentFieldNames(doc);
+  if (doc.stage !== 'received' && doc.stage !== 'verified' && doc.issues.some((i) => i.kind === 'nothing-read')) out.push('hard-to-read');
+  if (doc.typeId && MONEY_FILE_TYPES.has(doc.typeId) && !present.has('cost') && !present.has('total')) out.push('no-total');
+  if (doc.issues.some((i) => i.kind === 'duplicate' || i.kind === 'possible-copy')) out.push('copy');
+  if (present.size > 0 && doc.completeness && Number.isFinite(doc.completeness.minConfidence) && doc.completeness.minConfidence < 0.5) out.push('unsure-folder');
+  return out;
+}
+
+/** A company file that still needs a look (has at least one real reason). */
+export function companyFileNeedsLook(doc: Doc, schema: DomainSchema): boolean {
+  return companyFileReasons(doc, schema).length > 0;
 }
 
 /** True when a missing link is fine for this document: company paperwork, or a link-optional type (invoice, receipt,
@@ -244,12 +307,92 @@ export function recomputeIssues(doc: Doc, schema: DomainSchema): Doc {
   const type = schema.documentTypes.find((t) => t.id === doc.typeId);
   const present = new Set(doc.extracted.filter((f) => (f.correctedValue ?? f.value).trim()).map((f) => f.name));
   const noLinkNeeded = linkNotRequiredFor(doc, schema);
-  let kept = doc.issues.filter((i) => i.kind !== 'missing-field' && !(i.kind === 'unlinked' && (doc.linkedEntityIds.length > 0 || noLinkNeeded)));
+  let kept = doc.issues.filter((i) => i.kind !== 'missing-field' && i.kind !== 'nothing-read' && !(i.kind === 'unlinked' && (doc.linkedEntityIds.length > 0 || noLinkNeeded)));
   const missing = (type?.requiredFields ?? []).filter((r) => !isRequirementMet(present, r)).map((f) => ({ kind: 'missing-field' as const, field: f }));
   if (doc.typeId && doc.linkedEntityIds.length === 0 && !kept.some((i) => i.kind === 'unlinked') && !linkNotRequiredFor(doc, schema)) {
     kept = [...kept, { kind: 'unlinked' as const, confidence: 0 }];
   }
-  return { ...doc, issues: [...missing, ...kept] };
+  // Nothing read: a typed document with no real facts (or the reader's marker) needs a look, whatever else it lacks.
+  const nothingRead = doc.typeId && doc.stage !== 'verified' && isNothingRead(doc) ? [{ kind: 'nothing-read' as const }] : [];
+  return { ...doc, issues: [...nothingRead, ...missing, ...kept] };
+}
+
+// ---------------------------------------------------------------------------
+// "Might be a copy": document look-alikes (filename stem + number or cost)
+// ---------------------------------------------------------------------------
+
+/** Copy markers stripped from the end of a file name stem: "(copy)", " - copy", "(2)", " v2". */
+const COPY_SUFFIX = /(?:[\s_-]*\(\s*copy(?:\s*\d+)?\s*\)|[\s_-]+copy(?:\s*\d+)?|[\s_-]*\(\s*\d{1,2}\s*\)|[\s_-]+v\d{1,2})\s*$/i;
+const DOC_NUMBER_KEY = /^(?:invoice|po|purchase_order|receipt|permit|document|order|ticket|work_order|estimate|quote|statement)_(?:number|no)$/;
+
+/** Splits a file name into its stem and whether a copy marker was on it. Exported for the test. */
+export function copyStem(filename: string): { stem: string; marked: boolean } {
+  let stem = filename.replace(/\.[A-Za-z0-9]{1,5}$/, '').trim().toLowerCase();
+  let marked = false;
+  for (let i = 0; i < 3; i++) {
+    const next = stem.replace(COPY_SUFFIX, '').trim();
+    if (next === stem || !next) break;
+    stem = next;
+    marked = true;
+  }
+  return { stem: stem.replace(/\s+/g, ' '), marked };
+}
+
+function factValue(doc: Doc, test: (name: string) => boolean): string {
+  for (const f of doc.extracted) if (test(f.name)) { const v = (f.correctedValue ?? f.value).trim(); if (v) return v; }
+  return '';
+}
+const docNumberOf = (d: Doc) => factValue(d, (n) => DOC_NUMBER_KEY.test(n)).toUpperCase().replace(/[^A-Z0-9]/g, '');
+const costOf = (d: Doc): number | null => {
+  const raw = factValue(d, (n) => n === 'cost' || n === 'total');
+  const n = Number(raw.replace(/[^0-9.-]/g, ''));
+  return raw && Number.isFinite(n) ? Math.round(n * 100) / 100 : null;
+};
+
+/**
+ * Document ids that look like a copy of another document, mapped to that other document's id. A document is a likely
+ * copy when its file name is another's plus "(copy)", "(2)" or "v2" AND they share a document number or a cost. Two
+ * documents with different costs are a revision (a new quote), never a copy. Verified documents are not flagged.
+ */
+export function findPossibleCopies(docs: Iterable<Doc>): Map<DocumentId, DocumentId> {
+  const groups = new Map<string, Doc[]>();
+  for (const d of docs) {
+    const { stem } = copyStem(d.filename);
+    const g = groups.get(stem);
+    if (g) g.push(d); else groups.set(stem, [d]);
+  }
+  const out = new Map<DocumentId, DocumentId>();
+  for (const members of groups.values()) {
+    if (members.length < 2) continue;
+    for (const d of members) {
+      if (d.stage === 'verified' || !copyStem(d.filename).marked) continue;
+      const num = docNumberOf(d);
+      const cost = costOf(d);
+      for (const o of members) {
+        if (o.id === d.id) continue;
+        const oc = costOf(o);
+        if (cost !== null && oc !== null && cost !== oc) continue; // different cost: a revision
+        const on = docNumberOf(o);
+        if ((num && num === on) || (cost !== null && cost === oc)) { out.set(d.id, o.id); break; }
+      }
+    }
+  }
+  return out;
+}
+
+/** Returns `docs` with the 'possible-copy' issue set exactly on the documents findPossibleCopies names (same object when nothing changes). */
+export function withPossibleCopies(docs: Record<DocumentId, Doc>): Record<DocumentId, Doc> {
+  const copies = findPossibleCopies(Object.values(docs));
+  let next: Record<DocumentId, Doc> | null = null;
+  for (const d of Object.values(docs)) {
+    const has = d.issues.find((i) => i.kind === 'possible-copy');
+    const want = copies.get(d.id);
+    if ((has && has.kind === 'possible-copy' && has.of === want) || (!has && !want)) continue;
+    next ??= { ...docs };
+    const issues = d.issues.filter((i) => i.kind !== 'possible-copy');
+    next[d.id] = { ...d, issues: want ? [...issues, { kind: 'possible-copy', of: want }] : issues };
+  }
+  return next ?? docs;
 }
 
 /** Parse a corrected string back into the entity's field type. */
@@ -333,14 +476,14 @@ export const useGraph = create<GraphStore>((set, get) => ({
         const b = batches[bid]!;
         batches[bid] = { ...b, documentIds: [...ids] };
       }
-      return { docs: nextDocs, entities: nextEntities, batches };
+      return { docs: withPossibleCopies(nextDocs), entities: nextEntities, batches };
     }),
 
   seed: (schema, entities, docs, batches, conflicts) =>
     set({
       schema,
       entities: Object.fromEntries(entities.map((e) => [e.id, e])),
-      docs: Object.fromEntries(docs.map((d) => [d.id, d])),
+      docs: withPossibleCopies(Object.fromEntries(docs.map((d) => [d.id, d]))),
       batches: Object.fromEntries(batches.map((b) => [b.id, b])),
       conflicts: Object.fromEntries(conflicts.map((c) => [c.id, c])),
     }),
@@ -597,7 +740,7 @@ export const useGraph = create<GraphStore>((set, get) => ({
   upsertDoc: (doc) =>
     set((s) => {
       const next = recomputeIssues(doc, s.schema);
-      const docs = { ...s.docs, [next.id]: next };
+      const docs = withPossibleCopies({ ...s.docs, [next.id]: next });
       const existingBatch = s.batches[next.batchId];
       const batches = existingBatch
         ? existingBatch.documentIds.includes(next.id)
@@ -699,11 +842,15 @@ export function docCountsByStage(g: GraphSnapshot): Record<PipelineStage, number
   return counts;
 }
 
+/** Company files leave "Needs linking" and "Missing info" unless they have a real issue (companyFileReasons). Verified documents are never a problem. */
+const countsAsOpen = (d: Doc, g: GraphSnapshot) => d.stage !== 'verified' && (!isCompanyFileDoc(d, g.schema) || companyFileNeedsLook(d, g.schema));
+/** "Other" with nothing read cannot be linked until a person picks a type, so it asks for a type instead (see needInfo). */
+export const needsTypeChoice = (d: Doc) => d.typeId === 'other' && substantiveFactNames(d).length === 0;
 export function unlinkedDocs(g: GraphSnapshot): Doc[] {
-  return Object.values(g.docs).filter((d) => d.issues.some((i) => i.kind === 'unlinked'));
+  return Object.values(g.docs).filter((d) => d.issues.some((i) => i.kind === 'unlinked') && !needsTypeChoice(d) && countsAsOpen(d, g));
 }
 export function gapDocs(g: GraphSnapshot): Doc[] {
-  return Object.values(g.docs).filter((d) => d.issues.some((i) => i.kind === 'missing-field'));
+  return Object.values(g.docs).filter((d) => d.issues.some((i) => i.kind === 'missing-field') && countsAsOpen(d, g));
 }
 export function openConflicts(g: GraphSnapshot): Conflict[] {
   return Object.values(g.conflicts).filter((c) => !c.resolvedValue);
@@ -725,7 +872,7 @@ export function conflictDocs(g: GraphSnapshot): Doc[] {
   return Object.values(g.docs).filter((d) => ids.has(d.id));
 }
 export function duplicateDocs(g: GraphSnapshot): Doc[] {
-  return Object.values(g.docs).filter((d) => d.issues.some((i) => i.kind === 'duplicate'));
+  return Object.values(g.docs).filter((d) => d.issues.some((i) => i.kind === 'duplicate' || i.kind === 'possible-copy'));
 }
 
 // ---------------------------------------------------------------------------

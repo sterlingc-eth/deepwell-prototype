@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Copy, Download, Loader2, Sparkles } from 'lucide-react';
 import { STAGE_LABEL } from './StagePill';
 import { IntegrityPanel } from './IntegrityPanel';
-import { conflictDocs, docCountsByStage, duplicateDocs, gapDocs, unlinkedDocs, useGraph } from '../core/entityGraph';
+import { useGraph } from '../core/entityGraph';
+import { healthTiles, type HealthSummary } from '../core/healthTiles';
+import { recordsStore } from '../services/recordsStoreClient';
 import { PIPELINE_STAGES } from '../core/types';
 import { useAppStore } from '../store/appStore';
 import { loadGraphFromServer } from '../hooks/usePostgresSync';
@@ -31,15 +33,19 @@ export function DataHealthStrip() {
   const reclassifyDocs = useGraph((s) => s.reclassifyDocs);
   const aiVerifyDoc = useGraph((s) => s.aiVerifyDoc);
 
-  const counts = docCountsByStage(graph);
-  const total = Object.values(graph.docs).length;
-  const unlinked = unlinkedDocs(graph).length;
-  const gaps = gapDocs(graph).length;
-  // Document count, not conflict-record count — matches what the Review
-  // queue's "Conflicts" filter lists exactly (see conflictDocs's comment).
-  const conflicts = conflictDocs(graph).length;
-  const dups = duplicateDocs(graph).length;
-  const aiVerified = Object.values(graph.docs).filter((d) => d.verifiedBy === 'ai').length;
+  // One source per tile: the shop-wide total, checked count, AI count and stage bar come from the server's summary
+  // (re-fetched whenever the sync refreshes its counts); the "needs attention" tiles come from the graph, unverified only.
+  const [summary, setSummary] = useState<HealthSummary | null>(null);
+  useEffect(() => {
+    if (DEMO_MODE) return;
+    let cancelled = false;
+    recordsStore.reviewSummary().then((r) => { if (!cancelled) setSummary(r); }).catch(() => { /* the sync's own counts stand in */ });
+    return () => { cancelled = true; };
+  }, [graph.serverCounts]);
+  const t = healthTiles(graph, summary);
+  const total = t.total;
+  const counts = t.stages;
+  const aiVerified = t.aiVerified;
 
   const [bulkRunning, setBulkRunning] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<string | null>(null);
@@ -152,14 +158,14 @@ export function DataHealthStrip() {
       {!DEMO_MODE && <IntegrityPanel onApplied={() => void loadGraphFromServer()} />}
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <Stat label="Documents" value={total} sub={`${counts.verified} checked · ${Math.round((counts.verified / Math.max(total, 1)) * 100)}%`} onClick={() => setCurrentScreen('browse')} />
-        <Stat label="AI verified" value={aiVerified} sub={counts.verified ? `${Math.round((aiVerified / counts.verified) * 100)}% of checked` : 'None yet'} tone={aiVerified ? 'ok' : 'default'} onClick={() => openInboxNeedsPerson()} />
-        <Stat label="Needs linking" value={unlinked} sub={unlinked ? 'Target is zero' : 'Clear'} tone={unlinked ? 'warn' : 'ok'} onClick={() => openInboxNeedsPerson('unlinked')} />
-        <Stat label="Missing info" value={gaps} sub={gaps ? 'Needs a person' : 'Clear'} tone={gaps ? 'warn' : 'ok'} onClick={() => openInboxNeedsPerson('gaps')} />
-        <Stat label="Conflicts" value={conflicts} sub={conflicts ? 'Need a decision' : 'Clear'} tone={conflicts ? 'warn' : 'ok'} onClick={() => openInboxNeedsPerson('conflicts')} />
+        <Stat label="Documents" value={total} sub={`${t.checked} checked · ${t.checkedPct}%`} onClick={() => setCurrentScreen('browse')} />
+        <Stat label="AI verified" value={aiVerified} sub={t.checked ? `${t.aiPctOfChecked}% of checked` : 'None yet'} tone={aiVerified ? 'ok' : 'default'} onClick={() => openInboxNeedsPerson()} />
+        <Stat label="Needs linking" value={t.unlinked.text} sub={t.unlinked.value ? 'Target is zero' : t.partial ? 'None found so far' : 'Clear'} tone={t.unlinked.value ? 'warn' : 'ok'} onClick={() => openInboxNeedsPerson('unlinked')} />
+        <Stat label="Missing info" value={t.gaps.text} sub={t.gaps.value ? 'Needs a person' : t.partial ? 'None found so far' : 'Clear'} tone={t.gaps.value ? 'warn' : 'ok'} onClick={() => openInboxNeedsPerson('gaps')} />
+        <Stat label="Conflicts" value={t.conflicts.text} sub={t.conflicts.value ? 'Need a decision' : t.partial ? 'None found so far' : 'Clear'} tone={t.conflicts.value ? 'warn' : 'ok'} onClick={() => openInboxNeedsPerson('conflicts')} />
       </div>
-      {dups > 0 && (
-        <p className="flex items-center gap-2 text-body text-ink-2"><Copy className="w-4 h-4" aria-hidden="true" /> {dups} duplicate{dups === 1 ? '' : 's'} detected and held out of every count. <button type="button" className="underline underline-offset-4" onClick={() => openInboxNeedsPerson('duplicates')}>Merge</button></p>
+      {t.duplicates.value > 0 && (
+        <p className="flex items-center gap-2 text-body text-ink-2"><Copy className="w-4 h-4" aria-hidden="true" /> {t.duplicates.text} duplicate{t.duplicates.value === 1 ? '' : 's'} detected and held out of every count. <button type="button" className="underline underline-offset-4" onClick={() => openInboxNeedsPerson('duplicates')}>Merge</button></p>
       )}
 
       <div className="dw-card p-4">
@@ -177,7 +183,7 @@ export function DataHealthStrip() {
             </div>
           ))}
         </dl>
-        <p className="text-caption text-ink-3 mt-2">A document must be Matched before Ask can use it, and Checked before it counts as accurate.</p>
+        <p className="text-caption text-ink-3 mt-2">A document must be Matched before Ask can use it (company files don’t need matching), and Checked before it counts as accurate.</p>
       </div>
     </section>
   );

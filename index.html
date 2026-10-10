@@ -1406,6 +1406,7 @@ html.dwm .q[aria-pressed="true"]{box-shadow:none}
       <a href="#roadmap">Roadmap</a>
       <a href="#plans">Pricing</a>
       <a href="#team">Founders</a>
+      <a href="#contact">Contact</a>
     </div>
     <div class="navcta">
       <a class="btn btn-ghost" href="/app/">Log in</a>
@@ -2433,6 +2434,91 @@ html.dwm .q[aria-pressed="true"]{box-shadow:none}
 
     </div>
   </div>
+</section>
+
+<section id="talk-demo" aria-labelledby="td-h">
+  <style>
+    #talk-demo .td-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
+    #talk-demo .td-tab{min-height:44px;padding:0 16px;border:1px solid var(--line-strong);background:transparent;color:var(--muted);font:600 .88rem "IBM Plex Sans",system-ui,sans-serif;cursor:pointer;border-radius:0}
+    #talk-demo .td-tab[aria-pressed="true"]{background:var(--well);color:#fff;border-color:var(--well)}
+    :root[data-theme="dark"] #talk-demo .td-tab[aria-pressed="true"]{background:var(--brass);color:#0B1613;border-color:var(--brass)}
+    #talk-demo .td-stage{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    #talk-demo .td-step{border:1px solid var(--line);background:var(--surface);padding:16px;min-height:290px;display:flex;flex-direction:column;gap:10px;opacity:.45;transition:opacity .4s,border-color .4s}
+    #talk-demo .td-step.on{opacity:1;border-color:var(--brass)}
+    #talk-demo .td-n{font:500 .7rem "IBM Plex Mono",monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--brass-text)}
+    #talk-demo .td-step h3{margin:0;font-size:1.05rem}
+    #talk-demo .td-file{display:flex;align-items:center;gap:10px;border:1px solid var(--line);padding:9px 10px;font-size:.84rem;transform:translateY(8px);opacity:0;transition:transform .4s,opacity .4s}
+    #talk-demo .td-file.in{transform:none;opacity:1}
+    #talk-demo .td-file small{margin-left:auto;font:500 .68rem "IBM Plex Mono",monospace;color:var(--brass-text);white-space:nowrap}
+    #talk-demo .td-q,#talk-demo .td-a{font-size:.9rem;line-height:1.5;opacity:0;transition:opacity .5s}
+    #talk-demo .td-q.in,#talk-demo .td-a.in{opacity:1}
+    #talk-demo .td-q{border:1px solid var(--line-strong);padding:10px 12px}
+    #talk-demo .td-src{display:inline-block;margin-top:8px;font:500 .72rem "IBM Plex Mono",monospace;color:var(--brass-text);border:1px solid var(--line);padding:4px 8px}
+    #talk-demo .td-note{margin:14px 0 0;font-size:.82rem;color:var(--faint)}
+    #talk-demo .td-cta{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:20px}
+    #talk-demo .td-cta .btn{min-height:44px}
+    :root[data-theme="dark"] #talk-demo .td-cta .btn-primary{background:var(--brass);color:#0B1613}
+    @media (max-width:820px){#talk-demo .td-stage{grid-template-columns:1fr}#talk-demo .td-step{min-height:0}}
+    @media (prefers-reduced-motion:reduce){#talk-demo *{transition:none!important}}
+  </style>
+  <div class="wrap">
+    <div class="sec-head dw-observe dw-once">
+      <div>
+        <div class="eyebrow">See it first</div>
+        <h2 id="td-h">Paper in. A cited answer out.</h2>
+      </div>
+      <p class="lede">Watch a short example. Pick a kind of business to see the same three steps with different paperwork.</p>
+    </div>
+    <div class="td-tabs" role="group" aria-label="Choose an example">
+      <button type="button" class="td-tab" data-i="0" aria-pressed="true">Property management</button>
+      <button type="button" class="td-tab" data-i="1" aria-pressed="false">Nonprofit</button>
+      <button type="button" class="td-tab" data-i="2" aria-pressed="false">Dental office</button>
+      <button type="button" class="td-tab" id="td-replay">Replay</button>
+    </div>
+    <div class="td-stage" aria-live="polite">
+      <div class="td-step" id="td-s1"><div class="td-n">Step 1</div><h3>Upload your paperwork</h3><div id="td-files"></div></div>
+      <div class="td-step" id="td-s2"><div class="td-n">Step 2</div><h3>It is read and filed</h3><div id="td-filed"></div></div>
+      <div class="td-step" id="td-s3"><div class="td-n">Step 3</div><h3>Ask a question</h3><div class="td-q" id="td-q"></div><div class="td-a" id="td-a"></div></div>
+    </div>
+    <p class="td-note">Example only. All names, dates and documents here are made up.</p>
+    <div class="td-cta">
+      <a class="btn btn-primary" href="#contact">Talk to us</a>
+      <a class="btn btn-ghost" href="mailto:hello@deepwelltechnology.com?subject=Records%20Rescue%20demo%20sample">Send a sample box (free)</a>
+    </div>
+  </div>
+  <script>
+  (function(){
+    var D=[
+      {f:[["Elevator service contract.pdf","Contract"],["Roof repair invoice 4471.pdf","Invoice"],["Vendor insurance certificate.jpg","Insurance"]],q:"When does the elevator service contract renew?",a:"It renews on March 1, 2027. Cancelling needs 60 days' written notice.",s:"Elevator service contract, page 3"},
+      {f:[["Riverbend grant agreement.pdf","Grant"],["Donation receipt 0218.pdf","Receipt"],["Volunteer waiver, signed.jpg","Waiver"]],q:"When is the final report for the Riverbend grant due?",a:"The final report is due June 30, 2027.",s:"Riverbend grant agreement, page 2"},
+      {f:[["Sterilizer warranty certificate.pdf","Warranty"],["Office lease, suite 4.pdf","Lease"],["Supply invoice 90211.pdf","Invoice"]],q:"Is the sterilizer still under warranty?",a:"Yes. The warranty runs until August 14, 2027.",s:"Sterilizer warranty certificate, page 1"}
+    ];
+    var root=document.getElementById('talk-demo'),reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var files=document.getElementById('td-files'),filed=document.getElementById('td-filed'),q=document.getElementById('td-q'),a=document.getElementById('td-a');
+    var s=[1,2,3].map(function(n){return document.getElementById('td-s'+n)}),tabs=root.querySelectorAll('.td-tab[data-i]'),timers=[],cur=0;
+    function clear(){timers.forEach(clearTimeout);timers=[]}
+    function at(ms,fn){if(reduce){fn()}else{timers.push(setTimeout(fn,ms))}}
+    function row(t,tag){var d=document.createElement('div');d.className='td-file';var n=document.createElement('span');n.textContent=t;d.appendChild(n);if(tag){var m=document.createElement('small');m.textContent=tag;d.appendChild(m)}return d}
+    function play(i){
+      clear();cur=i;var e=D[i];
+      files.textContent='';filed.textContent='';q.textContent='';a.textContent='';q.className='td-q';a.className='td-a';
+      s.forEach(function(x){x.className='td-step'});
+      tabs.forEach(function(b,k){b.setAttribute('aria-pressed',k===i?'true':'false')});
+      var up=[],fl=[];
+      e.f.forEach(function(f){var u=row(f[0]);files.appendChild(u);up.push(u);var l=row(f[0].replace(/\.\w+$/,''),'Filed as '+f[1]);filed.appendChild(l);fl.push(l)});
+      s[0].classList.add('on');
+      up.forEach(function(u,k){at(300+k*450,function(){u.classList.add('in')})});
+      at(2000,function(){s[1].classList.add('on');fl.forEach(function(l,k){setTimeout(function(){l.classList.add('in')},reduce?0:k*450)})});
+      at(4000,function(){s[2].classList.add('on');q.textContent=e.q;q.classList.add('in')});
+      at(5200,function(){var p=document.createElement('div');p.textContent=e.a;var c=document.createElement('span');c.className='td-src';c.textContent='Source: '+e.s;a.appendChild(p);a.appendChild(c);a.classList.add('in')});
+    }
+    tabs.forEach(function(b){b.addEventListener('click',function(){play(+b.getAttribute('data-i'))})});
+    document.getElementById('td-replay').addEventListener('click',function(){play(cur)});
+    var started=false;
+    function go(){if(!started){started=true;play(0)}}
+    if(reduce||!('IntersectionObserver' in window)){go()}else{new IntersectionObserver(function(en,o){if(en[0].isIntersecting){go();o.disconnect()}},{threshold:.3}).observe(root)}
+  })();
+  </script>
 </section>
 
 <section id="closing">

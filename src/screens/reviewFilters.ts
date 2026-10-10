@@ -20,7 +20,7 @@ export const FILTERS: { id: Filter; label: string }[] = [
   // are AI-verified on extraction (isShopInternalDocument) and so never show
   // under "Needs a person" (isAttention requires stage !== 'verified'). This
   // chip is the only place left to find them, rather than nowhere at all.
-  { id: 'shop-records', label: 'Company records' },
+  { id: 'shop-records', label: 'Company files' },
   // Financials layer: invoices/quotes whose printed numbers don't add up (or were read with low confidence).
   { id: 'money', label: 'Money to check' },
   { id: 'all', label: 'All' },

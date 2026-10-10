@@ -129,6 +129,25 @@ const FAMILIES2 = [
     (m) => ({ name: m[1].trim() })],
 ];
 
+/* ---- Same-meaning reading of "which units had a part replaced more than once". Word classes, not phrases: any of the equipment nouns, any of
+ * the part-change verbs, any of the repeat markers, "a part"/"any part"/"parts" or a named part. */
+const EQUIP_NOUN = "(?:units?|equipment|systems?|machines?|assets?|hvac|furnaces?|a\\/?c|air\\s*conditioners?|heat\\s*pumps?|rtus?|appliances?|devices?)";
+const CHANGE_VERB = "(?:replac\\w*|swap\\w*|chang\\w*|exchang\\w*|substitut\\w*)";
+const REPEAT_MARK = "(?:more\\s+than\\s+(?:once|one\\s+time|1\\s+time)|(?:twice|two\\s+times|2\\s*x)(?:\\s+or\\s+more)?|(?:2|two|3|three|several|multiple|many)(?:\\+|\\s+or\\s+more)?\\s+times|multiple\\s+times|repeated(?:ly)?|again\\s+and\\s+again|more\\s+than\\s+one\\s+time|(?:at\\s+least|over)\\s+(?:twice|two\\s+times)|\\d+\\+?\\s+times)";
+const ANY_PART_WORD = "(?:an?\\s+(?:single\\s+|same\\s+)?part|any\\s+(?:part|component)s?|(?:the\\s+)?same\\s+(?:part|component)s?|(?:parts?|components?))";
+const LOOSE_RE = {
+  equip: new RegExp(`\\b${EQUIP_NOUN}\\b`, 'i'),
+  verb: new RegExp(`\\b${CHANGE_VERB}\\b`, 'i'),
+  repeat: new RegExp(`\\b${REPEAT_MARK}`, 'i'),
+  anyPart: new RegExp(`\\b${ANY_PART_WORD}\\b`, 'i'),
+  count: /\b(?:how\s+many|number\s+of|count|total)\b/i,
+};
+function looseRepeatPart(q) {
+  if (!LOOSE_RE.equip.test(q) || !LOOSE_RE.verb.test(q) || !LOOSE_RE.repeat.test(q) || !LOOSE_RE.anyPart.test(q)) return null;
+  if (/\b(?:customers?|clients?|homeowners?|people|who)\b/i.test(q) && !LOOSE_RE.equip.test(q)) return null;
+  return { family: 'repeatPartUnits', params: { count: LOOSE_RE.count.test(q) } };
+}
+
 /** Pure: question -> {family, params} or null. Strips a trailing '.'/'?'/'!' before matching (unlike
  *  questions.js's own families, this cluster includes flat-statement phrasings — "...in order." — not
  *  only questions), then tries the same closed set every other classifier here uses. */
@@ -139,12 +158,58 @@ export function classifyConnect2(question) {
     const m = re.exec(q);
     if (m) return { family, params: extract(m) };
   }
-  return null;
+  return looseRepeatPart(q);
 }
 
 /* ==================================================================== HANDLERS (db) */
 
+const REPEAT_PARTS = ANY_PART_LIST;
+
+/** Units with the same part replaced more than once, across every part in the closed list, de-duplicated per unit. This is the SAME computation the
+ *  dashboard's "Same part replaced more than once" card runs (insights/detectors/repeatFailures.js), so the chat answer and the card always agree. */
+export async function repeatPartUnits(db) {
+  const byUnit = new Map();
+  for (const part of REPEAT_PARTS) {
+    let a;
+    try { a = await HANDLERS.partReplacedUnitsCount(db, { part }); } catch { continue; }
+    const recs = a?.records ?? [];
+    const units = recs.filter((r) => r.type === 'unit');
+    const docs = recs.filter((r) => r.type === 'document' || r.type === 'invoice');
+    for (const u of units) {
+      const e = byUnit.get(u.id) ?? { rec: u, parts: new Set() };
+      e.parts.add(part);
+      byUnit.set(u.id, e);
+    }
+    byUnit.__docs = [...(byUnit.__docs ?? []), ...docs];
+  }
+  const docs = byUnit.__docs ?? []; delete byUnit.__docs;
+  return { units: [...byUnit.values()], docs };
+}
+
 export const HANDLERS = {
+  async repeatPartUnits(db, { count }) {
+    const { units, docs } = await repeatPartUnits(db);
+    const n = units.length;
+    const seen = new Set(); const docRecs = docs.filter((d) => (seen.has(d.id) ? false : seen.add(d.id)));
+    const cids = [...new Set(units.map((u) => u.rec.customerId).filter(Boolean))];
+    const names = new Map();
+    if (cids.length) {
+      try {
+        const { rows } = await db.raw(`SELECT id, data->>'customer_name' AS name FROM entities WHERE id = ANY($1::uuid[]) AND ${TENANT_SQL}`, [cids]);
+        for (const r of rows) names.set(r.id, r.name);
+      } catch { /* names are a convenience; the count never depends on them */ }
+    }
+    const label = (u) => `${names.get(u.rec.customerId) ?? 'A customer'}'s ${u.rec.label ?? 'unit'} (${[...u.parts].join(', ')})`;
+    const shown = units.slice(0, 12).map(label);
+    const text = n === 0
+      ? 'No unit has had the same part replaced more than once in your records.'
+      : `${n} unit${n === 1 ? ' has' : 's have'} had the same part replaced more than once${count ? '.' : `: ${shown.join('; ')}${n > shown.length ? `; and ${n - shown.length} more` : ''}.`}`;
+    return finish(text, [{ label: 'Units', value: String(n) }], {
+      records: [...units.map((u) => u.rec), ...docRecs], total: n, claimedCount: n, kind: n ? 'basis' : 'searched',
+      basis: `Checked each unit's linked documents for the same part (${REPEAT_PARTS.join(', ')}) being replaced on more than one document.`,
+    });
+  },
+
   /* ---------------------------------------------------------------- 1. part replaced, per unit */
 
   async partReplacedUnitsCount(db, { part }) {

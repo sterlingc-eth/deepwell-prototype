@@ -5,6 +5,7 @@
  *   GET  /api/support?starter=1&surface=public|app|mobile   -> {greeting, suggestions}   static, $0, no auth
  *   POST /api/support {message, history?, surface, page?, turn?} -> {reply, sources, mode, redirectTo?, handoff?, suggestions?}
  *   POST /api/support {action:'handoff', email, name?, message, transcript?, surface, kind?:'problem', diagnostics?} -> {ok:true}
+ *   POST /api/support {action:'access-status'|'access-grant'|'access-end', ...} -> see accessHelp.js (signed-in surfaces only)
  *   POST /api/support {action:'inquiry', name, company, email, phone?, size?, where?, message, website, elapsedMs} -> {ok:true}
  *     (website "Send my question" form, round 44: public, rate limited tighter than chat, emails the team + a receipt; see inquiry.js)
  *   POST /api/support {action:'client-error', surface:'app'|'mobile', kind, message, where?, page?, device?, build?} -> {ok:true}
@@ -26,6 +27,7 @@ import { createLimiter } from './limits.js';
 import { callSupportModel, supportModelEnabled, supportModelId } from './client.js';
 import { validateHandoff, deliverHandoff } from './handoff.js';
 import { runInquiry } from './inquiry.js';
+import { accessStatus, grantFromChat, endGrant } from './accessHelp.js';
 import { validateClientError, clientErrorLogLine } from './clientError.js';
 import { captureMessage } from '../telemetry.js';
 import * as tools from './tools.js';
@@ -110,6 +112,25 @@ export default async function handler(req, res) {
       void captureMessage(`client-error: ${v.value.message}`, { surface: v.value.surface, kind: v.value.kind, page: v.value.page, where: v.value.where, tenant_h: hashForLog(auth.tenantId) });
     } catch { /* logging must never fail the request */ }
     return res.status(200).json({ ok: true });
+  }
+
+  /* ------------------------------------------------------------ support access (see accessHelp.js) */
+  if (body.action === 'access-status' || body.action === 'access-grant' || body.action === 'access-end') {
+    if (!auth) return bad(res, 400, 'Not available for this surface.');
+    try {
+      if (body.action === 'access-status') return res.status(200).json(await accessStatus(auth));
+      if (body.action === 'access-grant') {
+        const rl = await lim.checkHandoff({ surface, req, auth });
+        if (!rl.ok) return rateLimited(res, rl);
+        const out = await grantFromChat(auth, { note: body.note, companyName: body.companyName }, { send: sendEmail });
+        return res.status(out.status).json(out.body);
+      }
+      const out = await endGrant(auth, body.grantId);
+      return res.status(out.status).json(out.body);
+    } catch {
+      console.error('support access failed');
+      return bad(res, 502, 'We could not do that just now. Please try again in a moment.');
+    }
   }
 
   /* ------------------------------------------------------------ hand-off */

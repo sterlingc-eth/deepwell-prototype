@@ -21,6 +21,7 @@
  *      is a separate value this file derives from `auth.userId` and appends
  *      itself, exactly as api/records.ts appends `clerk_user_id`.
  */
+import { shareScore, getSharing as getPerfSharing, setSharing as setPerfSharing, loadScores as loadPerfScores } from './_lib/learning/perfShare.js';
 import { armResponseDeadline } from './_lib/util/deadline.js';
 import { requireAuth, denyAuth, hasShop, requireRole, AuthError } from './_lib/auth.js';
 import * as reviewStore from './_lib/reviewStore.js';
@@ -70,6 +71,7 @@ import { dossierStatus, runDossierBackfillPage } from './_lib/search/dossier.js'
 import {
   requireSupportAccess, grantSupportAccess, revokeSupportAccess, getActiveGrant, listGrants, listAccessLog,
 } from './_lib/privacy/supportAccess.js';
+import { notifyStaffOfGrant } from './_lib/support/accessHelp.js';
 
 // integrityScan/integrityFix aren't billed AI calls, but a scan walks up to
 // 1000 documents and a fix can loop that same set doing writes — cheap per
@@ -90,8 +92,8 @@ import {
 // (list_autopilot_summary_window / a live gap-report rebuild can scan list_ask_misses_window and
 // list_scorecard_failures_window) an operator's dashboard could otherwise poll without limit — same
 // reasoning as missDigest above, even though neither makes a billed model call.
-const INTEGRITY_RATE_LIMIT_ACTIONS = new Set(['recheckDocument', 'recheckMissing', 'resortDocuments', 'integrityScan', 'integrityFix', 'missDigest', 'learningRunNow', 'learningReplay', 'learningRejectAllGaps', 'askFeedback', 'scorecardRun', 'scorecardBaseline', 'semanticBackfill', 'dossierBackfill', 'learningAutopilotStatus', 'learningGapReport']);
-const OPERATOR_ACTIONS = new Set(['missDigest', 'learningList', 'learningDecide', 'learningDeactivate', 'learningRunNow', 'learningExport', 'learningReplay', 'learningRejectAllGaps', 'scorecardRun', 'scorecardStatus', 'scorecardBaseline', 'learningAutopilotStatus', 'learningGapReport', 'examPromote', 'examList', 'examExport']);
+const INTEGRITY_RATE_LIMIT_ACTIONS = new Set(['recheckDocument', 'recheckMissing', 'resortDocuments', 'undoResort', 'integrityScan', 'integrityFix', 'missDigest', 'learningRunNow', 'learningReplay', 'learningRejectAllGaps', 'askFeedback', 'scorecardRun', 'scorecardBaseline', 'semanticBackfill', 'dossierBackfill', 'learningAutopilotStatus', 'learningGapReport']);
+const OPERATOR_ACTIONS = new Set(['missDigest', 'learningList', 'learningDecide', 'learningDeactivate', 'learningRunNow', 'learningExport', 'learningReplay', 'learningRejectAllGaps', 'scorecardRun', 'scorecardStatus', 'scorecardBaseline', 'learningAutopilotStatus', 'learningGapReport', 'examPromote', 'examList', 'examExport', 'donovanScores']);
 
 // HARD GATE (Reviewer NO-GO, 2026-09-21): which of this route's actions
 // spend a real Anthropic-billed model call and so need the billing gate
@@ -185,6 +187,7 @@ const ACTIONS = new Set([
   'recheckMissing',
   // Document-rules round: one-time owner-triggered re-sort + automatic check, $0 (reviewStore.resortDocuments).
   'resortDocuments',
+  'undoResort',
   'reclassify',
   'createCustomer',
   'updateCustomer',
@@ -221,6 +224,8 @@ const ACTIONS = new Set([
   'examPromote',
   'examList',
   'examExport',
+  'donovanSharing',
+  'donovanScores',
   // Round 22 (S2, privacy): tenant-admin-managed, NOT operator-gated — a tenant's own admin grants/
   // revokes/reads access to their OWN tenant (requireAdmin below), same as billing or the data export
   // in AccountSettingsCard already are.
@@ -332,20 +337,43 @@ export default async (req, res) => {
         break;
       // R33: "Re-check all missing fields" (Inbox bulk). Admin: it writes across many documents at once. Bounded
       // (<=100 per call; the caller loops on `leftForNextRun`), idempotent, $0.
-      case 'recheckMissing':
+      case 'recheckMissing': {
         requireAdmin(auth);
-        result = await recheckTenantMissing(ctx, {
-          limit: Math.min(100, Number(payload.limit) || 50),
+        const baseOpts = {
           documentIds: Array.isArray(payload.documentIds) ? payload.documentIds : null,
           force: payload.force === true,
           actorClerkId: auth.userId,
           source: 'inbox-bulk',
-          deadlineAt: Date.now() + 240_000,
-        });
+        };
+        if (payload.all !== true || baseOpts.force) {
+          result = await recheckTenantMissing(ctx, { ...baseOpts, limit: Math.min(300, Number(payload.limit) || 50), deadlineAt: Date.now() + 240_000 });
+          break;
+        }
+        // Chunked loop behind the admin button: 100 documents per pass until nothing is left or the time budget is
+        // spent (the caller can press again; what is done stays done, and a finished document is not picked twice).
+        const stopAt = Date.now() + 200_000;
+        const total = { scanned: 0, candidates: 0, rechecked: 0, filled: 0, fields: 0, verified: 0, leftForNextRun: 0, errors: 0, passes: 0 };
+        let prevLeft = Infinity;
+        for (;;) {
+          const r = await recheckTenantMissing(ctx, { ...baseOpts, limit: 100, deadlineAt: stopAt });
+          total.passes++;
+          const stalled = !r.filled && !r.verified && (r.leftForNextRun ?? 0) >= prevLeft;
+          prevLeft = r.leftForNextRun ?? 0;
+          for (const k of ['scanned', 'rechecked', 'filled', 'fields', 'verified', 'errors']) total[k] += r[k] ?? 0;
+          total.candidates = Math.max(total.candidates, r.candidates ?? 0);
+          total.leftForNextRun = r.leftForNextRun ?? 0;
+          if (stalled || !r.scanned || !total.leftForNextRun || Date.now() >= stopAt || total.passes >= 30) break;
+        }
+        result = total;
         break;
+      }
       case 'resortDocuments':
         requireAdmin(auth);
-        result = await reviewStore.resortDocuments(ctx, { afterId: payload.afterId ?? null, limit: Math.min(200, Number(payload.limit) || 100) }, auth.userId);
+        result = await reviewStore.resortDocuments(ctx, { afterId: payload.afterId ?? null, limit: Math.min(200, Number(payload.limit) || 100), dryRun: payload.dryRun === true, runId: payload.runId ?? null }, auth.userId);
+        break;
+      case 'undoResort':
+        requireAdmin(auth);
+        result = await reviewStore.undoResort(ctx, { runId: payload.runId }, auth.userId);
         break;
       case 'reclassify':
         result = await reviewStore.reclassifyDocuments(ctx, payload, auth.userId);
@@ -586,6 +614,20 @@ export default async (req, res) => {
         result = await replayMisses({ ctxArg: ctx, questions, force: payload.force === true, source: 'operator' });
         break;
       }
+      // Opt-in performance sharing (api/_lib/learning/perfShare.js). `enabled` omitted = read the setting; true/false = set it
+      // (tenant admin only). `isOperator` lets the client show the operator-only Donovan screen. Default is OFF.
+      case 'donovanSharing': {
+        requireAdmin(auth);
+        const sharing = typeof payload.enabled === 'boolean' ? await setPerfSharing(ctx, payload.enabled, auth.userId) : await getPerfSharing(ctx);
+        result = { sharing, isOperator: isPlatformOperator(auth) };
+        break;
+      }
+      // SUPPORT-ACCESS-EXEMPT (opt-in performance scores): cross-tenant AGGREGATE of redacted metrics only (category, outcome,
+      // latency, cost, hashed tenant). No question, answer, document or name is ever stored in it - see perfShare.js sanitizeMetric.
+      case 'donovanScores':
+        requireOperator(auth);
+        result = await loadPerfScores({ days: payload.days });
+        break;
       case 'askFeedback': {
         const question = typeof payload.question === 'string' ? payload.question.trim().slice(0, 300) : '';
         if (!question || (payload.rating !== 'up' && payload.rating !== 'down')) {
@@ -596,6 +638,7 @@ export default async (req, res) => {
         } else {
           const note = typeof payload.note === 'string' ? payload.note.trim().slice(0, 300) : '';
           result = { ok: true, ...(await applyThumbsDown({ ctxArg: ctx, question, note })) };
+          void shareScore(ctx, { question, outcome: 'marked_wrong' }); // opt-in only; redacted (shape/outcome), never the text
         }
         // DONOVAN-R5 step 3 (DONOVAN_EXAMPLE_BANK, default OFF): the person's verdict on a menu-pick reading of THIS organization's question
         try {
@@ -773,6 +816,8 @@ export default async (req, res) => {
         requireAdmin(auth);
         const grant = await grantSupportAccess(ctx, { hours: payload.hours, reason: payload.reason }, auth.userId);
         if (!grant) throw new reviewStore.ReviewError('Could not create a support-access grant (migration 58 may not be applied yet).', 503);
+        // T8: tell DeepWell staff (email + operator bell). Never blocks or undoes the grant.
+        await notifyStaffOfGrant(auth, { reason: grant.reason, expiresAt: grant.expiresAt, companyName: payload.companyName });
         result = { ok: true, grant };
         break;
       }

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Bell } from 'lucide-react';
+import { Bell, ChevronDown, ChevronRight } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
+import { useUiPrefs } from '../services/uiPrefs';
+import { ALERT_FILTERS, groupAlerts, type AlertsFilterId } from '../services/alertGroups';
 import {
   fetchNotifications,
   markAllNotificationsRead,
@@ -51,6 +53,14 @@ export function NotificationsPanel() {
   // Read notifications leave the list (they are done); "Show earlier notifications" brings them back for a look.
   const [showRead, setShowRead] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  // On a phone the bell can wrap to the left of a second header row, so a right-anchored 20rem panel would run off the
+  // left edge. Below the sm breakpoint the panel is pinned to the screen edges, just under the bell instead.
+  const [phoneTop, setPhoneTop] = useState(0);
+  const [prefs, updatePrefs] = useUiPrefs();
+  const collapsedMap = prefs.alerts?.collapsed ?? {};
+  const filter: AlertsFilterId = prefs.alerts?.filter ?? 'all';
+  const setAlertsPrefs = (next: { collapsed?: Record<string, boolean>; filter?: AlertsFilterId }) =>
+    updatePrefs({ alerts: { collapsed: next.collapsed ?? collapsedMap, filter: next.filter ?? filter } });
   const openEntity = useAppStore((s) => s.openEntity);
   const openCustomer = useAppStore((s) => s.openCustomer);
   const openOutreach = useAppStore((s) => s.openOutreach);
@@ -164,13 +174,14 @@ export function NotificationsPanel() {
 
   const badge = unreadBadgeLabel(unreadCount);
   const readCount = items.filter((i) => i.readAt).length;
-  const visibleItems = showRead ? items : items.filter((i) => !i.readAt);
+  const groups = groupAlerts(items, filter, Date.now(), showRead);
+  const visibleCount = groups.reduce((n, g) => n + g.items.length, 0);
 
   return (
     <div className="relative" ref={containerRef}>
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => { setPhoneTop((containerRef.current?.getBoundingClientRect().bottom ?? 0) + 8); setOpen((o) => !o); }}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
@@ -191,7 +202,8 @@ export function NotificationsPanel() {
         <div
           role="menu"
           aria-label="Notifications"
-          className="absolute right-0 top-full mt-2 w-80 max-w-[90vw] z-50 dw-card p-0 overflow-hidden shadow-lift"
+          style={phoneTop ? { top: phoneTop } : undefined}
+          className="fixed left-3 right-3 sm:absolute sm:left-auto sm:right-0 sm:!top-full sm:mt-2 sm:w-80 max-w-[calc(100vw-1.5rem)] z-50 dw-card p-0 overflow-hidden shadow-lift"
         >
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-line">
             <span className="text-body font-medium text-ink">Notifications</span>
@@ -201,32 +213,71 @@ export function NotificationsPanel() {
               </button>
             )}
           </div>
-          <div className="max-h-96 overflow-y-auto">
-            {!loaded && <p className="px-4 py-6 text-caption text-ink-3 text-center">Loading…</p>}
-            {loaded && visibleItems.length === 0 && (
-              <p className="px-4 py-6 text-caption text-ink-3 text-center">Nothing needs your attention.</p>
-            )}
-            {visibleItems.map((item) => (
+          <div role="group" aria-label="Show alerts" className="flex items-center gap-1.5 px-4 py-2 border-b border-line">
+            <span className="text-caption text-ink-3">Show:</span>
+            {ALERT_FILTERS.map((f) => (
               <button
-                key={item.id}
+                key={f.id}
                 type="button"
-                role="menuitem"
-                onClick={() => handleItemClick(item)}
-                className={[
-                  'w-full text-left px-4 py-3 border-b border-line last:border-0 hover:bg-surface-2 transition-colors duration-quick',
-                  item.readAt ? '' : 'bg-info-bg/40',
-                ].join(' ')}
+                aria-pressed={filter === f.id}
+                onClick={() => setAlertsPrefs({ filter: f.id })}
+                className={['min-h-touch sm:min-h-[32px] px-2.5 rounded-md text-caption', filter === f.id ? 'bg-forest-700 text-stone-0 dark:bg-brass-300 dark:text-forest-950' : 'bg-surface border border-line text-ink-2 hover:bg-surface-2'].join(' ')}
               >
-                <div className="flex items-start justify-between gap-2">
-                  <span className="text-body font-medium text-ink">{item.title}</span>
-                  {!item.readAt && <span aria-hidden="true" className="w-2 h-2 rounded-full bg-brass-400 mt-1.5 shrink-0" />}
-                </div>
-                {item.body && <p className="text-caption text-ink-2 mt-0.5">{item.body}</p>}
-                <p className="text-caption text-ink-3 mt-1">{timeAgo(item.createdAt)}</p>
+                {f.label}
               </button>
             ))}
           </div>
-          {loaded && readCount > 0 && (
+          <div className="max-h-96 overflow-y-auto">
+            {!loaded && <p className="px-4 py-6 text-caption text-ink-3 text-center">Loading…</p>}
+            {loaded && visibleCount === 0 && (
+              <p className="px-4 py-6 text-caption text-ink-3 text-center">
+                {filter === 'all' ? 'Nothing needs your attention.' : filter === 'unread' ? 'No unread alerts.' : 'No alerts from the last 7 days.'}
+              </p>
+            )}
+            {groups.map((g) => {
+              const isCollapsed = !!collapsedMap[g.kind];
+              return (
+                <section key={g.kind} aria-label={g.label}>
+                  <button
+                    type="button"
+                    aria-expanded={!isCollapsed}
+                    aria-controls={`alerts-group-${g.kind}`}
+                    onClick={() => setAlertsPrefs({ collapsed: { ...collapsedMap, [g.kind]: !isCollapsed } })}
+                    className="w-full min-h-touch flex items-center gap-2 px-4 py-2 bg-surface-2 border-b border-line text-left hover:bg-surface-3"
+                  >
+                    {isCollapsed ? <ChevronRight className="w-4 h-4 text-ink-3 shrink-0" aria-hidden="true" /> : <ChevronDown className="w-4 h-4 text-ink-3 shrink-0" aria-hidden="true" />}
+                    <span className="flex-1 text-caption font-medium text-ink">{g.label}</span>
+                    {g.unread > 0 && <span className="dw-pill-info">{g.unread} new</span>}
+                    <span className="text-caption text-ink-3">{g.items.length}</span>
+                  </button>
+                  {!isCollapsed && (
+                    <div id={`alerts-group-${g.kind}`}>
+                      {g.items.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          role="menuitem"
+                          onClick={() => handleItemClick(item)}
+                          className={[
+                            'w-full text-left px-4 py-3 border-b border-line last:border-0 hover:bg-surface-2 transition-colors duration-quick',
+                            item.readAt ? '' : 'bg-info-bg/40',
+                          ].join(' ')}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="text-body font-medium text-ink">{item.title}</span>
+                            {!item.readAt && <span aria-hidden="true" className="w-2 h-2 rounded-full bg-brass-400 mt-1.5 shrink-0" />}
+                          </div>
+                          {item.body && <p className="text-caption text-ink-2 mt-0.5">{item.body}</p>}
+                          <p className="text-caption text-ink-3 mt-1">{timeAgo(item.createdAt)}</p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              );
+            })}
+          </div>
+          {loaded && readCount > 0 && filter === 'all' && (
             <div className="px-4 py-2 border-t border-line">
               <button type="button" onClick={() => setShowRead((v) => !v)} className="text-caption text-ink-2 hover:text-ink underline">
                 {showRead ? 'Hide earlier notifications' : 'Show earlier notifications'}

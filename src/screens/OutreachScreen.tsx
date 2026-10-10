@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useAuth, useOrganization } from '@clerk/clerk-react';
 import { AlertTriangle, ArrowLeft, Check, ChevronDown, ChevronUp, Clipboard, Loader2, Mail, RefreshCw, Send, X } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
+import { formatYmd } from '../core/answer';
 import { useAppStore } from '../store/appStore';
 import { isAdminRole } from '../services/teamClient';
 import {
@@ -16,6 +17,7 @@ import {
   sentThisMonth,
   skipOutreach,
   type GenerateResult,
+  type NotDrafted,
   type OutreachMessage,
   type OutreachSettings,
 } from '../services/outreachClient';
@@ -25,6 +27,26 @@ const TIER_LABEL: Record<OutreachMessage['tier'], string> = {
   'expiring-30': 'Expires in 30 days',
   expired: 'Expired',
 };
+
+/** Why a customer got a draft, in one line: the warranty end date and how far away it is. */
+export function whyLine(expires: string | null | undefined, today: Date = new Date()): string | null {
+  if (!expires) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(expires);
+  if (!m) return null;
+  const end = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  const days = Math.round((end - Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())) / 86_400_000);
+  const date = formatYmd(expires);
+  if (days < 0) return `Warranty ended ${date}`;
+  if (days === 0) return `Warranty ends today (${date})`;
+  return `Warranty ends ${date} · ${days} day${days === 1 ? '' : 's'} left`;
+}
+
+/** Plain-language reason a customer was looked at but not drafted. */
+export function notDraftedReason(n: NotDrafted, leadDays: number): string {
+  if (n.reason === 'no-email') return 'No email on file for this customer';
+  if (n.reason === 'opted-out') return 'Customer opted out';
+  return `Warranty ends in ${n.daysLeft ?? '?'} days, outside your ${leadDays}-day window`;
+}
 
 /**
  * Customer outreach (handoffs/OUTREACH_2026-09-20.md): automated email to
@@ -52,6 +74,8 @@ export function OutreachScreen() {
   const [generating, setGenerating] = useState(false);
   const [generateNote, setGenerateNote] = useState<GenerateResult | null>(null);
   const [sending, setSending] = useState(false);
+  const [confirmSend, setConfirmSend] = useState(false);
+  const [sendNote, setSendNote] = useState<string | null>(null);
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedBody, setExpandedBody] = useState<Record<string, string>>({});
@@ -199,6 +223,9 @@ export function OutreachScreen() {
   };
 
   const enabled = settingsDraft.enabled ?? settings?.enabled ?? false;
+  // Same wording as the banner below; approving and sending wait until outreach is on.
+  const outreachOff = !!settings && !enabled;
+  const offReason = 'Customer outreach is off. Turn it on in Settings to approve and send.';
   const mode = settingsDraft.mode ?? settings?.mode ?? 'review';
   const leadDays = settingsDraft.leadDays ?? settings?.leadDays ?? 90;
   const fromName = settingsDraft.fromName ?? settings?.fromName ?? '';
@@ -432,7 +459,7 @@ export function OutreachScreen() {
         <section className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="dw-label">Drafts · {drafts.length}</h2>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <button type="button" onClick={() => void runGenerate()} disabled={generating} className="dw-btn-secondary !min-h-[36px] !py-1">
                 {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />}
                 Generate drafts
@@ -440,6 +467,9 @@ export function OutreachScreen() {
               {drafts.length > 0 && (
                 <button
                   type="button"
+                  disabled={outreachOff}
+                  title={outreachOff ? offReason : undefined}
+                  aria-describedby={outreachOff ? 'outreach-off-reason' : undefined}
                   onClick={() => void withBusy(drafts.map((d) => d.id), () => approveAllOutreach().then(() => undefined))}
                   className="dw-btn-secondary !min-h-[36px] !py-1"
                 >
@@ -449,23 +479,13 @@ export function OutreachScreen() {
               {approved.length > 0 && admin && (
                 <button
                   type="button"
-                  disabled={sending}
-                  onClick={() =>
-                    void (async () => {
-                      setSending(true);
-                      try {
-                        await sendApprovedOutreach();
-                        await load();
-                      } catch (e) {
-                        setLoadError(e instanceof Error ? e.message : 'Send failed.');
-                      } finally {
-                        setSending(false);
-                      }
-                    })()
-                  }
+                  disabled={sending || outreachOff}
+                  title={outreachOff ? offReason : undefined}
+                  aria-describedby={outreachOff ? 'outreach-off-reason' : undefined}
+                  onClick={() => { setSendNote(null); setConfirmSend(true); }}
                   className="dw-btn-primary !min-h-[36px] !py-1"
                 >
-                  {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Send className="w-3.5 h-3.5" aria-hidden="true" />}
+                  <Send className="w-3.5 h-3.5" aria-hidden="true" />
                   Send approved ({approved.length})
                 </button>
               )}
@@ -480,6 +500,73 @@ export function OutreachScreen() {
             </p>
           )}
 
+          {generateNote?.notDrafted && generateNote.notDrafted.length > 0 && (
+            <div data-testid="not-drafted" className="dw-card p-3 space-y-1">
+              <p className="dw-label">Not drafted · {generateNote.notDrafted.length}</p>
+              <ul className="space-y-1">
+                {generateNote.notDrafted.map((n) => (
+                  <li key={n.equipmentId} className="text-body text-ink-2">
+                    <span className="text-ink font-medium">{n.customerName ?? 'Unknown customer'}</span>
+                    {n.unit ? <span className="text-ink-3"> · {n.unit}</span> : null}
+                    <span className="block text-caption text-ink-3">{notDraftedReason(n, leadDays)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {settings && !enabled && (drafts.length > 0 || approved.length > 0) && (
+            <div role="status" data-testid="outreach-off" className="dw-card p-3 flex flex-wrap items-center justify-between gap-2 border-warn/40">
+              <p id="outreach-off-reason" className="text-body text-ink-2 min-w-0">
+                Customer outreach is off. Turn it on in Settings to approve and send. You can still copy any draft or open it in your mail app.
+              </p>
+              <button type="button" className="dw-btn-secondary !min-h-[36px] !py-1 shrink-0" onClick={() => setSettingsOpen(true)}>Open settings</button>
+            </div>
+          )}
+
+          {confirmSend && approved.length > 0 && (
+            <div role="alertdialog" aria-labelledby="send-confirm-title" data-testid="send-confirm" className="dw-card p-4 space-y-3 ring-2 ring-accent">
+              <p id="send-confirm-title" className="text-body font-medium text-ink">Send {approved.length} email{approved.length === 1 ? '' : 's'} now?</p>
+              <p className="text-caption text-ink-3">These go to the customers below. Each email says who it is from and how to opt out.</p>
+              <ul className="text-body text-ink-2 space-y-0.5">
+                {approved.map((m) => (
+                  <li key={m.id}>{m.customerName ?? 'Unknown customer'} <span className="text-ink-3">· {m.toEmail}</span></li>
+                ))}
+              </ul>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={sending}
+                  className="dw-btn-primary"
+                  onClick={() =>
+                    void (async () => {
+                      setSending(true);
+                      try {
+                        const r = await sendApprovedOutreach();
+                        setConfirmSend(false);
+                        const parts = [`Sent ${r.sent}`];
+                        if (r.failed > 0) parts.push(`${r.failed} could not be sent`);
+                        if (r.skippedOptOut > 0) parts.push(`${r.skippedOptOut} skipped (opted out)`);
+                        setSendNote(parts.join(' · '));
+                        await load();
+                      } catch (e) {
+                        setConfirmSend(false);
+                        setLoadError(e instanceof Error ? e.message : 'Send failed.');
+                      } finally {
+                        setSending(false);
+                      }
+                    })()
+                  }
+                >
+                  {sending ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Send className="w-4 h-4" aria-hidden="true" />} Send now
+                </button>
+                <button type="button" className="dw-btn-tertiary" onClick={() => setConfirmSend(false)} disabled={sending}>Cancel</button>
+              </div>
+            </div>
+          )}
+
+          {sendNote && <p role="status" data-testid="send-note" className="text-body text-ink-2">{sendNote}</p>}
+
           {!admin && approved.length > 0 && <p className="text-caption text-ink-3">Only a company admin can send approved drafts.</p>}
 
           <ul className="space-y-2">
@@ -493,11 +580,12 @@ export function OutreachScreen() {
                     <p className="text-body text-ink-3">
                       {msg.unit ?? 'Unit'} {msg.serialLast4 ? `(#${msg.serialLast4})` : ''} · {msg.toEmail}
                     </p>
+                    {whyLine(msg.warrantyExpires) && <p className="text-caption text-ink-2 mt-1" data-testid="why-line">{whyLine(msg.warrantyExpires)}</p>}
                     <p className="text-caption text-ink-3 mt-1">{expandedId === msg.id ? (expandedBody[msg.id] ?? msg.preview) : `${msg.preview}…`}</p>
                   </button>
-                  <div className="flex flex-col items-end gap-1.5 shrink-0">
+                  <div className="flex flex-col items-start sm:items-end gap-1.5 w-full sm:w-auto sm:shrink-0">
                     <span className={msg.status === 'approved' ? 'dw-pill-info' : 'dw-pill-muted'}>{TIER_LABEL[msg.tier]}</span>
-                    <div className="flex flex-wrap justify-end gap-1.5">
+                    <div className="flex flex-wrap sm:justify-end gap-1.5">
                       <button
                         type="button"
                         onClick={() => void copyMessage(msg)}
@@ -516,7 +604,9 @@ export function OutreachScreen() {
                       {msg.status === 'draft' && (
                         <button
                           type="button"
-                          disabled={busyIds.has(msg.id)}
+                          disabled={busyIds.has(msg.id) || outreachOff}
+                          title={outreachOff ? offReason : undefined}
+                          aria-describedby={outreachOff ? 'outreach-off-reason' : undefined}
                           onClick={() => void withBusy([msg.id], () => approveOutreach([msg.id]).then(() => undefined))}
                           className="dw-btn-secondary !min-h-[32px] !py-0.5"
                         >

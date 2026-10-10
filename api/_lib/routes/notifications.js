@@ -5,6 +5,7 @@ import { getPool, getTenantContext } from "../recordsStore.js";
 import { limit as rateLimit } from "../rateLimit.js";
 import { startTimer } from "../timing.js";
 import { mutedDigestUserIds } from "../util/digestMute.js";
+import { sanitizeUiPrefs, userUiPrefs } from "../util/userPrefs.js";
 import { logStage } from "../perf.js";
 
 /**
@@ -94,6 +95,8 @@ async function listNotifications(client, tenantId, userId) {
     emailDigest,
     /** This caller's own "Mute my daily digest" choice (independent of the shop-wide switch). */
     digestMuted,
+    /** This caller's own screen preferences (hidden "Needs attention" rows, collapsed alert groups). */
+    uiPrefs: userUiPrefs(row.settings, userId),
   };
 }
 
@@ -137,6 +140,32 @@ export default async function handler(req, res) {
     }
 
     const body = req.body ?? {};
+
+    // Per-person screen preferences: any signed-in member may change THEIR OWN entry only.
+    if (body.uiPrefs && typeof body.uiPrefs === "object") {
+      const patch = sanitizeUiPrefs(body.uiPrefs);
+      if (!patch || !auth.userId) {
+        statusSent = 400;
+        return handleCors(res, req).status(400).json({ error: "uiPrefs is not valid" });
+      }
+      const settings = await timer.time("handler", () =>
+        withTenantTx(ctx, async (client, tenantId) => {
+          const { rows } = await client.query(
+            `UPDATE tenants SET settings = jsonb_set(
+                 COALESCE(settings, '{}'::jsonb), '{uiPrefs}',
+                 COALESCE(settings->'uiPrefs', '{}'::jsonb) ||
+                   jsonb_build_object($2::text, COALESCE(settings->'uiPrefs'->$2::text, '{}'::jsonb) || $3::jsonb)
+               )
+               WHERE id = $1
+             RETURNING settings`,
+            [tenantId, auth.userId, JSON.stringify(patch)]
+          );
+          return rows[0]?.settings ?? {};
+        })
+      );
+      statusSent = 200;
+      return handleCors(res, req).status(200).json({ uiPrefs: userUiPrefs(settings, auth.userId) });
+    }
 
     // Per-person mute: any signed-in member may change THEIR OWN entry (never anyone else's). Only admins
     // are digest recipients, so for a member it is a no-op switch the UI does not show.

@@ -39,6 +39,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { deriveGeo, warrantyStatusOf } from '../api/_lib/analytics.js';
 import { deriveWarranty, normalizeBrand } from '../api/_lib/warrantyRules.js';
+import { assertUniqueRoster } from './lib/sampleRoster.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -1161,6 +1162,8 @@ if (TOPUP_MODE) {
   process.exit(0);
 }
 
+// the customer list must never name one customer twice (the shop's own name is not a customer either)
+assertUniqueRoster('synth-business', answerCustomers.map((c) => ({ name: c.canonicalName, address: c.address, phone: c.phone, email: c.email })), { ownNames: ['Sonoran Comfort Air'] });
 fs.writeFileSync(path.join(OUT_DIR, 'ANSWER_KEY.json'), JSON.stringify(answerKey, null, 2));
 
 /* ----------------------------------------------------------------- report */

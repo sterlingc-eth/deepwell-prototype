@@ -4,6 +4,7 @@ import { formatYmd } from '../core/answer';
 import { useCanAdmin, ASK_ADMIN_TITLE } from '../hooks/useCanAdmin';
 import { AskAdminNote } from '../components/AskAdminNote';
 import { DuplicateCustomersCard } from '../components/DuplicateCustomersCard';
+import { ReviewDuplicatesPanel } from '../components/ReviewDuplicatesPanel';
 import { customerClient, CustomerAddressConflictError, type CreateCustomerInput, type CustomerDuplicatePair, type CustomerSummary } from '../services/customerClient';
 import {
   ACTIVITY_OPTIONS,
@@ -154,7 +155,7 @@ export function CustomersScreen() {
   // record outright at an address that already had one on file — this is the
   // "A customer already exists at this address: <name> — Open it / Add
   // anyway" prompt (api/_lib/reviewStore.js's createCustomer 409).
-  const [addressConflict, setAddressConflict] = useState<{ id: string; name: string | null } | null>(null);
+  const [addressConflict, setAddressConflict] = useState<{ id: string; name: string | null; reason: 'address' | 'name' } | null>(null);
 
   const runCreate = async (confirmDuplicate = false) => {
     if (!draft.name.trim()) return;
@@ -178,7 +179,7 @@ export function CustomersScreen() {
       openCustomer(customer.id);
     } catch (e) {
       if (e instanceof CustomerAddressConflictError) {
-        setAddressConflict({ id: e.existingCustomerId, name: e.existingCustomerName });
+        setAddressConflict({ id: e.existingCustomerId, name: e.existingCustomerName, reason: e.reason });
       } else {
         setCreateErr(e instanceof Error ? e.message : 'Could not create that customer.');
       }
@@ -371,7 +372,7 @@ export function CustomersScreen() {
           {addressConflict && (
             <div role="alert" className="rounded-lg border border-warn/40 bg-warn-bg dark:bg-forest-800 p-3 space-y-2">
               <p className="text-caption text-warn-ink dark:text-brass-200">
-                A customer already exists at this address: {addressConflict.name || 'Unnamed'}.
+                {addressConflict.reason === 'name' ? 'A customer with this name already exists' : 'A customer already exists at this address'}: {addressConflict.name || 'Unnamed'}.
               </p>
               <div className="flex flex-wrap gap-2">
                 <button type="button" className="dw-btn-secondary !min-h-[32px] !py-1" onClick={() => { const id = addressConflict.id; setCreating(false); setAddressConflict(null); openCustomer(id); }}>
@@ -489,6 +490,7 @@ export function CustomersScreen() {
           catches two records at a time, off THIS loaded page). Same feature,
           one home: the Customers tab, where a person already is when they
           care about this. Admin-only, same gate Team used. */}
+      {isAdmin && <ReviewDuplicatesPanel onChanged={() => void load()} />}
       {isAdmin && <DuplicateCustomersCard />}
 
       <div className="dw-card p-3 space-y-2">

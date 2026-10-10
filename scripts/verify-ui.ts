@@ -1241,13 +1241,13 @@ function listFilesRecursive(dir: string): string[] {
     extracted: have.map((name) => ({ name, value: 'x', confidence: 0.9, location: {} })),
   });
   eq('needInfo: missing fields are named in plain words', needInfo(mk('a', 'invoice', ['cost']), ['service_address', 'cost']).text, 'Needs: service address');
-  eq('needInfo: several missing fields are listed', needInfo(mk('a', 'invoice', []), ['service_address', 'cost']).text, 'Needs: service address, cost');
+  eq('needInfo: several missing fields are listed', needInfo(mk('a', 'work-order', []), ['service_address', 'cost']).text, 'Needs: service address, cost');
   eq('needInfo: an either/or requirement reads "a or b"', needInfo(mk('a', 'dispatch-note', []), ['customer_name|service_address']).text, 'Needs: customer or service address');
   eq('needInfo: nothing outstanding gives no text', needInfo(mk('a', 'invoice', ['service_address', 'cost']), ['service_address', 'cost']).text, null);
   eq('needInfo: unlinked reads "Needs linking"', needInfo(mk('a', 'invoice', ['cost'], [{ kind: 'unlinked', confidence: 0 }]), ['cost']).text, 'Needs linking');
   const rows = [
-    { doc: mk('1', 'invoice', []), need: needInfo(mk('1', 'invoice', []), ['service_address']), typeLabel: 'Invoice' },
-    { doc: mk('2', 'invoice', []), need: needInfo(mk('2', 'invoice', []), ['service_address']), typeLabel: 'Invoice' },
+    { doc: mk('1', 'work-order', []), need: needInfo(mk('1', 'work-order', []), ['service_address']), typeLabel: 'Invoice' },
+    { doc: mk('2', 'work-order', []), need: needInfo(mk('2', 'work-order', []), ['service_address']), typeLabel: 'Invoice' },
     { doc: mk('3', 'invoice', ['service_address']), need: needInfo(mk('3', 'invoice', ['service_address']), ['service_address']), typeLabel: 'Invoice' },
     { doc: mk('4', 'correspondence', []), need: needInfo(mk('4', 'correspondence', []), ['customer_name']), typeLabel: 'Correspondence' },
   ];

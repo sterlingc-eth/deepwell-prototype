@@ -16,7 +16,7 @@ const TYPE_LABEL = {
 /** @returns {{text:string, citations:{documentId:string,page:number}[]}[]} at most 4 sentences */
 export function deterministicDossierSentences(doc, { today = new Date().toISOString().slice(0, 10) } = {}) {
   let r;
-  try { r = extractFromText(doc.pages ?? [], { skipInstallGuard: true }); } catch { return []; }
+  try { r = extractFromText(doc.pages ?? [], { skipInstallGuard: true, generic: false }); } catch { return []; }
   if (!r?.accepted) return [];
   const f = {};
   for (const x of r.toolInput.fields) if (!(x.key in f)) f[x.key] = x;

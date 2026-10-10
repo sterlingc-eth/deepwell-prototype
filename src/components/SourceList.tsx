@@ -1,7 +1,8 @@
 import { FileText, Image as ImageIcon, Table2, FileType2 } from 'lucide-react';
 import type { Doc, SourceRef } from '../core/types';
-import { useGraph } from '../core/entityGraph';
+import { isCompanyFileDoc, useGraph } from '../core/entityGraph';
 import { StagePill } from './StagePill';
+import { hvacSchema } from '../domains/hvac/schema';
 import { documentName, hasFriendlyName, originalFilename } from '../core/documentName';
 
 const FILE_ICON: Record<Doc['fileType'], typeof FileText> = {
@@ -72,7 +73,7 @@ export function SourceList({ sources, onOpen, title = 'Sources', emptyText = 'No
                         <span className="text-ink-3 font-mono text-data mr-1.5">[{i + 1}]</span>
                         {documentName(doc)}
                       </span>
-                      <StagePill stage={doc.stage} />
+                      <StagePill stage={doc.stage} companyFile={isCompanyFileDoc(doc, hvacSchema)} />
                     </span>
                     {hasFriendlyName(doc) && (
                       <span className="block text-body text-ink-3 truncate font-mono">{originalFilename(doc)}</span>

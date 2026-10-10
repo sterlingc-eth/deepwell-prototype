@@ -10,7 +10,7 @@
  */
 
 // Words that make text potentially a records question. Deliberately broad; one hit vetoes the gate.
-const RECORDS_WORDS = new Set((
+export const RECORDS_WORDS = new Set((
   "customer customers client clients unit units equipment invoice invoices estimate estimates quote quotes proposal proposals " +
   "serial model brand warranty warranties install installed installation service serviced services repair repaired repairs " +
   "maintenance inspection inspections permit permits document documents doc docs file files page pages record records " +

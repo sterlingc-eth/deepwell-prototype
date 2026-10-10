@@ -41,6 +41,7 @@ import {
 import { correctTriggerWordTypos, normalizeQuestion } from './nlNormalize.js';
 import { parseCompoundQuestion } from './lookups/compound.js';
 import { parseAggregate, runAggregate } from './lookups/aggregates.js';
+import { parseTemplate } from './lookups/aggTemplates.js';
 import { parseSerialQuestion, runSerialLookup } from './lookups/serialLookup.js';
 import { parseDocNumberQuestion, runDocNumberLookup } from './lookups/docNumberLookup.js';
 import { parseAgreementEndQuestion, runAgreementEnd } from './lookups/agreementEnd.js';
@@ -161,6 +162,9 @@ export function classifyDeterministic(question, opts = {}) {
   // Customer x document-type rank / none / have and quote-status counts (customer with most invoices, customers with no quotes, open quotes) - lookups/customerDocRank.js.
   const cdrQ = parseCustomerDocRank(String(question ?? ''));
   if (cdrQ) return { route: 'custdocrank', intent: cdrQ };
+  // R45: ranked / busiest-period / per-group / A-vs-B questions are the aggregation templates' (lookups/aggTemplates.js), not a single-record extreme.
+  const tmplQ = opts?.skipTemplate ? null : parseTemplate(String(question ?? ''));
+  if (tmplQ && ['top', 'busy', 'group', 'compare'].includes(tmplQ.t)) return { route: 'aggregate', intent: { kind: 'template', intent: tmplQ } };
   // Whole-shop extremes on one document type (oldest/newest invoice, cheapest invoice, biggest/oldest quote) - lookups/docExtremes.js.
   const extQ = parseDocExtreme(String(question ?? ''));
   if (extQ) return { route: 'docextreme', intent: extQ };
@@ -188,7 +192,7 @@ export function classifyDeterministic(question, opts = {}) {
   if (premise) return { route: 'premise', intent: premise };
 
   // R32b (loop C): closed-shape shop-wide aggregates (warranty extremes / out-of-warranty counts / technicians who never did X / date extremes ...).
-  const agg = parseAggregate(String(question ?? '')) ?? parseAggregate(q); // raw first: the fuzzy normalizer can respell real words (older -> order, start -> star)
+  const agg = parseAggregate(String(question ?? ''), opts) ?? parseAggregate(q, opts); // raw first: the fuzzy normalizer can respell real words (older -> order, start -> star)
   if (agg) return { route: 'aggregate', intent: agg };
 
   const cmp = parseComparison(q);
@@ -628,7 +632,13 @@ async function runDeterministicCore(db, intent, { today } = {}) {
   if (intent.route === 'vocabcount') return runVocabCount(db, intent.intent);
   if (intent.route === 'fieldabsence') return runFieldAbsence(db, intent.intent);
   if (intent.route === 'premise') return runFalsePremise(db, intent.intent);
-  if (intent.route === 'aggregate') return runAggregate(db, intent.intent, { today: t });
+  if (intent.route === 'aggregate') {
+    const ag = await runAggregate(db, intent.intent, { today: t });
+    if (ag || intent.intent?.kind !== 'template') return ag;
+    // R45: the template could not answer (a word it cannot place, no such data): behave as if the templates did not exist (re-classify without them).
+    const again = classifyDeterministic(intent.intent.intent?.raw ?? '', { skipTemplate: true });
+    return again ? runDeterministicCore(db, again, { today }) : null;
+  }
   if (intent.route === 'comparison') return runComparison(db, intent.intent);
   // Team G (industry packs): db is already inside this tenant's transaction, so packForTenant is a plain read
   // against it — no second transaction — and its own 10-minute cache makes repeat calls free.

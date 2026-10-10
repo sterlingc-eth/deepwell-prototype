@@ -90,9 +90,9 @@ async function postCreateCustomer(input: CreateCustomerInput): Promise<{ custome
   });
   if (!res.ok) {
     const { message, body } = await parseErrorBody(res);
-    const details = (body as { details?: { existingCustomerId?: string; existingCustomerName?: string | null } } | null)?.details;
+    const details = (body as { details?: { existingCustomerId?: string; existingCustomerName?: string | null; reason?: string } } | null)?.details;
     if (res.status === 409 && details?.existingCustomerId) {
-      throw new CustomerAddressConflictError(message, details.existingCustomerId, details.existingCustomerName ?? null);
+      throw new CustomerAddressConflictError(message, details.existingCustomerId, details.existingCustomerName ?? null, details.reason === 'name' ? 'name' : 'address');
     }
     throw new Error(message);
   }
@@ -266,11 +266,14 @@ export interface CreateCustomerInput {
 export class CustomerAddressConflictError extends Error {
   existingCustomerId: string;
   existingCustomerName: string | null;
-  constructor(message: string, existingCustomerId: string, existingCustomerName: string | null) {
+  /** Why it matched: the same address (default) or the same name. */
+  reason: 'address' | 'name';
+  constructor(message: string, existingCustomerId: string, existingCustomerName: string | null, reason: 'address' | 'name' = 'address') {
     super(message);
     this.name = 'CustomerAddressConflictError';
     this.existingCustomerId = existingCustomerId;
     this.existingCustomerName = existingCustomerName;
+    this.reason = reason;
   }
 }
 

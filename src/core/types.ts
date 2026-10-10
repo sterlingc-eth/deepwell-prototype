@@ -46,6 +46,8 @@ export interface DocumentTypeSpec {
   companyRecord?: boolean;
   /** Company paperwork only while no customer is named on it (an agreement with no customer). */
   companyRecordIfNoCustomer?: boolean;
+  /** Company paperwork only while neither a customer nor a service address is named on it ("other"). */
+  companyRecordIfNoCustomerOrAddress?: boolean;
   /** Needs no customer/equipment link when it carries no service address (invoice, receipt, delivery ticket...). */
   linkOptional?: boolean;
 }
@@ -131,6 +133,12 @@ export type DocumentIssue =
   | { kind: 'unlinked'; bestGuess?: EntityId; confidence: number }
   | { kind: 'conflict'; conflictId: string }
   | { kind: 'duplicate'; of: DocumentId }
+  // Nothing was read from this document: no real facts (underscore-prefixed bookkeeping rows do not count) or the
+  // reader's "nothing read" marker. Shown as "Hard to read"; it never sits in "Ready to verify".
+  | { kind: 'nothing-read' }
+  // Filename-and-number look-alike of another document ("(copy)", "(2)", "v2" plus the same document number or cost).
+  // A hint, not a certainty: shown as "Might be a copy" and never hides the document from answers.
+  | { kind: 'possible-copy'; of: DocumentId }
   // Limit-test defect D (2026-09-20): this document was linked to its
   // customer by name alone (no address to disambiguate), and that surname
   // now matches 2+ other non-merged customers — order-dependent at the time

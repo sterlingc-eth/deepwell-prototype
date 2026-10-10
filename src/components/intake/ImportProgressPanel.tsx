@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { recordsStore, type ImportProgressSummary } from '../../services/recordsStoreClient';
 import { loadGraphFromServer } from '../../hooks/usePostgresSync';
-import { docCountsByStage, documentTotalFor, useGraph } from '../../core/entityGraph';
+import { docCountsByStage, documentTotalFor, companyFileNeedsLook, isCompanyFileDoc, useGraph } from '../../core/entityGraph';
+import { hvacSchema } from '../../domains/hvac/schema';
 import { useAppStore } from '../../store/appStore';
 import { fmtCount, formatTimeLeft, minutesLeft } from '../../core/importProgress';
 
@@ -109,6 +110,11 @@ export function ImportProgressPanel() {
   const done = finished && pending === 0;
   const left = ok ? minutesLeft(pending, Number.isFinite(ok.readLast10m) ? ok.readLast10m : 0) : null;
   const label = pending > 0 ? `${fmtCount(pending)} still to read. ${ringLabel(byStage)}` : `${fmtCount(total)} documents. ${ringLabel(byStage)}`;
+  // Company files are not matched, and the server counts don't know about them, so the ring is left as the server
+  // reports it. A small honest line under the key counts the ones filed with nothing to check, only when every
+  // document is held in this browser (otherwise the number would be a partial count).
+  const allHeld = Object.keys(graph.docs).length >= total;
+  const filedCompany = allHeld ? Object.values(graph.docs).filter((d) => isCompanyFileDoc(d, hvacSchema) && !companyFileNeedsLook(d, hvacSchema)).length : 0;
   const failedLine = failed > 0 && (
     <p className="text-body text-ink-2">{fmtCount(failed)} couldn’t be read. You’ll find them under Needs you.</p>
   );
@@ -118,6 +124,7 @@ export function ImportProgressPanel() {
       <StageRing
         byStage={byStage}
         label={label}
+        footer={filedCompany > 0 ? <p className="text-caption text-ink-3" data-testid="company-files-filed">{fmtCount(filedCompany)} company file{filedCompany === 1 ? '' : 's'} filed</p> : undefined}
         center={
           <>
             <span className="font-display text-h2 leading-none tabular-nums">{fmtCount(pending > 0 ? pending : total)}</span>
@@ -174,7 +181,7 @@ const RING_STAGES = [
  * One thin ring split into the five stages, each segment sized by how many documents sit in that stage, with a key
  * beside it (colour dot, name, right-aligned count). Segments ease to new sizes as documents move along (motion-safe).
  */
-function StageRing({ byStage, center, label }: { byStage: StageCounts; center: ReactNode; label: string }) {
+function StageRing({ byStage, center, label, footer }: { byStage: StageCounts; center: ReactNode; label: string; footer?: ReactNode }) {
   const r = 52;
   const c = 2 * Math.PI * r;
   const total = RING_STAGES.reduce((n, s) => n + (byStage[s.key] ?? 0), 0);
@@ -210,7 +217,8 @@ function StageRing({ byStage, center, label }: { byStage: StageCounts; center: R
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center">{center}</div>
       </div>
-      <ul className="w-full sm:w-52 space-y-2 text-body" aria-hidden="true">
+      <div className="w-full sm:w-52 space-y-2">
+      <ul className="space-y-2 text-body" aria-hidden="true">
         {RING_STAGES.map((s) => (
           <li key={s.key} className="flex items-center gap-3">
             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: s.color }} />
@@ -219,6 +227,8 @@ function StageRing({ byStage, center, label }: { byStage: StageCounts; center: R
           </li>
         ))}
       </ul>
+      {footer}
+      </div>
     </div>
   );
 }

@@ -38,6 +38,8 @@ export interface ReviewSummary {
   /** Every document that is not verified. */
   needsReview: number;
   verified: number;
+  /** Verified by the AI reader (a subset of `verified`). Absent from older servers. */
+  aiVerified?: number;
 }
 
 export class RecordsStoreClient implements RecordsStore {

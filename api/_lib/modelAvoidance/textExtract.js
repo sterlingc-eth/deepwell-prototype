@@ -31,6 +31,9 @@ import { normalizeDate } from "../extractFields.js";
 import { BRAND_RULES } from "../warrantyRules.js";
 import { isFragmentName } from "../integrity.js";
 import { REQUIRED_FIELDS, DOCUMENT_TYPE_IDS, GENERIC_TITLE_PATTERNS } from "../documentTypes.js";
+import { extractLabelled } from "./labelledExtract.js";
+import { FIELD_SYNONYMS, labelSrc } from "./fieldSynonyms.js";
+import { detectLetterhead, isOwnName, counterpartyFromParties } from "./ownCompany.js";
 
 export const TEXT_EXTRACTOR_VERSION = 1;
 
@@ -43,6 +46,8 @@ export const TEMPLATE_TYPES = new Set([
 /* --------------------------------------------------------------------- titles / classification */
 const TITLES = [
   ["invoice", /^(?:tax\s+|service\s+|customer\s+)?invoice(?:\s*(?:#|no\.?|number)\s*[\w-]+)?$/],
+  // a credit memo is an invoice with a negative total (documentTypes.js files credit memos under invoice)
+  ["invoice", /^(?:customer\s+|vendor\s+)?credit\s+(?:memo|note)(?:randum)?(?:\s*(?:#|no\.?|number)\s*[\w-]+)?$/],
   ["service-ticket", /^(?:hvac\s+)?service\s+(?:ticket|report|call\s+report|record)$/],
   ["work-order", /^(?:service\s+)?work\s+order(?:\s*(?:#|no\.?|number)\s*[\w-]+)?$/],
   ["warranty-registration", /^(?:equipment\s+|product\s+)?warranty\s+registration(?:\s+form)?$/],
@@ -179,7 +184,7 @@ const LABELS = [
   L("BALANCE", "(?:balance\\s+due|balance)", "money"),
   L("status", "(?:status)"),
   L("permit_number", `(?:permit${NUMTAG})`),
-  L("IGNORE", "(?:contractor|contact|coverage|terms|payment\\s+terms|due\\s+date|subtotal|sub-total|tax|sales\\s+tax|amount\\s+paid|deposit|license(?:\\s*#)?|lic\\.?(?:\\s*#)?|roc(?:\\s*#)?|valid\\s+for|po(?:\\s*#)?|job(?:\\s*(?:#|no\\.?|number))?|ship\\s+to|location|preferred\\s+contact|attn|attention)", "ignore"),
+  L("IGNORE", "(?:contractor|contact|coverage|terms|payment\\s+terms|due\\s+date|subtotal|sub-total|tax|sales\\s+tax|deposit|license(?:\\s*#)?|lic\\.?(?:\\s*#)?|roc(?:\\s*#)?|valid\\s+for|po(?:\\s*#)?|job(?:\\s*(?:#|no\\.?|number))?|ship\\s+to|location|preferred\\s+contact|attn|attention)", "ignore"),
 ];
 // longest-first so "customer phone" wins over "customer"
 function makeLabelFinder(defs) {
@@ -235,7 +240,14 @@ const isAddress = (v) => ADDR_RE.test(v) || (ADDR_LOOSE_RE.test(v) && /\b\d{5}(?
 
 const BRANDS = [...new Set([...Object.keys(BRAND_RULES), "aprilaire", "bard", "nortek", "lg", "samsung", "rinnai", "navien", "burnham", "weil-mclain", "lochinvar", "a. o. smith", "bradford white", "friedrich", "gree", "midea", "york international", "american standard"])]
   .sort((a, b) => b.length - a.length);
+const BRAND_ANYWHERE_RE = new RegExp(`(?<![A-Za-z])(?:${BRANDS.map((b) => b.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})(?![A-Za-z])`, "i");
 const BRAND_LEAD_RE = new RegExp(`^(${BRANDS.map((b) => b.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})\\b\\s*(.*)$`, "i");
+
+// lowercase words that legitimately sit inside a name ("Plaza Dental of Mesa", "Smith and Sons", "c/o")
+const NAME_WORDS_OK = new Set(["&", "and", "of", "the", "de", "la", "van", "von", "dba", "c/o", "for", "at", "del", "y"]);
+// "Carrier Supply", "Trane Parts": a distributor named after a brand is a name, not equipment
+const DEALER_RE = new RegExp(`(?<![A-Za-z])(?:${BRANDS.map((b) => b.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})\\s+(?:supply|supplies|distributing|distribution|distributors?|parts|wholesale|enterprises|hvac|heating|air|cooling|plumbing|electric|electrical|service|services|co|company|inc|llc)\\b`, "gi");
+const BRAND_GUARD = { test: (text) => BRAND_ANYWHERE_RE.test(String(text).replace(DEALER_RE, " ")) };
 
 const cap = (s) => s.split(" ").map((w) => (w.length <= 2 ? w.toUpperCase() : w[0].toUpperCase() + w.slice(1))).join(" ");
 
@@ -284,6 +296,32 @@ const UNIT_LINE_RE = /^((?:unit\s+\d{1,2})|(?:[A-Za-z]{1,6}-?\d{1,3}))\s*:\s*(.+
  *          |{accepted: false, reason: string, type?: string|null}}
  */
 export function extractFromText(pages, opts = {}) {
+  const pack = opts.pack && opts.pack.id && opts.pack.id !== "hvac" ? opts.pack : null;
+  // 1) the strict template path (HVAC vocabulary; every line explained) ...
+  let strict = pack ? { accepted: false, reason: "non-hvac-pack", type: null } : extractTemplate(pages, opts);
+  // F1: a template-shaped bill whose "Bill To" is OUR OWN company must not create us as a customer: leave it to the
+  // own-company-aware readers below (or the model).
+  const ownNames = Array.isArray(opts.ownNames) ? opts.ownNames : [];
+  if (strict.accepted && ownNames.length && (strict.toolInput?.fields ?? []).some((f) => f.key === "customer_name" && isOwnName(f.value, ownNames))) {
+    strict = { accepted: false, reason: "bill-to-own-company", type: strict.type };
+  }
+  if (strict.accepted || opts.generic === false) return strict;
+  // 2) ... then the validated-label path (any industry pack; unexplained prose and tables allowed, only labelled
+  //    lines are read, every required field must be confident). Same refuse-when-unsure contract.
+  const lines = toLines(pages);
+  if (!lines.length) return strict;
+  const cls = classifyLines(lines);
+  if (!cls) return strict;
+  const order = detectDateOrder(lines.map((l) => l.t).join("\n"));
+  const g = extractLabelled({
+    lines, cls, pack: opts.pack ?? null, ownNames, brandRe: BRAND_GUARD, skipInstallGuard: !!opts.skipInstallGuard,
+    pageCount: (pages ?? []).filter((p) => String(p?.text ?? "").trim()).length || 1,
+    parseDate: (v) => normalizeDate(v, { order }),
+  });
+  return g.accepted ? g : { ...strict, genericReason: g.reason, type: strict.type ?? g.type };
+}
+
+function extractTemplate(pages, opts = {}) {
   const reject = (reason, type = null) => ({ accepted: false, reason, type });
   if (opts.pack && opts.pack.id && opts.pack.id !== "hvac") return reject("non-hvac-pack");
   const lines = toLines(pages);
@@ -344,6 +382,7 @@ export function extractFromText(pages, opts = {}) {
     return true;
   };
   const totals = []; // cost candidates
+  const parts = { sub: [], tax: [], adjusted: false }; // printed subtotal / tax lines, for the reconciliation check
   let balance = null;
   const workItems = []; // {key,value,line}
   const partItems = [];
@@ -420,7 +459,15 @@ export function extractFromText(pages, opts = {}) {
       }
       if (!value) return reject(`empty-value:${key}`, type);
       switch (key) {
-        case "IGNORE": break;
+        case "IGNORE": {
+          // Money components are not fields, but they are evidence: a total that does not equal subtotal + tax is a misread.
+          const lbl = mk.label.toLowerCase().replace(/[^a-z]/g, "");
+          const mv = moneyBare(value);
+          if (mv !== null && /^(?:subtotal)$/.test(lbl)) parts.sub.push(mv);
+          else if (mv !== null && /^(?:tax|salestax)$/.test(lbl)) parts.tax.push(mv);
+          else if (/^(?:amountpaid|deposit)$/.test(lbl)) parts.adjusted = true;
+          break;
+        }
         // R33: a date we have no field for ("Next Service Due", "Printed on") on the same form as the service date. Two
         // dates on one page is exactly where a lookup can pick the wrong one, so the whole document goes to the model
         // (and the label scan never reads one of these as a service date).
@@ -453,6 +500,7 @@ export function extractFromText(pages, opts = {}) {
         case "customer_name": {
           if (PLACEHOLDER_RE.test(value)) return reject("placeholder-customer-name", type);
           if (!NAME_RE.test(value) || /\d/.test(value) || value.length < 3 || isFragmentName(value)) return reject("bad-customer-name", type);
+          if (value.split(" ").some((w) => /^[a-z]/.test(w) && !NAME_WORDS_OK.has(w.toLowerCase()))) return reject("customer-name-is-a-sentence", type);
           if (!setSingle("customer_name", value, line)) return reject("conflict:customer_name", type);
           break;
         }
@@ -608,6 +656,13 @@ export function extractFromText(pages, opts = {}) {
     if (vals.length > 1) return reject("multiple-totals", type);
     if (balance && balance.v !== vals[0]) return reject("total-vs-balance-differ", type);
     const t0 = totals[0];
+    // subtotal + tax must equal the total (unless a deposit / amount paid is printed): otherwise something was misread
+    if (parts.sub.length && !parts.adjusted) {
+      const subs = [...new Set(parts.sub)];
+      const cents = (v) => Math.round(Number(v) * 100);
+      if (subs.length > 1) return reject("multiple-subtotals", type);
+      if (cents(subs[0]) + parts.tax.reduce((n, v) => n + cents(v), 0) !== cents(vals[0])) return reject("total-does-not-reconcile", type);
+    }
     fields.push({ key: "cost", value: t0.v, page_no: t0.line.page, verbatim: t0.line.t.slice(0, 200), confidence: 0.95 });
   } else if (balance) {
     fields.push({ key: "cost", value: balance.v, page_no: balance.line.page, verbatim: balance.line.t.slice(0, 200), confidence: 0.85 });
@@ -679,14 +734,30 @@ export function extractFromText(pages, opts = {}) {
  * Pure. No clock, no I/O. HVAC vocabulary (the caller skips other packs).
  */
 const SCAN_EXTRA = [
-  L("vendor", "(?:vendor|supplier|distributor|ordered\\s+from|purchased\\s+from)", "vendor"),
+  L("vendor", `(?:${labelSrc("vendor", "insured")})`, "vendor"),
   L("ADDRESS", "(?:address|addr\\.?|site|location|job\\s+at|for\\s+job\\s+at)", "address"),
 ];
+// F1 (2026-10-10): the synonym table (fieldSynonyms.js) is the one source of "the same meaning in other words" for the
+// party, the document date, the amount and the document number. The template path above keeps its strict service-trade
+// vocabulary (every line must be explained); this scan is the fallback that reads what is printed whatever it is called.
+const SCAN_REPLACED = new Set(["IGNORE", "customer_name", "cost", "invoice_number", "agreement_term"]);
+const SCAN_SYNONYM_LABELS = [
+  L("customer_name", `(?:${labelSrc("customer")})`),
+  L("DOCDATE", `(?:${labelSrc("invoiceDate", "receiptDate", "statementDate", "deliveryDate", "agreementDate", "quoteDate", "letterDate", "certificateDate")})`, "docdate"),
+  L("cost", `(?:${labelSrc("cost", "costPaid")})`, "money"),
+  L("invoice_number", `(?:${labelSrc("documentNumber")}|(?:invoice|work\\s+order|ticket|wo|inv)${NUMTAG})`),
+  // an agreement / lease / policy period and where it ends. The bare word "term" is NOT here ("Term: Net 30" is payment terms).
+  L("agreement_term", `(?:${labelSrc(FIELD_SYNONYMS.term.filter((x) => x !== "term"))})`),
+  L("TERM_END", `(?:${labelSrc("termEnd")})`, "termend"),
+];
+const TERM_START_LABEL_RE = new RegExp(`^(?:${labelSrc("termStart")})$`, "i");
 // The scanner's dictionary: everything the extractor knows, minus the generic IGNORE "location" (a bare "Location:"
-// is an address to the scan), plus vendor and a bare "Address:".
+// is an address to the scan), plus vendor and a bare "Address:". "amount paid" and "invoice date" are no longer ignored:
+// they are the document's amount and date (see FIELD_SYNONYMS.notIgnorable).
 const SCAN_LABELS = [
-  ...LABELS.filter((l) => l.key !== "IGNORE"),
-  L("IGNORE", "(?:contractor|contact|coverage|terms|payment\\s+terms|due\\s+date|subtotal|sub-total|tax|sales\\s+tax|amount\\s+paid|deposit|license(?:\\s*#)?|lic\\.?(?:\\s*#)?|roc(?:\\s*#)?|valid\\s+for|po(?:\\s*#)?|job(?:\\s*(?:#|no\\.?|number))?|ship\\s+to|preferred\\s+contact|attn|attention|order\\s+date|invoice\\s+date)", "ignore"),
+  ...LABELS.filter((l) => !SCAN_REPLACED.has(l.key)),
+  ...SCAN_SYNONYM_LABELS,
+  L("IGNORE", "(?:contractor|contact|coverage|terms|payment\\s+terms|due\\s+date|subtotal|sub-total|tax|sales\\s+tax|deposit|license(?:\\s*#)?|lic\\.?(?:\\s*#)?|roc(?:\\s*#)?|valid\\s+for|po(?:\\s*#)?|job(?:\\s*(?:#|no\\.?|number))?|ship\\s+to|preferred\\s+contact|attn|attention|order\\s+date)", "ignore"),
   ...SCAN_EXTRA,
 ];
 const findScanLabels = makeLabelFinder(SCAN_LABELS);
@@ -694,17 +765,24 @@ const findScanLabels = makeLabelFinder(SCAN_LABELS);
 const BARE_LABEL_RES = SCAN_LABELS.map((d) => ({ def: d, re: new RegExp(`^(?:${d.src})$`, "i") }));
 // A date label with no colon ("Date of Service 10/19/2028", "DOS - 10/19/2028") — only ever accepted when what follows
 // is a whole valid date, so it cannot capture prose.
-const DATE_KEYS_FOR_NOCOLON = ["service_date", "installation_date", "warranty_registered_date", "warranty_expires", "OTHER_DATE"];
+const DATE_KEYS_FOR_NOCOLON = ["service_date", "installation_date", "warranty_registered_date", "warranty_expires", "OTHER_DATE", "DOCDATE", "TERM_END"];
 const NOCOLON_DATE_RES = SCAN_LABELS.filter((d) => DATE_KEYS_FOR_NOCOLON.includes(d.key))
   .map((d) => ({ def: d, re: new RegExp(`^(${d.src})\\s*(?:[-–]\\s*|\\s)\\s*(.+)$`, "i") }));
+
+// F1: name / amount labels that are safe without a colon (each names one role; the value must still validate).
+const NOCOLON_CUSTOMER_PHRASES = ["received from", "payment received from", "paid by", "remitted by", "sold to", "billed to", "bill to", "invoice to"];
+const NOCOLON_VENDOR_PHRASES = ["issued by", "sold by", "payable to", "pay to", "remit to", "remittance to", "billed by"];
+const NOCOLON_NAME_RE = new RegExp(`^(${labelSrc(NOCOLON_CUSTOMER_PHRASES, NOCOLON_VENDOR_PHRASES)})\\s+(?=[A-Za-z])(.+)$`, "i");
+const NOCOLON_NAME_KEY = (label) => (NOCOLON_VENDOR_PHRASES.some((p) => new RegExp(`^${labelSrc([p])}$`, "i").test(collapse(label))) ? "vendor" : "customer_name");
+const NOCOLON_MONEY_RE = new RegExp(`^(${labelSrc(FIELD_SYNONYMS.cost, FIELD_SYNONYMS.costPaid.filter((c) => c !== "donation" && c !== "contribution"))})\\s*[-:]?\\s*(\\(?-?\\s?\\$\\s?[\\d,]+(?:\\.\\d{2})?\\)?|-?\\s?[\\d,]+\\.\\d{2})\\s*(?:USD)?$`, "i");
 
 /** Cells of a table-ish line: a pipe (with or without spaces), a tab, or a 3+ space column gap. */
 const splitCells = (line) => line.split(/\s*\|\s*|\t+|\s{3,}/).map((x) => x.trim()).filter(Boolean);
 
 /** Service paperwork on which a bare "Date:" IS the date the work was done (same rule as extractFromText's DATE). */
-export const BARE_DATE_MEANS_SERVICE = new Set(["service-ticket", "work-order", "startup-sheet", "inspection-report", "dispatch-note", "invoice"]);
+export const BARE_DATE_MEANS_SERVICE = new Set(["service-ticket", "work-order", "startup-sheet", "inspection-report", "dispatch-note", "invoice", "receipt", "statement", "delivery-ticket"]);
 
-const LABEL_PRIORITY_COST = ["total due", "amount due", "grand total", "invoice total", "total cost", "quote total", "estimate total", "estimated cost", "total", "annual cost", "annual fee", "agreement price", "agreement fee"];
+const LABEL_PRIORITY_COST = ["total due", "amount due", "grand total", "invoice total", "total cost", "quote total", "estimate total", "estimated cost", "total", "annual cost", "annual fee", "agreement price", "agreement fee", "amount received", "total received", "donation amount", "total paid", "payment amount", "amount paid"];
 
 /**
  * Pure. Every labelled, validated value on the page for the fields the caller cares about.
@@ -715,10 +793,13 @@ const LABEL_PRIORITY_COST = ["total due", "amount due", "grand total", "invoice 
 export function scanLabeledValues(pages, opts = {}) {
   const type = opts.type ?? null;
   const want = opts.keys ? new Set(opts.keys) : null;
+  const ownNames = Array.isArray(opts.ownNames) ? opts.ownNames : [];
   const lines = toLines(pages);
   const order = detectDateOrder(lines.map((l) => l.t).join("\n"));
   const parseDate = (v) => normalizeDate(v, { order });
   const out = {};
+  const termStarts = [];
+  const termEnds = [];
   const push = (key, value, line, label, strength = "explicit") => {
     if (want && !want.has(key)) return;
     (out[key] ??= []).push({ value, page_no: line.page, verbatim: line.t.slice(0, 200), label: String(label).toLowerCase(), strength });
@@ -736,6 +817,23 @@ export function scanLabeledValues(pages, opts = {}) {
     if (!value) return;
     switch (def.kind) {
       case "ignore": case "otherdate": return;
+      case "docdate": {
+        // The date the document is about, printed under a document-specific label (Invoice Date, Date Received, Payment
+        // Date, Effective Date ...). Never the service date proper: it is "bare" strength, so an explicit service date
+        // always wins and it only ever fills a REQUIRED service_date.
+        if (NON_DATE_PHRASES.test(value)) return;
+        const dd = parseDate(value);
+        if (dd) {
+          push("service_date", dd, line, label, "bare");
+          if (TERM_START_LABEL_RE.test(collapse(label))) termStarts.push({ raw: value, iso: dd });
+        }
+        return;
+      }
+      case "termend": {
+        const de = NON_DATE_PHRASES.test(value) ? null : parseDate(value);
+        if (de) termEnds.push({ raw: value, iso: de });
+        return;
+      }
       case "date": {
         if (NON_DATE_PHRASES.test(value)) return;
         const d = parseDate(value);
@@ -846,6 +944,24 @@ export function scanLabeledValues(pages, opts = {}) {
       continue;
     }
 
+    // F1: labels printed WITHOUT a colon: "RECEIVED FROM Martin Duarte", "Amount Received $500.00". Only phrases that name a
+    // role unambiguously, and only when what follows validates (a name that looks like a name, a whole amount).
+    {
+      const nc = NOCOLON_NAME_RE.exec(t);
+      if (nc) {
+        const nm = cleanValue(nc[2].split(/\s{3,}|\t+|\s\|\s/)[0]);
+        if (nm && NAME_RE.test(nm) && !/\d/.test(nm) && !PLACEHOLDER_RE.test(nm) && !isFragmentName(nm) && nm.length >= 3 && !nm.split(" ").some((w) => /^[a-z]/.test(w) && !NAME_WORDS_OK.has(w.toLowerCase()))) {
+          push(NOCOLON_NAME_KEY(nc[1]), nm, line, nc[1]);
+        }
+        continue;
+      }
+      const nm2 = NOCOLON_MONEY_RE.exec(t);
+      if (nm2) {
+        const v = moneyBare(nm2[2].replace(/\s+/g, ""));
+        if (v !== null) { push("cost", v, line, nm2[1]); continue; }
+      }
+    }
+
     const segs = splitCells(t);
     // Table header row: every cell is a bare label, and the next line has the same number of cells.
     if (segs.length >= 2 && i + 1 < lines.length) {
@@ -875,6 +991,43 @@ export function scanLabeledValues(pages, opts = {}) {
         if (def.key !== "OTHER_DATE") accept(def, m[2], line, i, m[1]);
         break;
       }
+    }
+  }
+
+  // ---- F1: our own company, the issuer's letterhead, agreement parties, agreement period -------------------------------
+  const ownKey = (v) => isOwnName(v, ownNames);
+  if (ownNames.length) {
+    // We are never the customer (a bill addressed to our own company) and never the vendor of that bill.
+    for (const k of ["customer_name", "vendor"]) if (out[k]) { out[k] = out[k].filter((c) => !ownKey(c.value)); if (!out[k].length) delete out[k]; }
+  }
+  const wantKey = (k) => !want || want.has(k);
+  if (ownNames.length && wantKey("vendor") && !out.vendor?.length && !["purchase-order", "dispatch-note", "internal", "correspondence"].includes(type ?? "")) {
+    const rawLines = lines.map((l) => l.t);
+    const lh = detectLetterhead(rawLines, {
+      ownNames,
+      isTitleLine: (t) => splitSegments(t).some((seg) => TITLES.some(([, re]) => re.test(collapse(seg).replace(/[:.]+$/, "").toLowerCase()))),
+      isLabelLine: (t) => findScanLabels(t).length > 0,
+    });
+    // A letterhead is the ISSUER only when no other party is named (a receipt, a bill to us) or the only named party is us.
+    // When a customer is named, the letterhead is almost always our own paperwork under a name variant we do not know.
+    if (lh && !lh.own && !out.customer_name?.length) {
+      (out.vendor ??= []).push({ value: lh.name, page_no: lines[lh.index]?.page ?? 1, verbatim: lh.name.slice(0, 200), label: "letterhead", strength: "letterhead", conf: lh.conf });
+    }
+  }
+  if (ownNames.length && wantKey("customer_name") && !out.customer_name?.length) {
+    // "Parties: A and B" / "Between A and B": when exactly one of the two is us, the other is the counterparty.
+    for (const l of lines) {
+      const other = counterpartyFromParties(l.t, ownNames);
+      if (other && NAME_RE.test(other) && !/\d/.test(other)) { push("customer_name", other, l, "parties", "bare"); break; }
+    }
+  }
+  if (wantKey("agreement_term") && !out.agreement_term?.length) {
+    const sUniq = [...new Set(termStarts.map((x) => x.iso))];
+    const eUniq = [...new Set(termEnds.map((x) => x.iso))];
+    if (sUniq.length === 1 && eUniq.length === 1) {
+      const sRaw = termStarts[0].raw, eRaw = termEnds[0].raw;
+      const ln = lines.find((l) => l.t.includes(eRaw)) ?? lines[0];
+      (out.agreement_term ??= []).push({ value: `${sRaw} - ${eRaw}`, page_no: ln?.page ?? 1, verbatim: ln?.t.slice(0, 200) ?? "", label: "effective date / end date", strength: "explicit" });
     }
   }
 

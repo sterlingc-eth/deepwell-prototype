@@ -25,6 +25,7 @@
  */
 import { withTenant } from './recordsStore.js';
 import { getProviderOutage } from './claude.js';
+import { shareMissFromDb } from './learning/perfShare.js';
 
 /** Outcome codes this file writes — the single source of truth api/ask.js,
  *  api/review.js and scripts/miss-review.mjs all import rather than
@@ -147,6 +148,8 @@ export async function insertAskMiss(db, { question, questionNormalized, outcome,
       ]
     );
     await db.raw("RELEASE SAVEPOINT ask_miss_insert", []);
+    // Opt-in only (default off): a redacted score row (shape + outcome, never the text). Never throws.
+    await shareMissFromDb(db, { question, missOutcome: outcome });
   } catch (err) {
     if (savepoint) await db.raw("ROLLBACK TO SAVEPOINT ask_miss_insert", []).catch(() => {});
     if (!warnedMissingTable) {

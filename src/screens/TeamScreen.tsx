@@ -1,3 +1,4 @@
+import { DonovanSharingCard } from '../components/DonovanSharingCard';
 import { useEffect, useState } from 'react';
 import { CreateOrganization, OrganizationProfile, useAuth, useOrganization } from '@clerk/clerk-react';
 import { Bell, ChevronDown, ChevronUp, Clock, Download, History, Loader2, ShieldAlert, ShieldCheck, Trash2, Users } from 'lucide-react';
@@ -11,6 +12,8 @@ import { memberDisplayName } from '../core/memberNames';
 import { FollowupsCard } from '../components/FollowupsCard';
 import { PhoneAppCard } from '../components/PhoneAppCard';
 import { DataExportButtons } from '../components/records/DataExportButtons';
+import { AccountFilesExport } from '../components/records/AccountFilesExport';
+import { SUPPORT_ACCESS_CHANGED } from '../services/supportClient';
 import { reviewClient, type StaffAccessLogEntry, type SupportAccessGrant } from '../services/reviewClient';
 
 /**
@@ -194,6 +197,11 @@ function AccountSettingsCard({ tenantId, shopName }: { tenantId: string | null; 
           </div>
 
           <div className="space-y-2 pt-2 border-t border-line">
+            <h3 className="text-body font-medium text-ink">Donovan</h3>
+            <DonovanSharingCard />
+          </div>
+
+          <div className="space-y-2 pt-2 border-t border-line">
             <h3 className="text-body font-medium text-ink">Your data</h3>
             <p className="text-caption text-ink-3">
               Download every document, extraction, customer/unit record and audit-log entry this company has on file,
@@ -205,6 +213,10 @@ function AccountSettingsCard({ tenantId, shopName }: { tenantId: string | null; 
             {exportError && <p role="alert" className="text-body text-warn-ink dark:text-brass-200">{exportError}</p>}
             <p className="text-caption text-ink-3">Or as spreadsheets:</p>
             <DataExportButtons />
+          </div>
+
+          <div className="space-y-2 pt-2 border-t border-line">
+            <AccountFilesExport />
           </div>
 
           {/* R25: self-serve deletion (promised on /security). Typed confirmation here; the server
@@ -284,7 +296,7 @@ function fmtDateTime(iso: string): string {
  * default dw-card shape as AccountSettingsCard right above it, and admin-only for the same reason:
  * this is an account-lifecycle/trust setting, not a people/seats one.
  */
-export function SupportAccessCard() {
+export function SupportAccessCard({ companyName }: { companyName?: string } = {}) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [active, setActive] = useState<SupportAccessGrant | null>(null);
@@ -308,7 +320,11 @@ export function SupportAccessCard() {
   };
 
   useEffect(() => {
-    if (open) refresh();
+    if (!open) return;
+    refresh();
+    // A grant made (or ended) from the Help chat or the banner shows here right away.
+    window.addEventListener(SUPPORT_ACCESS_CHANGED, refresh);
+    return () => window.removeEventListener(SUPPORT_ACCESS_CHANGED, refresh);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -316,9 +332,9 @@ export function SupportAccessCard() {
     setBusy(true);
     setError(null);
     try {
-      await reviewClient.supportAccessGrant({ hours, reason: reason.trim() || undefined });
+      await reviewClient.supportAccessGrant({ hours, reason: reason.trim() || undefined, companyName });
       setReason('');
-      refresh();
+      window.dispatchEvent(new Event(SUPPORT_ACCESS_CHANGED));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not grant access.');
     } finally {
@@ -332,7 +348,7 @@ export function SupportAccessCard() {
     setError(null);
     try {
       await reviewClient.supportAccessRevoke(active.id);
-      refresh();
+      window.dispatchEvent(new Event(SUPPORT_ACCESS_CHANGED));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not revoke access.');
     } finally {
@@ -605,7 +621,7 @@ export function TeamScreen() {
             section, until it has a Billing/Settings home this pass doesn't
             own (see AccountSettingsCard's file comment). */}
         <AccountSettingsCard tenantId={organization?.name ? (orgId ?? null) : null} shopName={organization?.name ?? ''} />
-        <SupportAccessCard />
+        <SupportAccessCard companyName={organization?.name ?? undefined} />
 
             <div className="dw-card p-1 sm:p-3 overflow-hidden" data-testid="team-clerk-panel">
               <OrganizationProfile appearance={clerkAppearance} />

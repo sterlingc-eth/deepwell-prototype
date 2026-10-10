@@ -27,6 +27,12 @@ ALTER TABLE tenant_outreach_settings ADD COLUMN IF NOT EXISTS shop_name  TEXT;
 ALTER TABLE tenant_outreach_settings ADD COLUMN IF NOT EXISTS shop_phone TEXT;
 ALTER TABLE tenant_outreach_settings ADD COLUMN IF NOT EXISTS signature  TEXT;
 
+-- Postgres refuses CREATE OR REPLACE when the returned columns change ("cannot change return type of existing
+-- function"), so the old version is dropped first and its grants are re-issued below. Without this the ALTERs above
+-- applied but the function stayed on the old three-column shape, and the nightly sweep drafted without the shop's
+-- name, phone or sign-off.
+DROP FUNCTION IF EXISTS list_outreach_enabled_tenants();
+
 CREATE OR REPLACE FUNCTION list_outreach_enabled_tenants()
 RETURNS TABLE(tenant_id uuid, tenant_key text, tenant_name text, mode text, lead_days int,
               from_name text, reply_to text, offer_text text,
@@ -45,6 +51,16 @@ AS $$
    ORDER BY s.updated_at ASC NULLS FIRST
    LIMIT 500;
 $$;
+
+DO $$
+DECLARE r text;
+BEGIN
+  FOREACH r IN ARRAY ARRAY['deepwell_rls', 'deepwell_app'] LOOP
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) THEN
+      EXECUTE format('GRANT EXECUTE ON FUNCTION list_outreach_enabled_tenants() TO %I', r);
+    END IF;
+  END LOOP;
+END $$;
 
 -- No new column for the outreach-auto-send entitlement: it is stored as
 -- tenants.limits->>'outreachAuto' (the same jsonb column billing_apply()

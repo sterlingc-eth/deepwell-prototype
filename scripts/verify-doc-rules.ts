@@ -99,7 +99,7 @@ console.log(`  Needs-you on these ${F.length} fixtures: before ${before}, after 
 eq('invoice requires a customer or vendor, a date and an amount, and no address', dt.REQUIRED_FIELDS.invoice, ['customer_name|vendor', 'service_date', 'cost']);
 eq('correspondence requires nothing', dt.REQUIRED_FIELDS.correspondence, []);
 check('work order does not require a technician', !dt.REQUIRED_FIELDS['work-order'].includes('technician'));
-for (const t of ['work-order', 'service-ticket', 'inspection-report', 'permit']) check(`${t} still requires a service address`, dt.REQUIRED_FIELDS[t].includes('service_address'));
+for (const t of ['work-order', 'service-ticket', 'inspection-report', 'permit']) check(`${t} still requires a service address`, dt.REQUIRED_FIELDS[t].some((r) => r.split('|').includes('service_address')));
 for (const t of ['receipt', 'agreement', 'delivery-ticket', 'schedule', 'price-list', 'statement', 'insurance-certificate', 'hr-letter']) {
   check(`new type ${t} exists with a label`, dt.DOCUMENT_TYPE_IDS.has(t) && !!dt.documentTypeLabel(t) && dt.documentTypeLabel(t) !== 'Other');
   check(`new type ${t} has a model definition`, !!dt.DOCUMENT_TYPE_DEFINITIONS[t]);
@@ -128,6 +128,10 @@ check('two confident facts are enough', dt.mayVerifyWithoutLink('schedule', [...
 // Re-sort safety
 eq('re-sort never touches a type outside invoice/other/correspondence/dispatch-note', dt.resortDecision({ currentType: 'work-order', filename: 'Receipt.pdf' }), null);
 eq('re-sort is not confident when title and name disagree', dt.resortDecision({ currentType: 'invoice', filename: 'Receipt R-1.pdf', titleType: 'statement' }), null);
+for (const n of ['Pay Statement - Jane Doe.pdf', 'Severance Agreement - R Smith.pdf', 'Receipt for relocation.pdf']) eq(`re-sort never moves an HR paper: ${n}`, dt.resortDecision({ currentType: 'hr-letter', filename: n }), null);
+eq('re-sort moves an HR-typed award letter to agreement', dt.resortDecision({ currentType: 'hr-letter', filename: 'Award Letter - City Grant.pdf' }), 'agreement');
+eq('re-sort never moves a paper with a People and HR choice', dt.resortDecision({ currentType: 'hr-letter', filename: 'Award Letter.pdf', hrOverride: true }), null);
+eq('re-sort never moves a checked paper', dt.resortDecision({ currentType: 'invoice', filename: 'Receipt R-20117.pdf', verified: true }), null);
 eq('re-sort leaves a plain invoice name alone', dt.resortDecision({ currentType: 'invoice', filename: 'Invoice 24310.pdf' }), null);
 
 console.log(`\n${pass} passed, ${fail} failed`);

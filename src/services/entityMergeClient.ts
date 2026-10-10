@@ -115,3 +115,99 @@ export function rejectDuplicateCluster(entityIds: string[], clusterId: string): 
 export function undoDuplicateMerge(suggestionId: string): Promise<UndoMergeResult> {
   return post({ op: 'undo', suggestionId });
 }
+
+/* ---------------------------------------------------- review duplicates */
+
+export interface ReviewMember {
+  id: string;
+  customerNumber: string | null;
+  name: string;
+  address: string;
+  phone: string;
+  email: string;
+  documents: number;
+  links: number;
+  equipment: number;
+}
+
+export interface ReviewGroup {
+  key: string;
+  name: string;
+  ids: string[];
+  mainId: string;
+  members: ReviewMember[];
+  totals: { records: number; documents: number; links: number; equipment: number };
+  /** Exact-name groups only: true when nothing argues against merging. */
+  safe?: boolean;
+  /** True when the names match but no phone, email or address does. */
+  nameOnly?: boolean;
+  conflicts?: string[];
+  /** Similar-name groups only. */
+  reasons?: string[];
+}
+
+export interface DuplicateReview {
+  companyName: string;
+  exact: ReviewGroup[];
+  near: ReviewGroup[];
+  self: ReviewMember[];
+  summary: {
+    customers: number;
+    exactGroups: number;
+    exactSafeGroups: number;
+    extraRecordsInExactSafe: number;
+    nearGroups: number;
+    selfRecords: number;
+  };
+}
+
+export interface MergeAllResult {
+  merged: Array<{ name: string; keepId: string; droppedIds: string[]; suggestionId: string | null; documents: number; links: number; equipment: number }>;
+  failed: Array<{ name: string; reason: string }>;
+  remaining: number;
+  needsReview: number;
+}
+
+export interface ThisIsUsResult {
+  logId: string | null;
+  markedIds: string[];
+  documentsMoved: number;
+  documentsKeptWithCustomers: number;
+  equipmentUnassigned: number;
+}
+
+export function reviewDuplicates(): Promise<DuplicateReview> {
+  return post({ op: 'review' });
+}
+
+/** One time-boxed pass; call again while `remaining` > 0. */
+export function mergeAllExactDuplicates(): Promise<MergeAllResult> {
+  return post({ op: 'merge-exact' });
+}
+
+export function markCustomersAsCompany(entityIds: string[]): Promise<ThisIsUsResult> {
+  return post({ op: 'this-is-us', entityIds });
+}
+
+export function undoMarkAsCompany(logId: string): Promise<{ restoredIds: string[] }> {
+  return post({ op: 'undo-this-is-us', logId });
+}
+
+export interface RecentChange {
+  id: string;
+  kind: 'merge-all' | 'this-is-us';
+  at: string;
+  groups?: number;
+  records: number;
+  documents?: number;
+  /** How many pieces can still be put back (0 = already undone). */
+  undoable: number;
+}
+
+export function fetchRecentChanges(): Promise<{ days: number; items: RecentChange[] }> {
+  return post({ op: 'recent' });
+}
+
+export function undoMergeAllRun(logId: string): Promise<{ restoredGroups: number }> {
+  return post({ op: 'undo-merge-all', logId });
+}

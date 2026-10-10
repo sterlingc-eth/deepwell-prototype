@@ -39,6 +39,8 @@ export async function runFinancialsBackfill(ctx, opts = {}) {
 
   const candidates = await wt(ctx, (db) => listBackfillCandidates(db, { afterId: opts.afterId ?? null, limit: maxCalls, documentTypes: [...FINANCIAL_DOCUMENT_TYPES] }));
   const out = { enabled: true, processed: 0, written: 0, skipped: 0, failed: 0, modelCalls: 0, costUsd: 0, stoppedReason: null };
+  /** What this batch added, for the "Read amounts now" result (additive field; older clients ignore it). */
+  const added = [];
   let cursor = opts.afterId ?? null;
   let i = 0;
   let stop = false;
@@ -58,7 +60,10 @@ export async function runFinancialsBackfill(ctx, opts = {}) {
         out.processed++;
         out.costUsd += r.costUsd ?? 0;
         if (r.modelCalls === 0) out.modelCalls--; // nothing was billed (skipped before the call)
-        if (r.status === 'written') out.written++;
+        if (r.status === 'written') {
+          out.written++;
+          added.push({ documentId: c.id, filename: c.filename ?? null, docKind: r.docKind ?? c.document_type ?? null, invoiceNumber: r.invoiceNumber ?? null, total: r.total ?? null, currency: r.currency ?? null });
+        }
         else if (r.status === 'skipped') out.skipped++;
         else out.failed++;
       } catch (err) {
@@ -73,7 +78,7 @@ export async function runFinancialsBackfill(ctx, opts = {}) {
   const counts = await wt(ctx, (db) => backfillCounts(db, { documentTypes: [...FINANCIAL_DOCUMENT_TYPES] }));
   out.costUsd = Math.round(out.costUsd * 10000) / 10000;
   if (!out.stoppedReason) out.stoppedReason = candidates.length === 0 ? 'done' : 'batch_complete';
-  return { ...out, eligible: counts.eligible, remaining: counts.remaining, nextCursor: candidates.length ? cursor : null };
+  return { ...out, added, eligible: counts.eligible, remaining: counts.remaining, nextCursor: candidates.length ? cursor : null };
 }
 
 export async function financialsBackfillStatus(ctx, { withTenantFn } = {}) {

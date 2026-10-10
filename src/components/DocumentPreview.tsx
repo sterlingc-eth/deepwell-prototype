@@ -2,14 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { X, AlertTriangle, Download, Loader2 } from 'lucide-react';
 import type { SourceLocation } from '../core/types';
 import { findPassage, passageHighlightOn, splitByPassage, withPdfPage } from '../core/passage';
-import { useGraph } from '../core/entityGraph';
+import { isCompanyFileDoc, useGraph } from '../core/entityGraph';
 import { customerForDocument } from '../core/customer';
 import { useAppStore } from '../store/appStore';
 import { StagePill } from './StagePill';
 import { locationLabel } from './SourceList';
 import { getOriginalUrl, type OriginalUrl } from '../services/documentClient';
 import { recordsStore } from '../services/recordsStoreClient';
-import { requirementLabel } from '../domains/hvac/schema';
+import { hvacSchema, requirementLabel } from '../domains/hvac/schema';
 import { documentName, hasFriendlyName, originalFilename } from '../core/documentName';
 
 // Server document ids are Postgres uuids; local ids minted before a sync
@@ -155,7 +155,7 @@ export function DocumentPreview({ documentId, location, excerpt, onClose }: Docu
               <p className="text-caption text-ink-3 truncate">{originalFilename(doc)}</p>
             )}
             <div className="mt-2 flex flex-wrap items-center gap-2 text-body text-ink-2">
-              <StagePill stage={doc.stage} />
+              <StagePill stage={doc.stage} companyFile={isCompanyFileDoc(doc, hvacSchema)} />
               {batch && <span>· {batch.name}</span>}
               <span>· {doc.pages} page{doc.pages === 1 ? '' : 's'}</span>
               {location && locationLabel(location) && <span>· cited at {locationLabel(location)}</span>}
