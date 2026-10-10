@@ -1,0 +1,15 @@
+{
+"doctype": {
+"bid": "proposals",
+"bids": "proposals",
+"bills": "invoices",
+"calls": "service tickets",
+"estimate": "proposals",
+"estimates": "proposals",
+"quote": "proposals",
+"quotes": "proposals",
+"regs": "warranty registrations",
+"wos": "work orders"
+},
+"tickettype": {}
+}

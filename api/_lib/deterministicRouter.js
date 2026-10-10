@@ -618,7 +618,9 @@ export function runDeterministic(db, intent, opts = {}) {
   return withTypoNote(() => runDeterministicCore(db, intent, opts));
 }
 
-async function runDeterministicCore(db, intent, { today } = {}) {
+async function runDeterministicCore(db, intent, { today, skips = {}, depth = 0 } = {}) {
+  // Re-classification after a lane releases must keep EVERY earlier release (else two lanes hand the question back and forth forever), and is bounded.
+  if (depth > 8) return null;
   const t = todayIso(today);
   if (intent.route === 'serial') return runSerialLookup(db, intent.intent, { today: t });
   if (intent.route === 'docnumber') return runDocNumberLookup(db, intent.intent);
@@ -626,31 +628,31 @@ async function runDeterministicCore(db, intent, { today } = {}) {
     const vb = await runVendorBills(db, intent.intent);
     if (vb) return vb;
     const again = classifyDeterministic(intent.intent.question, { ...(intent.intent.__opts ?? {}), skipVendorBills: true });
-    return again && again.route !== 'vendorbills' ? runDeterministicCore(db, again, { today }) : null;
+    return again && again.route !== 'vendorbills' ? runDeterministicCore(db, again, { today, skips, depth: depth + 1 }) : null;
   }
   if (intent.route === 'findingwho') {
     const fw = await runFindingWho(db, intent.intent);
     if (fw) return fw;
     const again = classifyDeterministic(intent.intent.question, { ...(intent.intent.__opts ?? {}), skipFindingWho: true });
-    return again && again.route !== 'findingwho' ? runDeterministicCore(db, again, { today }) : null;
+    return again && again.route !== 'findingwho' ? runDeterministicCore(db, again, { today, skips, depth: depth + 1 }) : null;
   }
   if (intent.route === 'tenantcount') {
     const tc = await runTenantCount(db, intent.intent);
     if (tc) return tc;
     const again = classifyDeterministic(intent.intent.question, { ...(intent.intent.__opts ?? {}), skipTenantCount: true });
-    return again && again.route !== 'tenantcount' ? runDeterministicCore(db, again, { today }) : null;
+    return again && again.route !== 'tenantcount' ? runDeterministicCore(db, again, { today, skips, depth: depth + 1 }) : null;
   }
   if (intent.route === 'quotedcount') {
     const qc = await runQuotedPhraseCount(db, intent.intent);
     if (qc) return qc;
     const again = classifyDeterministic(intent.intent.question, { ...(intent.intent.__opts ?? {}), skipQuotedCount: true });
-    return again && again.route !== 'quotedcount' ? runDeterministicCore(db, again, { today }) : null;
+    return again && again.route !== 'quotedcount' ? runDeterministicCore(db, again, { today, skips, depth: depth + 1 }) : null;
   }
   if (intent.route === 'agreementfee') {
     const af = await runAgreementFee(db, intent.intent);
     if (af) return af;
     const again = classifyDeterministic(intent.intent.question, { ...(intent.intent.__opts ?? {}), skipAgreementFee: true });
-    return again && again.route !== 'agreementfee' ? runDeterministicCore(db, again, { today }) : null;
+    return again && again.route !== 'agreementfee' ? runDeterministicCore(db, again, { today, skips, depth: depth + 1 }) : null;
   }
   if (intent.route === 'agreementend') return runAgreementEnd(db, intent.intent);
   if (intent.route === 'quote') return runQuoteLookup(db, intent.intent);
@@ -660,15 +662,15 @@ async function runDeterministicCore(db, intent, { today } = {}) {
     const pd = await runPaidLookup(db, intent.intent);
     if (pd) return pd;
     // Not ours (near-miss / partial / several names / amounts recorded): behave as if this lookup did not exist.
-    const again = classifyDeterministic(intent.intent.question, { skipPaid: true });
-    return again && again.route !== 'paid' ? runDeterministicCore(db, again, { today }) : null;
+    const again = classifyDeterministic(intent.intent.question, { ...(skips.skipPaid = true, skips) });
+    return again && again.route !== 'paid' ? runDeterministicCore(db, again, { today, skips, depth: depth + 1 }) : null;
   }
   if (intent.route === 'fieldmatch') {
     const fm = await runFieldMatch(db, intent.intent);
     if (fm) return fm;
     // No single named customer / no data: behave exactly as if this lookup did not exist (re-classify without it).
-    const again = classifyDeterministic(intent.intent.question, { skipFieldMatch: true });
-    return again && again.route !== 'fieldmatch' ? runDeterministicCore(db, again, { today }) : null;
+    const again = classifyDeterministic(intent.intent.question, { ...(skips.skipFieldMatch = true, skips) });
+    return again && again.route !== 'fieldmatch' ? runDeterministicCore(db, again, { today, skips, depth: depth + 1 }) : null;
   }
   if (intent.route === 'datequal') return runDateQualifier(db, intent.intent);
   if (intent.route === 'datedocs') return runDocWindow(db, intent.intent);
@@ -684,8 +686,8 @@ async function runDeterministicCore(db, intent, { today } = {}) {
     const ag = await runAggregate(db, intent.intent, { today: t });
     if (ag || intent.intent?.kind !== 'template') return ag;
     // R45: the template could not answer (a word it cannot place, no such data): behave as if the templates did not exist (re-classify without them).
-    const again = classifyDeterministic(intent.intent.intent?.raw ?? '', { skipTemplate: true });
-    return again ? runDeterministicCore(db, again, { today }) : null;
+    const again = classifyDeterministic(intent.intent.intent?.raw ?? '', { ...(skips.skipTemplate = true, skips) });
+    return again ? runDeterministicCore(db, again, { today, skips, depth: depth + 1 }) : null;
   }
   if (intent.route === 'comparison') return runComparison(db, intent.intent);
   // Team G (industry packs): db is already inside this tenant's transaction, so packForTenant is a plain read

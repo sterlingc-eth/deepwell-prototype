@@ -5,6 +5,7 @@
   "installCommand": "npm install",
   "env": {},
   "functions": {
+    "api/ask.js": { "includeFiles": "api/_lib/wording/*.json" },
     "api/review.js": { "includeFiles": "test-docs/scorecard/exam.json" },
     "api/account.js": { "includeFiles": "test-docs/scorecard/exam.json" }
   },

@@ -1,0 +1,241 @@
+{
+"rules": [
+{
+"t": "zzpo",
+"re": "\\bpo-?\\d{3,6}\\b",
+"g": 0
+},
+{
+"t": "zzrefrig",
+"re": "\\br-?\\d{2,3}[a-z]?\\b",
+"g": 0
+},
+{
+"t": "zzdoc",
+"re": "\\b[a-z]{2,3}-\\d{3,6}(?:-\\d{3,6})?\\b",
+"g": 0
+},
+{
+"t": "zzton",
+"re": "\\b(?:\\d(?:\\.\\d)?|(?:one|two|three|four|five|six|seven|eight|nine|ten|twelve|fifteen|twenty))\\s*-?\\s*tons?\\b",
+"g": 0
+},
+{
+"t": "zzserial",
+"re": "\\b(?:[a-z]{1,2}\\d{5,7}|\\d[a-z]\\d{5,7})\\b",
+"g": 0
+},
+{
+"t": "zzmoney",
+"re": "\\$\\s?\\d[\\d,]*(?:\\.\\d+)?(?:\\s?[km]\\b)?",
+"g": 0
+},
+{
+"t": "zzmoney",
+"re": "\\b\\d+(?:\\.\\d+)?\\s?k\\b",
+"g": 0
+},
+{
+"t": "zzmoney",
+"re": "\\b(?:a|(?:one|two|three|four|five|six|seven|eight|nine|ten|twelve|fifteen|twenty)|fifty|\\d+)\\s+(?:thousand|grand)\\b",
+"g": 0
+},
+{
+"t": "zzmoney",
+"re": "\\b\\d[\\d,]*(?:\\.\\d+)?\\s*(?:dollars|bucks|usd)\\b",
+"g": 0
+},
+{
+"t": "zzmoney",
+"re": "\\b(?:over|under|above|below|exceeding|exceeds|more than|less than|greater than|at least|at most|beyond|upwards of|bigger than|larger than|smaller than|cheaper than)\\s+(?!(?:19|20)\\d{2}\\b)(\\d[\\d,]{2,}(?:\\.\\d+)?)\\b",
+"g": 1
+},
+{
+"t": "zzperiod",
+"re": "\\b(?:q[1-4]\\s*(?:of\\s+)?'?\\d{2,4}|\\d{4}\\s*q[1-4]|(?:first|second|third|fourth|1st|2nd|3rd|4th)\\s+quarter(?:\\s+of)?\\s+\\d{4})\\b",
+"g": 0
+},
+{
+"t": "zzperiod",
+"re": "\\b(?:h[12]\\s*\\d{4}|(?:first|second|1st|2nd)\\s+half(?:\\s+of)?\\s+(?:the\\s+year\\s+)?\\d{4})\\b",
+"g": 0
+},
+{
+"t": "zzperiod",
+"re": "\\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\.?,?\\s+(?:of\\s+)?(?:\\d{1,2}(?:st|nd|rd|th)?,?\\s+)?\\d{4}\\b",
+"g": 0
+},
+{
+"t": "zzperiod",
+"re": "\\b(?:in|during|for|of|since|through|until|thru|by|from|to)\\s+((?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?))\\b",
+"g": 1
+},
+{
+"t": "zzperiod",
+"re": "\\b\\d{4}-\\d{2}-\\d{2}\\b",
+"g": 0
+},
+{
+"t": "zzperiod",
+"re": "\\b\\d{1,2}/\\d{1,2}(?:/\\d{2,4})?\\b",
+"g": 0
+},
+{
+"t": "zzperiod",
+"re": "\\b(?:19|20)\\d0s\\b",
+"g": 0
+},
+{
+"t": "zzrel",
+"re": "\\b(?:the\\s+)?(?:last|past|previous|prior|trailing)\\s+(?:\\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve|fifteen|twenty|thirty|sixty|ninety)\\s+(?:days?|weeks?|months?|years?|quarters?)\\b",
+"g": 0
+},
+{
+"t": "zzrel",
+"re": "\\b(?:so far this|last|past|previous|prior|this|current|next)\\s+(?:week|month|quarter|year)\\b",
+"g": 0
+},
+{
+"t": "zzrel",
+"re": "\\b(?:year[\\s-]to[\\s-]date|ytd|month[\\s-]to[\\s-]date|mtd|today|yesterday|tomorrow|year before last)\\b",
+"g": 0
+},
+{
+"t": "zzrel",
+"re": "\\b(?:a|an|one|\\d+)\\s+(?:year|month|week)s?\\s+ago\\b",
+"g": 0
+},
+{
+"t": "zzyear",
+"re": "\\b(?:19|20)\\d{2}\\b",
+"g": 0
+},
+{
+"t": "zzyear",
+"re": "(?:^|\\s)('\\d{2})\\b",
+"g": 1
+},
+{
+"t": "zznum",
+"re": "\\b(?:top|best|biggest|largest|highest|smallest|lowest|bottom)\\s+(\\d+|(?:one|two|three|four|five|six|seven|eight|nine|ten|twelve|fifteen|twenty))\\b",
+"g": 1
+},
+{
+"t": "zznum",
+"re": "\\b(\\d+|(?:one|two|three|four|five|six|seven|eight|nine|ten|twelve|fifteen|twenty))\\s+(?:top|biggest|largest|best|highest|smallest|lowest|bottom|most)\\b",
+"g": 1
+},
+{
+"t": "zznum",
+"re": "\\b\\d+\\b",
+"g": 0
+}
+],
+"brands": [
+"carrier",
+"daikin",
+"goodman",
+"lennox",
+"mitsubishi electric",
+"mitsubishi",
+"rheem",
+"trane",
+"york",
+"bryant",
+"amana",
+"fujitsu",
+"samsung",
+"lg",
+"payne",
+"heil",
+"ruud",
+"nordyne",
+"american standard",
+"armstrong air",
+"bosch",
+"haier",
+"gree",
+"midea",
+"coleman",
+"frigidaire",
+"tempstar",
+"comfortmaker",
+"maytag",
+"whirlpool",
+"honeywell",
+"emerson",
+"copeland",
+"generac",
+"kohler",
+"navien",
+"rinnai",
+"bradford white",
+"a o smith",
+"ao smith",
+"state water heaters",
+"noritz",
+"takagi",
+"weil-mclain",
+"burnham",
+"peerless",
+"mr cool",
+"senville",
+"friedrich",
+"fedders",
+"ge",
+"kenmore",
+"hisense",
+"panasonic",
+"toshiba",
+"hitachi",
+"sanyo",
+"york international",
+"luxaire",
+"guardian",
+"day and night",
+"keeprite",
+"tappan",
+"westinghouse",
+"magic chef",
+"arcoaire"
+],
+"cities": [
+"phoenix",
+"mesa",
+"gilbert",
+"chandler",
+"tempe",
+"scottsdale",
+"glendale",
+"peoria",
+"queen creek",
+"san tan valley",
+"casa grande",
+"maricopa",
+"florence",
+"tucson",
+"oro valley",
+"marana",
+"las vegas",
+"albuquerque",
+"los angeles",
+"flagstaff",
+"yuma",
+"sedona",
+"prescott",
+"surprise",
+"goodyear",
+"avondale",
+"buckeye",
+"fountain hills",
+"paradise valley",
+"apache junction",
+"denver",
+"dallas",
+"houston",
+"austin",
+"san diego",
+"reno",
+"henderson"
+]
+}

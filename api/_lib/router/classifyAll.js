@@ -473,11 +473,36 @@ function grammarDecline(out, question, ctx) {
   } catch { return null; }
 }
 
+/**
+ * Wording model (api/_lib/wording): the LAST resort, only for a question that no lane claimed. A small learned classifier recognises a paraphrase of
+ * a catalogued question shape ("how many jobs did we do in 2024"), the slots are carried over from the user's own words, and the question is spelled
+ * the canonical way. It is adopted ONLY when a deterministic lane claims the canonical question; the grammar / leftover guards (unused negation,
+ * a second clause, a name / period / number the template does not read, a word the template has never seen) have already run on the ORIGINAL
+ * question inside adapt(). It never overrides an existing claim. DONOVAN_WORDING_MODEL=0 turns it off.
+ */
+async function withWording(out, question, ctx) {
+  try {
+    if (process.env.DONOVAN_WORDING_MODEL === "0" || ctx?.noWording || ctx?.meta || (out?.winner && out.winner.name !== "analytics") || out?.leftoverDeclined) return out;
+    const { adapt } = await import("../wording/index.js");
+    const a = adapt(question, { tenantVocab: ctx?.tenantVocab });
+    if (!a?.canonical || a.canonical === question) return out;
+    const re = await classifyAllCore(a.canonical, { ...ctx, noWording: true });
+    if (!re?.winner) return out;
+    // the looser analytics stage (which may plan with a model) is only ever traded for a stricter lane, never for itself
+    if (out?.winner?.name === "analytics" && re.winner.name === "analytics") return out;
+    return { ...re, effectiveQuestion: re.effectiveQuestion ?? a.canonical, wording: { template: a.template, prob: a.prob, canonical: a.canonical } };
+  } catch { return out; }
+}
+
 export async function classifyAll(question, ctx = {}) {
+  return withWording(await classifyAllCore(question, ctx), question, ctx);
+}
+
+async function classifyAllCore(question, ctx = {}) {
   // two bare years joined by "and" ("total of invoices in 2024 and 2025"): the second is spelled as its own window so no lane reads it as a dollar amount ($2,025)
   if (process.env.DONOVAN_GRAMMAR !== "0") {
     const yp = yearPairRewrite(question);
-    if (yp) { const o2 = await classifyAll(yp, ctx); return { ...o2, effectiveQuestion: o2.effectiveQuestion ?? yp }; }
+    if (yp) { const o2 = await classifyAllCore(yp, ctx); return { ...o2, effectiveQuestion: o2.effectiveQuestion ?? yp }; }
   }
   let out = await classifyAllInner(question, ctx);
   // R2 B2: a summary claim travels under its one canonical spelling (summary/parse.js explains why): the older records-first lane answers

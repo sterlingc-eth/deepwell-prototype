@@ -14,12 +14,12 @@ import { TENANT_SQL, answerEnvelope } from "../scope.js";
 import { countSubject } from "../understanding/understand.js";
 
 const NOUNS = [
-  [/^(?:invoices?|invoce|invioce|bills?)$/, "invoice", "invoice"], [/^(?:quotes?|qoute|quoet|estimates?|proposals?)$/, "proposal-quote", "quote"],
+  [/^(?:invoices?|invoiced|invoce|invioce|bills?|billed)$/, "invoice", "invoice"], [/^(?:quotes?|qoute|quoet|estimates?|proposals?)$/, "proposal-quote", "quote"],
   [/^permits?$/, "permit", "permit"], [/^(?:agreements?|contracts?)$/, "maintenance-agreement", "maintenance agreement"],
   [/^(?:tickets?)$/, "service-ticket", "service ticket"], [/^(?:orders?)$/, "work-order", "work order"],
 ];
 const VOCAB = new Set(["how", "many", "number", "of", "count", "are", "is", "there", "we", "have", "has", "had", "do", "does", "did", "the", "our", "my", "a", "an", "any", "which", "what", "who", "whom", "show", "me", "list", "give", "tell",
-  "customer", "customers", "client", "clients", "with", "without", "no", "zero", "0", "never", "ever", "got", "received", "gotten", "having", "that", "not", "been", "sent", "given", "all", "got", "on", "file", "right", "now", "currently", "still", "yet", "work", "service", "maintenance"]);
+  "customer", "customers", "client", "clients", "with", "without", "no", "zero", "0", "never", "ever", "got", "received", "gotten", "having", "that", "not", "been", "sent", "given", "all", "got", "on", "file", "right", "now", "currently", "still", "yet", "work", "service", "maintenance", "different", "distinct", "unique"]);
 const RANK = { most: "max", fewest: "min", least: "min", highest: "max", lowest: "min" };
 const STATUS = new Set(["open", "pending", "outstanding", "unaccepted", "unsigned", "accepted", "approved", "signed", "declined", "won", "lost", "awaiting", "active", "unanswered", "expired", "unconverted", "rejected"]);
 

@@ -803,6 +803,8 @@ const SUPERLATIVE_BOTTOM_RE = new RegExp(
   'i'
 );
 
+const DOC_NOUN_BEHIND_BRAND_RE = /\b(?:invoices?|quotes?|proposals?|estimates?|tickets?|work orders?|purchase orders?|permits?|agreements?|contracts?|documents?|jobs?|visits?|calls?)\b/i;
+
 function detectGroupBySuperlative(q) {
   const topM = SUPERLATIVE_TOP_RE.exec(q);
   const botM = !topM ? SUPERLATIVE_BOTTOM_RE.exec(q) : null;
@@ -811,6 +813,8 @@ function detectGroupBySuperlative(q) {
   const word = (m[1] ?? m[2] ?? '').toLowerCase();
   const field = DIM_WORD_TO_FIELD[word];
   if (!field || !GROUP_BY_FIELDS.includes(field)) return null;
+  // "which brand shows up on the fewest invoices": the thing counted is a document, not the units that carry the brand, so a unit ranking would answer another question
+  if (field === 'brand' && DOC_NOUN_BEHIND_BRAND_RE.test(q) && !/\b(?:units?|systems?|equipment|installs?|installed|installations?|furnaces?|a\/?cs?|heat pumps?)\b/i.test(q)) return null;
   const entity = field === 'brand' ? 'equipment' : field === 'technician' ? 'serviceVisits' : entityFromNouns(q);
   return { entity, op: 'groupBy', groupBy: field, superlative: topM ? 'top' : 'bottom' };
 }
@@ -1226,7 +1230,7 @@ const READABLE_TEXT_DENY_RE = /\breadable text\b/i;
  * prevent. Denied at the TOP level, same as READABLE_TEXT_DENY_RE just above, so a miss here can
  * never fall through to a confident bare-count guess.
  */
-const UNTRACKED_CONCEPT_DENY_RE = /\bwarranty\s+claims?\b|\brenewal\s+reminders?\b/i;
+const UNTRACKED_CONCEPT_DENY_RE = /\bwarranty\s+claims?\b|\brenewal\s+reminders?\b|\b(?:labou?r|man)[\s-]*hours?\b/i; // labor hours: a per-document figure this planner cannot sum (never a document count)
 
 /**
  * Round 15 (A): "data-quality" / missing-field shapes — "documents aren't
@@ -1476,6 +1480,10 @@ export function detectAnalyticsPlan(question, tenantVocab, today) {
   const plan = detectAnalyticsPlanInner(question, tenantVocab, today);
   const bare = plan && plan.op === 'list' && plan.entity === 'customers' && !(plan.filters ?? []).length && Object.keys(plan).every((k) => k === 'entity' || k === 'op' || k === 'filters');
   if (bare && SUPERLATIVE_RE.test(String(question ?? ''))) return null;
+  // a plain list of the distinct values never answers a ranking ("which brand do we sell the most of"): released, not listed
+  if (plan && plan.distinctList && /\b(?:most|fewest|least)\b/i.test(String(question ?? ''))) return null;
+  // a bare SINGULAR "which customer?" points back at something already said; it is not a request for the whole customer list
+  if (bare && /^\s*(?:and\s+)?(?:which|what|who)(?:\s+is)?\s+(?:the\s+)?(?:customer|client)\s*[?.!]*\s*$/i.test(String(question ?? ''))) return null;
   return plan;
 }
 

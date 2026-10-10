@@ -13,6 +13,8 @@ export function docLaneFromUnderstanding(u, question = '') {
   if (!u || !DOC.has(u.docKind)) return null;
   // Loop R2: "top 5 customers by invoice total" is a ranking, not a single-biggest-document lookup; leave it to the ranking templates.
   if (/\b(?:top|bottom)\s+(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b(?=\s+[a-z])/i.test(String(question))) return null;
+  // "the 3 customers with the most invoices" / "vendors with the highest bills": a ranking of a group, also not a document lookup.
+  if (/\b(?:customers?|clients?|vendors?|suppliers?)\s+(?:with|having|by)\s+the\s+(?:most|fewest|least|highest|lowest|biggest|largest)\b/i.test(String(question))) return null;
   const f = u.filters ?? {};
   if ((u.notes ?? []).includes('directionConflict')) return { intent: 'direction_ask', docNoun: u.docKind };
   // A3: "wheres George Garrison invoice": a named customer (or vendor) and the document word, nothing else. The name never contains a question word or a role word.

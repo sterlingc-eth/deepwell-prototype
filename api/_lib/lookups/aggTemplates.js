@@ -29,7 +29,7 @@ const norm = (s) => String(s ?? "").toLowerCase().replace(/[’`]/g, "'").replac
 const NUM_WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, twelve: 12, fifteen: 15, twenty: 20 };
 const GLUE = new Set(("a an the we our us i you it is are was were be been do does did has have had what whats what's which who whose when where how many much number count of in on at for by to from with and or "
   + "size sizes that thats this these those there any all each every some please file files record records on-file listed shown currently current right now still so far overall total ever just really actually "
-  + "me show give tell list get can could would should say also then than as be being per service serviced services maintain maintained manage managed track tracked own handle handled work worked take taken keep kept on-file got into over across during within").split(/\s+/));
+  + "me show give tell list get can could would should say also then than as be being per service serviced services maintain maintained manage managed track tracked own handle handled work worked take taken keep kept on-file got into over across during within write wrote written writing sent issued").split(/\s+/));
 
 /* ---------------------------------------------------------------- slot vocabularies */
 // closed-class words can never be a brand / city / name: a leftover one means "not a template question", so the claim is never made
@@ -63,7 +63,7 @@ const CUES = {
   share: /\b(?:percent(?:age)?|share|proportion|fraction|portion|ratio)\b|\bhow much of\b/,
   avg: /\b(?:average|avg|mean|typical)\b/,
   busy: /\b(?:busiest|slowest|quietest|busy|slow|peak|least busy|most active|least active)\b|\bwhich (?:month|year) (?:had|has|saw|did we have|were we)\b[^.]*\b(?:most|fewest|least|highest|lowest|biggest|smallest)\b|\b(?:month|year) with the (?:most|fewest|least|highest|lowest)\b/,
-  top: /\b(?:top|biggest|largest|best|highest|leading|greatest)\b|\b(?:most|least|fewest|lowest) (?:active|valuable|profitable)\b/,
+  top: /\b(?:top|biggest|largest|best|highest|leading|greatest)\b|\b(?:most|least|fewest|lowest) (?:active|valuable|profitable)\b|\b(?:customers|clients|technicians|techs|vendors|suppliers|brands|cities)\s+(?:with|having|by)\s+the\s+most\b/,
   versus: /\b(?:compare|compared to|comparison|versus|vs|against)\b|\bdifference between\b/,
   // R3 B2: "total of Kevin Pratt's invoices", "what do Kevin Pratt's invoices add up to": the dollar sum of one scoped set
   sum: /\b(?:total|sum)\s+(?:of|for)\b|\badd(?:s|ed)?\s+up\b/,
@@ -135,6 +135,8 @@ export function parseTemplate(question) {
   let n = null;
   const nm = take(rest, /\b(?:top|first|biggest|largest|best|highest|busiest)\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve|fifteen|twenty)\b|\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:biggest|largest|best|highest|top|busiest)\b/);
   if (nm) { const w = nm.m[1] ?? nm.m[2]; n = /^\d+$/.test(w) ? Number(w) : NUM_WORDS[w]; rest = nm.rest; }
+  // "the 3 customers with the highest ..." / "the 7 customers with the most ...": the number sits before the ranked noun
+  if (n == null && t === "top") { const nn = take(rest, /\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|twelve|fifteen|twenty)\s+(?=(?:technicians|techs|customers|clients|vendors|suppliers|brands|cities)\b)/); if (nn) { n = /^\d+$/.test(nn.m[1]) ? Number(nn.m[1]) : NUM_WORDS[nn.m[1]]; rest = nn.rest; } }
 
   // dimension (group-by) and subject
   let dim = null;

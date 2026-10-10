@@ -424,6 +424,8 @@ export function parseMoneyIntent(question, { today }) {
   question = dropRoleBeforeInvoices(question);
   const q = String(question ?? '').toLowerCase();
   if (!q.trim()) return null;
+  // "how many different / distinct / unique customers have been invoiced" counts the PEOPLE, not dollars or invoices; no reader here counts distinct parties.
+  if (/\b(?:how many|number of|count of)\s+(?:different|distinct|unique|separate)\b/.test(q)) return null;
   // R39: "how many invoices have no <field> / without <field>" is a missing-field count; none of the readers below applies it (they would answer the paid / open / whole-shop count).
   if (/^(?:how many|number of|count of)\s+(?:invoices?|bills?)\b/.test(q) && /\b(?:no|without|missing|lacking|lacks?|(?:don'?t|do not|doesn'?t|does not|didn'?t) have)\s+(?:an?\s+|any\s+|the\s+)?[a-z]/.test(q) && !/\b(?:no|missing|lacking|lacks?|without|(?:don'?t|do not|doesn'?t|does not|didn'?t) have)\s+(?:an?\s+|any\s+|the\s+)?totals?\b/.test(q)) return null;
   // R39: an amount range that could also be read as a year window ("between 2000 and 2500"), "from 2000 to 3000 dollars", or two amount bounds ("over $2,000 and under $3,000")
@@ -1818,7 +1820,14 @@ async function docsInWindow(db, intent, ctx) {
   const note = (intent.readNotes ?? []).length ? ` (${intent.readNotes.join('; ')})` : '';
   if (!n) return baseAnswer(`No ${noun}s ${bill ? 'we received ' : 'we sent '}${when} are on file.${note}`, [], { confidence: 1, ...zeroCite(`Searched every ${noun} ${when}; none found.`) });
   const one = (x) => `${x.invoice_number ? `#${x.invoice_number}` : 'no printed number'}${(bill ? (x.vendor_name || x.customer_name) : x.customer_name) ? ` ${bill ? 'from' : 'to'} ${bill ? (x.vendor_name || x.customer_name) : x.customer_name}` : ''}${humanDate(x.doc_date) ? `, ${humanDate(x.doc_date)}` : ''}${x.total == null ? ', no printed total' : `, ${fmt(x.total)}`}`;
-  return baseAnswer(`${plural(n, noun)} ${bill ? 'we received' : 'we sent'} ${when}: ${rows.map(one).join('; ')}${n > rows.length ? `; and ${n - rows.length} more` : ''}.${note}`, rows.map((x) => invoiceFact(x)), {
+  // "what did we bill in 2025": the question asks for the amount, so the sum of the printed totals leads (never only a list)
+  const askedAmount = /\b(?:bill(?:ed|ing)?|invoiced|revenue|sales|total|totals|worth|how much|earned|took in|brought in)\b/i.test(String(intent.rawOriginal ?? intent.raw ?? ''));
+  let sumLead = ''; let sumNote = '';
+  if (askedAmount) {
+    const [s] = await q(db, `SELECT COALESCE(sum(f.total) FILTER (WHERE f.total IS NOT NULL AND f.currency = 'USD'), 0) AS amount, count(*) FILTER (WHERE f.total IS NULL)::int AS no_total, count(*) FILTER (WHERE f.total IS NOT NULL AND f.currency <> 'USD')::int AS foreign_n FROM financials f WHERE ${scope}`, [], ctx.hu);
+    if (s && s.no_total < n) { sumLead = `, ${fmt(String(s.amount))} in all`; sumNote = exclusionText({ noTotal: s.no_total, foreign: s.foreign_n, noun }); }
+  }
+  return baseAnswer(`${plural(n, noun)} ${bill ? 'we received' : 'we sent'} ${when}${sumLead}: ${rows.map(one).join('; ')}${n > rows.length ? `; and ${n - rows.length} more` : ''}.${sumNote}${note}`, rows.map((x) => invoiceFact(x)), {
     sources: rows.map((x) => docSource(x.document_id, x.total_page)), interpretation: `${noun}s ${when}`,
     cite: { records: financeRecords(rows), total: n, claimedCount: n, basis: `Counted the ${noun}s ${when} (newest first).` } });
 }
