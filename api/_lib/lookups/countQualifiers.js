@@ -10,6 +10,7 @@ import { attachCitations } from "../citations/records.js";
 import { documentRecordsFor, customerRecordsFor } from "../citations/enrich.js";
 import { TENANT_SQL, answerEnvelope } from "../scope.js";
 import { extractWindow } from "./dateQualifiers.js";
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 const ONES = { zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19 };
 const TENS = { twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
@@ -106,7 +107,7 @@ const stateOf = (addr) => (/,\s*([A-Z]{2})\s+\d{5}/.exec(String(addr ?? "")) ?? 
 export async function runCountQualifier(db, intent) {
   if (intent.kind === "invoice-amount") {
     const { rows: all } = await db.raw(
-      `SELECT f.document_id, f.total::float8 AS total FROM document_financials f JOIN documents d ON d.id = f.document_id AND d.${TENANT_SQL}
+      `SELECT f.document_id, f.total::float8 AS total FROM document_financials f JOIN documents d ON d.id = f.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
         WHERE f.${TENANT_SQL} AND lower(replace(d.document_type, '_', '-')) = 'invoice' AND f.total IS NOT NULL`, []);
     let rows = all, win = "";
     const W = intent.window;

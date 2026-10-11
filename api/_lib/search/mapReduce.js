@@ -51,6 +51,7 @@ import { sendEmail } from '../email.js';
 import { withTenant } from '../recordsStore.js';
 import { resolveFilterDocumentIds } from './knowledge.js';
 import { getDossier, dossierSchemaReady } from './dossier.js';
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 const TENANT = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 
@@ -89,7 +90,7 @@ async function selectCandidateDocuments(db, question, documentIds, limit) {
     const { rows: docs } = await db.raw(
       `SELECT d.id AS document_id, d.document_type, d.original_filename,
               (SELECT p.page_no FROM document_pages p WHERE p.document_id = d.id ORDER BY p.page_no LIMIT 1) AS page_no
-         FROM documents d WHERE d.id = ANY($1::uuid[]) AND d.${TENANT}`,
+         FROM documents d WHERE ${notPrivateSql("d")} AND d.id = ANY($1::uuid[]) AND d.${TENANT}`,
       [documentIds]
     );
     for (const d of docs) byDoc.set(d.document_id, { documentId: d.document_id, documentType: d.document_type, filename: d.original_filename, pages: d.page_no ? [{ page_no: d.page_no, excerpt: '' }] : [] });

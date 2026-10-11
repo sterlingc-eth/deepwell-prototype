@@ -20,6 +20,7 @@ import { TENANT_SQL, typeSql, normalizeTypeId, docTypeAliases, answerEnvelope } 
 import { attachCitations, customerRecord, unitRecord, documentRecord } from './citations/records.js';
 import { comparisonCitations } from './citations/history.js';
 import { parseNamedCompare, runNamedCompare } from './lookups/namedCompare.js'; // R32b
+import { notPrivateSql } from "./privacy/privateDocs.js";
 
 const BRANDS = ['trane', 'carrier', 'goodman', 'lennox', 'rheem', 'york', 'daikin', 'mitsubishi'];
 const CITY_SET = new Set([...KNOWN_AZ_CITY_NAMES, ...KNOWN_US_CITY_NAMES].map((c) => String(c).toLowerCase()));
@@ -124,7 +125,7 @@ export async function runComparison(db, intent) {
   if (intent.kind === 'named' || intent.kind === 'vendor' || intent.kind === 'servicetype') return runNamedCompare(db, intent); // R32b
   if (intent.kind === 'doctype') {
     const { rows } = await db.raw(
-      `SELECT ${typeSql('document_type')} AS t, count(*)::int AS n FROM documents WHERE ${TENANT_SQL} GROUP BY 1`, []);
+      `SELECT ${typeSql('document_type')} AS t, count(*)::int AS n FROM documents WHERE ${TENANT_SQL} AND ${notPrivateSql("")} GROUP BY 1`, []);
     const byId = new Map();
     for (const r of rows) byId.set(canonicalType(r.t), (byId.get(canonicalType(r.t)) ?? 0) + Number(r.n));
     const breakdown = [...byId.entries()].map(([id, count]) => ({ id, label: documentTypeLabel(id), count }))
@@ -132,7 +133,7 @@ export async function runComparison(db, intent) {
     // TEAM C: list the documents of BOTH sides (newest first, capped), grouped by side.
     const side = async (s) => (await db.raw(
       `SELECT id, document_type, original_filename, created_at FROM documents
-        WHERE ${typeSql('document_type')} = ANY($1::text[]) AND ${TENANT_SQL} ORDER BY created_at DESC LIMIT 200`, [docTypeAliases(s.key)])).rows
+        WHERE ${typeSql('document_type')} = ANY($1::text[]) AND ${TENANT_SQL} AND ${notPrivateSql("")} ORDER BY created_at DESC LIMIT 200`, [docTypeAliases(s.key)])).rows
       .map((r) => documentRecord(r, { label: `${s.label} · ${r.original_filename ?? r.id}`, sublabel: `uploaded ${String(r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at ?? '').slice(0, 10)}`, group: s.label }));
     const records = [...(await side(intent.a)), ...(await side(intent.b))];
     return buildComparisonAnswer(intent, { a: byId.get(intent.a.key) ?? 0, b: byId.get(intent.b.key) ?? 0, breakdown, records });
@@ -156,14 +157,14 @@ export async function runComparison(db, intent) {
     const q = {
       customers: `SELECT count(*)::int AS n FROM entities WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT_SQL}`,
       equipment: `SELECT count(*)::int AS n FROM entities WHERE entity_type = 'equipment' AND merged_into IS NULL AND ${TENANT_SQL}`,
-      documents: `SELECT count(*)::int AS n FROM documents WHERE ${TENANT_SQL}`,
+      documents: `SELECT count(*)::int AS n FROM documents WHERE ${TENANT_SQL} AND ${notPrivateSql("")}`,
     };
     const [ra, rb] = await Promise.all([db.raw(q[intent.a.key], []), db.raw(q[intent.b.key], [])]);
     // TEAM C: a sample of each side (records are capped at 200 per answer; recordsTotal carries the true counts).
     const list = {
       customers: `SELECT id, data->>'customer_name' AS name, data->>'service_address' AS addr FROM entities WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT_SQL} ORDER BY created_at DESC LIMIT 100`,
       equipment: `SELECT id, customer_id, data->>'manufacturer' AS m, data->>'model' AS model, data->>'equipment_type' AS et FROM entities WHERE entity_type = 'equipment' AND merged_into IS NULL AND ${TENANT_SQL} ORDER BY created_at DESC LIMIT 100`,
-      documents: `SELECT id, document_type, original_filename FROM documents WHERE ${TENANT_SQL} ORDER BY created_at DESC LIMIT 100`,
+      documents: `SELECT id, document_type, original_filename FROM documents WHERE ${TENANT_SQL} AND ${notPrivateSql("")} ORDER BY created_at DESC LIMIT 100`,
     };
     const asRecord = (k, s) => (r) => (k === 'customers' ? customerRecord({ id: r.id, customer_name: r.name, service_address: r.addr }, { group: s.label })
       : k === 'equipment' ? unitRecord({ id: r.id, manufacturer: r.m, equipment_type: r.et, model: r.model, customer_id: r.customer_id }, { group: s.label })

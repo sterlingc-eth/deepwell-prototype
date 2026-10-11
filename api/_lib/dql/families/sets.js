@@ -404,6 +404,7 @@ function parsePreds(items, ctx) {
             if (/^(?:dollars?|bucks)$/.test(items[i + 1]?.v ?? '')) i++;
             if (v.startsWith('age_')) fail();
             st.moneyCue = false;
+            if (items.some((it) => it.t === 'doc' && it.id !== 'invoice')) fail(); // an amount beside another kind of paper ("tenants on leases over $22,500") is not what an invoice was billed
             emit({ k: 'billed', cmp: qty(op, n) });
             break;
           }
@@ -493,6 +494,8 @@ function parsePreds(items, ctx) {
   }
   // "repeat clients with more than one invoice": the count that is written out defines what repeat means here
   if (E.all.some((p) => p.repeat) && E.all.some((p) => (p.k === 'doc' || p.k === 'unit') && p.cmp && !p.repeat)) E.all = E.all.filter((p) => !p.repeat);
+  // "repeat clients for engagement letters": repeat visits, or repeat letters? Too open to guess, so it is released
+  if (E.all.some((p) => p.repeat) && E.all.some((p) => (p.k === 'doc' || p.k === 'udoc') && p.type && !p.repeat)) fail();
   if (st.elseWord && !st.exclSeen) fail();
   // "customers in Mesa and Tucson": a customer lives in one city, so the intersection is empty by construction - released, not answered
   if (E.all.filter((p) => p.k === 'city').length > 1) fail();
@@ -795,6 +798,8 @@ function parsePerEntity(items) {
   const rest = body.filter((it) => it.t !== 'time');
   const m = measureIn(rest);
   if (!m || !['billed', 'visits', 'docs', 'units', 'tickets'].includes(m.kind)) return null;
+  // "average statement total per client" asks for an amount, not a number of papers: only the invoice (billed) measure reads money here
+  if (m.kind === 'docs' && rest.some((it) => it.t === 'w' && /^(?:total|totals|amount|amounts|dollars?|value|worth|cost|costs|price|prices)$/.test(it.v))) return null;
   // "average invoice per customer": the size of an invoice or the number of invoices - two readings, so it is released
   if (m.kind === 'docs' && m.type && /^(?:invoice|proposal-quote|purchase-order|maintenance-agreement)$/.test(m.type)) {
     const ai = items.findIndex((it) => isP(it, 'avg'));
@@ -1063,7 +1068,7 @@ function execSelect(plan, x) {
   const lapse = (e) => {
     const only = e.all.length === 0 && e.any.length === 0 && e.none.length === 1 ? e.none[0] : null;
     if (subj !== 'customer' || !only || !only.time || !/^since /.test(only.time.label ?? '') || only.cmp || !(only.k === 'doc' || only.k === 'udoc')) return null;
-    const ever = { all: [{ ...only, time: undefined }], none: [], any: [] };
+    const ever = { all: [{ ...only, time: { from: '0000-01-01', to: only.time.to, label: 'ever' } }], none: [], any: [] }; // a paper dated after today has not happened yet: it does not make a customer "lapsed"
     return (r) => test(r, ever);
   };
   const lapsedOf = lapse(expr);

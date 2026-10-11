@@ -17,6 +17,7 @@ import {
   MONEY_FIELDS, EDITABLE_FIELDS, REVIEW_FLAGS, effectiveHeader, recomputeFlags, needsReview, validateCorrection,
 } from './normalize.js';
 import { jobCostingColumnsExist } from './jobCosting.js';
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 const TENANT = "(current_setting('app.tenant_id', true))::uuid";
 const NEGATIVE_TTL_MS = 30_000;
@@ -171,7 +172,7 @@ export async function listFinancialsNeedingReview(db, { limit = 200 } = {}) {
   if (!(await financialsTableExists(db))) return { enabled: false, items: [] };
   const r = await db.raw(
     `SELECT f.document_id, d.original_filename AS filename, f.doc_kind, f.total, f.flags, f.confidence, f.invoice_number
-       FROM document_financials f JOIN documents d ON d.id = f.document_id AND d.tenant_id = f.tenant_id
+       FROM document_financials f JOIN documents d ON d.id = f.document_id AND ${notPrivateSql("d")} AND d.tenant_id = f.tenant_id
       WHERE f.tenant_id = ${TENANT} AND f.verified_by IS NULL
         AND (f.flags && $1::text[] OR f.confidence < 0.85)
       ORDER BY f.confidence NULLS FIRST, f.extracted_at DESC LIMIT $2`,
@@ -243,7 +244,7 @@ export async function listBackfillCandidates(db, { afterId = null, limit = 25, d
   const r = await db.raw(
     `SELECT d.id, d.document_type, d.original_filename AS filename
        FROM documents d
-      WHERE d.tenant_id = ${TENANT} AND d.document_type = ANY($1::text[])
+      WHERE ${notPrivateSql("d")} AND d.tenant_id = ${TENANT} AND d.document_type = ANY($1::text[])
         AND ($2::uuid IS NULL OR d.id > $2::uuid)
         AND NOT EXISTS (SELECT 1 FROM document_financials f WHERE f.document_id = d.id AND f.tenant_id = d.tenant_id)
         AND EXISTS (SELECT 1 FROM document_pages p WHERE p.document_id = d.id AND p.tenant_id = d.tenant_id AND length(btrim(p.text)) > 0)
@@ -260,7 +261,7 @@ export async function backfillCounts(db, { documentTypes }) {
     `SELECT count(*)::int AS eligible,
             count(*) FILTER (WHERE EXISTS (SELECT 1 FROM document_financials f WHERE f.document_id = d.id AND f.tenant_id = d.tenant_id))::int AS done
        FROM documents d
-      WHERE d.tenant_id = ${TENANT} AND d.document_type = ANY($1::text[])
+      WHERE ${notPrivateSql("d")} AND d.tenant_id = ${TENANT} AND d.document_type = ANY($1::text[])
         AND EXISTS (SELECT 1 FROM document_pages p WHERE p.document_id = d.id AND p.tenant_id = d.tenant_id AND length(btrim(p.text)) > 0)`,
     [documentTypes]
   );

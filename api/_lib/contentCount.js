@@ -50,6 +50,7 @@
 import { documentTypeLabel, canonicalTypeId } from './documentTypes.js';
 import { attachCitations, customerRecord, documentRecord } from './citations/records.js';
 import { parseJobSummaryQuestion, runJobSummary } from './content/jobSummary.js';
+import { notPrivateSql } from "./privacy/privateDocs.js";
 
 const TENANT_SQL = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 
@@ -602,7 +603,7 @@ export async function runContentCount(db, parsed, pack = null) {
         ({ rows: pages } = await db.raw(
           `SELECT p.document_id, p.page_no, p.text, d.document_type, d.original_filename, d.created_at
              FROM document_pages p
-             JOIN documents d ON d.id = p.document_id AND d.${TENANT_SQL}
+             JOIN documents d ON d.id = p.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
             WHERE p.${TENANT_SQL} AND p.tsv @@ (${prefilter.sql}) AND p.text ~* $${prefilter.params.length + 1}
             ORDER BY d.created_at DESC
             LIMIT ${MAX_PAGES}`,
@@ -618,7 +619,7 @@ export async function runContentCount(db, parsed, pack = null) {
       ({ rows: pages } = await db.raw(
       `SELECT p.document_id, p.page_no, p.text, d.document_type, d.original_filename, d.created_at
          FROM document_pages p
-         JOIN documents d ON d.id = p.document_id AND d.${TENANT_SQL}
+         JOIN documents d ON d.id = p.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
         WHERE p.${TENANT_SQL} AND p.text ~* $1
         ORDER BY d.created_at DESC
         LIMIT ${MAX_PAGES}`,

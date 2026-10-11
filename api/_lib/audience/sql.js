@@ -15,6 +15,8 @@
  * WARRANTY_BUCKET_CASE constants) meant to be AND-ed into an existing WHERE clause.
  */
 
+import { notPrivateSql } from '../privacy/privateDocs.js';
+
 /** The extractions.field_key used to record a document's audience before M3-config/57's
  *  `documents.audience` column exists. Never a real extracted fact — see documentTypes.js's
  *  REQUIRED_FIELDS/FIELD_LABELS, which deliberately does NOT list it (see the FIELD_LABELS entry
@@ -39,11 +41,13 @@ export const AUDIENCE_NOTIFIED_FIELD_KEY = '_audience_notified';
  * @returns {string}
  */
 export function audienceFilterSql({ docAlias = 'd', hasAudienceColumn, teamScoped = false } = {}) {
-  if (teamScoped) return 'TRUE';
+  // People / HR papers (privacy/privateDocs.js) are left out of EVERY answer, a team-scoped question included.
+  const priv = notPrivateSql(docAlias);
+  if (teamScoped) return priv;
   if (hasAudienceColumn) {
-    return `COALESCE(${docAlias}.audience, 'customer') <> 'internal'`;
+    return `${priv} AND COALESCE(${docAlias}.audience, 'customer') <> 'internal'`;
   }
-  return `NOT EXISTS (
+  return `${priv} AND NOT EXISTS (
     SELECT 1 FROM extractions ax
      WHERE ax.document_id = ${docAlias}.id AND ax.tenant_id = ${docAlias}.tenant_id
        AND ax.field_key = '${AUDIENCE_FALLBACK_FIELD_KEY}' AND ax.value = 'internal'

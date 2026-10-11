@@ -18,6 +18,7 @@
  * compose.js / rankings.js. No question text or row values are ever logged.
  */
 import { TENANT_SQL, isoDate } from '../scope.js';
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 /** The 7 document types the scorecard oracle treats as a "visit" — see this file's own header. */
 export const VISIT_DOC_TYPES = [
@@ -49,7 +50,7 @@ export async function fetchAllVisits(db, today) {
             (SELECT COALESCE(NULLIF(t.corrected_value, ''), t.value) FROM extractions t
               WHERE t.document_id = d.id AND t.field_key = 'technician' AND t.${TENANT_SQL} LIMIT 1) AS tech
        FROM document_entity_links l
-       JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL}
+       JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
        LEFT JOIN entities le ON le.id = l.entity_id AND le.entity_type = 'equipment' AND le.${TENANT_SQL}
        JOIN entities c ON (c.id = l.entity_id OR c.id = le.customer_id) AND c.entity_type = 'customer'
                        AND c.merged_into IS NULL AND c.${TENANT_SQL}
@@ -210,7 +211,7 @@ export async function fetchReplacementQuotes(db) {
   const { rows } = await db.raw(
     `SELECT DISTINCT c.id AS cust_id, d.id AS doc_id, d.created_at::date AS quoted_at
        FROM document_entity_links l
-       JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL}
+       JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
        JOIN document_pages p ON p.document_id = d.id AND p.${TENANT_SQL}
        LEFT JOIN entities le ON le.id = l.entity_id AND le.entity_type = 'equipment' AND le.${TENANT_SQL}
        JOIN entities c ON (c.id = l.entity_id OR c.id = le.customer_id) AND c.entity_type = 'customer'

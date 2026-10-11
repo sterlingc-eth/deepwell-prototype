@@ -50,6 +50,7 @@ import { tenantHasFinancialRows } from '../financials/store.js';
 // narratives — lives in its own module (connect2.js's own header explains why) and is merged into this
 // file's own classify/answer entry points below, so ask.js needs no change at all.
 import { classifyConnect2, HANDLERS as CONNECT2_HANDLERS } from './connect2.js';
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 /* ------------------------------------------------------------------ small pure helpers */
 
@@ -792,7 +793,7 @@ const HANDLERS = {
     const { rows } = await db.raw(
       `SELECT DISTINCT c.id, c.data->>'customer_name' AS name FROM entities c
         WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.${TENANT_SQL}
-          AND EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL}
+          AND EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
                         LEFT JOIN entities le ON le.id = l.entity_id AND le.entity_type = 'equipment' AND le.${TENANT_SQL}
                        WHERE (l.entity_id = c.id OR le.customer_id = c.id) AND l.${TENANT_SQL}
                          AND lower(replace(d.document_type, '_', '-')) = ANY($1::text[]))
@@ -814,7 +815,7 @@ const HANDLERS = {
     const { rows } = await db.raw(
       `SELECT DISTINCT c.id, c.data->>'customer_name' AS name FROM entities c
         WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.${TENANT_SQL}
-          AND EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL}
+          AND EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
                         LEFT JOIN entities le ON le.id = l.entity_id AND le.entity_type = 'equipment' AND le.${TENANT_SQL}
                        WHERE (l.entity_id = c.id OR le.customer_id = c.id) AND l.${TENANT_SQL}
                          AND lower(replace(d.document_type, '_', '-')) = ANY($1::text[]))`, [typeIds]);
@@ -1111,7 +1112,7 @@ const HANDLERS = {
   },
 
   async mostDocType(db) {
-    const { rows } = await db.raw(`SELECT lower(replace(document_type, '_', '-')) AS k, id FROM documents WHERE ${TENANT_SQL}`);
+    const { rows } = await db.raw(`SELECT lower(replace(document_type, '_', '-')) AS k, id FROM documents WHERE ${TENANT_SQL} AND ${notPrivateSql("")}`);
     const groups = groupIds(rows);
     const { winners, max } = topFromGroups(groups);
     if (!max) return finish('No documents are on file.', [], { records: [], total: 0, kind: 'searched', basis: 'No documents on file.' });
@@ -1138,7 +1139,7 @@ const HANDLERS = {
           AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.${TENANT_SQL}
                         AND e.customer_id = c.id AND lower(e.data->>'manufacturer') = lower($1)
                         AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN substr(e.data->>'installation_date', 1, 10)::date END) <= ($2::date - make_interval(years => $3::int)))
-          AND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL}
+          AND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
                             LEFT JOIN entities le ON le.id = l.entity_id AND le.entity_type = 'equipment' AND le.${TENANT_SQL}
                            WHERE (l.entity_id = c.id OR le.customer_id = c.id) AND l.${TENANT_SQL}
                              AND lower(replace(d.document_type, '_', '-')) = ANY($4::text[]))
@@ -1164,11 +1165,11 @@ const HANDLERS = {
     const { rows } = await db.raw(
       `SELECT c.id, c.data->>'customer_name' AS name FROM entities c
         WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.${TENANT_SQL}
-          AND EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL}
+          AND EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
                         LEFT JOIN entities le ON le.id = l.entity_id AND le.entity_type = 'equipment' AND le.${TENANT_SQL}
                        WHERE (l.entity_id = c.id OR le.customer_id = c.id) AND l.${TENANT_SQL}
                          AND lower(replace(d.document_type, '_', '-')) = ANY($1::text[]))
-          AND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL}
+          AND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
                             JOIN extractions y ON y.document_id = d.id AND y.field_key = 'service_date' AND y.${TENANT_SQL}
                             LEFT JOIN entities le ON le.id = l.entity_id AND le.entity_type = 'equipment' AND le.${TENANT_SQL}
                            WHERE (l.entity_id = c.id OR le.customer_id = c.id) AND l.${TENANT_SQL}
@@ -1193,10 +1194,10 @@ const HANDLERS = {
     const { rows } = await db.raw(
       `SELECT c.id, c.data->>'customer_name' AS name FROM entities c
         WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.${TENANT_SQL}
-          AND EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL}
+          AND EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
                         LEFT JOIN entities le ON le.id = l.entity_id AND le.entity_type = 'equipment' AND le.${TENANT_SQL}
                        WHERE (l.entity_id = c.id OR le.customer_id = c.id) AND l.${TENANT_SQL} AND lower(replace(d.document_type, '_', '-')) = ANY($1::text[]))
-          AND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL}
+          AND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
                             LEFT JOIN entities le ON le.id = l.entity_id AND le.entity_type = 'equipment' AND le.${TENANT_SQL}
                            WHERE (l.entity_id = c.id OR le.customer_id = c.id) AND l.${TENANT_SQL} AND lower(replace(d.document_type, '_', '-')) = ANY($2::text[]))`,
       [hasIds, lacksIds]);
@@ -1216,7 +1217,7 @@ const HANDLERS = {
           AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.${TENANT_SQL}
                         AND e.customer_id = c.id
                         AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN substr(e.data->>'installation_date', 1, 10)::date END) <= ($1::date - make_interval(years => $2::int)))
-          AND EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL}
+          AND EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
                         LEFT JOIN entities le ON le.id = l.entity_id AND le.entity_type = 'equipment' AND le.${TENANT_SQL}
                        WHERE (l.entity_id = c.id OR le.customer_id = c.id) AND l.${TENANT_SQL} AND lower(replace(d.document_type, '_', '-')) = ANY($3::text[]))`,
       [t, years, typeIds]);
@@ -1254,7 +1255,7 @@ const HANDLERS = {
           AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.${TENANT_SQL}
                         AND e.customer_id = c.id
                         AND (CASE WHEN e.data->>'installation_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN substr(e.data->>'installation_date', 1, 10)::date END) <= ($1::date - make_interval(years => $2::int)))
-          AND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL}
+          AND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
                             JOIN extractions y ON y.document_id = d.id AND y.field_key = 'service_date' AND y.${TENANT_SQL}
                             LEFT JOIN entities le ON le.id = l.entity_id AND le.entity_type = 'equipment' AND le.${TENANT_SQL}
                            WHERE (l.entity_id = c.id OR le.customer_id = c.id) AND l.${TENANT_SQL}
@@ -1346,9 +1347,9 @@ async function qualifyingUnitsNoDocTypeDays(db, { days, docPhrase, city, brand, 
       WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.${TENANT_SQL}
         AND e.data->>'installation_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
         AND substr(e.data->>'installation_date', 1, 10)::date <= $1::date - $2::int
-        AND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL}
+        AND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
                           WHERE l.entity_id = e.id AND l.${TENANT_SQL} AND lower(replace(d.document_type, '_', '-')) = ANY($3::text[]))
-        AND NOT EXISTS (SELECT 1 FROM document_entity_links l2 JOIN documents d2 ON d2.id = l2.document_id AND d2.${TENANT_SQL}
+        AND NOT EXISTS (SELECT 1 FROM document_entity_links l2 JOIN documents d2 ON d2.id = l2.document_id AND d2.${TENANT_SQL} AND ${notPrivateSql("d2")}
                           WHERE l2.entity_id = e.customer_id AND l2.${TENANT_SQL} AND lower(replace(d2.document_type, '_', '-')) = ANY($3::text[]))`,
     [t, days, typeIds]
   );

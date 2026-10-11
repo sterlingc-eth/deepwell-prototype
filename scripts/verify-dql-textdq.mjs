@@ -301,7 +301,13 @@ await sets('"more than once" counts customers by their quotes, it is not a dupli
 await sets('"repeat customers" is customers with several service visits', 'who are our repeat customers', /service visits/);
 await sets('two things asked at once about units is one set: neither paper', 'how many units have no startup sheet AND no registration', /without a startup sheet or a warranty registration/);
 await released('a brand is a value of a field, not a phrase on the papers', 'documents mentioning Trane');
-await released('a status word is a condition: completed work orders', 'completed work orders by ' + last(docs.find((d) => d.type === 'work-order' && last(d.id, 'technician')).id, 'technician'));
+{
+  // a status word is a condition, never dropped: either the question is released, or the status is applied (the answer says so and counts only those papers)
+  const tech = last(docs.find((d) => d.type === 'work-order' && last(d.id, 'technician')).id, 'technician');
+  const x = await ask('completed work orders by ' + tech);
+  const done = docs.filter((d) => d.type === 'work-order' && last(d.id, 'technician') === tech && /^completed$/i.test(last(d.id, 'status') ?? ''));
+  check('release :: a status word is a condition: completed work orders', x.data === null || (/Completed/.test(x.data.text) && (x.data.text.match(/^(?:list )?(\d+)/)?.[1] ?? '') === String(done.length)), `${x.intent?.plan?.op ?? 'no plan'} ${x.data?.text ?? ''}`);
+}
 await released('a model number question with no kind of paper named', 'how many docs are missing a model number');
 
 /* ================================================================== the core family and the other lanes keep their questions */

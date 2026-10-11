@@ -8,6 +8,7 @@ import { COMMON_WORDS } from '../router/lexicon.generated.js';
 import { docTypePhraseMap, ENTITY_WORDS, DIM_WORDS, MONEY_WORDS, FILLER, LOADED } from './lex.js';
 import { indexByLen } from './text.js';
 import { RESPELL } from '../lexicon/jargon.generated.js';
+import { resolveDocAliases } from './industryLex.js';
 
 const cache = new WeakMap();
 let commonSet = null;
@@ -31,7 +32,7 @@ function lexiconWords() {
     'january february march april june july august september october november december year years month months week weeks quarter quarters today yesterday tomorrow ' +
     'visits visited serviced customers customer units technician technicians vendor vendors brand brands hours labor tonnage refrigerant ' +
     'distinct unique different separate average mean typical combined altogether overall everything anything per each across breakdown group grouped sorted ranked ' +
-    'there exist exists named called ever never ton tons dollars dollar').split(' ')) out.add(w);
+    'there exist exists named called ever never ton tons dollars dollar days day since ago latest newest rundown headcount appointments appointment').split(' ')) out.add(w);
   return out;
 }
 let LEXW = null;
@@ -75,12 +76,22 @@ export function compileVocab(tv, pack) {
   for (const t of tv?.dql?.docTypes ?? []) {
     v.docTypesInUse.set(t.id, t.n);
     const base = t.id.replace(/-/g, ' ');
-    for (const p of [base, `${base}s`, t.id, `${t.id}s`]) if (!v.docPhrases.has(p)) v.docPhrases.set(p, t.id);
+    const parts = t.id.split('-'); const half = parts.length > 2 ? `${parts.slice(0, -1).join('-')} ${parts[parts.length - 1]}` : base; // "move-in inspection"
+    for (const p of [base, `${base}s`, t.id, `${t.id}s`, half, `${half}s`]) if (!v.docPhrases.has(p)) v.docPhrases.set(p, t.id);
   }
+  // the everyday word for a kind of paper in this kind of business ("estimate", "pledge", "repair order"): only when it means ONE of the kinds this organization has
+  v.otherIndustry = Boolean(tv?.industryKind) && String(tv.industryKind).toLowerCase() !== 'hvac';
+  // the shared everyday words of other kinds of business apply to an organization that chose one at sign-up (an HVAC shop, or no choice, keeps the words it always had)
+  const aliases = v.otherIndustry ? resolveDocAliases(v.docTypesInUse.keys(), tv?.industryKind) : Object.assign(new Map(), { scoped: new Set() });
+  v.scopedPhrases = aliases.scoped;
+  for (const [p, id] of aliases) { const cur = v.docPhrases.get(p); if (!cur || (cur !== id && !v.docTypesInUse.has(cur))) v.docPhrases.set(p, id); }
+  // a phrase for a kind of paper this organization does not keep, that is also an everyday noun for a visit or a customer ("site visit"), is that noun
+  { const nouns = new Set(Object.values(ENTITY_WORDS).flat()); for (const [p, id] of [...v.docPhrases]) if (!v.docTypesInUse.has(id) && nouns.has(p)) v.docPhrases.delete(p); }
   for (const w of tv?.industryWords ?? []) v.industry.add(String(w).toLowerCase());
 
   // repair targets: lexicon + brands + cities (names are deliberately NOT repair targets)
   const targets = new Set(lexWords());
+  for (const p of v.docPhrases.keys()) for (const w of p.split(' ')) if (w.length >= 4) targets.add(w);
   for (const keys of Object.values(RESPELL)) for (const k of keys) if (!k.includes(' ') && k.length >= 4) targets.add(k);
   for (const k of v.brands.keys()) for (const w of k.split(' ')) if (w.length >= 4) targets.add(w);
   for (const k of v.cities.keys()) for (const w of k.split(' ')) if (w.length >= 4) targets.add(w);

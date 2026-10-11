@@ -13,6 +13,7 @@
  */
 import { attachCitations, documentRecord } from "../citations/records.js";
 import { TENANT_SQL, answerEnvelope } from "../scope.js";
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 const norm = (s) => String(s ?? "").toLowerCase().replace(/[’`]/g, "'").normalize("NFC").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 const NOUN = { invoice: "invoice", invoices: "invoice", unit: "unit", units: "unit", customer: "customer", customers: "customer" };
@@ -51,7 +52,7 @@ export async function runFieldAbsence(db, intent) {
   const reg = await db.raw(`SELECT to_regclass('document_financials') IS NOT NULL AS ok`, []);
   if (!reg?.rows?.[0]?.ok) return null;
   // same population as the sibling "how many invoices" count (answers.js documentCount): receivable USD invoices, read from document_financials joined to its document exactly as the financials view does
-  const FROM = `FROM document_financials f JOIN documents d ON d.id = f.document_id AND d.tenant_id = (current_setting('app.tenant_id', true))::uuid WHERE f.tenant_id = (current_setting('app.tenant_id', true))::uuid AND f.doc_kind = 'invoice' AND f.direction = 'receivable' AND f.currency = 'USD'`;
+  const FROM = `FROM document_financials f JOIN documents d ON d.id = f.document_id AND ${notPrivateSql("d")} AND d.tenant_id = (current_setting('app.tenant_id', true))::uuid WHERE f.tenant_id = (current_setting('app.tenant_id', true))::uuid AND f.doc_kind = 'invoice' AND f.direction = 'receivable' AND f.currency = 'USD'`;
   // the effective value of the column: a correction replaces the original ('' or JSON null = a person cleared it), whitespace-only = absent (the product's own CASE, see financeViews.js eff())
   const effv = `${nb(`CASE WHEN f.corrections ? '${field.col}' THEN f.corrections->>'${field.col}' ELSE f.${field.col}::text END`)}`;
   const has = `(${effv} IS NOT NULL OR EXISTS (SELECT 1 FROM extractions x WHERE x.document_id = f.document_id AND x.${TENANT_SQL} AND x.field_key = $1 AND ${nb('CASE WHEN x.corrected_value IS NOT NULL THEN x.corrected_value ELSE x.value END')} IS NOT NULL))`;
@@ -59,7 +60,7 @@ export async function runFieldAbsence(db, intent) {
   const total = agg?.rows?.[0]?.total, missing = agg?.rows?.[0]?.missing;
   if (!total || missing == null) return null;
   // the plain "how many invoices do we have" answer counts the invoice documents themselves; if this lane's population is not exactly that, decline
-  const docs = await db.raw(`SELECT count(*)::int AS n FROM documents d WHERE d.document_type = 'invoice' AND d.${TENANT_SQL}`, []);
+  const docs = await db.raw(`SELECT count(*)::int AS n FROM documents d WHERE ${notPrivateSql("d")} AND d.document_type = 'invoice' AND d.${TENANT_SQL}`, []);
   if (docs?.rows?.[0]?.n !== total) return null;
   const miss = (await db.raw(`SELECT f.document_id, f.doc_kind, f.invoice_number, d.original_filename AS filename ${FROM} AND NOT ${has} ORDER BY f.created_at DESC LIMIT 40`, [field.key]))?.rows ?? [];
   const text = missing === total

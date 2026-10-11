@@ -29,6 +29,7 @@ import { BRAND_WORDS } from "../analytics.js";
 import { damerauLevenshteinDistance } from "../integrity.js";
 import { stripConversationalFrame } from "../router/frame.js";
 import { buildOutOfDomainAnswer } from "../contactLookup.js";
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 export const noAnchorEnabled = () => process.env.DONOVAN_NO_ANCHOR_DECLINE !== "0";
 
@@ -113,7 +114,7 @@ export async function wordInOrgData(db, words) {
     `SELECT w FROM unnest($1::text[]) AS w
       WHERE EXISTS (SELECT 1 FROM entities WHERE ${TENANT_SQL} AND merged_into IS NULL AND data::text ~* ('\\m' || w || '\\M'))
          OR EXISTS (SELECT 1 FROM extractions WHERE ${TENANT_SQL} AND COALESCE(NULLIF(corrected_value, ''), value) ~* ('\\m' || w || '\\M'))
-         OR EXISTS (SELECT 1 FROM documents WHERE ${TENANT_SQL} AND original_filename ~* ('\\m' || w || '\\M'))`,
+         OR EXISTS (SELECT 1 FROM documents WHERE ${TENANT_SQL} AND ${notPrivateSql("")} AND original_filename ~* ('\\m' || w || '\\M'))`,
     [list]
   );
   return new Set(rows.map((r) => r.w));

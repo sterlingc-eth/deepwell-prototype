@@ -13,6 +13,7 @@
  *
  * Nothing here logs question text or row values.
  */
+import { notPrivateSql, notPrivateIdSql } from "../privacy/privateDocs.js";
 import { neutralizeDocText } from "../promptFence.js";
 import { guardSql, wrapSql, referencedNames, VIEW_NAMES } from "./sqlGuard.js";
 import { resolveContactCandidates, resolveAddressCandidates } from "../contactLookup.js";
@@ -108,14 +109,14 @@ doc_links AS NOT MATERIALIZED (
          'link'::text AS via
     FROM document_entity_links l
     JOIN entities e ON e.id = l.entity_id AND e.merged_into IS NULL AND ${t("e")}
-   WHERE ${t("l")}
+   WHERE ${t("l")} AND ${notPrivateIdSql("l.document_id")}
   UNION
   SELECT x.document_id, x.entity_id, e.entity_type,
          CASE e.entity_type WHEN 'customer' THEN e.id WHEN 'equipment' THEN e.customer_id END AS customer_id,
          'extraction'::text AS via
     FROM extractions x
     JOIN entities e ON e.id = x.entity_id AND e.merged_into IS NULL AND ${t("e")}
-   WHERE x.entity_id IS NOT NULL AND ${t("x")}
+   WHERE x.entity_id IS NOT NULL AND ${t("x")} AND ${notPrivateIdSql("x.document_id")}
 ),
 ${docCustomerCte("doc_customer")},
 documents_v AS (
@@ -132,7 +133,7 @@ documents_v AS (
          dc.customer_id, dc.customer_name
     FROM documents d
     LEFT JOIN doc_customer dc ON dc.document_id = d.id
-   WHERE ${t("d")}
+   WHERE ${t("d")} AND ${notPrivateSql("d")}
 ),
 facts AS (
   SELECT x.document_id, x.entity_id, x.field_key,
@@ -140,7 +141,7 @@ facts AS (
          ${unit}, f.page_no, x.confidence, x.created_at
     FROM extractions x
     LEFT JOIN facets f ON f.id = x.source_facet_id AND ${t("f")}
-   WHERE ${t("x")}
+   WHERE ${t("x")} AND ${notPrivateIdSql("x.document_id")}
 ),
 ${financeViewsSql({ hasFinancials })}`.trim();
 }
@@ -628,7 +629,7 @@ export function createToolbox({ withTenant, ctxArg, today, fetchObject, deadline
       const docs = (await db.raw(
         `SELECT COALESCE(document_type, 'unclassified') AS document_type, count(*)::int AS n,
                 min(created_at) AS first_uploaded, max(created_at) AS last_uploaded
-           FROM documents WHERE ${t("documents")} GROUP BY 1 ORDER BY n DESC`, [])).rows;
+           FROM documents WHERE ${t("documents")} AND ${notPrivateSql("")} GROUP BY 1 ORDER BY n DESC`, [])).rows;
       const fields = (await db.raw(
         `SELECT field_key, count(*)::int AS n,
                 (array_agg(DISTINCT left(v, 40)) FILTER (WHERE v IS NOT NULL AND v <> ''))[1:2] AS examples
@@ -917,7 +918,7 @@ export function createToolbox({ withTenant, ctxArg, today, fetchObject, deadline
           let docInfo = [];
           const named = [...new Set((res.rows ?? []).map((r) => r.document_id ?? r.documentId).filter((v) => typeof v === "string" && UUID_RE.test(v)))].slice(0, MAX_QUERY_ROWS);
           if (named.length) {
-            docInfo = (await db.raw(`SELECT id, stage, original_filename FROM documents WHERE id = ANY($1::uuid[]) AND ${t("documents")}`, [named])).rows;
+            docInfo = (await db.raw(`SELECT id, stage, original_filename FROM documents WHERE id = ANY($1::uuid[]) AND ${t("documents")} AND ${notPrivateSql("")}`, [named])).rows;
           }
           // TEAM C: the customer / unit / document each returned row IS (same rows as the number), labelled from
           // this tenant's own rows inside this same transaction. Never allowed to fail the query.
@@ -1011,7 +1012,7 @@ export function createToolbox({ withTenant, ctxArg, today, fetchObject, deadline
     if (!UUID_RE.test(id)) return fail("documentId must be a documentId returned by another tool", "read_document");
     const fromPage = Math.max(1, Math.trunc(Number(input?.fromPage)) || 1);
     const out = await withTenant(ctxArg, async (db) => {
-      const { rows: dr } = await db.raw(`SELECT id, document_type, original_filename, stage FROM documents WHERE id = $1 AND ${t("documents")}`, [id]);
+      const { rows: dr } = await db.raw(`SELECT id, document_type, original_filename, stage FROM documents WHERE id = $1 AND ${t("documents")} AND ${notPrivateSql("")}`, [id]);
       if (!dr[0]) return null;
       const { rows: pages } = await db.raw(
         `SELECT page_no, text FROM document_pages WHERE document_id = $1 AND ${t("document_pages")} AND page_no >= $2 ORDER BY page_no LIMIT 200`,

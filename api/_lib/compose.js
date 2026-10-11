@@ -35,6 +35,7 @@ import { attachCitations } from './citations/records.js';
 import { customerRecord } from './citations/records.js';
 import { escapeRegex as reEscape } from './util/escape.js';
 import { getCorpusStamp } from './askCache.js';
+import { notPrivateSql } from "./privacy/privateDocs.js";
 
 // Doc types too generic/ambiguous to safely pattern-match in free text (never asked about this way in
 // this corpus, and "other"/"internal" are common enough words to false-positive on unrelated questions).
@@ -282,7 +283,7 @@ async function fetchDocLinkage(db) {
             (SELECT COALESCE(NULLIF(x.corrected_value, ''), x.value) FROM extractions x
               WHERE x.document_id = d.id AND x.field_key = 'technician' AND x.${TENANT_SQL}
               ORDER BY x.created_at DESC LIMIT 1) AS technician
-       FROM links JOIN documents d ON d.id = links.document_id AND d.${TENANT_SQL}
+       FROM links JOIN documents d ON d.id = links.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
       LIMIT 20000`
   );
   return rows;

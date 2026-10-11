@@ -13,6 +13,7 @@ import { attachCitations } from "../citations/records.js";
 import { documentRecordsFor, customerRecordsFor } from "../citations/enrich.js";
 import { TENANT_SQL, answerEnvelope } from "../scope.js";
 import { betweenWithCurrency } from "../amountWords.js";
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 const MON = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
 const MON_ALT = "jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?";
@@ -144,7 +145,7 @@ export async function runDateQualifier(db, intent) {
   if (intent.kind === "service" || intent.kind === "invoice") {
     const field = intent.kind === "service" ? "service_date" : "invoice_date";
     const { rows } = await db.raw(
-      `SELECT x.document_id, d.document_type AS dtype, ${VAL("x")} AS v FROM extractions x JOIN documents d ON d.id = x.document_id AND d.${TENANT_SQL}
+      `SELECT x.document_id, d.document_type AS dtype, ${VAL("x")} AS v FROM extractions x JOIN documents d ON d.id = x.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
         WHERE x.${TENANT_SQL} AND x.field_key = $1`, [field]);
     const seen = new Map();
     for (const r of rows) if (!seen.has(r.document_id)) seen.set(r.document_id, { id: r.document_id, type: String(r.dtype ?? "").replace(/_/g, "-").toLowerCase(), date: iso(r.v) });

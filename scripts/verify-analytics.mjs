@@ -2168,9 +2168,9 @@ for (const q of [
   // buildAnalyticsSQL: audienceClause defaults to a no-op ('TRUE') so every pre-existing caller
   // (this whole file's own section-6 SQL-builder fixture included) keeps its exact current SQL.
   const noClause = buildAnalyticsSQL({ entity: 'documents', op: 'count', filters: [] });
-  check('buildAnalyticsSQL: no audienceClause passed -> the default no-op TRUE, never a bare unclosed AND', noClause.sql.includes('AND (TRUE)'));
+  check('buildAnalyticsSQL: no audienceClause passed -> the default no-op TRUE, never a bare unclosed AND', noClause.sql.includes('AND ((TRUE) AND ') && noClause.sql.includes('hr-letter')); // private (HR) papers are always left out as well
   const withClause = buildAnalyticsSQL({ entity: 'documents', op: 'count', filters: [] }, { audienceClause: "COALESCE(d.audience, 'customer') <> 'internal'" });
-  check('buildAnalyticsSQL: a real audienceClause is AND-ed into the documents WHERE clause', withClause.sql.includes("AND (COALESCE(d.audience, 'customer') <> 'internal')"));
+  check('buildAnalyticsSQL: a real audienceClause is AND-ed into the documents WHERE clause', withClause.sql.includes("AND ((COALESCE(d.audience, 'customer') <> 'internal') AND ") && withClause.sql.includes('hr-letter'));
 
   // End to end against a mock db: the SAME plan answers differently depending on which
   // audienceClause executeAnalyticsPlan was given — proves the wiring actually reaches the query,

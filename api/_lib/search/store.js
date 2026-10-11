@@ -23,6 +23,7 @@ import {
 } from './embed.js';
 import { documentsHaveAudience } from '../audience/probe.js';
 import { audienceFilterSql } from '../audience/sql.js';
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 const TENANT = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 
@@ -478,7 +479,7 @@ export async function nearestChunks(db, { vector, model, k = 30, documentIds = n
      SELECT p.id, nn.document_id, nn.page_no, d.original_filename, d.document_type, d.stage, nn.chunk_text, (1 - nn.dist) AS sim
        FROM nn
        JOIN document_pages p ON p.document_id = nn.document_id AND p.page_no = nn.page_no AND p.${TENANT}
-       JOIN documents d ON d.id = nn.document_id AND d.${TENANT}
+       JOIN documents d ON d.id = nn.document_id AND d.${TENANT} AND ${notPrivateSql("d")}
       WHERE ${audienceClause}
       ORDER BY nn.dist`;
 

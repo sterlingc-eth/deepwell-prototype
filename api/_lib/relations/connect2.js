@@ -46,6 +46,7 @@ import { attachCitations, customerRecord, unitRecord } from '../citations/record
 import { documentRecordsFor } from '../citations/enrich.js';
 import { documentTypeLabel } from '../documentTypes.js';
 import { VISIT_DOC_TYPES, fetchEquipmentInstalls, customersByNameLike } from './timeline.js';
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 /* ------------------------------------------------------------------ small pure helpers (own copies —
  * see questions.js's own header: this file is deliberately decoupled from it, the same way timeline.js is. */
@@ -448,7 +449,7 @@ export const HANDLERS = {
     const yearEndExcl = `${Number(year) + 1}-01-01`;
     const { rows } = await db.raw(
       `SELECT d.id AS doc_id, y.value AS raw_date, lower(replace(d.document_type, '_', '-')) AS doc_type
-         FROM extractions y JOIN documents d ON d.id = y.document_id AND d.${TENANT_SQL}
+         FROM extractions y JOIN documents d ON d.id = y.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
         WHERE y.field_key = 'service_date' AND y.${TENANT_SQL}
           AND y.document_id IN (
             SELECT l.document_id FROM document_entity_links l WHERE l.entity_id = ANY($1::uuid[]) AND l.${TENANT_SQL}
@@ -551,7 +552,7 @@ async function addressHistoryRows(db, custIds) {
       UNION ALL
      SELECT l.entity_id AS cust_id, y.value, d.created_at::date AS date, d.id AS doc_id
        FROM document_entity_links l
-       JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL}
+       JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
        JOIN extractions y ON y.document_id = d.id AND y.field_key = 'service_address' AND y.${TENANT_SQL}
       WHERE l.entity_id = ANY($1::uuid[]) AND l.${TENANT_SQL} AND coalesce(y.value, '') <> ''`,
     [custIds]
@@ -586,11 +587,11 @@ async function maintenanceZeroVisitCustomers(db, brand) {
       WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.${TENANT_SQL}
         ${brand ? `AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.${TENANT_SQL}
                                  AND e.customer_id = c.id AND lower(e.data->>'manufacturer') = lower($3))` : ''}
-        AND EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL}
+        AND EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
                       LEFT JOIN entities le ON le.id = l.entity_id AND le.entity_type = 'equipment' AND le.${TENANT_SQL}
                     WHERE (l.entity_id = c.id OR le.customer_id = c.id) AND l.${TENANT_SQL}
                       AND lower(replace(d.document_type, '_', '-')) = ANY($1::text[]))
-        AND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL}
+        AND NOT EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
                           LEFT JOIN entities le ON le.id = l.entity_id AND le.entity_type = 'equipment' AND le.${TENANT_SQL}
                         WHERE (l.entity_id = c.id OR le.customer_id = c.id) AND l.${TENANT_SQL}
                           AND lower(replace(d.document_type, '_', '-')) = ANY($2::text[]))`,
@@ -608,7 +609,7 @@ async function maintenanceAgreementCustomers(db, brand) {
       WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.${TENANT_SQL}
         ${brand ? `AND EXISTS (SELECT 1 FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.${TENANT_SQL}
                                  AND e.customer_id = c.id AND lower(e.data->>'manufacturer') = lower($2))` : ''}
-        AND EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL}
+        AND EXISTS (SELECT 1 FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
                       LEFT JOIN entities le ON le.id = l.entity_id AND le.entity_type = 'equipment' AND le.${TENANT_SQL}
                     WHERE (l.entity_id = c.id OR le.customer_id = c.id) AND l.${TENANT_SQL}
                       AND lower(replace(d.document_type, '_', '-')) = ANY($1::text[]))`,
@@ -620,7 +621,7 @@ async function maintenanceAgreementCustomers(db, brand) {
 /** Every maintenance-agreement document reachable from any of `custIds` (directly or via their equipment). */
 async function maintAgreementDocIdsFor(db, custIds) {
   const { rows } = await db.raw(
-    `SELECT DISTINCT d.id FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL}
+    `SELECT DISTINCT d.id FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
        LEFT JOIN entities le ON le.id = l.entity_id AND le.entity_type = 'equipment' AND le.${TENANT_SQL}
       WHERE (l.entity_id = ANY($1::uuid[]) OR le.customer_id = ANY($1::uuid[])) AND l.${TENANT_SQL}
         AND lower(replace(d.document_type, '_', '-')) = ANY($2::text[])`,
@@ -638,7 +639,7 @@ async function fetchFieldMismatches(db, custIds) {
             d.id AS doc_id, d.original_filename, d.created_at::date AS doc_date
        FROM entities c
        JOIN document_entity_links l ON l.entity_id = c.id AND l.${TENANT_SQL}
-       JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL}
+       JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
        JOIN extractions y ON y.document_id = d.id AND y.field_key = ANY($2::text[]) AND y.${TENANT_SQL}
       WHERE c.id = ANY($1::uuid[]) AND c.${TENANT_SQL} AND coalesce(y.value, '') <> ''`,
     [custIds, ['phone', 'email', 'service_address']]

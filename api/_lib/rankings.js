@@ -17,6 +17,7 @@ import { TENANT_SQL, isoDate, humanDate } from './scope.js';
 import { installYearOf, warrantyStatusOf, deriveGeo } from './analytics.js';
 import { attachCitations, customerRecord, documentRecord, unitRecord } from './citations/records.js';
 import { financialsTableExists } from './financials/store.js';
+import { notPrivateSql } from "./privacy/privateDocs.js";
 
 const answer = (text, facts = []) => ({ kind: 'answer', text, facts, sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [] });
 const noAnswer = (text) => ({ kind: 'no-answer', text, facts: [], sources: [], confidence: 0, verifiedCount: 0, unverifiedCount: 0, closest: [] });
@@ -93,7 +94,7 @@ async function fetchEquipment(db) {
   return rows;
 }
 async function fetchDocTypeRows(db) {
-  const { rows } = await db.raw(`SELECT id, lower(replace(document_type, '_', '-')) AS k FROM documents WHERE ${TENANT_SQL} LIMIT 20000`);
+  const { rows } = await db.raw(`SELECT id, lower(replace(document_type, '_', '-')) AS k FROM documents WHERE ${TENANT_SQL} AND ${notPrivateSql("")} LIMIT 20000`);
   return rows;
 }
 async function fetchTechnicianRows(db, nameLike) {

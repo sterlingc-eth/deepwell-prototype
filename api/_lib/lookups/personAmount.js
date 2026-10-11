@@ -13,6 +13,7 @@ import { documentRecordsFor, customerRecordsFor } from "../citations/enrich.js";
 import { TENANT_SQL, answerEnvelope } from "../scope.js";
 import { extractWindow } from "./dateQualifiers.js";
 import { OPS, NUMW, wordsToNumber } from "./countQualifiers.js";
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 const FILLER = new Set("how many number of count the our all we do did have has are is were was there invoice invoices on in file total totals worth for from by to that a an with which what list show me give find any does and billed customer customers client clients named called who whose bill bills over under".split(" "));
 const NOT_NAME = new Set("open unpaid paid overdue outstanding quote quotes permit permits agreement agreements ticket tickets order orders job jobs unit units each apiece dollars dollar bucks".split(" "));
@@ -72,7 +73,7 @@ export async function runPersonAmount(db, intent) {
   const ids = matched.map((c) => c.id);
   const { rows: inv } = await db.raw(
     `SELECT DISTINCT l.entity_id, d.id AS document_id, f.total::float8 AS total, f.invoice_number
-       FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL} AND lower(replace(d.document_type, '_', '-')) = 'invoice'
+       FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")} AND lower(replace(d.document_type, '_', '-')) = 'invoice'
        JOIN document_financials f ON f.document_id = d.id AND f.${TENANT_SQL} AND f.total IS NOT NULL
       WHERE l.entity_id = ANY($1::uuid[])`, [ids]);
   let rows = inv, win = "";

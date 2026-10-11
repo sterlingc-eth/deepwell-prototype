@@ -12,6 +12,7 @@
  */
 import { attachCitations, documentRecord, makeRecord } from "../citations/records.js";
 import { ADDRESS_RE } from "./clarify.js";
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 const esc = (s) => String(s).replace(/[\\%_]/g, "\\$&");
 const norm = (s) => ` ${String(s ?? "").toLowerCase().replace(/[’']s\b/g, "").replace(/[^a-z0-9#]+/g, " ").trim()} `;
@@ -40,7 +41,7 @@ async function loadFields(db, docIds) {
   if (!docIds.length) return new Map();
   const r = await db.raw(
     `SELECT x.document_id, x.field_key, x.value, d.original_filename, d.document_type
-       FROM extractions x JOIN documents d ON d.id = x.document_id WHERE x.document_id = ANY($1::uuid[])`,
+       FROM extractions x JOIN documents d ON d.id = x.document_id AND ${notPrivateSql("d")} WHERE x.document_id = ANY($1::uuid[])`,
     [docIds]
   );
   const m = new Map();
@@ -53,7 +54,7 @@ async function loadFields(db, docIds) {
 }
 
 async function docsByType(db, type, extra = "", params = []) {
-  const r = await db.raw(`SELECT d.id FROM documents d WHERE d.document_type = $1 ${extra}`, [type, ...params]);
+  const r = await db.raw(`SELECT d.id FROM documents d WHERE ${notPrivateSql("d")} AND d.document_type = $1 ${extra}`, [type, ...params]);
   return loadFields(db, r.rows.map((x) => x.id));
 }
 
@@ -167,7 +168,7 @@ async function personLane(db, question, rawQuestion, today) {
     const what = kind === "has_lease" ? "lease agreement" : kind === "movein_doc" ? "move-in inspection" : "move-out inspection";
     return noAnswer(`No. I don't have a ${what} on file for ${unk}: no tenant by that name appears on any lease or inspection.`, `Searched the tenant names on every lease and inspection for ${unk}; none matched.`);
   }
-  const r = await db.raw(`SELECT DISTINCT d.id FROM extractions t JOIN documents d ON d.id = t.document_id WHERE t.field_key = 'tenant_name' AND lower(t.value) = lower($1)`, [name]);
+  const r = await db.raw(`SELECT DISTINCT d.id FROM extractions t JOIN documents d ON d.id = t.document_id AND ${notPrivateSql("d")} WHERE t.field_key = 'tenant_name' AND lower(t.value) = lower($1)`, [name]);
   const docs = [...(await loadFields(db, r.rows.map((x) => x.id))).values()];
   const leases = docs.filter((d) => d.type === "lease-agreement").sort((a, b) => String(a.f.lease_start_date ?? "").localeCompare(String(b.f.lease_start_date ?? "")));
   if (qAddr && docs.length && !docs.some((o) => String(o.f.service_address ?? "").toLowerCase().startsWith(qAddr))) return null; // the named address is not this tenant's: not answered here

@@ -26,6 +26,7 @@ import { answerEnvelope, TENANT_SQL, todayIso } from "../scope.js";
 import { formatDateHumanWithIso } from "../fastPath.js";
 import { resolveAnyTimeRange } from "../analytics.js";
 import { parseTemplate, runTemplate } from "./aggTemplates.js";
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 const norm = (s) => String(s ?? "").toLowerCase().replace(/[’`]/g, "'").replace(/[^a-z0-9'\s#-]/g, " ").replace(/\s+/g, " ").trim();
 const words = (q) => q.split(/\s+/).filter(Boolean);
@@ -437,8 +438,8 @@ async function techNever(db, intent, today) {
 async function noTextDocs(db) {
   const { rows } = await db.raw(
     `SELECT d.id, d.document_type, d.original_filename, d.created_at FROM documents d
-      WHERE d.${TENANT_SQL} AND NOT EXISTS (SELECT 1 FROM document_pages p WHERE p.document_id = d.id AND coalesce(p.text, '') <> '') ORDER BY d.created_at DESC`, []);
-  const { rows: all } = await db.raw(`SELECT count(*)::int AS n FROM documents WHERE ${TENANT_SQL}`, []);
+      WHERE ${notPrivateSql("d")} AND d.${TENANT_SQL} AND NOT EXISTS (SELECT 1 FROM document_pages p WHERE p.document_id = d.id AND coalesce(p.text, '') <> '') ORDER BY d.created_at DESC`, []);
+  const { rows: all } = await db.raw(`SELECT count(*)::int AS n FROM documents WHERE ${TENANT_SQL} AND ${notPrivateSql("")}`, []);
   const total = all[0]?.n ?? 0;
   if (!rows.length) {
     return attachCitations(answerEnvelope({ text: `No documents are missing text — all ${total} documents have readable text on at least one page.`, facts: [], extra: { fastIntent: "no_text_docs" } }),
@@ -455,7 +456,7 @@ async function historySkew(db, intent, today) {
     `SELECT count(*)::int AS n, count(*) FILTER (WHERE substr(value, 1, 10) < $1)::int AS before FROM extractions WHERE field_key = 'service_date' AND value ~ ${DATE_RE} AND ${TENANT_SQL}`, [cut]);
   const n = rows[0]?.n ?? 0; const before = rows[0]?.before ?? 0; const since = n - before;
   if (!n) return null;
-  const { rows: docs } = await db.raw(`SELECT DISTINCT x.document_id AS id, d.original_filename, d.document_type FROM extractions x JOIN documents d ON d.id = x.document_id AND d.${TENANT_SQL} WHERE x.field_key = 'service_date' AND x.value ~ ${DATE_RE} AND x.${TENANT_SQL} LIMIT 200`, []);
+  const { rows: docs } = await db.raw(`SELECT DISTINCT x.document_id AS id, d.original_filename, d.document_type FROM extractions x JOIN documents d ON d.id = x.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")} WHERE x.field_key = 'service_date' AND x.value ~ ${DATE_RE} AND x.${TENANT_SQL} LIMIT 200`, []);
   const cite = docs.map((r) => documentRecord(r));
   const yes = intent.side === "before" ? before > since : since > before;
   if (before === since) return attachCitations(answerEnvelope({ text: `No — it's an even split: ${before} dated service visits before ${formatDateHumanWithIso(cut)} and ${since} since.` }), { records: cite, total: n, kind: "searched", basis: `Counted the ${n} dated service visits on each side of ${cut}.` });
@@ -469,7 +470,7 @@ async function dateExtreme(db, intent) {
   const which = intent.dir === "asc" ? "earliest" : "most recent";
   if (intent.subject === "service") {
     const { rows } = await db.raw(
-      `SELECT x.document_id AS id, substr(x.value, 1, 10) AS d, d.original_filename, d.document_type FROM extractions x JOIN documents d ON d.id = x.document_id AND d.${TENANT_SQL}
+      `SELECT x.document_id AS id, substr(x.value, 1, 10) AS d, d.original_filename, d.document_type FROM extractions x JOIN documents d ON d.id = x.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
         WHERE x.field_key = 'service_date' AND x.value ~ ${DATE_RE} AND x.${TENANT_SQL} ORDER BY substr(x.value, 1, 10) ${dir}, x.document_id LIMIT 40`, []);
     if (!rows.length) return null;
     const best = rows[0].d; const tied = rows.filter((r) => r.d === best);
@@ -478,7 +479,7 @@ async function dateExtreme(db, intent) {
   }
   if (intent.subject === "invoice") {
     const { rows } = await db.raw(
-      `SELECT f.document_id AS id, f.invoice_date::text AS d, f.invoice_number, f.customer_name, f.total, d.original_filename FROM document_financials f JOIN documents d ON d.id = f.document_id AND d.${TENANT_SQL}
+      `SELECT f.document_id AS id, f.invoice_date::text AS d, f.invoice_number, f.customer_name, f.total, d.original_filename FROM document_financials f JOIN documents d ON d.id = f.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
         WHERE f.doc_kind = 'invoice' AND f.direction = 'receivable' AND f.invoice_date IS NOT NULL AND f.${TENANT_SQL} ORDER BY f.invoice_date ${dir}, f.document_id LIMIT 40`, []);
     if (!rows.length) return null;
     const best = rows[0].d.slice(0, 10); const tied = rows.filter((r) => r.d.slice(0, 10) === best);
@@ -509,7 +510,7 @@ async function openInPeriod(db, intent, today) {
   const range = { ...range0, from: lo(String(range0.from)), to: hi(String(range0.to)) };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(range.from) || !/^\d{4}-\d{2}-\d{2}$/.test(range.to)) return null;
   const { rows } = await db.raw(
-    `SELECT f.document_id AS id, d.original_filename FROM document_financials f JOIN documents d ON d.id = f.document_id AND d.${TENANT_SQL}
+    `SELECT f.document_id AS id, d.original_filename FROM document_financials f JOIN documents d ON d.id = f.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
       WHERE f.doc_kind = 'invoice' AND f.direction = 'receivable' AND f.invoice_date >= $1::date AND f.invoice_date <= $2::date AND f.${TENANT_SQL}`, [range.from, range.to]);
   const label = range.label ?? `${range.from} to ${range.to}`;
   const text = `I can't tell which invoices are still open — none of the invoices on file records whether it has been paid. ${rows.length ? `${rows.length} invoice${rows.length === 1 ? " is" : "s are"} dated ${label}; their payment status is not on file.` : `No invoices are dated ${label}.`}`;
@@ -525,7 +526,7 @@ function ticketScope(q) {
 }
 async function techRows(db, docType = null) {
   const { rows } = await db.raw(`SELECT t.value AS tech, t.document_id AS id, s.value AS stype FROM extractions t LEFT JOIN extractions s ON s.document_id = t.document_id AND s.field_key = 'service_type' AND s.${TENANT_SQL}
-    ${docType ? "JOIN documents dd ON dd.id = t.document_id AND dd.document_type = $1" : ""}
+    ${docType ? "JOIN documents dd ON dd.id = t.document_id AND dd.document_type = $1 AND " + notPrivateSql("dd") : ""}
     WHERE t.field_key = 'technician' AND coalesce(t.value, '') <> '' AND t.${TENANT_SQL}`, docType ? [docType] : []);
   return rows;
 }

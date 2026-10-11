@@ -10,6 +10,7 @@
  * Wired into api/ask.js AFTER the meta-router and fast path, BEFORE
  * retrieval — see handoffs/DONOVAN_ANALYTICS_A_2026-09-21.md.
  */
+import { notPrivateSql } from '../privacy/privateDocs.js';
 import { countSubject } from '../understanding/understand.js';
 import Anthropic from '@anthropic-ai/sdk';
 import { getApiKey, MODEL_TIMEOUT_MS, withBackoff } from '../claude.js';
@@ -1183,7 +1184,7 @@ async function queryCustomersByDocTypeCondition(db, plan, { audienceClause = 'TR
            c.data->>'email' AS email, c.data->>'phone' AS phone
       FROM entities c
       JOIN document_entity_links l ON l.entity_id = c.id AND l.${TENANT_SQL}
-      JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL}
+      JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
      WHERE c.entity_type = 'customer' AND c.merged_into IS NULL AND c.${TENANT_SQL} AND d.document_type = $1
        AND (${audienceClause})`;
 
@@ -1425,6 +1426,7 @@ function keyOf(groupBy) {
 // script call site keeps its exact current behavior; runAnalyticsQuestion (the only real caller)
 // computes a real clause per request from documentsHaveAudience's own probe + isTeamScopedQuestion.
 export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel, audienceClause = 'TRUE' } = {}) {
+  audienceClause = `(${audienceClause}) AND ${notPrivateSql('d')}`; // People / HR papers are never counted, listed or grouped
   // "who's our biggest customer" (round 4, item 1) — a distinct shape from
   // every other op: ranked, not filtered/counted. validatePlan already
   // guarantees sortBy only ever appears with entity 'customers' + op 'list'.

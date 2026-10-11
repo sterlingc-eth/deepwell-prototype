@@ -22,7 +22,7 @@ const SEP = String.raw`[\s,;:.…–—-]*`;
 const LEADING = [
   // Conversational lead-ins (v2 additions): "any chance you can tell me", "dispatch wants to know", "boss asked me,", "i forgot,", "ok last one:".
   new RegExp(String.raw`^(?:any\s+chance\s+(?:you\s+(?:can|could)\s+)?(?:tell\s+me\s+)?|dispatch\s+(?:wants|needs|is\s+asking)(?:\s+to\s+know)?|(?:the\s+)?boss\s+(?:asked|wants|needs)(?:\s+me)?(?:\s+to\s+know)?|i\s+forgot|(?:ok|okay)\s+last\s+one|last\s+one|hi\s+there|good\s+(?:morning|afternoon|evening)|wait|ah\s+right|mm+|erm|thing\s+is|question|sorry\s+to\s+bug\s+you|(?:one|two)\s+more\s+things?)\b${SEP}`, "i"),
-  new RegExp(String.raw`^(?:so|uh+|um+|er+|hm+|ok(?:ay)?|well|hey|yo|hi|actually|alright|oh|anyway)\b${SEP}`, "i"),
+  new RegExp(String.raw`^(?:so|uh+|um+|er+|hm+|ok(?:ay)?|well|hey|yo|hi|actually|alright|oh|anyway|donovan)\b${SEP}`, "i"),
   new RegExp(
     String.raw`^(?:quick(?:\s+(?:one|q|question|thing))?|real\s+quick|hang\s+on|hold\s+on|hold\s+up|one\s+(?:sec|second|moment)|gimme\s+a\s+(?:sec|second|minute|moment)|give\s+me\s+a\s+(?:sec|second|minute|moment)|just\s+a\s+(?:sec|second|moment)|lemme\s+(?:see|check)|let\s+me\s+see)\b${SEP}`,
     "i"

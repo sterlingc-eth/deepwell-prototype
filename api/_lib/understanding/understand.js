@@ -289,7 +289,8 @@ export function understandQuestion(question, { today = null, conversation = null
       if (out.filters.docNumber?.explicit && n.raw === out.filters.docNumber.value) continue;
       if (dateConsumed(n)) continue;
       const bare = !n.dollar && !n.k && !/[.,]/.test(n.raw);
-      if (bare && /^(?:19|20)\d\d$/.test(n.raw) && /\b(?:in|during|since|before|after|of|for|year|by)\s*$/.test(text.slice(0, n.start).toLowerCase())) continue; // a year
+      if (bare && /^(?:19|20)\d\d$/.test(n.raw) && /\b(?:in|during|since|before|after|of|for|year|by|from|until|till|through|thru)\s*$/.test(text.slice(0, n.start).toLowerCase())) continue; // a year
+      if (bare && /^(?:19|20)\d\d$/.test(n.raw) && /^\s*(?:invoices?|bills?)?\s*(?:with|and|showing|including)\s+(?:their\s+|the\s+)?(?:amounts?|totals?)\b/i.test(text.slice(n.end)) && !/[$]/.test(text)) continue; // "<year> with amounts": a period
       // F4: a bare 4-digit year right next to a document noun ("invoices 2025", "2025 receipts") is a year, unless a "$" or a money word is in the question.
       if (bare && /^(?:19|20)\d\d$/.test(n.raw) && !/[$]|\b(?:dollars?|bucks?|usd|grand|total|amount|worth|cost|costs|price|priced)\b/i.test(text)
         && (/\b(?:invoices?|bills?|receipts?|statements?|estimates?|quotes?|proposals?|orders?|pos?|agreements?|contracts?|documents?|docs?|paperwork|files?|papers?|schedules?|letters?|certificates?|tickets?)\s*$/i.test(text.slice(0, n.start)) || /^\s*(?:invoices?|bills?|receipts?|statements?|estimates?|quotes?|proposals?|orders?|agreements?|contracts?|documents?|docs?|paperwork|papers?|files?)\b/i.test(text.slice(n.end)))) continue;

@@ -24,7 +24,11 @@ import { tokenize, repairWord, findRun } from './text.js';
 import { compileVocab, normName } from './vocab.js';
 import { FILLER, ENTITY_WORDS, DIM_WORDS, MONEY_WORDS } from './lex.js';
 import { detectPlan, allFamilies, rescuePlan } from './registry.js';
+import { dqlFrame, dqlParaphrase } from './frame.js';
+import { FOREIGN_WORDS } from './industryLex.js';
+import { leftoverGate, verifyPlan } from './learned/index.js';
 import { isPlainInventory } from './plain.js';
+import { moneyRewrite, asksAmounts } from './moneyPhrases.js';
 import './families/index.js';
 
 export const dqlEnabled = () => process.env.DONOVAN_DQL !== '0';
@@ -60,7 +64,7 @@ const numberOf = (w) => { if (/^\d+(\.\d+)?$/.test(w)) return Number(w); const n
 /* ------------------------------------------------------------------ time */
 
 const TIME_PATTERNS = (() => {
-  const POINT = `(?:${MON}\\s+${YEAR}|${YEAR}|q[1-4]\\s+${YEAR}|${MON}|\\d{1,2}/\\d{1,2}/\\d{2,4}|${YEAR}-\\d{2}(?:-\\d{2})?)`;
+  const POINT = `(?:${MON}\\s+\\d{1,2}\\s+${YEAR}|${MON}\\s+${YEAR}|${YEAR}|q[1-4]\\s+${YEAR}|${MON}|\\d{1,2}/\\d{1,2}/\\d{2,4}|${YEAR}-\\d{2}(?:-\\d{2})?)`;
   return [
     `(?:between|from)\\s+${POINT}\\s+(?:and|to|through|thru|until|till)\\s+${POINT}(?:\\s+(?:of\\s+)?${YEAR})?`,
     `(?:the\\s+)?(?:first|second|third|fourth|1|2|3|4)\\s+quarter\\s+(?:of\\s+)?${YEAR}`,
@@ -154,15 +158,20 @@ export function parseDql(question, ctx = {}) {
   const raw0 = String(question ?? '').trim();
   if (!raw0 || raw0.length > 240) return null;
   const today = ctx.today ?? new Date().toISOString().slice(0, 10);
-  try { if (jargonEnabled() && untrackedConcept(raw0)) return null; } catch { /* ignore */ }
-  const framed = stripConversationalFrame(raw0) ?? raw0;
+  const vocab = compileVocab(tv, ctx.pack);
+  // a topic the shared jargon table lists as not recorded ("donation", "lease") is recorded when this organization keeps that kind of paper under that very word
+  try { const uc = jargonEnabled() ? untrackedConcept(raw0) : null; if (uc && !vocab.scopedPhrases?.has(String(uc.phrase).toLowerCase().replace(/\s+/g, ' '))) return null; } catch { /* ignore */ }
+  // payment status, balances and what is owed are not read from the papers by this engine: the older lanes answer or decline those
+  if (/\b(?:overdue|past\s+due|unpaid|outstanding|owed|owing|owes?|balances?|delinquent|paid|pay(?:ment)?s?\s+status|still\s+owe|behind\s+on)\b/i.test(raw0)) return null;
+  // "what's the number of the invoice for $115" asks for the paper's own number, not a count
+  if (/\bnumber\s+of\s+the\s+[a-z -]+?\s+(?:for|from|of|on|dated|with)\b/i.test(raw0) && !/\bhow\s+many\b/i.test(raw0)) return null;
+  const framed = dqlParaphrase(moneyRewrite(dqlFrame(stripConversationalFrame(dqlFrame(raw0)) ?? dqlFrame(raw0)) || raw0));
   // a definition or an opinion is not a query over records ("what is a startup sheet", "what does that mean")
   if (/\b(?:what(?:'s|s|\s+is|\s+are|\s+does)|define|explain|meaning\s+of)\s+(?:a|an)\s/i.test(framed) || /\bwhat\b.*\b(?:mean|means|meaning)\b/i.test(framed)) return null;
   if (/\b\d{1,6}\s+(?:[a-z.]+\s+){0,3}(?:st|street|ave|avenue|rd|road|dr|drive|ln|lane|blvd|boulevard|way|ct|court|pl|place|cir|circle|pkwy|parkway)\b/i.test(framed)) return null;
   // a question that opens by leaning on the one before it is a follow-up, not a query of its own
   const OPENER = /^\s*(?:and|also|then|but|or|so|what about|how about|same|those|these)\b/i;
   if (OPENER.test(raw0) || OPENER.test(framed) || (ctx.original && OPENER.test(String(ctx.original)))) return null;
-  const vocab = compileVocab(tv, ctx.pack);
 
   // ---- tokens + conservative repair
   const toks = tokenize(framed);
@@ -172,6 +181,8 @@ export function parseDql(question, ctx = {}) {
     return r ?? t.w;
   });
   if (ctx.debug) ctx.debug.words = words.join(' ');
+  // the words other kinds of business use are read only for an organization that chose such a business at sign-up
+  if (!vocab.otherIndustry && words.some((x) => FOREIGN_WORDS.has(x))) return null;
   const NUMWORDS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12 };
   for (let i = 1; i < words.length; i++) {
     if (NUMWORDS[words[i]] != null && /^(?:than|least|most|exactly|only|just|over|under|above|below|top|bottom|last|first)$/.test(words[i - 1])) words[i] = String(NUMWORDS[words[i]]);
@@ -179,7 +190,7 @@ export function parseDql(question, ctx = {}) {
   let w = new Work(words);
   if (jargonEnabled()) {
     try {
-      const jr = respellJargon(words.join(' '), { tenantVocab: tv });
+      const jr = respellJargon(words.join(' '), { tenantVocab: tv, keep: vocab.docPhrases });
       if (jr?.text) w = new Work(tokenize(jr.text).map((t) => t.w));
     } catch { /* keep the typed words */ }
   }
@@ -194,7 +205,8 @@ export function parseDql(question, ctx = {}) {
       for (let a = 0; a + n <= parts.length; a++) {
         if (used.slice(a, a + n).some(Boolean)) continue;
         const key = normName(parts.slice(a, a + n).map((p) => p.w).join(' '));
-        const hit = vocab.names.get(key);
+        // a possessive typed without its apostrophe ("timothy garcias latest invoice")
+        const hit = vocab.names.get(key) ?? (n >= 2 && a + n < parts.length && /[a-z]{4,}s$/.test(key) && !vocab.nameWords.has(key.split(' ').pop()) ? vocab.names.get(key.slice(0, -1)) : undefined);
         if (!hit) continue;
         // a single common word is not a name unless it is also written like one in the vocabulary (>= 5 letters or multi-word)
         if (n === 1 && key.length < 5) continue;
@@ -335,7 +347,8 @@ export function parseDql(question, ctx = {}) {
       for (let m; (m = w.take(re));) feat.filters.push({ field: 'model', op: 'eq', value: vocab.models.get(m[0].trim().toLowerCase()), label: vocab.models.get(m[0].trim().toLowerCase()) });
     }
     // categorical values: status needs the word "status"; the rest are nouns of their own
-    const statusCue = w.take(rx('status|statuses'));
+    const statusAsked = /(?:which|what|list|show|name)\s+(?:are\s+)?(?:all\s+)?(?:of\s+)?(?:the\s+|our\s+)?(?:status|statuses)\b/.test(w.s);
+    const statusCue = statusAsked ? null : w.take(rx('status|statuses'));
     for (const [field, map] of Object.entries(vocab.cat)) {
       if (field === 'status' && !statusCue) continue;
       if (field === 'refrigerant' || field === 'tonnage') continue; // read by their own slots above
@@ -384,7 +397,7 @@ export function parseDql(question, ctx = {}) {
   }
   {
     // "how many different brands", "which cities do we serve": the distinct values of one field
-    const DD = Object.entries(DIM_WORDS).filter(([id]) => ['tech', 'city', 'brand', 'vendor', 'refrigerant', 'model', 'serviceType', 'tonnage'].includes(id));
+    const DD = Object.entries(DIM_WORDS).filter(([id]) => ['tech', 'city', 'brand', 'vendor', 'refrigerant', 'model', 'serviceType', 'tonnage', 'status'].includes(id));
     const alt = DD.flatMap(([, ph]) => ph).sort((a, b) => b.length - a.length).join('|');
     const idOf = (phrase) => DD.find(([, ph]) => ph.includes(phrase.toLowerCase().replace(/\s+/g, ' ')))?.[0];
     let m = w.take(rx(`how\\s+many\\s+(?:(?:different|distinct|unique|separate)\\s+)?(${alt})`));
@@ -446,6 +459,7 @@ export function parseDql(question, ctx = {}) {
   // "jobs": a visit when nothing else says what is counted; just a carrier word beside a money word or a document type
   w.take(rx('log|logged|logging'));
   if (feat.docTypes.length || t.money?.length) w.take(rx('jobs?'));
+  else if (vocab.otherIndustry && w.take(rx('jobs?'))) { feat.nouns.visit = true; feat.flags.plural = true; } // "how many jobs": the visits (landscaping, electrical and other trades say job)
 
   // "tickets handled by Marisol Vega", "hours billed by Danny Ochoa": the technician filter's own preposition
   if (feat.filters.some((x) => x.role === 'tech')) w.take(rx('(?:handled|done|completed|performed|worked|logged|billed|written|filed|run|did) by|by'));
@@ -473,12 +487,19 @@ export function parseDql(question, ctx = {}) {
     // COVERAGE RULE: an unexplained word releases the question, unless exactly one family explains EVERY leftover word itself
     const early = rescuePlan(feat, { vocab });
     if (early) return { mode: 'dql', plan: early, text: framed, plain: false };
-    if (ctx.debug) ctx.debug.why = `unexplained: ${feat.left.join(' ')}`;
-    return null;
+    // LEARNED PLANNER (dql/learned): Donovan's own small model may mark the leftover words as filler, only above a high calibrated threshold
+    // and only when its guards pass; slots always came from the detectors above. DONOVAN_DQL_LEARNED=0 turns it off.
+    const lg = leftoverGate({ raw: raw0, framed, orig: w.orig, rest: w.s, left: feat.left, feat, vocab, debug: ctx.debug });
+    if (lg?.clear) { if (ctx.debug) ctx.debug.learned = lg; feat.left = []; feat.learned = lg; } else {
+      if (ctx.debug) ctx.debug.why = `unexplained: ${feat.left.join(' ')}`;
+      return null;
+    }
   }
 
   // ---- families
   const plan = detectPlan(feat, { vocab });
   if (!plan) { if (ctx.debug) ctx.debug.why = `no family claimed it${feat.unusedTriggers ? ` (unused: ${feat.unusedTriggers.join(',')})` : ''}`; return null; }
+  if (feat.learned && !verifyPlan(feat.learned, plan)) { if (ctx.debug) ctx.debug.why = 'learned planner disagrees with the plan'; return null; }
+  if (plan.op === 'list' && plan.entity === 'document' && asksAmounts(stripConversationalFrame(raw0) ?? raw0)) plan.showAmounts = true;
   return { mode: 'dql', plan, text: framed, plain: isPlainInventory(plan) };
 }

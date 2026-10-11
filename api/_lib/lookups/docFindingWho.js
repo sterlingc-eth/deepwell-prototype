@@ -12,6 +12,7 @@
 import { attachCitations, customerRecord } from "../citations/records.js";
 import { documentRecordsFor } from "../citations/enrich.js";
 import { TENANT_SQL, answerEnvelope } from "../scope.js";
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 const VAL = (a) => `COALESCE(NULLIF(${a}.corrected_value, ''), ${a}.value)`;
 const STOP = new Set("a an the in on of at with and to for from by is it that this was were".split(" "));
@@ -53,7 +54,7 @@ export function parseFindingWho(question) {
 
 async function resolveDocType(db, term) {
   const tw = content(term); if (!tw.length) return null;
-  const { rows } = await db.raw(`SELECT DISTINCT document_type FROM documents WHERE ${TENANT_SQL} AND document_type IS NOT NULL`);
+  const { rows } = await db.raw(`SELECT DISTINCT document_type FROM documents WHERE ${TENANT_SQL} AND ${notPrivateSql("")} AND document_type IS NOT NULL`);
   const scored = rows.map((r) => {
     const ww = content(String(r.document_type).replace(/[-_]/g, " "));
     const hit = tw.filter((w) => ww.some((x) => near(w, x)));
@@ -101,7 +102,7 @@ async function finding(db, it) {
   const type = await resolveDocType(db, it.term); if (!type) return null;
   const pw = content(it.phrase).filter((w) => !FINDING_GENERIC.has(w)); if (!pw.length) return null;
   const { rows: vals } = await db.raw(
-    `SELECT x.field_key, ${VAL("x")} AS v, array_agg(DISTINCT x.document_id::text) AS docs FROM extractions x JOIN documents d ON d.id = x.document_id AND d.${TENANT_SQL}
+    `SELECT x.field_key, ${VAL("x")} AS v, array_agg(DISTINCT x.document_id::text) AS docs FROM extractions x JOIN documents d ON d.id = x.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
       WHERE x.${TENANT_SQL} AND d.document_type = $1 AND x.field_key NOT LIKE '%name%' AND x.field_key NOT LIKE '%address%' AND x.field_key NOT LIKE '%date%' AND x.field_key <> 'technician'
         AND length(${VAL("x")}) BETWEEN 4 AND 120 AND ${VAL("x")} ~ '[A-Za-z]{3}' AND ${VAL("x")} !~ '^[A-Z0-9-]{6,}$' GROUP BY 1, 2`, [type]);
   const label = type.replace(/[-_]/g, " ");

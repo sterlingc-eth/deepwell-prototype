@@ -37,6 +37,7 @@ import { financeRecords, aggregatedDocRecord } from '../citations/finance.js';
 import { computeJobCosts, jobKeyFromQuestionAddress, normalizeJobKey, findJobForAddress } from './jobCosting.js';
 import { parseCents, centsToString } from './normalize.js';
 import { centsToDollars } from './amountInvoice.js';
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 /* ---------------------------------------------------------------- formatting */
 
@@ -979,7 +980,7 @@ async function receivables(db, intent, ctx, direction = 'receivable') {
   if (a.n_open === 0 && direction === 'receivable') {
     // R3 B2: when no invoice in scope records a payment status, balance or due date, say so plainly instead of "No open invoices"
     const [rec] = await q(db, `SELECT count(*)::int AS n, COALESCE(sum(f.total), 0) AS total,
-        count(*) FILTER (WHERE f.status IN ('paid','unpaid','partial') OR f.amount_paid IS NOT NULL OR f.due_date IS NOT NULL)::int AS k
+        count(*) FILTER (WHERE f.status IN ('paid','unpaid','partial') OR f.amount_paid IS NOT NULL)::int AS k
       FROM financials f WHERE ${scope} AND $2::date IS NOT NULL`, [today, g?.ids ?? null], ctx.hu);
     if (rec && rec.k === 0) {
       const has = rec.n ? `On file: ${plural(rec.n, 'invoice')}.` : `No invoices${who} are on file.`;
@@ -1589,7 +1590,7 @@ async function invoiceByAmount(db, intent, ctx) {
   const all = [...rows, ...numRows.filter((r) => !seen.has(r.document_id))];
   const [pop] = await q(db, `SELECT count(*) FILTER (WHERE f.doc_kind IN ('invoice','credit_memo') AND f.total IS NOT NULL)::int AS n_priced, count(*) FILTER (WHERE f.doc_kind IN ('invoice','credit_memo') AND f.total IS NULL)::int AS n_unpriced FROM financials f WHERE true${dirSql}`, [], ctx.hu);
   let nNoRow = 0;
-  try { const [r0] = await q(db, `SELECT count(*)::int AS n FROM documents d WHERE d.document_type = 'invoice' AND NOT EXISTS (SELECT 1 FROM financials f WHERE f.document_id = d.id)`, [], ctx.hu); nNoRow = intent.direction ? 0 : r0?.n ?? 0; } catch { return null; }
+  try { const [r0] = await q(db, `SELECT count(*)::int AS n FROM documents d WHERE ${notPrivateSql("d")} AND d.document_type = 'invoice' AND NOT EXISTS (SELECT 1 FROM financials f WHERE f.document_id = d.id)`, [], ctx.hu); nNoRow = intent.direction ? 0 : r0?.n ?? 0; } catch { return null; }
   if (!pop || pop.n_priced + pop.n_unpriced + nNoRow === 0) {
     // R41U: the shop has none on that side of the books at all: say so (never "nothing matches" about a side that is simply empty)
     if (intent.direction) {

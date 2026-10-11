@@ -35,6 +35,7 @@ import { attachCitations, customerRecord, documentRecord } from '../citations/re
 // exported helper, per this round's contract); fastPathQuery.js imports nothing from this file or from
 // contentCount.js, so there is no import cycle.
 import { resolveAddressEntityFieldGroup } from '../fastPathQuery.js';
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 const TENANT_SQL = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 
@@ -141,7 +142,7 @@ async function findingEntriesForCustomers(db, custIds) {
     ({ rows: pages } = await db.raw(
       `SELECT p.document_id, p.page_no, p.text, d.document_type, d.original_filename, d.created_at
          FROM document_pages p
-         JOIN documents d ON d.id = p.document_id AND d.${TENANT_SQL}
+         JOIN documents d ON d.id = p.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
         WHERE p.${TENANT_SQL}
           AND p.document_id IN (
             SELECT l.document_id FROM document_entity_links l
@@ -225,7 +226,7 @@ async function customerJobDocuments(db, custId) {
     const { rows } = await db.raw(
       `SELECT DISTINCT ON (d.id) d.id AS document_id, d.document_type, d.original_filename, d.created_at::date AS created_at
          FROM document_entity_links l
-         JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL}
+         JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
          LEFT JOIN entities le ON le.id = l.entity_id AND le.entity_type = 'equipment' AND le.${TENANT_SQL}
         WHERE l.${TENANT_SQL} AND (l.entity_id = $1 OR le.customer_id = $1)
         ORDER BY d.id, d.created_at ASC`,

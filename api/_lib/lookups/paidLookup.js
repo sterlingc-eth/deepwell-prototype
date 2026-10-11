@@ -10,6 +10,7 @@ import { denyOr } from "./nameMatch.js";
 import { attachCitations } from "../citations/records.js";
 import { documentRecordsFor } from "../citations/enrich.js";
 import { TENANT_SQL, answerEnvelope } from "../scope.js";
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 const PAY_RE = /\b(?:paid|payed|pay|pays|paying|owe|owes|owed|owing)\b/i;
 const SKIP_RE = /\b(?:vendors?|suppliers?|supply|distribut\w*|po|pos|purchase|parts?|payroll|wages?|salary|tax|taxes|rent|insurance|invoices?|bills?|billed|when|what date|what day|the date|how long|how often|late|early|on time|overdue|unpaid|open|outstanding|balance|list|which|who|whom|everyone|everybody|anyone|anybody|all|every|each|total|how many|average|avg|most|least|top|year|month|week|quarter|today|yesterday|vs|versus|compared?|quote\w*|estimate\w*|i|we owe|do we|did we pay|do i|did i|should|can|could)\b/i;
@@ -81,7 +82,7 @@ export async function runPaidLookup(db, intent) {
   const display = hits.find((n) => norm(n) === key);
   const { rows } = await db.raw(
     `SELECT f.document_id, f.total, f.amount_paid, f.invoice_date::text AS d
-       FROM document_financials f JOIN documents d ON d.id = f.document_id AND d.${TENANT_SQL}
+       FROM document_financials f JOIN documents d ON d.id = f.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
       WHERE f.${TENANT_SQL} AND d.document_type = 'invoice' AND f.total IS NOT NULL AND regexp_replace(lower(f.customer_name), '[^a-z0-9 ]+', ' ', 'g') = $1
       ORDER BY f.invoice_date DESC NULLS LAST`, [key]);
   if (!rows.length || rows.some((r) => r.amount_paid != null)) return null;

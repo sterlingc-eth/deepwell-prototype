@@ -24,6 +24,7 @@ import { installYearOf } from './analytics.js';
 import { financialsTableExists } from './financials/store.js';
 import { attachCitations } from './citations/records.js';
 import { documentRecordsFor } from './citations/enrich.js';
+import { notPrivateSql } from "./privacy/privateDocs.js";
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -158,7 +159,7 @@ const periodLabel = (grain, from) => {
 async function fetchServiceDates(db) {
   const { rows } = await db.raw(
     `SELECT x.document_id, COALESCE(NULLIF(x.corrected_value, ''), x.value) AS service_date, d.document_type
-       FROM extractions x JOIN documents d ON d.id = x.document_id
+       FROM extractions x JOIN documents d ON d.id = x.document_id AND ${notPrivateSql("d")}
       WHERE x.field_key = 'service_date' AND x.${TENANT_SQL}
       LIMIT 20000`
   );

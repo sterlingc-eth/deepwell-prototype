@@ -10,6 +10,7 @@
 import { attachCitations } from "../citations/records.js";
 import { documentRecordsFor } from "../citations/enrich.js";
 import { TENANT_SQL, answerEnvelope } from "../scope.js";
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 const INSTALL_W = String.raw`(?:inst+a+l+\w*|installd|put\s+in|set\s+up|setup)`;
 const INSTALLER_RE = new RegExp(String.raw`\b(?:who(?:'?s)?\b.*\b${INSTALL_W}|(?:which|what)\s+(?:tech\w*|guy|crew|company|contractor)\b.*\b${INSTALL_W}|\b${INSTALL_W}\s+by\b|installers?\b|inst+a+l+\s+tech\w*|install\s+guy|inst+a+l+\w*\s+(?:tech\w*|guy|crew)\b)`, "i");
@@ -55,7 +56,7 @@ export async function runFieldMatch(db, intent) {
 
   if (intent.field === "invoice_number") {
     const { rows } = await db.raw(
-      `SELECT f.document_id, f.invoice_number AS no, f.invoice_date::text AS d FROM document_financials f JOIN documents d ON d.id = f.document_id AND d.${TENANT_SQL}
+      `SELECT f.document_id, f.invoice_number AS no, f.invoice_date::text AS d FROM document_financials f JOIN documents d ON d.id = f.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
         WHERE f.${TENANT_SQL} AND d.document_type = 'invoice' AND f.invoice_number IS NOT NULL AND regexp_replace(lower(f.customer_name), '[^a-z0-9 ]+', ' ', 'g') = $1
         ORDER BY f.invoice_date DESC NULLS LAST`, [keys[0]]);
     if (!rows.length) return null;
@@ -68,7 +69,7 @@ export async function runFieldMatch(db, intent) {
   // installer: the install record = a document linked to the customer whose work starts "Install" (invoice) or a start-up sheet.
   const { rows } = await db.raw(
     `SELECT DISTINCT d.id AS document_id, d.document_type, t.value AS tech, coalesce(i.value, sd.value) AS dt
-       FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL}
+       FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
        JOIN extractions t ON t.document_id = d.id AND t.field_key = 'technician' AND t.${TENANT_SQL}
        LEFT JOIN extractions w ON w.document_id = d.id AND w.field_key = 'work_performed' AND w.${TENANT_SQL}
        LEFT JOIN extractions i ON i.document_id = d.id AND i.field_key = 'installation_date' AND i.${TENANT_SQL}

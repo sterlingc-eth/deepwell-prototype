@@ -16,6 +16,7 @@ import { attachCitations, customerRecord } from "../citations/records.js";
 import { documentRecordsFor } from "../citations/enrich.js";
 import { TENANT_SQL, humanDate, answerEnvelope } from "../scope.js";
 import { nameTokens, tokenSame, withinOne } from "./nameMatch.js";
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 const PREFIXES = { INV: "invoice", WO: "work order", PO: "purchase order", BP: "permit", EST: "estimate", Q: "quote", TKT: "ticket" };
 const WORD_KIND = [
@@ -108,7 +109,7 @@ async function docsByNumber(db, intent) {
     : `${CANON_SQL(VAL("x"))} = $1`;
   const { rows } = await db.raw(
     `SELECT x.document_id, x.field_key, ${VAL("x")} AS number, d.document_type, d.original_filename
-       FROM extractions x JOIN documents d ON d.id = x.document_id AND d.${TENANT_SQL}
+       FROM extractions x JOIN documents d ON d.id = x.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
       WHERE x.${TENANT_SQL} AND x.field_key = ANY($2::text[]) AND ${match}
       LIMIT 6`,
     params

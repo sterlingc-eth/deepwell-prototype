@@ -26,6 +26,7 @@ import { stripConversationalFrame } from "../router/frame.js";
 import { TENANT_SQL } from "../scope.js";
 import { LEX } from "./lexicon.js";
 import { extractWindow } from "./dateQualifiers.js";
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 const TLEX = new Set([
   ...[...LEX].filter((w) => !["no.", "nr", "num", "#", "ph"].includes(w)),
@@ -166,7 +167,7 @@ async function techRows(db, techs, { city = null, type = null } = {}) {
   if (city) { params.push(`%, ${city.replace(/[\\%_]/g, "\\$&")},%`); joins += ` JOIN document_entity_links l ON l.document_id = t.document_id JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL AND c.data->>'service_address' ILIKE $${params.length}`; }
   if (type) { params.push(type); joins += ` JOIN extractions s ON s.document_id = t.document_id AND s.field_key = 'service_type' AND lower(s.value) = lower($${params.length})`; }
   const { rows } = await db.raw(
-    `SELECT DISTINCT t.id, t.tech, t.document_id, d.original_filename FROM (${TECH_CTE}) t LEFT JOIN documents d ON d.id = t.document_id ${joins}
+    `SELECT DISTINCT t.id, t.tech, t.document_id, d.original_filename FROM (${TECH_CTE}) t LEFT JOIN documents d ON d.id = t.document_id AND ${notPrivateSql("d")} ${joins}
        WHERE t.tech = ANY($1::text[])`,
     params
   );
@@ -212,7 +213,7 @@ export async function runTechnician(db, parsed) {
   if (kind === "window") {
     const W = parsed.window, a0 = techs[0];
     const { rows: wr } = await db.raw(
-      `SELECT DISTINCT t.id, t.tech, t.document_id, d.original_filename, s.v AS sd FROM (${TECH_CTE}) t LEFT JOIN documents d ON d.id = t.document_id
+      `SELECT DISTINCT t.id, t.tech, t.document_id, d.original_filename, s.v AS sd FROM (${TECH_CTE}) t LEFT JOIN documents d ON d.id = t.document_id AND ${notPrivateSql("d")}
          JOIN (SELECT document_id, coalesce(nullif(corrected_value, ''), value) AS v FROM extractions WHERE field_key = 'service_date' AND ${TENANT_SQL}) s ON s.document_id = t.document_id
         WHERE t.tech = $1`, [a0]);
     const isoOf = (v) => { const m = /(\d{4})-(\d{2})-(\d{2})/.exec(String(v ?? "")); if (m) return `${m[1]}-${m[2]}-${m[3]}`; const u = /(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(String(v ?? "")); return u ? `${u[3]}-${String(+u[1]).padStart(2, "0")}-${String(+u[2]).padStart(2, "0")}` : null; };

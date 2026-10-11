@@ -5,6 +5,7 @@
  * detect(feat)  reads the slots parse.js collected and returns a plan or null (never a guess).
  * exec(plan, x) computes over the snapshot with the helpers in exec.js. say lives in ../say.js.
  */
+import { ynOf } from '../yn.js';
 import { registerFamily } from '../registry.js';
 import { ENTITIES, yearsBetween } from '../fields.js';
 import { sayResult } from '../say.js';
@@ -81,7 +82,7 @@ function mapFilters(filters, entity) {
 }
 
 function dimFor(dim, entity, timeField, f) {
-  if (['year', 'month', 'quarter', 'monthOfYear'].includes(dim)) {
+  if (['year', 'month', 'quarter', 'monthOfYear', 'weekday'].includes(dim)) {
     const field = timeField ?? ENTITIES[entity].defaultDate;
     return field ? { by: dim, field } : null;
   }
@@ -134,14 +135,28 @@ function detect(f) {
   // ---------------------------------------------------------------- entity
   if (f.nouns.install) { f.nouns.unit = true; f.cue = { ...(f.cue ?? {}), install: true }; }
   // "customers with an agreement", "customers with more than 5 documents": a customer reading, filtered by what it has
-  const custRel = Boolean(f.flags.custRel);
+  // "name the client with the latest invoice": the client on the extreme paper, not the clients that have an invoice
+  const custRel = Boolean(f.flags.custRel) && !((t.latest || t.earliest) && !(t.latest && t.earliest) && f.docTypes.length === 1 && (f.flags.explicitList || f.flags.listVerb || f.flags.who) && !f.recentN && !t.howMany);
+  const wantsRankEarly = Boolean(t.topN || t.argmax);
   if (custRel && f.nouns.customer && f.nouns.unit && f.filters.some((x) => x.field === 'brand') && !f.nouns.visit && !f.nouns.document && !f.docTypes.length) f.nouns.unit = false; // "customers with Carrier units"
   if (custRel && !(f.nouns.customer && !f.nouns.unit && !f.nouns.visit && !f.nouns.document && f.docTypes.length <= 1)) return null;
   // "revenue from Tucson clients", "what has client X been billed": the customer is a modifier of the invoices, not the thing counted
+  // "customers by revenue": the customers are what is ranked, not a modifier of the invoices (a total of everything would be a different question)
+  if (f.byMoney && f.nouns.customer && !f.docTypes.length && !wantsRankEarly && !f.dims.length && !t.argmax && !t.topN) return null;
   const moneyOnCust = !custRel && f.nouns.customer && !f.docTypes.length && !f.nouns.unit && !f.nouns.visit && !f.nouns.document && (t.money?.length || t.howMuch) && !f.filters.some((x) => x.field === '?num') && (t.moneyType ?? []).length === 1;
   if (moneyOnCust) f.docTypes = [...t.moneyType];
   let docType = f.docTypes[0] ?? null;
   const docEntity = !custRel && (f.docTypes.length > 0 || f.nouns.visit || f.nouns.document);
+  // "name the client with the latest invoice", "how much was the first PO", "the latest visit was done by who": one fact of the extreme paper
+  let ask = null;
+  if ((t.latest || t.earliest) && !(t.latest && t.earliest) && docEntity && !f.recentN && !t.howMany && !t.exists && !t.topN && !t.argmax && !f.dims.length && !f.distinctDim) {
+    const named = (role) => f.filters.some((x) => x.role === role);
+    const asked = Boolean(f.flags.explicitList || f.flags.listVerb || f.flags.who);
+    if (f.nouns.customer && !named('customer') && !f.nouns.tech && asked && !t.howMuch) ask = 'customer';
+    else if (f.nouns.tech && !named('tech') && !f.nouns.customer && asked && !t.howMuch) ask = 'tech';
+    else if (t.howMuch && !f.nouns.customer && !f.nouns.tech && !f.nouns.visit) ask = 'amount';
+    else if (!f.nouns.customer && !f.nouns.tech && /\bwho\s+(?:did|handled|performed|completed|worked\s+on|ran|was\s+assigned(?:\s+to)?)\b/i.test(f.raw ?? '') && !f.filters.some((x) => x.role === 'tech')) ask = 'tech';
+  }
   let entity = null; let visit = false;
   const argDim = t.argmax?.dim ?? null;
   const wantsRank = Boolean(t.topN || t.argmax);
@@ -152,11 +167,11 @@ function detect(f) {
   if (docEntity) {
     entity = 'document';
     if (f.nouns.visit && f.docTypes.length) return null; // "visits" and a document type together: ambiguous
-    if (f.nouns.customer) {
+    if (f.nouns.customer && ask !== 'customer') {
       if (wantsRank && !rankDim) rankDim = 'customer';
       else if (!(f.dims.length || t.argmax || t.money?.length || t.howMuch)) return null;
     }
-    if (f.nouns.tech) {
+    if (f.nouns.tech && ask !== 'tech') {
       if (wantsRank && !rankDim) rankDim = 'tech';
       else if (!(f.dims.length || t.argmax)) return null;
     }
@@ -198,6 +213,8 @@ function detect(f) {
     // "average invoice", "largest estimate": the amount of that kind of paper
     measure = { field: 'total', label: 'total', unit: 'money' };
   }
+  // invoices carry no vendor: "every vendor bill from Watsco" is the purchase orders placed with that vendor
+  if (docType === 'invoice' && !f.docTypes.length && f.filters.some((x) => x.role === 'vendor' || x.field === 'vendor')) docType = 'purchase-order';
   if (t.ageWord && !measure) return null;
   if (entity === 'document' && visit && measure?.field === 'total') return null;
   if (t.hours) need.delete('hours');
@@ -251,10 +268,10 @@ function detect(f) {
     const twoTimes = (f.times?.length ?? 0) === 2;
     const cm = measure ? { ...measure, agg: agg ?? 'sum' } : null;
     if (inF.length === 1 && !twoTimes && filters.filter((x) => x.op === 'in').length === 1) {
-      return fin({ ...base, op: 'compare_two_values', measure: cm, compare: { field: inF[0].field, values: inF[0].value }, filters: filters.filter((x) => x !== inF[0]) }, 'versus', 'howMany', ...aggKeys);
+      return fin({ ...base, op: 'compare_two_values', measure: cm, compare: { field: inF[0].field, values: inF[0].value }, filters: filters.filter((x) => x !== inF[0]), ...ynOf(f.raw) }, 'versus', 'howMany', ...aggKeys);
     }
     if (twoTimes && !inF.length && timeField) {
-      return fin({ ...base, op: 'compare_two_values', time: null, measure: cm, compare: { time: f.times.map((s) => ({ field: timeField, from: s.from, to: s.to, label: s.label })) } }, 'versus', 'howMany', ...aggKeys);
+      return fin({ ...base, op: 'compare_two_values', time: null, measure: cm, ...ynOf(f.raw), compare: { time: f.times.map((s) => ({ field: timeField, from: s.from, to: s.to, label: s.label })) } }, 'versus', 'howMany', ...aggKeys);
     }
     return null;
   }
@@ -300,6 +317,15 @@ function detect(f) {
     return null;
   }
 
+  // ---------------------------------------------------------------- the extreme paper, one fact of it
+  if (ask) {
+    if (groupBy.length || f.flags.each || agg && ask !== 'amount') return null;
+    if (ask === 'amount' && !(measure?.field === 'total' && docType && !visit)) return null;
+    const field = visit ? 'serviceDate' : time?.field ?? 'date';
+    for (const k of ['money', 'howMuch', 'total']) need.delete(k);
+    return fin({ ...base, op: t.latest ? 'latest' : 'first_ever', sortField: field, ask, measure: null }, 'latest', 'earliest');
+  }
+
   // ---------------------------------------------------------------- grouping
   if (groupBy.length) {
     if (t.exists || t.latest || t.earliest) return null;
@@ -343,7 +369,7 @@ function detect(f) {
       en = DISTINCT_UNIT_DIMS.has(dim) && dim !== 'type' ? 'unit' : dim === 'city' ? 'customer' : 'document';
     }
     const g = dimFor(dim, en, null, f);
-    if (!g || ['year', 'month', 'quarter', 'monthOfYear'].includes(dim)) return null;
+    if (!g || ['year', 'month', 'quarter', 'monthOfYear', 'weekday'].includes(dim)) return null;
     const fl = en === entity ? filters : mapFilters(resolveNumberFilters(f, en, f.today) ?? [], en);
     if (!fl) return null;
     const asList = !t.howMany;
@@ -386,6 +412,13 @@ const roundMoney = (n) => Math.round(n * 100) / 100;
 
 function execCore(plan, x) {
   const { snap, today, h } = x;
+  // a measure this organization never records at all (labor hours at a law office, tonnage at a clinic) is not answered with a zero
+  const mf = plan.measure?.field;
+  if (mf && mf !== 'total') {
+    const def = h.fieldDef(plan.entity, mf);
+    const all = plan.entity === 'unit' ? snap.units : plan.entity === 'customer' ? snap.customers : snap.documents;
+    if (def && !all.some((r) => def.get(r, snap, today) != null)) return { abstain: 'field-not-tracked' };
+  }
   const sel = rowsOf(plan, x);
   if (sel.abstain) return { abstain: sel.abstain, name: sel.name };
   let rows = sel.rows;
@@ -453,7 +486,9 @@ function execCore(plan, x) {
     }
     case 'latest': case 'first_ever': {
       const def = h.fieldDef(plan.entity, plan.sortField);
-      const withV = rows.map((r) => ({ r, v: def.get(r, snap, today) })).filter((o) => o.v != null).map((o) => ({ r: o.r, v: String(o.v).slice(0, 10) }));
+      let withV = rows.map((r) => ({ r, v: def.get(r, snap, today) })).filter((o) => o.v != null).map((o) => ({ r: o.r, v: String(o.v).slice(0, 10) }));
+      // "the most recent paper" is the latest one dated on or before today: a paper dated in the future (a term that has not started) is not "recent"
+      if (plan.op === 'latest' && plan.entity === 'document' && today && withV.some((o) => o.v <= today)) withV = withV.filter((o) => o.v <= today);
       if (!withV.length) return { ...res, value: null, extreme: [] };
       const best = plan.op === 'latest' ? withV.reduce((a, b) => (b.v > a.v ? b : a)).v : withV.reduce((a, b) => (b.v < a.v ? b : a)).v;
       return { ...res, value: best, extreme: withV.filter((o) => o.v === best).map((o) => o.r), dated: withV.length };
@@ -501,7 +536,13 @@ function execCore(plan, x) {
       if (!out.length) return { ...res, ranked: [], groupLeftOut: leftOut };
       const cut = out[Math.min(plan.limit, out.length) - 1].value;
       const ranked = out.filter((g) => (plan.dir === 'asc' ? g.value <= cut : g.value >= cut));
-      return { ...res, ranked, cut, groupLeftOut: leftOut, totalGroups: out.length };
+      // a ranking of years / months / quarters: periods with nothing in them are not groups (so they cannot be "the worst"), and the running period is not finished
+      const by0 = plan.groupBy[0]?.by; let gaps = 0;
+      if (['year', 'month', 'quarter'].includes(by0) && out.length > 1) {
+        const idx = (k) => { const [y, m] = String(k).split('-'); return by0 === 'year' ? Number(y) : by0 === 'month' ? Number(y) * 12 + Number(m) : Number(y) * 4 + Number(String(m).replace('Q', '')); };
+        const ix = out.map((g) => idx(g.key)); gaps = Math.max(...ix) - Math.min(...ix) + 1 - new Set(ix).size;
+      }
+      return { ...res, ranked, cut, groupLeftOut: leftOut, totalGroups: out.length, gaps };
     }
     case 'share_pct': {
       // denominator: same entity, same document type / visit scope and time span, none of the other conditions

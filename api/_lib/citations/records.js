@@ -19,6 +19,7 @@
  * Pure module: no db, no model, no logging of content.
  */
 
+import { isPrivateDoc } from '../privacy/privateDocs.js';
 export const MAX_RECORDS = 200;
 export const RECORD_TYPES = Object.freeze(['customer', 'unit', 'document', 'invoice']);
 
@@ -70,6 +71,7 @@ export function unitRecord(row, extra = {}) {
 }
 
 export function documentRecord(row, extra = {}) {
+  if (isPrivateDoc(row)) return null; // People / HR papers are never cited (null is already a legal result: makeRecord returns it for a bad row)
   const id = row?.id ?? row?.document_id ?? row?.documentId;
   const isInvoice = extra.type === 'invoice' || row?.document_type === 'invoice' || row?.doc_kind === 'invoice';
   return makeRecord({
@@ -214,6 +216,7 @@ const isRecordArray = (v) => Array.isArray(v) && v.every((r) => r && typeof r ==
  */
 export function finalizeCitations(data) {
   if (!data || typeof data !== 'object' || (data.kind !== 'answer' && data.kind !== 'no-answer')) return data;
+  if (Array.isArray(data.records)) data.records = data.records.filter((r) => !(r && typeof r.label === 'string' && /^HR \/ employment letters? ·/i.test(r.label))); // backstop: no HR paper is ever cited
   if (!isRecordArray(data.records)) {
     citationStats.derived++;
     const derived = deriveRecords(data).map((r) => makeRecord({ ...r, label: r.label || (r.type === 'customer' ? 'Customer record' : 'Document') })).filter(Boolean);

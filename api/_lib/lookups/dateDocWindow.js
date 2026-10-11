@@ -14,6 +14,7 @@ import { betweenWithCurrency } from "../amountWords.js";
 import { documentRecordsFor, customerRecordsFor } from "../citations/enrich.js";
 import { TENANT_SQL, answerEnvelope } from "../scope.js";
 import { extractPoints } from "./dateQualifiers.js";
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 const KINDS = [
   ["service", /\bservice\s+(?:visits?|calls?)\b/, "service_date", null, ["service visit", "service visits"], false],
@@ -99,7 +100,7 @@ export async function runDocWindow(db, it) {
   const ws = it.windows;
   const where = it.mode === "list" ? `on ${joinAnd(ws.map((w) => w.label))}`.replace(/^on /, ws.every((w) => w.from !== w.to) ? "in " : "on ") : when(ws[0], it.mode);
   if (!it.field) { // undated document types
-    const { rows } = await db.raw(`SELECT d.document_type AS t, count(*)::int AS n FROM documents d WHERE d.${TENANT_SQL} GROUP BY 1`, []);
+    const { rows } = await db.raw(`SELECT d.document_type AS t, count(*)::int AS n FROM documents d WHERE d.${TENANT_SQL} AND ${notPrivateSql("d")} GROUP BY 1`, []);
     const total = rows.filter((r) => norm(r.t) === it.dtype).reduce((s, r) => s + r.n, 0);
     if (!total) return none(`No ${it.noun[1]} on file.`, `No ${it.noun[1]} documents found.`);
     return attachCitations(answerEnvelope({ text: `You have ${total} ${plural(total)} on file, but ${it.noun[1]} aren't dated in your records, so I can't count them ${where}.`, facts: [{ label: `${it.noun[1][0].toUpperCase()}${it.noun[1].slice(1)} on file`, value: String(total), sources: [] }], extra: { fastIntent: "date_doc_window" } }),
@@ -112,7 +113,7 @@ export async function runDocWindow(db, it) {
     if (rows.length > dated.length) coverage = ` ${rows.length - dated.length} of ${rows.length} units have no install date on file.`;
   } else {
     const { rows } = await db.raw(
-      `SELECT x.document_id, d.document_type AS dtype, ${VAL("x")} AS v FROM extractions x JOIN documents d ON d.id = x.document_id AND d.${TENANT_SQL}
+      `SELECT x.document_id, d.document_type AS dtype, ${VAL("x")} AS v FROM extractions x JOIN documents d ON d.id = x.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
         WHERE x.${TENANT_SQL} AND x.field_key = $1`, [it.field]);
     const seen = new Map();
     for (const r of rows) if (!seen.has(r.document_id)) seen.set(r.document_id, { id: r.document_id, type: norm(r.dtype), date: isoOf(r.v) });

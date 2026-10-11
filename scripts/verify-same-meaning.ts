@@ -108,7 +108,8 @@ await sameAs('how many papers on file', 'how many documents do we have', 'papers
 await sameAs('list the guys we send out', 'list technicians', 'guys we send out = technicians');
 await sameAs('how many installers', 'how many technicians do we have', 'installers = technicians');
 await sameAs('which customers have outstanding balances', 'which customers owe us money', 'outstanding balances = owes');
-for (const [q, noun] of [['how many receipts do we have', 'receipt'], ['how many delivery tickets do we have', 'delivery'], ['how many pickup tickets', 'delivery'], ['how many price lists', 'price list'], ['how many COIs on file', 'insurance certificate'], ['how many certificates of insurance', 'insurance certificate'], ['how many HR letters', 'letter'], ['how many statements do we have', 'statement']] as const) {
+{ const r = await ask('how many HR letters'); check('how many HR letters: the private-papers reply, no count', r.kind === 'no-answer' && noModel(r) && !/\d/.test(r.text) && /private/i.test(r.text), r); } // HR letters are private (was: a count)
+for (const [q, noun] of [['how many receipts do we have', 'receipt'], ['how many delivery tickets do we have', 'delivery'], ['how many pickup tickets', 'delivery'], ['how many price lists', 'price list'], ['how many COIs on file', 'insurance certificate'], ['how many certificates of insurance', 'insurance certificate'], ['how many statements do we have', 'statement']] as const) {
   const r = await ask(q);
   check(`new document type words: ${q}`, r.kind === 'answer' && noModel(r) && new RegExp(noun, 'i').test(r.text) && /\b\d+\b/.test(r.text), r);
 }

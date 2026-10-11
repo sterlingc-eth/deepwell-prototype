@@ -22,6 +22,7 @@ import { splitVersus } from "../analytics/comparison.js";
 import { canonicalBrandLabel } from "../analytics/brandCanon.js";
 import { attachCitations, documentRecord, unitRecord, customerRecord } from "../citations/records.js";
 import { answerEnvelope, TENANT_SQL, todayIso } from "../scope.js";
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 export const templatesEnabled = () => process.env.DONOVAN_AGG_TEMPLATES !== "0";
 
@@ -266,7 +267,7 @@ async function loadVisits(db) {
             (SELECT COALESCE(NULLIF(x.corrected_value, ''), x.value) FROM extractions x WHERE x.document_id = d.id AND x.field_key = 'service_date' ORDER BY x.created_at LIMIT 1) AS sdate,
             (SELECT COALESCE(NULLIF(x.corrected_value, ''), x.value) FROM extractions x WHERE x.document_id = d.id AND x.field_key = 'technician' ORDER BY x.created_at LIMIT 1) AS tech,
             (SELECT COALESCE(NULLIF(x.corrected_value, ''), x.value) FROM extractions x WHERE x.document_id = d.id AND x.field_key = 'service_type' ORDER BY x.created_at LIMIT 1) AS stype
-       FROM documents d WHERE d.${TENANT_SQL} AND EXISTS (SELECT 1 FROM extractions x WHERE x.document_id = d.id AND x.field_key = 'service_date') LIMIT ${ROW_CAP + 1}`, []);
+       FROM documents d WHERE d.${TENANT_SQL} AND ${notPrivateSql("d")} AND EXISTS (SELECT 1 FROM extractions x WHERE x.document_id = d.id AND x.field_key = 'service_date') LIMIT ${ROW_CAP + 1}`, []);
   if (rows.length > ROW_CAP) return null;
   return rows.map((r) => ({ ...r, date: ymd(r.sdate), tech: r.tech ? String(r.tech).trim() : null, svc: r.stype ? String(r.stype).trim() : null }));
 }
@@ -282,14 +283,14 @@ async function loadMoney(db, kind) {
             COALESCE(NULLIF(f.corrections->>'vendor_name', ''), f.vendor_name) AS vendor,
             COALESCE(NULLIF(f.corrections->>'status', ''), f.status) AS status, f.currency, f.invoice_number,
             (SELECT COALESCE(NULLIF(x.corrected_value, ''), x.value) FROM extractions x WHERE x.document_id = f.document_id AND x.field_key = 'technician' ORDER BY x.created_at LIMIT 1) AS tech
-       FROM document_financials f JOIN documents d ON d.id = f.document_id
+       FROM document_financials f JOIN documents d ON d.id = f.document_id AND ${notPrivateSql("d")}
       WHERE f.${TENANT_SQL} AND f.doc_kind = $1 AND f.direction = $2 LIMIT ${ROW_CAP + 1}`, [MONEY_KINDS_SQL[kind], direction]);
   if (rows.length > ROW_CAP) return null;
   return rows.map((r) => ({ ...r, total: r.total == null ? null : Number(r.total), date: ymd(r.dt), customer: r.customer ? String(r.customer).trim() : null, vendor: r.vendor ? String(r.vendor).trim() : null, tech: r.tech ? String(r.tech).trim() : null }));
 }
 const MONEY_KINDS_SQL = MONEY_KINDS;
 async function loadDocTypes(db) {
-  const { rows } = await db.raw(`SELECT id, document_type, original_filename FROM documents WHERE ${TENANT_SQL} LIMIT ${ROW_CAP + 1}`, []);
+  const { rows } = await db.raw(`SELECT id, document_type, original_filename FROM documents WHERE ${TENANT_SQL} AND ${notPrivateSql("")} LIMIT ${ROW_CAP + 1}`, []);
   return rows.length > ROW_CAP ? null : rows;
 }
 

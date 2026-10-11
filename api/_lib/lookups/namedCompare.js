@@ -125,7 +125,7 @@ async function customerSide(db, noun, c) {
   const typeFilter = noun === "invoices" ? `AND ${typeSql("d.document_type")} = ANY($2::text[])` : "";
   const params = noun === "invoices" ? [c.id, docTypeAliases("invoice")] : [c.id];
   const { rows } = await db.raw(
-    `SELECT DISTINCT d.id, d.document_type, d.original_filename, d.created_at FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL}
+    `SELECT DISTINCT d.id, d.document_type, d.original_filename, d.created_at FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
       WHERE l.entity_id = $1 AND l.${TENANT_SQL} ${typeFilter} ORDER BY d.created_at DESC`, params);
   return { n: rows.length, docs: rows };
 }
@@ -196,6 +196,7 @@ export async function runNamedCompare(db, intent) {
 
 /* ------------------------------------------------------------------ per-customer COUNTS ("how many documents does X have", "document count for X") */
 import { docTypeFromWord, documentTypeLabel, docTypeSynonymAlternation } from "../documentTypes.js";
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 const GENERIC_NOUN = /^(?:documents?|docs?|files?|paperwork|jobs?)$/;
 const TYPED_NOUN = docTypeSynonymAlternation();
@@ -236,7 +237,7 @@ export async function runCustomerCount(db, intent) {
   const typeFilter = intent.typeId ? `AND ${typeSql("d.document_type")} = ANY($2::text[])` : "";
   const params = intent.typeId ? [c.id, docTypeAliases(intent.typeId)] : [c.id];
   const { rows } = await db.raw(
-    `SELECT DISTINCT d.id, d.document_type, d.original_filename, d.created_at FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL}
+    `SELECT DISTINCT d.id, d.document_type, d.original_filename, d.created_at FROM document_entity_links l JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
       WHERE l.entity_id = $1 AND l.${TENANT_SQL} ${typeFilter} ORDER BY d.created_at DESC`, params);
   const label = intent.typeId ? documentTypeLabel(intent.typeId).toLowerCase() : "document";
   const lab = (n) => `${label}${n === 1 ? "" : label.endsWith("s") ? "" : "s"}`;
@@ -280,7 +281,7 @@ export async function resolveTechnician(db, phrase) {
 async function runTechCompare(db, intent) {
   const [ta, tb] = [await resolveTechnician(db, intent.a.phrase), await resolveTechnician(db, intent.b.phrase)];
   if (!ta || !tb || ta === tb) return null;
-  const side = async (t) => (await db.raw(`SELECT x.document_id AS id, d.original_filename, d.document_type, d.created_at FROM extractions x JOIN documents d ON d.id = x.document_id AND d.${TENANT_SQL} WHERE x.field_key = 'technician' AND x.value = $1 AND x.${TENANT_SQL} ORDER BY d.created_at DESC`, [t])).rows;
+  const side = async (t) => (await db.raw(`SELECT x.document_id AS id, d.original_filename, d.document_type, d.created_at FROM extractions x JOIN documents d ON d.id = x.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")} WHERE x.field_key = 'technician' AND x.value = $1 AND x.${TENANT_SQL} ORDER BY d.created_at DESC`, [t])).rows;
   const [da, dbb] = [await side(ta), await side(tb)];
   const v = verdict(intent, da.length, dbb.length, ta, tb, "jobs", "Counted every document on file that names the technician (a job is a document).");
   return attachCitations(answerEnvelope({ text: v.text, facts: [{ label: ta, value: String(da.length), sources: [] }, { label: tb, value: String(dbb.length), sources: [] }], extra: { comparison: true } }),

@@ -4,6 +4,7 @@
  * Optional filters taken from the question: a name/topic phrase (must appear in the memo text) and an mm/dd/yyyy date.
  * Kill switch: DONOVAN_MEMO_AUDIENCE=0 restores the old behaviour.
  */
+import { notPrivateSql } from "../privacy/privateDocs.js";
 import { documentsHaveAudience } from "../audience/probe.js";
 import { attachCitations, documentRecord } from "../citations/records.js";
 
@@ -30,7 +31,7 @@ export async function answerInternalMemos(db, question) {
   const { rows } = await db.raw(
     `SELECT d.id, d.original_filename, d.created_at, string_agg(p.text, E'\\n' ORDER BY p.page_no) AS body
        FROM documents d JOIN document_pages p ON p.document_id = d.id AND p.${TENANT}
-      WHERE d.${TENANT} AND (${hasCol ? "d.audience = 'internal' OR " : ""}EXISTS (SELECT 1 FROM document_pages q WHERE q.document_id = d.id AND q.${TENANT} AND q.text ~* '\\yinternal memo\\s+(?:date|to|from|re)\\y'))
+      WHERE d.${TENANT} AND ${notPrivateSql("d")} AND (${hasCol ? "d.audience = 'internal' OR " : ""}EXISTS (SELECT 1 FROM document_pages q WHERE q.document_id = d.id AND q.${TENANT} AND q.text ~* '\\yinternal memo\\s+(?:date|to|from|re)\\y'))
       GROUP BY d.id, d.original_filename, d.created_at ORDER BY d.created_at DESC`
   );
   const all = rows.map((r) => {

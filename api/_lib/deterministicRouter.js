@@ -66,6 +66,7 @@ import { parseDocWindow, runDocWindow } from './lookups/dateDocWindow.js';
 import { parseExpiryWindow, runExpiryWindow } from './lookups/expiryWindow.js';
 import { parseDocFieldAsk } from './lookups/docFieldAsk.js';
 import { parseFalsePremise, runFalsePremise } from './lookups/falsePremise.js';
+import { notPrivateSql } from "./privacy/privateDocs.js";
 
 // R32 (loop 3/4): "have we been out to <addr> in the last 90 days" / "any service calls at <addr> last year" / "did we do any work at <addr> this year".
 const WINDOW_VISIT_LEAD_RE = /^\s*(?:any\s+(?:service\s+(?:calls?|visits?)|visits?|calls?|work|jobs?|repairs?|maintenance)|(?:did|have)\s+we\s+(?:do\s+any|had\s+any|done\s+any|been\s+(?:out\s+)?(?:to|at)|gone\s+out\s+to|visited|serviced|worked\s+(?:on|at)|got\s+any)|has\s+anyone\s+been\s+out\s+to)\b/i;
@@ -478,7 +479,7 @@ async function installFacts(db, unitIds, keys) {
   if (!unitIds.length) return [];
   const { rows } = await db.raw(
     `SELECT x.document_id, x.entity_id, x.field_key, COALESCE(NULLIF(x.corrected_value, ''), x.value) AS value, d.document_type
-       FROM extractions x JOIN documents d ON d.id = x.document_id
+       FROM extractions x JOIN documents d ON d.id = x.document_id AND ${notPrivateSql("d")}
       WHERE x.entity_id = ANY($1::uuid[]) AND x.field_key = ANY($2::text[]) AND x.${TENANT_SQL} AND coalesce(x.value, '') <> ''
       ORDER BY x.confidence DESC NULLS LAST, x.created_at DESC LIMIT 200`,
     [unitIds, keys]);
@@ -578,7 +579,7 @@ async function installer(db, intent, ctx, today) {
     // Cite the install-shaped document (startup sheet / install invoice) whose technician is that person.
     const ids = await scopeDocumentIds(db, ctx.scope);
     const { rows: tech } = ids.length ? await db.raw(
-      `SELECT x.document_id, d.document_type FROM extractions x JOIN documents d ON d.id = x.document_id
+      `SELECT x.document_id, d.document_type FROM extractions x JOIN documents d ON d.id = x.document_id AND ${notPrivateSql("d")}
         WHERE x.document_id = ANY($1::uuid[]) AND x.field_key = 'technician' AND lower(COALESCE(NULLIF(x.corrected_value, ''), x.value)) = lower($2)
           AND x.${TENANT_SQL} AND lower(replace(d.document_type, '_', '-')) IN ('startup-sheet', 'invoice', 'work-order')
         ORDER BY (lower(replace(d.document_type, '_', '-')) = 'startup-sheet') DESC LIMIT 1`, [ids, found[0].name]) : { rows: [] };

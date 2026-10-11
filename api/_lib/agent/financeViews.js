@@ -1,3 +1,4 @@
+import { notPrivateSql, notPrivateIdSql } from "../privacy/privateDocs.js";
 /**
  * Donovan agent — the FINANCIAL views (financials layer, handoffs/FINANCIALS_2026-09-23.md).
  *
@@ -52,12 +53,12 @@ export function docCustomerCte(name, { onlyFinancialDocs = false } = {}) {
       SELECT l.document_id, CASE e.entity_type WHEN 'customer' THEN e.id WHEN 'equipment' THEN e.customer_id END AS customer_id, 'link'::text AS via
         FROM document_entity_links l
         JOIN entities e ON e.id = l.entity_id AND e.merged_into IS NULL AND ${t("e")}
-       WHERE ${t("l")}${scope("l.document_id")}
+       WHERE ${t("l")} AND ${notPrivateIdSql("l.document_id")}${scope("l.document_id")}
       UNION ALL
       SELECT x.document_id, CASE e.entity_type WHEN 'customer' THEN e.id WHEN 'equipment' THEN e.customer_id END AS customer_id, 'extraction'::text AS via
         FROM extractions x
         JOIN entities e ON e.id = x.entity_id AND e.merged_into IS NULL AND ${t("e")}
-       WHERE x.entity_id IS NOT NULL AND ${t("x")}${scope("x.document_id")}
+       WHERE x.entity_id IS NOT NULL AND ${t("x")} AND ${notPrivateIdSql("x.document_id")}${scope("x.document_id")}
     ) s
     JOIN customers c ON c.customer_id = s.customer_id
    ORDER BY s.document_id, s.via, s.customer_id
@@ -108,7 +109,7 @@ financials AS (
          NULLIF(f.evidence->'total'->>'page', '')::int AS total_page,
          f.created_at
     FROM document_financials f
-    JOIN documents d ON d.id = f.document_id AND ${t("d")}
+    JOIN documents d ON d.id = f.document_id AND ${notPrivateSql("d")} AND ${t("d")}
     LEFT JOIN fin_doc_customer dc ON dc.document_id = f.document_id
    WHERE ${t("f")}
 ),

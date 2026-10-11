@@ -50,6 +50,7 @@ import { parseMoneyIntent } from "../financials/answers.js";
 import { extraDocTypeAlternation, stemWord } from "../lookups/lexicon.js";
 import { detectAnalyticsPlan } from "../analytics/detPlan.js";
 import { parseDql, dqlEnabled } from "../dql/index.js";
+import { arbiterAllows, arbiterMode, laneLabel, dqlLabel } from "./dqlArbiter.js";
 import { isMerged, isReleased } from "../followup/handoff.js";
 import { ENTITY_SYNONYMS } from "../analytics.js";
 import { leftoverWords, leftoverEnabled, domainWordsFromVocab, NEGATION_WORDS, unusedGrammar, grammarSpans, yearPairRewrite } from "./leftover.js";
@@ -503,6 +504,27 @@ async function withWording(out, question, ctx) {
  * whole question (every word explained, see dql/parse.js) the question travels as a decompose claim {mode:'dql'} (ask.js already runs
  * that lane and its precision guard) and the analytics lane is switched off. Kill switch: DONOVAN_DQL=0. It never overrides a claim.
  */
+function arbitrate(out, question, ctx) {
+  const w = out.winner;
+  if (!["analytics", "deterministic", "relations", "fastPath", "contactLookup", "docLookup", "contentCount", "money"].includes(w.name)) return null;
+  // DQL must explain the question as it was TYPED: a respelled form (a jargon or vocabulary rewrite an older lane adopted) can say something the person did not
+  const text = question;
+  const intent = parseDql(text, { tenantVocab: ctx.tenantVocab, pack: ctx.pack, today: ctx?.today, original: question });
+  if (!intent || intent.plain) return null;
+  let plan = null;
+  if (w.name === "analytics") { try { const norm = normalizeQuestionFull(text, { overlay: ctx.overlay, pack: ctx.pack, tenantVocab: ctx.tenantVocab }).normalized; plan = detectAnalyticsPlan(norm, ctx.tenantVocab, ctx?.today ?? new Date().toISOString().slice(0, 10)); } catch { plan = null; } }
+  const oldLabel = laneLabel(w, plan);
+  const ok = arbiterAllows(w, intent, { oldLabel, question: text, industryKind: ctx.tenantVocab?.industryKind });
+  if (arbiterMode() === "all") console.log(JSON.stringify({ route: "ask", dql_arbiter: { from: oldLabel, to: dqlLabel(intent.plan) } }));
+  if (!ok) return null;
+  // DQL answers at the decompose slot (0.42); the lanes tried before it are switched off, the later ones stay as the fall-through if DQL cannot answer at run time.
+  // The lane that lost the question stays behind DQL as its fall-through: the later lanes keep their gates, and the deterministic router (tried before the
+  // decompose slot) is handed to DQL as its fallback (decompose/index.js runs it when DQL has no answer at run time).
+  const dqlIntent = w.name === "deterministic" ? { ...intent, fallback: { name: "deterministic", intent: w.intent } } : intent;
+  const gated = { ...(out.gated ?? {}), deterministic: null, decompose: dqlIntent };
+  return { ...out, winner: { name: "decompose", intent: dqlIntent }, gated, claimed: [...new Set([...(out.claimed ?? []), "decompose"])], effectiveQuestion: out.effectiveQuestion ?? question, dql: true, dqlArbiter: { from: oldLabel, to: dqlLabel(intent.plan) } };
+}
+
 async function withDql(out, question, ctx) {
   try {
     if (process.env.DONOVAN_DQL === "0" || !dqlEnabled() || ctx?.meta || ctx?.noDql || !ctx?.tenantVocab) return out;
@@ -518,6 +540,11 @@ async function withDql(out, question, ctx) {
       return { ...out, winner: null, claimed: [], gated: Object.fromEntries(Object.keys(out.gated ?? {}).map((k) => [k, k === "analytics" ? false : null])), leftoverDeclined: { reason: "followup-merge", words: [] } }; // DQL cannot read the merged question: no older lane may answer it while dropping a condition
     }
     if (w) {
+      // Arbitration: an older lane's claim that DQL also explains completely. DQL takes it only for the pairs on the allowlist (router/dqlArbiter.js).
+      if (arbiterMode() !== "off" && !w.futureDate) {
+        const arb = arbitrate(out, question, ctx);
+        if (arb) return arb;
+      }
       if (w.name === "analytics" && !w.futureDate) {
         const today = ctx?.today ?? new Date().toISOString().slice(0, 10);
         const { overlay, pack, tenantVocab } = ctx;

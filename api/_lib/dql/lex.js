@@ -9,6 +9,7 @@
  */
 import { DOCUMENT_TYPE_SYNONYMS_ALL } from '../documentTypes.js';
 import { EXTRA_DOC_TYPE_WORDS } from '../lookups/lexicon.js';
+import { CUSTOMER_NOUNS, STAFF_NOUNS, VISIT_NOUNS } from './industryLex.js';
 
 /** Pure grammar: carries no condition. NEVER put a quantity, a comparison, a negation, a name or a date word here. */
 export const FILLER = new Set((
@@ -16,7 +17,7 @@ export const FILLER = new Set((
   'get gets got gotten can could would should will shall may might must please pls plz thanks thank hey hi hello ok okay so just also still now currently ' +
   'there here me my mine our ours we us you your yours i what whats which who ' +
   'need want like let lets know weve ive youve theyve thats theres im youre hes shes ' +
-  'file files record records recorded system database ' +
+  'file files record records recorded system database individual ' +
   'all any every some and or if then too very really actually ever ' +
   // verbs that only say "this paper was produced"; the date they might point at is read from the time span, never from the verb
   'sent issued written placed filed generated made created pulled raised signed booked scheduled performed'
@@ -28,12 +29,12 @@ export const LOADED = new Set(('not no never none without except excluding exclu
 /* ------------------------------------------------------------------ entity nouns */
 
 export const ENTITY_WORDS = {
-  customer: ['customer', 'customers', 'client', 'clients'],
+  customer: ['customer', 'customers', 'client', 'clients', ...CUSTOMER_NOUNS],
   unit: ['unit', 'units', 'piece of equipment', 'pieces of equipment', 'equipment', 'system', 'systems', 'machine', 'machines', 'asset', 'assets', 'condenser', 'condensers', 'furnace', 'furnaces'],
   install: ['install', 'installs', 'installation', 'installations'],
-  visit: ['visit', 'visits', 'service call', 'service calls', 'site visit', 'site visits', 'service visit', 'service visits', 'call out', 'callout', 'callouts'],
+  visit: ['visit', 'visits', 'service call', 'service calls', 'site visit', 'site visits', 'service visit', 'service visits', 'call out', 'callout', 'callouts', ...VISIT_NOUNS],
   document: ['document', 'documents', 'doc', 'docs', 'paperwork', 'paper', 'papers'],
-  technician: ['technician', 'technicians', 'tech', 'techs'],
+  technician: ['technician', 'technicians', 'tech', 'techs', ...STAFF_NOUNS],
 };
 
 /** Words for document types, from the shared tables (documentTypes.js + lexicon.js). phrase -> type id. */
@@ -70,12 +71,13 @@ export const MONEY_WORDS = [
 export const DIM_WORDS = {
   year: ['year', 'years', 'yearly', 'annual', 'annually'],
   month: ['month', 'months', 'monthly'],
+  weekday: ['weekday', 'weekdays', 'day of week'],
   quarter: ['quarter', 'quarters', 'quarterly'],
   type: ['type', 'types', 'kind', 'kinds', 'document type', 'document types', 'doc type', 'doc types', 'category', 'categories'],
-  tech: ['technician', 'technicians', 'tech', 'techs'],
+  tech: ['technician', 'technicians', 'tech', 'techs', ...STAFF_NOUNS],
   city: ['city', 'cities', 'town', 'towns'],
   brand: ['brand', 'brands', 'manufacturer', 'manufacturers', 'make', 'makes'],
-  customer: ['customer', 'customers', 'client', 'clients'],
+  customer: ['customer', 'customers', 'client', 'clients', ...CUSTOMER_NOUNS],
   vendor: ['vendor', 'vendors', 'supplier', 'suppliers'],
   status: ['status', 'statuses'],
   serviceType: ['service type', 'service types', 'type of service', 'types of service'],

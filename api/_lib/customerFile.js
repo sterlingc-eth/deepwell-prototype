@@ -14,6 +14,7 @@
 import { documentTypeLabel } from './documentTypes.js';
 import { listOpenReminders } from './reminders.js';
 import { warrantyStatusOf } from './analytics.js';
+import { notPrivateSql } from "./privacy/privateDocs.js";
 import {
   TENANT_SQL, isoDate, todayIso, humanDate, splitFuture, futureNote, fetchVisits, scopeDocumentIds, scopeFromCustomers,
   normalizeTypeId, answerEnvelope, describeVisit,
@@ -47,7 +48,7 @@ export async function fetchFileData(db, customerRow) {
               (SELECT COALESCE(NULLIF(x.corrected_value, ''), x.value) FROM extractions x
                 WHERE x.document_id = d.id AND x.field_key = 'service_date' AND x.${TENANT_SQL}
                 ORDER BY x.created_at DESC LIMIT 1) AS service_date
-         FROM documents d WHERE d.id = ANY($1::uuid[]) AND d.${TENANT_SQL} LIMIT 1000`,
+         FROM documents d WHERE ${notPrivateSql("d")} AND d.id = ANY($1::uuid[]) AND d.${TENANT_SQL} LIMIT 1000`,
       [ids]);
     docs = rows;
   }
@@ -185,7 +186,7 @@ export async function fetchNotes(db, customerRows, today) {
             (SELECT COALESCE(NULLIF(s.corrected_value, ''), s.value) FROM extractions s
               WHERE s.document_id = x.document_id AND s.field_key = 'service_date' AND s.${TENANT_SQL}
               ORDER BY s.created_at DESC LIMIT 1) AS service_date
-       FROM extractions x JOIN documents d ON d.id = x.document_id
+       FROM extractions x JOIN documents d ON d.id = x.document_id AND ${notPrivateSql("d")}
       WHERE x.document_id = ANY($1::uuid[]) AND x.field_key = ANY($2::text[]) AND x.${TENANT_SQL}
         AND coalesce(x.value, '') <> ''
       ORDER BY d.created_at DESC

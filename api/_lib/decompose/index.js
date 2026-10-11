@@ -118,7 +118,14 @@ async function runFilter(db, intent, { today }) {
  */
 export async function runDecompose(db, intent, { today } = {}) {
   if (!intent) return null;
-  if (intent.mode === 'dql') return runDql(db, intent, { today });
+  if (intent.mode === 'dql') {
+    const r = await runDql(db, intent, { today });
+    if (r || intent.fallback?.name !== 'deterministic') return r;
+    // router/dqlArbiter.js: DQL took this question from the deterministic router; when DQL cannot answer at run time that router still does
+    const { runDeterministic } = await import('../deterministicRouter.js');
+    const { withCitations } = await import('../citations/enrich.js');
+    return withCitations(db, runDeterministic(db, intent.fallback.intent, { today }));
+  }
   if (intent.mode === 'compare') return runComparison(db, intent, { today });
   if (intent.mode === 'filter') return runFilter(db, intent, { today });
   if (intent.mode === 'compound' && (intent.negation || intent.ratio)) return runNegation(db, intent, { today, pack: intent.pack });

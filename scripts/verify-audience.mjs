@@ -95,7 +95,7 @@ eq('extractMentionedNames: "To:" and "Tech:" prefixes, deduped', C.extractMentio
 
 /* ============================================================== 1b. pure: sql.js */
 const SQL = await import('../api/_lib/audience/sql.js');
-check('audienceFilterSql: teamScoped skips the exclusion entirely', SQL.audienceFilterSql({ hasAudienceColumn: true, teamScoped: true }) === 'TRUE');
+check('audienceFilterSql: teamScoped skips the internal exclusion (private HR papers stay out)', !/internal/.test(SQL.audienceFilterSql({ hasAudienceColumn: true, teamScoped: true })) && /hr-letter/.test(SQL.audienceFilterSql({ hasAudienceColumn: true, teamScoped: true })));
 check('audienceFilterSql: column path excludes internal via the real column', /audience/.test(SQL.audienceFilterSql({ hasAudienceColumn: true })) && /<> 'internal'/.test(SQL.audienceFilterSql({ hasAudienceColumn: true })));
 check('audienceFilterSql: pre-migration fallback excludes via the extractions marker, not the column', SQL.audienceFilterSql({ hasAudienceColumn: false }).includes('_audience') && !SQL.audienceFilterSql({ hasAudienceColumn: false }).includes('d.audience'));
 

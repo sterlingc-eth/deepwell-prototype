@@ -21,6 +21,8 @@
  *  - an average per month or per year counts the periods with nothing in them;
  *  - only dates that are really on file are used (a unit's warranty end date, a maintenance agreement's term, an installation date).
  */
+import { VISIT_ALT } from '../industryLex.js';
+import { ynOf, ynText } from '../yn.js';
 import { registerFamily } from '../registry.js';
 import { FILLER } from '../lex.js';
 import { normName } from '../vocab.js';
@@ -81,7 +83,7 @@ class Rest {
   words() { return this.s.split(/\s+/).filter(Boolean); }
   clone() { return new Rest(this.s); }
 }
-const EXTRA_FILLER = new Set('um uh hmm anyone anybody someone by out show tell give list display pull find us yet how serial'.split(' '));
+const EXTRA_FILLER = new Set('um uh hmm anyone anybody someone by out show tell give list display pull find us yet how serial name'.split(' '));
 const isFiller = (w) => FILLER.has(w) || EXTRA_FILLER.has(w);
 const rx = (src, flags = 'i') => new RegExp(`(?<![a-z0-9@$.-])(?:${src})(?![a-z0-9-])`, flags);
 
@@ -282,7 +284,7 @@ function nounsOf(d) {
 function takeMeasure(r, q) {
   const cands = [];
   const probe = (name, re, build) => { const c = r.clone(); const m = c.take(re); if (m) cands.push({ name, re, build, m }); };
-  probe('visit', rx('service\\s+calls?|site\\s+visits?|service\\s+visits?|visits?|calls?|callouts?|crews?'), () => ({ entity: 'document', docType: null, visit: true, dateField: 'serviceDate', noun: 'service visits', one: 'service visit' }));
+  probe('visit', rx(`service\\s+calls?|site\\s+visits?|service\\s+visits?|visits?|calls?|callouts?|crews?|${VISIT_ALT}`), () => ({ entity: 'document', docType: null, visit: true, dateField: 'serviceDate', noun: 'service visits', one: 'service visit' }));
   probe('money', rx('revenue|billings?|billed|invoiced|sales|income|bill'), () => ({ entity: 'document', docType: 'invoice', visit: false, dateField: 'date', valueField: 'total', agg: 'sum', noun: 'invoiced', money: true }));
   probe('hours', rx('labor\\s+hours?|hours?|hrs?'), () => ({ entity: 'document', docType: null, visit: true, dateField: 'serviceDate', valueField: 'hours', agg: 'sum', noun: 'labor hours', hours: true }));
   probe('install', rx('installs?|installed|installation|installations'), () => ({ entity: 'unit', dateField: 'installDate', noun: 'installations', one: 'installation' }));
@@ -315,7 +317,7 @@ function takeMeasure(r, q) {
   } else {
     r.take(pick.re);
     if (pick.name === 'money') { for (const x of dts) if (q.docs[x.i].id === 'invoice') r.s = r.s.replace(`@d${x.i}`, ' '); }
-    if (pick.name === 'hours') r.take(rx('visits?|calls?|jobs?'));
+    if (pick.name === 'hours') r.take(rx(`visits?|calls?|jobs?|${VISIT_ALT}`));
   }
   return meas;
 }
@@ -385,6 +387,7 @@ function parseSeries(q, feat) {
   r.takeAll(rx('how\\s+many|number\\s+of|how\\s+much|which|what|do|does|did|we|are|is|there|has|have|with|for|our|us|a|an|in|of|the|by|per|each|every|single|was|were|ever|happen|happens|happened|occur|occurs|on'));
   const grainNoun = r.takeAll(rx('years?|months?|quarters?|mo|mnth'));
   if (slowW || cmpW && !seasonsAsked.length) return null;
+  if ((weekday || moy) && grainNoun.length) return null; // two groupings ("by month and by day of the week"): not a single series
   // "up or down from last year" is a comparison with last year, not a series
   if (trendW && /up\s+or\s+down/.test(trendW[0]) && !q.periods.some((p) => p.kind === 'roll' && p.unit === 'year')) return null;
   const hasPeriodWord = r.has(rx('week|weeks'));
@@ -438,13 +441,13 @@ function parseSeries(q, feat) {
   if (allYears && range) return null;
   if (range && range.dir && !['before', 'since', 'after'].includes(range.dir)) return null;
   if (mode === 'peak' && (grain === 'moy' || grain === 'weekday') && range) return null;
-  const rangeOut = range ? { from: range.dir === 'before' ? null : range.from, to: range.dir === 'before' ? addDays(range.from, -1) : range.to, label: range.dir ? `${range.dir} ${range.label}` : range.label, kind: range.kind } : null;
+  const rangeOut = range ? { from: range.dir === 'before' ? null : range.dir === 'after' ? addDays(range.to, 1) : range.from, to: range.dir === 'before' ? addDays(range.from, -1) : range.dir === 'since' || range.dir === 'after' ? null : range.to, label: range.dir ? `${range.dir} ${range.label}` : range.label, kind: range.kind } : null;
   return { op: 'tm_series', mode, grain, measure: meas, filters, range: rangeOut, lastN, allYears: Boolean(allYears) };
 }
 
 /* ---------------------------------------------------------------- compare and change */
 
-function parseCompare(q) {
+function parseCompare(q, feat) {
   const r = q.r.clone();
   const pctW = r.takeAll(rx('percent|percentage|growth|grow|grew|increase|decrease|change|changed|up\\s+or\\s+down|up|down'))[0] ?? null;
   const cmpW = r.take(rx('compare|compared|comparison|versus|vs|than|against'));
@@ -500,13 +503,13 @@ function parseCompare(q) {
     if (/\bthan\b/.test(t0)) { if (/\bfrom\b/.test(t0)) return null; baseIdx = 1; } else if (!fromTo && /\b(?:up|down)\s+from\b/.test(t0)) baseIdx = 1; else if (!/\bfrom\b/.test(t0) && ps[0].from > ps[1].from) baseIdx = 1; // chronological when nothing says otherwise
   }
   const wantsPct = Boolean(pctW) && !/\bup\s+or\s+down\b/.test(q.r.s) ? true : Boolean(pctW);
-  return { op: 'tm_compare', measure, filters, periods: ps.map(({ from, to, label, kind, matched, short }) => ({ from, to, label, kind, matched: matched ?? false, short: short ?? null })), baseIdx, wantsPct, soFar: Boolean(soFar), sameTime: Boolean(sameTime), asIs: Boolean(yoy) };
+  return { op: 'tm_compare', ...ynOf(feat?.raw), measure, filters, periods: ps.map(({ from, to, label, kind, matched, short }) => ({ from, to, label, kind, matched: matched ?? false, short: short ?? null })), baseIdx, wantsPct, soFar: Boolean(soFar), sameTime: Boolean(sameTime), asIs: Boolean(yoy) };
 }
 
 /* ---------------------------------------------------------------- one period */
 
 const WINDOW_VERBS = 'cut|ran|run|handled|wrote|raised|booked|had|got|get|were|are|there|did|do|we|so\\s+far|total';
-function parseWindow(q) {
+function parseWindow(q, feat) {
   const r = q.r.clone();
   r.takeAll(rx(`how\\s+many|number\\s+of|count\\s+of|count|${WINDOW_VERBS}`));
   const measure = takeMeasure(r, q);
@@ -518,7 +521,7 @@ function parseWindow(q) {
   if (p.dir || p.over || !['year', 'quarter', 'month', 'ytd', 'roll', 'range'].includes(p.kind)) return null;
   if (p.kind === 'range' && !/^(?:since the start|from )/.test(p.label)) return null;
   if (!clean(r)) return null;
-  return { op: 'tm_window', measure, filters, period: { from: p.from, to: p.to, label: p.label, kind: p.kind } };
+  return { op: 'tm_window', measure, filters, period: { from: p.from, to: p.to, label: p.label, kind: p.kind }, ...(feat?.flags?.explicitList && !measure.money && !measure.hours ? { list: true } : {}) };
 }
 
 /* ---------------------------------------------------------------- rates */
@@ -559,7 +562,7 @@ function parseRate(q) {
 function subjectOf(q, r) {
   // what "the last ___" is: a visit, a paper of one kind, an installation, a bill, any paper that came in
   const subj = [];
-  if (r.take(rx('service\\s+calls?|site\\s+visits?|service\\s+visits?|visits?|visited|serviced|service|worked\\s+on|work|out\\s+to|were\\s+out|calls?'))) subj.push('visit');
+  if (r.take(rx(`service\\s+calls?|site\\s+visits?|service\\s+visits?|visits?|visited|serviced|service|worked\\s+on|work|out\\s+to|were\\s+out|calls?|${VISIT_ALT}`))) subj.push('visit');
   if (r.take(rx('billed|invoiced|bill|billing'))) subj.push('bill');
   if (r.take(rx('install(?:s|ed|ation|ations)?'))) subj.push('install');
   const docIdx = q.docs.map((d, i) => i).filter((i) => r.s.includes(`@d${i}`));
@@ -638,7 +641,7 @@ function parseInactive(q, feat) {
   r.take(rx('count'));
   r.takeAll(rx('been|had|have|has|a|any|new'));
   let activity = null;
-  if (r.take(rx('serviced|visited|visit|service\\s+call|service\\s+calls|service\\s+visit|out\\s+to|call|seen'))) activity = 'visit';
+  if (r.take(rx(`serviced|visited|visit|service\\s+call|service\\s+calls|service\\s+visit|out\\s+to|call|seen|${VISIT_ALT}`))) activity = 'visit';
   else if (r.take(rx('invoiced|billed|invoice'))) activity = 'invoice';
   else if (r.take(rx('installed|install|installation'))) { activity = 'install'; r.takeAll(rx('unit|units|system|systems|equipment')); }
   if (!activity) {
@@ -664,12 +667,12 @@ function parseInactive(q, feat) {
 
 /* ---------------------------------------------------------------- warranties and agreements that end */
 
-function expiryNouns(q, subj) {
+function expiryNouns(q, subj, docType = 'maintenance-agreement') {
   if (subj === 'warranty') return { noun: 'warranties', nounOne: 'warranty' };
-  const d = q.docs.find((x) => x.id === 'maintenance-agreement');
+  const d = q.docs.find((x) => x.id === docType);
   const w = d?.word ?? 'maintenance agreements';
-  const pl = /s$/.test(w) ? w : `${w}s`;
-  return { noun: pl, nounOne: pl.replace(/s$/, '') };
+  const pl = /s$/.test(w) ? w : /^(\w+) of (.+)$/.test(w) ? w.replace(/^(\w+) of /, '$1s of ') : `${w}s`;
+  return { noun: pl, nounOne: /^(\w+)s of /.test(pl) ? pl.replace(/^(\w+)s of /, '$1 of ') : pl.replace(/s$/, ''), docType };
 }
 
 function parseExpiry(q, feat) {
@@ -677,14 +680,15 @@ function parseExpiry(q, feat) {
   const termM = r.take(rx('(\\d+)\\s*-?\\s*(?:years?|yrs?)(?=\\s+(?:parts\\s+)?warrant)'));
   const termYears = termM ? Number(/\d+/.exec(termM[0])[0]) : null;
   const warr = r.take(rx('warrant(?:y|ies)|warrenty|warrenties'));
-  const agrDocIdx = q.docs.map((d, i) => i).filter((i) => r.s.includes(`@d${i}`) && q.docs[i].id === 'maintenance-agreement');
+  const agrDocIdx = q.docs.map((d, i) => i).filter((i) => r.s.includes(`@d${i}`) && EXPIRING_TYPES.has(q.docs[i].id));
+  const expType = agrDocIdx.length === 1 ? q.docs[agrDocIdx[0]].id : 'maintenance-agreement';
   let subj = null;
   if (warr && !agrDocIdx.length) subj = 'warranty';
   else if (agrDocIdx.length === 1 && !warr) { subj = 'agreement'; r.s = r.s.replace(`@d${agrDocIdx[0]}`, ' '); }
   if (!subj) return null;
   // an organization that keeps no maintenance agreements is not asked when they end
-  if (subj === 'agreement' && !q.vocab.docTypesInUse?.has('maintenance-agreement')) return null;
-  if (!rawLike(feat.raw, subj === 'warranty' ? ['warranty', 'warranties', 'warrenty'] : ['agreement', 'agreements', 'maintenance'])) return null;
+  if (subj === 'agreement' && !q.vocab.docTypesInUse?.has(expType)) return null;
+  if ((subj === 'warranty' || expType === 'maintenance-agreement') && !rawLike(feat.raw, subj === 'warranty' ? ['warranty', 'warranties', 'warrenty'] : ['agreement', 'agreements', 'maintenance', 'contract', 'contracts'])) return null;
   if (q.docs.length > (subj === 'agreement' ? 1 : 0)) return null;
   const nextW = r.take(rx('next\\s+(?:warranty\\s+)?to\\s+(?:expire|end)|next\\s+(?:one\\s+)?(?:to\\s+)?(?:expires?|expiring|ends?|ending)'));
   const verb = r.take(rx('expires?|expiring|expire|expiration|ends?|ending|run\\s+out|runs\\s+out|running\\s+out|lapses?|lapsing'));
@@ -711,11 +715,11 @@ function parseExpiry(q, feat) {
     if (p) return null;
     if (!clean(r)) return null;
     if (termYears != null) return null;
-    return { op: 'tm_expiry', subject: subj, mode: 'next', ...expiryNouns(q, subj) };
+    return { op: 'tm_expiry', subject: subj, mode: 'next', ...expiryNouns(q, subj, expType) };
   }
   if (!p) {
     // "agreements that already ended": everything whose end date is before today
-    if (pastVerb && /\balready\b/.test(q.text0) && subj === 'agreement') { r.takeAll(rx('already')); if (!clean(r)) return null; return { op: 'tm_expiry', subject: subj, mode, from: null, to: addDays(today, -1), label: 'before today', past: true, ...expiryNouns(q, subj) }; }
+    if (pastVerb && /\balready\b/.test(q.text0) && subj === 'agreement') { r.takeAll(rx('already')); if (!clean(r)) return null; return { op: 'tm_expiry', subject: subj, mode, from: null, to: addDays(today, -1), label: 'before today', past: true, ...expiryNouns(q, subj, expType) }; }
     return null;
   }
   if ((p.kind === 'month' || p.kind === 'quarter') && !p.dir) { from = p.from; to = p.to; label = `in ${p.label}`; }
@@ -730,7 +734,7 @@ function parseExpiry(q, feat) {
   if (!clean(r)) return null;
   if (pastVerb && from && from > today) return null;
   if (termYears != null && subj !== 'warranty') return null;
-  return { op: 'tm_expiry', subject: subj, mode, from, to, label, past: Boolean(pastVerb), term: termYears, ...expiryNouns(q, subj) };
+  return { op: 'tm_expiry', subject: subj, mode, from, to, label, past: Boolean(pastVerb), term: termYears, ...expiryNouns(q, subj, expType) };
 }
 
 /* ---------------------------------------------------------------- days between two dates */
@@ -1078,6 +1082,10 @@ function execInactive(plan, x) {
 }
 
 /** "01/01/2025 - 12/31/2026" -> {start, end} */
+const isoOf2 = (v) => { const t = String(v ?? '').trim(); let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(t); if (m) return `${m[1]}-${m[2]}-${m[3]}`; m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(t); return m ? `${m[3]}-${pad(Number(m[1]))}-${pad(Number(m[2]))}` : null; };
+/** The day a paper stops being in force: the end of its term, a lease end date, the day an insurance certificate runs out. */
+function endOf(d) { return agreementTerm(d)?.end ?? isoOf2(d.f?.lease_end_date) ?? isoOf2(d.f?.coi_expires) ?? isoOf2(d.f?.expiration_date) ?? isoOf2(d.f?.expires) ?? null; }
+const EXPIRING_TYPES = new Set(['maintenance-agreement', 'agreement', 'lease-agreement', 'certificate-of-insurance', 'insurance-certificate']);
 function agreementTerm(d) {
   const t = String(d.f?.agreement_term ?? '');
   const m = /^\s*(\d{1,2})\/(\d{1,2})\/(\d{4})\s*(?:-|to|through|–)\s*(\d{1,2})\/(\d{1,2})\/(\d{4})\s*$/i.exec(t);
@@ -1087,14 +1095,14 @@ function agreementTerm(d) {
   return { start: s, end: e };
 }
 
-function expiryRows(subject, snap, term = null) {
+function expiryRows(subject, snap, term = null, docType = 'maintenance-agreement') {
   if (subject === 'warranty') {
     const have = snap.units.filter((u) => u.warrantyExpires && (term == null || u.warrantyTermYears === term));
     return { rows: have.map((u) => ({ row: u, d: u.warrantyExpires })), unknown: snap.units.filter((u) => !u.warrantyExpires).length };
   }
-  const ag = snap.documents.filter((d) => d.type === 'maintenance-agreement');
+  const ag = snap.documents.filter((d) => d.type === docType);
   const out = []; let unknown = 0;
-  for (const d of ag) { const t = agreementTerm(d); if (t) out.push({ row: d, d: t.end }); else unknown++; }
+  for (const d of ag) { const e = endOf(d); if (e) out.push({ row: d, d: e }); else unknown++; }
   return { rows: out, unknown };
 }
 
@@ -1105,7 +1113,8 @@ function execExpiry(plan, x) {
     if (!u) return { notFound: plan.serial };
     return { unit: u };
   }
-  const { rows, unknown } = expiryRows(plan.subject, snap, plan.term ?? null);
+  const { rows, unknown } = expiryRows(plan.subject, snap, plan.term ?? null, plan.docType ?? 'maintenance-agreement');
+  if (!rows.length && plan.subject !== 'warranty' && plan.docType && plan.docType !== 'maintenance-agreement') return { abstain: 'no-end-dates' }; // this kind of paper carries no end date here
   if (plan.mode === 'next') {
     const fut = rows.filter((o) => o.d >= today).sort((a, b) => a.d.localeCompare(b.d));
     if (!fut.length) return { none: true, unknown };
@@ -1222,6 +1231,11 @@ function sayWindow(res, plan, x) {
   let text = res.value === 0 && !meas.money && !meas.hours ? `0 ${noun}${cond} ${when}.` : `${val} ${noun}${cond} ${when}.`;
   if (p.to > today && p.kind !== 'ytd' && p.kind !== 'roll' && p.kind !== 'range') text += ` ${cap1(p.label)} is not over yet (counted through ${fmtDate(today)}).`;
   const recs = res.rows ?? [];
+  // "list the permits in July": the papers themselves, with their own numbers
+  if (plan.list && recs.length && recs.length <= 40 && meas.entity !== 'unit') {
+    const lab = (d) => { const num = d.f?.invoice_number ?? d.f?.po_number ?? d.f?.permit_number; return `${num ?? d.filename ?? 'a paper'}${d.custName ? ` (${d.custName}, ${fmtDate(d.date)})` : ` (${fmtDate(d.date)})`}`; };
+    text += ` ${recs.map(lab).join('; ')}.`;
+  }
   return { text, facts: [{ label: cap1(noun), value: val }], records: recordsCap(recs, (r) => (meas.entity === 'unit' ? recUnit(r, snap) : recDoc(r, snap))), total: recs.length, claimedCount: meas.money || meas.hours ? null : res.value, basis: basisFor(plan, res.leftOut ? `${fmtInt(res.leftOut)} with no date on file were not counted.` : '') };
 }
 
@@ -1296,6 +1310,7 @@ function sayCompare(res, plan, x) {
   const val = (s) => fmtVal(meas, s.value);
   const word = meas.money ? 'invoiced' : meas.hours ? 'labor hours' : meas.noun;
   let text = `${cap1(word)}${cond}: ${lab(a)} had ${val(a)} and ${lab(b)} had ${val(b)}.`;
+  if (plan.yn) text = ynText(plan.yn, { label: lab(a), value: a.value }, { label: lab(b), value: b.value }, text);
   const notes = [];
   for (const s of res.sides) if (s.to > today && s.kind !== 'ytd' && s.kind !== 'roll') notes.push(`${s.label} is not over yet (counted through ${fmtDate(today)})`);
   const base = res.sides[plan.baseIdx]; const neu = res.sides[1 - plan.baseIdx];
@@ -1369,7 +1384,7 @@ function sayInactive(res, plan, x) {
   const cut = `(their latest one is dated before ${fmtDate(plan.cutoff)})`;
   const head = plan.mode === 'count'
     ? `${fmtInt(n)} customer${n === 1 ? '' : 's'} ${n === 1 ? 'has' : 'have'} ${verbPhrase} ${cut}.`
-    : n === 0 ? `Every customer with a ${actW} on file has had one ${plan.label} (since ${fmtDate(plan.cutoff)}).` : `${fmtInt(n)} customer${n === 1 ? '' : 's'} ${n === 1 ? 'has' : 'have'} ${verbPhrase} ${cut}: ${listNames(names, 60)}.`;
+    : n === 0 ? `Every customer with a ${actW} on file has had one ${plan.label} (since ${fmtDate(plan.cutoff)}).` : `${fmtInt(n)} customer${n === 1 ? '' : 's'} ${n === 1 ? 'has' : 'have'} ${verbPhrase} ${cut}: ${listNames(names, 120)}.`;
   const recs = res.inactive.map((o) => recCust(o.c, snap));
   const what = plan.activity === 'visit' ? 'service visit (any paper with a service date)' : plan.activity === 'invoice' ? 'invoice date' : 'unit installation date';
   return { text: head + neverNote, facts: [{ label: 'Customers', value: fmtInt(n) }], records: recs.slice(0, 200), total: n, claimedCount: n, basis: `Took each customer's latest ${what} and kept those whose latest one is before ${fmtDate(plan.cutoff)}.` };
@@ -1382,7 +1397,7 @@ function sayExpiry(res, plan, x) {
   const nounPl = termW + (plan.noun ?? (isW ? 'warranties' : 'maintenance agreements'));
   const nounOne = termW + (plan.nounOne ?? (isW ? 'warranty' : 'maintenance agreement'));
   const dateName = isW ? 'warranty end date' : 'agreement end date';
-  const lab = (o) => (isW ? `${o.row.serial ?? 'unit'}${[o.row.brand, o.row.custName].filter(Boolean).length ? ` (${[o.row.brand, o.row.custName].filter(Boolean).join(', ')})` : ''} on ${fmtDate(o.d)}` : `${o.row.custName ?? 'agreement'} on ${fmtDate(o.d)}`);
+  const lab = (o) => (isW ? `${o.row.serial ?? 'unit'}${[o.row.brand, o.row.custName].filter(Boolean).length ? ` (${[o.row.brand, o.row.custName].filter(Boolean).join(', ')})` : ''} on ${fmtDate(o.d)}` : `${o.row.custName ?? o.row.vendor ?? 'agreement'} on ${fmtDate(o.d)}`);
   const rec = (o) => (isW ? recUnit(o.row, snap) : (snap.custById.get(o.row.custId) ? recCust(snap.custById.get(o.row.custId), snap) : recDoc(o.row, snap)));
   const unk = res.unknown ? (isW ? ` ${fmtInt(res.unknown)} unit${res.unknown === 1 ? ' has' : 's have'} no warranty end date on file and ${res.unknown === 1 ? 'is' : 'are'} not counted.` : ` ${fmtInt(res.unknown)} agreement${res.unknown === 1 ? ' has' : 's have'} no readable term and ${res.unknown === 1 ? 'is' : 'are'} not counted.`) : '';
   const basis = isW ? 'Used each unit\'s warranty end date (the installation date plus the brand\'s term; five years is assumed when no registration is on file); claims and payments are not tracked.' : 'Used the end of each maintenance agreement\'s term; nothing about renewals or payments is tracked.';

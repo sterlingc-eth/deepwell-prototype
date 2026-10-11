@@ -7,6 +7,7 @@ import { customerDocumentIds } from "../docLookup.js";
 import { documentsHaveAudience } from "../audience/probe.js";
 import { audienceFilterSql } from "../audience/sql.js";
 import { hrGateSql } from "../companyFilesStore.js";
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 const FIELDS = ["invoice_date", "service_date", "warranty_registered_date", "technician", "status", "invoice_number"];
 const MAX_DOCS = 20000;
@@ -92,12 +93,12 @@ export async function loadDocuments(db, ids) {
 }
 
 export async function documentIdsOfType(db, typeId) {
-  const { rows } = await db.raw(`SELECT d.id FROM documents d WHERE d.${TENANT_SQL} AND ${typeSql("d.document_type")} = ANY($1::text[]) LIMIT ${MAX_DOCS + 1}`, [docTypeAliases(typeId)]);
+  const { rows } = await db.raw(`SELECT d.id FROM documents d WHERE d.${TENANT_SQL} AND ${notPrivateSql("d")} AND ${typeSql("d.document_type")} = ANY($1::text[]) LIMIT ${MAX_DOCS + 1}`, [docTypeAliases(typeId)]);
   return rows.map((r) => String(r.id));
 }
 
 export async function allDocumentIds(db) {
-  const { rows } = await db.raw(`SELECT d.id FROM documents d WHERE d.${TENANT_SQL} LIMIT ${MAX_DOCS + 1}`, []);
+  const { rows } = await db.raw(`SELECT d.id FROM documents d WHERE d.${TENANT_SQL} AND ${notPrivateSql("d")} LIMIT ${MAX_DOCS + 1}`, []);
   return rows.map((r) => String(r.id));
 }
 

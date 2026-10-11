@@ -16,6 +16,7 @@ import {
   MAX_RECORDS, makeRecord, customerRecord, unitRecord, documentRecord, attachCitations, deriveRecords, defaultBasis,
 } from './records.js';
 
+import { notPrivateSql, isPrivateDoc } from '../privacy/privateDocs.js';
 const TENANT_SQL = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const uuids = (ids) => [...new Set((ids ?? []).filter((v) => typeof v === 'string' && UUID_RE.test(v)))].slice(0, MAX_RECORDS);
@@ -63,6 +64,7 @@ export async function documentRecordsFor(db, ids, { group } = {}) {
   }
   return uuids(ids).map((id) => {
     const d = labels.get(id.toLowerCase());
+    if (isPrivateDoc(d)) return null; // People / HR papers are never cited
     if (!d) return documentRecord({ id }, { group }); // the id came from a tenant-scoped query; label is best-effort
     return documentRecord(d, {
       label: `${documentTypeLabel(d.document_type)} · ${d.original_filename ?? id}`,
@@ -103,6 +105,7 @@ export async function enrichCitations(db, data, { basis } = {}) {
       records.push(e.entity_type === 'equipment' ? unitRecord(e) : customerRecord(e));
     } else {
       const d = docs.get(String(r.id).toLowerCase());
+      if (isPrivateDoc(d)) continue;
       const label = d ? `${documentTypeLabel(d.document_type)} · ${d.original_filename ?? r.id}` : r.label || 'Document';
       records.push(documentRecord(d ?? { id: r.id }, { label, sublabel: r.sublabel ?? (d ? dateLabel(d.service_date) ?? dateLabel(d.created_at) ?? undefined : undefined), page: r.page }));
     }
@@ -146,7 +149,7 @@ export async function honestZeroCitations(db, ctx, { documentIdsFor }) {
 
 /** Generic no-answer: how much of the library was searched. One cheap count. */
 export async function searchedLibraryBasis(db) {
-  const { rows } = await db.raw(`SELECT COUNT(*)::int AS n FROM documents WHERE ${TENANT_SQL}`, []);
+  const { rows } = await db.raw(`SELECT COUNT(*)::int AS n FROM documents d WHERE d.${TENANT_SQL} AND ${notPrivateSql("d")} AND ${notPrivateSql('d')}`, []);
   const n = rows[0]?.n ?? 0;
   return n
     ? `Searched the text and extracted fields of all ${n} document${n === 1 ? '' : 's'} in your library; nothing matched.`
@@ -156,11 +159,11 @@ export async function searchedLibraryBasis(db) {
 /* ------------------------------------------------------------------ meta-router (counts / lists) */
 
 const META = {
-  documents: { sql: `SELECT d.id, d.document_type, d.original_filename, d.created_at, COUNT(*) OVER()::int AS total FROM documents d WHERE d.${TENANT_SQL} ORDER BY d.created_at DESC LIMIT ${MAX_RECORDS}`, kind: 'document', basis: 'Counted every document in your library.' },
+  documents: { sql: `SELECT d.id, d.document_type, d.original_filename, d.created_at, COUNT(*) OVER()::int AS total FROM documents d WHERE d.${TENANT_SQL} AND ${notPrivateSql("d")} AND ${notPrivateSql('d')} ORDER BY d.created_at DESC LIMIT ${MAX_RECORDS}`, kind: 'document', basis: 'Counted every document in your library.' },
   invoices: { sql: `SELECT d.id, d.document_type, d.original_filename, d.created_at, COUNT(*) OVER()::int AS total FROM documents d WHERE d.document_type = 'invoice' AND d.${TENANT_SQL} ORDER BY d.created_at DESC LIMIT ${MAX_RECORDS}`, kind: 'invoice', basis: 'Counted documents classified as invoices.' },
   warranties: { sql: `SELECT d.id, d.document_type, d.original_filename, d.created_at, COUNT(*) OVER()::int AS total FROM documents d WHERE d.document_type IN ('warranty-registration','warranty') AND d.${TENANT_SQL} ORDER BY d.created_at DESC LIMIT ${MAX_RECORDS}`, kind: 'document', basis: 'Counted documents classified as warranty registrations.' },
-  verified: { sql: `SELECT d.id, d.document_type, d.original_filename, d.created_at, COUNT(*) OVER()::int AS total FROM documents d WHERE d.stage = 'verified' AND d.${TENANT_SQL} ORDER BY d.created_at DESC LIMIT ${MAX_RECORDS}`, kind: 'document', basis: 'Counted documents a person has verified.' },
-  unverified: { sql: `SELECT d.id, d.document_type, d.original_filename, d.created_at, COUNT(*) OVER()::int AS total FROM documents d WHERE d.stage <> 'verified' AND d.${TENANT_SQL} ORDER BY d.created_at DESC LIMIT ${MAX_RECORDS}`, kind: 'document', basis: 'Counted documents that have not been verified yet.' },
+  verified: { sql: `SELECT d.id, d.document_type, d.original_filename, d.created_at, COUNT(*) OVER()::int AS total FROM documents d WHERE d.stage = 'verified' AND d.${TENANT_SQL} AND ${notPrivateSql('d')} ORDER BY d.created_at DESC LIMIT ${MAX_RECORDS}`, kind: 'document', basis: 'Counted documents a person has verified.' },
+  unverified: { sql: `SELECT d.id, d.document_type, d.original_filename, d.created_at, COUNT(*) OVER()::int AS total FROM documents d WHERE d.stage <> 'verified' AND d.${TENANT_SQL} AND ${notPrivateSql('d')} ORDER BY d.created_at DESC LIMIT ${MAX_RECORDS}`, kind: 'document', basis: 'Counted documents that have not been verified yet.' },
   customers: { sql: `SELECT e.id, e.data->>'customer_name' AS customer_name, e.data->>'service_address' AS service_address, COUNT(*) OVER()::int AS total FROM entities e WHERE e.entity_type = 'customer' AND e.${TENANT_SQL} ORDER BY e.updated_at DESC LIMIT ${MAX_RECORDS}`, kind: 'customer', basis: 'Counted customer records.' },
   equipment: { sql: `SELECT e.id, e.customer_id, e.data->>'manufacturer' AS manufacturer, e.data->>'equipment_type' AS equipment_type, e.data->>'model' AS model, e.data->>'serial_number' AS serial_number, COUNT(*) OVER()::int AS total FROM entities e WHERE e.entity_type = 'equipment' AND e.${TENANT_SQL} ORDER BY e.updated_at DESC LIMIT ${MAX_RECORDS}`, kind: 'unit', basis: 'Counted pieces of equipment on file.' },
 };
@@ -206,7 +209,7 @@ export async function metaDocumentTypes(db) {
   const { rows } = await db.raw(
     `SELECT document_type, COUNT(*)::int AS n,
             (array_agg(jsonb_build_object('id', id, 'filename', original_filename, 'created_at', created_at) ORDER BY created_at DESC))[1:${MAX_RECORDS}] AS docs
-       FROM documents WHERE ${TENANT_SQL} GROUP BY document_type ORDER BY n DESC`,
+       FROM documents d WHERE d.${TENANT_SQL} AND ${notPrivateSql("d")} AND ${notPrivateSql('d')} GROUP BY document_type ORDER BY n DESC`,
     []
   );
   const records = [];

@@ -11,6 +11,7 @@ import { attachCitations } from "../citations/records.js";
 import { documentRecordsFor } from "../citations/enrich.js";
 import { TENANT_SQL, answerEnvelope, todayIso } from "../scope.js";
 import { resolveAnyTimeRange } from "../analytics.js";
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 const FILLER = new Set(["what", "whats", "what's", "which", "who", "whos", "is", "was", "are", "were", "our", "the", "my", "a", "an", "one", "we", "ever", "have", "has", "had", "sent", "made", "written", "on", "file", "show", "me", "tell", "give", "find", "get", "pull", "up", "of", "all", "time", "in", "system", "records", "do", "did", "that", "single", "please", "i", "you", "us", "got", "issued", "out", "overall"]);
 const EXT = {
@@ -79,7 +80,7 @@ export async function runDocExtreme(db, intent, { today } = {}) {
   const where = (byDate ? "f.invoice_date IS NOT NULL" : "f.total IS NOT NULL") + (win ? " AND f.invoice_date >= $2::date AND f.invoice_date <= $3::date" : "") + notFut;
   const { rows } = await db.raw(
     `SELECT f.document_id, f.total, f.customer_name, f.invoice_number, f.invoice_date::text AS d
-       FROM document_financials f JOIN documents d ON d.id = f.document_id AND d.${TENANT_SQL}
+       FROM document_financials f JOIN documents d ON d.id = f.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
       WHERE f.${TENANT_SQL} AND d.document_type = $1 AND ${where} ORDER BY ${order} LIMIT 1`, win ? [type, win.from, win.to] : [type]);
   const wp = win ? (() => { const l = String(win.label ?? `${win.from} to ${win.to}`).replace(/^in /, ""); return /^(?:since|the |last|this|past|yesterday|today|ytd|year)/i.test(l) ? l : `in ${l}`; })() : "";
   const inWin = win ? ` dated ${wp}` : "";
@@ -91,7 +92,7 @@ export async function runDocExtreme(db, intent, { today } = {}) {
   }
   const r = rows[0];
   let futN = 0;
-  if (notFut) { const fr = await db.raw(`SELECT count(*)::int AS n FROM document_financials f JOIN documents d ON d.id = f.document_id AND d.${TENANT_SQL} WHERE f.${TENANT_SQL} AND d.document_type = $1 AND f.invoice_date > '${tNow}'::date`, [type]); futN = fr.rows?.[0]?.n ?? 0; }
+  if (notFut) { const fr = await db.raw(`SELECT count(*)::int AS n FROM document_financials f JOIN documents d ON d.id = f.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")} WHERE f.${TENANT_SQL} AND d.document_type = $1 AND f.invoice_date > '${tNow}'::date`, [type]); futN = fr.rows?.[0]?.n ?? 0; }
   const futureNote = futN ? ` I left out ${futN} invoice${futN === 1 ? "" : "s"} dated after today.` : "";
   const word = { max: "biggest", min: "smallest", newest: "newest", oldest: "oldest" }[intent.dir];
   const text = `The ${word} ${label}${win ? ` ${wp}` : ""} is ${r.total != null ? usd(r.total) : "(no total printed)"}${r.invoice_number ? ` (#${r.invoice_number})` : ""}${r.customer_name ? `, for ${r.customer_name}` : ""}${r.d && dateLabel(r.d) ? `, dated ${dateLabel(r.d)}` : ""}. ${intent.kind === "invoice" ? "Invoices only - not quotes or other documents." : "Quotes only - not invoices."}${futureNote}`;

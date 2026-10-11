@@ -35,6 +35,7 @@ import { resolveNamedCustomers } from './contactLookup.js';
 // cycle: analytics.js imports scope.js (not this file), and scope.js's own fastPath.js import is
 // the cycle fastPath.js's header warns about avoiding FROM fastPath.js, not from here.
 import { brandMatches } from './analytics.js';
+import { notPrivateSql } from "./privacy/privateDocs.js";
 import {
   FIELD_BY_INTENT,
   NO_FIELD_INTENTS,
@@ -326,7 +327,7 @@ async function fetchFieldRowsByDocumentIds(db, documentIds, fieldKey, teamScoped
             (SELECT sx.value FROM extractions sx
               WHERE sx.document_id = x.document_id AND sx.field_key = 'service_date' AND sx.tenant_id = x.tenant_id
               ORDER BY sx.confidence DESC NULLS LAST LIMIT 1) AS service_date
-       FROM extractions x JOIN documents d ON d.id = x.document_id
+       FROM extractions x JOIN documents d ON d.id = x.document_id AND ${notPrivateSql("d")}
       WHERE x.document_id = ANY($1::uuid[]) AND x.field_key = $2 AND x.${TENANT_SQL} AND (${audienceClause})
       LIMIT 50`,
     [documentIds, fieldKey]
@@ -343,7 +344,7 @@ async function fetchFieldRowsByEntity(db, entityId, fieldKey, teamScoped = false
             (SELECT sx.value FROM extractions sx
               WHERE sx.document_id = x.document_id AND sx.field_key = 'service_date' AND sx.tenant_id = x.tenant_id
               ORDER BY sx.confidence DESC NULLS LAST LIMIT 1) AS service_date
-       FROM extractions x JOIN documents d ON d.id = x.document_id
+       FROM extractions x JOIN documents d ON d.id = x.document_id AND ${notPrivateSql("d")}
       WHERE x.entity_id = $1 AND x.field_key = $2 AND x.${TENANT_SQL} AND (${audienceClause})
       LIMIT 50`,
     [entityId, fieldKey]
@@ -455,7 +456,7 @@ async function fetchEffectiveFinancialTotals(db, documentIds) {
               d.created_at::date::text
             ) AS date
        FROM document_financials f
-       JOIN documents d ON d.id = f.document_id
+       JOIN documents d ON d.id = f.document_id AND ${notPrivateSql("d")}
       WHERE f.document_id = ANY($1::uuid[]) AND f.${TENANT_SQL}
       LIMIT 50`,
     [documentIds]
@@ -534,7 +535,7 @@ async function fetchPoTotal(db, poNumber, customerNamePhrase) {
               (CASE WHEN f.corrections ? 'invoice_date' THEN NULLIF(f.corrections->>'invoice_date', '') ELSE f.invoice_date::text END),
               d.created_at::date::text
             ) AS date
-       FROM document_financials f JOIN documents d ON d.id = f.document_id
+       FROM document_financials f JOIN documents d ON d.id = f.document_id AND ${notPrivateSql("d")}
       WHERE f.doc_kind = 'po' AND f.po_number ILIKE $1 AND f.${TENANT_SQL}
       LIMIT 5`,
     [poNumber]
@@ -1232,10 +1233,10 @@ async function runReverseLookup(db, intent, value) {
  *  the exclusion has to happen HERE, on the id list itself, before that call. Mirrors
  *  audienceWhereClause's own gate exactly: `teamScoped` skips it entirely. */
 async function filterDocumentIdsByAudience(db, documentIds, teamScoped) {
-  if (!documentIds.length || teamScoped) return documentIds;
-  const audienceClause = await audienceWhereClause(db, false);
+  if (!documentIds.length) return documentIds;
+  const audienceClause = await audienceWhereClause(db, teamScoped); // audienceFilterSql always leaves private (HR) papers out, team-scoped or not
   const { rows } = await db.raw(
-    `SELECT d.id FROM documents d WHERE d.id = ANY($1::uuid[]) AND d.${TENANT_SQL} AND (${audienceClause})`,
+    `SELECT d.id FROM documents d WHERE ${notPrivateSql("d")} AND d.id = ANY($1::uuid[]) AND d.${TENANT_SQL} AND (${audienceClause})`,
     [documentIds]
   );
   return rows.map((r) => r.id);

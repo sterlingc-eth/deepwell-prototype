@@ -12,6 +12,7 @@ import { attachCitations } from "../citations/records.js";
 import { documentRecordsFor, customerRecordsFor } from "../citations/enrich.js";
 import { TENANT_SQL, answerEnvelope } from "../scope.js";
 import { countSubject } from "../understanding/understand.js";
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 const NOUNS = [
   [/^(?:invoices?|invoiced|invoce|invioce|bills?|billed)$/, "invoice", "invoice"], [/^(?:quotes?|qoute|quoet|estimates?|proposals?)$/, "proposal-quote", "quote"],
@@ -62,8 +63,8 @@ const names = (rows, k = 3) => rows.slice(0, k).map((r) => r.n).join(", ") + (ro
 export async function runCustomerDocRank(db, intent) {
   const [, type, label] = intent.noun;
   if (intent.mode === "status") {
-    const { rows } = await db.raw(`SELECT d.id FROM documents d WHERE d.${TENANT_SQL} AND d.document_type = $1 ORDER BY d.created_at DESC LIMIT 50`, [type]);
-    const { rows: c } = await db.raw(`SELECT count(*)::int AS n FROM documents d WHERE d.${TENANT_SQL} AND d.document_type = $1`, [type]);
+    const { rows } = await db.raw(`SELECT d.id FROM documents d WHERE d.${TENANT_SQL} AND ${notPrivateSql("d")} AND d.document_type = $1 ORDER BY d.created_at DESC LIMIT 50`, [type]);
+    const { rows: c } = await db.raw(`SELECT count(*)::int AS n FROM documents d WHERE d.${TENANT_SQL} AND ${notPrivateSql("d")} AND d.document_type = $1`, [type]);
     const n = c[0]?.n ?? 0;
     return attachCitations(answerEnvelope({
       text: `Your records don't show whether a quote is open, accepted or declined, so I can't count the ${intent.status} ones. There ${n === 1 ? "is" : "are"} ${plural(n, "quote")} on file in total.`,
@@ -73,7 +74,7 @@ export async function runCustomerDocRank(db, intent) {
   const { rows } = await db.raw(
     `SELECT e.id, e.data->>'customer_name' AS n, count(DISTINCT d.id)::int AS c
        FROM entities e LEFT JOIN document_entity_links l ON l.entity_id = e.id
-       LEFT JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL} AND d.document_type = $1
+       LEFT JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")} AND d.document_type = $1
       WHERE e.entity_type = 'customer' AND e.merged_into IS NULL AND e.${TENANT_SQL} GROUP BY e.id, e.data->>'customer_name' ORDER BY c DESC, n`, [type]);
   const total = rows.length, plus = rows.filter((r) => r.c > 0), zero = rows.filter((r) => r.c === 0);
   const basis = `Counted the ${label} documents linked to each of ${total} customers.`;

@@ -19,6 +19,7 @@
  * question falls through to the existing retrieval+model pipeline, exactly
  * like a fast-path miss does.
  */
+import { notPrivateSql, notPrivateIdSql } from './privacy/privateDocs.js';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -3558,6 +3559,7 @@ export { isTeamScopedQuestion } from './fastPath.js';
  * is wasted work and, past SCAN_LIMIT, wrong. Same WHERE (tenant, merged_into, audience) as the row query in buildAnalyticsSQL. Null for any other plan.
  */
 export function buildAnalyticsCountSQL(plan, { audienceClause = 'TRUE' } = {}) {
+  audienceClause = `(${audienceClause}) AND ${notPrivateSql('d')}`; // People / HR papers are never counted
   if (!plan || plan.op !== 'count' || plan.timeRange || (plan.filters ?? []).length || plan.sortBy) return null;
   if (plan.entity === 'customers') return { sql: `SELECT count(*)::int AS n FROM entities WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT_SQL}`, params: [] };
   if (plan.entity === 'equipment' || plan.entity === 'warranties') return { sql: `SELECT count(*)::int AS n FROM entities WHERE entity_type = 'equipment' AND merged_into IS NULL AND ${TENANT_SQL}`, params: [] };
@@ -3573,6 +3575,7 @@ export function buildAnalyticsCountSQL(plan, { audienceClause = 'TRUE' } = {}) {
  *    migration-tolerance probe and isTeamScopedQuestion above — this file stays pure/no-I/O and never
  *    probes the schema itself. */
 export function buildAnalyticsSQL(plan, { audienceClause = 'TRUE', rowLimit = SCAN_LIMIT } = {}) {
+  audienceClause = `(${audienceClause}) AND ${notPrivateSql('d')}`; // People / HR papers are never counted or listed
   const where = [TENANT_SQL];
   const params = [];
   const columnsFor = SQL_COLUMN[plan.entity === 'warranties' ? 'equipment' : plan.entity] ?? {};
@@ -3598,7 +3601,7 @@ export function buildAnalyticsSQL(plan, { audienceClause = 'TRUE', rowLimit = SC
                    data->>'service_address' AS service_address,
                    data->>'email' AS email, data->>'phone' AS phone, updated_at,
                    (EXISTS (SELECT 1 FROM document_entity_links l
-                             JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL}
+                             JOIN documents d ON d.id = l.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
                              WHERE l.entity_id = entities.id AND l.${TENANT_SQL} AND (${audienceClause}))) AS has_any_document,
                    -- R18 P4 (C4, negation, h134): "how many customers have zero equipment on
                    -- file" — the customers-side mirror of has_any_document just above.
@@ -3744,7 +3747,7 @@ export function buildAnalyticsSQL(plan, { audienceClause = 'TRUE', rowLimit = SC
                  -- D20: what KIND of paper this "visit" is (service ticket, invoice, work order, ...) so the answer can say what was counted.
                  (SELECT dt.document_type FROM documents dt WHERE dt.id = x.document_id AND dt.${TENANT_SQL}) AS document_type
             FROM extractions x
-           WHERE x.field_key = 'service_date' AND ${TENANT_SQL}
+           WHERE x.field_key = 'service_date' AND ${TENANT_SQL} AND ${notPrivateIdSql('x.document_id')}
            ORDER BY x.value DESC
            LIMIT ${Math.max(1, Math.trunc(Number(rowLimit)) || SCAN_LIMIT)}`,
     params: [],

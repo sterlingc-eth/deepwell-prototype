@@ -20,6 +20,13 @@ all every one ones only just also total totals totaling totalling worth amount a
 invoice invoices invoiced count send sent anything anyone number numbers record records document documents pdf copy one's number's name names`.split(/\s+/));
 const FORBIDDEN = /\b(?:between|over|under|above|below|more than|less than|fewer than|greater than|at least|at most|up to|no more than|no less than|around|about|roughly|approximately|approx|nearly|almost|close to|near|exceed\w*|average|avg|median|largest|biggest|smallest|highest|lowest|most|least|sum|combined|together|each|per|unpaid|paid|open|overdue|outstanding|owed|owe|partial|quote|quotes|estimate|estimates|proposal|po|purchase|vendor|payable|payables|credit|memo)\b/i;
 
+/** true when a bare 1900-2100 number reads as a calendar year: after a period word, or followed by "with amounts" / "and totals". */
+function isYearRef(t, before, after) {
+  if (t.dollar || t.k || !/^(?:19|20)\d\d$/.test(t.raw)) return false;
+  if (/\b(?:from|in|during|since|until|till|through|thru|before|after|by|between|within|as of)\s*$/.test(before)) return true;
+  return /^\s*(?:invoices?|bills?)?\s*(?:with|and|showing|including)\s+(?:their\s+|the\s+)?(?:amounts?|totals?)\b/.test(after);
+}
+
 /** Normalise a matched number token to integer cents (string) or null when malformed. */
 function toCents(raw, kSuffix) {
   let s = String(raw).trim();
@@ -73,6 +80,8 @@ export function parseAmountInvoiceQuestion(question) {
   if (!t.dollar && !dollarAfter && !t.k && /\b(?:customers?|clients?|jobs?|units?|tickets?|accounts?|acct|numbers?|no\.?|nr|id)\s*#?\s*$/.test(before)) return null;
   const hasDecimalOrComma = /[.,]/.test(t.raw);
   const bare = !t.dollar && !dollarAfter && !hasDecimalOrComma && !t.k;
+  // A year after from / in / during / since ... or "<year> with amounts" is a period, never an amount ("list all invoices from 2026 with amounts").
+  if (isYearRef(t, before, after)) return null;
   // A bare 4-digit number from 1900 to 2100 is far more likely a year than an amount.
   if (bare && /^(?:19|20)\d\d$/.test(t.raw) && marker !== 'adj' && !/(?:amount of|totall?ing|worth|totals?(?:\s+(?:is|was))?|amounting to)\s*(?:exactly\s*)?$/.test(before)) return null;
   // Everything that is not the amount or the word "invoice" must be plain filler.
@@ -94,6 +103,7 @@ export function amountMentioned(question) {
     const after = original.slice(t.end).toLowerCase();
     const bare = !t.dollar && !/[.,]/.test(t.raw) && !t.k;
     const yearish = /^(?:19|20)\d\d$/.test(t.raw);
+    if (isYearRef(t, before, after)) return false;
     if (bare && yearish) return /\b(?:for|of|is|was|totals?|totall?ing|worth|amount of|amounting to|billed|at)\s*$/.test(before) && (/^\s*(?:dollars?|bucks?|usd)\b/.test(after) || /amount of\s*$|totall?ing\s*$|worth\s*$|totals?(?:\s+(?:is|was))?\s*$/.test(before));
     // a bare standalone number of 3+ digits beside the word invoice(s) ("total invoices 3470", "average invoice 4210", "paid invoices 4210") may be the amount asked for; an aggregate/status answer that ignores it is wrong
     if (bare && !yearish && t.raw.length >= 3 && !/^\s*(?:days?|weeks?|months?|years?|hours?|minutes?|invoices?|customers?|jobs?|units?|visits?|miles?|%|percent|st|nd|rd|th|am|pm)\b/.test(after) && !/\b(?:last|past|next|previous|prior|top|first|within|recent|bottom|over the)\s*$/.test(before) && !/\b(?:in|during|since|from|until|by)\s*$/.test(before)) return true;

@@ -9,6 +9,7 @@
 import { attachCitations } from "../citations/records.js";
 import { documentRecordsFor } from "../citations/enrich.js";
 import { TENANT_SQL, answerEnvelope } from "../scope.js";
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 const KINDS = [
   { re: /\b(?:lease\s+agreements?|rental\s+agreements?|leases?)\b/, type: "lease-agreement", field: "lease_end_date", noun: ["lease", "leases"] },
@@ -56,7 +57,7 @@ const none = (text, basis, kind = "no-answer") => attachCitations({ kind, text, 
 export async function runExpiryWindow(db, it, { today } = {}) {
   const todayIso = String(today ?? new Date().toISOString()).slice(0, 10);
   const [noun1, nounN] = it.noun;
-  const { rows: docs } = await db.raw(`SELECT d.id, d.original_filename AS file FROM documents d WHERE d.${TENANT_SQL} AND replace(lower(d.document_type), '_', '-') = $1`, [it.type]);
+  const { rows: docs } = await db.raw(`SELECT d.id, d.original_filename AS file FROM documents d WHERE d.${TENANT_SQL} AND ${notPrivateSql("d")} AND replace(lower(d.document_type), '_', '-') = $1`, [it.type]);
   if (!docs.length) return none(`No ${nounN} on file.`, `Searched your documents for ${nounN}; none is on file.`);
   const { rows: vals } = await db.raw(`SELECT x.document_id AS id, x.field_key AS k, ${VAL} AS v FROM extractions x WHERE x.${TENANT_SQL} AND x.field_key IN ($1, 'tenant_name', 'unit_number') AND x.document_id = ANY($2::uuid[])`, [it.field, docs.map((d) => d.id)]);
   const by = new Map(docs.map((d) => [d.id, { id: d.id, file: d.file, end: null, tenant: null, unit: null }]));

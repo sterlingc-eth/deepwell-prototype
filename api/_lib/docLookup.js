@@ -49,6 +49,7 @@ import { parseDocFieldAsk, extractField } from "./lookups/docFieldAsk.js";
 // customer-scoped document-list answer here unless the question itself is about team/internal
 // material — see fastPath.js's isTeamScopedQuestion and audience/sql.js's own header.
 import { documentsHaveAudience } from "./audience/probe.js";
+import { notPrivateSql, notPrivateIdSql, withoutPrivateIds } from "./privacy/privateDocs.js";
 import { audienceFilterSql, AUDIENCE_FALLBACK_FIELD_KEY } from "./audience/sql.js";
 import { isTeamScopedQuestion } from "./fastPath.js";
 
@@ -132,11 +133,11 @@ async function countInternalDocuments(db) {
   const hasAudienceColumn = await documentsHaveAudience({ query: (sql, params) => db.raw(sql, params) });
   const queries = [
     db.raw(
-      `SELECT count(*)::int AS n FROM extractions WHERE ${TENANT_SQL} AND field_key = '${AUDIENCE_FALLBACK_FIELD_KEY}' AND value = 'internal'`
+      `SELECT count(*)::int AS n FROM extractions WHERE ${TENANT_SQL} AND field_key = '${AUDIENCE_FALLBACK_FIELD_KEY}' AND value = 'internal' AND ${notPrivateIdSql('document_id')}`
     ),
   ];
   if (hasAudienceColumn) {
-    queries.push(db.raw(`SELECT count(*)::int AS n FROM documents WHERE ${TENANT_SQL} AND audience = 'internal'`));
+    queries.push(db.raw(`SELECT count(*)::int AS n FROM documents d WHERE ${TENANT_SQL} AND audience = 'internal' AND ${notPrivateSql('d')}`));
   }
   const results = await Promise.all(queries);
   return results.reduce((sum, r) => sum + Number(r.rows?.[0]?.n ?? 0), 0);
@@ -562,8 +563,8 @@ const AUDIENCE_TERM_RE = /\b(?:internal|staff|team|shop)[-\s]only\b/i;
 async function listMemoDocuments(db) {
   const { rows } = await db.raw(
     `SELECT d.id, d.original_filename, d.created_at, p.page_no, p.text
-       FROM document_pages p JOIN documents d ON d.id = p.document_id AND d.${TENANT_SQL}
-      WHERE p.${TENANT_SQL} AND p.tsv @@ websearch_to_tsquery('english', 'memo')
+       FROM document_pages p JOIN documents d ON d.id = p.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
+      WHERE p.${TENANT_SQL} AND ${notPrivateSql('d')} AND p.tsv @@ websearch_to_tsquery('english', 'memo')
       ORDER BY d.created_at DESC, p.page_no
       LIMIT 500`
   );
@@ -702,7 +703,7 @@ export async function customerDocumentIds(db, row) {
     ...linkRows.map((r) => ({ documentId: r.document_id, via: r.via, serial: r.serial })),
     ...nameMatchRows.map((r) => ({ documentId: r.document_id, via: r.via, serial: r.serial })),
   ]);
-  return via.map((v) => v.documentId);
+  return withoutPrivateIds(db, via.map((v) => v.documentId));
 }
 
 function formatDateLabel(rawDate) {
@@ -860,9 +861,9 @@ async function runDocLookupCore(db, question, opts = {}) {
   const teamScoped = isTeamScopedQuestion(question);
   const hasAudienceColumn = await documentsHaveAudience({ query: (sql, params) => db.raw(sql, params) });
   const audienceClause = audienceFilterSql({ docAlias: "d", hasAudienceColumn, teamScoped });
-  if (idSet.size && !teamScoped) {
+  if (idSet.size) { // private (HR) papers are dropped even for a team-scoped question
     const { rows: audRows } = await db.raw(
-      `SELECT d.id FROM documents d WHERE d.id = ANY($1::uuid[]) AND d.${TENANT_SQL} AND (${audienceClause})`,
+      `SELECT d.id FROM documents d WHERE d.id = ANY($1::uuid[]) AND d.${TENANT_SQL} AND (${audienceClause}) AND ${notPrivateSql("d")}`,
       [[...idSet]]
     );
     idSet.clear();
@@ -893,7 +894,7 @@ async function runDocLookupCore(db, question, opts = {}) {
   // Defect 21: "how many documents are on file for X" - every document linked to the customer, by type.
   if (parsed.docField?.field === "count") {
     const { rows: byType } = await db.raw(
-      `SELECT ${typeSql("d.document_type")} AS t, count(*)::int AS n FROM documents d WHERE d.id = ANY($1::uuid[]) AND d.${TENANT_SQL} GROUP BY 1 ORDER BY 2 DESC, 1`, [ids]);
+      `SELECT ${typeSql("d.document_type")} AS t, count(*)::int AS n FROM documents d WHERE ${notPrivateSql("d")} AND d.id = ANY($1::uuid[]) AND d.${TENANT_SQL} GROUP BY 1 ORDER BY 2 DESC, 1`, [ids]);
     const total = byType.reduce((a, r) => a + r.n, 0);
     const parts = byType.map((r) => `${r.n} ${documentTypeLabel(r.t).toLowerCase()}${r.n === 1 ? "" : "s"}`);
     return attachCitations({
@@ -917,7 +918,7 @@ async function runDocLookupCore(db, question, opts = {}) {
                                 AND c.entity_type = 'customer' AND c.merged_into IS NULL AND c.${TENANT_SQL}
               WHERE l.document_id = d.id AND l.${TENANT_SQL} ORDER BY l.created_at DESC LIMIT 1) AS customer_name
        FROM documents d
-      WHERE d.id = ANY($1::uuid[]) AND ${typeSql("d.document_type")} = ANY($2::text[]) AND d.${TENANT_SQL}
+      WHERE ${notPrivateSql("d")} AND d.id = ANY($1::uuid[]) AND ${typeSql("d.document_type")} = ANY($2::text[]) AND d.${TENANT_SQL}
       ORDER BY d.created_at DESC
       LIMIT ${MAX_DOCS}`,
     [ids, docTypeAliases(doctype)]
@@ -1121,7 +1122,7 @@ async function runDocNumberField(db, parsed) {
   const { rows } = await db.raw(
     `SELECT d.id, d.document_type, d.original_filename, d.created_at, string_agg(p.text, E'\n' ORDER BY p.page_no) AS text
        FROM documents d JOIN document_pages p ON p.document_id = d.id AND p.${TENANT_SQL}
-      WHERE d.${TENANT_SQL} AND ${typeSql("d.document_type")} = ANY($1::text[]) AND position(lower($2::text) in lower(p.text)) > 0
+      WHERE d.${TENANT_SQL} AND ${notPrivateSql("d")} AND ${typeSql("d.document_type")} = ANY($1::text[]) AND position(lower($2::text) in lower(p.text)) > 0
       GROUP BY d.id, d.document_type, d.original_filename, d.created_at ORDER BY d.created_at DESC LIMIT 5`,
     [docTypeAliases(doctype), num]
   );

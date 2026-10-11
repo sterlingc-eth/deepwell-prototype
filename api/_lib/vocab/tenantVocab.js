@@ -40,6 +40,7 @@
 import { TENANT_SQL } from '../scope.js';
 import { deriveGeo } from '../analytics.js';
 import { withinEditDistance1, VOCAB } from '../nlNormalize.js';
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 const VOCAB_SCAN_LIMIT = 5000;
 const CACHE_TTL_MS = 10 * 60 * 1000; // backstop only — the data-version key is what really invalidates this
@@ -166,7 +167,7 @@ async function buildDqlVocab(db) {
     for (const f of ['refrigerant', 'tonnage', 'equipment_type']) for (const v of await distinctEntityValues(db, 'equipment', f, 500)) add(f === 'equipment_type' ? 'equipmentType' : f, v);
   } catch { /* ignore */ }
   try {
-    const { rows } = await db.raw(`SELECT lower(replace(document_type, '_', '-')) AS t, count(*)::int AS n FROM documents WHERE ${TENANT_SQL} GROUP BY 1 LIMIT 200`, []);
+    const { rows } = await db.raw(`SELECT lower(replace(document_type, '_', '-')) AS t, count(*)::int AS n FROM documents WHERE ${TENANT_SQL} AND ${notPrivateSql("")} GROUP BY 1 LIMIT 200`, []);
     out.docTypes = rows.map((r) => ({ id: r.t, n: r.n }));
   } catch { /* ignore */ }
   for (const k of Object.keys(out.categorical)) { const arr = [...out.categorical[k]]; out.categorical[k] = arr.length <= 60 ? arr : []; }
@@ -188,6 +189,9 @@ export async function buildTenantVocab(db, pack) {
   ]);
   const cities = dedupCi(addresses.map((a) => deriveGeo(a).city).filter(Boolean));
   const dql = await buildDqlVocab(db);
+  // the business kind the organization chose when it signed up (tenants.settings.industry), e.g. "nonprofit"; only ever used to read a word the way that kind of business means it
+  let industryKind = null;
+  try { const { rows } = await db.raw("SELECT settings->>'industry' AS i FROM tenants WHERE id = (current_setting('app.tenant_id', true))::uuid", []); industryKind = rows?.[0]?.i ? String(rows[0].i).toLowerCase() : null; } catch { industryKind = null; }
   const docTypePhrases = (pack?.documentTypes ?? [])
     .map((t) => ({ id: t.id, phrase: String(t.label ?? t.id).toLowerCase().trim() }))
     .filter((t) => t.phrase);
@@ -200,6 +204,7 @@ export async function buildTenantVocab(db, pack) {
     docTypePhrases,
     // R39: the trade the organization is in ("hvac", "plumbing"): a plain whole-shop count that says "HVAC units" in an HVAC shop names no extra condition
     industryWords: pack?.id ? [String(pack.id).toLowerCase()] : [],
+    industryKind,
     technicians: buildNameGlossary(technicians),
     customers: buildNameGlossary(customerNames),
     dql,

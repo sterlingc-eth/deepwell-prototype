@@ -23,7 +23,9 @@ import { attachCitations } from "../citations/records.js";
 import { buildOutOfDomainAnswer, buildUntrackedFieldAnswer } from "../contactLookup.js";
 import { untrackedConcept, jargonEnabled, untrackedPhrases } from "../lexicon/jargon.js";
 import { TENANT_SQL } from "../scope.js";
+import { isPrivateDocAsk, PRIVATE_DOCS_REPLY } from "../privacy/privateDocs.js";
 import { classifyCoverage, coverageTraceTerms } from "./coverage.js";
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 export const RECORD_ANCHOR_RE = new RegExp(
   String.raw`\b(?:customers?|clients?|accounts?|units?|systems?|equipment|hvac|e-?mails?|furnaces?|ac|a/c|air\s+conditioner|heat\s+pumps?|condensers?|air\s+handlers?|rtus?|mini[- ]?splits?|` +
@@ -296,6 +298,8 @@ export function classifyEarlyDecline(question, { hasConversation = false, contex
   if (!raw || raw.length > 200) return null;
   const stripped = norm(stripConversationalFrame(raw) ?? raw);
   const full = norm(raw);
+  // Privacy: a direct ask for HR / employee / personnel / disciplinary / offer letters gets an honest reply with no count and no names.
+  if (isPrivateDocAsk(raw)) return { kind: "private_papers" };
   for (const q of [stripped, full]) {
     const trig = isOffDomain(q);
     if (trig) return { kind: "off_domain", trigger: trig };
@@ -338,7 +342,12 @@ export function buildDanglingAnswer(noun) {
 }
 
 /** The honest decline for a classifyEarlyDecline() result (reuses the existing out-of-domain / untracked-field builders). */
+export function buildPrivatePapersAnswer() {
+  return attachCitations({ kind: "no-answer", text: PRIVATE_DOCS_REPLY, facts: [], sources: [], confidence: 0, verifiedCount: 0, unverifiedCount: 0, closest: [] }, { records: [], total: 0, kind: "searched", basis: "People and HR papers are private and are not searched, counted or listed." });
+}
+
 export function buildEarlyDeclineAnswer(kind, early) {
+  if (kind === "private_papers") return buildPrivatePapersAnswer();
   if (kind === "off_domain") return buildOutOfDomainAnswer();
   if (kind === "untracked_component") return buildUntrackedFieldAnswer();
   if (kind === "untracked_measure") return buildOutOfDomainAnswer();
@@ -370,7 +379,7 @@ export async function tenantHasTrace(db, trigger) {
   const { rows } = await db.raw(
     `SELECT 1 WHERE EXISTS (SELECT 1 FROM entities WHERE ${TENANT_SQL} AND merged_into IS NULL AND data::text ~* ANY($1::text[]))
          OR EXISTS (SELECT 1 FROM extractions WHERE ${TENANT_SQL} AND COALESCE(NULLIF(corrected_value, ''), value) ~* ANY($1::text[]))
-         OR EXISTS (SELECT 1 FROM documents WHERE ${TENANT_SQL} AND original_filename ~* ANY($1::text[]))`,
+         OR EXISTS (SELECT 1 FROM documents WHERE ${TENANT_SQL} AND ${notPrivateSql("")} AND original_filename ~* ANY($1::text[]))`,
     [pats]
   );
   return rows.length > 0;

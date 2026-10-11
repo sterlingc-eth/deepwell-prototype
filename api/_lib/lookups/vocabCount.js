@@ -11,6 +11,7 @@ import { TENANT_SQL, answerEnvelope } from "../scope.js";
 import { deriveGeo } from "../analytics.js";
 import { VOCAB as SYSTEM_VOCAB } from "../nlNormalize.js";
 import { properNameTokens, casingCarriesInformation, tokenize as rawTokenize } from "../router/leftover.js";
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 const norm = (s) => ` ${String(s ?? "").toLowerCase().replace(/[’`]/g, "'").replace(/'s\b/g, "").normalize("NFC").replace(/[^\p{L}\p{N}]+/gu, " ").trim()} `;
 const FILLER = new Set("any how many mny number of count the our all we do have has are there is on file in total installed that with a an and or got you your us it from by made brand make customers customer clients client homes people live living located based on".split(" "));
@@ -453,10 +454,10 @@ async function runVocabCountInner(db, intent) {
       { records: await customerRecordsFor(db, ids.map((u) => u.id)), total: hitCount, claimedCount: hitCount, basis: `Read the service address city on each of the ${total} customers.` });
   }
   const { rows: [t] } = await db.raw(
-    `SELECT count(DISTINCT x.document_id)::int AS n FROM extractions x JOIN documents d ON d.id = x.document_id AND d.${TENANT_SQL}
+    `SELECT count(DISTINCT x.document_id)::int AS n FROM extractions x JOIN documents d ON d.id = x.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
       WHERE x.field_key = 'technician' AND lower(COALESCE(NULLIF(x.corrected_value, ''), x.value)) = lower($1) AND x.${TENANT_SQL} AND lower(replace(d.document_type, '_', '-')) = 'invoice'`, [intent.value]);
   const { rows: docs } = t.n > 0 ? await db.raw(
-    `SELECT DISTINCT x.document_id FROM extractions x JOIN documents d ON d.id = x.document_id AND d.${TENANT_SQL}
+    `SELECT DISTINCT x.document_id FROM extractions x JOIN documents d ON d.id = x.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
       WHERE x.field_key = 'technician' AND lower(COALESCE(NULLIF(x.corrected_value, ''), x.value)) = lower($1) AND x.${TENANT_SQL} AND lower(replace(d.document_type, '_', '-')) = 'invoice' LIMIT 200`, [intent.value]) : { rows: [] };
   return attachCitations(
     answerEnvelope({ text: `${t.n} invoice${t.n === 1 ? "" : "s"} list ${intent.value} as the technician.`, facts: [{ label: `Invoices by ${intent.value}`, value: String(t.n), entityIds: [], sources: [] }], extra: { fastIntent: "vocab_tech_invoice_count" } }),

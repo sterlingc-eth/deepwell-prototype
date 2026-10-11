@@ -95,6 +95,7 @@ import { embedConfig } from './embed.js';
 import { rerankDocuments } from './rerank.js';
 import { documentsHaveAudience } from '../audience/probe.js';
 import { audienceFilterSql } from '../audience/sql.js';
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 const TENANT_SQL = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 
@@ -222,7 +223,7 @@ async function documentIdsForDateRange(db, dateFrom, dateTo) {
          AND value ~ '^\\d{4}-\\d{2}-\\d{2}' AND substring(value from 1 for 10)::date BETWEEN $1::date AND $2::date
      UNION
      SELECT id AS document_id FROM documents d
-       WHERE ${TENANT_SQL.replace('tenant_id', 'd.tenant_id')} AND d.created_at::date BETWEEN $1::date AND $2::date
+       WHERE ${notPrivateSql("d")} AND ${TENANT_SQL.replace('tenant_id', 'd.tenant_id')} AND d.created_at::date BETWEEN $1::date AND $2::date
          AND NOT EXISTS (
            SELECT 1 FROM extractions x
             WHERE x.document_id = d.id AND x.field_key IN ('service_date', 'installation_date')
@@ -251,7 +252,7 @@ async function documentIdsForTechnician(db, technician) {
 async function documentIdsExcludingInternal(db) {
   const hasAudienceColumn = await documentsHaveAudience({ query: (sql, p) => db.raw(sql, p) });
   const clause = audienceFilterSql({ docAlias: 'd', hasAudienceColumn, teamScoped: false });
-  const { rows } = await db.raw(`SELECT id AS document_id FROM documents d WHERE ${TENANT_SQL.replace('tenant_id', 'd.tenant_id')} AND ${clause}`, []);
+  const { rows } = await db.raw(`SELECT id AS document_id FROM documents d WHERE ${notPrivateSql("d")} AND ${TENANT_SQL.replace('tenant_id', 'd.tenant_id')} AND ${clause}`, []);
   return rows.map((r) => r.document_id);
 }
 

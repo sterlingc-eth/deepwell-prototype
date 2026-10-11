@@ -44,6 +44,7 @@ import { financialsTableExists } from './financials/store.js';
 // Records Browse audience filter chip (round 18, part 2, owner ask (a)): leaf probe only (see
 // audience/probe.js's own header on why this imports THAT file and never audience/store.js).
 import { documentsHaveAudience } from './audience/probe.js';
+import { notPrivateSql, notPrivateIdSql } from './privacy/privateDocs.js';
 import { AUDIENCE_FALLBACK_FIELD_KEY } from './audience/sql.js';
 import {
   hrGateSql, hrDocGate, hrAllowed as cfHrAllowed, companyFilesView as cfView, moveCompanyFile as cfMove,
@@ -2667,7 +2668,7 @@ function makeStore(db, tenantId) {
                  'MaxFragments=2, MaxWords=55, MinWords=20, FragmentDelimiter=" … ", StartSel="", StopSel=""') AS excerpt,
                ts_rank_cd(p.tsv, q.tsq) AS rank
           FROM document_pages p
-          JOIN documents d ON d.id = p.document_id
+          JOIN documents d ON d.id = p.document_id AND ${notPrivateSql("d")}
           CROSS JOIN q
          WHERE p.${TENANT} AND q.tsq IS NOT NULL AND p.tsv @@ q.tsq __SCOPE__
          ORDER BY rank DESC
@@ -2685,7 +2686,7 @@ function makeStore(db, tenantId) {
                h.rank AS rank
           FROM donovan_pages_by_text($1, $2, $3::uuid[]) WITH ORDINALITY AS h(id, rank, ord)
           JOIN document_pages p ON p.id = h.id AND p.${TENANT}
-          JOIN documents d ON d.id = p.document_id
+          JOIN documents d ON d.id = p.document_id AND ${notPrivateSql("d")}
           CROSS JOIN q
          ORDER BY h.ord`;
       push(
@@ -2714,7 +2715,7 @@ function makeStore(db, tenantId) {
                       0.5 AS rank
                  FROM donovan_pages_by_like($1, 4, $3::uuid[]) WITH ORDINALITY AS h(id, ord)
                  JOIN document_pages p ON p.id = h.id AND p.${TENANT}
-                 JOIN documents d ON d.id = p.document_id
+                 JOIN documents d ON d.id = p.document_id AND ${notPrivateSql("d")}
                 ORDER BY h.ord`,
               [`%${w}%`, w, documentIds ?? null]
             )
@@ -2724,7 +2725,7 @@ function makeStore(db, tenantId) {
                     substring(p.text from greatest(1, position(lower($2) in lower(p.text)) - 120) for 320) AS excerpt,
                     0.5 AS rank
                FROM document_pages p
-               JOIN documents d ON d.id = p.document_id
+               JOIN documents d ON d.id = p.document_id AND ${notPrivateSql("d")}
               WHERE p.${TENANT} AND p.text ILIKE $1 __SCOPE__
               LIMIT 4`,
             [`%${w}%`, w]
@@ -2750,7 +2751,7 @@ function makeStore(db, tenantId) {
                     1.0 AS rank
                FROM donovan_pages_by_like($1, 5, $3::uuid[]) WITH ORDINALITY AS h(id, ord)
                JOIN document_pages p ON p.id = h.id AND p.${TENANT}
-               JOIN documents d ON d.id = p.document_id
+               JOIN documents d ON d.id = p.document_id AND ${notPrivateSql("d")}
               ORDER BY h.ord`,
             [like, token, documentIds ?? null]
           )
@@ -2760,7 +2761,7 @@ function makeStore(db, tenantId) {
                   substring(p.text from greatest(1, position($2 in p.text) - 120) for 320) AS excerpt,
                   1.0 AS rank
              FROM document_pages p
-             JOIN documents d ON d.id = p.document_id
+             JOIN documents d ON d.id = p.document_id AND ${notPrivateSql("d")}
             WHERE p.${TENANT} AND p.text ILIKE $1 __SCOPE__
             LIMIT 5`,
           [like, token]
@@ -2800,7 +2801,7 @@ function makeStore(db, tenantId) {
         `SELECT x.id, x.document_id, x.entity_id, x.field_key, x.value, x.confidence,
                 d.original_filename, d.stage, e.entity_type, e.data
            FROM extractions x
-           JOIN documents d ON d.id = x.document_id
+           JOIN documents d ON d.id = x.document_id AND ${notPrivateSql("d")}
       LEFT JOIN entities  e ON e.id = x.entity_id
           WHERE x.${TENANT} AND x.value ILIKE ANY($1::text[])${scopeSql}
           LIMIT $2`,

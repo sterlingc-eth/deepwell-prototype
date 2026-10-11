@@ -453,6 +453,7 @@ function finishText(feat, h, o) {
   if (t.negation && !o.term.literalNeg) return null;
   if (t.missing || t.share || t.versus || t.median || t.avg || t.latest || t.earliest || t.topN || t.argmax || t.distinct || t.max || t.min) return null;
   if (feat.recentN || feat.flags.each) return null;
+  if (feat.distinctDim) return null; // "which cities have invoices with a roofing line" is a list of values, not a list of papers
   const money = Boolean(t.howMuch || t.total || t.money?.length);
   const lineWanted = o.lineScope || o.mode === 'billed' || o.cueKind === 'include';
   if (o.mode === 'implicit' || o.mode === 'times') {
@@ -469,13 +470,20 @@ function finishText(feat, h, o) {
   else if (t.exists || t.any) show = feat.flags.listVerb && !t.exists ? 'list' : 'exists';
   else show = 'list';
   if (lineWanted) {
+    if (feat.dims.length) return null; // a line search is not grouped here
     const wantsSum = Boolean(t.howMuch || t.total || (o.chargeWord && !t.howMany && !feat.flags.listVerb));
     if (o.mode !== 'billed' && money && !wantsSum) return null;
     if (t.avg || t.median) return null;
     if (asCustomers) return { ...base, op: 'line_search', term: o.term, show: 'customers', asCustomers: true, countLines: true };
     const docType = base.docType ?? (o.mode === 'billed' ? 'invoice' : null);
     if (docType && !LINE_TYPES.has(docType)) return null;
-    return { ...base, docType, docWord: base.docType ? base.docWord : null, op: 'line_search', term: o.term, show: wantsSum ? 'sum' : show, countLines: Boolean(o.lineScope) || o.mode === 'billed', _weak: o.mode === 'implicit' };
+    // "sum of POs that have a drywall line": the papers that carry such a line, added up by their own totals; only "line amounts" / "billed for" add up the lines themselves
+    const lineAmounts = /\b(?:line\s+(?:amounts?|totals?|values?)|lines?\s+(?:amounts?|totals?)|amounts?\s+(?:of|on)\s+(?:the\s+)?[\w ]{0,20}lines?|lines?\s+(?:items?\s+)?(?:amounts?|totals?))\b/i.test(feat.raw ?? '');
+    const rawL = String(feat.raw ?? '').toLowerCase();
+    const docPos = base.docWord ? rawL.search(new RegExp(`\\b${String(base.docWord).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`)) : -1;
+    const asModifier = docPos >= 0 && (/\b(?:billing|billed)\s+for\b/.test(rawL) && rawL.search(/\b(?:billing|billed)\s+for\b/) > docPos || /\bwith\s+(?:an?|the)\s+"?[\w ]{1,25}"?\s+line(?:\s+items?)?\b/.test(rawL) && rawL.search(/\bwith\s+(?:an?|the)\s+"?[\w ]{1,25}"?\s+line/) > docPos) && !/\b(?:how\s+much|total|sum|dollars?|amount)\s+(?:in|of)\s+(?:the\s+)?"?[\w ]{1,25}"?\s+lines?\b/.test(rawL);
+    const docLevel = asModifier && !lineAmounts || Boolean(base.docType) && o.mode !== 'billed' && !o.chargeWord && !lineAmounts && (o.cueKind === 'include' || /\b(?:include|includes|including|have|has|contain|contains)\s+(?:"[^"]+"|[a-z]+)\s+as\s+(?:a|an|the)\s+line\b/i.test(feat.raw ?? ''));
+    return { ...base, docType, docWord: base.docType ? base.docWord : null, op: 'line_search', term: o.term, show: wantsSum ? 'sum' : show, countLines: docLevel ? false : Boolean(o.lineScope) || o.mode === 'billed', sumDocs: Boolean(wantsSum && docLevel), _weak: o.mode === 'implicit' };
   }
   if (money) return null;
   if (asCustomers) return { ...base, op: 'text_search', term: o.term, show: 'customers', asCustomers: true };
@@ -1027,7 +1035,11 @@ function execText(plan, x) {
   // a question with no cue word is only read as a text search when it finds something; "nothing" would be a guess about what was meant
   if (plan.term.needCorpus && !pos.length) return { abstain: 'no-cue-no-match' };
   const res = { n: pos.length, rows: pos, neg, negEx, term, leftOut: sel.leftOut ?? 0, scanned: sel.rows.length, posLines };
-  if (plan.show === 'sum') {
+  if (plan.show === 'sum' && plan.sumDocs) {
+    const vals = pos.map((r) => r.total).filter((v) => v != null);
+    res.sum = vals.reduce((a, b) => a + b, 0); res.sumN = vals.length; res.noAmount = pos.length - vals.length;
+    if (pos.length && !vals.length) return { abstain: 'measure-missing' };
+  } else if (plan.show === 'sum') {
     const vals = posLines.map((l) => l.amount).filter((v) => v != null);
     res.sum = vals.reduce((a, b) => a + b, 0); res.sumN = vals.length; res.noAmount = posLines.length - vals.length;
     if (posLines.length && !vals.length) return { abstain: 'measure-missing' };
@@ -1329,6 +1341,7 @@ const termText = (term) => `"${term.display}"`;
 const repairNote = (term) => (term.repairs?.length ? `Read ${term.repairs.map(([a, b]) => `"${a}" as "${b}"`).join(' and ')}.` : '');
 const DOC_ONLY = 'internal-only papers and HR letters are left out';
 
+const pos0 = (res) => res.rows.length > 0;
 function sayText(res, plan, { snap }) {
   const out = { text: '', facts: [], records: [], basis: '', total: 0, claimedCount: null };
   const isLines = plan.op === 'line_search';
@@ -1356,6 +1369,14 @@ function sayText(res, plan, { snap }) {
   const rep = repairNote(res.term); if (rep) bits.push(rep);
   out.basis = bits.join(' ');
 
+  if (plan.show === 'sum' && plan.sumDocs) {
+    if (!pos0(res)) { out.text = `No ${docNoun(2)}${cond} have a line mentioning ${tm}, so there is nothing to add up.${negN ? ` ${negNote}` : ''}`; out.total = 0; return out; }
+    out.text = `${fmtMoney(res.sum)} across ${fmtInt(res.sumN)} ${docNoun(res.sumN)}${cond} with a line mentioning ${tm}.${res.noAmount ? ` ${fmtInt(res.noAmount)} ${docNoun(res.noAmount)} ${res.noAmount === 1 ? 'has' : 'have'} no total on file and ${res.noAmount === 1 ? 'was' : 'were'} left out.` : ''}`;
+    out.facts = [{ label: `${cap1(docNoun(2))} with ${res.term.display}`, value: fmtMoney(res.sum) }];
+    out.records = docRecords(res.rows, snap); out.total = res.rows.length;
+    out.basis += ' The total adds up the printed total of each of those papers.';
+    return out;
+  }
   if (plan.show === 'sum') {
     if (!res.posLines.length) { out.text = `No ${lineNoun(2)}${cond} mention ${tm}, so there is nothing to add up.${negN ? ` ${negNote}` : ''}`; out.total = 0; return out; }
     out.text = `${fmtMoney(res.sum)} across ${fmtInt(res.sumN)} ${lineNoun(res.sumN)}${cond} mentioning ${tm} (${fmtInt(n)} ${docNoun(n)}).${res.noAmount ? ` ${fmtInt(res.noAmount)} line${res.noAmount === 1 ? ' has' : 's have'} no amount on file and ${res.noAmount === 1 ? 'was' : 'were'} left out.` : ''}`;

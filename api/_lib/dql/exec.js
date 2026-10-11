@@ -141,7 +141,7 @@ export const monthName = (m) => MONTHS[m - 1];
 export function dimKey(row, dim, plan, snap, today) {
   const E = ENTITIES[plan.entity];
   const by = dim.by;
-  if (['year', 'month', 'quarter', 'monthOfYear'].includes(by)) {
+  if (['year', 'month', 'quarter', 'monthOfYear', 'weekday'].includes(by)) {
     const field = dim.field ?? plan.time?.field ?? E.defaultDate;
     const v = field ? valueOf(row, plan.entity, field, snap, today) : null;
     const d = v ? String(v).slice(0, 10) : null;
@@ -149,6 +149,7 @@ export function dimKey(row, dim, plan, snap, today) {
     if (by === 'year') return d.slice(0, 4);
     if (by === 'month') return d.slice(0, 7);
     if (by === 'monthOfYear') return d.slice(5, 7);
+    if (by === 'weekday') return ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][new Date(`${d}T00:00:00Z`).getUTCDay()];
     return `${d.slice(0, 4)}-Q${Math.floor((Number(d.slice(5, 7)) - 1) / 3) + 1}`;
   }
   const def = fieldDef(plan.entity, by);

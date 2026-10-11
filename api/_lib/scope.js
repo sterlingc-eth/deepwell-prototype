@@ -26,6 +26,7 @@ import { escapeRegex, escapeLikePattern as escapeLike } from './util/escape.js';
 // touching those other files. See fastPath.js's isTeamScopedQuestion for the one thing that opts out.
 import { documentsHaveAudience } from './audience/probe.js';
 import { audienceFilterSql } from './audience/sql.js';
+import { notPrivateSql, withoutPrivateIds } from "./privacy/privateDocs.js";
 
 export const TENANT_SQL = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 
@@ -335,7 +336,7 @@ export async function scopeDocumentIds(db, scope) {
     );
     for (const r of rows) ids.add(r.document_id);
   }
-  return [...ids];
+  return withoutPrivateIds(db, [...ids]); // People / HR papers never feed an answer
 }
 
 /* ----------------------------------------------------------------- visits */
@@ -366,7 +367,7 @@ export async function fetchVisits(db, documentIds, teamScoped = false) {
                                 AND c.entity_type = 'customer' AND c.merged_into IS NULL AND c.${TENANT_SQL}
               WHERE l.document_id = x.document_id AND l.${TENANT_SQL}
               ORDER BY l.created_at DESC LIMIT 1) AS customer_name
-       FROM extractions x JOIN documents d ON d.id = x.document_id
+       FROM extractions x JOIN documents d ON d.id = x.document_id AND ${notPrivateSql("d")}
       WHERE x.field_key = 'service_date' AND x.document_id = ANY($1::uuid[]) AND x.${TENANT_SQL} AND (${audienceClause})
       LIMIT 2000`,
     [ids]

@@ -26,6 +26,7 @@
 import { TENANT_SQL } from '../scope.js';
 import { warrantyStatusOf } from '../analytics.js';
 import { nodeId, parseNodeId, expandNode, kgEdgesTableExists, searchGraphNodes, resolveMergedNodes } from './build.js';
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 export const MAX_DEPTH = 3;
 export const MAX_LIMIT = 150;
@@ -96,7 +97,7 @@ export async function hydrateNodes(db, ids, today) {
       `SELECT d.id, d.document_type,
               (SELECT COALESCE(NULLIF(y.corrected_value,''), y.value) FROM extractions y
                 WHERE y.document_id = d.id AND y.field_key = 'service_date' AND y.${TENANT_SQL} LIMIT 1) AS service_date
-         FROM documents d WHERE d.id = ANY($1::uuid[]) AND d.${TENANT_SQL}`,
+         FROM documents d WHERE ${notPrivateSql("d")} AND d.id = ANY($1::uuid[]) AND d.${TENANT_SQL}`,
       [byType.visit]
     );
     for (const r of rows) {

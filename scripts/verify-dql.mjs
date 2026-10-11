@@ -256,7 +256,7 @@ check('empty :: an extreme over nothing says none', has(r, 'No purchase orders')
   const tv2 = await withTenant(ctxArg, async (db) => { const { resetTenantVocabCacheForTests } = await import('../api/_lib/vocab/tenantVocab.js'); resetTenantVocabCacheForTests(); return getTenantVocab(db, ctx.tenantKey, pack); });
   const intent = parseDql(`how many documents for ${dupName}`, { tenantVocab: tv2, pack, today: TODAY });
   const out = intent ? await withTenant(ctxArg, (db) => runDql(db, intent, { today: TODAY })) : null;
-  check('ambiguous name :: a customer name on file twice is released at run time (clarify path asks)', intent !== null && out === null, out?.text);
+  check('ambiguous name :: a customer name on file twice is never answered for one of them: it asks which one (round 7; before, the plan was released at run time)', intent !== null && (out === null || (/Which one do you mean\?/.test(out.text) && !/\$\d/.test(out.text))), out?.text);
 }
 
 /* ================================================================== wiring: classifyAll, decompose, guard */

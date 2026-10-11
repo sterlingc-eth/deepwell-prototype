@@ -5,6 +5,7 @@
  *   sayResult(result, plan, {snap, today}) -> {text, facts, records, basis, total, claimedCount}
  */
 import { documentTypeLabel } from '../documentTypes.js';
+import { ynText } from './yn.js';
 import { ENTITIES } from './fields.js';
 import { dimLabel, displayKey, monthName } from './exec.js';
 
@@ -150,12 +151,13 @@ function valueText(plan, v) {
   return fmtNum(v);
 }
 
-const DIM_NOUN = { tech: 'technician', city: 'city', brand: 'brand', customer: 'customer', vendor: 'vendor', status: 'status', serviceType: 'service type', refrigerant: 'refrigerant', tonnage: 'tonnage', model: 'model', type: 'document type', equipmentType: 'equipment type', year: 'year', month: 'month', quarter: 'quarter', monthOfYear: 'month of the year' };
+const DIM_NOUN = { weekday: 'day of the week', tech: 'technician', city: 'city', brand: 'brand', customer: 'customer', vendor: 'vendor', status: 'status', serviceType: 'service type', refrigerant: 'refrigerant', tonnage: 'tonnage', model: 'model', type: 'document type', equipmentType: 'equipment type', year: 'year', month: 'month', quarter: 'quarter', monthOfYear: 'month of the year' };
 const dimNoun = (d) => DIM_NOUN[d.by] ?? d.by;
+const plural = (w) => (/[^aeiou]y$/.test(w) ? `${w.slice(0, -1)}ies` : /(?:s|x|ch|sh)$/.test(w) ? `${w}es` : `${w}s`);
 
 function groupLines(plan, res, snap, today, cap = 40) {
   const parts = res.groups.map((g) => {
-    const label = g.parts.map((p, i) => displayKey(plan, i, p, snap)).map((p, i) => (['year', 'month', 'quarter', 'monthOfYear'].includes(plan.groupBy[i].by) ? dimLabel(plan.groupBy[i].by, g.parts[i]) : p)).join(' / ');
+    const label = g.parts.map((p, i) => displayKey(plan, i, p, snap)).map((p, i) => (['year', 'month', 'quarter', 'monthOfYear', 'weekday'].includes(plan.groupBy[i].by) ? dimLabel(plan.groupBy[i].by, g.parts[i]) : p)).join(' / ');
     return `${label}: ${plan.measure ? valueText(plan, g.value) : fmtInt(g.value)}`;
   });
   return listNames(parts, cap, '; ');
@@ -189,15 +191,15 @@ export function sayResult(res, plan, { snap, today }) {
       if (res.distinctItems) {
         const items = res.distinctItems;
         const dn = DIM_NOUN[plan.distinct] ?? plan.distinct;
-        out.text = items.length === 0 ? `No ${dn}s${cond} are on file.` : `${fmtInt(items.length)} ${items.length === 1 ? dn : `${dn}s`}${cond}: ${listNames(items.map((i) => i.value))}.`;
-        out.facts = items.length <= 7 ? items.map((i) => ({ label: cap1(dn), value: i.value })) : [{ label: `Different ${dn}s`, value: fmtInt(items.length) }];
+        out.text = items.length === 0 ? `No ${plural(dn)}${cond} are on file.` : `${fmtInt(items.length)} ${items.length === 1 ? dn : plural(dn)}${cond}: ${listNames(items.map((i) => i.value))}.`;
+        out.facts = items.length <= 7 ? items.map((i) => ({ label: cap1(dn), value: i.value })) : [{ label: `Different ${plural(dn)}`, value: fmtInt(items.length) }];
         out.records = recordsOf(plan, items.flatMap((i) => i.rows), snap); out.total = out.records.length;
         out.basis = basisLine('Listed the different values of one field across', plan, res, snap);
         break;
       }
       const list = res.list;
       if (!list.length) { out.text = none(plan, cond); out.records = []; out.total = 0; out.basis = basisLine('Checked', plan, res, snap); break; }
-      const names = list.map((r) => labelOf(plan, r, detailFor(list.length), hasCustFilter(plan)));
+      const names = list.map((r) => labelOf(plan, r, plan.showAmounts ? 2 : detailFor(list.length), hasCustFilter(plan)));
       out.text = plan.sort
         ? `The ${list.length === 1 ? '' : `${fmtInt(list.length)} `}${plan.sort.dir === 'desc' ? 'most recent' : 'oldest'} ${noun(list.length)}${cond}: ${listNames(names)}.`
         : `${fmtInt(n)} ${noun(n)}${cond}: ${listNames(names)}.`;
@@ -209,8 +211,8 @@ export function sayResult(res, plan, { snap, today }) {
     case 'count_distinct': {
       const dn = DIM_NOUN[plan.distinct] ?? plan.distinct;
       const items = res.distinctItems;
-      out.text = res.value === 0 ? `No ${dn} is recorded${cond}.` : `${fmtInt(res.value)} different ${res.value === 1 ? dn : `${dn}s`}${cond}${res.value <= 20 ? `: ${items.map((i) => i.value).sort().join(', ')}` : ''}.`;
-      out.facts = [{ label: `Different ${dn}s`, value: fmtInt(res.value) }];
+      out.text = res.value === 0 ? `No ${dn} is recorded${cond}.` : `${fmtInt(res.value)} different ${res.value === 1 ? dn : plural(dn)}${cond}${res.value <= 20 ? `: ${items.map((i) => i.value).sort().join(', ')}` : ''}.`;
+      out.facts = [{ label: `Different ${plural(dn)}`, value: fmtInt(res.value) }];
       out.records = recordsOf(plan, items.flatMap((i) => i.rows), snap); out.total = out.records.length;
       out.basis = basisLine('Counted the different values of one field across', plan, res, snap, res.missing ? `${fmtInt(res.missing)} ${noun(res.missing)} had no ${dn} on file.` : '');
       break;
@@ -249,7 +251,14 @@ export function sayResult(res, plan, { snap, today }) {
       const fieldName = (DATE_RULE[plan.sortField] ?? 'date').replace(/^the /, '');
       if (!tied.length) { out.text = `${none(plan, cond)}`; out.records = []; out.total = 0; out.basis = basisLine('Checked', plan, res, snap); break; }
       const names = tied.map((r) => labelOf(plan, r, detailFor(tied.length), hasCustFilter(plan)));
-      out.text = tied.length === 1 ? `The ${word} ${noun(1)}${cond} is ${names[0]}, dated ${fmtDate(res.value)}.` : `The ${word} date${cond} is ${fmtDate(res.value)}, shared by ${fmtInt(tied.length)} ${noun(tied.length)}: ${listNames(names, 15)}.`;
+      const askOf = { customer: (r) => r.custName, tech: (r) => r.tech, amount: (r) => (r.total != null ? fmtMoney(r.total) : null) }[plan.ask];
+      const askVals = askOf ? [...new Set(tied.map(askOf).filter(Boolean))] : [];
+      if (askOf && askVals.length === 1 && tied.length === 1) {
+        const who = plan.ask === 'customer' ? `The customer with the ${word} ${noun(1)}${cond} is ${askVals[0]}` : plan.ask === 'tech' ? `The ${word} ${noun(1)}${cond} was done by ${askVals[0]}` : `The ${word} ${noun(1)}${cond} was for ${askVals[0]}`;
+        out.text = `${who}, on ${tied[0].filename ?? 'a paper'} dated ${fmtDate(res.value)}.`;
+      } else if (askOf && tied.length === 1) {
+        out.text = `The ${word} ${noun(1)}${cond} is ${names[0]}, dated ${fmtDate(res.value)}, but ${plan.ask === 'customer' ? 'it is not linked to one customer' : plan.ask === 'tech' ? 'it has no technician on file' : 'it has no amount on file'}.`;
+      } else out.text = tied.length === 1 ? `The ${word} ${noun(1)}${cond} is ${names[0]}, dated ${fmtDate(res.value)}.` : `The ${word} date${cond} is ${fmtDate(res.value)}, shared by ${fmtInt(tied.length)} ${noun(tied.length)}: ${listNames(names, 15)}.`;
       out.facts = [{ label: cap1(word), value: fmtDate(res.value) }];
       out.records = recordsOf(plan, tied, snap); out.total = tied.length;
       out.basis = basisLine('Looked at the dates of', plan, res, snap, `Dated by ${DATE_RULE[plan.sortField] ?? 'its date'}.`);
@@ -287,7 +296,17 @@ export function sayResult(res, plan, { snap, today }) {
       const by = plan.measure ? (plan.measure.field === 'total' ? `${noun(1)} dollars` : plan.measure.label) : noun(2);
       out.text = plan.limit === 1 && r.length === 1
         ? `${displayKey(plan, 0, r[0].parts[0], snap)} (${plan.measure ? valueText(plan, r[0].value) : fmtInt(r[0].value)}) has the ${plan.dir === 'asc' ? 'fewest' : 'most'} ${by}${cond}.`
-        : `${plan.limit === 1 ? `Tied for ${plan.dir === 'asc' ? 'fewest' : 'most'}` : `${word} ${fmtInt(plan.limit)}`} ${dn}s by ${by}${cond}: ${listNames(lines, 25, '; ')}.${r.length > plan.limit ? ` ${fmtInt(r.length)} are shown because of a tie at ${plan.measure ? valueText(plan, res.cut) : fmtInt(res.cut)}.` : ''}`;
+        : `${plan.limit === 1 ? `Tied for ${plan.dir === 'asc' ? 'fewest' : 'most'}` : `${word} ${fmtInt(plan.limit)}`} ${plural(dn)} by ${by}${cond}: ${listNames(lines, 25, '; ')}.${r.length > plan.limit ? ` ${fmtInt(r.length)} are shown because of a tie at ${plan.measure ? valueText(plan, res.cut) : fmtInt(res.cut)}.` : ''}`;
+      {
+        // years / months / quarters: the running period is not finished, and periods with nothing in them are not ranked
+        const by0 = plan.groupBy[0]?.by;
+        if (['year', 'month', 'quarter'].includes(by0) && plan.limit === 1) {
+          const k = String(r[0].parts[0]); const [yy, mm] = k.split('-');
+          const end = by0 === 'year' ? `${yy}-12-31` : by0 === 'month' ? `${k}-31` : `${yy}-${['03-31', '06-30', '09-30', '12-31'][Number(String(mm).replace('Q', '')) - 1]}`;
+          if (end > today) out.text += ` ${cap1(displayKey(plan, 0, r[0].parts[0], snap))} is not over yet (counted through ${fmtDate(today)}).`;
+          if (plan.dir === 'asc' && res.gaps > 0) out.text += ` ${cap1(dn)}s with no ${noun(2)} are not counted.`;
+        }
+      }
       out.facts = r.length <= 7 ? r.map((g) => ({ label: displayKey(plan, 0, g.parts[0], snap), value: plan.measure ? valueText(plan, g.value) : fmtInt(g.value) })) : [{ label: `${cap1(dn)}s ranked`, value: fmtInt(r.length) }];
       out.records = recordsOf(plan, r.flatMap((g) => g.rows), snap); out.total = r.reduce((a, g) => a + g.rows.length, 0);
       out.basis = basisLine('Ranked', plan, { ...res, leftOut: (res.leftOut ?? 0) + (res.groupLeftOut ?? 0) }, snap);
@@ -311,8 +330,10 @@ export function sayResult(res, plan, { snap, today }) {
     case 'compare_two_values': {
       const [a, b] = res.sides;
       const f = (s) => (plan.measure ? valueText(plan, s.value) : `${fmtInt(s.value)} ${noun(s.value)}`);
-      const lead = a.value === b.value ? 'They are equal.' : `${a.value > b.value ? a.label : b.label} is higher by ${plan.measure ? valueText(plan, Math.abs(a.value - b.value)) : fmtInt(Math.abs(a.value - b.value))}.`;
-      out.text = `${a.label} has ${f(a)} and ${b.label} has ${f(b)}${cond}. ${lead}`;
+      const L = (s) => String(s.label).replace(/^in\s+/i, ''); // "in 2023" reads as "2023" at the start of a sentence
+      const lead = a.value === b.value ? 'They are equal.' : `${cap1(L(a.value > b.value ? a : b))} is higher by ${plan.measure ? valueText(plan, Math.abs(a.value - b.value)) : fmtInt(Math.abs(a.value - b.value))}.`;
+      out.text = `${cap1(L(a))} has ${f(a)} and ${L(b)} has ${f(b)}${cond}. ${lead}`;
+      if (plan.yn) out.text = ynText(plan.yn, a, b, out.text);
       out.facts = res.sides.map((s) => ({ label: s.label, value: f(s) }));
       out.records = recordsOf(plan, res.rows, snap); out.total = res.rows.length;
       out.basis = basisLine('Compared two values over', plan, res, snap);

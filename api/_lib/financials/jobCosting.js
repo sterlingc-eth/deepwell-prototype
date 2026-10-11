@@ -29,6 +29,7 @@
  */
 import { parseCents, centsToString } from './normalize.js';
 import { JOB_MATCH_CONFIDENCE, extractJobReference, normalizeJobKey, jobKeyParts, jobKeyFromText } from './jobKey.js';
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 export { JOB_MATCH_CONFIDENCE, extractJobReference, normalizeJobKey };
 
@@ -76,7 +77,7 @@ async function fetchJobRows(db, { hasCols, from, to }) {
             d.original_filename AS filename,
             ce.customer_address, ce.customer_entity_id
        FROM document_financials f
-       JOIN documents d ON d.id = f.document_id AND d.tenant_id = f.tenant_id
+       JOIN documents d ON d.id = f.document_id AND ${notPrivateSql("d")} AND d.tenant_id = f.tenant_id
        LEFT JOIN LATERAL (
          SELECT c.id AS customer_entity_id, c.data->>'service_address' AS customer_address
            FROM document_entity_links l

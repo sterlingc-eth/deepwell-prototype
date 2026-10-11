@@ -306,7 +306,7 @@ await released('the paper asked about is not the thing selected', 'repair ticket
   tv = await withTenant(ctxArg, (db) => getTenantVocab(db, ctx.tenantKey, pack));
   const intent = parseDql(`who else lives in Mesa besides ${dup}`, { tenantVocab: tv, pack, today: TODAY });
   const out = intent ? await withTenant(ctxArg, (db) => runDql(db, intent, { today: TODAY })) : null;
-  check('ambiguous name :: a customer on file twice is released at run time', out === null, out?.text);
+  check('ambiguous name :: a customer on file twice is never answered for one of them: it asks which one (round 7)', out === null || (/Which one do you mean\?/.test(out.text) && !/\$\d/.test(out.text)), out?.text);
   r = await ask('customers with no documents at all');
   check('duplicate names :: the answer says one name is on file twice', /on file twice/.test(text(r)) || noDocs.length === 0, text(r));
   check('duplicate names :: two customers with one name are told apart by address in a list', new RegExp(`${dup} \\(1 Dup St, Mesa, AZ 85201\\)`).test(text(r)) && new RegExp(`${dup} \\(${mesa[1].address.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\)`).test(text(r)) || (noDocs.length === 0 && /Dup St/.test(text(r))), text(r));

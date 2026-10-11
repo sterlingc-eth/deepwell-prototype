@@ -70,6 +70,7 @@
 import { TENANT_SQL, isoDate } from '../scope.js';
 import { normalizeJobKey, JOB_MATCH_CONFIDENCE } from '../financials/jobKey.js';
 import { VISIT_DOC_TYPES } from '../relations/timeline.js';
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const NODE_RE = /^(customer|unit|document|tech|site|visit|warranty):(.+)$/;
@@ -252,7 +253,7 @@ async function visitDocumentInfo(db, documentId) {
     `SELECT lower(replace(d.document_type, '_', '-')) AS type_norm,
             (SELECT COALESCE(NULLIF(y.corrected_value, ''), y.value) FROM extractions y
               WHERE y.document_id = d.id AND y.field_key = 'service_date' AND y.${TENANT_SQL} LIMIT 1) AS service_date
-       FROM documents d WHERE d.id = $1 AND d.${TENANT_SQL}`,
+       FROM documents d WHERE ${notPrivateSql("d")} AND d.id = $1 AND d.${TENANT_SQL}`,
     [documentId]
   );
   const r = rows[0];
@@ -621,7 +622,7 @@ export async function refreshGraphBatch(db, opts = {}) {
   const afterId = typeof opts.afterId === 'string' && UUID_RE.test(opts.afterId) ? opts.afterId : null;
 
   const { rows: docs } = await db.raw(
-    `SELECT id FROM documents WHERE ${TENANT_SQL} ${afterId ? 'AND id > $2' : ''} ORDER BY id LIMIT $1`,
+    `SELECT id FROM documents WHERE ${TENANT_SQL} AND ${notPrivateSql("")} ${afterId ? 'AND id > $2' : ''} ORDER BY id LIMIT $1`,
     afterId ? [limit, afterId] : [limit]
   );
 
@@ -655,7 +656,7 @@ export async function refreshGraphBatch(db, opts = {}) {
     }
   }
 
-  const { rows: remainingRows } = await db.raw(`SELECT count(*)::int AS n FROM documents WHERE ${TENANT_SQL} ${cursor ? 'AND id > $1' : ''}`, cursor ? [cursor] : []);
+  const { rows: remainingRows } = await db.raw(`SELECT count(*)::int AS n FROM documents WHERE ${TENANT_SQL} AND ${notPrivateSql("")} ${cursor ? 'AND id > $1' : ''}`, cursor ? [cursor] : []);
   if (!stoppedReason) stoppedReason = docs.length === 0 ? 'done' : 'batch_complete';
   return { enabled: true, processed, edgesWritten, remaining: remainingRows[0]?.n ?? 0, nextCursor: docs.length ? cursor : null, stoppedReason };
 }
@@ -682,7 +683,7 @@ export async function refreshGraphForDocument({ withTenant, ctxArg, documentId }
 
 export async function graphRefreshStatus(db) {
   if (!(await kgEdgesTableExists(db))) return { enabled: false, totalDocuments: 0, edgeCount: 0 };
-  const { rows: dr } = await db.raw(`SELECT count(*)::int AS n FROM documents WHERE ${TENANT_SQL}`, []);
+  const { rows: dr } = await db.raw(`SELECT count(*)::int AS n FROM documents WHERE ${TENANT_SQL} AND ${notPrivateSql("")}`, []);
   const { rows: er } = await db.raw(`SELECT count(*)::int AS n FROM kg_edges WHERE ${TENANT_SQL}`, []);
   return { enabled: true, totalDocuments: dr[0]?.n ?? 0, edgeCount: er[0]?.n ?? 0 };
 }

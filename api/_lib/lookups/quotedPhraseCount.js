@@ -9,6 +9,7 @@
 import { attachCitations } from "../citations/records.js";
 import { documentRecordsFor } from "../citations/enrich.js";
 import { TENANT_SQL, answerEnvelope } from "../scope.js";
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 const VAL = (a) => `COALESCE(NULLIF(${a}.corrected_value, ''), ${a}.value)`;
 const norm = (s) => String(s ?? "").toLowerCase().replace(/[^a-z0-9&]+/g, " ").trim();
@@ -64,7 +65,7 @@ export async function runQuotedPhraseCount(db, intent0) {
   const field = fields[0].field_key;
   const nq = ` ${norm(intent.rest)} `;
   // document type the question names (a type this tenant has)
-  const { rows: types } = await db.raw(`SELECT DISTINCT document_type FROM documents WHERE ${TENANT_SQL}`);
+  const { rows: types } = await db.raw(`SELECT DISTINCT document_type FROM documents WHERE ${TENANT_SQL} AND ${notPrivateSql("")}`);
   const typeHits = types.map((t) => t.document_type).filter((t) => t && (nq.includes(` ${norm(t)} `) || nq.includes(` ${norm(t)}s `)));
   if (typeHits.length > 1) return null;
   // vendor / technician values the question names
@@ -96,13 +97,13 @@ export async function runQuotedPhraseCount(db, intent0) {
     // a year can only be applied to documents that carry a service date; a type without one must not read as "none that year"
     const p2 = params.slice(0, 2 + (typeHits.length ? 1 : 0) + (nameHits.length ? 2 : 0));
     const base = await db.raw(
-      `SELECT count(DISTINCT x.document_id)::int AS n, count(DISTINCT s.document_id)::int AS dated FROM extractions x JOIN documents d ON d.id = x.document_id AND d.${TENANT_SQL} ${joins.filter((j) => !j.includes("'service_date'")).join(" ")}
+      `SELECT count(DISTINCT x.document_id)::int AS n, count(DISTINCT s.document_id)::int AS dated FROM extractions x JOIN documents d ON d.id = x.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")} ${joins.filter((j) => !j.includes("'service_date'")).join(" ")}
         LEFT JOIN extractions s ON s.document_id = x.document_id AND s.${TENANT_SQL} AND s.field_key = 'service_date'
         WHERE x.${TENANT_SQL} AND lower(trim(${VAL("x")})) = lower($1) AND x.field_key = $2 ${where.length ? `AND ${where.join(" AND ")}` : ""}`, p2);
     if (base.rows[0].n > 0 && base.rows[0].dated === 0) return null;
   }
   const { rows } = await db.raw(
-    `SELECT DISTINCT x.document_id, d.document_type FROM extractions x JOIN documents d ON d.id = x.document_id AND d.${TENANT_SQL} ${joins.join(" ")}
+    `SELECT DISTINCT x.document_id, d.document_type FROM extractions x JOIN documents d ON d.id = x.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")} ${joins.join(" ")}
       WHERE x.${TENANT_SQL} AND lower(trim(${VAL("x")})) = lower($1) AND x.field_key = $2 ${where.length ? `AND ${where.join(" AND ")}` : ""}`, params);
   const label = field.replace(/_/g, " ");
   const FIN = /invoice|purchase[-_ ]?order|quote|estimate|proposal|bill|receipt|credit/i;

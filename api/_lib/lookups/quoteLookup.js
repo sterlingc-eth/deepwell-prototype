@@ -8,6 +8,7 @@
 import { attachCitations } from "../citations/records.js";
 import { documentRecordsFor } from "../citations/enrich.js";
 import { TENANT_SQL, answerEnvelope } from "../scope.js";
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 const QUOTE_RE = /\b(?:quot(?:e|es|ed|ing)|qoutes?|qutoes?|quotte|estimat\w*|estmat\w*|proposals?|bid|bids)\b/i;
 const SKIP_RE = /\b(?:invoice\w*|how many|number of|count|list|all|every|total|sum|average|avg|most|least|vs|versus|compared?|any|anyone|waiting|pending|open|outstanding|which|who|accepted|approved|declined|expired|unsigned|sent)\b/i;
@@ -36,7 +37,7 @@ export async function runQuoteLookup(db, intent) {
   const display = hits.find((n) => norm(n) === key);
   const { rows } = await db.raw(
     `SELECT f.document_id, f.total, f.invoice_date::text AS d, d.document_type
-       FROM document_financials f JOIN documents d ON d.id = f.document_id AND d.${TENANT_SQL}
+       FROM document_financials f JOIN documents d ON d.id = f.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
       WHERE f.${TENANT_SQL} AND d.document_type IN ('proposal-quote', 'invoice') AND regexp_replace(lower(f.customer_name), '[^a-z0-9 ]+', ' ', 'g') = $1
       ORDER BY f.invoice_date DESC NULLS LAST`, [key]);
   const quotes = rows.filter((r) => r.document_type === "proposal-quote" && r.total != null);

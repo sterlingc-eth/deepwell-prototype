@@ -126,7 +126,7 @@ export const jargonEnabled = () => process.env.DONOVAN_JARGON !== "0";
  * Respell known jargon phrases to the canonical word. Longest phrase first, left to right, non-overlapping.
  * @returns {{ text: string, hits: Array<{ from: string, to: string, date: boolean }> } | null}  null when nothing changed
  */
-export function respellJargon(question, { tenantVocab } = {}) {
+export function respellJargon(question, { tenantVocab, keep } = {}) {
   tables();
   const src = String(question ?? "");
   if (!src.trim() || src.length > 300) return null;
@@ -139,6 +139,16 @@ export function respellJargon(question, { tenantVocab } = {}) {
   let cursor = 0;
   for (let i = 0; i < toks.length; ) {
     let hit = null;
+    // a phrase the organization's own vocabulary already reads ("patient bills", "lease agreement") is left as typed
+    if (keep) {
+      let kept = 0;
+      for (let len = Math.min(4, toks.length - i); len >= 1 && !kept; len--) {
+        const ws = toks.slice(i, i + len).map((t) => t.w);
+        if (len === 1 && !(ws[0].length >= 4)) continue;
+        if (keep.has(ws.join(" ")) && (len > 1 || RESP.has(keyAt(toks, i, 1)))) kept = len;
+      }
+      if (kept) { i += kept; continue; }
+    }
     for (let len = Math.min(MAX_WORDS, toks.length - i); len >= 1 && !hit; len--) {
       const key = keyAt(toks, i, len);
       const canon = RESP.get(key);
@@ -198,7 +208,9 @@ function respelledOver(toks, i, len) {
  */
 export function untrackedConcept(question) {
   tables();
-  const src = String(question ?? "");
+  // "a headcount of clients" counts the people a business serves; only a staff headcount (employees, payroll) is not recorded
+  let src = String(question ?? "");
+  if (/\bhead\s?count\b/i.test(src) && !/\b(?:employees?|staff|workforce|team|payroll|hir(?:e|es|ed|ing)|workers?|techs?|technicians?|crew|salary|wages?|turnover)\b/i.test(src)) src = src.replace(/\bhead\s?count(?:\s+of)?(?=\s+\w)/gi, "number of");
   if (!src.trim() || src.length > 300) return null;
   const toks = scan(src);
   for (let i = 0; i < toks.length; i++) {

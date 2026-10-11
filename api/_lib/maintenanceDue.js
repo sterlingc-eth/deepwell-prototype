@@ -24,6 +24,7 @@ import {
 // TEAM C: citations for this producer (records / recordsTotal / recordsKind / basis).
 import { attachCitations } from './citations/records.js';
 import { maintenanceCitations } from './citations/history.js';
+import { notPrivateSql } from "./privacy/privateDocs.js";
 
 /* ------------------------------------------------------------------ question shape */
 
@@ -330,7 +331,7 @@ export async function runMaintenanceDue(db, intent, { today, pack = null } = {})
   const aliases = docTypeAliases('maintenance-agreement');
   const [{ rows: agreementDocs }, { rows: visitRows }] = await Promise.all([
     db.raw(
-      `SELECT d.id FROM documents d WHERE ${typeSql('d.document_type')} = ANY($1::text[]) AND d.${TENANT_SQL} LIMIT 5000`,
+      `SELECT d.id FROM documents d WHERE ${notPrivateSql("d")} AND ${typeSql('d.document_type')} = ANY($1::text[]) AND d.${TENANT_SQL} LIMIT 5000`,
       [aliases]),
     db.raw(
       `SELECT x.document_id, COALESCE(NULLIF(x.corrected_value, ''), x.value) AS service_date, d.document_type,
@@ -340,7 +341,7 @@ export async function runMaintenanceDue(db, intent, { today, pack = null } = {})
               (SELECT COALESCE(NULLIF(tt.corrected_value, ''), tt.value) FROM extractions tt
                 WHERE tt.document_id = x.document_id AND tt.field_key = 'technician' AND tt.${TENANT_SQL}
                 ORDER BY tt.created_at DESC LIMIT 1) AS technician
-         FROM extractions x JOIN documents d ON d.id = x.document_id
+         FROM extractions x JOIN documents d ON d.id = x.document_id AND ${notPrivateSql("d")}
         WHERE x.field_key = 'service_date' AND x.${TENANT_SQL}
         LIMIT 20000`, []),
   ]);
