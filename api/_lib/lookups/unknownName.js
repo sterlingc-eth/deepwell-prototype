@@ -18,6 +18,7 @@ import { isNonNameWord } from "./commonWords.js";
 import { damerauLevenshteinDistance } from "../integrity.js";
 import { isNicknamePair, formalsOf } from "../vocab/nicknames.js";
 import { buildNoAnchorDecline } from "./tenantWord.js";
+import { isNotAPerson } from "./notAPerson.js";
 
 export const unknownNameEnabled = () => process.env.DONOVAN_UNKNOWN_NAME_DECLINE !== "0";
 
@@ -87,6 +88,7 @@ export function extractNamePhrase(question) {
     if (WHO_SHAPES.has(re) && NOT_A_PERSON_RE.test(m[1])) continue;
     const tokens = m[1].split(/\s+/).map((t) => t.replace(/['’]s?$/i, "")).filter((t) => t && !STOP.has(t.toLowerCase()) && !TAIL_WORDS.has(t.toLowerCase()));
     if (!tokens.length || tokens.length > 3) continue;
+    if (isNotAPerson(tokens.join(" "))) continue; // R10
     return tokens.join(" ");
   }
   if (nfEnabled()) for (const re of NF_SHAPES) {

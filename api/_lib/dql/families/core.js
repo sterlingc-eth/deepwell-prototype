@@ -57,7 +57,7 @@ function resolveNumberFilters(f, entity, today) {
     if (x.dollar || /^(dollar|buck)/.test(unit) || unit === '') {
       if (entity !== 'document') return null;
       if (unit === '' && !x.dollar && !(f.trig.money?.length || f.docTypes.some((d) => MONEY_TYPES_HINT.has(d)))) return null;
-      out.push({ field: 'total', op: x.op, value: x.value, label: Array.isArray(x.value) ? `between ${usd(x.value[0])} and ${usd(x.value[1])}` : `${x.word} ${usd(x.value)}`, money: true });
+      out.push({ field: (f.docTypes ?? []).length && f.docTypes.every((t) => /lease|rental/i.test(String(t))) && !/\b(?:total|worth|value|valued|contract\s+value)\b/i.test(f.text0 ?? '') ? 'rent' : 'total', op: x.op, value: x.value, label: x.op === 'outside' ? `under ${usd(x.value[0])} or over ${usd(x.value[1])}` : Array.isArray(x.value) ? `between ${usd(x.value[0])} and ${usd(x.value[1])}` : `${x.word} ${usd(x.value)}`, money: true });
       continue;
     }
     return null; // counts of related records ("more than 5 documents"), percentages, days: not this family

@@ -22,7 +22,10 @@ const NOUNS = {
 export function typeNoun(typeId, n = 2) {
   const fixed = NOUNS[typeId];
   if (fixed) return n === 1 ? fixed[0] : fixed[1];
-  const sing = String(documentTypeLabel(typeId) ?? typeId).toLowerCase();
+  let label = documentTypeLabel(typeId) ?? typeId;
+  // a kind of paper this table has no label for (a lease agreement, a move-in inspection) is named by its own words, never "other"
+  if (typeId !== "other" && label === documentTypeLabel("other")) label = String(typeId).replace(/[-_]+/g, " ");
+  const sing = String(label).toLowerCase();
   return n === 1 ? sing : `${sing}s`;
 }
 const capital = (s) => s.charAt(0).toUpperCase() + s.slice(1);

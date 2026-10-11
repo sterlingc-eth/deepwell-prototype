@@ -240,5 +240,30 @@ check('ordinal :: the place after the last one says so', (await ask('five hundre
   check('router :: with the arbiter off, no older lane answers an ordinal', !o3.winner || o3.winner.name === 'decompose', JSON.stringify(o3.winner)?.slice(0, 100));
 }
 
+
+/* ================================================================== round 10: other documents, bills, leases, by-words, "after today" */
+{
+  const others = ofType('other').length;
+  const r = await ask('how many other documents do we have');
+  check('r10 :: "other documents" counts the documents filed as other, not all of them', r.intent?.plan?.docType === 'other' && has(r, int(others)) && !has(r, int(docs.length)), r.data?.text);
+  const { billSense, vendorBillsAsPurchaseOrders } = await import('../api/_lib/dql/billSense.js');
+  check('r10 :: "bills we sent" is the customer side', billSense('bills we sent') === 'customer' && billSense('bills to our customers') === 'customer');
+  check('r10 :: "our bills", "bills we got", "bills from vendors" are the vendor side', ['our bills', 'bills we got', 'bills from vendors', 'vendor bills'].every((q) => billSense(q) === 'vendor'));
+  check('r10 :: a bare "bills" is neither side', billSense('how many bills') === 'bare' && billSense('how many invoices') == null);
+  check('r10 :: vendor bills read as purchase orders for a company that keeps them', vendorBillsAsPurchaseOrders('total of our bills') === 'total of purchase orders' && vendorBillsAsPurchaseOrders('our bills') === 'how many purchase orders');
+  const { normalizeRephrase } = await import('../api/_lib/router/rephrase.js');
+  check('r10 :: "bills we sent" is rewritten to invoices', /invoices we sent/.test(normalizeRephrase('how many bills we sent') ?? ''), normalizeRephrase('how many bills we sent'));
+  const { respellJargon } = await import('../api/_lib/lexicon/jargon.js');
+  check('r10 :: a lease is never respelled to a maintenance agreement', !/agreement/.test(respellJargon('how many leases do we have', { tenantVocab: tv })?.text ?? ''), respellJargon('how many leases do we have', { tenantVocab: tv })?.text);
+  const { isPlainInventory } = await import('../api/_lib/dql/plain.js');
+  check('r10 :: "tenants with a lease" is not a plain inventory the older lanes answer', !isPlainInventory({ op: 'count', filters: [{ relPresence: true, docType: 'lease-agreement' }] }) && isPlainInventory({ op: 'count', filters: [{ relPresence: true, docType: 'maintenance-agreement' }] }));
+  const { namedMoneyShape: nm } = await import('../api/_lib/lookups/namedMoney.js');
+  check('r10 :: "invoices by city / the way / Friday" name nobody', ['invoices by city', 'invoices by the way', 'invoices by Friday'].every((q) => nm(q) == null));
+  const { typeNoun } = await import('../api/_lib/summary/text.js');
+  check('r10 :: a paper kind with no label is named by its own words, never "others"', typeNoun('lease-agreement', 2) === 'lease agreements' && typeNoun('other', 2) === 'other documents', typeNoun('lease-agreement', 2));
+  const ago = await ask('which maintenance agreements expire after today');
+  const agr = ofType('maintenance-agreement');
+  check('r10 :: "expire after today" is an open-ended window from tomorrow', ago.intent?.plan?.op === 'tm_expiry' && ago.intent.plan.to == null && ago.intent.plan.from > TODAY || ago.data == null, JSON.stringify(ago.intent?.plan)?.slice(0, 160));
+}
 console.log(`\n${passes} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

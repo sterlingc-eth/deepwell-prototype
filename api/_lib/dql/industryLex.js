@@ -36,7 +36,7 @@ const A = {
   receipt: ['payment receipt', 'copay receipt', 'receipt'],
   statement: ['statement'],
   'insurance-certificate': ['insurance card', 'insurance record', 'insurance certificate', 'certificate of insurance', 'coi'],
-  'certificate-of-insurance': ['certificate of insurance', 'coi'],
+  'certificate-of-insurance': ['certificate of insurance', 'coi', 'insurance certificate', 'insurance cert', 'proof of insurance'],
   schedule: ['schedule entry', 'schedule entries', 'event schedule', 'schedule'],
   other: ['filing', 'court filing', 'lab result', 'test result'],
   'dispatch-note': ['crew dispatch', 'dispatch note'],

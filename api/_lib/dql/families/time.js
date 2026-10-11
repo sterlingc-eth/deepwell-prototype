@@ -719,6 +719,11 @@ function parseExpiry(q, feat) {
     return { op: 'tm_expiry', subject: subj, mode: 'next', ...expiryNouns(q, subj, expType) };
   }
   if (!p) {
+    // "certificates that expire after today": everything still in force after today (an open end)
+    if (verb && !pastVerb && /\b(?:after|since|from)\s+(?:today|now)\b|\bgoing\s+forward\b/i.test(feat.raw) && (r.takeAll(rx('after|since|from|today|now|on|onwards?|going\\s+forward|here')), true)) {
+      if (!clean(r)) return null;
+      return { op: 'tm_expiry', subject: subj, mode, from: addDays(today, 1), to: null, label: 'after today', past: false, term: termYears, ...expiryNouns(q, subj, expType) };
+    }
     // "agreements that already ended": everything whose end date is before today
     if (pastVerb && /\balready\b/.test(q.text0) && subj === 'agreement') { r.takeAll(rx('already')); if (!clean(r)) return null; return { op: 'tm_expiry', subject: subj, mode, from: null, to: addDays(today, -1), label: 'before today', past: true, ...expiryNouns(q, subj, expType) }; }
     return null;
@@ -1437,7 +1442,7 @@ function sayExpiry(res, plan, x) {
     return { text: `The next ${nounOne} to end is ${listNames(items, 20)}, on ${fmtDate(d)}: ${plainInt(days)} day${days === 1 ? '' : 's'} from today.${unk}`, facts: [{ label: 'Next end date', value: fmtDate(d) }], records: res.next.map(rec).slice(0, 100), total: res.next.length, basis };
   }
   const n = res.sel.length;
-  const when = `${plan.label}${plan.from && !plan.past && plan.label !== 'before today' ? ` (${fmtDate(plan.from)} to ${fmtDate(plan.to)})` : ''}`;
+  const when = `${plan.label}${plan.from && !plan.past && plan.label !== 'before today' ? (plan.to ? ` (${fmtDate(plan.from)} to ${fmtDate(plan.to)})` : ` (from ${fmtDate(plan.from)} on)`) : ''}`;
   const verb = plan.past ? 'ended' : 'end';
   const noun = n === 1 ? nounOne : nounPl;
   let text;

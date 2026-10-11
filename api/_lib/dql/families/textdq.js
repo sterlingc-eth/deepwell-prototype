@@ -1675,7 +1675,10 @@ function say(res, plan, x) {
 }
 
 /** "units with no warranty registration": the sets family reads it as units with no registration PAPER, this family as the registration field left blank; both count the same units, and this answer names the field it checked. */
-const beats = (mine, other) => mine.op === 'missing_field' && other.op === 'set_select' && other.entity === 'unit' && !other.base && !other.scope && !other.expr?.all?.length && !other.expr?.any?.length && other.expr?.none?.length === 1 && other.expr.none[0].k === 'udoc' && other.expr.none[0].type === 'warranty-registration';
+const beatsUnit = (mine, other) => mine.op === 'missing_field' && other.op === 'set_select' && other.entity === 'unit' && !other.base && !other.scope && !other.expr?.all?.length && !other.expr?.any?.length && other.expr?.none?.length === 1 && other.expr.none[0].k === 'udoc' && other.expr.none[0].type === 'warranty-registration';
+/** "customers without an email": the sets family reads it as customers with no email PAPER (a correspondence document); a contact field named in the same words is what is meant: the customers whose record has no such field. */
+const beatsContact = (mine, other) => mine.op === 'missing_field' && other.op === 'set_select' && other.entity === 'customer' && mine.entity === 'customer' && !other.base && !other.scope && !other.expr?.all?.length && !other.expr?.any?.length && other.expr?.none?.length === 1 && other.expr.none[0].k === 'doc' && mine.fields?.length === 1 && ['email', 'phone'].includes(mine.fields[0].id) && String(other.expr.none[0].word ?? '').replace(/[^a-z]/gi, '').toLowerCase() === mine.fields[0].id;
+const beats = (mine, other) => beatsUnit(mine, other) || beatsContact(mine, other);
 
 registerFamily({ id: 'textdq', ops: TEXTDQ_OPS, beats, detect: (feat, h) => analyze(feat, h), rescue: (feat, h) => analyze(feat, h), exec, say });
 export { analyze as _analyze, exec as _exec };

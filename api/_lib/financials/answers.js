@@ -22,7 +22,10 @@
  */
 import { CUSTOMER_NOUNS } from '../dql/industryLex.js';
 import { customerWordForDb } from '../dql/custWord.js';
+import { billSense } from '../dql/billSense.js';
+import { staffInvoicesNamed } from '../lookups/vocabCount.js';
 import { nameVerdict, clarifyText, denialText, nameTokens, tokenSame, withinOne } from '../lookups/nameMatch.js';
+import { isNotAPerson } from '../lookups/notAPerson.js';
 import { countSubject, repairKnownTypos } from '../understanding/understand.js';
 import { isPoMoneyQuestion, matchVendor, vendorPoEnabled } from '../lookups/vendorPo.js';
 import { resolveCalendarSpan } from '../timeSpans.js';
@@ -817,6 +820,23 @@ async function subjectGate(db, intent) {
         cands.slice(0, 5).map((c) => ({ label: c.name, value: c.address ?? 'customer', entityId: c.id, sources: [] })),
         { confidence: 0.5, cite: { records: cands.slice(0, 5).map((c) => customerRecord({ id: c.id, name: c.name, address: c.address })), total: cands.slice(0, 5).length, basis: `Several customers could be "${intent.subject}"; pick one.` } }),
     };
+  }
+  // two customers carrying exactly the full name that was asked ("Pat Smith" on file twice): never merged into one answer; ask which, with where each is
+  if (cands.length > 1 && /\s/.test(subjectPhrase)) {
+    const same = cands.filter((c) => String(c.name ?? '').toLowerCase().trim() === subjectPhrase);
+    if (same.length > 1) {
+      // tell them apart by address; when the addresses are the same too, by the invoices each one has
+      const addrs = same.map((c) => String(c.address ?? '').trim().toLowerCase());
+      const distinctAddr = new Set(addrs).size === same.length && addrs.every(Boolean);
+      const hu0 = distinctAddr ? false : await extractionsHaveUnitIndex(db);
+      const invNos = distinctAddr ? [] : await Promise.all(same.slice(0, 5).map(async (c) => (await q(db, `SELECT f.invoice_number FROM financials f WHERE ${LAST_INVOICE_WHERE} AND f.customer_id = $2::uuid ORDER BY f.doc_date DESC NULLS LAST, f.document_id LIMIT 2`, [c.id], hu0)).map((r) => r.invoice_number).filter(Boolean)));
+      const where = same.slice(0, 5).map((c, i) => `${c.name} (${distinctAddr ? c.address : (invNos[i]?.length ? `${c.address ? `${c.address}; ` : ''}invoice${invNos[i].length === 1 ? '' : 's'} ${invNos[i].map((n) => `#${n}`).join(', ')}` : (c.address || 'no address'))})`);
+      return {
+        answer: baseAnswer(`${same[0].name} is on file ${same.length === 2 ? 'twice' : `${same.length} times`}: ${where.join(' and ')}. Which one do you mean?`,
+          same.slice(0, 5).map((c) => ({ label: c.name, value: c.address ?? 'customer', entityId: c.id, sources: [] })),
+          { confidence: 0.5, cite: { records: same.slice(0, 5).map((c) => customerRecord({ id: c.id, name: c.name, address: c.address })), total: same.length, basis: `More than one customer is named "${same[0].name}"; pick one.` } }),
+      };
+    }
   }
   const names = [...new Set(cands.map((c) => c.name))];
   return { ids: cands.map((c) => c.id), name: names.join(' and ') };
@@ -1750,6 +1770,15 @@ async function docCount(db, intent, ctx) {
   const [{ n }] = await q(db, `SELECT count(*)::int AS n FROM financials f WHERE f.direction = 'payable' AND f.doc_kind = 'invoice'`, [], ctx.hu);
   const [po] = await q(db, `SELECT count(*)::int AS n FROM financials f WHERE f.doc_kind = 'po'`, [], ctx.hu);
   const poNote = po.n ? ` (${plural(po.n, 'purchase order')} ${po.n === 1 ? "isn't a bill" : "aren't bills"}, so ${po.n === 1 ? 'it was' : 'they were'} not counted.)` : '';
+  const sense = billSense(intent.raw) ?? (VENDORISH_RE.test(String(intent.raw ?? '')) ? 'vendor' : 'bare');
+  if (!n && po.n && sense !== 'customer') {
+    const [{ n: ni0 }] = await q(db, `SELECT count(*)::int AS n FROM financials f WHERE f.direction = 'receivable' AND f.doc_kind = 'invoice'`, [], ctx.hu);
+    if (sense === 'bare' && ni0) return baseAnswer('Do you mean invoices we sent to customers (money coming in), or bills we received from vendors (money going out)? Tell me which and I will look.', [], { confidence: 0.5, ...zeroCite('"Bills" could mean either side of the books, so nothing was counted.') });
+    const porows = await q(db, `SELECT f.* FROM financials f WHERE f.doc_kind = 'po' ORDER BY f.doc_date DESC NULLS LAST, f.document_id LIMIT 12`, [], ctx.hu);
+    return baseAnswer(`You have ${plural(po.n, 'purchase order')} from vendors on file and no separate vendor bills, so I counted the purchase orders as the bills you receive.${note}`, porows.slice(0, 6).map((x) => invoiceFact(x)), {
+      sources: porows.slice(0, 6).map((x) => docSource(x.document_id, x.total_page)), interpretation: 'purchase orders (vendor bills)',
+      cite: { records: financeRecords(porows), total: po.n, claimedCount: po.n, basis: 'Counted the purchase orders placed with vendors; there are no separate vendor bills, so they stand for the bills you receive.' } });
+  }
   if (!n && !VENDORISH_RE.test(String(intent.raw ?? ''))) {
     // no vendor bills at all: the bills this company has are the invoices it sends
     const irows = await q(db, `SELECT f.* FROM financials f WHERE f.direction = 'receivable' AND f.doc_kind = 'invoice' ORDER BY f.doc_date DESC NULLS LAST, f.document_id LIMIT 12`, [], ctx.hu);
@@ -1775,6 +1804,11 @@ async function billThreshold(db, intent, ctx) {
   const [c] = await q(db, `SELECT count(*) FILTER (WHERE f.total IS NOT NULL AND ${cmp})::int AS n, count(*)::int AS n_all, count(*) FILTER (WHERE f.total IS NULL)::int AS n_unpriced FROM financials f WHERE ${scope}`, params, ctx.hu);
   const note = (intent.readNotes ?? []).length ? ` (${intent.readNotes.join('; ')})` : '';
   const what = intent.between ? `between ${fmt(String(lo))} and ${fmt(String(hi))}` : `${intent.inclusive ? (intent.dir === 'over' ? 'at least' : 'at most') : intent.dir} ${fmt(String(intent.amount))}`;
+  if (!c.n_all && !VENDORISH_RE.test(String(intent.raw ?? '')) && billSense(intent.raw) === 'bare') {
+    const [po0] = await q(db, `SELECT count(*)::int AS n FROM financials f WHERE f.doc_kind = 'po'`, [], ctx.hu);
+    const [ni0] = await q(db, `SELECT count(*)::int AS n FROM financials f WHERE f.direction = 'receivable' AND f.doc_kind = 'invoice'`, [], ctx.hu);
+    if (po0.n && ni0.n) return baseAnswer('Do you mean invoices we sent to customers (money coming in), or bills we received from vendors (money going out)? Tell me which and I will look.', [], { confidence: 0.5, ...zeroCite('"Bills" could mean either side of the books, so nothing was compared.') });
+  }
   if (!c.n_all && !VENDORISH_RE.test(String(intent.raw ?? ''))) {
     // a company with no vendor bills at all, asked about "bills": the bills it has are the invoices it sends (a clinic's patient bills, a landlord's tenant charges)
     const rcv = `f.direction = 'receivable' AND f.doc_kind = 'invoice' AND f.currency = 'USD'`;
@@ -1851,6 +1885,15 @@ async function sideDocs(db, intent, ctx) {
   const note = (intent.readNotes ?? []).length ? ` (${intent.readNotes.join('; ')})` : '';
   const role = intent.role ?? 'party';
   const plain = ['customer', 'vendor', 'supplier'].includes(role);
+  if (!n && bill) {
+    const [po] = await q(db, `SELECT count(*)::int AS n FROM financials f WHERE f.doc_kind = 'po'`, [], ctx.hu);
+    if (po.n) {
+      const porows = await q(db, `SELECT f.* FROM financials f WHERE f.doc_kind = 'po' ORDER BY f.doc_date DESC NULLS LAST, f.document_id LIMIT 6`, [], ctx.hu);
+      return baseAnswer(`You have ${plural(po.n, 'purchase order')} from vendors on file and no separate vendor bills, so I counted the purchase orders as the bills you receive.${note}`, porows.map((x) => invoiceFact(x)), {
+        sources: porows.map((x) => docSource(x.document_id, x.total_page)), interpretation: 'purchase orders (vendor bills)',
+        cite: { records: financeRecords(porows), total: po.n, claimedCount: po.n, basis: 'Counted the purchase orders placed with vendors; there are no separate vendor bills, so they stand for the bills you receive.' } });
+    }
+  }
   if (!n) return baseAnswer(`There ${bill ? 'are no vendor bills (bills we received)' : 'are no customer invoices (invoices we sent)'} in your records, so none is from a ${role}.${note}`, [], { confidence: 1, ...zeroCite(`Looked for ${bill ? 'payable' : 'receivable'} invoices; there are none on file.`) });
   const nm = (x) => (x.direction === 'payable' ? (x.vendor_name || x.customer_name) : x.customer_name);
   const one = (x) => `${x.invoice_number ? `#${x.invoice_number}` : 'no printed number'}${nm(x) ? ` ${bill ? 'from' : 'to'} ${nm(x)}` : ''}${humanDate(x.doc_date) ? `, ${humanDate(x.doc_date)}` : ''}${x.total == null ? '' : `, ${fmt(x.total)}`}${today && ymdOf(x.doc_date) > today ? ' (dated in the future)' : ''}`;
@@ -1894,9 +1937,16 @@ async function docsInWindow(db, intent, ctx) {
  * The name was read by the shared understanding step, so question words ("wheres", "whats", "show me") and role words are never part of it.
  * A name that matches nobody is declined BY NAME (never answered with someone else's document).
  */
+/** "invoices by city", "invoices by the way", "invoices by Friday": the word after "by" is a field to group on, a filler phrase or a day, never a customer's name. */
+const BY_NOT_A_NAME = /^(?:the\s+)?(?:way|city|cities|town|state|zip|month|year|quarter|week|day|weekday|date|type|kind|category|status|technician|tech|brand|customer|client|vendor|supplier|building|property|unit|tenant|patient|donor|member|(?:mon|tues|wednes|thurs|fri|satur|sun)day|today|tomorrow|yesterday|now|then|hand|default|chance|accident|large|end|time|name|amount|total|number)s?$/i;
+export function byWordIsNotAName(raw, name) {
+  if (/^(?:(?:mon|tues|wednes|thurs|fri|satur|sun)day|today|tomorrow|yesterday)$/i.test(String(name ?? '').trim())) return true; // a day is a date, not a customer
+  return /\bby\s+\S/i.test(String(raw ?? '')) && BY_NOT_A_NAME.test(String(name ?? '').trim()) && new RegExp(`\\bby\\s+${String(name).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(String(raw));
+}
 async function customerDocs(db, intent, ctx) {
   let name = String(intent.subject ?? '').trim().replace(/^(?:mr|mrs|ms|miss|mx|dr|mister)\.?\s+(?=\S)/i, '');
-  if (!name) return null;
+  if (!name || isNotAPerson(name)) return null; // R10: a date, time or ordinary word is never a customer name
+  if (byWordIsNotAName(intent.rawOriginal ?? intent.raw, name)) return null;
   // The invoice look-up answers only words it read. A question with no billing word whose other words are not just the name and plain look-up glue
   // ("history with X", "X past jobs", "what did we do for X and Y") asks something this lane did not read, so it steps aside (the records-first lane then gives the customer's stored record).
   const rawQ = String(intent.rawOriginal ?? intent.raw ?? '');
@@ -1995,6 +2045,16 @@ async function customerDocs(db, intent, ctx) {
         if (v.canonical && v.type === 'vendor') return vendorNote(v.canonical, note);
         return nameClarify(name, v, note);
       }
+      // staff are resolved as staff: "invoices by Marisol Vega" is the invoices that name her as the technician
+      if (!wantBill) {
+        const st = await staffInvoicesNamed(db, name);
+        if (st.n > 0) {
+          const srows = await q(db, `SELECT f.* FROM financials f WHERE f.document_id = ANY($2::uuid[]) AND f.doc_kind = 'invoice' ORDER BY f.doc_date DESC NULLS LAST, f.document_id LIMIT 12`, [st.ids], ctx.hu);
+          return baseAnswer(`${name} is on file as a technician, not a customer. ${plural(st.n, 'invoice')} ${st.n === 1 ? 'lists' : 'list'} ${name} as the technician.${note}`, srows.slice(0, 6).map((x) => invoiceFact(x)), {
+            sources: srows.slice(0, 6).map((x) => docSource(x.document_id, x.total_page)), interpretation: `invoices by technician ${name}`,
+            cite: { records: financeRecords(srows), total: st.n, claimedCount: st.n, basis: `Counted the invoices whose technician is ${name}.` } });
+        }
+      }
       return baseAnswer(`${denialText({ name, scope: 'both', ask: wantBill ? 'a bill' : 'an invoice' })}${note}`, [], { confidence: 1, ...zeroCite(`Searched customer and vendor names for ${name}; none match.`) });
     }
     return null;
@@ -2017,6 +2077,11 @@ async function customerDocs(db, intent, ctx) {
       : ` Payment status isn't recorded on ${n === 1 ? 'it' : 'them'}, so I can't tell you whether ${n === 1 ? 'it has' : 'they have'} been paid.`;
   }
   if (pre || payNote) ans.text = `${pre}${ans.text}${payNote}`;
+  // "invoices by Ray Sutton" for a person who is a customer AND a technician: the other reading is said too
+  if (!wantBill && /\bby\s+\S/i.test(String(intent.rawOriginal ?? intent.raw ?? '')) && !forcedName) {
+    const st = await staffInvoicesNamed(db, g.name);
+    if (st.n > 0) ans.text = `${ans.text} ${g.name} is also a technician: ${plural(st.n, 'invoice')} ${st.n === 1 ? 'lists' : 'list'} ${g.name} as the technician.`;
+  }
   return ans;
 }
 
@@ -2469,6 +2534,7 @@ async function splitLookAlikes(db, intent, opts) {
   return { ...merged, text, facts, interpretation: merged.interpretation };
 }
 export async function runMoneyIntent(db, intent, opts) {
+  if (intent?.subject && byWordIsNotAName(intent.rawOriginal ?? intent.raw, intent.subject)) return null;
   if (intent?.billsAsInvoices) {
     // only when the company has no vendor bills of its own: then "bills" are the invoices it sends, and the answer says so
     const [{ n }] = await q(db, `SELECT count(*)::int AS n FROM financials f WHERE f.direction = 'payable' AND f.doc_kind = 'invoice'`, [], await extractionsHaveUnitIndex(db));

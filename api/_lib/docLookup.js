@@ -21,6 +21,7 @@
  * analytics/retrieval question" guards this shares with contactLookup.js.
  */
 import { denyOr } from "./lookups/nameMatch.js";
+import { isNotAPerson } from "./lookups/notAPerson.js";
 import { localYmdIn } from "./util/localDate.js";
 import { extractWindow } from "./lookups/dateQualifiers.js";
 import { correctTriggerWordTypos, normalizeQuestion } from "./nlNormalize.js";
@@ -300,7 +301,7 @@ const NAME_STOPWORD_RE =
   /^(?:the|a|an|this|that|these|those|our|their|his|her|my|your|its|which|who|what|how|why|when|does|do|did|is|are|was|were|list|show|has|have|had|in|on|at|of|for|with|without|any|anyone|anybody|everyone|everybody|someone|somebody|some|all|last|next|first|second|third|most|many|few|several|pull|need|get)$/i;
 
 const NAME_DESCRIPTOR_RE =
-  /^(?:biggest|largest|smallest|oldest|newest|highest|lowest|overdue|accepted|declined|expired|pending|unpaid|average|avg|total|totals|sum|tally|tot|num|number|count|whats|can|grand|grande)$/i;
+  /^(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|tomorrow|yesterday|biggest|largest|smallest|oldest|newest|highest|lowest|overdue|accepted|declined|expired|pending|unpaid|average|avg|total|totals|sum|tally|tot|num|number|count|whats|can|grand|grande)$/i;
 
 const AGGREGATE_WORD_RE = new RegExp(
   `\\b(${[...new Set([
@@ -359,6 +360,7 @@ function isRealNameOrAddressPhrase(phrase, { trailingJob = false } = {}) {
   if (process.env.DONOVAN_NAME_DESCRIPTOR_GUARD !== "0" && NAME_DESCRIPTOR_RE.test(firstWord)) return false;
   if (MONTH_NAMES.has(firstWord) && p.split(/\s+/).length <= 2) return false; // "for august", "for august 2024"
   if (TIME_WORDS.has(firstWord)) return false;
+  if (isNotAPerson(p)) return false; // R10: ordinary words, dates and time words are never a person
   if (AGGREGATE_WORD_RE.test(p)) return false;
   // R2 B2: a ranking word or a "date of ..." / "when ..." opener is a question about a document ("date of the newest proposal"), never a customer's name.
   if (SUMMARY_NOT_A_NAME_RE.test(p) || /^(?:dates?|when)\b/i.test(p)) return false;

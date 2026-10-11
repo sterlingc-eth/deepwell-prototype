@@ -12,6 +12,8 @@ import { deriveGeo } from "../analytics.js";
 import { VOCAB as SYSTEM_VOCAB } from "../nlNormalize.js";
 import { properNameTokens, casingCarriesInformation, tokenize as rawTokenize } from "../router/leftover.js";
 import { notPrivateSql } from "../privacy/privateDocs.js";
+import { extractionsHaveUnitIndex } from "../recordsStore.js";
+import { buildViewsSql } from "../agent/tools.js";
 
 const norm = (s) => ` ${String(s ?? "").toLowerCase().replace(/[’`]/g, "'").replace(/'s\b/g, "").normalize("NFC").replace(/[^\p{L}\p{N}]+/gu, " ").trim()} `;
 const FILLER = new Set("any how many mny number of count the our all we do have has are there is on file in total installed that with a an and or got you your us it from by made brand make customers customer clients client homes people live living located based on".split(" "));
@@ -459,8 +461,37 @@ async function runVocabCountInner(db, intent) {
   const { rows: docs } = t.n > 0 ? await db.raw(
     `SELECT DISTINCT x.document_id FROM extractions x JOIN documents d ON d.id = x.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
       WHERE x.field_key = 'technician' AND lower(COALESCE(NULLIF(x.corrected_value, ''), x.value)) = lower($1) AND x.${TENANT_SQL} AND lower(replace(d.document_type, '_', '-')) = 'invoice' LIMIT 200`, [intent.value]) : { rows: [] };
+  // a person on file as a customer AND as staff: say both counts, never only the staff one
+  const asCust = await customerInvoicesNamed(db, intent.value);
+  if (asCust.n > 0) {
+    const techPart = t.n === 0 ? `no invoice lists ${intent.value} as the technician` : `${t.n} invoice${t.n === 1 ? " lists" : "s list"} ${intent.value} as the technician`;
+    return attachCitations(
+      answerEnvelope({ text: `${intent.value} is on file as both a customer and a technician: ${asCust.n} invoice${asCust.n === 1 ? " was" : "s were"} billed to ${intent.value} as a customer, and ${techPart}.`, facts: [{ label: `Invoices billed to ${intent.value}`, value: String(asCust.n), entityIds: [], sources: [] }, { label: `Invoices by technician ${intent.value}`, value: String(t.n), entityIds: [], sources: [] }], extra: { fastIntent: "vocab_tech_invoice_count" } }),
+      { records: await customerRecordsFor(db, await linkedEntityIds(db, [...asCust.ids, ...docs.map((r) => r.document_id)])), total: asCust.n + t.n, claimedCount: asCust.n + t.n, basis: `Counted the invoices billed to ${intent.value} and the invoices whose technician is ${intent.value}.` });
+  }
   return attachCitations(
     answerEnvelope({ text: `${t.n} invoice${t.n === 1 ? "" : "s"} list ${intent.value} as the technician.`, facts: [{ label: `Invoices by ${intent.value}`, value: String(t.n), entityIds: [], sources: [] }], extra: { fastIntent: "vocab_tech_invoice_count" } }),
     { records: await customerRecordsFor(db, await linkedEntityIds(db, docs.map((r) => r.document_id))), total: t.n, claimedCount: t.n, basis: `Counted invoice documents whose technician is ${intent.value}.` });
+}
+
+/** Customer invoices (receivable) billed to exactly this full name (the customer each invoice is linked to); {n, ids}. */
+export async function customerInvoicesNamed(db, value) {
+  try {
+    const hu = await extractionsHaveUnitIndex(db);
+    const views = buildViewsSql({ hasUnitIndex: hu, hasFinancials: true });
+    const { rows } = await db.raw(
+      `WITH ${views} SELECT DISTINCT f.document_id FROM financials f JOIN customers c ON c.customer_id = f.customer_id
+        WHERE f.direction = 'receivable' AND f.doc_kind = 'invoice' AND lower(btrim(c.name)) = lower(btrim($2::text)) LIMIT 500`, [JSON.stringify({ c: [], e: [] }), value]);
+    return { n: rows.length, ids: rows.slice(0, 200).map((r) => r.document_id) };
+  } catch (e) { if (process.env.DBG10) import("node:fs").then((f) => f.appendFileSync("/tmp/claude-0/r10b/dbg.txt", "vc " + e.message + "\n")); return { n: 0, ids: [] }; }
+}
+/** Invoices that name this full name as the technician; {n, ids}. */
+export async function staffInvoicesNamed(db, value) {
+  try {
+    const { rows } = await db.raw(
+      `SELECT DISTINCT x.document_id FROM extractions x JOIN documents d ON d.id = x.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
+        WHERE x.field_key = 'technician' AND lower(btrim(COALESCE(NULLIF(x.corrected_value, ''), x.value))) = lower(btrim($1)) AND x.${TENANT_SQL} AND lower(replace(d.document_type, '_', '-')) = 'invoice' LIMIT 500`, [value]);
+    return { n: rows.length, ids: rows.slice(0, 200).map((r) => r.document_id) };
+  } catch (e) { if (process.env.DBG10) import("node:fs").then((f) => f.appendFileSync("/tmp/claude-0/r10b/dbg.txt", "vc " + e.message + "\n")); return { n: 0, ids: [] }; }
 }
 

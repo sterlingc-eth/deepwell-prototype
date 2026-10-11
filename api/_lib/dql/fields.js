@@ -20,6 +20,7 @@ export { yearsBetween };
 
 const unitOf = (d, snap) => (d.unitId ? snap.unitById.get(d.unitId) ?? null : null);
 
+const rentOf = (d) => { const v = d.f?.rent_amount ?? d.f?.monthly_rent ?? d.f?.rent; if (v == null || v === '') return null; const n = Number(String(v).replace(/[$,\s]/g, '')); return Number.isFinite(n) ? n : null; };
 const DOC_FIELDS = {
   type: { kind: 'text', label: 'document type', get: (d) => d.type },
   customer: { kind: 'text', label: 'customer', get: (d) => d.custName },
@@ -34,6 +35,12 @@ const DOC_FIELDS = {
   refrigerant: { kind: 'text', label: 'refrigerant', get: (d, s) => d.f.refrigerant ?? unitOf(d, s)?.refrigerant ?? null },
   tonnage: { kind: 'num', label: 'tonnage', get: (d, s) => { const t = d.f.tonnage ?? unitOf(d, s)?.tonnage; const m = /(\d+(?:\.\d+)?)/.exec(String(t ?? '')); return m ? Number(m[1]) : null; } },
   total: { kind: 'num', label: 'total', get: (d) => d.total },
+  // a lease or rental agreement is asked about by its rent ("leases over $1,500"): the printed total of such a paper is the rent times the term. A paper type whose organization stores no rent is asked by its total.
+  rent: { kind: 'num', label: 'rent', get: (d, s) => {
+    if (!s) return d.total;
+    if (!s._rentTypes) { s._rentTypes = new Set(); for (const x of s.documents ?? []) if (rentOf(x) != null) s._rentTypes.add(x.type); }
+    return s._rentTypes.has(d.type) ? rentOf(d) : d.total;
+  } },
   hours: { kind: 'num', label: 'labor hours', get: (d) => d.hours },
   date: { kind: 'date', label: 'document date', get: (d) => d.date },
   serviceDate: { kind: 'date', label: 'service date', get: (d) => d.serviceDate },

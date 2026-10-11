@@ -25,6 +25,7 @@ import { attachCitations, customerRecord } from '../citations/records.js';
 import { documentRecordsFor } from '../citations/enrich.js';
 import { classifyWithTypoTolerance } from '../relations/normalize.js';
 import { runDql } from '../dql/index.js';
+import { hasOrdinalRank } from '../dql/ordinal.js';
 
 /** Pure: question (+ the tenant's own industry pack, already resolved by ask.js before this is called —
  *  same convention as classifyRelationsQuestion/classifyDeterministic) -> a decompose intent, or null.
@@ -34,7 +35,7 @@ import { runDql } from '../dql/index.js';
 export function classifyDecompose(question, { pack } = {}) {
   // Existing conjunctive-filter / job-comparison readings first (byte-identical to before); a question that is none of those
   // but asks two or three small things at once ("how many X and what was the total") is read by compound.js.
-  return classifyWithTypoTolerance(question, (q) => parseDecompose(q, pack)) ?? parseCompound(question, pack) ?? withPack(parseNegation(question) ?? parseRatio(question), pack);
+  return classifyWithTypoTolerance(question, (q) => parseDecompose(q, pack)) ?? (hasOrdinalRank(question) ? null : parseCompound(question, pack)) ?? withPack(parseNegation(question) ?? parseRatio(question), pack);
 }
 
 /** One short, human sentence naming every condition applied — same "list every condition in one basis

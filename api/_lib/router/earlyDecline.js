@@ -26,6 +26,7 @@ import { TENANT_SQL } from "../scope.js";
 import { isPrivateDocAsk, PRIVATE_DOCS_REPLY } from "../privacy/privateDocs.js";
 import { classifyCoverage, coverageTraceTerms } from "./coverage.js";
 import { notPrivateSql } from "../privacy/privateDocs.js";
+import { hasOrdinalRank, ORD_WHO_TAIL } from "../dql/ordinal.js";
 
 export const RECORD_ANCHOR_RE = new RegExp(
   String.raw`\b(?:customers?|clients?|accounts?|units?|systems?|equipment|hvac|e-?mails?|furnaces?|ac|a/c|air\s+conditioner|heat\s+pumps?|condensers?|air\s+handlers?|rtus?|mini[- ]?splits?|` +
@@ -320,7 +321,7 @@ export function classifyEarlyDecline(question, { hasConversation = false, contex
     const st = PAPER_STATUS_RE.exec(stripped) ?? PAPER_STATUS_RE.exec(full);
     if (st) return { kind: "off_domain", trigger: st[0], untracked: "paper_status" };
   }
-  if (!hasConversation) {
+  if (!hasConversation && !(hasOrdinalRank(raw) && ORD_WHO_TAIL.test(String(raw).trim()))) { // "the second highest invoice and who is it for" is one question, not a pronoun follow-up
     for (const q of [stripped, full]) {
       if (isDangling(q, raw)) return { kind: "dangling" };
     }

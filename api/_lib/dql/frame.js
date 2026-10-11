@@ -173,6 +173,8 @@ export function openEndRewrite(text) {
   return String(text ?? '').replace(/\b(?:from|since)\s+((?:[a-z]+\s+\d{1,2},?\s+)?(?:[a-z]+\s+)?\d{1,4}(?:[/-]\d{1,2}(?:[/-]\d{2,4})?)?(?:,?\s*\d{4})?)\s+(?:until|till|to|through|thru|up\s+to)\s+(?:now|today|present|date)\b/gi, 'since $1');
 }
 const MONTH_NUM = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+const BOUNDW = '(?:over|above|greater\\s+than|more\\s+than|bigger\\s+than|larger\\s+than|higher\\s+than|exceeding|under|below|less\\s+than|lower\\s+than|smaller\\s+than|fewer\\s+than|cheaper\\s+than)';
+const cmpPlain = (w) => (/^(?:over|above|greater|more|bigger|larger|higher|exceeding)/i.test(w) ? 'over' : 'under');
 export function dqlParaphrase(text) {
   let q = String(text ?? '');
   // "May 28, 2026" / "28 May 2026" -> 5/28/2026: the one day-level date form every span reader (single, from-to, between) understands
@@ -182,6 +184,8 @@ export function dqlParaphrase(text) {
   q = q.replace(new RegExp(`(?<!\\b(?:percent|percentage|share|proportion|fraction|number|count|list|many|total|ratio|which|what)\\s)\\b(?:for|of|from)\\s+(?:the\\s+|our\\s+|all\\s+)?${CUSTW}\\s+(?=(?:in|at|located|based)\\b)`, 'gi'), '');
   q = compareRewrite(numbersRewrite(perEntityRewrite(rankRewrite(q.replace(/\s+/g, ' ').trim()))));
   for (const [re, to] of PARAPHRASE) q = q.replace(re, to);
+  // "greater than $250 and less than $1,200": a two-bound amount is written with the plain words the planner was checked on ("over $250 and under $1,200")
+  q = q.replace(new RegExp(`\\b(${BOUNDW})\\s+(\\$\\s?\\d[\\d,]*(?:\\.\\d+)?|\\d[\\d,]*(?:\\.\\d+)?(?=\\s+(?:and|or|but)\\s+(?:${BOUNDW})\\s+\\$))\\s+(and|or|but)\\s+(${BOUNDW})\\s+(\\$?\\s?\\d[\\d,]*(?:\\.\\d+)?)`, 'gi'), (_, c1, n1, j, c2, n2) => `${cmpPlain(c1)} ${n1.replace(/\\s+/g, '')} ${j.toLowerCase() === 'but' ? 'and' : j} ${cmpPlain(c2)} ${n2.replace(/\\s+/g, '')}`);
   // "which tenants have leases ending ...": who holds the papers is what the answer lists; the question is about the papers
   if (/\b(?:expire|expires|expiring|expired|ending|ends|ended|run\s+out)\b/i.test(q)) q = q.replace(new RegExp(`\\b(?:which|what|list(?:\\s+the)?|name(?:\\s+the)?|show(?:\\s+me)?(?:\\s+the)?|who|for\\s+which)\\s+(?:of\\s+our\\s+)?(?:${CUSTW}|vendors?|suppliers?)\\s+(?:whose|that\\s+have|who\\s+have|with|have|has)\\s+(?:an?\\s+)?`, 'gi'), '').replace(/\bwho\s+(?:has|have)\s+(?:an?\s+)?/gi, '').replace(/,?\s*(?:for\s+which\s+(?:tenants?|clients?|customers?|vendors?|suppliers?|patients?|donors?))\s*\??$/i, '');
   for (const [re, to] of ABBREV) q = q.replace(re, to);

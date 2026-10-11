@@ -17,15 +17,30 @@ const ORD_RANK_G = new RegExp(ORD_RANK.source, 'gi');
 const RUNNER = /(?<![a-z0-9$.-])runner[\s-]?ups?(?![a-z0-9-])/i;
 const NEXT_LAST = /(?<![a-z0-9$.-])(?:(?:next|second)[\s-]to[\s-]last|second[\s-]last|penultimate|last\s+but\s+one)(?![a-z0-9-])/i;
 
+/** the trailing "and who is it for" of "the second highest invoice and who is it for" */
+export const ORD_WHO_TAIL = /[\s,]+(?:and|plus|&)?\s*(?:who(?:'s|s|\s+is|\s+was)\s+(?:it|that|this|the\s+(?:invoice|bill|one))\s+(?:for|to|from|billed\s+to|made\s+out\s+to)|(?:for|to)\s+whom|who\s+(?:is|was)\s+(?:the\s+)?(?:customer|client))\s*[?.!]*$/i;
+const NUM_ORD = ['', 'first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth'];
+const HASH_ORD = /(?<![a-z0-9$.-])(?:#|no\.?|nos?\.?|number|num\.?)\s*(\d{1,2})(?:st|nd|rd|th)?\s+(?=(?:(?:top|best|biggest|largest)\s+)?(?:customers?|clients?|tenants?|patients?|donors?|members?|vendors?|suppliers?|techs?|technicians?|accounts?|invoices?)\b)/i;
+const HASH_ORD_G = new RegExp(HASH_ORD.source, 'gi');
+/** "#2 customer by revenue" / "number 2 client" / "No. 3 tech" -> "second biggest customer by revenue" (the ordinal forms the rest of this file reads). */
+export function hashOrdinalRewrite(text) {
+  return String(text ?? '').replace(HASH_ORD_G, (m, d, off, all) => {
+    const n = Number(d); if (!(n >= 1 && n <= 10)) return m;
+    const rest = String(all).slice(off + m.length);
+    const rank = /^(?:techs?|technicians?)\b/i.test(rest) ? 'busiest' : 'biggest';
+    return n === 1 ? `${rank} ` : `${NUM_ORD[n]} ${rank} `;
+  });
+}
+
 /** True when the text carries an ordinal ranking expression (used by the router to keep older lanes from answering with the extreme). */
 export function hasOrdinalRank(text) {
-  const s = String(text ?? '');
+  const s = hashOrdinalRewrite(String(text ?? ''));
   return ORD_RANK.test(s) || RUNNER.test(s) || NEXT_LAST.test(s);
 }
 
 /** {text, n} with the ordinal taken out ("second largest invoice" -> "largest invoice", n 2); null when there is none; {bad:true} when it is not a single clear one. */
 export function readOrdinal(text) {
-  const s = String(text ?? '');
+  const s = hashOrdinalRewrite(String(text ?? ''));
   const hits = [...s.matchAll(ORD_RANK_G)];
   const runner = RUNNER.test(s); const nl = NEXT_LAST.test(s);
   const count = hits.length + (runner ? 1 : 0) + (nl ? 1 : 0);
@@ -34,6 +49,11 @@ export function readOrdinal(text) {
   if (hits.length) return { text: s.replace(ORD_RANK, (_, o, r) => r), n: ORD_N[hits[0][1].toLowerCase()], lead: hits[0][2].toLowerCase().replace(/\s+/g, ' ') };
   if (runner) return { text: s.replace(RUNNER, 'biggest'), n: 2, lead: 'biggest' };
   return { text: s.replace(NEXT_LAST, 'latest'), n: 2, lead: 'latest' };
+}
+
+/** "which tech has the most jobs" (the ordinal already taken out) -> "which tech is the busiest": the same ranking of technicians, in the words the engine ranks by. */
+export function ordinalTechRewrite(text) {
+  return String(text ?? '').replace(/\b(which|what)\s+(tech|techs|technician|technicians|mechanic|mechanics|plumber|electrician|installer)\s+(?:has|have|had|did|does)\s+(?:the\s+)?most\s+(?:jobs?|work\s+orders?|tickets?|calls?)\b/i, (_, q, t) => `${q} ${t.replace(/s$/i, '')} is the busiest`);
 }
 
 const NTH = ['', 'first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth'];

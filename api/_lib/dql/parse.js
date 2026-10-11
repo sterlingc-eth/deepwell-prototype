@@ -30,8 +30,9 @@ import { leftoverGate, verifyPlan, supplyOp } from './learned/index.js';
 import { isPlainInventory } from './plain.js';
 import { INDUSTRY_ONLY_TYPES } from './industryLex.js';
 import { customerWordFor } from './custWord.js';
+import { billSense, vendorBillsAsPurchaseOrders } from './billSense.js';
 import { moneyRewrite, asksAmounts } from './moneyPhrases.js';
-import { readOrdinal, applyOrdinal } from './ordinal.js';
+import { readOrdinal, applyOrdinal, ordinalTechRewrite, hashOrdinalRewrite, ORD_WHO_TAIL } from './ordinal.js';
 import './families/index.js';
 
 export const dqlEnabled = () => process.env.DONOVAN_DQL !== '0';
@@ -179,7 +180,7 @@ export function parseDql(question, ctx = {}) {
   if (!dqlEnabled()) return null;
   const tv = ctx.tenantVocab;
   if (!tv) return null;
-  const raw0 = String(question ?? '').trim();
+  const raw0 = String(question ?? '').trim().replace(/\bw\/o\b/gi, 'without').replace(/\bw\/(?=\s)/gi, 'with');
   if (!raw0 || raw0.length > 240) return null;
   const today = ctx.today ?? new Date().toISOString().slice(0, 10);
   const vocab = compileVocab(tv, ctx.pack);
@@ -189,11 +190,25 @@ export function parseDql(question, ctx = {}) {
   if (/\b(?:overdue|past\s+due|unpaid|outstanding|owed|owing|owes?|balances?|delinquent|paid|pay(?:ment)?s?\s+status|still\s+owe|behind\s+on)\b/i.test(raw0)) return null;
   // "what's the number of the invoice for $115" asks for the paper's own number, not a count
   if (/\bnumber\s+of\s+the\s+[a-z -]+?\s+(?:for|from|of|on|dated|with)\b/i.test(raw0) && !/\bhow\s+many\b/i.test(raw0)) return null;
-  const rawOpen = openEndRewrite(raw0);
+  // "bills": the invoices we send, or what vendors send us. A company that keeps purchase orders reads the vendor side as those; a bare "bills" there is asked, not guessed.
+  let raw1 = raw0;
+  if (vocab.docTypesInUse.has('purchase-order')) {
+    const bs = billSense(raw0);
+    if (bs === 'bare' && vocab.docTypesInUse.has('invoice')) return null;
+    if (bs === 'vendor') raw1 = vendorBillsAsPurchaseOrders(raw0);
+  }
+  const rawOpen = openEndRewrite(raw1);
   let framed = dqlParaphrase(moneyRewrite(dqlFrame(stripConversationalFrame(dqlFrame(rawOpen)) ?? dqlFrame(rawOpen)) || rawOpen));
   // "the second largest invoice": the ordinal is taken out here, the rest reads as the plain extreme, and the plan is turned into the Nth of that ranking at the end
   let ordinal = null;
-  { const od = readOrdinal(framed); if (od?.bad) return null; if (od) { ordinal = od.n; framed = ordinalCustomerRewrite(od.text); } }
+  // "the second highest invoice and who is it for": the listed paper already names its customer, so the clause is answered by the same line (only for a ranking of single papers: checked after the plan)
+  let whoClause = false;
+  framed = hashOrdinalRewrite(framed);
+  { const od = readOrdinal(framed); if (od?.bad) return null; if (od) {
+    ordinal = od.n; let t0 = od.text;
+    if (ORD_WHO_TAIL.test(t0)) { t0 = t0.replace(ORD_WHO_TAIL, ''); whoClause = true; }
+    framed = ordinalCustomerRewrite(ordinalTechRewrite(t0));
+  } }
   // a definition or an opinion is not a query over records ("what is a startup sheet", "what does that mean")
   if (/\b(?:what(?:'s|s|\s+is|\s+are|\s+does)|define|explain|meaning\s+of)\s+(?:a|an)\s/i.test(framed) || /\bwhat\b.*\b(?:mean|means|meaning)\b/i.test(framed)) return null;
   if (/\b\d{1,6}\s+(?:[a-z.]+\s+){0,3}(?:st|street|ave|avenue|rd|road|dr|drive|ln|lane|blvd|boulevard|way|ct|court|pl|place|cir|circle|pkwy|parkway)\b/i.test(framed)) return null;
@@ -296,6 +311,18 @@ export function parseDql(question, ctx = {}) {
     if (!vocab.unitRe) vocab.unitRe = [...vocab.docPhrases.keys()].filter((p) => p.length >= 3).sort((a, b) => b.length - a.length).map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+')).join('|');
     const UNIT = `(?:\\s+(years?|yrs?|days?|months?|hours?|hrs?|tons?|ton|dollars?|bucks|percent|units?|systems?|visits?|documents?|docs?|customers?|times|${vocab.unitRe}))?`;
     const TAIL = '(?:\\s+(?:or|and)\\s+(more|less|bigger|larger|smaller|older|newer|higher|lower|greater|fewer|up)(?!\\s+than))?'; // "over 5 or more" is a tail; "over $1500 and less than $3000" is a second bound
+    // "leases with rent over 1500": the word rent only names the amount compared (the lease family reads that amount as the rent)
+    if (/\b(?:leases?|rental|rentals)\b/.test(w.s)) w.take(rx(`(?:(?:with|have|has|having|at|where|whose|a|the)\\s+)*(?:monthly\\s+)?rent(?:al)?(?:\\s+(?:amount|payments?|price))?(?:\\s+(?:is|are|of))?(?=\\s+(?:${CMP}|between)\\b)`));
+    // "under $A or over $B": the union of two opposite one-sided bounds (a value outside the span A..B). Any other "or" between amounts is not read (released).
+    for (let m; (m = w.take(rx(`(${CMP})\\s+${NUM}(?:\\s+dollars?)?\\s+or\\s+(${CMP})\\s+${NUM}(?:\\s+dollars?)?`)));) {
+      const up = (x) => /^(?:more|greater|bigger|larger|higher|exceeding|exceeds|over|above)/.test(x);
+      const lowIs = !up(m[1]) && up(m[3]); const highIs = up(m[1]) && !up(m[3]);
+      const a = Number(m[2].replace('$', '')); const b = Number(m[4].replace('$', ''));
+      const lo = lowIs ? a : b; const hi = lowIs ? b : a;
+      const money = m[2].startsWith('$') || m[4].startsWith('$');
+      if (!(lowIs || highIs) || /^(?:at\s|no\s|exact|only|just)/.test(m[1]) || /^(?:at\s|no\s|exact|only|just)/.test(m[3]) || !(lo < hi) || !(money || /\b(?:invoices?|bills?|quotes?|estimates?|proposals?|purchase\s+orders?|pos|payments?|leases?|rent)\s+(?:(?:with|of|for|worth|totall?ing|valued|at|where)\s+)*(?:(?:a\s+)?(?:total|amount|rent|value)\s+)?(?:less|more|under|over|above|below|greater|exceeding)\b/.test(feat.text0))) { feat.flags.badNumber = true; continue; }
+      feat.filters.push({ field: '?num', op: 'outside', value: [lo, hi], unit: '', dollar: true, word: 'outside' });
+    }
     const re = rx(`(${CMP})\\s+${NUM}${UNIT}(?:\\s+ago)?${TAIL}`);
     for (let m; (m = w.take(re));) {
       const word = m[1].replace(/\s+/g, ' ');
@@ -305,6 +332,11 @@ export function parseDql(question, ctx = {}) {
       const num = Number(m[2].replace('$', ''));
       if (!m[2].startsWith('$') && !m[3] && num >= 1900 && num <= 2100 && Number.isInteger(num)) { feat.flags.badNumber = true; }
       feat.filters.push({ field: '?num', op, value: num, unit: (m[3] ?? '').toLowerCase().replace(/s$/, ''), relDoc: m[3] ? vocab.docPhrases.get(m[3].toLowerCase().replace(/\s+/g, ' ')) ?? null : null, dollar: m[2].startsWith('$'), word, ago: /ago/.test(m[0]), older: /older|younger|newer/.test(word) });
+    }
+    // "over 1k and under 2k" / "more than 250 but less than 1200": the word between the two bounds is the connector of the pair, not a condition of its own
+    if (feat.filters.filter((x) => x.field === '?num' && (x.op === 'gt' || x.op === 'gte' || x.op === 'lt' || x.op === 'lte')).length >= 2) {
+      const CONN = new RegExp(`[\\d$][\\w,.]*\\s+(and|but)\\s+(?=(?:${CMP})\\s+\\$?\\d)`, 'gi');
+      for (const m of w.orig.matchAll(CONN)) { const pos = m.index + m[0].lastIndexOf(m[1]); if (w.s.slice(pos, pos + m[1].length) === m[1]) w.blank(pos, m[1].length); }
     }
     // "have 7 documents", "has 3 units": an exact count of related records
     for (let m; (m = w.take(rx(`(?:have|has|had|having|with)\\s+(\\d+)\\s+(units?|systems?|documents?|docs?|visits?|${vocab.unitRe})`)));) {
@@ -501,7 +533,11 @@ export function parseDql(question, ctx = {}) {
   if (feat.docTypes.length || t.money?.length) w.take(rx('jobs?'));
   // "how many jobs did Kevin Pratt work": the papers that name him as the technician (the same count "Kevin Pratt has 60 jobs on file" gives)
   else if (!feat.time && !feat.times.length && feat.filters.some((x) => x.role === 'tech') && !feat.nouns.visit && !feat.nouns.document && !feat.nouns.unit && !feat.nouns.customer && w.take(rx('jobs?'))) {
-    feat.nouns.document = true; feat.flags.plural = true; w.takeAll(rx('work|worked|working|do|did|does|done|handle|handled|handles|complete|completed|perform|performed'));
+    feat.nouns.document = true; feat.flags.plural = true; feat.flags.jobWord = true; w.takeAll(rx('work|worked|working|do|did|does|done|handle|handled|handles|complete|completed|perform|performed'));
+  }
+  // "which tech has the second most jobs": the papers that name each technician (the count "Kevin Pratt has 60 jobs on file" gives), ranked
+  else if (ordinal && !feat.time && !feat.times.length && (feat.dims.includes('tech') || feat.distinctDim === 'tech' || feat.nouns.tech) && !feat.nouns.visit && !feat.nouns.document && !feat.nouns.unit && !feat.nouns.customer && w.take(rx('jobs?'))) {
+    feat.nouns.document = true; feat.flags.plural = true;
   }
   else if (vocab.otherIndustry && w.take(rx('jobs?'))) { feat.nouns.visit = true; feat.flags.plural = true; } // "how many jobs": the visits (landscaping, electrical and other trades say job)
 
@@ -530,7 +566,7 @@ export function parseDql(question, ctx = {}) {
   if (feat.left.length) {
     // COVERAGE RULE: an unexplained word releases the question, unless exactly one family explains EVERY leftover word itself
     const early = rescuePlan(feat, { vocab });
-    if (early) { const ep = ordinal ? applyOrdinal(early, ordinal) : early; return ep ? { mode: 'dql', plan: ep, text: framed, plain: false } : null; }
+    if (early) { const ep = ordinal ? applyOrdinal(early, ordinal) : early; return ep && !whoClause ? { mode: 'dql', plan: ep, text: framed, plain: false } : null; }
     // LEARNED PLANNER (dql/learned): Donovan's own small model may mark the leftover words as filler, only above a high calibrated threshold
     // and only when its guards pass; slots always came from the detectors above. DONOVAN_DQL_LEARNED=0 turns it off.
     const lg = leftoverGate({ raw: raw0, framed, orig: w.orig, rest: w.s, left: feat.left, feat, vocab, debug: ctx.debug });
@@ -552,12 +588,14 @@ export function parseDql(question, ctx = {}) {
     }
   }
   if (plan && ordinal) { plan = applyOrdinal(plan, ordinal); if (!plan && ctx.debug) ctx.debug.why = 'ordinal: not a ranking that can be placed'; }
+  if (plan && whoClause && !(plan.rank === 'rows' && plan.entity === 'document')) { if (ctx.debug) ctx.debug.why = 'who-clause beside a ranking that does not list single papers'; return null; }
   if (!plan) { if (ctx.debug) ctx.debug.why = `no family claimed it${feat.unusedTriggers ? ` (unused: ${feat.unusedTriggers.join(',')})` : ''}`; return null; }
   if (feat.learned && !verifyPlan(feat.learned, plan)) { if (ctx.debug) ctx.debug.why = 'learned planner disagrees with the plan'; return null; }
   if (plan.op === 'list' && plan.entity === 'document' && asksAmounts(stripConversationalFrame(raw0) ?? raw0)) plan.showAmounts = true;
   // a plain count of a paper kind only this kind of business keeps (a lease, a gift receipt) is DQL's: the older lanes read those words as an HVAC shop's papers
   const industryPaper = vocab.otherIndustry && !Array.isArray(plan.docType) && plan.docType
     && (INDUSTRY_ONLY_TYPES.has(plan.docType) || (plan.docWord && vocab.scopedPhrases?.has(String(plan.docWord).toLowerCase())));
+  if (feat.flags.jobWord && plan.entity === 'document' && !plan.docType && !plan.visit && (plan.filters ?? []).some((x) => x.field === 'tech')) plan.jobWord = true; // the owner said "jobs": the count is said as jobs, not as documents
   if (vocab.otherIndustry && plan.entity === 'customer') { const cw = customerWordFor(vocab.industryKind).one; if (cw !== 'customer') plan.custWord = cw; }
   return { mode: 'dql', plan, text: framed, plain: isPlainInventory(plan) && !industryPaper };
 }

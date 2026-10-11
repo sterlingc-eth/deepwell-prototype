@@ -8,6 +8,7 @@
  *   4. (typoFixes/applyTypoFixes, guarded by the org's own words) a transposed/dropped/doubled letter in a small closed set of words (unpaid, overdue, outstanding, units, address, warranty) -> the word
  * (Typos in "invoice"/"invoices" themselves are handled elsewhere; this file never touches them.)
  */
+import { billsSentAsInvoices } from "../dql/billSense.js";
 const ID = String.raw`(?:inv|po|bp|wo|est|quote|qt|permit)[-#\s]?\d[\w-]*|#\s?[\w-]*\d[\w-]*`;
 const PLURAL_BEFORE_ID = new RegExp(String.raw`\b(invoices|quotes|estimates|permits|purchase orders|work orders|tickets)\s+(?=(?:no\.?\s*|number\s*|#\s*)?(?:${ID}))`, "i");
 const SINGULAR = { invoices: "invoice", quotes: "quote", estimates: "estimate", permits: "permit", "purchase orders": "purchase order", "work orders": "work order", tickets: "ticket" };
@@ -30,6 +31,14 @@ export function rephraseEnabled() { return process.env.DONOVAN_REPHRASE !== "0";
 export function normalizeRephrase(question) {
   let q = String(question ?? ""), changed = false;
   const set = (n) => { if (n !== q) { q = n; changed = true; } };
+  // chatty filler ("by the way, how many invoices do we have", "... by the way") is not a "by <name>": removed when a real question remains
+  {
+    const FILLER = /^\s*(?:(?:oh\s+)?(?:by the way|btw|incidentally|just curious|quick question)\b[\s,:;.-]*)|[\s,;.-]*\b(?:by the way|btw)\s*(?=[?.!]*\s*$)/gi;
+    const stripped = q.replace(FILLER, " ").replace(/\s+/g, " ").replace(/\s+([?.!])/g, "$1").trim();
+    if (stripped !== q.trim() && stripped.split(" ").length >= 3) set(stripped);
+  }
+  // "bills we sent", "bills to our customers": the invoices the company sends, in every kind of company
+  { const sent = billsSentAsInvoices(q); if (sent) set(sent); }
   set(q.replace(PLURAL_BEFORE_ID, (_m, p) => SINGULAR[p.toLowerCase()] + " "));
   if (ROLE_OWE.test(q.trim())) set("how much is owed to us");
   const m = INVOICE_TOTAL.exec(q.trim());

@@ -79,7 +79,7 @@ check('vendor contracts are known but not tracked', J.untrackedConcept('how many
 const FAMILIES: Array<[string, string]> = [
   ['how many tenants do we have', 'customers do we have'], ['how many donors are in Mesa', 'customers are in Mesa'], ['members in Tempe', 'customers in Tempe'],
   ['total of all our bids', 'total of all our quotes'], ['how many estimates did we send', 'quotes did we send'],
-  ['how many leases do we hold', 'maintenance agreements do we hold'], ['total value of our retainers', 'maintenance agreements'], ['active service contracts', 'maintenance agreements'],
+  ['total value of our retainers', 'maintenance agreements'], ['active service contracts', 'maintenance agreements'],
   ['number of site visits in 2025', 'service tickets in 2025'], ['how many call-outs did we go on', 'service tickets did we go on'], ['maintenance requests in 2024', 'service tickets in 2024'],
   ['how many repair requests do we have', 'repair tickets do we have'],
   ['how many building permits are on file', 'permits are on file'],

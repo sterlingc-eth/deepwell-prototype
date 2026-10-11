@@ -35,14 +35,16 @@ export function nounOf(plan, n = 2) {
   if (plan.entity === 'customer') return n === 1 ? (plan.custWord ?? 'customer') : `${plan.custWord ?? 'customer'}s`; // the business's own word for them (patients, tenants, donors)
   if (plan.entity === 'unit') return n === 1 ? 'unit' : 'units';
   if (plan.visit) return n === 1 ? 'service visit' : 'service visits';
+  if (plan.jobWord && plan.entity === 'document' && !plan.docType) return n === 1 ? 'job' : 'jobs';
   if (plan.docType && !Array.isArray(plan.docType)) {
     // the owner's own word for it, when it is a plain noun ("quotes", "work orders"); the type's label otherwise
     const w = plan.docWord;
-    if (w && w.length >= 4 && !/^(?:pos?|wo|pm)$/.test(w) && /^[a-z -]+$/.test(w)) {
+    if (w && w.length >= 4 && !/^(?:pos?|wo|pm|others?)$/.test(w) && /^[a-z -]+$/.test(w)) {
       if (UNCOUNTABLE.test(w)) return w;
       const base = /ss$/.test(w) ? w : w.replace(/s$/, '');
       return n === 1 ? base : pluralize(base);
     }
+    if (plan.docType === 'other') return n === 1 ? 'other document' : 'other documents'; // the papers filed under no other kind
     const label = documentTypeLabel(plan.docType) ?? plan.docType.replace(/-/g, ' ');
     if (UNCOUNTABLE.test(label)) return singular(label);
     return n === 1 ? singular(label) : pluralize(label);
@@ -73,6 +75,7 @@ function condPhrase(f, plan) {
     case 'status': return `with status ${f.value}`;
     case 'serviceType': return `with service type ${Array.isArray(f.value) ? f.value.join(' or ') : f.value}`;
     case 'model': return `model ${f.value}`;
+    case 'rent': return `with rent ${f.label}`;
     case 'docCount': case 'unitCount': case 'visitCount': case 'billed': case 'hasBrand': return f.label;
     case 'equipmentType': return `of type ${f.value}`;
     default: return f.label ?? `${f.field} ${f.op} ${f.value}`;
@@ -83,7 +86,7 @@ const timePhrase = (t) => (t ? t.label : '');
 /** " for X in Y dated Z" — the conditions after the noun. */
 export function condText(plan) {
   const fl = plan.filters ?? [];
-  const parts = fl.map((f, i) => (f.field === 'total' && i > 0 && fl[i - 1].field === 'total' ? `and ${condPhrase(f, plan)}` : condPhrase(f, plan)));
+  const parts = fl.map((f, i) => (f.field === 'total' && i > 0 && fl[i - 1].field === 'total' ? `and ${condPhrase(f, plan)}` : f.field === 'rent' && i > 0 && fl[i - 1].field === 'rent' ? `and ${f.label}` : condPhrase(f, plan)));
   if (plan.time) parts.push(timePhrase(plan.time));
   return parts.length ? ` ${parts.join(' ')}` : '';
 }
@@ -144,7 +147,7 @@ const hasCustFilter = (plan) => (plan.filters ?? []).some((f) => f.field === 'cu
 
 const listNames = (arr, cap = 40, sep = ', ') => (arr.length > cap ? `${arr.slice(0, cap).join(sep)}${sep.trim() === ';' ? ';' : ','} and ${fmtInt(arr.length - cap)} more` : arr.join(sep));
 const cap1 = (s) => s[0].toUpperCase() + s.slice(1);
-const none = (plan, cond) => `No ${nounOf(plan, 2)}${cond} on file.`;
+const none = (plan, cond) => `No ${nounOf(plan, 2)}${cond}${/ on file$/.test(cond) ? "" : " on file"}.`;
 
 function valueText(plan, v) {
   const u = plan.measure?.unit;

@@ -9,7 +9,7 @@ export function tokenize(text) {
   const s = String(text ?? '').toLowerCase().replace(/[’‘`]/g, "'")
     .replace(/(\d),(\d{3})/g, '$1$2')               // 5,000 -> 5000
     .replace(/\$\s+(\d)/g, '$$$1')                  // "$ 500" -> "$500"
-    .replace(/\b(\d+(?:\.\d+)?)\s*k\b/g, (_, n) => String(Number(n) * 1000)) // 5k -> 5000
+    .replace(/(\$?)\b(\d+(?:\.\d+)?)\s*k\b/g, (_, d, n) => `$${String(Math.round(Number(n) * 1000))}`) // 5k -> $5000 (a k is always money: 2k must not be read as the year 2000)
     .replace(/\b(\d+)\s*(?:st|nd|rd|th)\b/g, '$1')
     .replace(/%/g, ' percent ');
   const out = [];

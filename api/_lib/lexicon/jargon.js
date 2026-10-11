@@ -154,6 +154,8 @@ export function respellJargon(question, { tenantVocab, keep } = {}) {
       const canon = RESP.get(key);
       if (!canon) continue;
       const span = toks.slice(i, i + len);
+      // a lease is not a maintenance agreement: in a company that keeps no lease papers the word stays as typed (none to count), never turned into agreements
+      if (len === 1 && /^leases?$/.test(span[0].w) && !(tenantVocab?.dql?.docTypes ?? []).some((t) => t.id === 'lease-agreement')) continue;
       // a plural-only word ("billings" is revenue; "billing address" is not)
       if (PLU.has(key) && !isPluralWord(toks[i + len - 1].w)) continue;
       // a phrase that means something else in a business that keeps paperwork stays as typed

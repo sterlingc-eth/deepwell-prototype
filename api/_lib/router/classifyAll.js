@@ -50,7 +50,7 @@ import { parseMoneyIntent } from "../financials/answers.js";
 import { extraDocTypeAlternation, stemWord } from "../lookups/lexicon.js";
 import { detectAnalyticsPlan } from "../analytics/detPlan.js";
 import { parseDql, dqlEnabled } from "../dql/index.js";
-import { arbiterAllows, arbiterMode, laneLabel, dqlLabel, arbiterLastHit } from "./dqlArbiter.js";
+import { arbiterAllows, arbiterMode, laneLabel, dqlLabel, arbiterLastHit, TWO_BOUND_AMOUNT_RE } from "./dqlArbiter.js";
 import { hasOrdinalRank } from "../dql/ordinal.js";
 import { isMerged, isReleased } from "../followup/handoff.js";
 import { ENTITY_SYNONYMS } from "../analytics.js";
@@ -584,6 +584,8 @@ async function withDql(out, question, ctx) {
       } else return out;
     }
     const intent = parseDql(text, { tenantVocab: ctx.tenantVocab, pack: ctx.pack, today: ctx?.today, original: question });
+    // two amount bounds ("over 1000, under 2000", "under $A or over $B") that DQL does not read: an older lane would keep one bound and answer for the whole range, so the question is released
+    if (!intent && w && OLDER_LANES.has(w.name) && (TWO_BOUND_AMOUNT_RE.test(text) || TWO_BOUND_AMOUNT_RE.test(question))) return releaseClaims(out, "two-bounds");
     if (!intent || intent.plain) return out; // a plain inventory question stays with the lanes that have always answered it
     if (place === "after") return { ...out, gated: { ...out.gated, decompose: intent }, claimed: [...new Set([...(out.claimed ?? []), "decompose"])], dql: "after" };
     const gated = { ...(out?.gated ?? {}), decompose: intent, analytics: false };

@@ -27,7 +27,7 @@
  *   ops   DQL plan ops (or "op:dim") the entry covers; "*" = any op.
  */
 const TWO_ENDED_PERIOD = /\b(?:between\s+\S+(?:\s+\S+){0,3}\s+and\s+(?:\S+\s+)?(?:19|20)\d\d|between\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+and\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)|from\s+\S+(?:\s+\S+){0,2}\s+(?:to|through|thru|until|till)\s+(?:\S+\s+)?(?:(?:19|20)\d\d|jan\w*|feb\w*|mar\w*|apr\w*|may|jun\w*|jul\w*|aug\w*|sep\w*|oct\w*|nov\w*|dec\w*|now|today|present)\b|\b(?:19|20)\d\d\s+(?:to|through|thru|until|till)\s+(?:19|20)\d\d|since\s+\S+(?:\s+\S+){0,2}\s+(?:until|till|to)\s+(?:now|today|present|date))/i;
-const TWO_BOUND_AMOUNT = /\b(?:between\s+\$?\d[\d,.k]*\s+and\s+\$?\d|from\s+\$?\s?(?!(?:19|20)\d\d\s+(?:to|through|thru|until|-)\s+(?:19|20)\d\d\b)\d[\d,.k]*\s+(?:to|through|thru|until|-)\s+\$?\d|(?:over|above|more than|greater than|at least|exceeding|under|below|less than|at most|no more than)\s+\$?\d[\d,.k]*(?:\s+dollars)?\s+(?:and|but)\s+(?:over|above|more than|greater than|at least|exceeding|under|below|less than|at most|no more than)\s+\$?\d)/i;
+const TWO_BOUND_AMOUNT = /\b(?:between\s+\$?\d[\d,.k]*\s+and\s+\$?\d|from\s+\$?\s?(?!(?:19|20)\d\d\s+(?:to|through|thru|until|-)\s+(?:19|20)\d\d\b)\d[\d,.k]*\s+(?:to|through|thru|until|-)\s+\$?\d|(?:over|above|more than|greater than|at least|exceeding|under|below|less than|at most|no more than)\s+\$?\d[\d,.k]*(?:\s+dollars)?(?:\s*,\s*(?:and\s+|but\s+)?|\s+(?:and|but|or)\s+)(?:over|above|more than|greater than|at least|exceeding|under|below|less than|at most|no more than)\s+\$?\d)/i;
 const NEGATED_SET = /\b(?:with(?:out)?\s+(?:no|any)\b|without\b|who\s+never\b|that\s+never\b|never\s+(?:got|had|received|have|has|been|issued|sent)\b|(?:have|has|had)\s+no\b|(?:have|has|had)n'?t\b|lack(?:s|ing)?\b)/i;
 
 export const ARBITER_ALLOWLIST = [
@@ -95,6 +95,9 @@ export const ARBITER_ALLOWLIST = [
   { from: "deterministic:serial", ops: ["tm_age"],
     why: "gives the unit card where the question asked for its age",
     dev: "4 answers improved (wrong, declined or punted before, right now), 0 regressions (per op: tm_age 4)" },
+  { id: "typed-by-time", from: "deterministic:aggregate", ops: ["group_count"], plan: { has: ["docType"], not: { "groupBy.0.by": ["tech", "customer", "city", "type"] } }, only: /\b(?:by|per|each|every)\s+(?:the\s+)?(?:month|year|quarter|week)\b|\b(?:monthly|yearly|quarterly|weekly|annually)\b/i,
+    why: "\"service tickets by month\": the aggregate lane counts every visit when it groups by time, and drops the kind of paper asked about",
+    dev: "round 10: service tickets / work orders by month, year and quarter" },
   { from: "analytics:groupBy", ops: ["group_count"],
     why: "a grouping of all documents by an empty field where the question names the document kind",
     dev: "2 answers improved (wrong, declined or punted before, right now), 0 regressions (per op: group_count 2)" },
@@ -121,6 +124,9 @@ export const ARBITER_ALLOWLIST = [
   { id: "complement-set", from: "*", notFrom: "relations", ops: ["set_select"], only: NEGATED_SET,
     why: "\"customers with no invoices\", \"clients who never got an estimate\": the older lanes drop the negation and answer with the positive list. The relations lane reads its own never-had families correctly (golden breadth-multi-hop-024), so it keeps them",
     dev: "see the round 8 report" },
+  { id: "type-other", from: "*", ops: ["count","list","sum"], only: /\bother\s+(?:documents?|docs?|papers?|files?|paperwork)\b/i, plan: { has: ["docType"] },
+    why: "\"how many other documents do we have\": the older lanes drop the word \"other\" and answer with every document; DQL counts the documents filed as other",
+    dev: "R7 QA: 9 of 9 older answers wrong (the grand total)" },
   { id: "person-jobs", from: "deterministic:tenantcount", ops: ["count"], only: /\bjobs?\b/i, plan: { hasFilter: "tech" },
     why: "\"how many jobs did Kevin Pratt work\": the count lane answers with the work orders only",
     dev: "see the round 8 report" },
@@ -128,6 +134,8 @@ export const ARBITER_ALLOWLIST = [
     why: "\"service tickets by Kevin Pratt\": the older lanes count every job of the person and drop the kind of paper",
     dev: "see the round 8 report" },
 ];
+/** "invoices between $10,000": one end only. It is not "exactly $10,000" and not "over $10,000"; the engines release it. */
+export const ONE_BOUND_BETWEEN_RE = /\bbetween\s+\$?\s?\d[\d,.]*k?(?!\d)(?:\s+(?:dollars?|bucks))?\s*(?:[?.!,]|$|(?=\s+(?:in|on|for|from|during|since|before|after|by|this|last|that|this)\b))/i;
 export const TWO_ENDED_PERIOD_RE = TWO_ENDED_PERIOD;
 export const TWO_BOUND_AMOUNT_RE = TWO_BOUND_AMOUNT;
 export const NEGATED_SET_RE = NEGATED_SET;
@@ -138,7 +146,7 @@ const SET_NOUN = /\b(?:customers?|clients?|accounts?|tenants?|patients?|donors?|
  */
 export function droppedConditionShape(question) {
   const q = String(question ?? "");
-  return TWO_ENDED_PERIOD.test(q) || TWO_BOUND_AMOUNT.test(q) || (NEGATED_SET.test(q) && SET_NOUN.test(q));
+  return TWO_ENDED_PERIOD.test(q) || TWO_BOUND_AMOUNT.test(q) || ONE_BOUND_BETWEEN_RE.test(q) || (NEGATED_SET.test(q) && SET_NOUN.test(q));
 }
 
 export function arbiterMode() {
