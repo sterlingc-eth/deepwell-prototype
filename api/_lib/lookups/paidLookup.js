@@ -11,10 +11,12 @@ import { attachCitations } from "../citations/records.js";
 import { documentRecordsFor } from "../citations/enrich.js";
 import { TENANT_SQL, answerEnvelope } from "../scope.js";
 import { notPrivateSql } from "../privacy/privateDocs.js";
+import { CUSTOMER_NOUNS } from "../dql/industryLex.js";
 
 const PAY_RE = /\b(?:paid|payed|pay|pays|paying|owe|owes|owed|owing)\b/i;
 const SKIP_RE = /\b(?:vendors?|suppliers?|supply|distribut\w*|po|pos|purchase|parts?|payroll|wages?|salary|tax|taxes|rent|insurance|invoices?|bills?|billed|when|what date|what day|the date|how long|how often|late|early|on time|overdue|unpaid|open|outstanding|balance|list|which|who|whom|everyone|everybody|anyone|anybody|all|every|each|total|how many|average|avg|most|least|top|year|month|week|quarter|today|yesterday|vs|versus|compared?|quote\w*|estimate\w*|i|we owe|do we|did we pay|do i|did i|should|can|could)\b/i;
-const WHO_STOP = new Set(["i", "we", "you", "they", "he", "she", "it", "us", "me", "customers", "customer", "clients", "client", "everyone", "anyone", "someone", "people", "somebody", "the customer", "the client", "a customer", "that customer", "this customer", "the company", "company"]);
+const WHO_STOP = new Set(["still", "yet", "currently", "now", "all", "everything", "patients", "patient", "tenants", "tenant", "donors", "donor", "accounts", "account", "members", "member", "residents", "resident", "supporters", "homeowners", "guests", "students", "families", "clients and customers", "i", "we", "you", "they", "he", "she", "it", "us", "me", "customers", "customer", "clients", "client", "everyone", "anyone", "someone", "people", "somebody", "the customer", "the client", "a customer", "that customer", "this customer", "the company", "company"]);
+const GROUP_NOUNS = new Set([...CUSTOMER_NOUNS, "still", "all", "folks", "families", "people", "everybody", "everyone", "any", "anybody", "anyone", "customers"]);
 const NOT_A_NAME = /\b(?:job|jobs|work|invoice|invoices|bill|bills|unit|units|system|systems|install\w*|repair\w*|service|permit|contract|warranty|equipment|furnace|ac|hvac|unpaid|paid|money|cash|check|cheque|card|credit|cost|price|visit|call|ticket|order|week|month|year|today|ones?)\b/i;
 const CAND_RES = [
   /\b(?:did|does|do|has|have|had|will|would|is|was)\s+(.+?)\s+(?:pay|paid|payed|owe|owed|owes|paying|owing)\b/i,
@@ -30,8 +32,9 @@ function candidate(raw) {
     const m = re.exec(raw);
     if (!m) continue;
     let c = m[1].replace(/[?!.]+$/g, "").replace(/\b(?:us|so far|to date|yet|for (?:the|that|this) \w+|last time|again|anything|in full|all of it)\b/gi, " ").replace(/\s+/g, " ").trim();
-    c = c.replace(/^(?:the|a|an)\s+/i, "");
-    if (!c || WHO_STOP.has(norm(c)) || NOT_A_NAME.test(c) || /\d/.test(c)) continue;
+    c = c.replace(/^(?:how\s+much\s+(?:do|does|did|will|would)\s+|how\s+much\s+|what\s+(?:do|does|did)\s+)/i, "").replace(/^(?:(?:only|just|also|and|but|so|then|which|what|that|those|these|the|a|an)\s+)+/i, "");
+    // a group of customers in this business's own word or a filler word is never a name; neither is a pronoun
+    if (!c || /^(?:ones?|them|those|these|it|that|this|which|what)$/i.test(c) || /^(?:how|what|who|whom|which|when|where|why)\b/i.test(c) || WHO_STOP.has(norm(c)) || GROUP_NOUNS.has(norm(c)) || norm(c).split(" ").every((w) => GROUP_NOUNS.has(w)) || NOT_A_NAME.test(c) || /\d/.test(c)) continue;
     if (c.split(" ").length > 4) continue;
     return c;
   }

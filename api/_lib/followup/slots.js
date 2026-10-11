@@ -296,12 +296,12 @@ function priorMeasure(text) {
   if (kinds.includes('count')) return 'count';
   if (kinds.includes('avg')) return 'avg';
   if (kinds.includes('extreme')) return 'extreme';
-  if (kinds.includes('total') || /\b(billed|invoiced|revenue|sales)\b/i.test(text)) return 'total';
+  if (kinds.includes('total') || /\b(billed|invoiced?|revenue|sales)\b/i.test(text)) return 'total';
   return null;
 }
 
 const TAIL_FILLER = new Set(('came come were are was is we did do does have has there written wrote send sent issued issue made make completed ' +
-  'billed bill done on file books the our all to with a an that of in for from during and total').split(' '));
+  'billed bill done on file books the our all to with a an that of in for from during and total by').split(' '));
 
 function onlyFiller(text, set) {
   const words = text.toLowerCase().replace(/[?.!,;:()'’"]/g, ' ').split(/\s+/).filter(Boolean);
@@ -323,28 +323,31 @@ function parseMeasureQuestion(prior) {
   let doc;
   let headEnd;
   if (docs.length === 1) { doc = docs[0].raw; headEnd = docs[0].start; }
-  else if (docs.length === 0 && /\b(billed|invoiced|revenue)\b/i.test(prior)) { doc = 'invoices'; headEnd = -1; }
+  else if (docs.length === 0 && /\b(billed|invoiced?|revenue)\b/i.test(prior)) { doc = 'invoices'; headEnd = -1; }
   else return null;
   if (headEnd >= 0) {
     const head = prior.slice(0, headEnd);
-    if (!/^\W*(?:and\s+)?(?:what(?:'s| is| was)?\s+the\s+)?(?:how many|number of|count of|total(?: dollar)?(?: amount)?(?: of)?|sum of|average(?: of)?)\s*$/i.test(head)) return null;
+    if (/^\W*(?:and\s+)?how much\s+(?:did|do|have|has)\s+(?:we|you)\s*$/i.test(head) && /^invoice$/i.test(doc)) doc = 'invoices'; // "how much did we invoice": the invoices are the papers, the verb is how it is asked
+    else if (!/^\W*(?:and\s+)?(?:what(?:'s| is| was)?\s+the\s+)?(?:how many|number of|count of|total(?: dollar)?(?: amount)?(?: of)?|sum of|average(?: of)?)\s*$/i.test(head)) return null;
   }
   // the words around the slots must all be plain filler
   const rest = mask(prior, spans);
   const restClean = headEnd >= 0 ? rest.slice(0, headEnd).replace(/.*/, ' ') + rest.slice(headEnd) : rest;
-  const tailWords = restClean.replace(/\b(?:total|billed|invoiced|revenue|what|whats|is|the|how|many|much)\b/gi, ' ');
+  const tailWords = restClean.replace(/\b(?:total|billed|invoiced?|revenue|what|whats|is|the|how|many|much)\b/gi, ' ');
   if (!onlyFiller(tailWords, TAIL_FILLER)) return null;
-  let person = null;
+  let person = null; let personPrep = 'for';
   if (people.length) {
     const p = people[0];
     const around = prior.slice(Math.max(0, p.start - 14), Math.min(prior.length, p.end + 12));
     const customerForm = /\b(?:does|do|did|has|have)\s+$/i.test(prior.slice(0, p.start)) && /^\s*(?:have|get|receive|received|own)\b/i.test(prior.slice(p.end));
     const forForm = /\b(?:for|from|to)\s+$/i.test(prior.slice(0, p.start));
-    if (!customerForm && !forForm) return null;
+    const byForm = /\b(?:by|with)\s+$/i.test(prior.slice(0, p.start)); // "service tickets by Kevin Pratt": the technician's papers, said the same way back
+    if (!customerForm && !forForm && !byForm) return null;
     person = p.raw;
+    personPrep = byForm ? (/\bwith\s+$/i.test(prior.slice(0, p.start)) ? 'with' : 'by') : 'for';
   }
   return {
-    doc, person,
+    doc, person, personPrep,
     thr: thrs[0] ? thrs[0].raw : null,
     city: cities[0] ? cities[0].raw : null,
     period: periods[0] ? periods[0].period : null,
@@ -355,7 +358,7 @@ function composeMeasure(parts, lead) {
   const bits = [lead, parts.doc];
   if (parts.thr) bits.push(parts.thr);
   if (parts.city) bits.push(`in ${parts.city}`);
-  if (parts.person) bits.push(`for ${parts.person}`);
+  if (parts.person) bits.push(`${parts.personPrep ?? 'for'} ${parts.person}`);
   if (parts.period) {
     const r = renderPeriod(parts.period);
     if (!r) return null;
@@ -382,7 +385,7 @@ const UNREAD_FIELD_RE = /\b(technician|tech|labor|hours?|notes?|serial|model|who
 const ANAPHOR_RE = /\b(it|that one|this one|that|this)\b/i;
 const ADDRESS_ASK_RE = /\bwhere\b[^?]*\b(live|lives|located|stay|stays|reside|resides|at)\b|\bwhere (?:is|are) (?:he|she|they|it)\b|\bwhere do(?:es)? (?:he|she|they)\b/i;
 const CONTACT_PRIOR_RE = /\b(phone|number|email|e-mail|address|cell|mobile)\b/i;
-const HOWMANY_THAT_RE = /^\s*(?:and\s+)?how many(?: is| are| was| were)?\s+(?:that|those|them|it|this)\s*[?.!]*\s*$/i;
+const HOWMANY_THAT_RE = /^\s*(?:and\s+)?how many(?:\s+([a-z][a-z ]{1,30}?))?(?: is| are| was| were)?\s+(?:that|those|them|it|this)\s*[?.!]*\s*$/i;
 
 const TOTAL_OF_THAT_RE = /^(?:what|how much)\s+(?:did|does|do|would|will)\s+(?:that|those|they|it|these|this)\s+(?:all\s+)?(?:come|add\s+up|amount|total|sum\s+up)(?:\s+up)?\s+to$/i;
 const MONEY_DOC_RE = /\b(?:invoice|proposal|estimate|quote|bid|purchase order|credit memo)s?\b/i;
@@ -422,7 +425,23 @@ export function slotRewrite(prior, follow, priorTurn = null) {
   }
 
   // ---- "how many is that?" after a list or "who has the most X"
-  if (HOWMANY_THAT_RE.test(F0)) {
+  const HT = HOWMANY_THAT_RE.exec(F0);
+  if (HT) {
+    // "how many invoices was that": the noun must be the thing the earlier question was about
+    const hn = (HT[1] || '').trim().toLowerCase();
+    if (hn && !/^(?:is|are|was|were)$/.test(hn)) {
+      const sing = (w) => w.replace(/ies$/, 'y').replace(/s$/, '');
+      const nounOk = new RegExp(`\\b${sing(hn).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i').test(P) || (/^invoice/.test(hn) && /\b(billed|invoiced?|revenue)\b/i.test(P));
+      if (!nounOk) return null;
+    }
+    // the earlier question was a total or a plain list of papers: the same papers, counted ("how much did we invoice in 2020" -> "how many invoices in 2020")
+    if (!/^(?:and\s+)?(?:which|what|who)\b/i.test(P) && !/^(?:and\s+)?(?:list|show(?: me)?|give me)\b/i.test(P) && !/\bhow many\b/i.test(P)) {
+      let parts = null;
+      if (priorMeasure(P) === 'total') parts = parseMeasureQuestion(P);
+      else if (!/^(?:and\s+)?(?:how|is|are|do|does|did|can)\b/i.test(P)) parts = parseMeasureQuestion(`how many ${P}`);
+      const q = parts ? composeMeasure(parts, 'how many') : null;
+      if (q) return { query: q, slot: 'measure' };
+    }
     const lm = P.match(/^(?:and\s+)?(?:which|what)\s+(.+)$/i) || P.match(/^(?:and\s+)?(?:list|show(?: me)?|give me)\s+(?:all\s+)?(?:the\s+)?(.+)$/i);
     if (lm && /\b[a-z]+s\b/i.test(lm[1]) && !/^(?:is|was|are|were)\b/i.test(lm[1])) {
       const rest = lm[1];
@@ -552,6 +571,11 @@ export function slotRewrite(prior, follow, priorTurn = null) {
     return { query: replaceRange(P, start, target.end, r.text) + '?', slot: 'period' };
   }
   if (fs.kind === 'thr') {
+    // "invoices over $7000" then "and under $7500": the second bound is added to the first, never swapped in for it
+    const UP = /^(?:over|above|more than|greater than|exceeding|at least|beyond)$/; const DOWN = /^(?:under|below|less than|at most|up to)$/;
+    if (fs.comp && target.comp && ((UP.test(fs.comp) && DOWN.test(target.comp)) || (DOWN.test(fs.comp) && UP.test(target.comp)))) {
+      return { query: replaceRange(P, target.end, target.end, ` and ${fs.comp} ${fs.amount}`) + '?', slot: 'threshold' };
+    }
     const comp = fs.comp || target.comp || '';
     return { query: replaceRange(P, target.start, target.end, `${comp ? comp + ' ' : ''}${fs.amount}`) + '?', slot: 'threshold' };
   }
@@ -590,4 +614,23 @@ export function slotFollowup(turns, question) {
   } catch {
     return null;
   }
+}
+
+
+/**
+ * A follow-up made ONLY of slot values and filler ("and in 2024", "just Mesa", "for Kevin Pratt", "under $5000"): it means something only against the earlier question.
+ * When no merge could carry the earlier scope, typed alone an older lane would answer the unscoped total, so the caller releases it.
+ */
+export function isSlotOnlyFollowup(follow) {
+  try {
+    const F0 = stripPunct(follow);
+    const F = F0.replace(LEAD_IN_RE, '').trim();
+    if (!F || F.split(/\s+/).length > 8) return false;
+    const spans = findSpans(F, { fragment: true });
+    if (!spans.length) return false;
+    if (spans.some((x) => x.kind !== 'period' && x.kind !== 'thr')) return false; // a person, place or brand swap has its own path (resolve.js)
+    const left = stripMeasures(mask(F, spans)).replace(/[?.!,;:]/g, ' ').toLowerCase().split(/\s+/).filter(Boolean);
+    if (measureOf(F).length) return false;
+    return left.every((w) => FILLER.has(w) || /^(?:only|just|than|more|less|least|most|over|under|above|below|between|within)$/.test(w));
+  } catch { return false; }
 }

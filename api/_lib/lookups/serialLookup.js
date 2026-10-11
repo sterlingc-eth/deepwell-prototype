@@ -280,11 +280,18 @@ export async function runSerialLookup(db, intent, { today } = {}) {
     case "brand": text = `Serial ${serial} is a ${u.manufacturer || "unit of unknown brand"}${u.model ? ` (model ${u.model})` : ""}${who ? ` — ${who}` : ""}.`; break;
     case "where": text = at ? `Serial ${serial} is at ${at}${who ? ` (${who})` : ""}.` : `No address is on file for serial ${serial} (${ident}).`; break;
     case "install": text = installed ? `Serial ${serial} (${ident}) was installed ${installed}.` : `No install date is on file for serial ${serial} (${ident}).`; break;
-    case "warranty":
+    case "warranty": {
+      // "is the warranty expired?" asks about the END: yes means it has expired (the other framing - "still covered?" - keeps its own yes/no)
+      const askedExpired = /\b(?:expired|lapsed|out of warranty|run out|ran out|ended)\b/i.test(String(intent.question ?? ""));
+      if (askedExpired && w.status !== "unknown") {
+        text = w.status === "expired" ? `Yes — serial ${serial} (${ident}): ${w.text}.` : `No — serial ${serial} (${ident}) is ${w.text}.`;
+        break;
+      }
       text = w.status === "unknown" ? `Serial ${serial} (${ident}): no warranty end date on file.`
         : w.status === "expired" ? `No — serial ${serial} (${ident}): ${w.text}.`
           : `Yes — serial ${serial} (${ident}) is ${w.text}.`;
       break;
+    }
     case "service": text = last ? `Serial ${serial} (${ident}) was ${lastText}.` : `No service visit is on file for serial ${serial} (${ident}).`; break;
     default:
       text = `Serial ${serial}: ${brandModel(u)}${u.tonnage ? ` (${u.tonnage})` : ""}${who ? `, ${who}` : ""}${at ? `, ${at}` : ""}. ` +

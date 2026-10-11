@@ -143,6 +143,10 @@ const PARAPHRASE = [
   [/\bwhose\s+(?:address|city)\s+is\s+in\b/gi, 'in'],
   [/\bwhere\s+the\s+(?:customer|client|patient|tenant|resident|owner|donor|account|member|supporter)\s+is\s+(?:located\s+)?in\b/gi, 'in'],
   [/\b(?:that|which)\s+(?:are|were|is|was)\s+(?=(?:completed|cancelled|canceled|open|scheduled|rescheduled|pending|approved|closed)\b)/gi, 'with status '],
+  [/\bbut\s+(?=(?:less|under|below|over|above|more|greater|fewer|at\s+most|at\s+least|no\s+more|no\s+less)\b)/gi, 'and '],
+  // "from $1,500 to $3,000" (a dollar sign on either end makes both ends amounts): the same two-bound range as "between $1,500 and $3,000"
+  [/\bfrom\s+(\$\s?\d[\d,]*(?:\.\d+)?k?)\s+(?:to|through|thru|until|till|-)\s+\$?\s?(\d[\d,]*(?:\.\d+)?k?)\b/gi, 'between $1 and $$$2'],
+  [/\bfrom\s+(\d[\d,]*(?:\.\d+)?k?)\s+(?:to|through|thru|until|till|-)\s+(\$\s?\d[\d,]*(?:\.\d+)?k?)\b/gi, 'between $$$1 and $2'],
   [/\bfrom\s+((?:19|20)\d\d)\s+(?:on|onward|onwards|forward|and\s+(?:on|later|after))\b/gi, 'since $1'],
   [/\b((?:19|20)\d\d)\s+(?:onward|onwards)\b/gi, 'since $1'],
   [/\bfrom\s+((?:[a-z]+\s+\d{1,2},?\s+)?(?:[a-z]+\s+)?\d{1,4}(?:[/-]\d{1,2}(?:[/-]\d{2,4})?)?(?:,?\s*\d{4})?)\s+(?:until|till|to|through|thru)\s+(?:now|today|present|date)\b/gi, 'since $1'],
@@ -164,6 +168,10 @@ const PARAPHRASE = [
   [/\bhow\s+many\s+days\s+since\b/gi, 'days since'],
   [/\b([a-z]+)\s+whose\s+(?:last|latest|most\s+recent)\s+(.+?)\s+was\s+(?:before|prior\s+to|earlier\s+than)\s+(.+)$/i, '$1 with no $2 since $3'],
 ];
+/** "from March 2024 to today", "since 2024 until now": the end of the span is "now", so the span is "since ..." - said before the chatter is stripped (the stripper would take "today" and leave "from March 2024 to"). */
+export function openEndRewrite(text) {
+  return String(text ?? '').replace(/\b(?:from|since)\s+((?:[a-z]+\s+\d{1,2},?\s+)?(?:[a-z]+\s+)?\d{1,4}(?:[/-]\d{1,2}(?:[/-]\d{2,4})?)?(?:,?\s*\d{4})?)\s+(?:until|till|to|through|thru|up\s+to)\s+(?:now|today|present|date)\b/gi, 'since $1');
+}
 const MONTH_NUM = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
 export function dqlParaphrase(text) {
   let q = String(text ?? '');
@@ -267,5 +275,22 @@ const CMP_FORMS = [
 ];
 export function compareRewrite(q) {
   for (const [re, fn] of CMP_FORMS) { const m = re.exec(q.trim()); if (m) return fn(m).replace(/\s+/g, ' ').trim(); }
+  return q;
+}
+
+/* ---------------------------------------------------------------- the Nth customer, asked short */
+
+const CUST_DIM = '(customers?|clients?|accounts?|tenants?|patients?|donors?|supporters?|members?|residents?|homeowners?)';
+const BILLED_BY = '(?:\\s+by\\s+(?:billing|billings|billed|revenue|sales|spend|spending|dollars|amount|total(?:\\s+billed)?|money))?';
+/**
+ * Used only after an ordinal was taken out of the question ("who is our second largest customer" -> "who is our largest customer"):
+ * the extreme customer is the one with the most billed, and "who has the most invoices" asks which customer has the most.
+ */
+export function ordinalCustomerRewrite(q) {
+  const t = String(q ?? '').trim().replace(/[?.!]+$/, '');
+  let m = new RegExp(`^(?:(?:who|what|which(?:\\s+one)?)\\s+(?:is|was|are)\\s+)?(?:(?:our|the|my)\\s+)?(?:top|best|biggest|largest|highest)\\s+${CUST_DIM}${BILLED_BY}$`, 'i').exec(t);
+  if (m) return `which ${m[1].toLowerCase()} is the biggest by total billed`;
+  m = new RegExp(`^(?:who|which\\s+${CUST_DIM})\\s+(?:has|have|had|got)\\s+(?:the\\s+)?(most|fewest|least)\\s+(invoices?|bills?|quotes?|estimates?|proposals?|work\\s+orders?|service\\s+tickets?|tickets?|jobs?|visits?|permits?)$`, 'i').exec(t);
+  if (m) return `which ${(m[1] ?? 'customer').toLowerCase()} has the ${m[2].toLowerCase() === 'most' ? 'most' : 'fewest'} ${m[3]}`;
   return q;
 }

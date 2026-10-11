@@ -27,8 +27,8 @@ const KINDS = [
   ["quote", /\b(?:quotes?|proposals?|estimates?)\b/, "invoice_date", "proposal-quote", ["quote", "quotes"], true],
   ["po", /\b(?:purchase\s+orders?|pos)\b/, "invoice_date", "purchase-order", ["purchase order", "purchase orders"], true],
   ["warranty", /\bwarrant(?:y|ies)\s+(?:were\s+|was\s+)?(?:registrations?|registered)\b|\bregistered\s+warrant(?:y|ies)\b/, "warranty_registered_date", "warranty-registration", ["warranty registration", "warranty registrations"], true],
-  ["permit", /\bpermits?\b/, null, "permit", ["permit", "permits"], true],
-  ["dispatch", /\bdispatch(?:\s+notes?)?\b/, null, "dispatch-note", ["dispatch note", "dispatch notes"], true],
+  ["permit", /\bpermits?\b/, "__upload__", "permit", ["permit", "permits"], true],
+  ["dispatch", /\bdispatch(?:\s+notes?)?\b/, "service_date", "dispatch-note", ["dispatch note", "dispatch notes"], true],
   ["agreement", /\b(?:maintenance\s+)?(?:agreements?|contracts?)\b/, null, "maintenance-agreement", ["maintenance agreement", "maintenance agreements"], true],
 ];
 const FILLER = new Set("how many number of count the our all we do did have has are is were was there on in during between and from to through thru until till since after before dated date a an got done performed completed total file made issued written for within each service visit visits call calls unit units system systems equipment piece pieces installed install installs invoice invoices ac hvac furnace furnaces heat pump pumps ticket tickets work order orders startup start up sheet sheets inspection inspections report reports quote quotes proposal proposals estimate estimates purchase po pos warranty warranties registration registrations registered permit permits dispatch note notes maintenance agreement agreements contract contracts pull pulled send sent".split(" "));
@@ -111,6 +111,18 @@ export async function runDocWindow(db, it) {
     const { rows } = await db.raw(`SELECT id, data->>'installation_date' AS d FROM entities WHERE entity_type = 'equipment' AND merged_into IS NULL AND ${TENANT_SQL}`, []);
     dated = rows.map((r) => ({ id: r.id, date: isoOf(r.d) })).filter((r) => r.date);
     if (rows.length > dated.length) coverage = ` ${rows.length - dated.length} of ${rows.length} units have no install date on file.`;
+  } else if (it.field === "__upload__") {
+    // a permit that prints a date of its own is counted by that date; one that does not is counted by the day it was uploaded, and the answer says so
+    const { rows } = await db.raw(`SELECT d.id, d.document_type AS dtype, d.created_at::text AS v FROM documents d WHERE d.${TENANT_SQL} AND ${notPrivateSql("d")}`, []);
+    const mine = rows.filter((r) => norm(r.dtype) === it.dtype);
+    const own = new Map();
+    if (mine.length) {
+      const { rows: xs } = await db.raw(`SELECT x.document_id, ${VAL("x")} AS v FROM extractions x WHERE x.${TENANT_SQL} AND x.document_id = ANY($1::uuid[]) AND x.field_key IN ('permit_date', 'issue_date', 'issued_date', 'date_issued', 'service_date', 'invoice_date')`, [mine.map((r) => r.id)]);
+      for (const x of xs) if (!own.has(x.document_id) && isoOf(x.v)) own.set(x.document_id, isoOf(x.v));
+    }
+    dated = mine.map((r) => ({ id: r.id, type: it.dtype, date: own.get(r.id) ?? isoOf(r.v) })).filter((r) => r.date);
+    const noOwn = mine.filter((r) => !own.has(r.id)).length;
+    if (noOwn) coverage = ` ${noOwn === mine.length ? `${it.noun[1][0].toUpperCase()}${it.noun[1].slice(1)} don't print a date in your records, so this counts` : `${noOwn} of ${mine.length} ${it.noun[1]} print no date, so those are counted by`} the day each one was uploaded.`;
   } else {
     const { rows } = await db.raw(
       `SELECT x.document_id, d.document_type AS dtype, ${VAL("x")} AS v FROM extractions x JOIN documents d ON d.id = x.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
@@ -120,14 +132,14 @@ export async function runDocWindow(db, it) {
     dated = [...seen.values()].filter((r) => r.date && (!it.dtype || r.type === it.dtype));
   }
   hits = dated.filter((r) => inAny(r.date, ws));
-  const basis = `Compared the ${it.field.replace(/_/g, " ")} on ${dated.length} ${it.kind === "install" ? "units" : "dated documents"} to ${ws.map((w) => `${w.from} through ${w.to}`).join(" and ")}.`;
+  const basis = `Compared the ${it.field === "__upload__" ? "upload date" : it.field.replace(/_/g, " ")} on ${dated.length} ${it.kind === "install" ? "units" : "dated documents"} to ${ws.map((w) => `${w.from} through ${w.to}`).join(" and ")}.`;
   if (!hits.length) return none(`No ${it.noun[1]} on file ${where}.${coverage}`, `${basis} None fall in it.`);
   const per = it.mode === "list" ? ` (${ws.map((w) => `${dated.filter((r) => r.date >= w.from && r.date <= w.to).length} ${when(w, "single")}`).join(", ")})` : "";
   const text = `${hits.length} ${plural(hits.length)} ${where}${per}.${coverage}`;
   const label = `${it.noun[1][0].toUpperCase()}${it.noun[1].slice(1)} ${where}`;
   const facts = [it.kind === "install"
     ? { label, value: String(hits.length), entityIds: hits.slice(0, 40).map((r) => r.id), sources: [] }
-    : { label, value: String(hits.length), sources: hits.slice(0, 20).map((r) => ({ documentId: r.id, location: { field: it.field } })) }];
+    : { label, value: String(hits.length), sources: hits.slice(0, 20).map((r) => ({ documentId: r.id, location: { field: it.field === "__upload__" ? "created_at" : it.field } })) }];
   return attachCitations(answerEnvelope({ text, facts, extra: { fastIntent: "date_doc_window" } }),
     { records: it.kind === "install" ? await customerRecordsFor(db, hits.slice(0, 200).map((r) => r.id)) : await documentRecordsFor(db, hits.slice(0, 200).map((r) => r.id)), total: hits.length, claimedCount: hits.length, basis });
 }

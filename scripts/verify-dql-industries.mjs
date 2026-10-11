@@ -247,5 +247,24 @@ for (const k of KEYS) {
   const r3 = await C.medical.ask('how many hr letters'); check('privacy :: HR letters are not answered at all', !r3.data, r3.data?.text);
 }
 
+/* ------------------------------------------------------------------ round 8: a lease is a lease; the same word for the people a business bills */
+{
+  let r = await C.property.ask('how many lease agreements do we have');
+  check('property count :: lease agreements are the lease papers', r.data && has(r, int(C.property.ofType('lease-agreement').length), 'lease'), r.data?.text);
+  for (const k of ['nonprofit', 'legal', 'medical', 'construction']) {
+    r = await C[k].ask('how many lease agreements do we have');
+    check(`${k} count :: no lease papers is "none", never the agreements it does keep`, r.data && /^No lease agreements on file\.$/.test(r.data.text), r.data?.text);
+  }
+  r = await C.nonprofit.ask('how many gifts do we have');
+  check('nonprofit count :: gifts are the donation receipts', r.data && has(r, int(C.nonprofit.ofType('receipt').length), 'gifts'), r.data?.text);
+  r = await C.nonprofit.ask('do we have an invoice dated January 1st, 2030');
+  check('nonprofit exists :: a period after today says none on file with no computed zero attached', r.data && /on file\.$/.test(r.data.text) && (r.data.facts ?? []).length === 0, JSON.stringify(r.data?.facts));
+  r = await C.nonprofit.ask('invoices dated in 2027');
+  check('nonprofit count :: invoices dated after today are counted when they exist', r.data && /^\d+ invoices?\b/.test(r.data.text) && !/future date/.test(r.data.text), r.data?.text);
+  r = await C.medical.ask('how many patients are not in Phoenix or Mesa');
+  check('medical count :: "not in X or Y" reads once', !r.data || !/not in [A-Za-z ]+ not in/.test(r.data.text), r.data?.text);
+}
+
+
 console.log(`\n${passes} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

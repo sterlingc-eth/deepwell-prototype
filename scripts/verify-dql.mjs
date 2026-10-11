@@ -230,7 +230,15 @@ await released('a month with no year', 'how many invoices in september');
 { const x = parseDql('invoices with no technician', { tenantVocab: tv, pack, today: TODAY }); check('release :: core family leaves negation on documents to the text family', x?.plan?.op === 'missing_field', JSON.stringify(x?.plan ?? null).slice(0, 200)); }
 await released('HR letters are never listed', 'how many hr letters do we have');
 await released('a number with no unit', 'how many invoices 4000');
-await released('a name that is two things', `how many tickets did ${techs[0]} do`, { tenantVocab: { ...tv, customers: { ...tv.customers, phrases: [...tv.customers.phrases, techs[0]] } } });
+await released('a name that is two things', `how many tickets ${techs[0]}`, { tenantVocab: { ...tv, customers: { ...tv.customers, phrases: [...tv.customers.phrases, techs[0]] } } });
+{
+  // round 8: the question's own words may say which of the two it is ("tickets BY <name>", "how many jobs DID <name> WORK"), "for <name>" says customer
+  const both = { tenantVocab: { ...tv, customers: { ...tv.customers, phrases: [...tv.customers.phrases, techs[0]] } } };
+  const byX = parseDql(`service tickets by ${techs[0]}`, { pack, today: TODAY, ...both });
+  check('role :: "service tickets by <name>" reads the name as the technician when it is also a customer', (byX?.plan?.filters ?? []).some((f) => f.field === 'tech' && f.value === techs[0]), JSON.stringify(byX?.plan ?? null).slice(0, 200));
+  const forX = parseDql(`service tickets for ${techs[0]}`, { pack, today: TODAY, ...both });
+  check('role :: "service tickets for <name>" reads the name as the customer', (forX?.plan?.filters ?? []).every((f) => f.field !== 'tech'), JSON.stringify(forX?.plan ?? null).slice(0, 200));
+}
 {
   const k = parseDql('how many invoices', { tenantVocab: tv, pack, today: TODAY });
   process.env.DONOVAN_DQL = '0';

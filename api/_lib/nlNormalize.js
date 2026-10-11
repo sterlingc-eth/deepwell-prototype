@@ -535,6 +535,8 @@ export function normalizeQuestion(text, opts = {}) {
   // address and which isn't.
   const singleRecord = looksLikeSingleRecordReference(original);
   const words = q.split(' ').filter(Boolean);
+  // R8: "how many bills are paid / unpaid / overdue" - "bills" is the word, not a typo of "hills" (only when it sits next to a payment status; other questions keep their old reading)
+  const billStatusAsk = /\bbills?\b/.test(q) && /\b(?:paid|unpaid|open|outstanding|overdue|past due|owed)\b/.test(q);
 
   const normalized = withLearnedOverlay(overlay, (tables) => {
     const out = words.map((raw, idx) => {
@@ -558,7 +560,7 @@ export function normalizeQuestion(text, opts = {}) {
       }
 
       const isPlainWord = /^[a-z]+$/.test(lower);
-      if (!singleRecord && isPlainWord && lower.length >= 5 && !tables.vocab.has(lower)) {
+      if (!singleRecord && isPlainWord && lower.length >= 5 && !tables.vocab.has(lower) && !(billStatusAsk && lower === 'bills')) {
         // Extra belt-and-suspenders guard even outside the single-record case:
         // a word immediately after a number is almost always a street name
         // component ("123 Maple") — never fuzzy-corrected.

@@ -177,7 +177,7 @@ for (const q of [`is ${someCust}'s invoice paid`, 'which invoices are unpaid', '
   check('allowlist :: every entry names its lane, ops, reason and dev evidence', L.length > 10 && L.every((e) => typeof e.from === 'string' && Array.isArray(e.ops) && e.ops.length && e.why && e.dev), L.length);
   check('allowlist :: the document-number route is not on it (it answers those lookups correctly)', !L.some((e) => /docnumber/.test(e.from)));
   check('allowlist :: no entry reaches the records-first lane', !L.some((e) => /records/i.test(e.from)));
-  check('allowlist :: no wildcard op (every op was seen in the dev set)', !L.some((e) => e.ops.includes('*')));
+  check('allowlist :: no wildcard op (every op was seen in the dev set), except a round 8 shape entry that names its shape (an ordinal in the plan)', !L.some((e) => e.ops.includes('*') && !(e.id && e.plan?.has?.length)));
   const fake = (name, route2) => ({ name, intent: { route: route2 } });
   const intentOf = (op) => ({ plan: { op }, plain: false });
   check('allowlist :: money -> sum is allowed', arb.arbiterAllows(fake('money'), intentOf('sum'), { oldLabel: 'money' }));

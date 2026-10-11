@@ -24,11 +24,14 @@ import { tokenize, repairWord, findRun } from './text.js';
 import { compileVocab, normName } from './vocab.js';
 import { FILLER, ENTITY_WORDS, DIM_WORDS, MONEY_WORDS } from './lex.js';
 import { detectPlan, allFamilies, rescuePlan } from './registry.js';
-import { dqlFrame, dqlParaphrase } from './frame.js';
+import { dqlFrame, dqlParaphrase, openEndRewrite, ordinalCustomerRewrite } from './frame.js';
 import { FOREIGN_WORDS } from './industryLex.js';
-import { leftoverGate, verifyPlan } from './learned/index.js';
+import { leftoverGate, verifyPlan, supplyOp } from './learned/index.js';
 import { isPlainInventory } from './plain.js';
+import { INDUSTRY_ONLY_TYPES } from './industryLex.js';
+import { customerWordFor } from './custWord.js';
 import { moneyRewrite, asksAmounts } from './moneyPhrases.js';
+import { readOrdinal, applyOrdinal } from './ordinal.js';
 import './families/index.js';
 
 export const dqlEnabled = () => process.env.DONOVAN_DQL !== '0';
@@ -64,8 +67,11 @@ const numberOf = (w) => { if (/^\d+(\.\d+)?$/.test(w)) return Number(w); const n
 /* ------------------------------------------------------------------ time */
 
 const TIME_PATTERNS = (() => {
-  const POINT = `(?:${MON}\\s+\\d{1,2}\\s+${YEAR}|${MON}\\s+${YEAR}|${YEAR}|q[1-4]\\s+${YEAR}|${MON}|\\d{1,2}/\\d{1,2}/\\d{2,4}|${YEAR}-\\d{2}(?:-\\d{2})?)`;
+  const POINT = `(?:(?:${MON})\\s+\\d{1,2}\\s+${YEAR}|(?:${MON})\\s+${YEAR}|${YEAR}|q[1-4]\\s+${YEAR}|(?:${MON})|\\d{1,2}/\\d{1,2}/\\d{2,4}|${YEAR}-\\d{2}(?:-\\d{2})?)`;
+  const DATED = `(?:(?:${MON})\\s+\\d{1,2}\\s+${YEAR}|(?:${MON})\\s+${YEAR}|${YEAR})`;
   return [
+    `(?:between|from|since)\\s+${POINT}\\s+(?:and|to|through|thru|until|till)\\s+(?:now|today|present|date)`,
+    `${DATED}\\s+(?:to|through|thru|until|till)\\s+${DATED}`,
     `(?:between|from)\\s+${POINT}\\s+(?:and|to|through|thru|until|till)\\s+${POINT}(?:\\s+(?:of\\s+)?${YEAR})?`,
     `(?:the\\s+)?(?:first|second|third|fourth|1|2|3|4)\\s+quarter\\s+(?:of\\s+)?${YEAR}`,
     `q[1-4]\\s+(?:of\\s+)?${YEAR}`, `${YEAR}\\s+q[1-4]`,
@@ -93,8 +99,26 @@ function takeTime(w, today) {
     let phrase = m[0].trim();
     if (/^(?:19|20)\d\d$/.test(phrase)) phrase = `in ${phrase}`;
     let span = null;
-    try { span = resolveAnyTimeRange(phrase, today); } catch { span = null; }
+    // "since 2024 until now", "from March 2024 to today": the start of the span, through today
+    const openEnd = /^(?:between|from|since)\s+(.+?)\s+(?:and|to|through|thru|until|till)\s+(?:now|today|present|date)$/i.exec(phrase);
+    try {
+      if (openEnd) { const st = resolveAnyTimeRange(`since ${openEnd[1]}`, today); span = st && !st.invalid && st.from ? { from: st.from, to: today, label: `from ${openEnd[1]} through today` } : null; }
+      else span = resolveAnyTimeRange(phrase, today);
+    } catch { span = null; }
     if (!span || span.invalid || !span.from || !span.to) continue;
+    // the shared span reader drops "before / after / until / through" when the point is a month or a day ("before March 2024" comes back as March 2024 alone): the direction is applied here, or the question is released
+    {
+      const dir = /^(?:in\s+|on\s+|during\s+)?(before|prior\s+to|after|until|till|by|through|thru)\s+(?!the\b)(.+)$/i.exec(phrase);
+      if (dir && !openEnd) {
+        const kw = dir[1].toLowerCase().replace(/\s+/g, ' ');
+        const iso = (v, end) => { const x = String(v).slice(0, 10); if (/^\d{4}$/.test(x)) return end ? `${x}-12-31` : `${x}-01-01`; if (/^\d{4}-\d{2}$/.test(x)) { if (!end) return `${x}-01`; const [yy, mm] = x.split('-').map(Number); return `${x}-${String(new Date(Date.UTC(yy, mm, 0)).getUTCDate()).padStart(2, '0')}`; } return x; };
+        const shift = (d, n) => { const t = new Date(`${d}T00:00:00Z`); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
+        const f0 = iso(span.from, false); const t0 = iso(span.to, true);
+        if (kw === 'before' || kw === 'prior to') { if (f0 > '1901-01-01') span = { from: '1900-01-01', to: shift(f0, -1), label: `before ${dir[2]}` }; }
+        else if (kw === 'after') { if (t0 < today) span = { from: shift(t0, 1), to: today, label: `after ${dir[2]}` }; }
+        else if (f0 > '1901-01-01' && !/^(?:19|20)\d\d$/.test(dir[2].trim())) return { ambiguous: true }; // "until March 2024", "by June": whether the named month is in is not said
+      }
+    }
     w.blank(m.index, m[0].length);
     const day = (v, end) => {
       const x = String(v).slice(0, 10);
@@ -165,7 +189,11 @@ export function parseDql(question, ctx = {}) {
   if (/\b(?:overdue|past\s+due|unpaid|outstanding|owed|owing|owes?|balances?|delinquent|paid|pay(?:ment)?s?\s+status|still\s+owe|behind\s+on)\b/i.test(raw0)) return null;
   // "what's the number of the invoice for $115" asks for the paper's own number, not a count
   if (/\bnumber\s+of\s+the\s+[a-z -]+?\s+(?:for|from|of|on|dated|with)\b/i.test(raw0) && !/\bhow\s+many\b/i.test(raw0)) return null;
-  const framed = dqlParaphrase(moneyRewrite(dqlFrame(stripConversationalFrame(dqlFrame(raw0)) ?? dqlFrame(raw0)) || raw0));
+  const rawOpen = openEndRewrite(raw0);
+  let framed = dqlParaphrase(moneyRewrite(dqlFrame(stripConversationalFrame(dqlFrame(rawOpen)) ?? dqlFrame(rawOpen)) || rawOpen));
+  // "the second largest invoice": the ordinal is taken out here, the rest reads as the plain extreme, and the plan is turned into the Nth of that ranking at the end
+  let ordinal = null;
+  { const od = readOrdinal(framed); if (od?.bad) return null; if (od) { ordinal = od.n; framed = ordinalCustomerRewrite(od.text); } }
   // a definition or an opinion is not a query over records ("what is a startup sheet", "what does that mean")
   if (/\b(?:what(?:'s|s|\s+is|\s+are|\s+does)|define|explain|meaning\s+of)\s+(?:a|an)\s/i.test(framed) || /\bwhat\b.*\b(?:mean|means|meaning)\b/i.test(framed)) return null;
   if (/\b\d{1,6}\s+(?:[a-z.]+\s+){0,3}(?:st|street|ave|avenue|rd|road|dr|drive|ln|lane|blvd|boulevard|way|ct|court|pl|place|cir|circle|pkwy|parkway)\b/i.test(framed)) return null;
@@ -210,7 +238,7 @@ export function parseDql(question, ctx = {}) {
         if (!hit) continue;
         // a single common word is not a name unless it is also written like one in the vocabulary (>= 5 letters or multi-word)
         if (n === 1 && key.length < 5) continue;
-        nameHits.push({ key, hit, a, n });
+        nameHits.push({ key, hit, a, n, before: parts.slice(Math.max(0, a - 3), a).map((x) => x.w.toLowerCase()), after: parts.slice(a + n, a + n + 2).map((x) => x.w.toLowerCase()) });
         for (let k = a; k < a + n; k++) used[k] = true;
       }
     }
@@ -221,7 +249,15 @@ export function parseDql(question, ctx = {}) {
   }
   for (const h of nameHits.sort((x, y) => x.a - y.a)) {
     const r = h.hit;
-    const roles = [r.customer && 'customer', r.tech && 'tech', r.vendor && 'vendor'].filter(Boolean);
+    let roles = [r.customer && 'customer', r.tech && 'tech', r.vendor && 'vendor'].filter(Boolean);
+    // a person on file as a customer AND a technician: the question's own words may say which ("service tickets BY Kevin Pratt", "how many jobs DID Kevin Pratt WORK"); otherwise ask, do not guess
+    if (roles.length === 2 && roles.includes('tech') && roles.includes('customer') && !r.vendor) {
+      const b = h.before ?? []; const af = h.after ?? [];
+      const techCue = b[b.length - 1] === 'by' || /^(?:technician|tech|mechanic|foreman|electrician|plumber|attorney|lawyer|provider|doctor|coordinator|crew|installer|inspector)$/.test(b[b.length - 1] ?? '')
+        || (/^(?:did|does|do|has|have|had|was|were|is)$/.test(b[b.length - 1] ?? '') && /^(?:work|worked|handle|handled|perform|performed|complete|completed|service|serviced|install|installed|fix|fixed|repair|repaired|inspect|inspected|visit|visited|do|did|done|run|ran)$/.test(af[0] ?? ''));
+      const custCue = /^(?:for|to|from|of)$/.test(b[b.length - 1] ?? '') || /^(?:owe|owes|owed|pay|paid|pays|bought|ordered)$/.test(af[0] ?? '');
+      if (techCue && !custCue) roles = ['tech']; else if (custCue && !techCue) roles = ['customer'];
+    }
     if (roles.length !== 1) return null; // a name that is two things at once: ask, do not guess
     feat.filters.push({ field: roles[0], op: 'eq', value: r.display, label: r.display, role: roles[0] });
   }
@@ -259,7 +295,7 @@ export function parseDql(question, ctx = {}) {
     const NUM = `(\\$?\\d+(?:\\.\\d+)?)`;
     if (!vocab.unitRe) vocab.unitRe = [...vocab.docPhrases.keys()].filter((p) => p.length >= 3).sort((a, b) => b.length - a.length).map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+')).join('|');
     const UNIT = `(?:\\s+(years?|yrs?|days?|months?|hours?|hrs?|tons?|ton|dollars?|bucks|percent|units?|systems?|visits?|documents?|docs?|customers?|times|${vocab.unitRe}))?`;
-    const TAIL = '(?:\\s+(?:or|and)\\s+(more|less|bigger|larger|smaller|older|newer|higher|lower|greater|fewer|up))?';
+    const TAIL = '(?:\\s+(?:or|and)\\s+(more|less|bigger|larger|smaller|older|newer|higher|lower|greater|fewer|up)(?!\\s+than))?'; // "over 5 or more" is a tail; "over $1500 and less than $3000" is a second bound
     const re = rx(`(${CMP})\\s+${NUM}${UNIT}(?:\\s+ago)?${TAIL}`);
     for (let m; (m = w.take(re));) {
       const word = m[1].replace(/\s+/g, ' ');
@@ -370,6 +406,10 @@ export function parseDql(question, ctx = {}) {
   // ---- 10. operator triggers
   const t = feat.trig = {};
   if (feat.byMoney) { t.money = ['dollars']; t.moneyType = feat.byMoneyType; }
+  // "the busiest technician / mechanic / attorney": the staff member with the most visits (the technician noun was taken in step 8)
+  if ((feat.nouns.tech || feat.distinctDim === 'tech') && !feat.nouns.visit && !feat.docTypes.length && !feat.dims.length && w.take(rx('(?:the\\s+)?(?:busiest|most\\s+active)'))) {
+    t.argmax = { dim: null, dir: 'desc' }; feat.nouns.document = true; feat.flags.plural = true; feat.nouns.tech = true; if (feat.distinctDim === 'tech') feat.distinctDim = null;
+  }
   // "which tech has the most X" / "who has the fewest X"
   {
     const m = w.take(rx(`(?:which|what|who)\\s+(?:(${DIM_ALT})\\s+)?(?:(?:has|have|had|did|does|do|is|are|was|were|with|got|gets|brings?|in|made|makes|sold|generated|handled|done|completed|we|our|us|the|a|an)\\s+){0,4}(most|highest|biggest|largest|busiest|top|least|fewest|lowest|smallest)`));
@@ -459,6 +499,10 @@ export function parseDql(question, ctx = {}) {
   // "jobs": a visit when nothing else says what is counted; just a carrier word beside a money word or a document type
   w.take(rx('log|logged|logging'));
   if (feat.docTypes.length || t.money?.length) w.take(rx('jobs?'));
+  // "how many jobs did Kevin Pratt work": the papers that name him as the technician (the same count "Kevin Pratt has 60 jobs on file" gives)
+  else if (!feat.time && !feat.times.length && feat.filters.some((x) => x.role === 'tech') && !feat.nouns.visit && !feat.nouns.document && !feat.nouns.unit && !feat.nouns.customer && w.take(rx('jobs?'))) {
+    feat.nouns.document = true; feat.flags.plural = true; w.takeAll(rx('work|worked|working|do|did|does|done|handle|handled|handles|complete|completed|perform|performed'));
+  }
   else if (vocab.otherIndustry && w.take(rx('jobs?'))) { feat.nouns.visit = true; feat.flags.plural = true; } // "how many jobs": the visits (landscaping, electrical and other trades say job)
 
   // "tickets handled by Marisol Vega", "hours billed by Danny Ochoa": the technician filter's own preposition
@@ -486,7 +530,7 @@ export function parseDql(question, ctx = {}) {
   if (feat.left.length) {
     // COVERAGE RULE: an unexplained word releases the question, unless exactly one family explains EVERY leftover word itself
     const early = rescuePlan(feat, { vocab });
-    if (early) return { mode: 'dql', plan: early, text: framed, plain: false };
+    if (early) { const ep = ordinal ? applyOrdinal(early, ordinal) : early; return ep ? { mode: 'dql', plan: ep, text: framed, plain: false } : null; }
     // LEARNED PLANNER (dql/learned): Donovan's own small model may mark the leftover words as filler, only above a high calibrated threshold
     // and only when its guards pass; slots always came from the detectors above. DONOVAN_DQL_LEARNED=0 turns it off.
     const lg = leftoverGate({ raw: raw0, framed, orig: w.orig, rest: w.s, left: feat.left, feat, vocab, debug: ctx.debug });
@@ -497,9 +541,23 @@ export function parseDql(question, ctx = {}) {
   }
 
   // ---- families
-  const plan = detectPlan(feat, { vocab });
+  let plan = detectPlan(feat, { vocab });
+  // LEARNED PLANNER, hook B (dql/learned supplyOp): no family claimed it because no operator trigger matched; a very confident model may supply it
+  if (!plan) {
+    const sup = supplyOp({ raw: raw0, framed, orig: w.orig, rest: w.s, left: feat.left, feat, vocab, debug: ctx.debug });
+    if (sup) {
+      feat.trig[sup.flag] = true;
+      const p2 = detectPlan(feat, { vocab });
+      if (p2 && sup.confirm(p2)) { plan = p2; feat.supplied = sup; if (ctx.debug) ctx.debug.supplied = { op: sup.op, prob: sup.prob }; } else feat.trig[sup.flag] = false;
+    }
+  }
+  if (plan && ordinal) { plan = applyOrdinal(plan, ordinal); if (!plan && ctx.debug) ctx.debug.why = 'ordinal: not a ranking that can be placed'; }
   if (!plan) { if (ctx.debug) ctx.debug.why = `no family claimed it${feat.unusedTriggers ? ` (unused: ${feat.unusedTriggers.join(',')})` : ''}`; return null; }
   if (feat.learned && !verifyPlan(feat.learned, plan)) { if (ctx.debug) ctx.debug.why = 'learned planner disagrees with the plan'; return null; }
   if (plan.op === 'list' && plan.entity === 'document' && asksAmounts(stripConversationalFrame(raw0) ?? raw0)) plan.showAmounts = true;
-  return { mode: 'dql', plan, text: framed, plain: isPlainInventory(plan) };
+  // a plain count of a paper kind only this kind of business keeps (a lease, a gift receipt) is DQL's: the older lanes read those words as an HVAC shop's papers
+  const industryPaper = vocab.otherIndustry && !Array.isArray(plan.docType) && plan.docType
+    && (INDUSTRY_ONLY_TYPES.has(plan.docType) || (plan.docWord && vocab.scopedPhrases?.has(String(plan.docWord).toLowerCase())));
+  if (vocab.otherIndustry && plan.entity === 'customer') { const cw = customerWordFor(vocab.industryKind).one; if (cw !== 'customer') plan.custWord = cw; }
+  return { mode: 'dql', plan, text: framed, plain: isPlainInventory(plan) && !industryPaper };
 }

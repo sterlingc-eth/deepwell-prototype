@@ -34,6 +34,7 @@
  * pure: classifyRelationsQuestion
  * db:   answerRelationsQuestion (one withTenant transaction; every read is TENANT_SQL-scoped)
  */
+import { customerWordForDb } from '../dql/custWord.js';
 import { TENANT_SQL, todayIso, humanDate, answerEnvelope, docTypeAliases } from '../scope.js';
 import { attachCitations, customerRecord, unitRecord } from '../citations/records.js';
 import { documentRecordsFor } from '../citations/enrich.js';
@@ -765,8 +766,9 @@ const HANDLERS = {
   async totalCustomersCount(db) {
     const customers = await fetchCustomers(db);
     const n = customers.length;
-    return finish(`${n} customer${n === 1 ? '' : 's'} on file in total.`, [{ label: 'Customers', value: String(n) }],
-      { records: customers.filter((c) => c.name).map((c) => customerRecord(c)), total: n, claimedCount: n, basis: 'Counted every customer on file.' });
+    const cw = (await customerWordForDb(db)).one; // the business's own word for them (patients, tenants, donors, clients)
+    return finish(`${n} ${n === 1 ? cw : `${cw}s`} on file in total.`, [{ label: `${cw[0].toUpperCase()}${cw.slice(1)}s`, value: String(n) }],
+      { records: customers.filter((c) => c.name).map((c) => customerRecord(c)), total: n, claimedCount: n, basis: `Counted every ${cw} on file.` });
   },
 
   async totalUnitsCount(db) {

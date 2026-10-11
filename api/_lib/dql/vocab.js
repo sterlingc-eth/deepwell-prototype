@@ -80,11 +80,12 @@ export function compileVocab(tv, pack) {
     for (const p of [base, `${base}s`, t.id, `${t.id}s`, half, `${half}s`]) if (!v.docPhrases.has(p)) v.docPhrases.set(p, t.id);
   }
   // the everyday word for a kind of paper in this kind of business ("estimate", "pledge", "repair order"): only when it means ONE of the kinds this organization has
+  v.industryKind = tv?.industryKind ?? null;
   v.otherIndustry = Boolean(tv?.industryKind) && String(tv.industryKind).toLowerCase() !== 'hvac';
   // the shared everyday words of other kinds of business apply to an organization that chose one at sign-up (an HVAC shop, or no choice, keeps the words it always had)
   const aliases = v.otherIndustry ? resolveDocAliases(v.docTypesInUse.keys(), tv?.industryKind) : Object.assign(new Map(), { scoped: new Set() });
   v.scopedPhrases = aliases.scoped;
-  for (const [p, id] of aliases) { const cur = v.docPhrases.get(p); if (!cur || (cur !== id && !v.docTypesInUse.has(cur))) v.docPhrases.set(p, id); }
+  for (const [p, id] of aliases) { const cur = v.docPhrases.get(p); if (!cur || (cur !== id && (!v.docTypesInUse.has(cur) || (id === 'lease-agreement' && !v.docTypesInUse.has(id))))) v.docPhrases.set(p, id); } // a lease is not a generic agreement: with no lease papers on file the answer is none
   // a phrase for a kind of paper this organization does not keep, that is also an everyday noun for a visit or a customer ("site visit"), is that noun
   { const nouns = new Set(Object.values(ENTITY_WORDS).flat()); for (const [p, id] of [...v.docPhrases]) if (!v.docTypesInUse.has(id) && nouns.has(p)) v.docPhrases.delete(p); }
   for (const w of tv?.industryWords ?? []) v.industry.add(String(w).toLowerCase());

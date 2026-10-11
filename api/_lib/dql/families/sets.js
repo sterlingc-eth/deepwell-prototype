@@ -1376,7 +1376,7 @@ function resolveBuilding(phrase, snap) {
 /* ====================================================================== say */
 
 const nounFor = (plan, n) => {
-  if (plan.entity === 'customer') return n === 1 ? 'customer' : 'customers';
+  if (plan.entity === 'customer') return n === 1 ? (plan.custWord ?? 'customer') : `${plan.custWord ?? 'customer'}s`;
   if (plan.entity === 'unit') return n === 1 ? 'unit' : 'units';
   if (plan.entity === 'city') return n === 1 ? 'city' : 'cities';
   if (plan.entity === 'tech') return n === 1 ? 'technician' : 'technicians';
@@ -1451,7 +1451,10 @@ function condPhrase(expr, plan) {
   if (withPos.length) parts.push(`with ${withPos.join(' and ')}`);
   if (anyPart.length) parts.push(anyStyle === 'with' ? `with ${anyPart.join(' or ')}` : (expr.any.every((p) => p.k === 'city') ? `in ${expr.any.map((p) => p.value).join(' or ')}` : anyPart.join(' or ')));
   if (withNeg.length) parts.push(`${withPos.length || anyPart.length ? 'but ' : ''}without ${withNeg.join(' or ')}`);
-  return [...plainPos, ...parts, ...plainNeg].filter(Boolean).join(' ');
+  // "not in Mesa" + "not in Gilbert" read as one condition: "not in Mesa or Gilbert"
+  const notIn = plainNeg.filter((t) => /^not in /.test(t));
+  const negOut = notIn.length > 1 ? [`not in ${notIn.map((t) => t.slice(7)).join(' or ')}`, ...plainNeg.filter((t) => !/^not in /.test(t))] : plainNeg;
+  return [...plainPos, ...parts, ...negOut].filter(Boolean).join(' ');
 }
 
 /** A unit in a sentence: serial, brand, model; in a list longer than twelve just the serial (the same rule the core family uses), the cards carry the rest. */
@@ -1514,10 +1517,20 @@ function sameNameParts(res, plan) {
   return { who: listNames(uniq.slice(0, 3)), many: uniq.length > 1, distinct: seen.size };
 }
 
+/** "customers with no invoices": the customers with no paper of any kind on file are in the list; say how many, so the list reads whole. */
+function nothingAtAll(res, plan, snap) {
+  if (plan.entity !== 'customer' || plan.mode === 'share' || plan.mode === 'share_billed' || !Array.isArray(res.rows) || !res.rows.length) return 0;
+  if (!(plan.expr?.none ?? []).some((p) => p.k === 'doc' && p.type)) return 0;
+  const ix = indexOf(snap);
+  const n = res.rows.filter((r) => !(ix.docsByCust.get(r.id)?.length)).length;
+  return n > 0 && n < res.rows.length ? n : 0;
+}
+
 function saySelect(res, plan, { snap }) {
   const r = saySelect0(res, plan, { snap });
   if (!r?.text) return r;
   const dn = sameNameParts(res, plan);
+  const zero = nothingAtAll(res, plan, snap);
   // in a long list the notes that qualify the NUMBER sit right after the count, before the names, so they are never pushed out of sight
   if (r.text.includes(LEAD)) {
     const parts = [];
@@ -1525,6 +1538,7 @@ function saySelect(res, plan, { snap }) {
     if (dn) parts.push(`${dn.who} ${dn.many ? 'are' : 'is'} on file twice, so ${fmtInt(dn.distinct)} different names`);
     if (res.unknown) parts.push(`${fmtInt(res.unknown.n)} more ${res.unknown.n === 1 ? 'has' : 'have'} no ${res.unknown.field} on file and ${res.unknown.n === 1 ? 'is' : 'are'} not counted`);
     if (res.never) parts.push(`${fmtInt(res.never)} more ${res.never === 1 ? 'has' : 'have'} never had one and ${res.never === 1 ? 'is' : 'are'} left out`);
+    if (zero) parts.push(`${fmtInt(zero)} of them ${zero === 1 ? 'has' : 'have'} no papers of any kind on file`);
     r.text = r.text.replace(LEAD, parts.length ? ` (${parts.join('; ')})` : '');
 
     if ((res.caveats ?? []).length) r.text += ` ${caveatSentence({ caveats: res.caveats }).trim()}`;
@@ -1534,6 +1548,7 @@ function saySelect(res, plan, { snap }) {
   if (res.unknown) r.text += ` ${fmtInt(res.unknown.n)} more ${res.unknown.n === 1 ? 'has' : 'have'} no ${res.unknown.field} on file and ${res.unknown.n === 1 ? 'is' : 'are'} not counted.`;
   if (res.never) r.text += ` ${fmtInt(res.never)} more ${res.never === 1 ? 'has' : 'have'} never had one and ${res.never === 1 ? 'is' : 'are'} left out.`;
   if (dn) r.text += ` ${dn.who} ${dn.many ? 'are' : 'is'} on file twice, so that is ${fmtInt(dn.distinct)} different names.`;
+  if (zero) r.text += ` ${fmtInt(zero)} of them ${zero === 1 ? 'has' : 'have'} no papers of any kind on file.`;
   return r;
 }
 

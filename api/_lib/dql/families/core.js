@@ -9,6 +9,7 @@ import { ynOf } from '../yn.js';
 import { registerFamily } from '../registry.js';
 import { ENTITIES, yearsBetween } from '../fields.js';
 import { sayResult } from '../say.js';
+import { nthOf } from '../ordinal.js';
 
 export const CORE_OPS = ['count', 'count_distinct', 'list', 'sum', 'avg', 'min', 'max', 'median', 'group_count', 'group_sum', 'group_avg', 'pivot_two_dims',
   'top_n', 'bottom_n', 'latest', 'first_ever', 'exists_yes_no', 'share_pct', 'per_entity_avg', 'compare_two_values'];
@@ -490,6 +491,14 @@ function execCore(plan, x) {
       // "the most recent paper" is the latest one dated on or before today: a paper dated in the future (a term that has not started) is not "recent"
       if (plan.op === 'latest' && plan.entity === 'document' && today && withV.some((o) => o.v <= today)) withV = withV.filter((o) => o.v <= today);
       if (!withV.length) return { ...res, value: null, extreme: [] };
+      if (plan.nth) {
+        const sorted = [...withV].sort((a, b) => (plan.op === 'latest' ? (a.v < b.v ? 1 : a.v > b.v ? -1 : 0) : (a.v < b.v ? -1 : a.v > b.v ? 1 : 0)));
+        const nt = nthOf(sorted.map((o) => o.v), plan.nth);
+        if (nt.status === 'ambiguous') return { abstain: 'ordinal-ties' };
+        if (nt.status === 'short') return { ...res, value: null, extreme: [], nth: nt, dated: withV.length };
+        const at = sorted.slice(nt.from, nt.to);
+        return { ...res, value: at[0].v, extreme: at.map((o) => o.r), nth: nt, dated: withV.length };
+      }
       const best = plan.op === 'latest' ? withV.reduce((a, b) => (b.v > a.v ? b : a)).v : withV.reduce((a, b) => (b.v < a.v ? b : a)).v;
       return { ...res, value: best, extreme: withV.filter((o) => o.v === best).map((o) => o.r), dated: withV.length };
     }
@@ -517,6 +526,7 @@ function execCore(plan, x) {
         if (!withV.length) return { ...res, ranked: [] };
         const cut = withV[Math.min(plan.limit, withV.length) - 1].v;
         const ranked = withV.filter((o) => (plan.dir === 'asc' ? o.v <= cut : o.v >= cut));
+        if (plan.nth) { const nt = nthOf(ranked.map((o) => o.v), plan.nth); if (nt.status === 'ambiguous') return { abstain: 'ordinal-ties' }; return { ...res, ranked, nUsed: withV.length, cut, nth: nt }; }
         return { ...res, ranked, nUsed: withV.length, cut, tiesBeyond: ranked.length > plan.limit };
       }
       const { groups, leftOut } = h.groupRows(rows, plan, snap, today);
@@ -536,6 +546,7 @@ function execCore(plan, x) {
       if (!out.length) return { ...res, ranked: [], groupLeftOut: leftOut };
       const cut = out[Math.min(plan.limit, out.length) - 1].value;
       const ranked = out.filter((g) => (plan.dir === 'asc' ? g.value <= cut : g.value >= cut));
+      if (plan.nth) { const nt = nthOf(ranked.map((g) => g.value), plan.nth); if (nt.status === 'ambiguous') return { abstain: 'ordinal-ties' }; return { ...res, ranked, cut, groupLeftOut: leftOut, totalGroups: out.length, nth: nt }; }
       // a ranking of years / months / quarters: periods with nothing in them are not groups (so they cannot be "the worst"), and the running period is not finished
       const by0 = plan.groupBy[0]?.by; let gaps = 0;
       if (['year', 'month', 'quarter'].includes(by0) && out.length > 1) {

@@ -104,6 +104,7 @@ import { canonicalBrandLabel } from '../analytics/brandCanon.js';
 import { attachCitations, unitRecord, customerRecord, documentRecord } from '../citations/records.js';
 // Team A (2026-09-24): time semantics (uploaded vs service date) and future-dated service records.
 import { dateBasisOf, todayIso, splitFuture, isVisitType } from '../scope.js';
+import { customerWordForDb } from '../dql/custWord.js';
 // Tier 2 learning loop, Part A (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md):
 // overlayFewShotHash mixes the active overlay's few-shot items into this
 // file's own analytics cache promptVersion (see runAnalyticsQuestion below)
@@ -1955,7 +1956,23 @@ export function applyExistenceShape(data, question) {
  *                    stays easy to call from ask.js without a second import
  *                    cycle back through recordsStore.
  */
-export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today, overlay, tenantVocab, noCache = false }) {
+/** R8: an answer that counts or names the people a business bills uses that business's own word ("patients", "tenants", "donors", "clients"). */
+export async function runAnalyticsQuestion(args) {
+  const res = await runAnalyticsQuestionInner(args);
+  try {
+    const t = res?.handled && res.data?.kind === 'answer' && (res.data.facts?.length ?? 0) > 0 ? res.data.text : null; // a counted answer only: the fixed fallbacks never touch the database
+    if (t && /\bcustomers?\b/i.test(t) && args.withTenant && args.ctxArg) {
+      const w = await args.withTenant(args.ctxArg, (db) => customerWordForDb(db));
+      if (w && w.one !== 'customer') {
+        const re = (x) => x.replace(/\bcustomers\b/g, w.many).replace(/\bcustomer\b/g, w.one).replace(/\bCustomers\b/g, w.many[0].toUpperCase() + w.many.slice(1)).replace(/\bCustomer\b/g, w.one[0].toUpperCase() + w.one.slice(1));
+        res.data = { ...res.data, text: re(t) };
+      }
+    }
+  } catch { /* the answer stands as it was */ }
+  return res;
+}
+
+async function runAnalyticsQuestionInner({ withTenant, ctxArg, question, today, overlay, tenantVocab, noCache = false }) {
   const EMPTY = { handled: false, data: null, cacheHit: false, modelCalled: false, writes: [] };
   // Day 1 training-plan normalization layer (nlNormalize.js): both the plan
   // and every cache key below key off the NORMALIZED text (more cache hits,
@@ -1999,7 +2016,17 @@ export async function runAnalyticsQuestion({ withTenant, ctxArg, question, today
     // ("do we have an invoice dated January 1st, 2030") is still a future-date question first and
     // foremost, never a "financials not built yet" one. See mentionsFutureYear's own doc comment.
     if (mentionsFutureYear(question_n, today)) {
-      return { handled: true, data: futureDateAnswer(), cacheHit: false, modelCalled: false, writes: [] };
+      // R8: "nothing is dated after today" is only said when it is true. An invoice (or other paper) the owner has dated in that year is on file,
+      // so the blanket decline is withheld and the question goes on to the paths that can read it.
+      const yrs = [...String(question_n).matchAll(/\b(19\d{2}|20\d{2}|21\d{2})\b/g)].map((m) => Number(m[1])).filter((y) => y > new Date(today || Date.now()).getUTCFullYear());
+      const dated = yrs.length ? await withTenant(ctxArg, async (db) => {
+        try {
+          const r = await db.raw(`SELECT COALESCE(NULLIF(x.corrected_value, ''), x.value) AS v FROM extractions x JOIN documents d ON d.id = x.document_id AND d.${TENANT_SQL} WHERE x.${TENANT_SQL} AND x.field_key IN ('invoice_date', 'service_date', 'warranty_registered_date')`, []);
+          return (r?.rows ?? []).some((row) => yrs.some((y) => new RegExp(`(?:^|[^0-9])${y}(?:[^0-9]|$)`).test(String(row.v ?? ''))));
+        } catch { return false; }
+      }).catch(() => false) : false;
+      if (!dated) return { handled: true, data: futureDateAnswer(), cacheHit: false, modelCalled: false, writes: [] };
+      return EMPTY;
     }
     const conditionsUpFront = detectedConditions(question_n);
     if (conditionsUpFront.has('money')) {

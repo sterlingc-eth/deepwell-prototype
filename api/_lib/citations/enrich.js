@@ -17,6 +17,10 @@ import {
 } from './records.js';
 
 import { notPrivateSql, isPrivateDoc } from '../privacy/privateDocs.js';
+import { visibleDocSql } from '../audience/visible.js';
+
+/** " AND (<internal-audience papers left out>)": the same papers every other count leaves out, so a total and a by-type list always agree. */
+async function audienceAnd(db) { return ` AND (${await visibleDocSql(db, 'd')})`; }
 const TENANT_SQL = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const uuids = (ids) => [...new Set((ids ?? []).filter((v) => typeof v === 'string' && UUID_RE.test(v)))].slice(0, MAX_RECORDS);
@@ -149,7 +153,7 @@ export async function honestZeroCitations(db, ctx, { documentIdsFor }) {
 
 /** Generic no-answer: how much of the library was searched. One cheap count. */
 export async function searchedLibraryBasis(db) {
-  const { rows } = await db.raw(`SELECT COUNT(*)::int AS n FROM documents d WHERE d.${TENANT_SQL} AND ${notPrivateSql("d")} AND ${notPrivateSql('d')}`, []);
+  const { rows } = await db.raw(`SELECT COUNT(*)::int AS n FROM documents d WHERE d.${TENANT_SQL} AND ${notPrivateSql("d")} ${await audienceAnd(db)}`, []);
   const n = rows[0]?.n ?? 0;
   return n
     ? `Searched the text and extracted fields of all ${n} document${n === 1 ? '' : 's'} in your library; nothing matched.`
@@ -159,11 +163,11 @@ export async function searchedLibraryBasis(db) {
 /* ------------------------------------------------------------------ meta-router (counts / lists) */
 
 const META = {
-  documents: { sql: `SELECT d.id, d.document_type, d.original_filename, d.created_at, COUNT(*) OVER()::int AS total FROM documents d WHERE d.${TENANT_SQL} AND ${notPrivateSql("d")} AND ${notPrivateSql('d')} ORDER BY d.created_at DESC LIMIT ${MAX_RECORDS}`, kind: 'document', basis: 'Counted every document in your library.' },
+  documents: { sql: `SELECT d.id, d.document_type, d.original_filename, d.created_at, COUNT(*) OVER()::int AS total FROM documents d WHERE d.${TENANT_SQL} AND ${notPrivateSql("d")} /*AUD*/ ORDER BY d.created_at DESC LIMIT ${MAX_RECORDS}`, kind: 'document', basis: 'Counted every document in your library.' },
   invoices: { sql: `SELECT d.id, d.document_type, d.original_filename, d.created_at, COUNT(*) OVER()::int AS total FROM documents d WHERE d.document_type = 'invoice' AND d.${TENANT_SQL} ORDER BY d.created_at DESC LIMIT ${MAX_RECORDS}`, kind: 'invoice', basis: 'Counted documents classified as invoices.' },
   warranties: { sql: `SELECT d.id, d.document_type, d.original_filename, d.created_at, COUNT(*) OVER()::int AS total FROM documents d WHERE d.document_type IN ('warranty-registration','warranty') AND d.${TENANT_SQL} ORDER BY d.created_at DESC LIMIT ${MAX_RECORDS}`, kind: 'document', basis: 'Counted documents classified as warranty registrations.' },
-  verified: { sql: `SELECT d.id, d.document_type, d.original_filename, d.created_at, COUNT(*) OVER()::int AS total FROM documents d WHERE d.stage = 'verified' AND d.${TENANT_SQL} AND ${notPrivateSql('d')} ORDER BY d.created_at DESC LIMIT ${MAX_RECORDS}`, kind: 'document', basis: 'Counted documents a person has verified.' },
-  unverified: { sql: `SELECT d.id, d.document_type, d.original_filename, d.created_at, COUNT(*) OVER()::int AS total FROM documents d WHERE d.stage <> 'verified' AND d.${TENANT_SQL} AND ${notPrivateSql('d')} ORDER BY d.created_at DESC LIMIT ${MAX_RECORDS}`, kind: 'document', basis: 'Counted documents that have not been verified yet.' },
+  verified: { sql: `SELECT d.id, d.document_type, d.original_filename, d.created_at, COUNT(*) OVER()::int AS total FROM documents d WHERE d.stage = 'verified' AND d.${TENANT_SQL} AND ${notPrivateSql('d')} /*AUD*/ ORDER BY d.created_at DESC LIMIT ${MAX_RECORDS}`, kind: 'document', basis: 'Counted documents a person has verified.' },
+  unverified: { sql: `SELECT d.id, d.document_type, d.original_filename, d.created_at, COUNT(*) OVER()::int AS total FROM documents d WHERE d.stage <> 'verified' AND d.${TENANT_SQL} AND ${notPrivateSql('d')} /*AUD*/ ORDER BY d.created_at DESC LIMIT ${MAX_RECORDS}`, kind: 'document', basis: 'Counted documents that have not been verified yet.' },
   customers: { sql: `SELECT e.id, e.data->>'customer_name' AS customer_name, e.data->>'service_address' AS service_address, COUNT(*) OVER()::int AS total FROM entities e WHERE e.entity_type = 'customer' AND e.${TENANT_SQL} ORDER BY e.updated_at DESC LIMIT ${MAX_RECORDS}`, kind: 'customer', basis: 'Counted customer records.' },
   equipment: { sql: `SELECT e.id, e.customer_id, e.data->>'manufacturer' AS manufacturer, e.data->>'equipment_type' AS equipment_type, e.data->>'model' AS model, e.data->>'serial_number' AS serial_number, COUNT(*) OVER()::int AS total FROM entities e WHERE e.entity_type = 'equipment' AND e.${TENANT_SQL} ORDER BY e.updated_at DESC LIMIT ${MAX_RECORDS}`, kind: 'unit', basis: 'Counted pieces of equipment on file.' },
 };
@@ -185,7 +189,7 @@ function metaRecord(kind, r, group) {
 export async function metaCount(db, target) {
   const spec = META[target];
   if (!spec) return null;
-  const { rows } = await db.raw(spec.sql, []);
+  const { rows } = await db.raw(spec.sql.replace('/*AUD*/', await audienceAnd(db)), []);
   const n = rows[0]?.total ?? 0;
   return {
     n,
@@ -209,7 +213,7 @@ export async function metaDocumentTypes(db) {
   const { rows } = await db.raw(
     `SELECT document_type, COUNT(*)::int AS n,
             (array_agg(jsonb_build_object('id', id, 'filename', original_filename, 'created_at', created_at) ORDER BY created_at DESC))[1:${MAX_RECORDS}] AS docs
-       FROM documents d WHERE d.${TENANT_SQL} AND ${notPrivateSql("d")} AND ${notPrivateSql('d')} GROUP BY document_type ORDER BY n DESC`,
+       FROM documents d WHERE d.${TENANT_SQL} AND ${notPrivateSql("d")} ${await audienceAnd(db)} GROUP BY document_type ORDER BY n DESC`,
     []
   );
   const records = [];

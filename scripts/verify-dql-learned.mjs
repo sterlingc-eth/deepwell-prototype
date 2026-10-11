@@ -58,27 +58,65 @@ check('guard :: a negation left standing in the question releases', (L.guardReas
 
 /* ---- the shipped model */
 const size = fs.statSync(modelPath).size;
-check('model :: JSON under 2.5 MB', size < 2.5e6, size);
-check('model :: all heads and thresholds present', ['op', 'measure', 'entity', 'doc', 'group'].every((h) => model.heads[h]?.classes?.length && model.heads[h].T > 0) && model.tok && model.gate?.platt && model.thresholds?.gate >= 0.9);
+check('model :: JSON under 4 MB', size < 4.0e6, size);
+check('model :: round-2 format (hashed heads, word clusters)', model.version === 2 && model.hash?.bits === 22 && model.clusters?.length === 2, JSON.stringify(model.hash));
+check('model :: all heads, the verify gate and thresholds present', ['op', 'measure', 'entity', 'doc', 'group'].every((h) => model.heads[h]?.classes?.length && model.heads[h].T > 0) && model.tok && model.verify?.platt && model.thresholds?.verify >= 0.85 && model.thresholds?.tok >= 0.8);
 const ph = L.predictHeads(['how', 'many', '<s>', 'in', '<n>']);
 check('model :: heads classify "how many <s> in <n>" as a count of documents', ph.op.label === 'count' && ph.entity.label === 'document', JSON.stringify(ph));
-check('model :: probabilities are a distribution', (() => { const r = LIN.classify(model.heads.op, FE.headFeats(['top', '<n>', '<s>'])); return Math.abs([...r.p].reduce((a, b) => a + b, 0) - 1) < 1e-9; })());
+const CLU = model.clusters.map((o) => new Map(Object.entries(o)));
+check('model :: probabilities are a distribution', (() => { const r = LIN.classify2(model.heads.op, FE.hashIds(FE.headFeats2(['top', '<n>', '<s>'], CLU))); return Math.abs([...r.p].reduce((a, b) => a + b, 0) - 1) < 1e-9; })());
 check('model :: group head reads "by city"', L.predictHeads(['average', '<s>', 'by', 'city']).group.label === 'city');
 
-/* ---- the gate on recorded real cases */
+
+/* ---- round 2: hashed features (the trainer's feature function and the runtime's must agree bit for bit) */
+check('features2 :: crc32 of a known string', FE.crc32('hello') === 0x3610a686 && FE.crc32('') === 0, FE.crc32('hello'));
+{
+  const f2 = FE.headFeats2(['how', 'many', '<s>', 'tallys'], CLU);
+  check('features2 :: word n-grams, skip-grams, char n-grams, cluster n-grams and length are all there', f2.has('b:how many') && f2.has('t:^ how many') && f2.has('sk:how_<s>') && f2.has('sk3:how_tallys') && f2.has('hc: ho') && f2.has('hc:allys') && [...f2].some((x) => x.startsWith('ka2:')) && [...f2].some((x) => x.startsWith('kb1:')) && f2.has('len:4'), [...f2].slice(0, 12).join('|'));
+  check('features2 :: placeholders get no char grams', ![...FE.headFeats2(['<s>', '<n>'], CLU)].some((x) => x.startsWith('hc:')));
+}
+const par = JSON.parse(fs.readFileSync(path.join(ROOT, 'scripts/learned-parity.json'), 'utf8')).rows;
+check('features2 :: bucket ids match the Python trainer on recorded views', par.every((r) => { const ids = [...FE.hashIds(FE.headFeats2(r.v, CLU))].sort((a, b) => a - b); return ids.length === r.n && ids.reduce((a, b) => a + b, 0) === r.sum && r.first.every((x, i) => x === ids[i]); }));
+check('clusters :: synonyms the corpus itself shows share a cluster (average / avg, invoices / bills, latest / newest)', ['average|avg', 'invoices|bills', 'latest|newest'].every((p) => { const [a, b] = p.split('|'); return CLU[0].get(a) !== undefined && CLU[0].get(a) === CLU[0].get(b); }));
+check('clusters :: the table is small', JSON.stringify(model.clusters).length < 250000);
+const pw = (q) => L.predictHeads(q.split(' '));
+check('heads :: "<n> <s> in <n>" style telegraphic wording still reads as a count', pw('how many <s> in <n>').op.label === 'count' && pw('number of <s> <s> in <n>').op.label === 'count');
+check('heads :: indirect asks and persona padding still read as a count', pw('could you tell me how many <s> there were in <n>').op.label === 'count' && pw('my accountant is asking me how many <s> we had in <n>').op.label === 'count');
+check('heads :: operator synonyms read as their operator (tally up -> count, mean -> avg)', pw('tally up <s> <s> for <n>').op.label === 'count' && pw('whats the mean <s> total for <s> <s>').op.label === 'avg');
+check('heads :: sum wording with a money measure', (() => { const p = pw('what is the total dollar amount of <s> in <n>'); return p.op.label === 'sum' && p.measure.label === 'money'; })());
+check('heads :: an untracked concept reads as a decline', pw('what is our <s> margin').op.label === 'decline' || pw('what is our profit margin').op.label === 'decline');
+check('speed :: head inference under 1 ms', (() => { const v = 'i was wondering how many <s> <s> did we do in <n> for the accountant'.split(' '); L.predictHeads(v); const t0 = process.hrtime.bigint(); for (let i = 0; i < 300; i++) L.predictHeads(v); return Number(process.hrtime.bigint() - t0) / 1e6 / 300 < 1; })());
+
+/* ---- hook B: supplying the missing operator word (api/_lib/dql/learned supplyOp) */
+{
+  const mk = (over = {}) => ({ raw: 'x', orig: ' tickets in 2025 ', rest: '                  ', left: [], feat: { trig: {}, flags: {}, dims: [], ...over.feat }, debug: {}, ...over });
+  const out = (o) => L.supplyOp(o);
+  check('hook B :: refuses when the parser has an operator trigger of its own', out(mk({ feat: { trig: { howMany: true }, flags: {}, dims: [] } })) === null);
+  check('hook B :: refuses a grouped question, a set question and a time-window question', out(mk({ feat: { trig: {}, flags: {}, dims: ['year'] } })) === null && out(mk({ feat: { trig: {}, flags: {}, dims: [], sets: {} } })) === null && out(mk({ feat: { trig: {}, flags: {}, dims: [], timeq: {} } })) === null);
+  check('hook B :: refuses while words are still unexplained', out(mk({ left: ['tally'], orig: ' tally of invoices ', rest: ' tally           ' })) === null);
+  check('hook B :: refuses a negation or a second clause even when the heads are sure', out(mk({ raw: 'invoices and also which customers', orig: ' invoices and also which customers ', rest: '                                  ' })) === null);
+  process.env.DONOVAN_DQL_HOOKB = '0';
+  check('hook B :: kill switch', out(mk()) === null);
+  delete process.env.DONOVAN_DQL_HOOKB;
+  check('hook B :: supply table covers count, sum, avg, median, max, min, exists, latest, first', ['count', 'sum', 'avg', 'median', 'max', 'min', 'exists', 'latest', 'first'].every((k) => typeof L.SUPPLY[k] === 'string'));
+}
+
+/* ---- the gate on recorded real cases (scripts/learned-fixtures.json: words the parser left over on factory questions, with the plan's own reading) */
 const fx = JSON.parse(fs.readFileSync(path.join(ROOT, 'scripts/learned-fixtures.json'), 'utf8'));
-for (const c of fx.open) {
-  const r = L.leftoverGate({ raw: c.q, orig: c.orig, rest: c.rest, left: c.left, debug: {} });
-  check(`gate opens :: ${c.q.slice(0, 70)} [${c.left.join(' ')}]`, Boolean(r?.clear));
-}
-for (const c of fx.shut) {
-  const r = L.leftoverGate({ raw: c.q, orig: c.orig, rest: c.rest, left: c.left, debug: {} });
-  check(`gate releases :: ${c.q.slice(0, 70)} [${c.left.join(' ')}]`, r === null);
-}
+const vth = model.thresholds.verify;
+const decide = (c) => {
+  const g = L.leftoverGate({ raw: c.q, orig: c.orig, rest: c.rest, left: c.left, debug: {} });
+  if (!g) return { open: false, why: 'guard/tok' };
+  const p = L.verifyScore(g, c.dh);
+  return { open: p !== null && p >= vth, p };
+};
+for (const c of fx.open) { const d = decide(c); check(`gate opens :: ${c.q.slice(0, 70)} [${c.left.join(' ')}]`, d.open, JSON.stringify(d)); }
+for (const c of fx.shut) { const d = decide(c); check(`gate releases :: ${c.q.slice(0, 70)} [${c.left.join(' ')}]`, !d.open, JSON.stringify(d)); }
 process.env.DONOVAN_DQL_LEARNED = '0';
 check('kill switch :: DONOVAN_DQL_LEARNED=0 never opens the gate', fx.open.every((c) => L.leftoverGate({ raw: c.q, orig: c.orig, rest: c.rest, left: c.left, debug: {} }) === null));
 delete process.env.DONOVAN_DQL_LEARNED;
 check('no leftover words :: nothing to decide', L.leftoverGate({ raw: 'x', orig: ' a ', rest: '   ', left: [], debug: {} }) === null);
+check('verify gate :: a plan the heads contradict is released', (() => { const g = L.leftoverGate({ raw: fx.open[0].q, orig: fx.open[0].orig, rest: fx.open[0].rest, left: fx.open[0].left, debug: {} }); return g && L.verifyPlan({ ...g, pending: false }, { op: 'top_n', entity: 'customer', groupBy: [{ by: 'city' }] }) === false; })());
 
 /* ---- wiring in parseDql on the golden export */
 const off = await import('./offline-exam.mjs');

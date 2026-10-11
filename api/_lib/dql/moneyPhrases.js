@@ -47,6 +47,14 @@ export function moneyRewrite(text) {
   if (/^\s*(?:list|show|display|give\s+me|pull\s+up)\b/i.test(s) && (m = /\s+(?:along\s+)?(?:with|and|showing|including)\s+(?:their\s+|the\s+)?(?:amounts?|totals?|dollar\s+amounts?|prices?)\s*$/i.exec(s))) {
     return s.slice(0, m.index);
   }
+  // "invoices from 1500 to 3000", "quotes from 1,000 through 5,000": two bounds on the amount (two year-like numbers are a period, not money)
+  if ((m = /\bfrom\s+\$?(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?k?)\s+(?:to|through|thru|until|till|-|and)\s+\$?(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?k?)(?![\d,]*\s*(?:%|percent|units?|visits?|days?|months?|years?|tons?|seer|btu))/i.exec(s)) && /\b(?:invoices?|bills?|quotes?|estimates?|proposals?|purchase\s+orders?|pos|receipts?|payments?)\b/i.test(s)) {
+    const n = (x) => { const k = /k$/i.test(x); const v = Number(String(x).replace(/[,k]/gi, '')); return k ? v * 1000 : v; };
+    const a = n(m[1]); const b = n(m[2]);
+    const yearish = (v) => Number.isInteger(v) && v >= 1900 && v <= 2100;
+    const hasMark = /\$/.test(m[0]) || /,/.test(m[0]);
+    if (!(yearish(a) && yearish(b) && !hasMark) && Math.max(a, b) >= 100 && a !== b) return `${s.slice(0, m.index)}between $${Math.min(a, b)} and $${Math.max(a, b)}${s.slice(m.index + m[0].length)}`;
+  }
   return s;
 }
 

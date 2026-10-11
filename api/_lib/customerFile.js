@@ -53,6 +53,18 @@ export async function fetchFileData(db, customerRow) {
     docs = rows;
   }
   const visits = ids.length ? await fetchVisits(db, ids) : [];
+  // R8: a person who is a customer AND the technician / provider on other papers is also on file as staff. Only the fact is said; the papers that show it are
+  // counted nowhere (private and internal papers stay out of this check too).
+  let alsoStaff = false;
+  try {
+    const nm = String(customerRow.customer_name ?? '').trim().toLowerCase();
+    if (nm) {
+      const { rows } = await db.raw(
+        `SELECT 1 FROM extractions x JOIN documents d ON d.id = x.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
+          WHERE x.${TENANT_SQL} AND x.field_key = 'technician' AND lower(trim(COALESCE(NULLIF(x.corrected_value, ''), x.value))) = $1 LIMIT 1`, [nm]);
+      alsoStaff = rows.length > 0;
+    }
+  } catch { alsoStaff = false; }
   let reminders = [];
   try { reminders = await listOpenReminders(db, { customerId: customerRow.id }); } catch { reminders = []; }
   let agreementTerm = null;
@@ -64,7 +76,7 @@ export async function fetchFileData(db, customerRow) {
       [agreementDoc.id]);
     agreementTerm = rows[0]?.v ?? null;
   }
-  return { units, docs, visits, reminders, agreementTerm, scope };
+  return { units, docs, visits, reminders, agreementTerm, scope, alsoStaff };
 }
 
 const pluralType = (label, n) => (n === 1 ? label.toLowerCase() : `${label.toLowerCase()}${/s$/i.test(label) ? '' : 's'}`);
@@ -147,6 +159,7 @@ export function buildFileSummary(row, data, today) {
   } else {
     lines.push('No open reminders.');
   }
+  if (data.alsoStaff) lines.push('Also on file as staff.');
   return { lines, facts };
 }
 

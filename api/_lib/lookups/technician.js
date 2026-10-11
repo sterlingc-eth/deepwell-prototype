@@ -51,7 +51,7 @@ export function parseTechnician(question, tenantVocab, opts = {}) {
   // "tickets by Danny in 2011", "jobs by Danny Ochoa", "service calls by Danny last year" (no "how many"): a record noun + "by <name>" is the same
   // one-technician count. Roster-gated below (an unknown name still returns null). Kill switch: DONOVAN_TECH_BY=0.
   if (process.env.DONOVAN_TECH_BY !== "0" && !/\bhow many\b|\bnumber of\b|\bcount\b|\btotal\b/i.test(raw)) {
-    const by = /^\s*(?:(?:show\s+me|list|gimme|give\s+me|get\s+me|pull\s+up|any)\s+)?(?:the\s+|all\s+)?(?:service\s+tickets?|tickets?|tix|work\s*orders?|service\s+calls?|calls?|jobs?|visits?)\s+(?:done\s+|worked\s+|run\s+|logged\s+)?by\s+(?:tech(?:nician)?\s+)?(.+?)\s*[?.!]*\s*$/i.exec(raw);
+    const by = /^\s*(?:(?:show\s+me|list|gimme|give\s+me|get\s+me|pull\s+up|any)\s+)?(?:the\s+|all\s+)?(?:service\s+calls?|calls?|jobs?|visits?)\s+(?:done\s+|worked\s+|run\s+|logged\s+)?by\s+(?:tech(?:nician)?\s+)?(.+?)\s*[?.!]*\s*$/i.exec(raw);
     if (by) raw = `how many jobs by ${by[1]}`;
   }
   // A date window (in 2012, since 2020-01-01, between 2010 and 2012) is read first and taken out of the text; only a plain one-technician total may carry it.

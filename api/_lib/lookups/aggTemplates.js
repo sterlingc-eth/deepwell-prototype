@@ -23,6 +23,7 @@ import { canonicalBrandLabel } from "../analytics/brandCanon.js";
 import { attachCitations, documentRecord, unitRecord, customerRecord } from "../citations/records.js";
 import { answerEnvelope, TENANT_SQL, todayIso } from "../scope.js";
 import { notPrivateSql } from "../privacy/privateDocs.js";
+import { visibleDocSql } from "../audience/visible.js";
 
 export const templatesEnabled = () => process.env.DONOVAN_AGG_TEMPLATES !== "0";
 
@@ -267,7 +268,7 @@ async function loadVisits(db) {
             (SELECT COALESCE(NULLIF(x.corrected_value, ''), x.value) FROM extractions x WHERE x.document_id = d.id AND x.field_key = 'service_date' ORDER BY x.created_at LIMIT 1) AS sdate,
             (SELECT COALESCE(NULLIF(x.corrected_value, ''), x.value) FROM extractions x WHERE x.document_id = d.id AND x.field_key = 'technician' ORDER BY x.created_at LIMIT 1) AS tech,
             (SELECT COALESCE(NULLIF(x.corrected_value, ''), x.value) FROM extractions x WHERE x.document_id = d.id AND x.field_key = 'service_type' ORDER BY x.created_at LIMIT 1) AS stype
-       FROM documents d WHERE d.${TENANT_SQL} AND ${notPrivateSql("d")} AND EXISTS (SELECT 1 FROM extractions x WHERE x.document_id = d.id AND x.field_key = 'service_date') LIMIT ${ROW_CAP + 1}`, []);
+       FROM documents d WHERE d.${TENANT_SQL} AND (${await visibleDocSql(db, "d")}) AND EXISTS (SELECT 1 FROM extractions x WHERE x.document_id = d.id AND x.field_key = 'service_date') LIMIT ${ROW_CAP + 1}`, []);
   if (rows.length > ROW_CAP) return null;
   return rows.map((r) => ({ ...r, date: ymd(r.sdate), tech: r.tech ? String(r.tech).trim() : null, svc: r.stype ? String(r.stype).trim() : null }));
 }
@@ -290,7 +291,7 @@ async function loadMoney(db, kind) {
 }
 const MONEY_KINDS_SQL = MONEY_KINDS;
 async function loadDocTypes(db) {
-  const { rows } = await db.raw(`SELECT id, document_type, original_filename FROM documents WHERE ${TENANT_SQL} AND ${notPrivateSql("")} LIMIT ${ROW_CAP + 1}`, []);
+  const { rows } = await db.raw(`SELECT d.id, d.document_type, d.original_filename FROM documents d WHERE d.${TENANT_SQL} AND (${await visibleDocSql(db, "d")}) LIMIT ${ROW_CAP + 1}`, []);
   return rows.length > ROW_CAP ? null : rows;
 }
 

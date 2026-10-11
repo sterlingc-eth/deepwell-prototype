@@ -21,12 +21,13 @@
  */
 import { withTenant as defaultWithTenant } from '../recordsStore.js';
 import { tenantHasFinancialRows } from './store.js';
-import { parseMoneyIntent, runMoneyIntent, dropRoleBeforeInvoices } from './answers.js';
+import { parseMoneyIntent, runMoneyIntent, dropRoleBeforeInvoices, billsAsInvoicesText } from './answers.js';
 import { leftoverWords, unusedGrammar } from '../router/leftover.js';
 import { resolveContactCandidates } from '../contactLookup.js';
 import { parseAmountInvoiceQuestion, amountMentioned } from './amountInvoice.js';
 import { docLaneFromUnderstanding } from '../understanding/route.js';
 import { namedMoneyShape } from '../lookups/namedMoney.js';
+import { droppedConditionShape } from '../router/dqlArbiter.js';
 import { nameVerdict, clarifyText, nameTokens } from '../lookups/nameMatch.js';
 
 /** R39: a plain "how many invoices/quotes/purchase orders" count answers from the document kind, the period and the named subject ONLY. Any other
@@ -64,11 +65,14 @@ export function moneyNoMatchAnswer() {
  */
 export async function answerMoneyQuestion({ withTenant = defaultWithTenant, ctxArg, question, today }) {
   question = dropRoleBeforeInvoices(question); // E2 A4: "customer invoices" counts invoices; the role word is not a leftover name
+  const billsRead = billsAsInvoicesText(question); // R8: "how many bills are unpaid" in a company whose bills are the invoices it sends: "bills" is not a leftover name
+  if (billsRead) question = billsRead;
   try {
     return await withTenant(ctxArg, async (db) => {
       if (!(await tenantHasFinancialRows(db))) return { handled: false, hasData: false };
       const intent = parseMoneyIntent(question, { today });
       if (!intent) return { handled: false, hasData: true };
+      if (billsRead) { if (intent.subject || intent.period) return { handled: false, hasData: true }; intent.billsAsInvoices = true; }
       // B3: grammar the money reading never used (a negation, a second year, "combined", "and their total value", a top-N ...) must not be silently dropped: a figure for a different question is not an answer
       if (moneyGrammarUnused(question, today).length) return { handled: false, hasData: true, intent: intent.intent };
       // R40: a question that names an invoice amount is never answered with a shop-wide total / count / last-invoice that ignores the amount.
@@ -112,6 +116,8 @@ const NOT_MONEY_FACT_OK = /\b(?:who (?:owes|paid|pays|has not paid|hasn't paid|h
 export const asksNonMoneyFact = (q) => NOT_MONEY_FACT.test(String(q)) && !NOT_MONEY_FACT_OK.test(String(q));
 
 export async function answerAmountInvoiceQuestion({ withTenant = defaultWithTenant, ctxArg, question, today, understanding = null }) {
+  // R8: "invoices from March to June 2025", "invoices between $500 and $4,000", "customers with no invoices": this lane keeps one half of the condition, so it steps aside and the router decides
+  if (droppedConditionShape(question)) return { handled: false, hasData: false };
   // R41U: the shared reading (understanding/understand.js) decides the lane; the R40 strict parser stays as the second door for the exact R40 shape.
   const lane = understanding ? docLaneFromUnderstanding(understanding, question) : null;
   const amt = lane?.intent === 'invoice_by_amount' ? { cents: lane.amountCents, bare: lane.amountBare } : parseAmountInvoiceQuestion(question);

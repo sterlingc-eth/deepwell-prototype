@@ -26,6 +26,10 @@
  *   from  "stage" matches the whole stage, "stage:sub" matches one sub-lane; a trailing * matches a prefix.
  *   ops   DQL plan ops (or "op:dim") the entry covers; "*" = any op.
  */
+const TWO_ENDED_PERIOD = /\b(?:between\s+\S+(?:\s+\S+){0,3}\s+and\s+(?:\S+\s+)?(?:19|20)\d\d|between\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*\s+and\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)|from\s+\S+(?:\s+\S+){0,2}\s+(?:to|through|thru|until|till)\s+(?:\S+\s+)?(?:(?:19|20)\d\d|jan\w*|feb\w*|mar\w*|apr\w*|may|jun\w*|jul\w*|aug\w*|sep\w*|oct\w*|nov\w*|dec\w*|now|today|present)\b|\b(?:19|20)\d\d\s+(?:to|through|thru|until|till)\s+(?:19|20)\d\d|since\s+\S+(?:\s+\S+){0,2}\s+(?:until|till|to)\s+(?:now|today|present|date))/i;
+const TWO_BOUND_AMOUNT = /\b(?:between\s+\$?\d[\d,.k]*\s+and\s+\$?\d|from\s+\$?\s?(?!(?:19|20)\d\d\s+(?:to|through|thru|until|-)\s+(?:19|20)\d\d\b)\d[\d,.k]*\s+(?:to|through|thru|until|-)\s+\$?\d|(?:over|above|more than|greater than|at least|exceeding|under|below|less than|at most|no more than)\s+\$?\d[\d,.k]*(?:\s+dollars)?\s+(?:and|but)\s+(?:over|above|more than|greater than|at least|exceeding|under|below|less than|at most|no more than)\s+\$?\d)/i;
+const NEGATED_SET = /\b(?:with(?:out)?\s+(?:no|any)\b|without\b|who\s+never\b|that\s+never\b|never\s+(?:got|had|received|have|has|been|issued|sent)\b|(?:have|has|had)\s+no\b|(?:have|has|had)n'?t\b|lack(?:s|ing)?\b)/i;
+
 export const ARBITER_ALLOWLIST = [
   { from: "deterministic:aggregate", ops: ["sum","set_per_entity","share_pct","tm_compare","set_above_avg","tm_rate","compare_two_values","first_ever","tm_expiry","set_rank:tech"],
     why: "the aggregate route answers a different question (grand total, ungrouped numbers) when the question has a comparison, a share, a rank among rows or a set condition",
@@ -103,7 +107,39 @@ export const ARBITER_ALLOWLIST = [
   { from: "contactLookup:slotFill", ops: ["duplicates"],
     why: "asks nothing useful of a duplicate-serial question",
     dev: "1 answers improved (wrong, declined or punted before, right now), 0 regressions (per op: duplicates 1)" },
+
+  /* ---- round 8: shapes where the older lanes drop a condition that DQL reads whole. Each is limited by the question's own wording AND a plan condition. ---- */
+  { id: "ordinal", from: "*", ops: ["*"], plan: { has: ["nth"] },
+    why: "\"the second largest invoice\", \"third most recent\", \"2nd busiest month\": every older lane drops the ordinal and answers with the extreme or a grand total",
+    dev: "R7 QA: 30 of 30 older answers wrong; see the round 8 report for the dev-set counts" },
+  { id: "range-period", from: "*", ops: ["list","count","sum","avg","median","max","min","group_count","group_sum","top_n","bottom_n","latest","first_ever","set_select","missing_field","line_search","tm_window"], only: TWO_ENDED_PERIOD, plan: { has: ["time"] },
+    why: "a period with an end (\"between March and August 2026\", \"from March to June 2025\", \"since 2024 until now\"): the older lanes read the start only (or only the month named first)",
+    dev: "see the round 8 report" },
+  { id: "range-amount", from: "*", ops: ["list","count","sum","avg","median","max","min","group_count","group_sum","set_select"], only: TWO_BOUND_AMOUNT, plan: { has: ["filters"] },
+    why: "an amount with both bounds (\"over $1,500 and under $3,000\", \"between $50 and $200\"): the older lanes apply one bound or none",
+    dev: "see the round 8 report" },
+  { id: "complement-set", from: "*", notFrom: "relations", ops: ["set_select"], only: NEGATED_SET,
+    why: "\"customers with no invoices\", \"clients who never got an estimate\": the older lanes drop the negation and answer with the positive list. The relations lane reads its own never-had families correctly (golden breadth-multi-hop-024), so it keeps them",
+    dev: "see the round 8 report" },
+  { id: "person-jobs", from: "deterministic:tenantcount", ops: ["count"], only: /\bjobs?\b/i, plan: { hasFilter: "tech" },
+    why: "\"how many jobs did Kevin Pratt work\": the count lane answers with the work orders only",
+    dev: "see the round 8 report" },
+  { id: "person-and-type", from: "*", ops: ["list","count","sum","group_count"], plan: { has: ["docType"], hasFilter: "tech" },
+    why: "\"service tickets by Kevin Pratt\": the older lanes count every job of the person and drop the kind of paper",
+    dev: "see the round 8 report" },
 ];
+export const TWO_ENDED_PERIOD_RE = TWO_ENDED_PERIOD;
+export const TWO_BOUND_AMOUNT_RE = TWO_BOUND_AMOUNT;
+export const NEGATED_SET_RE = NEGATED_SET;
+const SET_NOUN = /\b(?:customers?|clients?|accounts?|tenants?|patients?|donors?|members?|residents?|owners?|supporters?|homeowners?|units?|equipment|systems?|sites?|properties|buildings?|vendors?|suppliers?|technicians?|techs?)\b/i;
+/**
+ * A question whose second condition (the end of a period, the upper bound of an amount, the "no" of a set) only DQL reads. The money-amount lane (financials/moneyGate.js)
+ * answers before the router and keeps one half of such a question, so it steps aside for these and the router decides (DQL, or a release).
+ */
+export function droppedConditionShape(question) {
+  const q = String(question ?? "");
+  return TWO_ENDED_PERIOD.test(q) || TWO_BOUND_AMOUNT.test(q) || (NEGATED_SET.test(q) && SET_NOUN.test(q));
+}
 
 export function arbiterMode() {
   const v = process.env.DONOVAN_DQL_ARBITER;
@@ -134,6 +170,7 @@ const pathGet = (o, path) => String(path).split(".").reduce((a, k) => (a == null
 function planFits(cond, plan) {
   if (!cond) return true;
   for (const k of cond.has ?? []) { const v = pathGet(plan, k); if (v == null || (Array.isArray(v) && !v.length)) return false; }
+  if (cond.hasFilter && !(plan.filters ?? []).some((f) => f.field === cond.hasFilter)) return false;
   for (const [k, vals] of Object.entries(cond.not ?? {})) if (vals.includes(pathGet(plan, k))) return false;
   return true;
 }
@@ -161,7 +198,17 @@ export function arbiterAllows(winner, intent, { oldLabel, question, industryKind
   const plan = intent?.plan;
   if (!plan || intent.plain) return false;
   if (mode === "all" || otherIndustry(industryKind)) return true;
+  // an ordinal ("the second largest invoice"): every older lane answers with the extreme or a grand total, so DQL takes it from any of them (round 7: 30 of 30 older answers wrong)
+  if (plan.nth && !entryOff("ordinal")) { lastHit = "ordinal"; return true; }
   if (DATE_OPS.has(plan.op) && WHEN_QUESTION.test(String(question ?? ""))) return false;
   const label = oldLabel ?? laneLabel(winner, null);
-  return ARBITER_ALLOWLIST.some((e) => fromMatches(e.from, label) && opMatches(e.ops, plan) && !(e.unless && e.unless.test(String(question ?? ""))) && (!e.only || e.only.test(String(question ?? ""))) && planFits(e.plan, plan));
+  const hit = ARBITER_ALLOWLIST.find((e) => !entryOff(e.id) && fromMatches(e.from, label) && !(e.notFrom && fromMatches(e.notFrom, label)) && opMatches(e.ops, plan) && !(e.unless && e.unless.test(String(question ?? ""))) && (!e.only || e.only.test(String(question ?? ""))) && planFits(e.plan, plan));
+  lastHit = hit ? (hit.id ?? `${hit.from}`) : null;
+  return Boolean(hit);
 }
+
+/** Diagnostic switch: DONOVAN_DQL_ARBITER_OFF=range-period,complement-set turns off the named round 8 entries (used to measure each one on the dev sets). */
+const entryOff = (id) => { const off = process.env.DONOVAN_DQL_ARBITER_OFF; return Boolean(id) && Boolean(off) && off.split(",").some((x) => x.trim() === id); };
+let lastHit = null;
+/** The allowlist entry that took the last question (for the route log). */
+export const arbiterLastHit = () => lastHit;

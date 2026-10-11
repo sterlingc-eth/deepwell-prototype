@@ -20,7 +20,7 @@ import { resolveAnyTimeRange } from '../analytics.js';
 import { extractDocTypeMentions } from '../search/knowledge.js';
 import { KNOWN_AZ_CITY_NAMES } from '../analytics.js';
 import { looksLikeContinuation, classifyFollowupKind, detectSwapTarget, looksLikeDisambiguationReply } from './classify.js';
-import { slotFollowup } from './slots.js';
+import { slotFollowup, isSlotOnlyFollowup } from './slots.js';
 import { dqlMergeFollowup, plainScope } from './dqlmerge.js';
 import { markMerged, markReleased, isFragment } from './handoff.js';
 import { subjectFromText, subjectFromEntities, pronounReplacement, substitutePronouns, stripTrailingPunct, brandMentionIn, inferNoun, anchorAlreadyPresent, pronounNeedsBrandFromEarlierTurn } from './subject.js';
@@ -304,6 +304,12 @@ export function resolveFollowup(context, question) {
   if (merged) markMerged(clip(merged.query));
   if (merged) return { query: clip(merged.query), filters: {}, isFollowup: true, kind: 'dql-merge', needsClarification: false };
 
+  // a bare slot value ("and in 2024", "just Mesa") that no merge could attach to the earlier question: typed alone an older lane would answer the unscoped total
+  if (isSlotOnlyFollowup(q) && !/^(?:and\s+|also\s+|then\s+|what about\s+|how about\s+)?(?:in|for|of)\s+(?:the\s+)?(?:last|next|this|past)\b/i.test(q)) {
+    const carried = clip(`Earlier question: "${String(priorTurn.question).trim().replace(/[?.!\s]+$/, '')}". Follow-up: ${String(q).trim()}`);
+    markReleased(carried);
+    return { query: carried, filters: {}, isFollowup: true, kind: 'fragment', needsClarification: false };
+  }
   if (!looksLikeContinuation(q, priorTurn)) {
     // a fragment that names no thing of its own ("how many are Trane", "as a technician") only means something against the earlier question; typed
     // alone an older lane would answer a different question (all Trane units, every technician), so no lane may claim it

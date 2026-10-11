@@ -61,6 +61,8 @@ export function resolveDocAliases(typesInUse, industryKind = null) {
     const have = [...ids].filter((i) => inUse.has(i));
     if (have.length === 1) out.set(phrase, have[0]);
   }
+  // R8: a lease is a lease. An organization that keeps no lease papers is told there are none; its maintenance agreements are not leases.
+  if (!inUse.has('lease-agreement')) for (const f of ['lease', 'leases', 'lease agreement', 'lease agreements']) out.set(f, 'lease-agreement');
   const kind = String(industryKind ?? '').toLowerCase().replace(/-admin$/, '');
   const scoped = new Set();
   for (const [id, ph] of Object.entries(SCOPED[kind] ?? {})) {
@@ -70,6 +72,9 @@ export function resolveDocAliases(typesInUse, industryKind = null) {
   out.scoped = scoped;
   return out;
 }
+
+/** Kinds of paper only some kinds of business keep. The older lanes were tuned on an HVAC shop and read these words as a maintenance agreement or an inspection, so DQL answers a plain count of them itself. */
+export const INDUSTRY_ONLY_TYPES = new Set(['lease-agreement', 'move-in-inspection', 'move-out-inspection', 'certificate-of-insurance', 'insurance-certificate', 'delivery-ticket', 'equipment-record']);
 
 /** Words that keep their meaning only when the organization's own data does not use them as a field (a property manager's "tenant" is a lease party, not the customer). */
 export const FIELD_CLAIMED_NOUNS = { tenant_name: ['tenant', 'tenants'], patient_name: ['patient', 'patients'] };

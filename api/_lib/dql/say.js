@@ -8,6 +8,7 @@ import { documentTypeLabel } from '../documentTypes.js';
 import { ynText } from './yn.js';
 import { ENTITIES } from './fields.js';
 import { dimLabel, displayKey, monthName } from './exec.js';
+import { nthWord } from './ordinal.js';
 
 const fmtInt = (n) => Number(n).toLocaleString('en-US');
 const fmtMoney = (n) => `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -31,7 +32,7 @@ function singular(label) { return String(label).toLowerCase(); }
 
 /** The thing being counted, in words ("service tickets", "documents", "customers", "units"). */
 export function nounOf(plan, n = 2) {
-  if (plan.entity === 'customer') return n === 1 ? 'customer' : 'customers';
+  if (plan.entity === 'customer') return n === 1 ? (plan.custWord ?? 'customer') : `${plan.custWord ?? 'customer'}s`; // the business's own word for them (patients, tenants, donors)
   if (plan.entity === 'unit') return n === 1 ? 'unit' : 'units';
   if (plan.visit) return n === 1 ? 'service visit' : 'service visits';
   if (plan.docType && !Array.isArray(plan.docType)) {
@@ -81,7 +82,8 @@ const timePhrase = (t) => (t ? t.label : '');
 
 /** " for X in Y dated Z" — the conditions after the noun. */
 export function condText(plan) {
-  const parts = (plan.filters ?? []).map((f) => condPhrase(f, plan));
+  const fl = plan.filters ?? [];
+  const parts = fl.map((f, i) => (f.field === 'total' && i > 0 && fl[i - 1].field === 'total' ? `and ${condPhrase(f, plan)}` : condPhrase(f, plan)));
   if (plan.time) parts.push(timePhrase(plan.time));
   return parts.length ? ` ${parts.join(' ')}` : '';
 }
@@ -93,7 +95,7 @@ function basisLine(verb, plan, res, snap, extra = '') {
   for (const f of plan.filters ?? []) conds.push(condPhrase(f, plan));
   if (plan.time) conds.push(`${plan.time.label} (by ${DATE_RULE[plan.time.field] ?? plan.time.field})`);
   if (plan.measure?.field === 'total') conds.push('amounts as printed on each document');
-  const scope = plan.entity === 'document' ? (plan.visit ? 'every document on file' : plan.docType && !Array.isArray(plan.docType) ? `every ${singular(documentTypeLabel(plan.docType) ?? plan.docType)} on file` : 'every document on file') : plan.entity === 'customer' ? 'every customer on file' : 'every unit on file';
+  const scope = plan.entity === 'document' ? (plan.visit ? 'every document on file' : plan.docType && !Array.isArray(plan.docType) ? `every ${singular(documentTypeLabel(plan.docType) ?? plan.docType)} on file` : 'every document on file') : plan.entity === 'customer' ? `every ${plan.custWord ?? 'customer'} on file` : 'every unit on file';
   const tail = [];
   if (res.leftOut) tail.push(`${fmtInt(res.leftOut)} ${nounOf(plan, res.leftOut)} with no ${plan.time ? (DATE_RULE[plan.time.field] ?? 'date').replace(/^the /, '') : 'date'} on file were not counted`);
   if (res.unitless) tail.push(`${fmtInt(res.unitless)} ${nounOf(plan, res.unitless)} with no ${plan.measure?.label ?? 'amount'} on file were left out`);
@@ -130,7 +132,10 @@ function labelOf(plan, row, detail = 2, skipCustomer = false) {
     return bits.length ? `${id} (${bits.join(', ')})` : id;
   }
   // a longer list has to stay readable: a numbered paper by its number, an unnumbered one (a quote, a ticket) by whose it is
-  const id = num ?? (!skipCustomer && row.custName ? row.custName : null) ?? row.filename ?? documentTypeLabel(row.type);
+  // a paper that normally prints a number but has none says so, so a list of numbers never carries a bare customer name
+  const numbered = /^(?:invoice|purchase-order|permit)$/.test(String(row.type ?? ''));
+  const noNum = !num && numbered ? `${(documentTypeLabel(row.type) ?? 'document').toLowerCase()} with no number${!skipCustomer && row.custName ? ` (${row.custName})` : ''}` : null;
+  const id = num ?? noNum ?? (!skipCustomer && row.custName ? row.custName : null) ?? row.filename ?? documentTypeLabel(row.type);
   if (detail === 0 || !num || skipCustomer || !row.custName) return id;
   return `${id} (${row.custName})`;
 }
@@ -164,6 +169,57 @@ function groupLines(plan, res, snap, today, cap = 40) {
 }
 
 /** The answer. `res.abstain` is handled by the caller (null). */
+/** "The second largest invoice", "second place by service visits", "the third most recent invoice": the Nth of a ranking (dql/ordinal.js decides ties; a tie at place N is stated). */
+function sayNth(res, plan, { snap, today }, out, cond, noun) {
+  const n = plan.nth; const nw = nthWord(n); const Nw = cap1(nw);
+  const nt = res.nth ?? { status: 'short' };
+  const asc = plan.dir === 'asc' || plan.op === 'first_ever';
+  if (plan.op === 'latest' || plan.op === 'first_ever') {
+    const word = plan.op === 'latest' ? 'most recent' : 'earliest';
+    if (nt.status === 'short') { out.text = `Only ${fmtInt(res.dated ?? 0)} ${noun(res.dated ?? 0)}${cond} ${(res.dated ?? 0) === 1 ? 'has' : 'have'} a date on file, so there is no ${nw} ${word}.`; out.records = []; out.total = 0; out.basis = basisLine('Looked at the dates of', plan, res, snap); return out; }
+    const tied = res.extreme;
+    const names = tied.map((r) => labelOf(plan, r, detailFor(tied.length), hasCustFilter(plan)));
+    out.text = tied.length === 1 ? `The ${nw} ${word} ${noun(1)}${cond} is ${names[0]}, dated ${fmtDate(res.value)}.` : `The ${nw} ${word} date${cond} is ${fmtDate(res.value)}, shared by ${fmtInt(tied.length)} ${noun(tied.length)}: ${listNames(names, 15)}.`;
+    out.facts = [{ label: `${Nw} ${word}`, value: fmtDate(res.value) }];
+    out.records = recordsOf(plan, tied, snap); out.total = tied.length;
+    out.basis = basisLine('Put the dates of', plan, res, snap, `Dated by ${DATE_RULE[plan.sortField] ?? 'its date'}.`);
+    return out;
+  }
+  const ranked = res.ranked ?? [];
+  if (plan.rank === 'rows') {
+    const word = asc ? 'smallest' : 'largest';
+    if (nt.status === 'short') { out.text = `Only ${fmtInt(ranked.length)} ${noun(ranked.length)}${cond} can be ranked, so there is no ${nw} ${word}.`; out.records = []; out.total = 0; out.basis = basisLine('Ranked', plan, res, snap); return out; }
+    const at = ranked.slice(nt.from, nt.to);
+    const names = at.map((o) => labelOf(plan, o.r, detailFor(at.length), hasCustFilter(plan)));
+    const what = plan.measure.field === 'total' ? noun(1) : `${noun(1)} by ${plan.measure.label}`;
+    out.text = at.length === 1 ? `The ${nw} ${word} ${what}${cond} is ${valueText(plan, at[0].v)}: ${names[0]}.` : `The ${nw} ${word} ${what}${cond} is ${valueText(plan, at[0].v)}, shared by ${fmtInt(at.length)} ${noun(at.length)}: ${listNames(names, 15)}.`;
+    out.text += ` The ${word} is ${valueText(plan, ranked[0].v)}.`;
+    out.facts = [{ label: `${Nw} ${word}`, value: valueText(plan, at[0].v) }];
+    out.records = recordsOf(plan, at.map((o) => o.r), snap); out.total = at.length;
+    out.basis = basisLine('Ranked', plan, res, snap);
+    return out;
+  }
+  const dn = dimNoun(plan.groupBy[0]);
+  const by = plan.measure ? (plan.measure.field === 'total' ? `${noun(1)} dollars` : plan.measure.label) : noun(2);
+  const val = (g) => (plan.measure ? valueText(plan, g.value) : fmtInt(g.value));
+  if (nt.status === 'short') { out.text = `Only ${fmtInt(ranked.length)} ${ranked.length === 1 ? dn : plural(dn)}${cond} can be ranked by ${by}, so there is no ${nw} place.`; out.records = []; out.total = 0; out.basis = basisLine('Ranked', plan, res, snap); return out; }
+  const at = ranked.slice(nt.from, nt.to);
+  const nm = (g) => displayKey(plan, 0, g.parts[0], snap);
+  const place = asc ? `${Nw} from the bottom` : `${Nw} place`;
+  out.text = at.length === 1 ? `${place} by ${by}${cond}: ${nm(at[0])} (${val(at[0])}).` : `Tied for ${asc ? `${nw} from the bottom` : `${nw} place`} by ${by}${cond}, each with ${val(at[0])}: ${listNames(at.map(nm), 15)}.`;
+  out.text += ` ${asc ? 'Lowest' : 'Highest'} is ${nm(ranked[0])} (${val(ranked[0])}).`;
+  const by0 = plan.groupBy[0]?.by;
+  if (['year', 'month', 'quarter'].includes(by0) && at.length === 1) {
+    const k = String(at[0].parts[0]); const [yy, mm] = k.split('-');
+    const end = by0 === 'year' ? `${yy}-12-31` : by0 === 'month' ? `${k}-31` : `${yy}-${['03-31', '06-30', '09-30', '12-31'][Number(String(mm).replace('Q', '')) - 1]}`;
+    if (end > today) out.text += ` ${cap1(nm(at[0]))} is not over yet (counted through ${fmtDate(today)}).`;
+  }
+  out.facts = at.map((g) => ({ label: nm(g), value: val(g) }));
+  out.records = recordsOf(plan, at.flatMap((g) => g.rows), snap); out.total = at.reduce((a, g) => a + g.rows.length, 0);
+  out.basis = basisLine('Ranked', plan, { ...res, leftOut: (res.leftOut ?? 0) + (res.groupLeftOut ?? 0) }, snap);
+  return out;
+}
+
 export function sayResult(res, plan, { snap, today }) {
   const E = ENTITIES[plan.entity];
   const cond = condText(plan);
@@ -172,6 +228,7 @@ export function sayResult(res, plan, { snap, today }) {
   const rowsAll = res.rows ?? [];
   const noun = (k) => nounOf(plan, k);
 
+  if (plan.nth && ['top_n', 'bottom_n', 'latest', 'first_ever'].includes(plan.op)) return sayNth(res, plan, { snap, today }, out, cond, noun);
   switch (plan.op) {
     case 'count': {
       out.text = n === 0 ? none(plan, cond) : `${fmtInt(n)} ${noun(n)}${cond}.`;
@@ -219,7 +276,7 @@ export function sayResult(res, plan, { snap, today }) {
     }
     case 'sum': {
       const what = plan.measure.field === 'total' ? `${cap1(noun(2))} total` : plan.measure.field === 'hours' ? 'Labor hours total' : 'Tonnage totals';
-      out.text = res.value == null ? `${none(plan, cond)} The total is ${valueText(plan, 0)}.` : `${what} ${valueText(plan, res.value)}${cond} (${fmtInt(res.nUsed)} ${noun(res.nUsed)}).`;
+      out.text = res.value == null ? `${none(plan, cond)} The total is ${valueText(plan, 0)}.` : `${what} ${valueText(plan, res.value)}${cond} (${fmtInt(res.nUsed + (res.unitless ?? 0))} ${noun(res.nUsed + (res.unitless ?? 0))}${res.unitless ? `; ${fmtInt(res.unitless)} ${res.unitless === 1 ? 'has' : 'have'} no ${plan.measure.field === 'total' ? 'total' : (plan.measure.label ?? 'amount')} on file and ${res.unitless === 1 ? 'is' : 'are'} not in the amount` : ''}).`;
       out.facts = [{ label: what, value: res.value == null ? valueText(plan, 0) : valueText(plan, res.value) }];
       out.records = recordsOf(plan, res.used ?? rowsAll, snap); out.total = (res.used ?? rowsAll).length;
       out.basis = basisLine('Added up', plan, res, snap);
@@ -254,7 +311,7 @@ export function sayResult(res, plan, { snap, today }) {
       const askOf = { customer: (r) => r.custName, tech: (r) => r.tech, amount: (r) => (r.total != null ? fmtMoney(r.total) : null) }[plan.ask];
       const askVals = askOf ? [...new Set(tied.map(askOf).filter(Boolean))] : [];
       if (askOf && askVals.length === 1 && tied.length === 1) {
-        const who = plan.ask === 'customer' ? `The customer with the ${word} ${noun(1)}${cond} is ${askVals[0]}` : plan.ask === 'tech' ? `The ${word} ${noun(1)}${cond} was done by ${askVals[0]}` : `The ${word} ${noun(1)}${cond} was for ${askVals[0]}`;
+        const who = plan.ask === 'customer' ? `The ${plan.custWord ?? 'customer'} with the ${word} ${noun(1)}${cond} is ${askVals[0]}` : plan.ask === 'tech' ? `The ${word} ${noun(1)}${cond} was done by ${askVals[0]}` : `The ${word} ${noun(1)}${cond} was for ${askVals[0]}`;
         out.text = `${who}, on ${tied[0].filename ?? 'a paper'} dated ${fmtDate(res.value)}.`;
       } else if (askOf && tied.length === 1) {
         out.text = `The ${word} ${noun(1)}${cond} is ${names[0]}, dated ${fmtDate(res.value)}, but ${plan.ask === 'customer' ? 'it is not linked to one customer' : plan.ask === 'tech' ? 'it has no technician on file' : 'it has no amount on file'}.`;
@@ -341,5 +398,7 @@ export function sayResult(res, plan, { snap, today }) {
     }
     default: return null;
   }
+  // a period that starts after today holds nothing yet: the plain "none on file" sentence stands alone, with no computed zero attached to it
+  if (plan.time?.from && /^\d{4}-\d{2}-\d{2}/.test(String(plan.time.from)) && String(plan.time.from).slice(0, 10) > String(today).slice(0, 10) && (out.total === 0 || n === 0) && out.facts?.length) out.facts = [];
   return out;
 }

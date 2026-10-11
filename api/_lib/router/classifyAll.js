@@ -50,7 +50,8 @@ import { parseMoneyIntent } from "../financials/answers.js";
 import { extraDocTypeAlternation, stemWord } from "../lookups/lexicon.js";
 import { detectAnalyticsPlan } from "../analytics/detPlan.js";
 import { parseDql, dqlEnabled } from "../dql/index.js";
-import { arbiterAllows, arbiterMode, laneLabel, dqlLabel } from "./dqlArbiter.js";
+import { arbiterAllows, arbiterMode, laneLabel, dqlLabel, arbiterLastHit } from "./dqlArbiter.js";
+import { hasOrdinalRank } from "../dql/ordinal.js";
 import { isMerged, isReleased } from "../followup/handoff.js";
 import { ENTITY_SYNONYMS } from "../analytics.js";
 import { leftoverWords, leftoverEnabled, domainWordsFromVocab, NEGATION_WORDS, unusedGrammar, grammarSpans, yearPairRewrite } from "./leftover.js";
@@ -517,12 +518,25 @@ function arbitrate(out, question, ctx) {
   const ok = arbiterAllows(w, intent, { oldLabel, question: text, industryKind: ctx.tenantVocab?.industryKind });
   if (arbiterMode() === "all") console.log(JSON.stringify({ route: "ask", dql_arbiter: { from: oldLabel, to: dqlLabel(intent.plan) } }));
   if (!ok) return null;
+  if (process.env.DONOVAN_DQL_ARBITER_LOG === "1") console.log(JSON.stringify({ route: "ask", dql_arbiter_hit: arbiterLastHit(), from: oldLabel, to: dqlLabel(intent.plan) }));
   // DQL answers at the decompose slot (0.42); the lanes tried before it are switched off, the later ones stay as the fall-through if DQL cannot answer at run time.
   // The lane that lost the question stays behind DQL as its fall-through: the later lanes keep their gates, and the deterministic router (tried before the
   // decompose slot) is handed to DQL as its fallback (decompose/index.js runs it when DQL has no answer at run time).
+  // an ordinal question has no older fall-through: when DQL cannot place the Nth (a tie before it, too few items) every older lane would answer with the extreme
+  if (intent.plan?.nth) {
+    const g = { ...(out.gated ?? {}), deterministic: null, relations: null, fastPath: null, contactLookup: null, docLookup: null, contentCount: null, money: null, decompose: intent, analytics: false };
+    return { ...out, winner: { name: "decompose", intent }, gated: g, claimed: [...new Set([...(out.claimed ?? []).filter((n) => n !== "analytics"), "decompose"])], effectiveQuestion: out.effectiveQuestion ?? question, dql: true, dqlArbiter: { from: oldLabel, to: dqlLabel(intent.plan) } };
+  }
   const dqlIntent = w.name === "deterministic" ? { ...intent, fallback: { name: "deterministic", intent: w.intent } } : intent;
-  const gated = { ...(out.gated ?? {}), deterministic: null, decompose: dqlIntent };
+  const gated = { ...(out.gated ?? {}), deterministic: null, ...(w.name === "relations" ? { relations: null } : {}), decompose: dqlIntent }; // relations runs before the decompose slot: when it is the lane DQL took the question from, it is switched off too
   return { ...out, winner: { name: "decompose", intent: dqlIntent }, gated, claimed: [...new Set([...(out.claimed ?? []), "decompose"])], effectiveQuestion: out.effectiveQuestion ?? question, dql: true, dqlArbiter: { from: oldLabel, to: dqlLabel(intent.plan) } };
+}
+
+const PER_CUSTOMER_MONEY_AVG = /\b(?:average|avg|mean|typical)\b[^?]*\b(?:billed|invoiced?|revenue|spent|spend|sales|income|paid|bill|total|amount|worth)\b[^?]*\b(?:per|by|for\s+each|for\s+every|each|every)\s+(?:customer|client|tenant|patient|donor|account|member|resident|supporter|homeowner|guest|student)s?\b/i;
+const OLDER_LANES = new Set(["analytics", "deterministic", "relations", "fastPath", "contactLookup", "docLookup", "contentCount", "money"]);
+/** No lane may answer: the question carries a condition that only DQL reads, and DQL did not read it. */
+function releaseClaims(out, reason) {
+  return { ...(out ?? {}), winner: null, claimed: [], gated: Object.fromEntries(Object.keys(out?.gated ?? {}).map((k) => [k, k === "analytics" ? false : null])), leftoverDeclined: { reason, words: [] } };
 }
 
 async function withDql(out, question, ctx) {
@@ -545,6 +559,10 @@ async function withDql(out, question, ctx) {
         const arb = arbitrate(out, question, ctx);
         if (arb) return arb;
       }
+      // "the second largest invoice": no older lane reads the ordinal (they answer with the largest or a grand total), so a claim they keep is released to the model
+      if (OLDER_LANES.has(w.name) && (hasOrdinalRank(text) || hasOrdinalRank(question))) return releaseClaims(out, "ordinal");
+      // "average billed per customer": the grand total or an average of invoices is a different number (the average over customers is one number, per invoice another): not answered by a lane that drops "per customer"
+      if (OLDER_LANES.has(w.name) && PER_CUSTOMER_MONEY_AVG.test(text)) return releaseClaims(out, "per-customer-average");
       if (w.name === "analytics" && !w.futureDate) {
         const today = ctx?.today ?? new Date().toISOString().slice(0, 10);
         const { overlay, pack, tenantVocab } = ctx;
@@ -557,6 +575,12 @@ async function withDql(out, question, ctx) {
         const g = out?.gated ?? {};
         if (g.decompose || g.fastPath || g.contactLookup || g.docLookup || g.contentCount || g.money) return out;
         place = "after";
+      } else if (w.name === "analytics" && w.futureDate) {
+        // "invoices dated 2027": the future-date decline is only true when nothing is dated then. DQL reads the question over the real records and says so
+        // either way; the analytics decline stays behind it for a question DQL cannot read.
+        const fi = parseDql(text, { tenantVocab: ctx.tenantVocab, pack: ctx.pack, today: ctx?.today, original: question });
+        if (!fi || fi.plain) return out;
+        return { ...out, winner: { name: "decompose", intent: fi }, gated: { ...(out.gated ?? {}), decompose: fi }, claimed: [...new Set([...(out.claimed ?? []), "decompose"])], effectiveQuestion: out.effectiveQuestion ?? question, dql: true };
       } else return out;
     }
     const intent = parseDql(text, { tenantVocab: ctx.tenantVocab, pack: ctx.pack, today: ctx?.today, original: question });

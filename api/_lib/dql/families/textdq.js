@@ -1516,6 +1516,7 @@ function sayMissing(res, plan, { snap }) {
   return out;
 }
 
+const ASK_VAL = { hours: (r) => (r.hours != null ? `${r.hours}` : null), total: (r) => (r.total != null ? fmtMoney(r.total) : null), tech: (r) => r.tech, vendor: (r) => r.vendor, status: (r) => r.status, customer: (r) => r.custName, serviceDate: (r) => (r.serviceDate ? fmtDate(r.serviceDate) : null), invoiceDate: (r) => (r.invoiceDate ? fmtDate(r.invoiceDate) : null), date: (r) => (r.date ? fmtDate(r.date) : null), work: (r) => r.f.work_performed ?? null };
 function sayFind(res, plan, { snap }) {
   const out = { text: '', facts: [], records: [], basis: '', total: 0, claimedCount: null };
   const rows = res.rows;
@@ -1523,9 +1524,22 @@ function sayFind(res, plan, { snap }) {
   const kind = res.kind ?? plan.by;
   if (kind === 'number') {
     if (!rows.length) { out.text = `${plan.code.toUpperCase()} was not found: no ${plan.docType ? nounOf(plan, 1) : 'document'} with that number is on file.`; out.basis = 'Looked for that number among the invoice, purchase order and permit numbers of every document on file.'; return out; }
+    if (rows.length > 1) {
+      // one number printed on several papers: show every one of them, each with who it is for, when and the amount (and the asked fields)
+      const each = rows.map((r) => {
+        const asked = (plan.ask ?? []).map((a) => { const v = ASK_VAL[a.id]?.(r); return v == null ? `no ${a.label} on file` : `${a.label} ${v}`; });
+        const bits = plan.ask?.length ? asked : [r.custName ? `for ${r.custName}` : null, r.date ? `dated ${fmtDate(r.date)}` : null, r.total != null ? `total ${fmtMoney(r.total)}` : null].filter(Boolean);
+        return `${cap1(documentTypeLabel(r.type) ?? 'document')} ${numOf(r, snap)}${plan.ask?.length && r.custName ? ` for ${r.custName}` : ''}${bits.length ? ` (${bits.join(', ')})` : ''}`;
+      });
+      out.text = `${fmtInt(rows.length)} documents on file print ${plan.code.toUpperCase()}: ${each.join('; ')}.`;
+      out.facts = rows.slice(0, 7).map((r) => ({ label: cap1(documentTypeLabel(r.type) ?? 'Document'), value: numOf(r, snap) }));
+      out.records = docRecords(rows, snap); out.total = rows.length; out.claimedCount = rows.length;
+      out.basis = 'Looked for that number among the invoice, purchase order and permit numbers of every document on file.';
+      return out;
+    }
     const d = rows[0];
     if (plan.ask?.length) {
-      const val = { hours: (r) => (r.hours != null ? `${r.hours}` : null), total: (r) => (r.total != null ? fmtMoney(r.total) : null), tech: (r) => r.tech, vendor: (r) => r.vendor, status: (r) => r.status, customer: (r) => r.custName, serviceDate: (r) => (r.serviceDate ? fmtDate(r.serviceDate) : null), invoiceDate: (r) => (r.invoiceDate ? fmtDate(r.invoiceDate) : null), date: (r) => (r.date ? fmtDate(r.date) : null), work: (r) => r.f.work_performed ?? null };
+      const val = ASK_VAL;
       const parts = plan.ask.map((a) => ({ a, v: val[a.id](d) }));
       const label = `${cap1(documentTypeLabel(d.type) ?? 'document')} ${numOf(d, snap)}`;
       out.text = `${label}: ${parts.map(({ a, v }) => (v == null ? `no ${a.label} on file` : `${a.label} ${v}`)).join('; ')}.`;

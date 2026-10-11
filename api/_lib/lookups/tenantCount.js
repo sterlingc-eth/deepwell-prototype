@@ -14,6 +14,7 @@
 import { attachCitations } from "../citations/records.js";
 import { customerRecordsFor, documentRecordsFor } from "../citations/enrich.js";
 import { TENANT_SQL, answerEnvelope } from "../scope.js";
+import { visibleDocSql } from "../audience/visible.js";
 import { notPrivateSql } from "../privacy/privateDocs.js";
 
 const VAL = (a) => `COALESCE(NULLIF(${a}.corrected_value, ''), ${a}.value)`;
@@ -247,15 +248,15 @@ export async function runTenantCount(db, intent) {
     if (year) {
       const { rows } = await db.raw(`SELECT a.document_id FROM extractions a JOIN extractions s ON s.document_id = a.document_id AND s.field_key = 'service_date' AND s.${TENANT_SQL}
         WHERE a.field_key = 'service_type' AND a.${TENANT_SQL} AND ${VAL("a")} = $1 AND ${VAL("s")} LIKE $2`, [sv, `${year}-%`]);
-      return docCount(db, rows.map((r) => r.document_id), `"${sv}" calls in ${year}`, `Counted the service records whose service type is "${sv}" and whose service date is in ${year}.`);
+      return docCount(db, rows.map((r) => r.document_id), (n) => `"${sv}" ${n === 1 ? "call" : "calls"} in ${year}`, `Counted the service records whose service type is "${sv}" and whose service date is in ${year}.`);
     }
-    const { rows: tys } = await db.raw(`SELECT DISTINCT d.document_type AS t FROM extractions a JOIN documents d ON d.id = a.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")} WHERE a.field_key = 'service_type' AND a.${TENANT_SQL} AND ${VAL("a")} = $1`, [sv]);
+    const { rows: tys } = await db.raw(`SELECT DISTINCT d.document_type AS t FROM extractions a JOIN documents d ON d.id = a.document_id AND d.${TENANT_SQL} AND (${await visibleDocSql(db, "d")}) WHERE a.field_key = 'service_type' AND a.${TENANT_SQL} AND ${VAL("a")} = $1`, [sv]);
     if (tys.length !== 1) return null;
     const p = [sv, tys[0].t]; let cityJoin = "";
     if (city) { p.push(`%, ${likeEsc(city)}, %`); cityJoin = `JOIN document_entity_links l ON l.document_id = d.id AND l.${TENANT_SQL} JOIN entities c ON c.id = l.entity_id AND c.entity_type = 'customer' AND c.merged_into IS NULL AND c.${TENANT_SQL} AND c.data->>'service_address' ILIKE $3`; }
     const { rows } = await db.raw(`SELECT DISTINCT d.id AS document_id FROM documents d ${cityJoin} JOIN extractions a ON a.document_id = d.id AND a.field_key = 'service_type' AND a.${TENANT_SQL}
       WHERE d.${TENANT_SQL} AND d.document_type = $2 AND ${VAL("a")} = $1`, p);
-    return docCount(db, rows.map((r) => r.document_id), `"${sv}" calls${city ? ` from ${city}` : ""}`, `Counted the ${tys[0].t.replace(/[-_]/g, " ")} documents whose service type is "${sv}"${city ? ` and whose customer's service address is in ${city}` : ""}.`);
+    return docCount(db, rows.map((r) => r.document_id), (n) => `"${sv}" ${n === 1 ? "call" : "calls"}${city ? ` from ${city}` : ""}`, `Counted the ${tys[0].t.replace(/[-_]/g, " ")} documents whose service type is "${sv}"${city ? ` and whose customer's service address is in ${city}` : ""}.`);
   }
 
   // ---- C. a name this organization does not have, asked with a year: an honest zero
@@ -268,32 +269,33 @@ export async function runTenantCount(db, intent) {
   // ---- D. documents of one kind: technician / failed result / year
   if (docType && !brand && !eqType && !gallonsVal && !svc && (tech || (year && (failCue || !/invoice|bill|credit/.test(norm(docType)))))) { // R43: an INVOICE kind + year alone ("how many invoices in 2025") belongs to the financial lanes, which word it and handle direction/credits
     const label = docType.replace(/[-_]/g, " ");
-    const { rows: keys } = await db.raw(`SELECT x.field_key, count(DISTINCT x.document_id)::int AS n FROM extractions x JOIN documents d ON d.id = x.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")} WHERE x.${TENANT_SQL} AND d.document_type = $1 GROUP BY 1`, [docType]).then((r) => ({ rows: r.rows.filter((k) => String(k.field_key).endsWith("_date")) }));
+    const { rows: keys } = await db.raw(`SELECT x.field_key, count(DISTINCT x.document_id)::int AS n FROM extractions x JOIN documents d ON d.id = x.document_id AND d.${TENANT_SQL} AND (${await visibleDocSql(db, "d")}) WHERE x.${TENANT_SQL} AND d.document_type = $1 GROUP BY 1`, [docType]).then((r) => ({ rows: r.rows.filter((k) => String(k.field_key).endsWith("_date")) }));
     const stem = norm(docType).split(" ")[0];
     const dateKey = year ? (keys.find((k) => k.field_key.startsWith(stem)) ?? keys.find((k) => k.field_key === "service_date") ?? (keys.length === 1 ? keys[0] : null))?.field_key : null;
     if (year && !dateKey) return null;
     if (failCue) {
       if (!tech) return null;
-      const { rows: rk } = await db.raw(`SELECT DISTINCT x.field_key FROM extractions x JOIN documents d ON d.id = x.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")} WHERE x.${TENANT_SQL} AND d.document_type = $1 AND ${VAL("x")} ILIKE 'fail%'`, [docType]).then((r) => ({ rows: r.rows.filter((k) => String(k.field_key).includes("result")) }));
+      const { rows: rk } = await db.raw(`SELECT DISTINCT x.field_key FROM extractions x JOIN documents d ON d.id = x.document_id AND d.${TENANT_SQL} AND (${await visibleDocSql(db, "d")}) WHERE x.${TENANT_SQL} AND d.document_type = $1 AND ${VAL("x")} ILIKE 'fail%'`, [docType]).then((r) => ({ rows: r.rows.filter((k) => String(k.field_key).includes("result")) }));
       if (rk.length !== 1) return null;
-      const { rows } = await db.raw(`SELECT DISTINCT a.document_id FROM extractions a JOIN extractions b ON b.document_id = a.document_id AND b.field_key = $2 AND b.${TENANT_SQL} JOIN documents d ON d.id = a.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
+      const { rows } = await db.raw(`SELECT DISTINCT a.document_id FROM extractions a JOIN extractions b ON b.document_id = a.document_id AND b.field_key = $2 AND b.${TENANT_SQL} JOIN documents d ON d.id = a.document_id AND d.${TENANT_SQL} AND (${await visibleDocSql(db, "d")})
         WHERE a.field_key = 'technician' AND a.${TENANT_SQL} AND d.document_type = $3 AND lower(${VAL("a")}) = lower($1) AND ${VAL("b")} ILIKE 'fail%'${year ? ` AND EXISTS (SELECT 1 FROM extractions s WHERE s.document_id = a.document_id AND s.field_key = '${dateKey}' AND ${VAL("s")} LIKE $4 AND s.${TENANT_SQL})` : ""}`, year ? [tech, rk[0].field_key, docType, `${year}-%`] : [tech, rk[0].field_key, docType]);
-      return docCount(db, rows.map((r) => r.document_id), `failed ${label}s run by ${tech}${year ? ` in ${year}` : ""}`, `Counted the ${label} documents ${tech} is recorded on whose result starts with "fail".`);
+      return docCount(db, rows.map((r) => r.document_id), (n) => `failed ${label}${n === 1 ? "" : "s"} run by ${tech}${year ? ` in ${year}` : ""}`, `Counted the ${label} documents ${tech} is recorded on whose result starts with "fail".`);
     }
     if (failCue) return null;
     const p = []; const add = (v) => { p.push(v); return `$${p.length}`; };
     const parts = [`d.document_type = ${add(docType)}`];
     if (tech) parts.push(`EXISTS (SELECT 1 FROM extractions a WHERE a.document_id = d.id AND a.field_key = 'technician' AND a.${TENANT_SQL} AND lower(${VAL("a")}) = lower(${add(tech)}))`);
     if (year) parts.push(`EXISTS (SELECT 1 FROM extractions s WHERE s.document_id = d.id AND s.field_key = ${add(dateKey)} AND s.${TENANT_SQL} AND ${VAL("s")} LIKE ${add(`${year}-%`)})`);
-    const { rows } = await db.raw(`SELECT d.id AS document_id FROM documents d WHERE d.${TENANT_SQL} AND ${notPrivateSql("d")} AND ${parts.join(" AND ")}`, p);
-    return docCount(db, rows.map((r) => r.document_id), `${label}s${tech ? ` under ${tech}` : ""}${year ? ` in ${year}` : ""}`, `Counted the ${label} documents${tech ? ` that name ${tech} as technician` : ""}${year ? ` dated ${year} (${dateKey.replace(/_/g, " ")})` : ""}.`);
+    const { rows } = await db.raw(`SELECT d.id AS document_id FROM documents d WHERE d.${TENANT_SQL} AND (${await visibleDocSql(db, "d")}) AND ${parts.join(" AND ")}`, p);
+    return docCount(db, rows.map((r) => r.document_id), (n) => `${label}${n === 1 ? "" : "s"}${tech ? ` under ${tech}` : ""}${year ? ` in ${year}` : ""}`, `Counted the ${label} documents${tech ? ` that name ${tech} as technician` : ""}${year ? ` dated ${year} (${dateKey.replace(/_/g, " ")})` : ""}.`);
   }
   return null;
 }
 
-async function docCount(db, ids, label, basis) {
+async function docCount(db, ids, labelOf, basis) {
   const uniq = [...new Set(ids)];
   const n = uniq.length;
+  const label = typeof labelOf === "function" ? labelOf(n) : labelOf; // the noun agrees with the count: "1 correspondence", "6 correspondences"
   if (!n) return empty(`0: no ${label} on file.`, basis);
   const src = uniq.slice(0, 40).map((documentId) => ({ documentId, location: { field: "service_type" } }));
   return attachCitations(

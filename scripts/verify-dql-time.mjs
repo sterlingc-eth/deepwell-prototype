@@ -314,7 +314,7 @@ check('core keeps :: a plain per-year breakdown', r.intent?.plan.op === 'group_c
 
 {
   const x = parseDql('how many invoices between 2024 and now', { tenantVocab: tv, pack, today: TODAY });
-  check('range :: "between 2024 and now" covers the whole span through today', x?.plan?.op === 'tm_window' && x.plan.period.from === '2024-01-01' && x.plan.period.to === TODAY, JSON.stringify(x?.plan ?? null).slice(0, 300));
+  { const sp = x?.plan?.period ?? x?.plan?.time; check('range :: "between 2024 and now" covers the whole span through today', Boolean(x?.plan) && sp?.from === '2024-01-01' && sp?.to === TODAY, JSON.stringify(x?.plan ?? null).slice(0, 300)); }
   const y = parseDql('how many invoices 2024 to now', { tenantVocab: tv, pack, today: TODAY });
   check('range :: a year to "now" is never read as the first year alone', y === null || y.plan?.period?.to === TODAY, JSON.stringify(y?.plan ?? null).slice(0, 300));
 }

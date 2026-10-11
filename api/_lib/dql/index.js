@@ -33,7 +33,10 @@ export function answerFromSnapshot(snap, plan, today) {
   if (res?.abstain === 'ambiguous-name' && res.name) {
     const same = snap.customers.filter((c) => String(c.name).toLowerCase() === String(res.name).toLowerCase());
     if (same.length > 1) {
-      const where = same.map((c) => `${c.name} (${c.city ?? c.address ?? c.number ?? 'no address'})`);
+      // say where each lives; when two share a city, the street address tells them apart, and when that is the same too, the customer number
+      const pick = (c, f) => (f === 'city' ? c.city : f === 'address' ? c.address : c.number != null ? `no. ${c.number}` : null);
+      const field = ['city', 'address', 'number'].find((f) => new Set(same.map((c) => pick(c, f) ?? '')).size === same.length && same.every((c) => pick(c, f))) ?? null;
+      const where = same.map((c) => `${c.name} (${(field ? pick(c, field) : (c.city ?? c.address ?? pick(c, 'number'))) ?? 'no address'})`);
       const text = `${res.name} is on file ${same.length === 2 ? 'twice' : `${same.length} times`}: ${where.join(' and ')}. Which one do you mean?`;
       return attachCitations(answerEnvelope({ text, facts: [] }), { records: same.map((c) => ({ type: 'customer', id: c.id, label: c.name, sublabel: c.address ?? undefined })), total: same.length, basis: `Looked for ${res.name} among the customers on file.`, kind: 'basis' });
     }

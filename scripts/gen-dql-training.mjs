@@ -1,7 +1,7 @@
 /**
  * scripts/gen-dql-training.mjs - training rows for Donovan's learned planner (api/_lib/dql/learned), from the question factory's TRAIN split.
  *
- *   node scripts/gen-dql-training.mjs --split train --out /tmp/claude-0/lp/train [--tenants a,b] [--limit N] [--factory /home/claude/work/factory]
+ *   node scripts/gen-dql-training.mjs --split train --out /tmp/claude-0/lp/train [--tenants a,b] [--limit N] [--factory /home/claude/work/factory] [--qdir <factory>/questions/out2]
  *   (heavy: run it under `flock /tmp/claude-0/harness.lock`)
  *
  * Per tenant: loads the synthetic company, builds its tenant vocabulary and snapshot, then for every single-turn question
@@ -23,6 +23,7 @@ const FACTORY = A.factory ?? '/home/claude/work/factory';
 const SPLIT = A.split ?? 'train';
 if (SPLIT === 'test') throw new Error('the test split is sealed');
 const OUT = A.out ?? '/tmp/claude-0/lp/train';
+const QDIR = A.qdir ?? `${FACTORY}/questions/out`; // out2 = the round-2 wording bank (factory/questions/generate.mjs --bank 2)
 const LIMIT = Number(A.limit ?? 0);
 const KEYS = A.tenants ? A.tenants.split(',') : ['property', 'legal', 'medical', 'construction', 'cleaning', 'landscaping', 'nonprofit', 'auto', 'plumbing', 'electrical', 'hvac'];
 const HVAC_EXPORT = '/home/claude/work/qa6/export-q6.json'; const HVAC_DEV = '/home/claude/work/deep/dev'; // the HVAC dev questions (NOT the sealed sets)
@@ -53,7 +54,7 @@ function* readTenant(k) {
     }
     return;
   }
-  const dir = `${FACTORY}/questions/out`;
+  const dir = QDIR;
   for (const f of fs.readdirSync(dir).filter((x) => x.startsWith(`${k}-`)).sort()) {
     for (const l of zlib.gunzipSync(fs.readFileSync(path.join(dir, f))).toString().split('\n')) {
       if (!l) continue;
@@ -118,19 +119,19 @@ for (const k of KEYS) {
     if (LIMIT && n >= LIMIT) break;
     n++;
     const dbg = {};
-    delete process.env.DQL_LEARNED_FORCE;
+    delete process.env.DQL_LEARNED_FORCE; process.env.DONOVAN_DQL_LEARNED = '0'; // the labels come from the deterministic parser alone
     const r0 = parseDql(rec.q, { tenantVocab: tv, pack, today: TODAY, debug: dbg });
     let cat = r0 ? 'parsed' : /^unexplained/.test(dbg.why ?? '') ? 'left' : /no family/.test(dbg.why ?? '') ? 'nofam' : 'other';
-    const row = { id: rec.id, tn: k, sp: rec.split, q: rec.q, cat, h: k === 'hvac' ? hvacHeads(rec) : factoryHeads(rec), ek: rec.expect?.kind, fam: rec.family, pat: rec.pattern, noise: rec.noise, grp: rec.grp };
+    const row = { fw: rec.fillw ? [...new Set(String(rec.fillw).toLowerCase().split(/\s+/).map((x) => x.replace(/[^a-z0-9]/g, '')).filter(Boolean))] : undefined, id: rec.id, tn: k, sp: rec.split, q: rec.q, cat, h: k === 'hvac' ? hvacHeads(rec) : factoryHeads(rec), ek: rec.expect?.kind, fam: rec.family, pat: rec.pattern, noise: rec.noise, grp: rec.grp };
     const wk = dbg.feat?.work;
     if (wk) { row.orig = wk.orig.trim(); row.rest = wk.s; row.left = dbg.feat.left ?? []; row.tk = classifyWords(wk.orig, wk.s, row.left); }
     if (r0) { row.base = grade(rec, r0).v; row.dh = dqlHeads(r0.plan); row.dop = r0.plan.op; }
     if (cat === 'nofam') row.ut = dbg.feat?.unusedTriggers ?? null;
     else if (cat === 'left') {
-      process.env.DQL_LEARNED_FORCE = '1';
+      process.env.DQL_LEARNED_FORCE = '1'; delete process.env.DONOVAN_DQL_LEARNED;
       const d2 = {};
       const r1 = parseDql(rec.q, { tenantVocab: tv, pack, today: TODAY, debug: d2 });
-      delete process.env.DQL_LEARNED_FORCE;
+      delete process.env.DQL_LEARNED_FORCE; process.env.DONOVAN_DQL_LEARNED = '0';
       row.force = grade(rec, r1).v;
       if (r1) { row.dh = dqlHeads(r1.plan); row.dop = r1.plan.op; } else row.fwhy = d2.why ?? null;
     }

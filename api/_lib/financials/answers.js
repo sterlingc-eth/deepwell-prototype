@@ -20,6 +20,8 @@
  *
  * parseMoneyIntent is pure (unit-tested with no DB). runMoneyIntent touches `db`.
  */
+import { CUSTOMER_NOUNS } from '../dql/industryLex.js';
+import { customerWordForDb } from '../dql/custWord.js';
 import { nameVerdict, clarifyText, denialText, nameTokens, tokenSame, withinOne } from '../lookups/nameMatch.js';
 import { countSubject, repairKnownTypos } from '../understanding/understand.js';
 import { isPoMoneyQuestion, matchVendor, vendorPoEnabled } from '../lookups/vendorPo.js';
@@ -180,6 +182,7 @@ const TIME_STOP = new Set([
   'due', 'now', 'right', 'current', 'yet', 'receivable', 'receivables', 'open', 'overdue', 'outstanding', 'unpaid', 'paid',
   // Defect 1: adjectives that can sit between "the" and "invoice(s)" in a shop-wide question ("the recent invoices") and are never part of a customer name.
   'quotes', 'estimates', 'proposals', 'come', 'comes', 'came', 'recent', 'newest', 'oldest', 'latest', 'previous', 'prior', 'entire', 'whole', 'any', 'new', 'old', 'big', 'small', 'large', 'single', 'individual',
+  ...CUSTOMER_NOUNS, // a business's own word for its customers (patients, tenants, donors, accounts) is never part of a name
 ]);
 
 /** A candidate name phrase is usable only if it has at least one non-stop word. */
@@ -420,9 +423,39 @@ export function dropRoleBeforeInvoices(question) {
   if (cs?.subject === 'invoice') question = fixed;
   return cs?.subject === 'invoice' ? String(question).replace(/\b(?:customer|client)s?'?\s+(?=invoices?\b)/gi, '') : question;
 }
+/**
+ * R8: "how many bills are paid / unpaid / overdue" in a company whose own bills are the invoices it sends (a clinic, a landlord, a law office).
+ * Read as the same question about invoices; runMoneyIntent checks that the company really has no vendor bills (otherwise it is ambiguous and is not answered here).
+ */
+const BILL_STATUS_RE = /\b(?:paid|unpaid|open|outstanding|overdue|past[\s-]?due|partially\s+paid|partial|owed)\b/i;
+/**
+ * The question with "bills" read as "invoices" when it asks a payment status of bills (null when it does not, or when it carries a period or a name:
+ * those stay with the readers that apply them, never a whole-shop figure).
+ */
+const BILL_QUALIFIER_RE = /\b(?:19|20)\d{2}\b|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b|\b(?:last|past|this|since|during|between|before|after|ago|yesterday|today|week|weeks|month|months|year|years|quarter|days?|ytd)\b|\bq[1-4]\b|\$|\d/i;
+export function billsAsInvoicesText(question) {
+  const raw = String(question ?? '');
+  if (!(/\bbills?\b/i.test(raw) && BILL_STATUS_RE.test(raw)) || /\b(?:invoices?|vendors?|suppliers?|payables?|supply|distributors?|we owe|owe them|purchase|pos?)\b/i.test(raw)) return null;
+  const swapped = raw.replace(/\bbills\b/gi, 'invoices').replace(/\bbill\b/gi, 'invoice');
+  if (BILL_QUALIFIER_RE.test(swapped)) return null;
+  // a capitalised word that is not the first is a name ("bills Hannah Thornton owes")
+  if (/\S\s+[A-Z][a-z]+\b/.test(swapped.replace(/\bDonovan\b/g, ''))) return null;
+  return swapped;
+}
 export function parseMoneyIntent(question, { today }) {
+  const swapped = billsAsInvoicesText(question);
+  if (swapped) {
+    const it = parseMoneyIntentInner(swapped, { today });
+    if (it && !it.period && !it.subject) return { ...it, billsAsInvoices: true };
+    return parseMoneyIntentInner(question, { today });
+  }
+  return parseMoneyIntentInner(question, { today });
+}
+function parseMoneyIntentInner(question, { today }) {
   // E2 A4: "how many customer invoices do we have" counts INVOICES: customer/client is a role word (invoices we sent), never the thing counted or a name.
   question = dropRoleBeforeInvoices(question);
+  // "how much do patients owe us": the people who are billed are this organization's customers, whatever it calls them (a plural industry noun is not a name)
+  question = String(question ?? '').replace(/\b(?:patients|tenants|donors|accounts|members|residents|supporters|homeowners|families|guests|students)\b(?=\s+(?:still\s+)?(?:owe|owes|owing|haven'?t paid|have not paid|are behind)\b)/gi, 'customers');
   const q = String(question ?? '').toLowerCase();
   if (!q.trim()) return null;
   // "how many different / distinct / unique customers have been invoiced" counts the PEOPLE, not dollars or invoices; no reader here counts distinct parties.
@@ -1010,7 +1043,7 @@ async function receivables(db, intent, ctx, direction = 'receivable') {
       ? `Nothing${who} is past due${thresholdNote} right now (${plural(a.n_open, `open ${noun}`)} totaling ${fmt(a.open_total)}).${excl}`
       : `${plural(a.n_overdue, `${noun}`)}${who} ${a.n_overdue === 1 ? 'is' : 'are'} past due${thresholdNote}, totaling ${fmt(a.overdue_total)} (of ${fmt(a.open_total)} open in all).${excl}${flaggedText(a.n_flagged)}`;
   } else {
-    text = `${direction === 'receivable' ? `Customers owe us ${fmt(a.open_total)}${who}` : `We owe ${fmt(a.open_total)} on open bills`} across ${plural(a.n_open, `open ${noun}`)}; ${fmt(a.overdue_total)} of it (${plural(a.n_overdue, noun)}) is past due.${excl}${flaggedText(a.n_flagged)}`;
+    text = `${direction === 'receivable' ? `${(await customerWordForDb(db)).many.replace(/^./, (c) => c.toUpperCase())} owe us ${fmt(a.open_total)}${who}` : `We owe ${fmt(a.open_total)} on open bills`} across ${plural(a.n_open, `open ${noun}`)}; ${fmt(a.overdue_total)} of it (${plural(a.n_overdue, noun)}) is past due.${excl}${flaggedText(a.n_flagged)}`;
   }
   const facts = [
     { label: direction === 'receivable' ? 'Open receivables' : 'Open payables', value: fmt(a.open_total), status: 'ok', sources: rows.slice(0, 12).map((r) => docSource(r.document_id, r.total_page)) },
@@ -1205,7 +1238,7 @@ async function topCustomers(db, intent, ctx) {
   if (!rows.length) return baseAnswer('No invoices with totals are linked to customers yet, so I can\'t rank customers by revenue.', [], { confidence: 1, ...zeroCite('Searched every customer invoice with a printed total; none are linked to a customer yet.') });
   const extra = [
     ex.n_unlinked ? `${plural(ex.n_unlinked, 'invoice')} ${ex.n_unlinked === 1 ? "isn't" : "aren't"} linked to a customer and ${ex.n_unlinked === 1 ? 'is' : 'are'} not ranked` : null,
-    ex.n_no_total ? `${plural(ex.n_no_total, 'invoice')} print no total and ${ex.n_no_total === 1 ? 'is' : 'are'} excluded` : null,
+    ex.n_no_total ? `${plural(ex.n_no_total, 'invoice')} ${ex.n_no_total === 1 ? 'prints' : 'print'} no total and ${ex.n_no_total === 1 ? 'is' : 'are'} excluded` : null,
   ].filter(Boolean);
   const text = intent.topN > 1
     ? `Our top ${plural(rows.length, 'customer')} by invoiced revenue${p ? ` in ${p.label}` : ''}: ${rows.map((r, i) => `${i + 1}. ${r.name} (${fmt(r.amount)})`).join(', ')}.${extra.length ? ` Note: ${extra.join('; ')}.` : ''}`
@@ -1717,12 +1750,21 @@ async function docCount(db, intent, ctx) {
   const [{ n }] = await q(db, `SELECT count(*)::int AS n FROM financials f WHERE f.direction = 'payable' AND f.doc_kind = 'invoice'`, [], ctx.hu);
   const [po] = await q(db, `SELECT count(*)::int AS n FROM financials f WHERE f.doc_kind = 'po'`, [], ctx.hu);
   const poNote = po.n ? ` (${plural(po.n, 'purchase order')} ${po.n === 1 ? "isn't a bill" : "aren't bills"}, so ${po.n === 1 ? 'it was' : 'they were'} not counted.)` : '';
+  if (!n && !VENDORISH_RE.test(String(intent.raw ?? ''))) {
+    // no vendor bills at all: the bills this company has are the invoices it sends
+    const irows = await q(db, `SELECT f.* FROM financials f WHERE f.direction = 'receivable' AND f.doc_kind = 'invoice' ORDER BY f.doc_date DESC NULLS LAST, f.document_id LIMIT 12`, [], ctx.hu);
+    const [{ n: ni }] = await q(db, `SELECT count(*)::int AS n FROM financials f WHERE f.direction = 'receivable' AND f.doc_kind = 'invoice'`, [], ctx.hu);
+    if (ni) return baseAnswer(`You have ${plural(ni, 'invoice')} on file. You have no vendor bills, so I read "bills" as the invoices you send.${note}`, irows.slice(0, 6).map((x) => invoiceFact(x)), {
+      sources: irows.slice(0, 6).map((x) => docSource(x.document_id, x.total_page)), interpretation: 'invoices',
+      cite: { records: financeRecords(irows), total: ni, claimedCount: ni, basis: 'Counted the invoices you sent; there are no vendor bills, so "bills" was read as invoices.' } });
+  }
   if (!n) return baseAnswer(`There are no vendor bills in your records.${poNote}${note}`, [], { confidence: 1, ...zeroCite('Counted the payable invoices (vendor bills); there are none on file.') });
   return baseAnswer(`You have ${plural(n, 'vendor bill')} on file.${poNote}${note}`, rows.slice(0, 6).map((x) => invoiceFact(x)), {
     sources: rows.slice(0, 6).map((x) => docSource(x.document_id, x.total_page)), interpretation: 'vendor bills',
     cite: { records: financeRecords(rows), total: n, claimedCount: n, basis: 'Counted the payable invoices (vendor bills) on file; purchase orders are not bills.' } });
 }
 
+const VENDORISH_RE = /\b(?:vendors?|suppliers?|payables?|supply|distributors?|we owe|owe them|purchase|po|pos)\b/i;
 /** R2: "bills over 5000 from vendors" / "vendor bills between 2000 and 5000": counted from the payable rows (a purchase order is not a bill; a bill with no printed total cannot be compared and is said). */
 async function billThreshold(db, intent, ctx) {
   const scope = `f.direction = 'payable' AND f.doc_kind = 'invoice'`;
@@ -1733,6 +1775,20 @@ async function billThreshold(db, intent, ctx) {
   const [c] = await q(db, `SELECT count(*) FILTER (WHERE f.total IS NOT NULL AND ${cmp})::int AS n, count(*)::int AS n_all, count(*) FILTER (WHERE f.total IS NULL)::int AS n_unpriced FROM financials f WHERE ${scope}`, params, ctx.hu);
   const note = (intent.readNotes ?? []).length ? ` (${intent.readNotes.join('; ')})` : '';
   const what = intent.between ? `between ${fmt(String(lo))} and ${fmt(String(hi))}` : `${intent.inclusive ? (intent.dir === 'over' ? 'at least' : 'at most') : intent.dir} ${fmt(String(intent.amount))}`;
+  if (!c.n_all && !VENDORISH_RE.test(String(intent.raw ?? ''))) {
+    // a company with no vendor bills at all, asked about "bills": the bills it has are the invoices it sends (a clinic's patient bills, a landlord's tenant charges)
+    const rcv = `f.direction = 'receivable' AND f.doc_kind = 'invoice' AND f.currency = 'USD'`;
+    const [ci] = await q(db, `SELECT count(*) FILTER (WHERE f.total IS NOT NULL AND ${cmp})::int AS n, count(*)::int AS n_all, count(*) FILTER (WHERE f.total IS NULL)::int AS n_unpriced FROM financials f WHERE ${rcv}`, params, ctx.hu);
+    if (ci.n_all) {
+      const irows = await q(db, `SELECT f.* FROM financials f WHERE ${rcv} AND f.total IS NOT NULL AND ${cmp} ORDER BY f.total DESC, f.doc_date DESC NULLS LAST LIMIT 8`, params, ctx.hu);
+      const lead = `You have no vendor bills on file, so I read "bills" as the invoices you send.`;
+      const unpi = ci.n_unpriced ? ` ${plural(ci.n_unpriced, 'invoice')} print${ci.n_unpriced === 1 ? 's' : ''} no total and could not be compared.` : '';
+      if (!ci.n) return baseAnswer(`No invoice is ${what} (${plural(ci.n_all, 'invoice')} checked). ${lead}${unpi}${note}`, [], { confidence: 1, ...zeroCite(`Compared the printed total of every invoice with ${what}; none qualifies.`) });
+      return baseAnswer(`${plural(ci.n, 'invoice')} ${ci.n === 1 ? 'is' : 'are'} ${what}: ${irows.map((x) => `${x.invoice_number ? `#${x.invoice_number}` : 'no printed number'}${x.customer_name ? ` to ${x.customer_name}` : ''}${humanDate(x.doc_date) ? `, ${humanDate(x.doc_date)}` : ''}, ${fmt(x.total)}`).join('; ')}${ci.n > irows.length ? `; and ${ci.n - irows.length} more` : ''}. ${lead}${unpi}${note}`, irows.slice(0, 6).map((x) => invoiceFact(x)), {
+        sources: irows.map((x) => docSource(x.document_id, x.total_page)), interpretation: `invoices ${what}`,
+        cite: { records: financeRecords(irows), total: ci.n, claimedCount: ci.n, basis: `Counted the invoices you sent with a printed total ${what}; there are no vendor bills, so "bills" was read as invoices.` } });
+    }
+  }
   if (!c.n_all) return baseAnswer(`There are no vendor bills in your records, so none is ${what}.${note}`, [], { confidence: 1, ...zeroCite('Looked for payable invoices (vendor bills); there are none on file.') });
   const unp = c.n_unpriced ? ` ${plural(c.n_unpriced, 'bill')} print${c.n_unpriced === 1 ? 's' : ''} no total and could not be compared.` : '';
   const nm = (x) => x.vendor_name || x.customer_name;
@@ -2413,6 +2469,14 @@ async function splitLookAlikes(db, intent, opts) {
   return { ...merged, text, facts, interpretation: merged.interpretation };
 }
 export async function runMoneyIntent(db, intent, opts) {
+  if (intent?.billsAsInvoices) {
+    // only when the company has no vendor bills of its own: then "bills" are the invoices it sends, and the answer says so
+    const [{ n }] = await q(db, `SELECT count(*)::int AS n FROM financials f WHERE f.direction = 'payable' AND f.doc_kind = 'invoice'`, [], await extractionsHaveUnitIndex(db));
+    if (n) return null;
+    const out = await runMoneyIntent(db, { ...intent, billsAsInvoices: false }, opts);
+    if (out && typeof out.text === 'string') out.text = `${out.text.replace(/\s+$/, '')} You have no vendor bills, so I read "bills" as the invoices you send.`;
+    return out;
+  }
   const split = await splitLookAlikes(db, intent, opts);
   const out = split ?? await runMoneyIntentInner(db, intent, opts);
   // A payment-status question that also named an amount ("open invoices over 5k"): the status answer cannot apply the amount, so say so plainly.

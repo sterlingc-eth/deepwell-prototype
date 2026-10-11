@@ -42,6 +42,16 @@ const TODAY = '2026-09-23';
 
 /* ================================================================== 1. pure */
 {
+  // round 8: "bills" asked a payment status is the same question about invoices (a clinic's or landlord's own bills); it is never read as a name or as a typo of "hills"
+  {
+    const A = await import('../api/_lib/financials/answers.js');
+    const NL = await import('../api/_lib/nlNormalize.js');
+    const bp = A.parseMoneyIntent('how many bills are paid', { today: TODAY });
+    check('r8: "how many bills are paid" reads as the paid-invoices count', bp?.intent === 'payment_status' && bp.billsAsInvoices === true, JSON.stringify(bp));
+    check('r8: "how many bills are unpaid" reads as open invoices', A.parseMoneyIntent('how many bills are unpaid', { today: TODAY })?.intent === 'open_invoices');
+    check('r8: vendor bills keep their own reading', A.billsAsInvoicesText('which vendor bills are unpaid') === null && A.billsAsInvoicesText('how many bills do we have') === null);
+    check('r8: "bills" is never respelled to "hills"', NL.normalizeQuestion('how many bills are paid').normalized === 'how many bills are paid');
+  }
   eq('parseCents: plain, $, commas, parens, minus, trailing minus', ['1234.50', '$1,234.50', '(45.00)', '-$45', '45.00-', 1234.5].map((v) => N.parseCents(v)), [123450, 123450, -4500, -4500, -4500, 123450]);
   eq('parseCents: refuses non-amounts (TBD, 1,2,3, ranges, exponent, 3+ decimals that need rounding, empty)', ['TBD', '1,2,3', '10-20', '1e5', '12.345', '', null, {}].map((v) => N.parseCents(v)), [null, null, null, null, null, null, null, null]);
   eq('parseCents: trailing zeros beyond cents are fine, magnitude cap holds', [N.parseCents('12.500'), N.parseCents('100000000'), N.parseCents('99999999.99')], [1250, null, 9999999999]);

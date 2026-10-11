@@ -29,6 +29,7 @@ import { normName } from '../vocab.js';
 import { fmtDate, recordFor } from '../say.js';
 import { editDistance } from '../text.js';
 import { documentTypeLabel } from '../../documentTypes.js';
+import { nthOf, nthWord } from '../ordinal.js';
 
 export const TIME_OPS = ['tm_window', 'tm_series', 'tm_compare', 'tm_rate', 'tm_since', 'tm_inactive', 'tm_expiry', 'tm_between', 'tm_age'];
 
@@ -1250,6 +1251,27 @@ function saySeries(res, plan, x) {
   const rangeNote = plan.range ? ` ${plan.range.label}` : '';
   const thisYear = today.slice(0, 4);
   let text;
+  if (plan.mode === 'peak' && plan.nth) {
+    // "the second busiest month": place N of the periods ranked by the measure (a tie before place N, or one reaching back to it, is released)
+    const ranked = keys.map((k) => ({ k, v: res.buckets.get(k) })).sort((a, b) => b.v - a.v || (a.k < b.k ? -1 : 1));
+    const nt = nthOf(ranked.map((o) => o.v), plan.nth);
+    if (nt.status === 'ambiguous') return null;
+    const periodWord = { year: 'year', month: 'month', quarter: 'quarter', moy: 'month of the year', weekday: 'weekday' }[grain];
+    const inRange = plan.range ? (/^(?:before|after|since)/.test(plan.range.label) ? ` ${plan.range.label}` : ` in ${plan.range.label}`) : '';
+    const every = grain === 'moy' || grain === 'weekday' ? ' across all years' : '';
+    const amountOf = (v) => (meas.money ? fmtMoney(v) : meas.hours ? `${fmtNum(v, 1)} labor hours` : `${fmtInt(v)} ${meas.noun}`);
+    if (nt.status === 'short') return { text: `Only ${fmtInt(ranked.length)} ${periodWord}${ranked.length === 1 ? '' : 's'}${inRange}${cond} have anything on file, so there is no ${nthWord(plan.nth)} busiest ${periodWord}.`, facts: [], records: [], total: 0, basis: basisFor(plan) };
+    const at = ranked.slice(nt.from, nt.to);
+    const names = at.map((o) => bucketLabel(o.k, grain));
+    const nameLine = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+    text = at.length === 1 ? `The ${nthWord(plan.nth)} busiest ${periodWord}${inRange}${cond} was ${nameLine}, with ${amountOf(at[0].v)}${every}.` : `The ${nthWord(plan.nth)} busiest ${periodWord}${inRange}${cond} is a tie between ${nameLine}, each with ${amountOf(at[0].v)}${every}.`;
+    text += ` The busiest was ${bucketLabel(ranked[0].k, grain)}, with ${amountOf(ranked[0].v)}.`;
+    const live = at.filter((o) => (grain === 'year' && o.k === thisYear) || (grain === 'month' && o.k === today.slice(0, 7)));
+    if (live.length) text += ` Note that ${live[0].k === thisYear ? thisYear : monthLabel(live[0].k)} is not over yet (counted through ${fmtDate(today)}).`;
+    if (meas.assumed) text += ' Busiest is measured by service visits.';
+    const recs = res.rowsBy ? at.flatMap((o) => res.rowsBy.get(o.k)) : [];
+    return { text, facts: at.map((o) => ({ label: bucketLabel(o.k, grain), value: fmtVal(meas, o.v) })), records: recordsCap(recs, (r) => (meas.entity === 'unit' ? recUnit(r, snap) : recDoc(r, snap))), total: recs.length, basis: basisFor(plan, res.leftOut ? `${fmtInt(res.leftOut)} with no date on file were not counted.` : '') };
+  }
   if (plan.mode === 'peak') {
     const max = Math.max(...keys.map((k) => res.buckets.get(k)));
     const top = keys.filter((k) => res.buckets.get(k) === max);
