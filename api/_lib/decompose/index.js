@@ -24,6 +24,7 @@ import { todayIso, answerEnvelope } from '../scope.js';
 import { attachCitations, customerRecord } from '../citations/records.js';
 import { documentRecordsFor } from '../citations/enrich.js';
 import { classifyWithTypoTolerance } from '../relations/normalize.js';
+import { runDql } from '../dql/index.js';
 
 /** Pure: question (+ the tenant's own industry pack, already resolved by ask.js before this is called —
  *  same convention as classifyRelationsQuestion/classifyDeterministic) -> a decompose intent, or null.
@@ -117,6 +118,7 @@ async function runFilter(db, intent, { today }) {
  */
 export async function runDecompose(db, intent, { today } = {}) {
   if (!intent) return null;
+  if (intent.mode === 'dql') return runDql(db, intent, { today });
   if (intent.mode === 'compare') return runComparison(db, intent, { today });
   if (intent.mode === 'filter') return runFilter(db, intent, { today });
   if (intent.mode === 'compound' && (intent.negation || intent.ratio)) return runNegation(db, intent, { today, pack: intent.pack });

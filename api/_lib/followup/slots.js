@@ -169,6 +169,16 @@ export function findSpans(text, { fragment = false } = {}) {
   const lowered = masked.replace(/^(\s*)((?:How|What|Whats|Who|Whose|Which|When|Where|Total|Average|Show|List|Give|Tell|Number|Count|And|Also|Same|Now|Then|Do|Does|Did|Is|Are|Was|Were|Can|Could|Please)\b)/, (_, a, b) => a + b.toLowerCase());
   for (const m of matchAll(/\b[A-Z][a-z]+(?:['’-][A-Za-z]+)?(?:\s+[A-Z][a-z]+(?:['’-][A-Za-z]+)?){1,2}/g, lowered)) {
     let raw = m[0].replace(/['’]s$/i, '');
+    // Round 5: a business name runs on past three words ("Sunrise Valley Elementary School"): cut out whole, never half, so no part of an old name survives a swap
+    if (raw === m[0]) {
+      let end = m.index + raw.length;
+      for (;;) {
+        const t = /^\s+([A-Z][A-Za-z&-]*)\b/.exec(lowered.slice(end));
+        if (!t || /^(?:In|At|And|For|Of|How|What|Who|When|Where|Which|The|To|On|By|Has|Have|Does|Do|Did|Is|Are)$/.test(t[1])) break;
+        end += t[0].length;
+      }
+      raw = text.slice(m.index, end);
+    }
     claim({ kind: 'person', start: m.index, end: m.index + raw.length, raw });
   }
   return spans.sort((a, b) => a.start - b.start);

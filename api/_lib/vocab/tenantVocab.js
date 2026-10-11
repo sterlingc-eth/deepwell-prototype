@@ -63,11 +63,13 @@ export async function computeDataVersion(db) {
         (SELECT count(*)::text || ':' || coalesce(max(updated_at)::text, '') FROM entities
           WHERE entity_type = 'equipment' AND merged_into IS NULL AND ${TENANT_SQL}) AS e,
         (SELECT count(*)::text || ':' || coalesce(max(created_at)::text, '') FROM extractions
-          WHERE field_key = 'technician' AND ${TENANT_SQL}) AS t`,
+          WHERE field_key = 'technician' AND ${TENANT_SQL}) AS t,
+        (SELECT count(*)::text || ':' || coalesce(max(created_at)::text, '') FROM documents
+          WHERE ${TENANT_SQL}) AS d`,
     []
   );
   const r = rows[0] ?? {};
-  return `${r.c ?? ''}|${r.e ?? ''}|${r.t ?? ''}`;
+  return `${r.c ?? ''}|${r.e ?? ''}|${r.t ?? ''}|${r.d ?? ''}`;
 }
 
 /** Every distinct, trimmed value for one jsonb text field across a tenant's own entities of one type. */
@@ -136,6 +138,42 @@ function dedupCi(values) {
 }
 
 /**
+ * DQL (api/_lib/dql): the organization's own categorical values, so the query parser can recognise "Watsco" or "Repair" or "R-454B" without a
+ * word list of its own: field -> distinct values (short text fields with few distinct values), the document types in use, and the vendor
+ * names on the money documents. Every read is tenant-scoped; a missing table or column simply leaves that part out.
+ */
+const DQL_EXTRACTION_FIELDS = { status: 'status', service_type: 'serviceType', refrigerant: 'refrigerant', tonnage: 'tonnage', equipment_type: 'equipmentType', vendor_name: 'vendor' };
+async function buildDqlVocab(db) {
+  const out = { categorical: {}, docTypes: [] };
+  const add = (field, v) => { const t = String(v ?? '').replace(/\s+/g, ' ').trim(); if (!t || t.length > 40) return; (out.categorical[field] ??= new Set()).add(t); };
+  try {
+    const { rows } = await db.raw(
+      `SELECT field_key, COALESCE(NULLIF(corrected_value, ''), value) AS v FROM extractions
+        WHERE field_key = ANY($1::text[]) AND ${TENANT_SQL} AND coalesce(value, '') <> '' GROUP BY 1, 2 LIMIT 3000`,
+      [Object.keys(DQL_EXTRACTION_FIELDS)]
+    );
+    for (const r of rows) add(DQL_EXTRACTION_FIELDS[r.field_key], r.v);
+  } catch { /* extractions unreadable: leave the categorical part out */ }
+  try {
+    // probe first: a failed statement would abort the surrounding transaction
+    const has = await db.raw(`SELECT to_regclass('document_financials') IS NOT NULL AS ok`, []);
+    if (has.rows?.[0]?.ok) {
+      const { rows } = await db.raw(`SELECT DISTINCT vendor_name AS v FROM document_financials WHERE ${TENANT_SQL} AND vendor_name IS NOT NULL LIMIT 2000`, []);
+      for (const r of rows) add('vendor', r.v);
+    }
+  } catch { /* no financials table */ }
+  try {
+    for (const f of ['refrigerant', 'tonnage', 'equipment_type']) for (const v of await distinctEntityValues(db, 'equipment', f, 500)) add(f === 'equipment_type' ? 'equipmentType' : f, v);
+  } catch { /* ignore */ }
+  try {
+    const { rows } = await db.raw(`SELECT lower(replace(document_type, '_', '-')) AS t, count(*)::int AS n FROM documents WHERE ${TENANT_SQL} GROUP BY 1 LIMIT 200`, []);
+    out.docTypes = rows.map((r) => ({ id: r.t, n: r.n }));
+  } catch { /* ignore */ }
+  for (const k of Object.keys(out.categorical)) { const arr = [...out.categorical[k]]; out.categorical[k] = arr.length <= 60 ? arr : []; }
+  return out;
+}
+
+/**
  * Builds the full glossary for the calling tenant, no caching — see getTenantVocab for the cached,
  * data-version-keyed entry point every caller should actually use.
  */
@@ -149,6 +187,7 @@ export async function buildTenantVocab(db, pack) {
     distinctEntityValues(db, 'customer', 'service_address'),
   ]);
   const cities = dedupCi(addresses.map((a) => deriveGeo(a).city).filter(Boolean));
+  const dql = await buildDqlVocab(db);
   const docTypePhrases = (pack?.documentTypes ?? [])
     .map((t) => ({ id: t.id, phrase: String(t.label ?? t.id).toLowerCase().trim() }))
     .filter((t) => t.phrase);
@@ -163,6 +202,7 @@ export async function buildTenantVocab(db, pack) {
     industryWords: pack?.id ? [String(pack.id).toLowerCase()] : [],
     technicians: buildNameGlossary(technicians),
     customers: buildNameGlossary(customerNames),
+    dql,
   };
 }
 

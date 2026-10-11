@@ -49,6 +49,8 @@ import { isFinancialQuestion } from "../financials/classify.js";
 import { parseMoneyIntent } from "../financials/answers.js";
 import { extraDocTypeAlternation, stemWord } from "../lookups/lexicon.js";
 import { detectAnalyticsPlan } from "../analytics/detPlan.js";
+import { parseDql, dqlEnabled } from "../dql/index.js";
+import { isMerged, isReleased } from "../followup/handoff.js";
 import { ENTITY_SYNONYMS } from "../analytics.js";
 import { leftoverWords, leftoverEnabled, domainWordsFromVocab, NEGATION_WORDS, unusedGrammar, grammarSpans, yearPairRewrite } from "./leftover.js";
 import { normalizeQuestion as normalizeQuestionFull } from "../nlNormalize.js";
@@ -494,8 +496,59 @@ async function withWording(out, question, ctx) {
   } catch { return out; }
 }
 
+/**
+ * DQL (api/_lib/dql): the general query engine - question -> structured plan -> executed over the organization's own records.
+ * Tried LAST, after the wording model, and only when the question is still unclaimed: no lane won it, or the only claim is the analytics
+ * lane AND the deterministic planner (analytics/detPlan.js) has no plan for it (that path would plan with a model). When parseDql reads the
+ * whole question (every word explained, see dql/parse.js) the question travels as a decompose claim {mode:'dql'} (ask.js already runs
+ * that lane and its precision guard) and the analytics lane is switched off. Kill switch: DONOVAN_DQL=0. It never overrides a claim.
+ */
+async function withDql(out, question, ctx) {
+  try {
+    if (process.env.DONOVAN_DQL === "0" || !dqlEnabled() || ctx?.meta || ctx?.noDql || !ctx?.tenantVocab) return out;
+    const text = out?.effectiveQuestion ?? question;
+    const w = out?.winner;
+    // follow-up hand-off (followup/handoff.js): a follow-up whose pronoun has no safe referent is claimed by no lane; a merged follow-up goes to DQL first
+    if (isReleased(question) || isReleased(text)) return { ...(out ?? {}), winner: null, claimed: [], gated: Object.fromEntries(Object.keys(out?.gated ?? {}).map((k) => [k, k === "analytics" ? false : null])), leftoverDeclined: { reason: "followup-pronoun", words: [] } };
+    const mergedFollowup = isMerged(question) || isMerged(text);
+    let place = "claim"; // "claim": DQL becomes the winner; "after": DQL waits behind the earlier lane that claimed the question
+    if (w && mergedFollowup) {
+      const mi = parseDql(text, { tenantVocab: ctx.tenantVocab, pack: ctx.pack, today: ctx?.today, original: question });
+      if (mi && !mi.plain) return { ...out, winner: { name: "decompose", intent: mi }, gated: { ...(out.gated ?? {}), deterministic: null, relations: null, fastPath: null, contactLookup: null, docLookup: null, contentCount: null, money: null, decompose: mi, analytics: false }, claimed: [...new Set([...(out.claimed ?? []).filter((n) => n !== "analytics"), "decompose"])], dql: true };
+      return { ...out, winner: null, claimed: [], gated: Object.fromEntries(Object.keys(out.gated ?? {}).map((k) => [k, k === "analytics" ? false : null])), leftoverDeclined: { reason: "followup-merge", words: [] } }; // DQL cannot read the merged question: no older lane may answer it while dropping a condition
+    }
+    if (w) {
+      if (w.name === "analytics" && !w.futureDate) {
+        const today = ctx?.today ?? new Date().toISOString().slice(0, 10);
+        const { overlay, pack, tenantVocab } = ctx;
+        const norm = normalizeQuestionFull(text, { overlay, pack, tenantVocab }).normalized;
+        if (detectAnalyticsPlan(norm, tenantVocab, today)) return out; // the deterministic planner has a plan: not a model-planned analytics claim
+      } else if (w.name === "relations" || w.name === "deterministic") {
+        // These two run BEFORE the decompose stage in ask.js and fall through to it when they return nothing (their reading of the question
+        // failed at run time, which today ends in a model call). DQL waits in the decompose slot, behind them: it only ever sees a question
+        // they could not answer, and only when no later lane (fast path, lookups, content count, money) claimed it too.
+        const g = out?.gated ?? {};
+        if (g.decompose || g.fastPath || g.contactLookup || g.docLookup || g.contentCount || g.money) return out;
+        place = "after";
+      } else return out;
+    }
+    const intent = parseDql(text, { tenantVocab: ctx.tenantVocab, pack: ctx.pack, today: ctx?.today, original: question });
+    if (!intent || intent.plain) return out; // a plain inventory question stays with the lanes that have always answered it
+    if (place === "after") return { ...out, gated: { ...out.gated, decompose: intent }, claimed: [...new Set([...(out.claimed ?? []), "decompose"])], dql: "after" };
+    const gated = { ...(out?.gated ?? {}), decompose: intent, analytics: false };
+    return {
+      ...(out ?? {}),
+      winner: { name: "decompose", intent },
+      gated,
+      claimed: [...new Set([...(out?.claimed ?? []).filter((n) => n !== "analytics"), "decompose"])],
+      effectiveQuestion: out?.effectiveQuestion ?? question,
+      dql: true,
+    };
+  } catch { return out; }
+}
+
 export async function classifyAll(question, ctx = {}) {
-  return withWording(await classifyAllCore(question, ctx), question, ctx);
+  return withDql(await withWording(await classifyAllCore(question, ctx), question, ctx), question, ctx);
 }
 
 async function classifyAllCore(question, ctx = {}) {

@@ -123,12 +123,14 @@ const A = (q) => adapt(q, { lex, roster });
   const tv = { technicians: { phrases: par.techs, words: [] }, customers: { phrases: par.customers, words: [] }, brands: [], cities: [] };
   const ctx = { today: "2026-10-07", tenantVocab: tv };
   process.env.DONOVAN_WORDING_MODEL = "0";
+  process.env.DONOVAN_DQL = "0"; // the DQL engine (api/_lib/dql) is tried AFTER the wording model; this check measures the wording model alone
   const claimedQs = ["how many invoices in 2024", "how many customers are in Mesa", "average invoice amount"];
   const base = [];
   for (const q of claimedQs) base.push(await classifyAll(q, ctx));
   const unclaimed = [];
   for (const q of ["Joseph Norwood documents count?", "Scottsdale customers count and Mesa customers count", "yo how many unis use r-454b"]) unclaimed.push([q, await classifyAll(q, ctx)]);
   delete process.env.DONOVAN_WORDING_MODEL;
+  delete process.env.DONOVAN_DQL;
   for (let i = 0; i < claimedQs.length; i++) {
     const o = await classifyAll(claimedQs[i], ctx);
     check(`existing claim untouched: "${claimedQs[i]}"`, base[i].winner && !o.wording && o.winner?.name === base[i].winner.name && o.effectiveQuestion === base[i].effectiveQuestion);

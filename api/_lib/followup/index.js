@@ -8,3 +8,4 @@ export { resolveFollowup, composeFollowupFilters } from './resolve.js';
 export { looksLikeContinuation, classifyFollowupKind, looksLikeDisambiguationReply, detectSwapTarget } from './classify.js';
 export { subjectFromText, subjectFromEntities, brandMentionIn } from './subject.js';
 export { slotFollowup, slotRewrite } from './slots.js';
+export { dqlMergeFollowup, dqlMergeRewrite } from './dqlmerge.js';

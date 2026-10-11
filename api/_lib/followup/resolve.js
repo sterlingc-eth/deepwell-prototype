@@ -21,6 +21,8 @@ import { extractDocTypeMentions } from '../search/knowledge.js';
 import { KNOWN_AZ_CITY_NAMES } from '../analytics.js';
 import { looksLikeContinuation, classifyFollowupKind, detectSwapTarget, looksLikeDisambiguationReply } from './classify.js';
 import { slotFollowup } from './slots.js';
+import { dqlMergeFollowup, plainScope } from './dqlmerge.js';
+import { markMerged, markReleased, isFragment } from './handoff.js';
 import { subjectFromText, subjectFromEntities, pronounReplacement, substitutePronouns, stripTrailingPunct, brandMentionIn, inferNoun, anchorAlreadyPresent, pronounNeedsBrandFromEarlierTurn } from './subject.js';
 
 /** Runs a pronoun substitution and guarantees the anchor's own raw text (address/name/customer
@@ -167,6 +169,8 @@ function buildSwapQuestion(priorTurn, target) {
   if (priorSubj.address && priorTurn.question.includes(priorSubj.address)) return priorTurn.question.replace(priorSubj.address, newSubjectText);
   if (priorSubj.name && priorTurn.question.includes(priorSubj.name)) return priorTurn.question.replace(priorSubj.name, newSubjectText);
   if (priorSubj.customerNumber && priorTurn.question.includes(priorSubj.customerNumber)) return priorTurn.question.replace(priorSubj.customerNumber, newSubjectText);
+  // Round 5: a prior question that names someone (or an address) this code could not locate must not keep them beside the new subject.
+  if (/\b[A-Z][a-z]+(?:['’-][A-Za-z]+)?\s+[A-Z][a-z]+\b/.test(priorTurn.question.replace(/^\s*\w+\s/, ' ')) && !(priorSubj.address || priorSubj.name || priorSubj.customerNumber)) return null;
   const newSubject = { address: probe.address, name: probe.name || (!probe.address ? target : null), noun: inferNoun(priorTurn.question) };
   const rewritten = rewriteWithAnchor(priorTurn.question, newSubject);
   if (rewritten.changed) return rewritten.query;
@@ -179,6 +183,7 @@ function resolveSwap(question, priorTurn) {
   const probe = extractSubject(`for ${target}`);
   if (!probe.hasAny) return null; // "what about tomorrow" etc. — not a real entity swap, fall through
   const query = buildSwapQuestion(priorTurn, target);
+  if (!query) return null;
   return { query: clip(query), filters: {}, isFollowup: true, kind: 'swap', needsClarification: false };
 }
 
@@ -232,7 +237,15 @@ function resolveRefinement(question, anchor, priorTurn) {
   // stand in for; rewriteWithAnchor then leaves the pronoun untouched (`changed: false`), and the
   // generic noun substitution below is the right fallback rather than shipping a dangling "those".
   const rewritten = anchor ? rewriteWithAnchor(question, anchor.subject) : { query: question, changed: false };
-  const noun = anchor?.subject?.noun || inferNoun(question);
+  let noun = anchor?.subject?.noun || inferNoun(question);
+  // Round 5: with no named customer or address to stand for "those", the only honest referent is the scope of a plain inventory question
+  // ("how many Trane units do we have"). A prior that carried any other condition (a period, a city, a threshold, a status) would lose it
+  // here, and a guessed noun ("units" for a list of customers) would answer a different question: release instead.
+  if (!rewritten.changed && GENERIC_PRONOUN_RE.test(question)) {
+    const plain = priorTurn ? plainScope(priorTurn.question) : null;
+    if (!plain) { markReleased(question); return passthrough(question, composeFollowupFilters(priorTurn?.resolvedFilters, question)); }
+    noun = plain.noun;
+  }
   let q = rewritten.changed ? rewritten.query : genericSubstitution(question, noun, inherited?.label);
   // The anchor DID rewrite the pronoun (a named customer/address carried forward) but an inherited
   // brand still isn't anywhere in the resulting text ("those" replaced by the customer's own
@@ -285,7 +298,22 @@ export function resolveFollowup(context, question) {
   const slotted = slotFollowup(turns, q);
   if (slotted) return { query: clip(slotted.query), filters: {}, isFollowup: true, kind: 'slot', needsClarification: false };
 
-  if (!looksLikeContinuation(q, priorTurn)) return passthrough(q);
+  // Round 5 (family "followup"): the merge the DQL parser can fully explain (carry the prior slots, replace the slot of the same
+  // kind, add the refinement). Uncertain merges return null and fall through exactly as before.
+  const merged = dqlMergeFollowup(turns, q);
+  if (merged) markMerged(clip(merged.query));
+  if (merged) return { query: clip(merged.query), filters: {}, isFollowup: true, kind: 'dql-merge', needsClarification: false };
+
+  if (!looksLikeContinuation(q, priorTurn)) {
+    // a fragment that names no thing of its own ("how many are Trane", "as a technician") only means something against the earlier question; typed
+    // alone an older lane would answer a different question (all Trane units, every technician), so no lane may claim it
+    if (isFragment(q)) {
+      const carried = clip(`Earlier question: "${String(priorTurn.question).trim().replace(/[?.!\s]+$/, '')}". Follow-up: ${String(q).trim()}`);
+      markReleased(carried);
+      return { query: carried, filters: {}, isFollowup: true, kind: 'fragment', needsClarification: false };
+    }
+    return passthrough(q);
+  }
 
   const kind = classifyFollowupKind(q);
   const anchor = findAnchor(turns);
