@@ -20,6 +20,7 @@ import { FILLER as DQL_FILLER } from '../dql/lex.js';
 import { editDistance as lexDistance } from '../dql/text.js';
 import { parseDql } from '../dql/parse.js';
 import { KNOWN_AZ_CITY_NAMES } from '../analytics.js';
+import { convoRewrite } from './convo.js';
 
 const MONTHS = 'january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept|sep|oct|nov|dec';
 const YEAR = '(?:19|20)\\d{2}';
@@ -551,14 +552,18 @@ function opChange(P, F0) {
 export function dqlMergeRewrite(prior, follow) {
   if (process.env.DQL_FOLLOWUP_MERGE === '0') return null; // kill switch
   const P = strip(prior); const F0 = strip(follow);
-  if (!P || !F0 || F0.length > 160) return null;
-  if (LEAD_RE.test(P)) return null; // the prior is itself a bare fragment with nothing of its own to carry
+  if (!P || !F0 || F0.length > 220) return null;
+  if (LEAD_RE.test(P)) { const c0 = convoRewrite(P, F0, { spansOf, swapPeriod }); return c0 || null; } // the prior is itself a bare fragment with nothing of its own to carry (R17: unless it is a full question behind a lead-in)
   try {
     const a = slotMerge(P, F0);
     if (a) return { query: `${a}?`, slot: 'dql-slot' };
     const b = opChange(P, F0);
-    if (b && !dqlExplains(/\?$/.test(b) ? b : `${b}?`, spansOf(b).filter((x) => x.kind === 'person').map((x) => x.raw))) return null;
-    if (b) return { query: /\?$/.test(b) ? b : `${b}?`, slot: 'dql-op' };
+    if (b && dqlExplains(/\?$/.test(b) ? b : `${b}?`, spansOf(b).filter((x) => x.kind === 'person').map((x) => x.raw))) return { query: /\?$/.test(b) ? b : `${b}?`, slot: 'dql-op' };
+    // R17: the same scope with another measure or one more condition, built from the prior's own words (any company's vocabulary)
+    // a named customer in the scope is released: the engine may read a short or variant spelling as several people and decline the rewrite
+    if (/\b(?:of|for|by|from|at)\s+(?:[A-Z][\w'&.-]*\s+){1,}[A-Z][\w'&.-]*/.test(P)) return null;
+    const c = convoRewrite(P, F0, { spansOf, swapPeriod });
+    if (c) return c;
   } catch { /* fall through: release */ }
   return null;
 }

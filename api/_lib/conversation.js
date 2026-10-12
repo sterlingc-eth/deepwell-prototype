@@ -48,6 +48,7 @@
  * by a hostile client rather than echoed back honestly.
  */
 import { isFragment } from './followup/handoff.js';
+import { isBareMeasureFollowup } from './followup/convo.js';
 import { resolveFollowup, composeFollowupFilters as composeFollowupFiltersImpl, looksLikeContinuation, slotFollowup, dqlMergeFollowup, provenanceFollowup, correctionPayload } from './followup/index.js';
 
 export const MAX_CONTEXT_TURNS = 4;
@@ -140,7 +141,7 @@ export function lastTurn(context) {
 export function isFollowupContinuation(question, priorTurn) {
   // api/ask.js passes the whole validated context here; a slot-style elliptical follow-up ("and in 2022?",
   // "and Lennox?") is a continuation even though it carries no pronoun (followup/slots.js).
-  if (Array.isArray(priorTurn?.turns) && (slotFollowup(priorTurn.turns, question) || dqlMergeFollowup(priorTurn.turns, question) || provenanceFollowup(priorTurn.turns, question) || correctionPayload(question) || isFragment(question))) return true;
+  if (Array.isArray(priorTurn?.turns) && (slotFollowup(priorTurn.turns, question) || dqlMergeFollowup(priorTurn.turns, question) || provenanceFollowup(priorTurn.turns, question) || correctionPayload(question) || isFragment(question) || isBareMeasureFollowup(question))) return true;
   return looksLikeContinuation(question, priorTurn ?? null);
 }
 

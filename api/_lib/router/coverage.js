@@ -44,6 +44,12 @@ export function trackedVocabulary() {
 const MEASURE_CLASSES = [
   { cls: "satisfaction", re: /\b(?:customer\s+)?satisfaction\b|\bcsat\b|\bnps\b|\bnet\s+promoter\b/i, roots: ["satisfaction", "csat", "nps"] },
   { cls: "fuel", re: /\bgallons?\b|\bfuel\b|\bdiesel\b|\bmileage\b|\bodometer\b|\bgas\s+(?:used|usage|mileage|cost|spend|expense)\b|\bgas\s+did\b/i, roots: ["gallon", "fuel", "diesel", "mileage", "odometer"] },
+  { cls: "weight", re: /\b(?:dog|pet|animal|body|patient|load|shipping|package)\s+weights?\b|\bhow\s+(?:much|heavy)\s+(?:does|did|do)\s+[^?]{0,30}\bweigh\b|\b(?:avg|average|total)\s+weights?\b/i, roots: ["weight", "weigh", "lbs"] },
+  { cls: "tips", re: /\btips?\s+(?:received|earned|collected|total|totals|amount|amounts|left|by|per)\b|\b(?:total|average|avg)\s+tips?\b|\bgratuit(?:y|ies)\b|\btip\s+(?:total|totals|income|pool)\b/i, roots: ["tip", "tips", "gratuity"] },
+  { cls: "grades", re: /\bgrade\s+(?:improvement|average|point|level|changes?)\b|\b(?:test|exam|quiz)\s+scores?\b|\bgpa\b|\breport\s+card\s+grades?\b/i, roots: ["grade", "gpa", "exam"] },
+  { cls: "deposit", re: /\b(?:security|damage|pet|cleaning|tenant)\s+deposits?\s+(?:balances?|held|amounts?|totals?|refunds?|owed|on\s+hand|outstanding)\b|\bdeposits?\s+(?:balances?|held|outstanding)\b|\bhow\s+much\s+(?:in\s+)?(?:security\s+)?deposits?\s+(?:are|is|do|does)\s+(?:we\s+)?(?:held|holding|hold)\b/i, roots: ["deposit", "deposits"] }, // R18: a held balance is not a field on any paper kept here ("deposit receipts" stay a paper kind)
+  { cls: "resolve", re: /\b(?:mean|average|avg|median)\s+time\s+to\s+(?:resolve|fix|close|repair)(?:\s+(?:a\s+|the\s+)?(?:tickets?|issues?|requests?|cases?|calls?))?\b|\b(?:time|hours|days)\s+to\s+(?:resolve|fix)(?:\s+(?:a\s+|the\s+)?(?:tickets?|issues?|requests?|cases?|calls?))?\b|\bresolution\s+times?\b|\bfix\s+times?\b/i, roots: ["resolve", "resolution", "fix"] },
+  { cls: "miles", re: /\b(?:route|deadhead|empty|loaded|total|trip)\s+miles\b|\bmiles\s+(?:driven|per\s+(?:gallon|load|stop|delivery|day)|traveled|travelled)\b/i, roots: ["mile", "miles", "mileage"] },
   { cls: "fleet", re: /\b(?:which|what)\s+(?:truck|van|vehicle|car)\b|\b(?:truck|van|vehicle)\s+(?:is|does|was)\s+[^?]{0,30}\b(?:driv|assign|us)\w*|\blicense\s+plate\b|\b(?:fleet|company)\s+(?:trucks?|vans?|vehicles?)\b/i, roots: ["truck", "vehicle", "fleet"] },
   { cls: "bank", re: /\bbank\s+(?:balance|account|deposit|statement)\b|\bcash\s+(?:balance|on\s+hand|position)\b|\bin\s+the\s+bank\b|\bchecking\s+account\b|\bsavings\b/i, roots: ["bank", "cash", "checking", "savings"] },
   { cls: "birthday", re: /\bbirthday\b|\bbirth\s*date\b|\bdate\s+of\s+birth\b/i, roots: ["birthday", "birthdate", "birth"] },
@@ -60,7 +66,7 @@ const ID_DIGITS_RE = /\$\s?\d|#\s?\d|\b[a-z]{1,5}-\d|\b\d{3,}-\d|\b\d{5,}\b/i;
 const HOWTO_RE = /\bhow\s+(?:do|can|to|would|should)\s+(?:i|we|you)\b|\bhow\s+to\b|\bwhere\s+(?:do|can)\s+i\b|\b(?:upload|import|export|invite|log\s*in|password|subscription|billing|pricing)\b/i;
 
 /** Words that may follow a measure word when the measure itself is what is asked for ("satisfaction score", "fuel spend", "cash balance in the bank"). */
-const AFTER_OK = new Set("score scores rating ratings level levels rate rates balance balances spend spending usage cost costs expense expenses used use did does do was were is are last this that per for in of at by to the our we us and or it with from about across over so how what when why also total totals number count average avg year month week day today yesterday days weeks months years ytd now currently".split(" "));
+const AFTER_OK = new Set("on score scores rating ratings level levels rate rates balance balances spend spending usage cost costs expense expenses used use did does do was were is are last this that per for in of at by to the our we us and or it with from about across over so how what when why also total totals number count average avg year month week day today yesterday days weeks months years ytd now currently".split(" "));
 const TRACKED_PREP_RE = /^\s*(?:on|for|about|with|from|in)\s+(?:the|our|a|an|this|that|my|your)?\s*([a-z]+)/i;
 function isTheAsk(q, m) {
   const rest = q.slice(m.index + m[0].length);

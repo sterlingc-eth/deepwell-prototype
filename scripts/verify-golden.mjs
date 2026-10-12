@@ -411,7 +411,8 @@ if (examExport) {
     // R32b (Team A3, loops A-E: page attributes + unknown names + off-domain, per-customer/vendor counts + named comparisons, warranty/date aggregates +
     // tech-never sets, technician pair comparisons, dangling/trivia declines): measured 1594 answered / 1574 correct / 0 wrong / 14 needs-model / 45 clarified
     // (was 1572/1552/0/33 -> 35 in this repo) -> floors RAISED to 1590/1570 and needs-model LOWERED to <= 16.
-    check(`R35: needs-model has not risen above 13 (got ${overall.needsModel})`, overall.needsModel <= 13, JSON.stringify(overall));
+    // R18: k099 ("any staff-only notes about <customer>'s account") used to get the equipment/last-service/phone menu, which says nothing about notes; R17 sends it to the model instead (+1 needs-model, 0 wrong).
+    check(`R35: needs-model has not risen above 14 (got ${overall.needsModel})`, overall.needsModel <= 14, JSON.stringify(overall));
     check(`R32: wrong stays 0 (got ${overall.wrong})`, overall.wrong === 0, JSON.stringify(overall));
     check(`fast: full ${exam.questions.length}-question exam finished in under 3 minutes (took ${Math.round(durationMs / 1000)}s)`, durationMs < 180_000, `${durationMs}ms`);
 

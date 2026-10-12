@@ -24,6 +24,7 @@ import { tokenize, repairWord, findRun } from './text.js';
 import { compileVocab, normName } from './vocab.js';
 import { FILLER, ENTITY_WORDS, DIM_WORDS, MONEY_WORDS, docTypePhraseMap } from './lex.js';
 import { detectPlan, allFamilies, rescuePlan } from './registry.js';
+import { readerShaped } from './families/reader.js';
 import { dqlFrame, dqlParaphrase, openEndRewrite, ordinalCustomerRewrite } from './frame.js';
 import { CUSTOMER_NOUNS } from './industryLex.js';
 import { leftoverGate, verifyPlan, supplyOp } from './learned/index.js';
@@ -194,7 +195,8 @@ export function parseDql(question, ctx = {}) {
   const today = ctx.today ?? new Date().toISOString().slice(0, 10);
   const vocab = compileVocab(tv, ctx.pack);
   // a topic the shared jargon table lists as not recorded ("donation", "lease") is recorded when this organization keeps that kind of paper under that very word
-  try { const uc = jargonEnabled() ? untrackedConcept(raw0) : null; if (uc && !vocab.scopedPhrases?.has(String(uc.phrase).toLowerCase().replace(/\s+/g, ' '))) return null; } catch { /* ignore */ }
+  let readerOnly = false; // R18: a clause the papers may state in words ("late fees", "governing law") is not a field this company keeps, but the extractive reader can still READ it; only the reader may answer such a question
+  try { const uc = jargonEnabled() ? untrackedConcept(raw0) : null; if (uc && !vocab.scopedPhrases?.has(String(uc.phrase).toLowerCase().replace(/\s+/g, ' '))) { if (readerShaped(raw0)) readerOnly = true; else return null; } } catch { /* ignore */ }
   // payment status, balances and what is owed are not read from the papers by this engine: the older lanes answer or decline those
   if (/\b(?:overdue|past\s+due|unpaid|outstanding|owed|owing|owes?|balances?|delinquent|paid|pay(?:ment)?s?\s+status|still\s+owe|behind\s+on)\b/i.test(raw0)) return null;
   // R16: "as of <date>" is a running position up to that date, which this engine does not total; "what's the number of the earliest ... " asks for the paper's own number, not its file name: both are released
@@ -600,6 +602,7 @@ export function parseDql(question, ctx = {}) {
   if (feat.left.length) {
     // COVERAGE RULE: an unexplained word releases the question, unless exactly one family explains EVERY leftover word itself
     const early = rescuePlan(feat, { vocab });
+    if (early && readerOnly && early.op !== 'read_span') return null;
     if (early) { const ep = ordinal ? applyOrdinal(early, ordinal) : early; return ep && !whoClause ? { mode: 'dql', plan: ep, text: framed, plain: false } : null; }
     // LEARNED PLANNER (dql/learned): Donovan's own small model may mark the leftover words as filler, only above a high calibrated threshold
     // and only when its guards pass; slots always came from the detectors above. DONOVAN_DQL_LEARNED=0 turns it off.
@@ -629,6 +632,7 @@ export function parseDql(question, ctx = {}) {
   }
   if (plan && ordinal) { plan = applyOrdinal(plan, ordinal); if (!plan && ctx.debug) ctx.debug.why = 'ordinal: not a ranking that can be placed'; }
   if (plan && whoClause && !(plan.rank === 'rows' && plan.entity === 'document')) { if (ctx.debug) ctx.debug.why = 'who-clause beside a ranking that does not list single papers'; return null; }
+  if (plan && readerOnly && plan.op !== 'read_span') return null;
   if (!plan) { if (ctx.debug) ctx.debug.why = `no family claimed it${feat.unusedTriggers ? ` (unused: ${feat.unusedTriggers.join(',')})` : ''}`; return null; }
   if (feat.learned && !verifyPlan(feat.learned, plan)) { if (ctx.debug) ctx.debug.why = 'learned planner disagrees with the plan'; return null; }
   // LEARNED PLANNER v3 (dql/learned/shape3.js): a slot-masked reading of the question's shape; a strict, calibrated "this asks for several things" against a single-answer plan RELEASES (never opens anything)

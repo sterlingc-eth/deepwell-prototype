@@ -6,5 +6,6 @@ import './core.js';
 import './time.js';
 import './sets.js';
 import './textdq.js';
+import './reader.js';
 import './links.js';
 import './multi.js';

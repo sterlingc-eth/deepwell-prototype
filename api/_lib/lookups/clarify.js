@@ -86,7 +86,7 @@ const CUSTOMER_TEMPLATES = [
   { re: /\b(?:serial|model|brand|make|tonnage|unit|units|system|equipment|furnace|ac|install\w*)\b/i, t: (n) => `what equipment does ${n} have` },
   { re: /\b(?:tech|technician|technicians|who|handles?|dispatch)\b/i, t: (n) => `who's been out to ${n}'s place` },
   { re: /\b(?:last|visit|visits|serviced?|service|repair|maintenance|job|jobs|call|calls|scheduled?|appointment)\b/i, t: (n) => `when was ${n} last serviced` },
-  { re: /\b(?:phone|email|e-mail|address|contact|reach|number)\b/i, t: (n) => `what is the phone number for ${n}` },
+  { re: /\b(?:phone|email|e-mail|address|contact|reach|phone\s+number)\b/i, t: (n) => `what is the phone number for ${n}` },
 ];
 const CUSTOMER_DEFAULTS = [
   (n) => `what equipment does ${n} have`,
@@ -134,6 +134,8 @@ export function buildClarifyChips(question, vocab, ctx = {}) {
   const name = findNamedCustomer(q, vocab);
   if (name) {
     const picked = CUSTOMER_TEMPLATES.filter((t) => t.re.test(q)).map((t) => t.t(name));
+    // R17: the stock reformulations (equipment, last service, phone) say nothing about a question that names none of what they read: such a question goes on to the model, it is not answered with a menu
+    if (!picked.length && process.env.R17_CLARIFY !== "0") return [];
     return validated([...picked, ...CUSTOMER_DEFAULTS.map((f) => f(name))], q, ctx);
   }
   const m = ADDRESS_RE.exec(q);

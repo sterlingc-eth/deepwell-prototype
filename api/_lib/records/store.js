@@ -20,8 +20,10 @@ export async function loadCustomers(db) {
 }
 
 /** documents of ONE customer, by the same attribution every other money lane uses (a document belongs to the one customer its links / extractions point at) */
-export async function docsForCustomer(db, customerId) {
-  return rows(db, `WITH ${CUSTOMERS_CTE}, ${docCustomerCte("doc_customer")}
+export async function docsForCustomer(db, customerId, { scoped = true } = {}) {
+  // R19 (scale): only the papers that link to this customer or to one of its units can be attributed to it, so the attribution pass reads those papers' rows only
+  const docIdsSql = scoped ? `ARRAY(SELECT l.document_id FROM document_entity_links l JOIN entities le ON le.id = l.entity_id WHERE (le.id = $1 OR le.customer_id = $1) AND ${T("l")} UNION SELECT x.document_id FROM extractions x JOIN entities xe ON xe.id = x.entity_id WHERE (xe.id = $1 OR xe.customer_id = $1) AND ${T("x")})` : null;
+  return rows(db, `WITH ${CUSTOMERS_CTE}, ${docCustomerCte("doc_customer", { docIdsSql })}
     SELECT d.id AS document_id, d.document_type, d.original_filename AS filename, d.created_at::text AS created_at, dc.customer_id, dc.customer_name
       FROM documents d JOIN doc_customer dc ON dc.document_id = d.id
      WHERE dc.customer_id = $1 AND ${T("d")} AND ${notPrivateSql("d")}
@@ -56,8 +58,9 @@ export async function unitsBySerial(db, serials) {
      AND regexp_replace(upper(coalesce(e.data->>'serial_number','')), '[^A-Z0-9]', '', 'g') = ANY($1::text[])`, [serials]);
 }
 /** documents linked to (or extracted for) a unit */
-export async function docsForUnit(db, unitId) {
-  return rows(db, `WITH ${CUSTOMERS_CTE}, ${docCustomerCte("doc_customer")}
+export async function docsForUnit(db, unitId, { scoped = true } = {}) {
+  const docIdsSql = scoped ? `ARRAY(SELECT l.document_id FROM document_entity_links l WHERE l.entity_id = $1 AND ${T("l")} UNION SELECT x.document_id FROM extractions x WHERE x.entity_id = $1 AND ${T("x")})` : null;
+  return rows(db, `WITH ${CUSTOMERS_CTE}, ${docCustomerCte("doc_customer", { docIdsSql })}
     SELECT d.id AS document_id, d.document_type, d.original_filename AS filename, d.created_at::text AS created_at, dc.customer_id, dc.customer_name
       FROM documents d LEFT JOIN doc_customer dc ON dc.document_id = d.id
      WHERE ${T("d")} AND ${notPrivateSql("d")} AND d.id IN (SELECT l.document_id FROM document_entity_links l WHERE l.entity_id = $1 AND ${T("l")} UNION SELECT x.document_id FROM extractions x WHERE x.entity_id = $1 AND ${T("x")})
@@ -74,19 +77,19 @@ export async function customersByAddress(db, { number, street }) {
 }
 
 /** everything stored about a set of documents: extraction facts, the money header, the line items and the page text */
-export async function loadBundle(db, docIds) {
+export async function loadBundle(db, docIds, { scoped = true } = {}) {
   const out = { facts: [], fin: new Map(), lines: [], pages: [] };
   if (!docIds.length) return out;
   out.facts = await rows(db, `SELECT x.document_id, x.entity_id, x.field_key, COALESCE(NULLIF(x.corrected_value, ''), x.value) AS value, x.created_at::text AS created_at, fa.page_no
       FROM extractions x LEFT JOIN facets fa ON fa.id = x.source_facet_id AND ${T("fa")}
      WHERE x.document_id = ANY($1::uuid[]) AND ${T("x")} ORDER BY x.created_at, x.id`, [docIds]);
   if (await hasFinancials(db)) {
-    const fr = await rows(db, `WITH ${CUSTOMERS_CTE}, ${financeViewsSql({ hasFinancials: true })}
+    const fr = await rows(db, `WITH ${CUSTOMERS_CTE}, ${financeViewsSql({ hasFinancials: true, docIdsSql: scoped ? "$1::uuid[]" : null })}
       SELECT f.document_id, f.doc_kind, f.direction, f.invoice_number, f.po_number, f.invoice_date::text AS invoice_date, f.due_date::text AS due_date, f.doc_date::text AS doc_date, f.agreement_term,
              f.subtotal::text AS subtotal, f.tax::text AS tax, f.total::text AS total, f.amount_paid::text AS amount_paid, f.balance_due::text AS balance_due, f.status, f.customer_name, f.vendor_name, f.total_page
         FROM financials f WHERE f.document_id = ANY($1::uuid[]) AND EXISTS (SELECT 1 FROM documents td WHERE td.id = f.document_id AND ${T("td")})`, [docIds]);
     for (const r of fr) out.fin.set(r.document_id, r);
-    out.lines = await rows(db, `WITH ${CUSTOMERS_CTE}, ${financeViewsSql({ hasFinancials: true })}
+    out.lines = await rows(db, `WITH ${CUSTOMERS_CTE}, ${financeViewsSql({ hasFinancials: true, docIdsSql: scoped ? "$1::uuid[]" : null })}
       SELECT l.document_id, l.line_no, l.description, l.qty::text AS qty, l.unit_price::text AS unit_price, l.amount::text AS amount, l.category_guess, l.page_no FROM invoice_lines l WHERE l.document_id = ANY($1::uuid[])  AND EXISTS (SELECT 1 FROM documents td WHERE td.id = l.document_id AND ${T("td")}) ORDER BY l.document_id, l.line_no`, [docIds]);
   }
   out.pages = await rows(db, `SELECT p.document_id, p.page_no, p.text FROM document_pages p WHERE p.document_id = ANY($1::uuid[]) AND ${T("p")} ORDER BY p.document_id, p.page_no`, [docIds]);

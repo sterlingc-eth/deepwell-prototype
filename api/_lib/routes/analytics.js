@@ -96,6 +96,7 @@ import { audienceFilterSql } from '../audience/sql.js';
 import { schemaLinkedVocabLines } from '../vocab/tenantVocab.js';
 // TEAM C (citations everywhere): records/basis come from the SAME rows the number was computed from.
 import { withAnalyticsCitations } from '../citations/analytics.js';
+import { resolveProvenance } from '../citations/provenance.js';
 import { canonicalBrandLabel } from '../analytics/brandCanon.js';
 // g133/g138 (oldest/newest install): its own citation build, not withAnalyticsCitations'
 // (that helper's sortBy wording is customers-ranking-specific — see citations/analytics.js's
@@ -1426,7 +1427,11 @@ function keyOf(groupBy) {
 // R19 (I2, task 5): 'TRUE' (a no-op AND) whenever a caller doesn't pass one — every existing test/
 // script call site keeps its exact current behavior; runAnalyticsQuestion (the only real caller)
 // computes a real clause per request from documentsHaveAudience's own probe + isTeamScopedQuestion.
-export async function executeAnalyticsPlan(db, plan, { today, timeRangeLabel, audienceClause = 'TRUE' } = {}) {
+export async function executeAnalyticsPlan(db, plan, opts = {}) {
+  // round 19: every analytics answer names the papers behind it with the page that holds the value (citations/provenance.js)
+  return resolveProvenance(db, await executeAnalyticsPlanInner(db, plan, opts));
+}
+async function executeAnalyticsPlanInner(db, plan, { today, timeRangeLabel, audienceClause = 'TRUE' } = {}) {
   audienceClause = `(${audienceClause}) AND ${notPrivateSql('d')}`; // People / HR papers are never counted, listed or grouped
   // "who's our biggest customer" (round 4, item 1) — a distinct shape from
   // every other op: ranked, not filtered/counted. validatePlan already

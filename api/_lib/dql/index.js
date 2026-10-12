@@ -13,16 +13,26 @@ import { parseDql, dqlEnabled } from './parse.js';
 import { loadSnapshot } from './load.js';
 import { execute } from './exec.js';
 import { familyForOp } from './registry.js';
+import { resolveProvenance } from '../citations/provenance.js';
 import { sourcesSentence } from './cite.js';
+import { loadReaderPages } from './families/reader.js';
 
 export { parseDql, dqlEnabled };
 
 export async function runDql(db, intent, { today } = {}) {
   if (!intent?.plan || !dqlEnabled()) return null;
   const t = todayIso(today);
-  const snap = await loadSnapshot(db, { today: t });
+  let snap = await loadSnapshot(db, { today: t });
   if (snap.truncated) return null; // more records than one read holds: no answer is better than a partial one
-  return answerFromSnapshot(snap, intent.plan, t);
+  // the snapshot is shared between requests, so the reader's pages go on a shallow copy
+  if (intent.plan.op === 'read_span') { snap = { ...snap }; try { await loadReaderPages(db, snap, intent.plan, t); } catch { return null; } } // the extractive reader reads the pages of the few candidate papers only
+  const ans = await resolveProvenance(db, answerFromSnapshot(snap, intent.plan, t));
+  // the "Sources:" sentence was written before the pages were looked up: write it again with them
+  if (ans && intent.plan.cite && ans.records?.length && /\sSources: /.test(ans.text)) {
+    const src = sourcesSentence(ans.records, ans.recordsTotal);
+    if (src) ans.text = ans.text.replace(/\s+Sources: .*$/s, ` ${src}`);
+  }
+  return ans;
 }
 
 /** Pure half of runDql (the verify script and the dev harness run it over a snapshot built from an export file). */

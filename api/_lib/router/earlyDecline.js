@@ -81,7 +81,7 @@ const OFF_DOMAIN_RES = [
   /\brhymes?\s+with\b|\b(?:read|give)\s+me\s+the\s+news\b|\b(?:ride|lift)\s+to\s+the\s+(?:airport|station|mall|hospital)\b|\bwhat\s+time\s+does\s+(?:the\s+)?(?:bank|mall|store|post\s+office|library|gym|pharmacy)\s+(?:open|close)\b|\b(?:mall|bank|store|library|gym|pharmacy|post\s+office)\s+open\s+(?:today|now|tonight|tomorrow)\b/i,
   /\btell\s+me\s+about\s+yourself\b|\bhow\s+(?:big|large|small|hot|cold)\s+is\s+(?:texas|arizona|california|florida|alaska|the\s+(?:usa|us|world|earth|desert))\b|\bwhat\s+should\s+i\s+(?:cook|wear|watch|read|play|listen\s+to)\b|\b(?:haircut|hiking\s+trail|hiking|workout|fishing|camping|vacation\s+spot)\b|\b(?:ford|chevy|toyota|honda|dodge)\s+or\s+(?:ford|chevy|toyota|honda|dodge)\b|\bhow\s+do\s+i\s+(?:unlock|jailbreak|screenshot|factory\s+reset)\s+my\b|\b(?:get\s+a\s+tan|bet\s+on\s+the\b|\bnba\b|\bnfl\b|\bmlb\b|\bnhl\b|\bwhy\s+do\s+(?:cats|dogs|birds|dolphins|whales|bees)\b|\bhow\s+many\s+(?:legs|eyes|arms|teeth|bones)\b|\bexplain\s+how\b)/i,
   /\b(?:iphone|android|tesla|joker|batman|marvel|stadium|marathon|halloween|christmas|thanksgiving|easter|puppy|kitten|earth|sunset|sunrise|freeway|horoscope|first\s+date|date\s+night)\b/i,
-  /\b(?:stor(?:y|ies)|(?<!\b(?:how\s+many|number\s+of|count\s+of|total|list|all|our|the)\s)gifts?)\b(?!\s+(?:in|during|since|this|last|received|from)\b)(?![^?]*\b(?:customers?|jobs?|invoices?|units?)\b)/i, // "how many gifts" is a count of a paper kind (a nonprofit's donation receipts), not gift shopping
+  /\b(?:stor(?:y|ies)|(?<!\b(?:how\s+many|number\s+of|count\s+of|total|list|all|our|the)\s)gifts?)\b(?!\s+(?:cards?\b|in|during|since|this|last|received|from)\b)(?![^?]*\b(?:customers?|jobs?|invoices?|units?)\b)/i, // "how many gifts" is a count of a paper kind (a nonprofit's donation receipts), not gift shopping
   /\b(?:show|movie|series|game)\s+to\s+(?:watch|play)\b|\bhow\s+(?:long|far|tall|old)\s+is\s+(?:a|an|the)\s+(?:marathon|mile|football|movie|flight|mountain|river)\b|\bhow\s+many\s+people\s+(?:are|live)\b/i,
   /\bwhos?\s+(?:is\s+)?(?:playing|singing|performing)\b|\bwho\s+plays\b|\bwhat\s+day\s+is\b|\bwhen\s+does\s+the\s+(?:sun|moon)\b|\b(?:name|names)\s+(?:for|my)\s+(?:a\s+|my\s+)?(?:puppy|dog|cat|baby|boat|band|kid)\b/i,
   // R32b (loop E): arithmetic / unit conversion, history & science trivia, shopping and lifestyle advice, device help, everyday health, weather in a named place
@@ -139,7 +139,7 @@ function isOffDomain(q) {
   if (process.env.DONOVAN_EXTERNAL_DECLINE !== "0" && !/\d/.test(q)) { const ext = EXTERNAL_DATA_RE.exec(q); if (ext && !/\b(?:our|we|my)\s+(?:lead\s+time|stock)\b|\bhow\s+many\b|\bwhich\b|\bcustomers?\b/i.test(q)) return ext[0]; }
   const selfApp = isSelfOrAppOrAnnounce(q);
   if (selfApp) return selfApp;
-  const anchored = RECORD_ANCHOR_RE.test(q);
+  const anchored = RECORD_ANCHOR_RE.test(q) || (process.env.R17_DOCID !== '0' && /\b[a-z]{1,6}-\d{3,}\b/i.test(q)); // R17: a paper's own number (LB-1696, GC-1910) is a record ask whatever the company calls the paper
   for (let i = 0; i < OFF_DOMAIN_RES.length; i++) {
     const m = OFF_DOMAIN_RES[i].exec(q);
     if (!m) continue;

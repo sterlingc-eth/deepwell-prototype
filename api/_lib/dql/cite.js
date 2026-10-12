@@ -24,7 +24,7 @@ export function stripSourceAsk(question) {
   return { q: q.replace(/\s+/g, ' ').replace(/[,;]\s*$/, '').trim(), cite };
 }
 
-const THAT = '(?:that|this|it|the\\s+(?:number|figure|answer|total|count|result)|that\\s+(?:number|figure|answer|total|count|result))';
+const THAT = '(?:that|taht|tht|thta|htat|this|thsi|it|the\\s+(?:number|figure|answer|total|count|result)|that\\s+(?:number|figure|answer|total|count|result))';
 const SRC_RES = [
   new RegExp(`\\bwhere(?:'?s|s|\\s+is|\\s+did|\\s+does|\\s+do|\\s+was|\\s+are|'?d)?\\s*${THAT}\\b[^?]{0,30}\\b(?:from|come|came|coming|pulled|taken|got)\\b`, 'i'),
   /\b(?:what(?:'?s|s|\s+is|\s+are)?|give\s+me|show\s+me|show|got|need|cite|list|name|pull\s+up|open)\s+(?:the\s+)?(?:sources?|source\s+(?:documents?|files?|papers?))\b/i,

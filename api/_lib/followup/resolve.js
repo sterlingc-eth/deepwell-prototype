@@ -24,6 +24,7 @@ import { slotFollowup, isSlotOnlyFollowup } from './slots.js';
 import { dqlMergeFollowup, plainScope } from './dqlmerge.js';
 import { provenanceFollowup } from './provenance.js';
 import { correctionFollowup, correctionPayload } from './correction.js';
+import { isBareMeasureFollowup } from './convo.js';
 import { markMerged, markReleased, isFragment } from './handoff.js';
 import { subjectFromText, subjectFromEntities, pronounReplacement, substitutePronouns, stripTrailingPunct, brandMentionIn, inferNoun, anchorAlreadyPresent, pronounNeedsBrandFromEarlierTurn } from './subject.js';
 
@@ -322,6 +323,12 @@ export function resolveFollowup(context, question) {
 
   // a bare slot value ("and in 2024", "just Mesa") that no merge could attach to the earlier question: typed alone an older lane would answer the unscoped total
   if (isSlotOnlyFollowup(q) && !/^(?:and\s+|also\s+|then\s+|what about\s+|how about\s+)?(?:in|for|of)\s+(?:the\s+)?(?:last|next|this|past)\b/i.test(q)) {
+    const carried = clip(`Earlier question: "${String(priorTurn.question).trim().replace(/[?.!\s]+$/, '')}". Follow-up: ${String(q).trim()}`);
+    markReleased(carried);
+    return { query: carried, filters: {}, isFollowup: true, kind: 'fragment', needsClarification: false };
+  }
+  // R17: a bare measure ("average amount?", "their total please", "the newest one?") that no merge could attach to the earlier question: typed alone an older lane would answer the unscoped total
+  if (isBareMeasureFollowup(q)) {
     const carried = clip(`Earlier question: "${String(priorTurn.question).trim().replace(/[?.!\s]+$/, '')}". Follow-up: ${String(q).trim()}`);
     markReleased(carried);
     return { query: carried, filters: {}, isFollowup: true, kind: 'fragment', needsClarification: false };

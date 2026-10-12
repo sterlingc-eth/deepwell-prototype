@@ -45,8 +45,10 @@ function eff(col, cast) {
  * document_financials row (the `financials` view never looks any other document up).
  * (No SQL comments in the emitted text: callers may collapse whitespace.)
  */
-export function docCustomerCte(name, { onlyFinancialDocs = false } = {}) {
-  const scope = (col) => (onlyFinancialDocs ? ` AND ${col} IN (SELECT ff.document_id FROM document_financials ff WHERE ${t("ff")})` : "");
+export function docCustomerCte(name, { onlyFinancialDocs = false, docIdsSql = null } = {}) {
+  // R19 (scale): `docIdsSql` (a uuid[] expression) limits the pass to those documents' rows. A document's attributed customer depends only on that
+  // document's own links and extractions, so the answer for each listed document is unchanged; without it the pass reads every link of the company.
+  const scope = (col) => (onlyFinancialDocs ? ` AND ${col} IN (SELECT ff.document_id FROM document_financials ff WHERE ${t("ff")})` : "") + (docIdsSql ? ` AND ${col} = ANY(${docIdsSql})` : "");
   return `${name} AS (
   SELECT DISTINCT ON (s.document_id) s.document_id, s.customer_id, c.name AS customer_name
     FROM (
@@ -65,7 +67,7 @@ export function docCustomerCte(name, { onlyFinancialDocs = false } = {}) {
 )`;
 }
 
-export function financeViewsSql({ hasFinancials = true } = {}) {
+export function financeViewsSql({ hasFinancials = true, docIdsSql = null } = {}) {
   if (!hasFinancials) {
     return `
 financials AS (
@@ -87,7 +89,7 @@ invoice_lines AS (
   }
   const flagged = `(f.flags && ARRAY['total_mismatch','lines_mismatch','line_math','balance_mismatch','status_conflict','amount_not_on_page','due_before_invoice','non_usd']::text[])`;
   return `
-${docCustomerCte("fin_doc_customer", { onlyFinancialDocs: true })},
+${docCustomerCte("fin_doc_customer", { onlyFinancialDocs: true, docIdsSql })},
 financials AS (
   SELECT f.document_id, d.original_filename AS filename, d.stage, f.doc_kind, f.direction, f.currency,
          f.invoice_number, f.po_number,

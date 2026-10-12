@@ -21,7 +21,10 @@
  */
 import { withTenant as defaultWithTenant } from '../recordsStore.js';
 import { tenantHasFinancialRows } from './store.js';
-import { parseMoneyIntent, runMoneyIntent, dropRoleBeforeInvoices, billsAsInvoicesText } from './answers.js';
+import { parseMoneyIntent, runMoneyIntent as runMoneyIntentBare, dropRoleBeforeInvoices, billsAsInvoicesText } from './answers.js';
+import { resolveProvenance } from '../citations/provenance.js';
+// round 19: every money answer names its papers with the page that holds the figure
+const runMoneyIntent = async (db, intent, opts) => resolveProvenance(db, await runMoneyIntentBare(db, intent, opts));
 import { leftoverWords, unusedGrammar } from '../router/leftover.js';
 import { resolveContactCandidates } from '../contactLookup.js';
 import { parseAmountInvoiceQuestion, amountMentioned } from './amountInvoice.js';

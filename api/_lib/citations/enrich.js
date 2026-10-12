@@ -16,6 +16,7 @@ import {
   MAX_RECORDS, makeRecord, customerRecord, unitRecord, documentRecord, attachCitations, deriveRecords, defaultBasis,
 } from './records.js';
 
+import { resolveProvenance } from './provenance.js';
 import { notPrivateSql, isPrivateDoc } from '../privacy/privateDocs.js';
 import { visibleDocSql } from '../audience/visible.js';
 
@@ -124,7 +125,7 @@ export async function withCitations(db, produced, opts) {
   const data = await produced;
   if (!data || typeof data !== 'object') return data;
   try {
-    return await enrichCitations(db, data, opts);
+    return await resolveProvenance(db, await enrichCitations(db, data, opts));
   } catch (err) {
     console.error('Citation enrichment failed, answer sent with derived citations only:', err?.message);
     return data;

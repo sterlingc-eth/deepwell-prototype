@@ -59,6 +59,7 @@ import { isGivenName } from "./lookups/commonWords.js";
 // R31 (Team A): entity-first slot filling — the parser's last resort, see lookups/slotFill.js.
 import { stripConversationalFrame } from "./router/frame.js";
 import { parseSlotFill, runSlotFill } from "./lookups/slotFill.js";
+import { dqlFrame } from "./dql/frame.js";
 import { parseTechnician, runTechnician, loadTechnicianVocab } from "./lookups/technician.js";
 import { parseSummaryQuestion } from "./summary/parse.js";
 
@@ -1374,8 +1375,37 @@ function guardPhone(question, parsed) {
   const nameWords = String(parsed.namePhrase ?? "").split(/\s+/).concat(parsed.block ?? []);
   return bareNumberIsPhone(question, nameWords) ? parsed : null;
 }
+/** R17: other ways to ask for one contact field of one name, put in the shape the lane reads ("where is X located" -> "X address"). Each keeps the name and the one field; nothing else is added. */
+const NM = "([A-Za-z][A-Za-z'.&-]*(?:\\s+[A-Za-z][A-Za-z'.&-]*){0,4})";
+const CONTACT_SHAPES = [
+  [new RegExp(`^${NM}\\s*[-\u2013\u2014,:]+\\s*(phone(?:\\s+number)?|e-?mail(?:\\s+address)?|address|cell(?:\\s+phone)?|mobile)\\s*\\??$`, "i"), (n, f) => `${n} ${/mail/i.test(f) ? "email" : /address/i.test(f) ? "address" : "phone"}`],
+  [new RegExp(`^where(?:'s|\\s+is|\\s+are)\\s+${NM}\\s+(?:located|based|situated)\\s*\\??$`, "i"), (n) => `${n} address`],
+  [new RegExp(`^where\\s+(?:do|can|would)\\s+(?:i|we)\\s+(?:send\\s+(?:an?\\s+)?)?e-?mail\\s+${NM}\\s*\\??$`, "i"), (n) => `${n} email`],
+  [new RegExp(`^(?:how|where)\\s+(?:do|can|would|should)\\s+(?:i|we)\\s+(?:reach|contact|call|phone|ring|get\\s+(?:a\\s+hold\\s+of|in\\s+touch\\s+with))\\s+${NM}\\s+(?:by|on|at|via)\\s+(?:the\\s+)?(phone|e-?mail|telephone|cell)\\s*\\??$`, "i"), (n, f) => `${n} ${/mail/i.test(f) ? "email" : "phone"}`],
+  [new RegExp(`^(?:what|which)\\s+(?:is|'s)?\\s*(?:the\\s+)?(?:best\\s+)?(?:number|line)\\s+to\\s+(?:reach|call|contact)\\s+${NM}\\s*\\??$`, "i"), (n) => `${n} phone`],
+  [new RegExp(`^(?:what|which)\\s+(?:is|'s)?\\s*(?:the\\s+)?(?:best\\s+)?(?:e-?mail(?:\\s+address)?)\\s+(?:to\\s+(?:reach|contact)|for)\\s+${NM}\\s*\\??$`, "i"), (n) => `${n} email`],
+];
+/** R17: the question the contact lane reads: the chatter-free form when that is a contact ask, else the original. */
+export function contactAskText(question, opts = {}) {
+  if (process.env.R17_CONTACT === "0") return question;
+  try {
+    const framed = dqlFrame(question);
+    if (framed && framed !== String(question).trim() && guardPhone(framed, parseContactLookupQuestionInner(framed, opts))) return framed;
+    const base = framed || String(question).trim();
+    if (!parseContactLookupQuestionInner(base, opts)) {
+      for (const [re, to] of CONTACT_SHAPES) {
+        const m = re.exec(base.replace(/\s+/g, " "));
+        if (!m) continue;
+        const asked = to(...m.slice(1));
+        if (guardPhone(asked, parseContactLookupQuestionInner(asked, opts))) return asked;
+      }
+    }
+  } catch { /* unchanged */ }
+  return question;
+}
 export function parseContactLookupQuestion(question, opts = {}) {
-  return guardPhone(question, parseContactLookupQuestionInner(question, opts));
+  const q = contactAskText(question, opts);
+  return guardPhone(q, parseContactLookupQuestionInner(q, opts));
 }
 function parseContactLookupQuestionInner(question, opts = {}) {
   // internal-memo questions ("any internal memos on file?") are not a contact-field lookup ("X on file") — docLookup owns them
@@ -2049,6 +2079,7 @@ async function runContactLookupCore(db, question, opts = {}) {
     // that could be about them; the classifier stage, which HAS the vocabulary, already decided to claim this).
     try { tenantVocab = await loadTechnicianVocab(db); } catch (err) { console.error("technician vocab load failed:", err?.message); }
   }
+  question = contactAskText(question, { overlay, tenantVocab });
   const parsed = parseContactLookupQuestion(question, { overlay, tenantVocab });
   if (!parsed) return null;
   if (parsed.field === "technician") return runTechnician(db, parsed);

@@ -53,5 +53,10 @@ export function rescuePlan(feat, h) {
     try { p = fam.rescue(feat, h); } catch (e) { if (process.env.DQL_DEBUG) console.error("dql rescue error", e); p = null; }
     if (p && !opOff(p)) claims.push(p);
   }
+  if (claims.length > 1) {
+    // the same tie-break as detectPlan: a family may declare that its plan outranks another's for a question both read the same way
+    const winners = claims.filter((p) => { const fam = familyForOp(p.op); return fam?.beats && claims.every((o) => o === p || fam.beats(p, o)); });
+    if (winners.length === 1) return winners[0];
+  }
   return claims.length === 1 ? claims[0] : null;
 }

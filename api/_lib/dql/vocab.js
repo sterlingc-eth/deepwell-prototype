@@ -113,6 +113,7 @@ function learnCard(v, card) {
   }
   // R16: short forms of a kind's name ("lab order" for print-lab-order, "facility request" for facility-use-request, "rent bill", "rate con", "mill PO", "monthly statement"): two words of the
   // type id, in order or reversed, a word cut short, "po" for purchase order; only when the short form names exactly ONE stored kind. Anything two kinds could share stays unknown (released).
+  const HEAD_SYN = { notice: ['letter'], letter: ['notice'], bill: ['invoice', 'statement'], invoice: ['bill'], statement: ['bill'], request: ['application'], application: ['request'], contract: ['agreement'], agreement: ['contract'], log: ['record'], sheet: ['form'], form: ['sheet'] };
   if (process.env.R16_SHORT !== '0') { const STOP = new Set(['of', 'for', 'the', 'and', 'a', 'to', 'in']);
     const forms = (t) => { const o = new Set([t]); if (/ing$/.test(t) && t.length > 6) o.add(t.slice(0, -3)); if (['month', 'year', 'week', 'quarter'].includes(t)) o.add(`${t}ly`); if (t === 'purchase') o.add('po'); return [...o]; };
     const cut = (t) => (t.length >= 8 ? [t.slice(0, 3), t.slice(0, 4)] : []);
@@ -123,7 +124,7 @@ function learnCard(v, card) {
       for (let i = 0; i < tk.length; i++) for (let j = 0; j < tk.length; j++) {
         if (i === j || tk[i].length < 3 || tk[j].length < 3) continue;
         const ordered = i < j;
-        const as = forms(tk[i]); const bs = forms(tk[j]).concat(ordered || j === tk.length - 1 ? cut(tk[j]) : []);
+        const as = forms(tk[i]); const bs = forms(tk[j]).concat(ordered || j === tk.length - 1 ? cut(tk[j]) : []).concat(ordered && j === tk.length - 1 && process.env.R17_HEADSYN !== '0' ? (HEAD_SYN[tk[j]] ?? []) : []); // R17: the head noun's everyday twin ("lien letter" for lien-sale-notice, "tuition bill" for tuition-statement)
         for (const a of as) for (const b of bs) {
           if (a === 'po' && b === 'order') continue;
           if (!ordered && !(j === tk.length - 1 || i === tk.length - 1)) continue; // reversed only when the head noun of the id leads ("tuition receipt" for payment-receipt-tuition)
