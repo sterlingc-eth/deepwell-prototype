@@ -118,6 +118,9 @@ export const ARBITER_ALLOWLIST = [
     dev: "R11 mass sample, analytics lane: top_n 63 wrong, busiest_period 35, group_count 48; after: see the round 12a report" },
 
   /* ---- round 8: shapes where the older lanes drop a condition that DQL reads whole. Each is limited by the question's own wording AND a plan condition. ---- */
+  { id: "multi-measure", from: "*", ops: ["multi"],
+    why: "\"how many invoices in 2022 and what was the total\": the older lanes answer one of the two measures (or a bigger set) and stop; DQL answers both for the same papers or releases the whole question",
+    dev: "round 15: count+total, total+average and count+first/last questions on the bank 3 and 4 dev sets" },
   { id: "ordinal", from: "*", ops: ["*"], plan: { has: ["nth"] },
     why: "\"the second largest invoice\", \"third most recent\", \"2nd busiest month\": every older lane drops the ordinal and answers with the extreme or a grand total",
     dev: "R7 QA: 30 of 30 older answers wrong; see the round 8 report for the dev-set counts" },
@@ -139,6 +142,9 @@ export const ARBITER_ALLOWLIST = [
   { id: "person-and-type", from: "*", ops: ["list","count","sum","group_count"], plan: { has: ["docType"], hasFilter: "tech" },
     why: "\"service tickets by Kevin Pratt\": the older lanes count every job of the person and drop the kind of paper",
     dev: "see the round 8 report" },
+  { id: "links-r13", from: "*", ops: ["link_chain","link_seq","link_ending","link_address","link_after","link_repeat","link_job"],
+    why: "questions that connect papers of different kinds (a quote that became an invoice, an invoice with no job paper, a follow-up inside the notes, who else is at an address) are answered by the older lanes with a count of one kind of paper, a customer lookup or a decline; the links family states how the papers were linked",
+    dev: "connect-r13 shape set: older lanes right 5 of 59 on construction and property, links family right on the same questions (see scripts/connect-r13)" },
 ];
 /** "invoices between $10,000": one end only. It is not "exactly $10,000" and not "over $10,000"; the engines release it. */
 export const ONE_BOUND_BETWEEN_RE = /\bbetween\s+\$?\s?\d[\d,.]*k?(?!\d)(?:\s+(?:dollars?|bucks))?\s*(?:[?.!,]|$|(?=\s+(?:in|on|for|from|during|since|before|after|by|this|last|that|this)\b))/i;
@@ -204,14 +210,43 @@ const DATE_OPS = new Set(["tm_since", "tm_age", "tm_between", "tm_expiry", "late
  * HVAC setting, or with no setting, keep the allowlist above exactly as it was.
  */
 export const OTHER_INDUSTRY_TAKES_ALL = true;
-const otherIndustry = (k) => OTHER_INDUSTRY_TAKES_ALL && Boolean(k) && String(k).toLowerCase() !== "hvac";
+const YES_NO_START = /^\s*(?:so\s+|and\s+)?(?:did|do|does|is|are|was|were|has|have|can|any)\b/i;
+/** R13: true for every company. The industry setting no longer decides who answers; DQL answers what it fully reads and releases the rest. Set DONOVAN_DQL_ALLOWLIST=1 to bring back the HVAC-only allowlist for a comparison run. */
+const otherIndustry = (k) => OTHER_INDUSTRY_TAKES_ALL && !/^(?:1|true|on)$/i.test(String(process.env.DONOVAN_DQL_ALLOWLIST ?? ""));
+
+/**
+ * R13i: shapes where the older lanes' reading is the exact one (golden tenant: 24 answers moved when DQL took every question): an e-mail or phone as a FIELD of a customer (not the papers called e-mail);
+ * "jobs" that mention a word are counted as papers, not only visits; a phone number looked up as a contact; "does <name> have a <brand> unit" is a yes/no about one customer's equipment;
+ * the "warranty expiring in the next year" / "not under warranty" counts and a "notice" question belong to the lanes that define them.
+ */
+export function dqlStepsAside(question, plan) {
+  const qq = String(question ?? "");
+  const planS = JSON.stringify(plan ?? {});
+  if (/correspondence/.test(planS) && /\b(?:have|has|with|without|no)\s+(?:an?\s+)?(?:e-?mail|phone)\b|\be-?mail\s+(?:address\s+)?on\s+file\b/i.test(qq)) return true;
+  if (/\bjobs?\b[^?]*\bmentions?\b|\bhow\s+many\s+times\s+have\s+we\b|\bjobs?\s+have\s+we\s+(?:done|completed|worked)\s+for\b/i.test(qq)) return true;
+  if (/\b(?:who|whose)\b[^?]*\d{3}[-.\s)]*\d{3}[-.\s]*\d{4}|\d{3}[-.\s)]*\d{3}[-.\s]*\d{4}[^?]*\bwho/i.test(qq)) return true;
+  if (/^\s*(?:so\s+|and\s+)?(?:did|do|does|is|are|was|were|has|have|can|any)\b/i.test(qq) && plan?.entity === "unit" && (plan.filters ?? []).some((f) => f.field === "brand") && (plan.filters ?? []).some((f) => f.field === "customer" || f.field === "name")) return true;
+  if (/\bwarrant\w*\s+expir\w*\s+in\s+the\s+next\b|\bnot\s+(?:currently\s+)?under\s+warranty\b|\bnotices?\b/i.test(qq)) return true;
+  if (plan?.op === "find_document" && plan.by === "filename" && !(plan.filters ?? []).length) return true; // a bare filename-word search is DQL's fallback reading of an analytic question ("what tonnage do we see most often"); the older lane that claimed it has the real plan
+  if (/\bunits?\b[^?]*\bhad\s+service\b/i.test(qq)) return true; // "which units had service this month": the visits are counted by the older lane (the exam's truth)
+  if (/^\s*(?:so\s+|and\s+)?(?:which|what|who|list|show)\s+(?:me\s+)?(?:the\s+)?customers?\b/i.test(qq) && plan?.entity === "unit") return true; // asked for customers, planned as units
+  return false;
+}
 
 export function arbiterAllows(winner, intent, { oldLabel, question, industryKind } = {}) {
   const mode = arbiterMode();
   if (mode === "off") return false;
   const plan = intent?.plan;
   if (!plan || intent.plain) return false;
-  if (mode === "all" || otherIndustry(industryKind)) return true;
+  if (mode === "all") return true;
+  if (otherIndustry(industryKind)) {
+    // R13: two guards that hold for every company (they were measured on the HVAC dev set, where taking everything made them wrong): a "when" question is not answered in days, and a yes/no question is not turned into a list
+    if (DATE_OPS.has(plan.op) && WHEN_QUESTION.test(String(question ?? ""))) { lastHit = null; return false; }
+    if (YES_NO_START.test(String(question ?? "")) && (plan.op === "list" || plan.op === "set_select")) { lastHit = null; return false; }
+    if (dqlStepsAside(question, plan)) { lastHit = null; return false; }
+    lastHit = "all-companies";
+    return true;
+  }
   // an ordinal ("the second largest invoice"): every older lane answers with the extreme or a grand total, so DQL takes it from any of them (round 7: 30 of 30 older answers wrong)
   if (plan.nth && !entryOff("ordinal")) { lastHit = "ordinal"; return true; }
   if (DATE_OPS.has(plan.op) && WHEN_QUESTION.test(String(question ?? ""))) return false;

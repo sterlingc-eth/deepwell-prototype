@@ -360,6 +360,85 @@ async function countLane(db, question) {
   return ok(`You have ${n} rental unit${n === 1 ? "" : "s"}${where} (rental units on file, not appliances).`, [{ label: "Rental units", value: String(n), sources: [] }], recs, `Counted the unit records${where ? ` whose address is in ${city}` : ""}.`);
 }
 
+
+/* ------------------------------------------------------------------ vendor / rent-roll lane (R43) */
+
+async function vendorNames(db) {
+  const r = await db.raw(`SELECT DISTINCT x.value FROM extractions x WHERE x.field_key = 'vendor' AND x.value IS NOT NULL`);
+  return r.rows.map((x) => String(x.value).trim()).filter(Boolean);
+}
+const YEAR_OR_PERIOD = /\b(?:19|20)\d{2}\b|\b(?:this|last|past|next)\s+(?:week|month|quarter|year)\b|\bsince\b|\bbetween\b|\byear to date\b|\bytd\b/i;
+
+/** Vendor work-order counts and "which vendors carry insurance": the vendor name is read from the tenant's own work-order / COI extractions. */
+async function vendorLane(db, raw, q) {
+  const l = q.toLowerCase();
+  if (YEAR_OR_PERIOD.test(l)) return null;
+  const coiList = /^(?:which|what|list|who|show(?: me)?)\s+(?:all\s+|of\s+)?(?:our\s+|the\s+)?(?:vendors?|contractors?)\s+(?:do we have\s+|that\s+|who\s+|with\s+)?(?:have|has|having)?\s*(?:an?\s+)?(?:insurance|coi|certificates? of insurance)(?:\s+on file)?$/i.test(q.trim());
+  if (coiList) {
+    const cois = [...(await docsByType(db, "certificate-of-insurance")).values()].filter((o) => o.f.vendor);
+    if (!cois.length) return noAnswer("No certificates of insurance are on file for any vendor.", "Looked for certificate-of-insurance documents; none exist.");
+    const byV = new Map(); for (const o of cois) if (!byV.has(o.f.vendor) || String(o.f.coi_expires ?? "") > String(byV.get(o.f.vendor).f.coi_expires ?? "")) byV.set(o.f.vendor, o);
+    const rows = [...byV.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+    const f = rows.map(([v, o]) => ({ label: "Vendor with insurance on file", value: `${v}${o.f.coi_expires ? ` (expires ${prettyDate(o.f.coi_expires)})` : ""}`, sources: srcFor(o) }));
+    return ok(`${rows.length} vendor${rows.length === 1 ? " has" : "s have"} a certificate of insurance on file: ${f.map((x) => x.value).join("; ")}.`, f, rows.map(([, o]) => recFor(o, "Certificate of insurance")), "Read the vendor on every certificate-of-insurance document.");
+  }
+  if (!(/\bwork\s*orders?\b/.test(l) && /\bhow many\b|\bnumber of\b|\bcount\b|\btotal\b/.test(l))) return null;
+  const vendors = await vendorNames(db);
+  const WO_OK = new Set("how many work order orders did does do has have had handle handled handling done we they the number of count total on file for".split(" "));
+  const restWords = (txt) => norm(txt).trim().split(" ").filter((w) => w && !WO_OK.has(w));
+  let hit = null; const qn = norm(raw);
+  for (const v of vendors) { const k = norm(v); if (qn.includes(k) && (!hit || k.length > hit.k.length)) hit = { v, k }; }
+  if (hit) {
+    if (restWords(qn.replace(hit.k, " ")).length) return null; // any other condition (month, address, customer, status, second vendor...): not answered here
+    const r = await db.raw(`SELECT DISTINCT d.id FROM extractions x JOIN documents d ON d.id = x.document_id AND ${notPrivateSql("d")} WHERE x.field_key = 'vendor' AND d.document_type = 'work-order' AND lower(x.value) = lower($1)`, [hit.v]);
+    const wos = [...(await loadFields(db, r.rows.map((x) => x.id))).values()];
+    const f = [{ label: `Work orders for ${hit.v}`, value: String(wos.length), sources: wos.slice(0, 20).map(srcFor).flat() }];
+    return ok(`${wos.length} work order${wos.length === 1 ? "" : "s"} on file for ${hit.v}.`, f, wos.slice(0, 20).map((o) => recFor(o, "Work order")), `Counted the work-order documents whose vendor is ${hit.v}.`);
+  }
+  const cand = (/\b(?:did|has|have|does|for|from|by|handled by)\s+((?:[A-Z][A-Za-z&'.-]+\s+){1,3}[A-Z][A-Za-z&'.-]+)/.exec(raw) ?? /^((?:[A-Z][A-Za-z&'.-]+\s+){1,3}[A-Z][A-Za-z&'.-]+)\s+[Ww]ork\s*[Oo]rders?/.exec(raw))?.[1]?.trim();
+  if (!cand || /^(?:How|Many|Work|Unit|Apt|Suite|The|Our)\b/.test(cand)) return null;
+  const cl = cand.toLowerCase();
+  if (/\b(?:street|st|road|rd|avenue|ave|drive|dr|lane|ln|blvd|way|court|ct|county|city|heights|valley|properties|apartments|unit)\b/i.test(cand) || restWords(qn.replace(norm(cand), " ")).length) return null;
+  { const anywhere = await db.raw(`SELECT 1 FROM entities WHERE data::text ILIKE $1 UNION ALL SELECT 1 FROM extractions WHERE value ILIKE $1 LIMIT 1`, [`%${esc(cand)}%`]); if (anywhere.rows.length) return null; }
+  if (vendors.some((v) => dl(cl, v.toLowerCase()) <= 2)) return null; // near miss of a real vendor: typo handling stays elsewhere
+  const names = await tenantNames(db);
+  if (names.some((n) => n.toLowerCase() === cl)) return null;
+  const known = await db.raw(`SELECT 1 FROM entities WHERE entity_type IN ('customer','technician') AND (data->>'customer_name' ILIKE $1 OR data->>'technician_name' ILIKE $1 OR data->>'name' ILIKE $1) LIMIT 1`, [`%${esc(cand)}%`]);
+  if (known.rows.length) return null;
+  return ok(`0 work orders on file for ${cand}: I don't have a vendor by that name. The vendors I do have work orders from are ${vendors.sort().join(", ")}.`, [{ label: `Work orders for ${cand}`, value: "0", sources: [] }], [], `Searched the vendor on every work order for ${cand}; none matched.`);
+}
+
+/** Rent-roll statistics over the lease agreements on file (count above/below a rent, highest / lowest / average rent). */
+async function rentStatsLane(db, raw, q) {
+  const l = q.toLowerCase();
+  if (YEAR_OR_PERIOD.test(l) || !/\brent\b|\bpay(?:s|ing)?\b/.test(l) || /\b(?:paid|late|behind|overdue|owe\w*)\b/.test(l)) return null;
+  const cmpM = /\bhow many\b[^?]*\b(?:tenants?|leases?|units?|renters?|residents?)\b[^?]*\b(?:pay|pays|paying|rent|rents|have)\b[^?]*?\b(more than|over|above|greater than|under|less than|below|fewer than|at least|at most|exactly)\s*\$?\s*(\d[\d,]*(?:\.\d+)?)\b(?!\s*(?:to|-|and|or)\b)/.exec(l);
+  const stat = /\b(highest|biggest|largest|top|most expensive|maximum|max)\b[^?]*\brent\b|\brent\b[^?]*\b(?:highest|biggest|largest|maximum)\b/.test(l) ? "max"
+    : /\b(lowest|cheapest|smallest|minimum|min)\b[^?]*\brent\b|\brent\b[^?]*\b(?:lowest|smallest|minimum)\b/.test(l) ? "min"
+    : /\baverage\b[^?]*\brent\b|\bavg\b[^?]*\brent\b|\bmean\b[^?]*\brent\b/.test(l) ? "avg" : null;
+  if (!cmpM && !stat) return null;
+  { const RENT_OK = new Set("how many what whats is the our a an tenants tenant leases lease units unit renters residents pay pays paying rent rents rented month monthly per mo do we have highest lowest average avg mean biggest largest smallest cheapest max min maximum minimum collect charge of across all on file more than over above greater under less below fewer at least most exactly".split(" ")); const rest = norm(l.replace(/\$?\s*\d[\d,]*(?:\.\d+)?/g, " ")).trim().split(" ").filter((w) => w && !RENT_OK.has(w)); if (rest.length) return null; if ((l.match(/\d[\d,]*(?:\.\d+)?/g) || []).length > 1) return null; }
+  if (/\b(?:and|or)\b[^?]*\$?\d/.test(l.replace(cmpM?.[0] ?? "", "")) && cmpM) return null; // a second bound: not handled here
+  const leases = [...(await docsByType(db, "lease-agreement")).values()].filter((o) => Number.isFinite(Number(o.f.rent_amount)));
+  if (!leases.length) return null;
+  if (cmpM) {
+    const n = Number(cmpM[2].replace(/,/g, ""));
+    const op = { "more than": (x) => x > n, over: (x) => x > n, above: (x) => x > n, "greater than": (x) => x > n, under: (x) => x < n, "less than": (x) => x < n, below: (x) => x < n, "fewer than": (x) => x < n, "at least": (x) => x >= n, "at most": (x) => x <= n, exactly: (x) => x === n }[cmpM[1]];
+    const hits = leases.filter((o) => op(Number(o.f.rent_amount)));
+    const f = [{ label: `Leases with rent ${cmpM[1]} ${money(n)}`, value: String(hits.length), sources: hits.slice(0, 20).map(srcFor).flat() }];
+    return ok(`${hits.length} of the ${leases.length} lease${leases.length === 1 ? "" : "s"} on file ${hits.length === 1 ? "has" : "have"} monthly rent ${cmpM[1]} ${money(n)} (all leases on file, including past ones).`, f, hits.slice(0, 20).map((o) => recFor(o, "Lease agreement")), `Compared the rent amount on every lease agreement with ${money(n)}.`);
+  }
+  const nums = leases.map((o) => Number(o.f.rent_amount));
+  if (stat === "avg") {
+    const avg = nums.reduce((a, b) => a + b, 0) / nums.length;
+    return ok(`The average monthly rent across the ${leases.length} lease${leases.length === 1 ? "" : "s"} on file is ${money(avg)}.`, [{ label: "Average rent", value: money(avg), sources: [] }], leases.slice(0, 20).map((o) => recFor(o, "Lease agreement")), "Averaged the rent amount on every lease agreement.");
+  }
+  const best = stat === "max" ? Math.max(...nums) : Math.min(...nums);
+  const top = leases.filter((o) => Number(o.f.rent_amount) === best);
+  const who = top.length <= 3 ? top.map((o) => `${o.f.tenant_name ?? "a tenant"}${o.f.unit_number ? `, unit ${o.f.unit_number}` : ""}${o.f.service_address ? ` at ${o.f.service_address}` : ""}`).join("; ") : `${top.length} leases`;
+  return ok(`The ${stat === "max" ? "highest" : "lowest"} monthly rent on file is ${money(best)} (${who}).`, [{ label: stat === "max" ? "Highest rent" : "Lowest rent", value: money(best), sources: top.slice(0, 20).map(srcFor).flat() }], top.slice(0, 20).map((o) => recFor(o, "Lease agreement")), `Compared the rent amount on every lease agreement and took the ${stat === "max" ? "largest" : "smallest"}.`);
+}
+
 /* ------------------------------------------------------------------ entry */
 
 /** ONLY the pure shape "how many (different) tenants have rented at <address>" and nothing else (no extra clause, year, city, punctuation, instruction). */
@@ -379,7 +458,7 @@ export async function tryPropertyPack(db, question, { today } = {}) {
   if (!q || q.length > 300) return null;
   const t = /^\d{4}-\d{2}-\d{2}$/.test(String(today ?? "")) ? today : new Date().toISOString().slice(0, 10);
   try {
-    return (await countLane(db, raw)) ?? (await unitLane(db, q, raw, t)) ?? (await noBuildingLane(db, q)) ?? (await notOnFileLane(db, q)) ?? (await personLane(db, q, raw, t));
+    return (await countLane(db, raw)) ?? (await unitLane(db, q, raw, t)) ?? (await vendorLane(db, raw, q)) ?? (await rentStatsLane(db, raw, q)) ?? (await noBuildingLane(db, q)) ?? (await notOnFileLane(db, q)) ?? (await personLane(db, q, raw, t));
   } catch (err) {
     console.error("propertyPack lane failed, falling through:", err?.message);
     return null;

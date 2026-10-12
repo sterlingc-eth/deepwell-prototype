@@ -86,7 +86,7 @@ export function selectRows(plan, snap, today) {
   if (entity === 'document') {
     // a kind of paper this organization has never filed is not "zero": the question may be about something it does not keep at all
     // (a lease is the exception: a company with no lease papers has none, and the older lanes would read the word as a maintenance agreement)
-    if (plan.docType && plan.docType !== 'lease-agreement' && plan.docType !== 'other' && !snap.documents.some((d) => d.type === plan.docType)) return { abstain: 'type-not-on-file' };
+    if (plan.docType && plan.docType !== 'lease-agreement' && plan.docType !== 'other' && ![].concat(plan.docType).some((t) => snap.documents.some((d) => d.type === t))) return { abstain: 'type-not-on-file' };
     if (plan.docType) {
       const set = new Set([].concat(plan.docType));
       rows = rows.filter((d) => set.has(d.type));

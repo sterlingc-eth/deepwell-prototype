@@ -485,6 +485,14 @@ function parseCompare(q, feat) {
     const y = ps[1].y; ps[1] = { kind: 'ytd', y, from: `${y}-01-01`, to: addYears(ps[0].to, -1), label: `${y} through ${fmtDate(addYears(ps[0].to, -1))}`, matched: true };
     sameTime.length = 0;
   }
+  // "this year compared with last year": the year in progress is set against the SAME stretch of last year (a part year against a whole one would always look smaller); "the whole of last year" keeps it whole
+  if (ps.length === 2 && !sameTime && baseHint == null && feat?.today && !/\b(?:whole|full|entire)\b/.test(q.text0)) {
+    const cur = ps.find((p) => p.kind === 'year' && p.rel === 'thisYear'); const prev = ps.find((p) => p.kind === 'year' && p.rel === 'lastYear');
+    if (cur && prev && cur.y === prev.y + 1 && cur.to > feat.today && cur.from <= feat.today) {
+      const e = addYears(feat.today, -1);
+      ps = ps.map((p) => (p === cur ? { ...cur, kind: 'ytd', to: feat.today, label: `${cur.y} so far` } : { kind: 'ytd', y: prev.y, from: prev.from, to: e, label: `${prev.y} through ${fmtDate(e)}`, matched: true }));
+    }
+  }
   // a rolling window and "the N days before"
   if (ps.length === 2 && ps[0].kind === 'roll' && ps[1].kind === 'prior') {
     const a = ps[0]; const b = ps[1];
@@ -779,9 +787,26 @@ function parseBetween(q, feat) {
     return { op: 'tm_between', mode: 'register', scope, serial: q.serials[0] ?? null, filters: q.names.map((n) => ({ field: 'customer', op: 'eq', value: n.value })) };
   }
   r.takeAll(rx('how\\s+many|how\\s+long|did|take|does|do|long'));
+  // R15: "the span in days of Kim Lee's invoices, first to last", "days from Kim Lee's earliest invoice to the last": the days between the first and the last dated paper of one kind for one customer
+  {
+    const spanW = /\b(?:span|from|between)\b/i.test(q.text0) && /\b(?:first|earliest|oldest)\b/i.test(q.text0) && /\b(?:last|latest|newest|final)\b/i.test(q.text0);
+    const dIdx = q.docs.map((d, i) => i).filter((i) => r.s.includes(`@d${i}`));
+    if (process.env.SPAN_DEBUG) process.stderr.write('SPAN ' + JSON.stringify({ days: !!days, spanW, dIdx, docs: q.docs.map((d) => d.id), names: q.names, nos: q.docNos, rs: r.s, t0: q.text0 }) + '\n');
+    if (days && spanW && !q.docNos.length && !q.periods.length && !q.serials.length && !q.brands.length && !q.cities.length && dIdx.length === 1 && q.docs.length === 1 && q.names.length === 1 && q.names[0].role === 'customer') {
+      const rr = r.clone();
+      rr.s = rr.s.replace(`@d${dIdx[0]}`, ' ');
+      rr.takeAll(rx('span|in|of|the|first|last|earliest|latest|oldest|newest|final|to|from|and|s|apart|for|his|her|their'));
+      rr.s = rr.s.replace(/@n\d+/g, ' ');
+      if (process.env.SPAN_DEBUG) process.stderr.write('SPAN-left ' + JSON.stringify(rr.s) + '\n');
+      if (!clean(rr)) return null;
+      return { op: 'tm_between', mode: 'span', docType: q.docs[dIdx[0]].id, docWord: q.docs[dIdx[0]].word ?? null, filters: [{ field: 'customer', op: 'eq', value: q.names[0].value }] };
+    }
+  }
   // two numbered papers
-  if (btw && q.docNos.length === 2) {
+  if ((btw || /\bapart\b/i.test(q.text0)) && q.docNos.length === 2) {
     r.s = r.s.replace('@r0', ' ').replace('@r1', ' ');
+    for (let i = 0; i < q.docs.length; i++) r.s = r.s.replace(`@d${i}`, ' ');
+    r.takeAll(rx('file|files|record|records|paper|papers|document|documents|are|is|there'));
     r.take(rx('and'));
     if (!days || !clean(r) || q.names.length || q.periods.length) return null;
     return { op: 'tm_between', mode: 'docs', numbers: q.docNos.slice() };
@@ -1149,6 +1174,16 @@ function execBetween(plan, x) {
     if (!da || !db) return { abstain: 'no-date' };
     return { a: a[0], b: b[0], da, db, days: Math.abs(diffDays(da, db)) };
   }
+  if (plan.mode === 'span') {
+    const nm = plan.filters[0].value;
+    if (snap.customers.filter((c) => lc(c.name) === lc(nm)).length > 1) return { abstain: 'ambiguous-name' };
+    const rows = snap.documents.filter((d) => d.type === plan.docType && lc(d.custName) === lc(nm));
+    const dated = rows.filter((d) => d.date).sort((a, b) => a.date.localeCompare(b.date));
+    if (rows.length !== dated.length) return { abstain: 'no-date' }; // a paper without a date would change the first or the last
+    if (dated.length < 2) return { abstain: 'span-needs-two' };
+    const a = dated[0]; const b = dated[dated.length - 1];
+    return { a, b, n: dated.length, rows: dated, days: diffDays(a.date, b.date) };
+  }
   if (plan.mode === 'register') {
     let us;
     if (plan.scope === 'serial') { const u = snap.units.find((v) => lc(v.serial) === lc(plan.serial)); if (!u) return { notFound: plan.serial }; us = [u]; }
@@ -1300,6 +1335,7 @@ function saySeries(res, plan, x) {
     const live = top.filter((k) => (grain === 'year' && k === thisYear) || (grain === 'month' && k === today.slice(0, 7)));
     if (live.length) text += ` Note that ${live[0] === thisYear ? thisYear : monthLabel(live[0])} is not over yet (counted through ${fmtDate(today)}).`;
     if (meas.assumed) text += ' Busiest is measured by service visits.';
+    if (!meas.money && !meas.hours) { const tot = keys.reduce((a, k) => a + res.buckets.get(k), 0); text += ` Counted over ${fmtInt(tot)} ${meas.noun} that have ${/visit/.test(meas.noun) ? 'a service date' : /invoice/.test(meas.noun) ? 'an invoice date' : 'a date'}.`; }
     const recs = res.rowsBy ? top.flatMap((k) => res.rowsBy.get(k)) : [];
     return { text, facts: top.slice(0, 7).map((k) => ({ label: bucketLabel(k, grain), value: fv(k) })), records: recordsCap(recs, (r) => (meas.entity === 'unit' ? recUnit(r, snap) : recDoc(r, snap))), total: recs.length, basis: basisFor(plan, res.leftOut ? `${fmtInt(res.leftOut)} with no date on file were not counted.` : '') };
   }
@@ -1467,6 +1503,10 @@ function sayBetween(res, plan, x) {
     const lab = (d, n) => `${n.toUpperCase()} (${documentTypeLabel(d.type)?.toLowerCase() ?? 'document'}, ${fmtDate(d.date)})`;
     const [na, nb] = plan.numbers;
     return { text: `${dayText(res.days)} between ${lab(res.a, na)} and ${lab(res.b, nb)}.`, facts: [{ label: 'Days apart', value: fmtInt(res.days) }], records: [recDoc(res.a, snap), recDoc(res.b, snap)], total: 2, basis: 'Counted the days from the date of one paper to the date of the other (not counting both end days).' };
+  }
+  if (plan.mode === 'span') {
+    const kind = documentTypeLabel(plan.docType)?.toLowerCase() ?? 'document';
+    return { text: `${dayText(res.days)} from the first to the last of ${plan.filters[0].value}'s ${res.n} ${kind} papers (${fmtDate(res.a.date)} to ${fmtDate(res.b.date)}).`, facts: [{ label: 'Days from first to last', value: fmtInt(res.days) }], records: res.rows.slice(0, 100).map((d) => recDoc(d, snap)), total: res.rows.length, basis: `Counted the days from the earliest to the latest date among ${plan.filters[0].value}'s ${kind} papers on file.` };
   }
   if (plan.mode === 'register') {
     const bs = 'Counted the days from the installation date to the warranty registration date on file.';

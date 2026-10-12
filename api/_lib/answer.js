@@ -116,7 +116,8 @@ const RULES = `Rules:
 - Return at most 5 facts — only the ones that answer the question, never an exhaustive dump of everything retrieved.
 - Facts are a key/value grid: keep labels short ("Warranty", "Installed by", "Cost"). Use status "ok" for an active warranty, "warn" for one expiring within 90 days, "bad" for expired.
 - basis is "printed" unless you personally computed the value yourself — see the basis field description.
-- text is 1–2 sentences a dispatcher would say out loud. No filler, no restating the question.`;
+- Never quote, infer or mention an HR, personnel, payroll or internal-only paper, even if a passage seems to contain one; say that kind of paper is not available here.
+- text is 1–2 sentences a person in the office would say out loud. No filler, no restating the question.`;
 
 /**
  * ---------------------------------------------------------------------------
@@ -157,8 +158,8 @@ const RULES = `Rules:
  */
 
 const PREAMBLE =
-  "You are a grounded question-answering assistant for an HVAC dispatch " +
-  'company. You will be given retrieved passages from the customer\'s own ' +
+  "You are a grounded question-answering assistant for a business that keeps its own " +
+  'paperwork (trades, property, legal, medical office, nonprofit ...). You will be given retrieved passages from the customer\'s own ' +
   'documents, then a question. Answer using only the "answer" tool.';
 
 /**

@@ -22,6 +22,8 @@ import { KNOWN_AZ_CITY_NAMES } from '../analytics.js';
 import { looksLikeContinuation, classifyFollowupKind, detectSwapTarget, looksLikeDisambiguationReply } from './classify.js';
 import { slotFollowup, isSlotOnlyFollowup } from './slots.js';
 import { dqlMergeFollowup, plainScope } from './dqlmerge.js';
+import { provenanceFollowup } from './provenance.js';
+import { correctionFollowup, correctionPayload } from './correction.js';
 import { markMerged, markReleased, isFragment } from './handoff.js';
 import { subjectFromText, subjectFromEntities, pronounReplacement, substitutePronouns, stripTrailingPunct, brandMentionIn, inferNoun, anchorAlreadyPresent, pronounNeedsBrandFromEarlierTurn } from './subject.js';
 
@@ -290,6 +292,20 @@ export function resolveFollowup(context, question) {
   if (priorCandidates.length >= 2 && looksLikeDisambiguationReply(q, priorTurn)) {
     const resolved = resolveDisambiguationReply(q, priorTurn);
     if (resolved) return resolved;
+  }
+
+  // R15: "where did that come from" / "which documents say that": the previous question again, with its source papers
+  const prov = provenanceFollowup(turns, q);
+  if (prov) { markMerged(clip(prov.query)); return { query: clip(prov.query), filters: {}, isFollowup: true, kind: 'dql-merge', needsClarification: false }; }
+
+  // R15: "no, I meant 2024" / "not Linda, Lisa": the previous question again with the corrected value in place of the old one
+  const corr = correctionFollowup(turns, q);
+  if (corr) { markMerged(clip(corr.query)); return { query: clip(corr.query), filters: {}, isFollowup: true, kind: 'dql-merge', needsClarification: false }; }
+  // a correction the merge cannot place ("scratch that, license renewal notices"): typed alone an older lane would answer it as a fresh question about something else
+  if (!corr && correctionPayload(q)) {
+    const carried = clip(`Earlier question: "${String(priorTurn.question).trim().replace(/[?.!\s]+$/, '')}". Correction: ${String(q).trim()}`);
+    markReleased(carried);
+    return { query: carried, filters: {}, isFollowup: true, kind: 'fragment', needsClarification: false };
   }
 
   // R2 (B1): an elliptical follow-up that names ONE new slot value (period, person, city, brand, document type,

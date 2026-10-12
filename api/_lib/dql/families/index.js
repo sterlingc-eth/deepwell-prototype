@@ -6,3 +6,5 @@ import './core.js';
 import './time.js';
 import './sets.js';
 import './textdq.js';
+import './links.js';
+import './multi.js';

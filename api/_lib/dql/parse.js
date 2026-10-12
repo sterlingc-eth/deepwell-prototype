@@ -22,17 +22,25 @@ import { wordsToNumber } from '../lookups/countQualifiers.js';
 import { untrackedConcept, jargonEnabled, respellJargon } from '../lexicon/jargon.js';
 import { tokenize, repairWord, findRun } from './text.js';
 import { compileVocab, normName } from './vocab.js';
-import { FILLER, ENTITY_WORDS, DIM_WORDS, MONEY_WORDS } from './lex.js';
+import { FILLER, ENTITY_WORDS, DIM_WORDS, MONEY_WORDS, docTypePhraseMap } from './lex.js';
 import { detectPlan, allFamilies, rescuePlan } from './registry.js';
 import { dqlFrame, dqlParaphrase, openEndRewrite, ordinalCustomerRewrite } from './frame.js';
-import { FOREIGN_WORDS } from './industryLex.js';
+import { CUSTOMER_NOUNS } from './industryLex.js';
 import { leftoverGate, verifyPlan, supplyOp } from './learned/index.js';
-import { isPlainInventory } from './plain.js';
+import { shapeVeto } from './learned/shape3.js';
+import { isPlainInventory, OLDER_LANES_READ } from './plain.js';
 import { INDUSTRY_ONLY_TYPES } from './industryLex.js';
 import { customerWordFor } from './custWord.js';
+import { documentTypeLabel } from '../documentTypes.js';
+const CUST_TYPED = new RegExp(`\\b(client|${CUSTOMER_NOUNS.filter((x) => !/s$/.test(x) || /ss$/.test(x)).join('|')})s?\\b`, 'i');
+/** the everyday word for the people a company bills, as the owner typed it ("patients" -> "patient"); null when no such word is in the question. */
+function typedCustomerWord(raw) { const m = CUST_TYPED.exec(String(raw ?? '')); return m ? m[1].toLowerCase() : null; }
 import { billSense, vendorBillsAsPurchaseOrders } from './billSense.js';
 import { moneyRewrite, asksAmounts } from './moneyPhrases.js';
-import { readOrdinal, applyOrdinal, ordinalTechRewrite, hashOrdinalRewrite, ORD_WHO_TAIL } from './ordinal.js';
+import { readOrdinal, applyOrdinal, chronoOrdinalRewrite, ordinalTechRewrite, hashOrdinalRewrite, ORD_WHO_TAIL } from './ordinal.js';
+import { parseAddress } from './linkAddress.js';
+import { multiPlan, multiRespell, respellVersusLast } from './multi.js';
+import { stripSourceAsk } from './cite.js';
 import './families/index.js';
 
 export const dqlEnabled = () => process.env.DONOVAN_DQL !== '0';
@@ -81,7 +89,7 @@ const TIME_PATTERNS = (() => {
     `(?:on\\s+|in\\s+|during\\s+|since\\s+|before\\s+|after\\s+)?(?:${MON})\\s+(?:\\d{1,2}\\s+)?${YEAR}`,
     `(?:on\\s+|since\\s+|before\\s+|after\\s+)?\\d{1,2}/\\d{1,2}/\\d{2,4}`, `${YEAR}-\\d{2}(?:-\\d{2})?`,
     `(?:since|before|after|by|until|till|through|prior\\s+to)\\s+${YEAR}`,
-    `(?:in|during|for|of|from|within)\\s+(?:the\\s+year\\s+)?${YEAR}`,
+    `(?:in|during|for|of|from|within)\\s+(?:the\\s+)?(?:year\\s+)?${YEAR}`,
     `(?:since|before|after)\\s+(?:${MON})`,
     `(?:in|during|for|of)\\s+(?:the\\s+month\\s+of\\s+)?(?:${MON})`,
     `(?:in\\s+|during\\s+|over\\s+|within\\s+|for\\s+|from\\s+)?(?:the\\s+)?(?:last|past|previous|prior)\\s+(?:(?:\\d+|${NUMW})\\s+)?(?:day|week|month|quarter|year)s?`,
@@ -180,7 +188,8 @@ export function parseDql(question, ctx = {}) {
   if (!dqlEnabled()) return null;
   const tv = ctx.tenantVocab;
   if (!tv) return null;
-  const raw0 = String(question ?? '').trim().replace(/\bw\/o\b/gi, 'without').replace(/\bw\/(?=\s)/gi, 'with').replace(/\b(?:the\s+)?(?:last|previous|past)\s+calendar\s+year\b/gi, 'last year').replace(/\b(?:the\s+)?(?:this|current)\s+calendar\s+year\b/gi, 'this year'); // round 11: "last calendar year" is the previous calendar year
+  const citeAsk = stripSourceAsk(question);
+  const raw0 = respellVersusLast(multiRespell(citeAsk.q)).trim().replace(/\bgrand\s+total(?=s?\b)/gi, 'total').replace(/\bw\/o\b/gi, 'without').replace(/\bw\/(?=\s)/gi, 'with').replace(/\b(?:the\s+)?(?:last|previous|past)\s+calendar\s+year\b/gi, 'last year').replace(/\b(?:the\s+)?(?:this|current)\s+calendar\s+year\b/gi, 'this year'); // round 11: "last calendar year" is the previous calendar year
   if (!raw0 || raw0.length > 240) return null;
   const today = ctx.today ?? new Date().toISOString().slice(0, 10);
   const vocab = compileVocab(tv, ctx.pack);
@@ -188,6 +197,8 @@ export function parseDql(question, ctx = {}) {
   try { const uc = jargonEnabled() ? untrackedConcept(raw0) : null; if (uc && !vocab.scopedPhrases?.has(String(uc.phrase).toLowerCase().replace(/\s+/g, ' '))) return null; } catch { /* ignore */ }
   // payment status, balances and what is owed are not read from the papers by this engine: the older lanes answer or decline those
   if (/\b(?:overdue|past\s+due|unpaid|outstanding|owed|owing|owes?|balances?|delinquent|paid|pay(?:ment)?s?\s+status|still\s+owe|behind\s+on)\b/i.test(raw0)) return null;
+  // R16: "as of <date>" is a running position up to that date, which this engine does not total; "what's the number of the earliest ... " asks for the paper's own number, not its file name: both are released
+  if (process.env.R16_ASOF !== '0' && /\bas\s+of\b(?!\s+(?:today|now)\b)/i.test(raw0) || (/\bnumbers?\s+of\s+the\s+(?:earliest|latest|first|last|oldest|newest|most\s+recent|biggest|largest|smallest|top)\b/i.test(raw0) && !/\bhow\s+many\b/i.test(raw0))) return null;
   // "what's the number of the invoice for $115" asks for the paper's own number, not a count
   if (/\bnumber\s+of\s+the\s+[a-z -]+?\s+(?:for|from|of|on|dated|with)\b/i.test(raw0) && !/\bhow\s+many\b/i.test(raw0)) return null;
   // "bills": the invoices we send, or what vendors send us. A company that keeps purchase orders reads the vendor side as those; a bare "bills" there is asked, not guessed.
@@ -203,7 +214,7 @@ export function parseDql(question, ctx = {}) {
   let ordinal = null;
   // "the second highest invoice and who is it for": the listed paper already names its customer, so the clause is answered by the same line (only for a ranking of single papers: checked after the plan)
   let whoClause = false;
-  framed = hashOrdinalRewrite(framed);
+  framed = chronoOrdinalRewrite(hashOrdinalRewrite(framed));
   { const od = readOrdinal(framed); if (od?.bad) return null; if (od) {
     ordinal = od.n; let t0 = od.text;
     if (ORD_WHO_TAIL.test(t0)) { t0 = t0.replace(ORD_WHO_TAIL, ''); whoClause = true; }
@@ -211,7 +222,11 @@ export function parseDql(question, ctx = {}) {
   } }
   // a definition or an opinion is not a query over records ("what is a startup sheet", "what does that mean")
   if (/\b(?:what(?:'s|s|\s+is|\s+are|\s+does)|define|explain|meaning\s+of)\s+(?:a|an)\s/i.test(framed) || /\bwhat\b.*\b(?:mean|means|meaning)\b/i.test(framed)) return null;
-  if (/\b\d{1,6}\s+(?:[a-z.]+\s+){0,3}(?:st|street|ave|avenue|rd|road|dr|drive|ln|lane|blvd|boulevard|way|ct|court|pl|place|cir|circle|pkwy|parkway)\b/i.test(framed)) return null;
+  if (/\b\d{1,6}\s+(?:[a-z.]+\s+){0,3}(?:st|street|ave|avenue|rd|road|dr|drive|ln|lane|blvd|boulevard|way|ct|court|pl|place|cir|circle|pkwy|parkway)\b/i.test(framed)) {
+    // links family: "who else is at <address>" / "what happened at <address>" are read here; any other question with a street address is released as before
+    const lp = process.env.DONOVAN_DQL_LINKS_OFF ? null : parseAddress(raw0, today);
+    return lp ? { mode: 'dql', plan: lp, text: framed, plain: false } : null;
+  }
   // a question that opens by leaning on the one before it is a follow-up, not a query of its own
   const OPENER = /^\s*(?:and|also|then|but|or|so|what about|how about|same|those|these)\b/i;
   if (OPENER.test(raw0) || OPENER.test(framed) || (ctx.original && OPENER.test(String(ctx.original)))) return null;
@@ -225,10 +240,9 @@ export function parseDql(question, ctx = {}) {
   });
   if (ctx.debug) ctx.debug.words = words.join(' ');
   // the words other kinds of business use are read only for an organization that chose such a business at sign-up
-  if (!vocab.otherIndustry && words.some((x) => FOREIGN_WORDS.has(x))) return null;
   const NUMWORDS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12 };
   for (let i = 1; i < words.length; i++) {
-    if (NUMWORDS[words[i]] != null && /^(?:than|least|most|exactly|only|just|over|under|above|below|top|bottom|last|first)$/.test(words[i - 1])) words[i] = String(NUMWORDS[words[i]]);
+    if (NUMWORDS[words[i]] != null && /^(?:than|least|most|exactly|only|just|over|under|above|below|top|bottom|last|first)$/.test(words[i - 1]) && !/^(?:hundred|thousand|million|grand|k|and|dollars?|bucks)$/.test(words[i + 1] ?? '') && !(NUMWORDS[words[i + 1]] != null || /^(?:twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred)$/.test(words[i + 1] ?? ''))) words[i] = String(NUMWORDS[words[i]]); // "over two thousand" is not "over 2"
   }
   let w = new Work(words);
   if (jargonEnabled()) {
@@ -237,7 +251,7 @@ export function parseDql(question, ctx = {}) {
       if (jr?.text) w = new Work(tokenize(jr.text).map((t) => t.w));
     } catch { /* keep the typed words */ }
   }
-  const feat = { today, vocab, text0: w.s, raw: raw0, recentN: null, distinctDim: null, times: [], filters: [], docTypes: [], flags: {}, nouns: {}, dims: [], notes: [] };
+  const feat = { rawWords: toks.map((t) => t.w), today, vocab, text0: w.s, raw: raw0, recentN: null, distinctDim: null, times: [], filters: [], docTypes: [], flags: {}, nouns: {}, dims: [], notes: [] };
 
   // ---- 1. names (customers, technicians, vendors), longest first
   const nameHits = [];
@@ -273,6 +287,11 @@ export function parseDql(question, ctx = {}) {
       const custCue = /^(?:for|to|from|of)$/.test(b[b.length - 1] ?? '') || /^(?:owe|owes|owed|pay|paid|pays|bought|ordered)$/.test(af[0] ?? '');
       if (techCue && !custCue) roles = ['tech']; else if (custCue && !techCue) roles = ['customer'];
     }
+    if (roles.length === 1 && roles[0] === 'customer' && vocab.dualNames?.has(normName(r.display))) { // R15: a customer who is also on the company's staff list (the card's staff key)
+      const b = h.before ?? []; const af = h.after ?? [];
+      const staffCue = b[b.length - 1] === 'by' || (vocab.nounExtra?.technician ?? []).includes(b[b.length - 1] ?? '');
+      if (staffCue) return null;
+    }
     if (roles.length !== 1) return null; // a name that is two things at once: ask, do not guess
     feat.filters.push({ field: roles[0], op: 'eq', value: r.display, label: r.display, role: roles[0] });
   }
@@ -294,11 +313,13 @@ export function parseDql(question, ctx = {}) {
   // ---- 3. dimensions ("by year", "per technician", "for each city")
   const dimHits = [];
   if (w.take(rx('(?:what|which)\\s+(?:kinds?|types?)\\s+of(?=\\s+(?:documents?|docs?|paperwork|files|records|papers))'))) dimHits.push('type');
-  for (let m; (m = w.take(DIM_RE));) {
+  if (!vocab.dimRe) { const ex = vocab.nounExtra?.technician; if (ex?.length) { const alt = [...Object.values(DIM_WORDS).flat(), ...ex].sort((a, b) => b.length - a.length).join('|'); vocab.dimRe = rx(`(?:${BYWORDS})\\s+(?:the\\s+)?(?:(?:month\\s+of\\s+the\\s+year|month\\s+of\\s+year)|(${alt}))(?:\\s+(?:and|then)\\s+(?:${BYWORDS}\\s+)?(?:(${alt})))?`); } else vocab.dimRe = DIM_RE; }
+  const dimIdOfV = (p) => (vocab.nounExtra?.technician?.includes(String(p ?? '').toLowerCase().trim()) ? 'tech' : dimIdOf(p));
+  for (let m; (m = w.take(vocab.dimRe));) {
     const full = m[0];
     if (/month\s+of\s+(?:the\s+)?year/.test(full)) dimHits.push('monthOfYear');
-    if (m[1]) { dimHits.push(dimIdOf(m[1])); if (/^per\b/i.test(full.trim())) { feat.flags.perDim = true; if (dimIdOf(m[1]) === 'customer') feat.flags.perCustomer = true; } }
-    if (m[2]) dimHits.push(dimIdOf(m[2]));
+    if (m[1]) { dimHits.push(dimIdOfV(m[1])); if (/^per\b/i.test(full.trim())) { feat.flags.perDim = true; if (dimIdOfV(m[1]) === 'customer') feat.flags.perCustomer = true; } }
+    if (m[2]) dimHits.push(dimIdOfV(m[2]));
   }
   if (w.take(rx('how\\s+many\\s+of\\s+each|of\\s+each|each\\s+one|each'))) feat.flags.each = true;
   feat.dims = dimHits.filter(Boolean);
@@ -371,18 +392,22 @@ export function parseDql(question, ctx = {}) {
   // ---- 7. document types (longest phrase first)
   {
     if (!vocab.docRe) {
-      const phr = [...vocab.docPhrases.keys()].filter((p) => p.length >= 2).sort((a, b) => b.length - a.length).map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+'));
+      const phr = [...vocab.docPhrases.keys(), ...(vocab.docGroups?.keys() ?? [])].filter((p) => p.length >= 2).sort((a, b) => b.length - a.length).map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+'));
       vocab.docRe = rx(phr.join('|'));
     }
     for (let m; (m = w.take(vocab.docRe));) {
-      const id = vocab.docPhrases.get(m[0].trim().replace(/\s+/g, ' ').toLowerCase());
+      const key0 = m[0].trim().replace(/\s+/g, ' ').toLowerCase();
+      if (/^emails?$/.test(key0) && /@/.test(raw0)) continue; // the domain of an address ("...@email.com") is not the kind of paper
+      const grp = vocab.docGroups?.get(key0);
+      if (grp) { for (const gid of grp) if (!feat.docTypes.includes(gid)) feat.docTypes.push(gid); feat.docWord = key0; feat.docGroup = true; if (/s\s*$/.test(m[0].trim())) feat.flags.plural = true; continue; } // R13: a word that names several kinds this company keeps ("inspections")
+      const id = vocab.docPhrases.get(key0);
       if (id && !feat.docTypes.includes(id)) { feat.docTypes.push(id); feat.docWord = m[0].trim().replace(/\s+/g, ' ').toLowerCase(); }
       if (/s\s*$/.test(m[0].trim()) || /\bpos?\b/.test(m[0])) feat.flags.plural = true;
     }
   }
   // ---- 8. entity nouns that are not document types
   const noun = (key) => {
-    const alt = ENTITY_WORDS[key].slice().sort((a, b) => b.length - a.length).map((p) => p.replace(/\s+/g, '\\s+')).join('|');
+    const alt = ENTITY_WORDS[key].concat(vocab.nounExtra?.[key] ?? []).sort((a, b) => b.length - a.length).map((p) => p.replace(/\s+/g, '\\s+')).join('|');
     return rx(alt);
   };
   for (const k of ['visit', 'document', 'unit', 'customer', 'technician', 'install']) {
@@ -425,12 +450,19 @@ export function parseDql(question, ctx = {}) {
         const pmKey = [...map.keys()].find((k) => /preventive maintenance/.test(k));
         if (pmKey) w.s = w.s.replace(/(?<![a-z0-9$.\/-])(?:pms?|preventative maintenance)(?![a-z0-9-])/g, ` ${pmKey} `);
       }
+      if (field === 'equipmentType') {
+        // the company's own word for what it services ("vehicle") and its everyday synonyms ("car", "truck"): a company that stores vehicles is asked about cars
+        const veh = [...map.keys()].find((k) => /^(?:vehicle|car|auto|truck)$/.test(k));
+        if (veh) w.s = w.s.replace(/(?<![a-z0-9$.\/-])(?:cars?|automobiles?|autos?|trucks?|vans?)(?![a-z0-9-])/g, ` ${veh} `);
+      }
       const keys = [...map.keys()].filter((k) => k.length >= 3).sort((a, b) => b.length - a.length).map((k) => `${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+')}s?`);
       if (!keys.length) continue;
       const re = rx(keys.join('|'));
       const hits = [];
       for (let m; (m = w.take(re));) hits.push(lookupPlural(map, m[0]));
       if (hits.length) feat.filters.push({ field, op: hits.length > 1 ? 'in' : 'eq', value: hits.length > 1 ? hits : hits[0], label: hits.join(' or ') });
+      // the company's own word for a kind of unit ("vehicles", "furnaces") is also the noun being asked about
+      if (hits.length && field === 'equipmentType' && !feat.docTypes.length && !feat.nouns.visit && !feat.nouns.document && !feat.nouns.customer && !feat.nouns.unit) { feat.nouns.unit = true; feat.flags.plural = true; }
     }
     if (statusCue) feat.flags.statusCue = true;
   }
@@ -490,6 +522,7 @@ export function parseDql(question, ctx = {}) {
   t.missing = Boolean(w.take(R.missing));
   t.distinct = Boolean(w.take(R.distinct)) || Boolean(t.distinctWord);
   t.howMany = Boolean(w.take(R.howMany)) || Boolean(t.howMany);
+  if (t.howMany && feat.docTypes.length === 2 && !feat.docGroup) w.take(R.howMany); // "the invoice count and the permit count": one count word for each kind of paper
   t.howMuch = Boolean(w.take(R.howMuch));
   t.share = Boolean(w.take(R.share));
   t.versus = Boolean(w.take(R.versus));
@@ -556,7 +589,8 @@ export function parseDql(question, ctx = {}) {
   for (const fam of allFamilies()) { if (fam.slots) { try { fam.slots(w, feat, vocab, { takeTime }); } catch (e) { if (process.env.DQL_DEBUG) console.error('dql slots error', e); } } }
   // a verb that is only filler ("issued") is a condition when this organization has it as a value of a field ("issued" permits, "completed" work orders)
   // and nothing in the question gave it a date to point at: it is then not explained, and the question is released
-  const valueWords = new Set(Object.values(vocab.cat ?? {}).flatMap((m) => [...m.keys()]).flatMap((k) => k.split(' ')));
+  const VALUE_STOP = new Set('this that with from into onto about been being does doing have has had having could would should shall might must please thanks thank hello okay just also still currently there here what whats which need want like know'.split(' ')); // the little words of a multi-word value ("in transit", "on hold") are grammar, not the condition
+  const valueWords = new Set(Object.values(vocab.cat ?? {}).flatMap((m) => [...m.keys()]).flatMap((k) => k.split(' ')).filter((x) => x.length >= 4 && !VALUE_STOP.has(x)));
   // "2024 to now", "until today": the end of a range is a condition; "now" is only filler when it does not close a span
   const spanEnd = /\b(?:to|until|till|through|thru|and|up to)\s+(?:now|today|present)\b/.test(w.s) ? new Set(['now', 'today', 'present']) : null;
   feat.left = w.left().filter((x) => !FILLER.has(x) || (spanEnd && spanEnd.has(x)) || (valueWords.has(x) && !feat.times.length && !feat.time));
@@ -576,6 +610,12 @@ export function parseDql(question, ctx = {}) {
     }
   }
 
+  // ---- two measures of the same papers ("how many ... and what was the total"): both parts or neither
+  {
+    const mp = multiPlan(feat, vocab);
+    if (mp === 'release') { if (ctx.debug) { ctx.debug.why = 'two measures that cannot both be answered for the same papers'; ctx.debug.multiRelease = true; } return null; }
+    if (mp) return { mode: 'dql', plan: citeAsk.cite ? { ...mp, cite: true } : mp, text: framed, plain: false };
+  }
   // ---- families
   let plan = detectPlan(feat, { vocab });
   // LEARNED PLANNER, hook B (dql/learned supplyOp): no family claimed it because no operator trigger matched; a very confident model may supply it
@@ -591,11 +631,21 @@ export function parseDql(question, ctx = {}) {
   if (plan && whoClause && !(plan.rank === 'rows' && plan.entity === 'document')) { if (ctx.debug) ctx.debug.why = 'who-clause beside a ranking that does not list single papers'; return null; }
   if (!plan) { if (ctx.debug) ctx.debug.why = `no family claimed it${feat.unusedTriggers ? ` (unused: ${feat.unusedTriggers.join(',')})` : ''}`; return null; }
   if (feat.learned && !verifyPlan(feat.learned, plan)) { if (ctx.debug) ctx.debug.why = 'learned planner disagrees with the plan'; return null; }
+  // LEARNED PLANNER v3 (dql/learned/shape3.js): a slot-masked reading of the question's shape; a strict, calibrated "this asks for several things" against a single-answer plan RELEASES (never opens anything)
+  { const sv = shapeVeto(raw0, vocab.card, vocab.customerNames, plan); if (sv) { if (ctx.debug) ctx.debug.why = `learned planner v3: ${sv}`; return null; } }
   if (plan.op === 'list' && plan.entity === 'document' && asksAmounts(stripConversationalFrame(raw0) ?? raw0)) plan.showAmounts = true;
   // a plain count of a paper kind only this kind of business keeps (a lease, a gift receipt) is DQL's: the older lanes read those words as an HVAC shop's papers
   const industryPaper = vocab.otherIndustry && !Array.isArray(plan.docType) && plan.docType
     && (INDUSTRY_ONLY_TYPES.has(plan.docType) || (plan.docWord && vocab.scopedPhrases?.has(String(plan.docWord).toLowerCase())));
+  // R13: the older lanes know the shared paper words only. A word this company's own papers taught us (or one it uses for a different kind than the shared table does), a word naming several kinds, and a list of a kind they never listed are DQL's.
+  const ownPaper = plan.entity === 'document' && !plan.visit && plan.docType && (Array.isArray(plan.docType)
+    ? plan.docType.length > 1
+    : ((plan.docWord && docTypePhraseMap().get(String(plan.docWord).toLowerCase()) !== plan.docType) || (plan.op === 'list' && !OLDER_LANES_READ.has(plan.docType))));
   if (feat.flags.jobWord && plan.entity === 'document' && !plan.docType && !plan.visit && (plan.filters ?? []).some((x) => x.field === 'tech')) plan.jobWord = true; // the owner said "jobs": the count is said as jobs, not as documents
-  if (vocab.otherIndustry && plan.entity === 'customer') { const cw = customerWordFor(vocab.industryKind).one; if (cw !== 'customer') plan.custWord = cw; }
-  return { mode: 'dql', plan, text: framed, plain: isPlainInventory(plan) && !industryPaper };
+  // the company's own name for the stored kind of paper ("maintenance agreements", "donation receipts"), said in the answer; a kind it has no label for keeps the word the question used
+  if (plan.docType && !Array.isArray(plan.docType) && plan.docType !== 'other') { const lab = documentTypeLabel(plan.docType, ctx.pack); if (lab && lab !== documentTypeLabel('other', ctx.pack)) { plan.docLabel = lab; const w = String(plan.docWord ?? '').toLowerCase(); if (w && /^[a-z -]+$/.test(w) && vocab.scopedPhrases?.has(w) && !lab.toLowerCase().includes(w.replace(/s$/, ''))) plan.docAlias = w; } }
+  if (vocab.cardStaffNoun && new RegExp(`\\b${vocab.cardStaffNoun}s?\\b`, 'i').test(raw0)) plan.staffWord = vocab.cardStaffNoun; // the word the owner used for the staff is said back (groomer, driver)
+  if (plan.entity === 'customer') { const ownCw = (vocab.nounExtra?.customer ?? []).filter((x) => /[a-z]$/.test(x) && !/(?:ies|s|y)$/.test(x)).sort((a, b) => b.length - a.length).find((x) => new RegExp(`\\b${x.replace(/\s+/g, '\\s+')}(?:s|es)?\\b|\\b${x.replace(/y$/, 'ies')}\\b`, 'i').test(raw0)); const cw = typedCustomerWord(raw0) ?? ownCw ?? customerWordFor(vocab.industryKind).one; if (cw !== 'customer') plan.custWord = cw; } // the word the owner used for the people (patients, tenants, donors ...) is said back
+  if (citeAsk.cite) plan.cite = true;
+  return { mode: 'dql', plan, text: framed, plain: !citeAsk.cite && isPlainInventory(plan) && !industryPaper && !ownPaper };
 }

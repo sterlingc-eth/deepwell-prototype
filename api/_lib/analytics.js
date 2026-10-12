@@ -2098,7 +2098,7 @@ function synonymPromptLine() {
 }
 
 export const ANALYTICS_SYSTEM_PROMPT_BASE =
-  'You turn an HVAC dispatch company\'s counting/listing/grouping question into a query plan ' +
+  'You turn a company\'s counting/listing/grouping question about its own records into a query plan ' +
   'using the "analytics_plan" tool. You never see or write SQL, and you never answer the question ' +
   'yourself — you only choose entity/op/groupBy/filters from the closed vocabulary the tool schema ' +
   'declares. The owner uses plain English, not database terms — map every synonym to its canonical ' +

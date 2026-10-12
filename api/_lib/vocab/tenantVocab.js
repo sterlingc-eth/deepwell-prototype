@@ -41,6 +41,7 @@ import { TENANT_SQL } from '../scope.js';
 import { deriveGeo } from '../analytics.js';
 import { withinEditDistance1, VOCAB } from '../nlNormalize.js';
 import { notPrivateSql } from "../privacy/privateDocs.js";
+import { buildCard } from '../dql/card.js';
 
 const VOCAB_SCAN_LIMIT = 5000;
 const CACHE_TTL_MS = 10 * 60 * 1000; // backstop only — the data-version key is what really invalidates this
@@ -170,6 +171,23 @@ async function buildDqlVocab(db) {
     const { rows } = await db.raw(`SELECT lower(replace(document_type, '_', '-')) AS t, count(*)::int AS n FROM documents WHERE ${TENANT_SQL} AND ${notPrivateSql("")} GROUP BY 1 LIMIT 200`, []);
     out.docTypes = rows.map((r) => ({ id: r.t, n: r.n }));
   } catch { /* ignore */ }
+  // R15: the company's own vocabulary card (kinds of paper, field value shapes, who is staff, which key is the status / visit date), from the same rows the snapshot reads
+  if (process.env.DONOVAN_CARD !== '0') try {
+    const dr = await db.raw(`SELECT d.id, lower(replace(d.document_type, '_', '-')) AS t FROM documents d WHERE d.${TENANT_SQL} AND ${notPrivateSql('d')} LIMIT 200000`, []);
+    const typeById = new Map(dr.rows.map((r) => [r.id, r.t])); const cnt = new Map(); for (const t of typeById.values()) if (t !== 'hr-letter') cnt.set(t, (cnt.get(t) ?? 0) + 1);
+    const xr = await db.raw(`SELECT x.document_id, x.field_key AS k, COALESCE(NULLIF(x.corrected_value, ''), x.value) AS v FROM extractions x WHERE x.${TENANT_SQL} AND x.field_key NOT LIKE '\\_%' LIMIT 200000`, []);
+    const cr = await db.raw(`SELECT DISTINCT data->>'customer_name' AS v FROM entities WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT_SQL} AND data->>'customer_name' IS NOT NULL LIMIT 20000`, []);
+    out.card = buildCard({
+      rows: xr.rows.map((x) => ({ k: x.k, t: typeById.get(x.document_id), v: String(x.v ?? '').replace(/\s+/g, ' ').trim() || null })).filter((r) => r.v != null && r.t && r.t !== 'hr-letter'),
+      docTypes: [...cnt].map(([id, n]) => ({ id, n })), custNames: cr.rows.map((r) => r.v), nDocs: typeById.size,
+    });
+    // the company's own keys for the roles the engine reads: their values join the same lists (status words, kinds of service, staff names)
+    for (const [key, role] of Object.entries(out.card.alias)) {
+      const f = out.card.fields[key]; const to = role === 'status' ? 'status' : role === 'service_type' ? 'serviceType' : null;
+      if (to) for (const v of f?.values ?? []) add(to, v);
+    }
+    { const cs = new Set(cr.rows.map((r) => String(r.v ?? '').toLowerCase().replace(/\s+/g, ' ').trim())); out.card.staffDual = out.card.roles.technician ? (out.card.fields[out.card.roles.technician.key]?.values ?? []).filter((n) => cs.has(String(n).toLowerCase().replace(/\s+/g, ' ').trim())) : []; out.card.staffNames = out.card.roles.technician ? (out.card.fields[out.card.roles.technician.key]?.values ?? []).filter((n) => !cs.has(String(n).toLowerCase().replace(/\s+/g, ' ').trim())) : []; } // a person on file as a customer too stays a customer here: the older lanes ask which one
+  } catch { /* no card: the parser keeps the words it always had */ }
   for (const k of Object.keys(out.categorical)) { const arr = [...out.categorical[k]]; out.categorical[k] = arr.length <= 60 ? arr : []; }
   return out;
 }

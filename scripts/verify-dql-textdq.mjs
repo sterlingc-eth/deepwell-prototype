@@ -74,8 +74,9 @@ const NEG = /\b(?:no|not|without|none|never)\b[^,;.]{0,24}\b(?:leak|leaks|leakin
 
 /* ------------------------------------------------------------------ harness */
 async function ask(q, extra = {}) {
-  const intent = parseDql(q, { tenantVocab: tv, pack, today: TODAY, ...extra });
-  if (!intent) return { intent: null, data: null };
+  const debug = {};
+  const intent = parseDql(q, { tenantVocab: tv, pack, today: TODAY, debug, ...extra });
+  if (!intent) return { intent: null, data: null, why: debug.why };
   const out = await withTenant(ctxArg, (db) => runDql(db, intent, { today: TODAY }));
   return { intent, data: out };
 }
@@ -122,7 +123,7 @@ await released('a search word that is not in the records when no cue word was ty
 
 const tix = docs.filter((d) => d.type === 'service-ticket' && textsOf(d).some((t) => /capacitor/i.test(t)));
 r = await ask('which tickets mention a capacitor');
-check('text :: a kind of paper with no match says which other papers do', tix.length === 0 && has(r, 'No tickets mention') && new RegExp(`${cap.length} invoices? do`).test(r.data?.text ?? ''), r.data?.text);
+check('text :: a kind of paper with no match says which other papers do', tix.length === 0 && /^No (?:service )?tickets mention/.test(r.data?.text ?? '') && new RegExp(`${cap.length} invoices? do`).test(r.data?.text ?? ''), r.data?.text);
 
 const yr = docs.filter((d) => d.type === 'service-ticket' && textsOf(d).some((t) => /replaced\s+air\s+filter/i.test(t)) && String(last(d.id, 'service_date') ?? last(d.id, 'invoice_date') ?? d.created_at).startsWith('2024'));
 r = await ask('how many service tickets replaced an air filter in 2024');
@@ -266,7 +267,7 @@ await released('field_text :: a list of more than ten matches is not read out', 
 {
   const withEmail = customers.find((c) => c.data.email);
   r = await ask(`which customer uses ${withEmail.data.email}`);
-  check('reverse :: the customer who has an email address', mine(r) && has(r, withEmail.data.customer_name), r.data?.text);
+  check('reverse :: the customer who has an email address', mine(r) && has(r, withEmail.data.customer_name), JSON.stringify(r.intent?.plan)+' '+r.data?.text+' '+r.why);
   r = await ask(`is ${withEmail.data.email} one of ours`);
   check('reverse :: "is this email one of ours" answers yes with the name', has(r, 'Yes', withEmail.data.customer_name), r.data?.text);
   r = await ask('is zq.vx@example.org one of ours');
@@ -297,7 +298,7 @@ await released('field_text :: a list of more than ten matches is not read out', 
 }
 // the three questions below are about customers or units having (or lacking) papers: not duplicates, not text search. The text family stays out and the sets family answers (verify:dql-sets checks them).
 const sets = async (name, q, re) => { const x = await ask(q); check(`not mine :: ${name}`, x.intent?.plan?.op === 'set_select' && re.test(String(x.data?.text ?? '')), `${x.intent?.plan?.op ?? 'no plan'} ${x.data?.text ?? ''}`); };
-await sets('"more than once" counts customers by their quotes, it is not a duplicates question', 'which customers did we quote more than once', /^(?:No customers|\d[\d,]* customers) with more than 1 quote/);
+await sets('"more than once" counts customers by their quotes, it is not a duplicates question', 'which customers did we quote more than once', /^(?:No customers|\d[\d,]* customers) with more than 1 (?:proposal \/ )?quote/);
 await sets('"repeat customers" is customers with several service visits', 'who are our repeat customers', /service visits/);
 await sets('two things asked at once about units is one set: neither paper', 'how many units have no startup sheet AND no registration', /without a startup sheet or a warranty registration/);
 await released('a brand is a value of a field, not a phrase on the papers', 'documents mentioning Trane');

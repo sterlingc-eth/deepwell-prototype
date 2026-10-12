@@ -13,6 +13,7 @@ import { parseDql, dqlEnabled } from './parse.js';
 import { loadSnapshot } from './load.js';
 import { execute } from './exec.js';
 import { familyForOp } from './registry.js';
+import { sourcesSentence } from './cite.js';
 
 export { parseDql, dqlEnabled };
 
@@ -49,6 +50,9 @@ export function answerFromSnapshot(snap, plan, today) {
   if (/\band \d[\d,]* more\b/.test(said.text) && facts.length <= 1 && (said.records?.length ?? 0) > 1) {
     facts = said.records.slice(0, 200).map((r) => ({ label: String(r.label ?? ''), value: String(r.sublabel ?? '') })).filter((f) => f.label);
   }
-  const data = answerEnvelope({ text: said.text, facts });
+  let sayText = said.text;
+  if (plan.staffWord && /^[a-z]+$/.test(plan.staffWord)) { const sw = plan.staffWord; sayText = sayText.replace(/\btechnicians\b/g, `${sw}s`).replace(/\btechnician\b/g, sw); }
+  if (plan.cite && said.records?.length) { const src = sourcesSentence(said.records, said.total); if (src) sayText = `${sayText} ${src}`; }
+  const data = answerEnvelope({ text: sayText, facts });
   return attachCitations(data, { records: said.records ?? [], total: said.total, claimedCount: said.claimedCount ?? null, basis: said.basis, kind: (said.records?.length ? 'basis' : 'searched') });
 }

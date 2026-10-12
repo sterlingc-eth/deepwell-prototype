@@ -17,6 +17,7 @@ let failures = 0; let passes = 0;
 const check = (name, ok, detail = '') => { if (ok) passes++; else failures++; console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${ok || !detail ? '' : `\n      ${String(detail).slice(0, 400)}`}`); };
 
 delete process.env.ANTHROPIC_API_KEY;
+process.env.DONOVAN_DQL_ALLOWLIST = '1'; // R13: this file characterises the measured allowlist (the optional legacy switch); the default for every company is DQL taking what it fully reads (verify:vocab-r13)
 delete process.env.DONOVAN_DQL;
 const realLog = console.log;
 console.log = (...a) => { if (typeof a[0] === 'string' && /^\{"/.test(a[0])) return; realLog(...a); };

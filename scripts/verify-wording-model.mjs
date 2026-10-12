@@ -130,11 +130,12 @@ const A = (q) => adapt(q, { lex, roster });
   const unclaimed = [];
   for (const q of ["Joseph Norwood documents count?", "Scottsdale customers count and Mesa customers count", "yo how many unis use r-454b"]) unclaimed.push([q, await classifyAll(q, ctx)]);
   delete process.env.DONOVAN_WORDING_MODEL;
-  delete process.env.DONOVAN_DQL;
+  // R13i: DQL now takes every question it fully reads, so the second pass keeps DQL off too: this check is about the wording model not touching a claim, not about who answers
   for (let i = 0; i < claimedQs.length; i++) {
     const o = await classifyAll(claimedQs[i], ctx);
     check(`existing claim untouched: "${claimedQs[i]}"`, base[i].winner && !o.wording && o.winner?.name === base[i].winner.name && o.effectiveQuestion === base[i].effectiveQuestion);
   }
+  delete process.env.DONOVAN_DQL;
   let adopted = 0;
   for (const [q, b] of unclaimed) {
     const o = await classifyAll(q, ctx);

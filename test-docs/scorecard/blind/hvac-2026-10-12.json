@@ -1,0 +1,506 @@
+{
+ "version": 1,
+ "category": "blind-2026-10-12-hvac",
+ "source": "scripts/gen-blind-nightly.mjs 2026-10-12 (seeded)",
+ "questions": [
+  {
+   "id": "hvac-001",
+   "text": "hw many Lennoxs do we have over in Glendale",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "brand_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1 AND c.data->>'service_address' ILIKE $2",
+    "params": [
+     "Lennox",
+     "%, Glendale, %"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "hvac-002",
+   "text": "hw many Mitsubishis do we have over in San Tan Valley",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "brand_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1 AND c.data->>'service_address' ILIKE $2",
+    "params": [
+     "Mitsubishi",
+     "%, San Tan Valley, %"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "hvac-003",
+   "text": "hw many Daikins do we have over in San Tan Valley",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "brand_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1 AND c.data->>'service_address' ILIKE $2",
+    "params": [
+     "Daikin",
+     "%, San Tan Valley, %"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "hvac-004",
+   "text": "Trane units in San Tan Valley, how many",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "brand_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1 AND c.data->>'service_address' ILIKE $2",
+    "params": [
+     "Trane",
+     "%, San Tan Valley, %"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "hvac-005",
+   "text": "got any Rheems? how many",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "brand_count_casual",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1",
+    "params": [
+     "Rheem"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "hvac-006",
+   "text": "numebr of Goodman equipment",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "brand_count_casual",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1",
+    "params": [
+     "Goodman"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "hvac-007",
+   "text": "got any Tranes? how many",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "brand_count_casual",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1",
+    "params": [
+     "Trane"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "hvac-008",
+   "text": "any Navien equipment on file? how many",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "ghost_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1",
+    "params": [
+     "Navien"
+    ]
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "hvac-009",
+   "text": "any Kinetico equipment on file? how many",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "ghost_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1",
+    "params": [
+     "Kinetico"
+    ]
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "hvac-010",
+   "text": "how many Fujitsu units do we have",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "ghost_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1",
+    "params": [
+     "Fujitsu"
+    ]
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "hvac-011",
+   "text": "customers in Reno?",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "ghost_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "%, Reno, %"
+    ]
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "hvac-012",
+   "text": "how many customers do we have in Denver",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "ghost_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "%, Denver, %"
+    ]
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "hvac-013",
+   "text": "how many Navien units in Albuquerque",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "ghost_brand_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1 AND c.data->>'service_address' ILIKE $2",
+    "params": [
+     "Navien",
+     "%, Albuquerque, %"
+    ]
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "hvac-014",
+   "text": "where does Gerald Pemberton live",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "ghost_person_phone",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "Gerald Pemberton"
+    ]
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "hvac-015",
+   "text": "what's Colleen Aldridge's phone number",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "ghost_person_phone",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "Colleen Aldridge"
+    ]
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "hvac-016",
+   "text": "got a number for Harlan Voss?",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "ghost_person_phone",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "Harlan Voss"
+    ]
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "hvac-017",
+   "text": "pull up Sunrise Valley Elementary School's adrdess",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "lookup_service_address",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "Sunrise Valley Elementary School"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "hvac-018",
+   "text": "pull up Angela Hutchins's phone numebr",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "lookup_phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "Angela Hutchins"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "hvac-019",
+   "text": "Cactus Rose Restaurant email adrdess",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "lookup_email",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'email' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "Cactus Rose Restaurant"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "hvac-020",
+   "text": "Anthony Bennett phone numebr",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "lookup_phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "Anthony Bennett"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "hvac-021",
+   "text": "list the Casa Grande customers",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "list_city_customers",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT data->>'customer_name' AS item FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "%, Casa Grande, %"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "hvac-022",
+   "text": "which customer has the most equipment",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "top_customer_equipment",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT c.data->>'customer_name' AS v FROM entities c JOIN entities e ON e.customer_id=c.id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.merged_into IS NULL GROUP BY c.id, c.data->>'customer_name' ORDER BY count(*) DESC, 1 LIMIT 1",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "hvac-023",
+   "text": "how many invoices did Wyatt do",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "tech_invoices",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x JOIN documents d ON d.id=x.document_id WHERE x.field_key='technician' AND d.document_type='invoice' AND x.value ILIKE $1",
+    "params": [
+     "Wyatt Coburn"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "hvac-024",
+   "text": "jobs Marisol Vega has invoiced",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "tech_invoices",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x JOIN documents d ON d.id=x.document_id WHERE x.field_key='technician' AND d.document_type='invoice' AND x.value ILIKE $1",
+    "params": [
+     "Marisol Vega"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "hvac-025",
+   "text": "jobs Ray Sutton has invoiced",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "tech_invoices",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x JOIN documents d ON d.id=x.document_id WHERE x.field_key='technician' AND d.document_type='invoice' AND x.value ILIKE $1",
+    "params": [
+     "Ray Sutton"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "hvac-026",
+   "text": "how many invoices did Dana Pemberton do",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "ghost_tech",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x JOIN documents d ON d.id=x.document_id WHERE x.field_key='technician' AND d.document_type='invoice' AND x.value ILIKE $1",
+    "params": [
+     "Dana Pemberton"
+    ]
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "hvac-027",
+   "text": "how many service tickets in 2024",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "year_docs",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x JOIN documents d ON d.id=x.document_id WHERE d.document_type='service-ticket' AND x.field_key='service_date' AND x.value LIKE $1",
+    "params": [
+     "2024-%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "hvac-028",
+   "text": "how many service tickets in 2025",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "year_docs",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x JOIN documents d ON d.id=x.document_id WHERE d.document_type='service-ticket' AND x.field_key='service_date' AND x.value LIKE $1",
+    "params": [
+     "2025-%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "hvac-029",
+   "text": "how many service tickets in 2023",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "year_docs",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x JOIN documents d ON d.id=x.document_id WHERE d.document_type='service-ticket' AND x.field_key='service_date' AND x.value LIKE $1",
+    "params": [
+     "2023-%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "hvac-030",
+   "text": "how many permits do we have on file",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "type_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM documents d WHERE d.document_type='permit'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "hvac-031",
+   "text": "number of maintenance agreements",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "type_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM documents d WHERE d.document_type='maintenance-agreement'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "hvac-032",
+   "text": "how many 3 ton systems are there",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "tonnage_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'tonnage' ILIKE $1",
+    "params": [
+     "3 ton"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "hvac-033",
+   "text": "how many 5 ton systems are there",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "tonnage_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'tonnage' ILIKE $1",
+    "params": [
+     "5 ton"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "hvac-034",
+   "text": "how many units run R-410A",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "refrigerant_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'refrigerant' ILIKE $1",
+    "params": [
+     "R-410A"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "hvac-035",
+   "text": "what's the SEER rating on the Trane at Linda Fitzgerald's house",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "honest_other",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key ~ '(seer|efficiency)'",
+    "params": []
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "hvac-036",
+   "text": "what is the square footage of Linda Fitzgerald's house",
+   "category": "blind-2026-10-12-hvac",
+   "shape": "honest_other",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key ~ '(sqft|square)'",
+    "params": []
+   },
+   "citationRequired": false
+  }
+ ]
+}

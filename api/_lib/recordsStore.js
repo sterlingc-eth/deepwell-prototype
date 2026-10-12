@@ -304,6 +304,9 @@ export async function getTenantContext(tenantKey, tenantName) {
   return result;
 }
 
+/** The tenantKey a tenant uuid was resolved from (populated by getTenantContext on every request); null when unknown. Lets code that only holds the store (db.tenantId) meter and cap its own model calls. */
+export function tenantKeyForId(tenantUuid) { return uuidToTenantKey.get(tenantUuid) ?? null; }
+
 /**
  * Clear one tenant's entry out of EVERY registered per-tenant cache
  * (tenantContextCache here, plan.js's billingRowCache, and any future one)

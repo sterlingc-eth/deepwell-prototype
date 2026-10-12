@@ -15,6 +15,7 @@
  * `fMulti` holds every distinct value of a field the paper states more than once (null when there is none): only text search reads it.
  */
 import { deriveGeo, warrantyStatusOf } from '../analytics.js';
+import { buildCard, aliasMap } from './card.js';
 
 const clean = (v) => { const s = v == null ? '' : String(v).replace(/\s+/g, ' ').trim(); return s === '' ? null : s; };
 const isoDay = (v) => {
@@ -116,7 +117,15 @@ export function buildSnapshot(raw, { today } = {}) {
   // ---- extracted fields (corrected value first, newest wins)
   const fieldsByDoc = new Map();
   const allByDoc = new Map(); // every distinct value of a field a paper states more than once (two lines of work performed): text search reads them all
-  const ex = [...(raw.extractions ?? [])].sort((a, b) => String(a.created_at ?? '').localeCompare(String(b.created_at ?? '')));
+  // R15: the company's vocabulary card renames its own field keys (groomer, groom_date ...) to the ones the engine reads; a key the company already stores under the engine's own name is never overwritten
+  const typeById = new Map((raw.documents ?? []).map((d) => [d.id, normType(d.document_type)]));
+  const typeCount = new Map(); for (const t of typeById.values()) if (!EXCLUDED_DOC_TYPES.has(t)) typeCount.set(t, (typeCount.get(t) ?? 0) + 1);
+  const card = buildCard({
+    rows: (raw.extractions ?? []).map((x) => ({ k: x.field_key, t: typeById.get(x.document_id), v: clean(x.corrected_value) ?? clean(x.value) })).filter((r) => r.v != null && r.t && !EXCLUDED_DOC_TYPES.has(r.t)),
+    docTypes: [...typeCount].map(([id, n]) => ({ id, n })), custNames: customers.map((c) => c.name).filter(Boolean), nDocs: typeById.size,
+  });
+  const renames = process.env.DONOVAN_CARD === '0' ? new Map() : aliasMap(card, new Set((raw.extractions ?? []).map((x) => x.field_key)));
+  const ex = [...(raw.extractions ?? [])].map((x) => (renames.has(x.field_key) ? { ...x, field_key: renames.get(x.field_key) } : x)).sort((a, b) => String(a.created_at ?? '').localeCompare(String(b.created_at ?? '')));
   for (const x of ex) {
     if (!x.document_id || !x.field_key) continue;
     const v = clean(x.corrected_value) ?? clean(x.value);
@@ -162,7 +171,7 @@ export function buildSnapshot(raw, { today } = {}) {
       serviceDate, invoiceDate, date, dateBasis,
       tech: clean(f.technician), hours: hoursOf(f.labor_hours), status: clean(f.status) ?? clean(fin?.status !== 'unknown' ? fin?.status : null),
       serviceType: clean(f.service_type), vendor: clean(fin?.vendor_name) ?? clean(f.vendor_name), total: money(fin?.total), kind: fin?.doc_kind ?? null, direction: fin?.direction ?? null,
-      finId: fin?.id ?? null,
+      finId: fin?.id ?? null, totalPage: (() => { const n = Math.trunc(Number(fin?.evidence?.total?.page)); return Number.isFinite(n) && n > 0 ? n : null; })(),
       brand: clean(f.manufacturer) ?? unit?.brand ?? null, model: clean(f.model) ?? unit?.model ?? null, serial: clean(f.serial_number) ?? unit?.serial ?? null,
       f: f2, fMulti: multiOf(allByDoc.get(d.id)),
     });
@@ -190,5 +199,5 @@ export function buildSnapshot(raw, { today } = {}) {
     if (d.type === 'invoice' && d.total != null) { st.billed += d.total; st.billedN++; }
   }
   for (const u of units) { const st = u.custId ? stats.get(u.custId) : null; if (st) st.units.push(u); }
-  return { today: today ?? null, documents, docById, customers, custById, units, unitById, fin: finRows, lines, stats };
+  return { today: today ?? null, card, documents, docById, customers, custById, units, unitById, fin: finRows, lines, stats };
 }

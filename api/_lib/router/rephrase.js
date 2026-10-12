@@ -37,6 +37,11 @@ export function normalizeRephrase(question) {
     const stripped = q.replace(FILLER, " ").replace(/\s+/g, " ").replace(/\s+([?.!])/g, "$1").trim();
     if (stripped !== q.trim() && stripped.split(" ").length >= 3) set(stripped);
   }
+  // R43: "jobs Marisol Vega has invoiced" (no "how many") is the invoice COUNT for that technician, never a dollar total
+  {
+    const m = /^\s*(?:the\s+)?(?:jobs?|invoices?)\s+((?:[A-Z][\w'-]+\s+)+[A-Z][\w'-]+)\s+(?:has|have|had)\s+(?:invoiced|billed|closed out)\s*[?.!]*\s*$/.exec(q);
+    if (m) set(`how many invoices did ${m[1]} do`);
+  }
   // "bills we sent", "bills to our customers": the invoices the company sends, in every kind of company
   { const sent = billsSentAsInvoices(q); if (sent) set(sent); }
   set(q.replace(PLURAL_BEFORE_ID, (_m, p) => SINGULAR[p.toLowerCase()] + " "));

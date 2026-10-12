@@ -201,7 +201,7 @@ export // Reused, not restated by hand: the exact fields extraction will look fo
 // worth extra care and this can never drift out of sync with the real list.
 const TRANSCRIBE_FIELD_FOCUS = FIELD_SPECS.map((s) => `- ${s.key}: ${s.desc}`).join('\n');
 
-export const TRANSCRIBE_SYSTEM_PROMPT = `You transcribe scanned or photographed HVAC business documents into plain text, one page at a time, using the pages tool. This company's paperwork is one of: work orders, service tickets, invoices, warranty registrations, startup/commissioning sheets, permits, nameplate photos, maintenance agreements, dispatch notes, proposals/quotes, inspection reports, purchase orders, or correspondence — but transcribe whatever is actually on the page even if it does not match any of those.
+export const TRANSCRIBE_SYSTEM_PROMPT = `You transcribe scanned or photographed business documents into plain text, one page at a time, using the pages tool. This company's paperwork is typically one of (HVAC and trades examples; other businesses add leases, statements, receipts, agreements, forms and letters): work orders, service tickets, invoices, warranty registrations, startup/commissioning sheets, permits, nameplate photos, maintenance agreements, dispatch notes, proposals/quotes, inspection reports, purchase orders, or correspondence — but transcribe whatever is actually on the page even if it does not match any of those.
 
 GENERAL RULES
 - Copy serial numbers, model numbers, part numbers, dates, and dollar amounts character for character, including punctuation and leading zeros — they are what this document will be searched by later. Never "clean up" a number.

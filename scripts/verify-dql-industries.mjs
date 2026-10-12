@@ -233,7 +233,10 @@ for (const k of KEYS) {
   const { arbiterAllows } = await import('../api/_lib/router/dqlArbiter.js');
   const intent = { plan: { op: 'avg' }, plain: false };
   check('arbiter :: an organization that chose another kind of business takes DQL for any question it fully reads', arbiterAllows({ name: 'analytics' }, intent, { oldLabel: 'analytics:zzz', question: 'x', industryKind: 'legal' }) === true);
-  check('arbiter :: no industry setting (or HVAC) keeps the allowlist as it was', arbiterAllows({ name: 'analytics' }, intent, { oldLabel: 'analytics:zzz', question: 'x', industryKind: null }) === false && arbiterAllows({ name: 'analytics' }, intent, { oldLabel: 'analytics:zzz', question: 'x', industryKind: 'hvac' }) === false);
+  check('arbiter :: no industry setting (or HVAC) takes DQL for any question it fully reads, like every other company (R13)', arbiterAllows({ name: 'analytics' }, intent, { oldLabel: 'analytics:zzz', question: 'x', industryKind: null }) === true && arbiterAllows({ name: 'analytics' }, intent, { oldLabel: 'analytics:zzz', question: 'x', industryKind: 'hvac' }) === true);
+  process.env.DONOVAN_DQL_ALLOWLIST = '1';
+  check('arbiter :: the legacy allowlist can be switched back on for a comparison run', arbiterAllows({ name: 'analytics' }, intent, { oldLabel: 'analytics:zzz', question: 'x', industryKind: null }) === false);
+  delete process.env.DONOVAN_DQL_ALLOWLIST;
   check('arbiter :: a plain inventory question is never taken', arbiterAllows({ name: 'analytics' }, { plan: { op: 'count' }, plain: true }, { oldLabel: 'analytics:count', question: 'x', industryKind: 'legal' }) === false);
 }
 

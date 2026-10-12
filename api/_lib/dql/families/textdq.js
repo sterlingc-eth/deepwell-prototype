@@ -1453,7 +1453,7 @@ function sayDuplicates(res, plan, { snap }) {
     else if (k.kind === 'unitSerial' && res.checked) out.text = `No repeats: ${fmtInt(res.checked)} distinct serials across ${fmtInt(res.checked)} ${nounPl}${condText(plan)}.`;
     else out.text = `No repeats: no two ${nounPl}${condText(plan)} share the same ${k.kind === 'invoiceAmount' ? `customer${k.job ? ', job site' : ''} and amount` : k.kind === 'visitDay' ? 'customer and visit day' : lab}; ${checkedBits}.`;
     out.basis = `Compared ${k.kind === 'invoiceAmount' ? `the customer${k.job ? ', job site' : ''} and total` : k.kind === 'visitDay' ? 'the customer and service date' : `the ${lab}${k.kind === 'customerField' && k.field === 'phone' ? ' (digits only)' : ''}`} of ${res.ent === 'document' ? `every ${nounOf(plan, 1)} on file` : `every ${res.ent} on file`} against all the others; a match needs the same value on two or more. ${res.ent === 'document' ? cap1(DOC_ONLY) + '.' : ''}`.trim();
-    out.facts = [{ label: 'Repeated', value: '0' }]; out.claimedCount = 0;
+    out.facts = []; out.claimedCount = 0; // an empty list carries no facts (the sentence says none repeat)
     return out;
   }
   const detail = g.map((gr) => {
@@ -1682,3 +1682,4 @@ const beats = (mine, other) => beatsUnit(mine, other) || beatsContact(mine, othe
 
 registerFamily({ id: 'textdq', ops: TEXTDQ_OPS, beats, detect: (feat, h) => analyze(feat, h), rescue: (feat, h) => analyze(feat, h), exec, say });
 export { analyze as _analyze, exec as _exec };
+export { resolveTerm, matchAny };

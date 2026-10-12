@@ -4,7 +4,7 @@
  * read such a question (parseDql still returns the plan), but the router (classifyAll) leaves it to those lanes.
  */
 // the kinds of paper the older customer-by-document lanes read; "tenants with a lease" is a kind they would read as a maintenance agreement
-const OLDER_LANES_READ = new Set(['invoice', 'proposal-quote', 'permit', 'maintenance-agreement', 'service-ticket', 'work-order']);
+export const OLDER_LANES_READ = new Set(['invoice', 'proposal-quote', 'permit', 'maintenance-agreement', 'service-ticket', 'work-order']);
 export function isPlainInventory(plan) {
   if (!plan || !['count', 'list', 'exists_yes_no'].includes(plan.op)) return false;
   if (plan.docType === 'other') return false; // "other documents": the older lanes drop the word and count every document

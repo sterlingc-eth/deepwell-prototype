@@ -25,6 +25,7 @@ import { attachCitations, customerRecord } from '../citations/records.js';
 import { documentRecordsFor } from '../citations/enrich.js';
 import { classifyWithTypoTolerance } from '../relations/normalize.js';
 import { runDql } from '../dql/index.js';
+import { runTranslated } from '../dql/translator/index.js';
 import { hasOrdinalRank } from '../dql/ordinal.js';
 
 /** Pure: question (+ the tenant's own industry pack, already resolved by ask.js before this is called —
@@ -127,6 +128,7 @@ export async function runDecompose(db, intent, { today } = {}) {
     const { withCitations } = await import('../citations/enrich.js');
     return withCitations(db, runDeterministic(db, intent.fallback.intent, { today }));
   }
+  if (intent.mode === 'dql-translate') return runTranslated(db, intent, { today }); // DONOVAN_PLAN_TRANSLATOR=1 only: the cheapest model writes a plan, DQL answers it
   if (intent.mode === 'compare') return runComparison(db, intent, { today });
   if (intent.mode === 'filter') return runFilter(db, intent, { today });
   if (intent.mode === 'compound' && (intent.negation || intent.ratio)) return runNegation(db, intent, { today, pack: intent.pack });

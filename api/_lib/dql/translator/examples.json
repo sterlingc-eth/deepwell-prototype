@@ -1,0 +1,343 @@
+[
+{
+"tenant": "property",
+"q": "Hi, count of move-out inspections by Janet Santos during 2022",
+"plan": {
+"op": "count",
+"entity": "document",
+"docType": "move-out-inspection",
+"filters": [
+{
+"field": "tech",
+"op": "eq",
+"value": "Janet Santos",
+"words": "by Janet Santos"
+}
+],
+"time": {
+"words": "during 2022"
+}
+}
+},
+{
+"tenant": "cleaning",
+"q": "Sum of receipts since May 28, 2022 when you get a chance",
+"plan": {
+"op": "sum",
+"entity": "document",
+"docType": "receipt",
+"time": {
+"words": "since May 28, 2022"
+},
+"measure": {
+"field": "total"
+}
+}
+},
+{
+"tenant": "nonprofit",
+"q": "On average how big are statements on Frank Powers's account in Q3 of 2025 asap",
+"plan": {
+"op": "avg",
+"entity": "document",
+"docType": "statement",
+"filters": [
+{
+"field": "customer",
+"op": "eq",
+"value": "Frank Powers",
+"words": "Frank Powers"
+}
+],
+"time": {
+"words": "in Q3 of 2025"
+},
+"measure": {
+"field": "total"
+}
+}
+},
+{
+"tenant": "cleaning",
+"q": "I need to know what is the min purchase order total from Home Supply Co before 2025",
+"plan": {
+"op": "min",
+"entity": "document",
+"docType": "purchase-order",
+"filters": [
+{
+"field": "vendor",
+"op": "eq",
+"value": "Home Supply Co",
+"words": "from Home Supply Co"
+}
+],
+"time": {
+"words": "before 2025"
+},
+"measure": {
+"field": "total"
+}
+}
+},
+{
+"tenant": "cleaning",
+"q": "Hey Donovan, what's the median bid amount from Las Vegas over the past 3 months",
+"plan": {
+"op": "median",
+"entity": "document",
+"docType": "proposal-quote",
+"filters": [
+{
+"field": "city",
+"op": "eq",
+"value": "Las Vegas",
+"words": "from Las Vegas"
+}
+],
+"time": {
+"words": "over the past 3 months"
+},
+"measure": {
+"field": "total"
+}
+}
+},
+{
+"tenant": "cleaning",
+"q": "Can you please pull up the count of quality inspections for each city thx",
+"plan": {
+"op": "group_count",
+"entity": "document",
+"docType": "inspection-report",
+"groupBy": [
+"city"
+]
+}
+},
+{
+"tenant": "construction",
+"q": "Quick one - the avg pay application value per month, for clients located in Mesa back in 2023 for me",
+"plan": {
+"op": "group_avg",
+"entity": "document",
+"docType": "invoice",
+"filters": [
+{
+"field": "city",
+"op": "eq",
+"value": "Mesa",
+"words": "in Mesa"
+}
+],
+"time": {
+"words": "in 2023"
+},
+"measure": {
+"field": "total"
+},
+"groupBy": [
+"month"
+]
+}
+},
+{
+"tenant": "cleaning",
+"q": "Which customer has the largest count of service visits before 2025 please",
+"plan": {
+"op": "top_n",
+"entity": "document",
+"visit": true,
+"time": {
+"words": "before 2025"
+},
+"groupBy": [
+"customer"
+],
+"limit": 1
+}
+},
+{
+"tenant": "auto",
+"q": "I was wondering what technician has the greatest number of inspection reports for customers based in Santa Fe?",
+"plan": {
+"op": "top_n",
+"entity": "document",
+"docType": "inspection-report",
+"filters": [
+{
+"field": "city",
+"op": "eq",
+"value": "Santa Fe",
+"words": "in Santa Fe"
+}
+],
+"groupBy": [
+"tech"
+],
+"limit": 1
+}
+},
+{
+"tenant": "cleaning",
+"q": "Hey Donovan, any receipts under $140 for Vista Medical Center thanks?",
+"plan": {
+"op": "exists_yes_no",
+"entity": "document",
+"docType": "receipt",
+"filters": [
+{
+"field": "total",
+"op": "lt",
+"value": 140,
+"words": "under $140"
+},
+{
+"field": "customer",
+"op": "eq",
+"value": "Vista Medical Center",
+"words": "Vista Medical Center"
+}
+]
+}
+},
+{
+"tenant": "cleaning",
+"q": "When was the latest quality inspection on file in the year 2019 if you can?",
+"plan": {
+"op": "latest",
+"entity": "document",
+"docType": "inspection-report",
+"time": {
+"words": "in the year 2019"
+},
+"sortField": "date"
+}
+},
+{
+"tenant": "cleaning",
+"q": "Please tell me which different statuses do inspection reports Margaret Tran worked on last year involve?",
+"plan": {
+"op": "list",
+"entity": "document",
+"docType": "inspection-report",
+"filters": [
+{
+"field": "tech",
+"op": "eq",
+"value": "Margaret Tran",
+"words": "Margaret Tran"
+}
+],
+"time": {
+"words": "last year"
+},
+"distinct": "status"
+}
+},
+{
+"tenant": "cleaning",
+"q": "Tell me how many accounts have never gotten a quote",
+"plan": {
+"op": "count",
+"entity": "customer",
+"filters": [
+{
+"field": "docCount",
+"op": "eq",
+"value": 0,
+"words": "never gotten a quote",
+"docType": "proposal-quote"
+}
+]
+}
+},
+{
+"tenant": "legal",
+"q": "Hey, how many statements came in at $300 to $2,500 please?",
+"plan": {
+"op": "count",
+"entity": "document",
+"docType": "statement",
+"filters": [
+{
+"field": "total",
+"op": "between",
+"value": [
+300,
+2500
+],
+"words": "$300 to $2,500"
+}
+]
+}
+},
+{
+"tenant": "medical",
+"q": "Hey, how many patients are there whose bills total less than $490 thanks?",
+"plan": {
+"op": "count",
+"entity": "customer",
+"filters": [
+{
+"field": "billed",
+"op": "lt",
+"value": 490,
+"words": "bills total less than $490"
+}
+]
+}
+},
+{
+"tenant": "auto",
+"q": "Tell me any visits that aren't completed for the customer Jordan Rios if you can?",
+"plan": {
+"op": "exists_yes_no",
+"entity": "document",
+"visit": true,
+"filters": [
+{
+"field": "customer",
+"op": "eq",
+"value": "Jordan Rios",
+"words": "Jordan Rios"
+},
+{
+"field": "status",
+"op": "neq",
+"value": "Completed",
+"words": "aren't completed"
+}
+]
+}
+},
+{
+"tenant": "property",
+"q": "Ok count the distinct cities on move-out inspections done by Shirley McCoy back in 2025",
+"plan": {
+"op": "count_distinct",
+"entity": "document",
+"docType": "move-out-inspection",
+"filters": [
+{
+"field": "tech",
+"op": "eq",
+"value": "Shirley McCoy",
+"words": "by Shirley McCoy"
+}
+],
+"time": {
+"words": "in 2025"
+},
+"distinct": "city"
+}
+},
+{
+"tenant": "legal",
+"q": "Should we renew the maintenance agreements this year, what do you recommend?",
+"plan": {
+"op": "none",
+"reason": "advice, not a look-up of stored records"
+}
+}
+]

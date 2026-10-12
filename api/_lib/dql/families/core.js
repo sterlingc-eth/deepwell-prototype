@@ -113,7 +113,7 @@ function timeFieldFor(f, entity, visit) {
 }
 
 function detect(f) {
-  if (f.sets || f.timeq) return null; // a set / rank / group-average question taken by the sets family
+  if (f.sets || f.timeq || f.links) return null; // a set / rank / group-average question taken by the sets family
   const t = f.trig ?? {};
   const SEM = ['negation', 'missing', 'distinct', 'howMany', 'howMuch', 'share', 'versus', 'median', 'avg', 'exists', 'total', 'max', 'min', 'latest', 'earliest', 'any', 'hours', 'tonnageWord', 'ageWord', 'topN', 'argmax'];
   const need = new Set(SEM.filter((k) => t[k]));
@@ -130,7 +130,7 @@ function detect(f) {
 
   if (t.negation || t.missing) return null;
   if (f.docTypes.includes('hr-letter')) return null;
-  if (f.docTypes.length > 1) return null;
+  if (f.docTypes.length > 1 && !f.docGroup) return null;
   if ((f.times?.length ?? 0) > 1 && !t.versus) return null;
 
   // ---------------------------------------------------------------- entity
@@ -146,7 +146,7 @@ function detect(f) {
   if (f.byMoney && f.nouns.customer && !f.docTypes.length && !wantsRankEarly && !f.dims.length && !t.argmax && !t.topN) return null;
   const moneyOnCust = !custRel && f.nouns.customer && !f.docTypes.length && !f.nouns.unit && !f.nouns.visit && !f.nouns.document && (t.money?.length || t.howMuch) && !f.filters.some((x) => x.field === '?num') && (t.moneyType ?? []).length === 1;
   if (moneyOnCust) f.docTypes = [...t.moneyType];
-  let docType = f.docTypes[0] ?? null;
+  let docType = f.docGroup && f.docTypes.length > 1 ? f.docTypes.slice() : (f.docTypes[0] ?? null); // a word that names several stored kinds ("inspections") is all of them
   const docEntity = !custRel && (f.docTypes.length > 0 || f.nouns.visit || f.nouns.document);
   // "name the client with the latest invoice", "how much was the first PO", "the latest visit was done by who": one fact of the extreme paper
   let ask = null;
@@ -249,7 +249,7 @@ function detect(f) {
   if (!f.time && need.size && [...need].some((k) => k.startsWith('cue:'))) return null; // a date cue with no span
   if (entity === 'customer' && time) return null;
 
-  const base = { v: 1, entity, docType, visit, filters, time, measure: null, groupBy: [], limit: null, dir: 'desc', docWord: f.docTypes.length === 1 ? f.docWord ?? null : null };
+  const base = { v: 1, entity, docType, visit, filters, time, measure: null, groupBy: [], limit: null, dir: 'desc', docWord: f.docTypes.length === 1 || f.docGroup ? f.docWord ?? null : null };
   const agg = t.median ? 'median' : t.avg ? 'avg' : t.max && measure ? 'max' : t.min && measure ? 'min' : (measure && (t.total || t.howMuch || t.money?.length)) ? 'sum' : null;
   const aggKeys = ['median', 'avg', 'max', 'min', 'total', 'howMuch', 'money'];
   if ((t.max || t.min) && !measure && !t.latest && !t.earliest) return null;
@@ -272,7 +272,20 @@ function detect(f) {
       return fin({ ...base, op: 'compare_two_values', measure: cm, compare: { field: inF[0].field, values: inF[0].value }, filters: filters.filter((x) => x !== inF[0]), ...ynOf(f.raw) }, 'versus', 'howMany', ...aggKeys);
     }
     if (twoTimes && !inF.length && timeField) {
-      return fin({ ...base, op: 'compare_two_values', time: null, measure: cm, ...ynOf(f.raw), compare: { time: f.times.map((s) => ({ field: timeField, from: s.from, to: s.to, label: s.label })) } }, 'versus', 'howMany', ...aggKeys);
+      let spans = f.times.map((s) => ({ field: timeField, from: s.from, to: s.to, label: s.label }));
+      // R13: a year that is not over, set against the whole year before it, is compared with the same stretch of that year (a year in progress would always look smaller)
+      const tdy = f.today;
+      if (tdy && spans.length === 2 && /\bthis\s+year\b|\bcurrent\s+year\b|\byear\s+to\s+date\b/i.test(String(f.raw ?? ''))) {
+        const [a, b] = spans[0].from <= spans[1].from ? [spans[0], spans[1]] : [spans[1], spans[0]];
+        const whole = (x) => /^\d{4}-01-01$/.test(x.from) && x.to === `${x.from.slice(0, 4)}-12-31`;
+        if (whole(a) && whole(b) && Number(b.from.slice(0, 4)) === Number(a.from.slice(0, 4)) + 1 && b.to > tdy && b.from <= tdy) {
+          const cut = addYears(tdy, 1);
+          const wholePrev = /\b(?:whole|full|entire|all\s+of)\b/i.test(String(f.raw ?? '')); // "so far this year against the WHOLE of last year": last year stays a full year
+          const na = wholePrev ? a : { ...a, to: cut, label: `${a.label} through ${new Date(`${cut}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}` }; const nb = { ...b, to: tdy, label: `${b.label} so far` };
+          spans = spans[0] === a ? [na, nb] : [nb, na];
+        }
+      }
+      return fin({ ...base, op: 'compare_two_values', time: null, measure: cm, ...ynOf(f.raw), compare: { time: spans } }, 'versus', 'howMany', ...aggKeys);
     }
     return null;
   }

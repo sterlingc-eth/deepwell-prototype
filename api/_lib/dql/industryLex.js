@@ -27,7 +27,7 @@ const A = {
   'proposal-quote': ['estimate', 'bid', 'proposal', 'quote', 'quotation'],
   'purchase-order': ['po', 'purchase order', 'material order', 'expense order'],
   'work-order': ['repair order', 'maintenance request', 'work order'],
-  'service-ticket': ['service ticket', 'maintenance ticket', 'job ticket', 'service report'],
+  'service-ticket': ['service ticket', 'maintenance ticket', 'job ticket', 'service report', 'maintenance request'], // "maintenance request" is also a work order's everyday name: a company that keeps both is asked, not guessed
   'maintenance-agreement': ['service contract', 'maintenance contract', 'service agreement', 'maintenance agreement', 'contract'],
   agreement: ['engagement letter', 'retainer agreement', 'retainer', 'consent form', 'signed form', 'signed contract', 'contract', 'agreement'],
   permit: ['permit', 'building permit'],

@@ -1,0 +1,550 @@
+{
+ "version": 1,
+ "category": "blind-2026-10-12-plumbing",
+ "source": "scripts/gen-blind-nightly.mjs 2026-10-12 (seeded)",
+ "questions": [
+  {
+   "id": "plumb-001",
+   "text": "Culligan units in Green Valley, how many",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "brand_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1 AND c.data->>'service_address' ILIKE $2",
+    "params": [
+     "Culligan",
+     "%, Green Valley, %"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb-002",
+   "text": "how many Rheem units are in Tucson",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "brand_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1 AND c.data->>'service_address' ILIKE $2",
+    "params": [
+     "Rheem",
+     "%, Tucson, %"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb-003",
+   "text": "Rinnai units in Tucson, how many",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "brand_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1 AND c.data->>'service_address' ILIKE $2",
+    "params": [
+     "Rinnai",
+     "%, Tucson, %"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb-004",
+   "text": "hw many Bradford Whites do we have over in Green Valley",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "brand_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1 AND c.data->>'service_address' ILIKE $2",
+    "params": [
+     "Bradford White",
+     "%, Green Valley, %"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb-005",
+   "text": "nubmer of Febco equipment",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "brand_count_casual",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1",
+    "params": [
+     "Febco"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb-006",
+   "text": "got any Wilkinss? how many",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "brand_count_casual",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1",
+    "params": [
+     "Wilkins"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb-007",
+   "text": "got any Naviens? how many",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "brand_count_casual",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1",
+    "params": [
+     "Navien"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb-008",
+   "text": "how many Carrier units do we have",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "ghost_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1",
+    "params": [
+     "Carrier"
+    ]
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "plumb-009",
+   "text": "how many Trane units do we have",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "ghost_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1",
+    "params": [
+     "Trane"
+    ]
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "plumb-010",
+   "text": "any Lennox equipment on file? how many",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "ghost_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1",
+    "params": [
+     "Lennox"
+    ]
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "plumb-011",
+   "text": "customers in Phoenix?",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "ghost_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "%, Phoenix, %"
+    ]
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "plumb-012",
+   "text": "how many customers do we have in Mesa",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "ghost_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "%, Mesa, %"
+    ]
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "plumb-013",
+   "text": "how many Carrier units in Vail",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "ghost_brand_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1 AND c.data->>'service_address' ILIKE $2",
+    "params": [
+     "Carrier",
+     "%, Vail, %"
+    ]
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "plumb-014",
+   "text": "got a number for Gerald Pemberton?",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "ghost_person_phone",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "Gerald Pemberton"
+    ]
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "plumb-015",
+   "text": "what's Colleen Aldridge's phone number",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "ghost_person_phone",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "Colleen Aldridge"
+    ]
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "plumb-016",
+   "text": "where does Harlan Voss live",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "ghost_person_phone",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "Harlan Voss"
+    ]
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "plumb-017",
+   "text": "pull up Andrew Cardenas's email addrses",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "lookup_email",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'email' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "Andrew Cardenas"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb-018",
+   "text": "pull up Carol Cardenas's email adderss",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "lookup_email",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'email' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "Carol Cardenas"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb-019",
+   "text": "pull up Linda Dawson's email adderss",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "lookup_email",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'email' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "Linda Dawson"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb-020",
+   "text": "Linda Nguyen email adderss",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "lookup_email",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'email' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "Linda Nguyen"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb-021",
+   "text": "total water sotfener units",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "type_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'equipment_type' ILIKE $1",
+    "params": [
+     "water softener%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb-022",
+   "text": "how many water hetaers do we have",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "type_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'equipment_type' ILIKE $1",
+    "params": [
+     "water heater%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb-023",
+   "text": "how many bakcflow preventers do we have",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "type_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'equipment_type' ILIKE $1",
+    "params": [
+     "backflow preventer%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb-024",
+   "text": "how many invoices did Dana Whitfield do",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "tech_invoices",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x JOIN documents d ON d.id=x.document_id WHERE x.field_key='technician' AND d.document_type='invoice' AND x.value ILIKE $1",
+    "params": [
+     "Dana Whitfield"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb-025",
+   "text": "how many invoices did Priya Raman do",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "tech_invoices",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x JOIN documents d ON d.id=x.document_id WHERE x.field_key='technician' AND d.document_type='invoice' AND x.value ILIKE $1",
+    "params": [
+     "Priya Raman"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb-026",
+   "text": "how many jobs has Harlan Voss done",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "ghost_tech",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x JOIN documents d ON d.id=x.document_id WHERE x.field_key='technician' AND d.document_type='invoice' AND x.value ILIKE $1",
+    "params": [
+     "Harlan Voss"
+    ]
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "plumb-027",
+   "text": "how many invoices are still unpaid",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "unpaid_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM document_financials f WHERE f.doc_kind='invoice' AND f.status='unpaid'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb-028",
+   "text": "how much are customers still owing us",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "unpaid_total",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT sum(f.total::numeric) AS n FROM document_financials f WHERE f.doc_kind='invoice' AND f.status='unpaid'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb-029",
+   "text": "how many invoices went out in 2023",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "year_invoices",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM document_financials f WHERE f.doc_kind='invoice' AND f.invoice_date::text LIKE $1",
+    "params": [
+     "2023-%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb-030",
+   "text": "how many invoices went out in 2024",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "year_invoices",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM document_financials f WHERE f.doc_kind='invoice' AND f.invoice_date::text LIKE $1",
+    "params": [
+     "2024-%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb-031",
+   "text": "how many invoices went out in 2025",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "year_invoices",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM document_financials f WHERE f.doc_kind='invoice' AND f.invoice_date::text LIKE $1",
+    "params": [
+     "2025-%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb-032",
+   "text": "invoices between 2023 and 2024",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "range_invoices",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM document_financials f WHERE f.doc_kind='invoice' AND f.invoice_date::date BETWEEN '2023-01-01' AND '2024-12-31'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb-033",
+   "text": "how many customers don't have a water softener",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "neg_customers",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities c WHERE c.entity_type='customer' AND c.merged_into IS NULL AND NOT EXISTS (SELECT 1 FROM entities e WHERE e.customer_id=c.id AND e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'equipment_type' ILIKE 'water softener')",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb-034",
+   "text": "which customers failed their backflow test",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "failed_backflow_names",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS item FROM extractions x JOIN documents d ON d.id=x.document_id JOIN document_entity_links l ON l.document_id=d.id JOIN entities c ON c.id=l.entity_id WHERE x.field_key='backflow_test_result' AND x.value ILIKE 'FAILED' AND c.entity_type='customer'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb-035",
+   "text": "how many sewer camera reports do we have",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "type_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM documents d WHERE d.document_type='sewer-camera-report'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb-036",
+   "text": "how many permits did we pull",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "type_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM documents d WHERE d.document_type='permit'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb-037",
+   "text": "how many customers are on a maintenance plan",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "agreement_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(DISTINCT l.entity_id) AS n FROM documents d JOIN document_entity_links l ON l.document_id=d.id JOIN entities c ON c.id=l.entity_id WHERE d.document_type='maintenance-agreement' AND c.entity_type='customer'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb-038",
+   "text": "what's the water pressure at David Soto's house",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "honest_other",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key ~ '(pressure|psi)'",
+    "params": []
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "plumb-039",
+   "text": "what's the pipe material at David Soto's place",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "honest_other",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key ~ '(pipe|material)' AND field_key<>'material'",
+    "params": []
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "plumb-040",
+   "text": "when was the last time we flushed Mark Eriksen's heater",
+   "category": "blind-2026-10-12-plumbing",
+   "shape": "honest_other",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key ~ '(flush)'",
+    "params": []
+   },
+   "citationRequired": false
+  }
+ ]
+}

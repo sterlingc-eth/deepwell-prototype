@@ -266,7 +266,9 @@ check('hop :: units a technician has serviced (a service visit by that technicia
 
 /* ================================================================== releases: a negation or condition that cannot be applied is never dropped */
 await released('a word nothing explains', 'customers with a frobnicated agreement but no estimate');
-await released('contract is not agreement (no such kind of paper)', 'clients with a contract but no invoices');
+{ // R13: "contract" is read for every company the same way: the one kind of contract paper it keeps (here the maintenance agreements), never an agreement it does not have
+  const x = await ask('clients with a contract but no invoices');
+  check('release :: contract is the maintenance agreements this company keeps (or is released), never a plain agreement', x.intent === null || !JSON.stringify(x.intent?.plan ?? '').includes('"type":"agreement"'), JSON.stringify(x.intent?.plan ?? null).slice(0, 200)); }
 await released('units and a paper not tied to units (agreements)', 'units with no maintenance agreement');
 await released('units and a paper not tied to units (nameplate photos)', 'units with no nameplate photo');
 await released('one customer cannot live in two cities', 'customers in Mesa and Tucson without an agreement');

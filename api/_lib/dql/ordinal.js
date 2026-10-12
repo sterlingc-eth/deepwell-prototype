@@ -92,3 +92,14 @@ export function applyOrdinal(plan, n) {
   if (op === 'tm_series' && plan.mode === 'peak') return { ...plan, nth: n };
   return null;
 }
+
+/**
+ * "the second visit for Kelly Reyes", "Kelly Reyes's third invoice": an ordinal in front of a kind of paper or a visit counts from the first one on file ("first visit" is the earliest),
+ * so the ordinal is read as "second earliest". A ranking word after the ordinal ("second largest") is left alone. Words are the shared ones: a visit, a call, or a document word.
+ */
+const CHRONO_OBJ = '(?:(?:service|site|repair|office)\\s+)?(?:visits?|calls?|appointments?|jobs?|invoices?|bills?|quotes?|estimates?|work\\s+orders?|service\\s+tickets?|tickets?|permits?|receipts?|agreements?|letters?|documents?|papers?|inspections?|orders?)';
+const CHRONO = new RegExp(`(?<![a-z0-9$.-])(second|2nd|third|3rd|fourth|4th|fifth|5th)\\s+(?=${CHRONO_OBJ}(?![a-z0-9-]))`, 'gi');
+export function chronoOrdinalRewrite(text) {
+  const s = String(text ?? '');
+  return s.replace(CHRONO, (_, o) => `${o} earliest `);
+}

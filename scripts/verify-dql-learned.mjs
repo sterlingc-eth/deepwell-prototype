@@ -145,5 +145,27 @@ process.env.DONOVAN_DQL_LEARNED = '0';
 check('parse :: kill switch leaves the deterministic parse as it was', ask('how many invoices do we have maybe').r === null);
 delete process.env.DONOVAN_DQL_LEARNED;
 
+/* ---- version 3: slot-masked shape heads (dql/learned/shape3.js, model-v3.json) */
+{
+  const S3 = await import('../api/_lib/dql/learned/shape3.js');
+  const m3p = path.join(ROOT, 'api/_lib/dql/learned/model-v3.json');
+  const m3 = JSON.parse(fs.readFileSync(m3p, 'utf8'));
+  const card3 = { kinds: { 'grooming-ticket': { label: 'grooming ticket', plural: 'grooming tickets', heads: ['grooming', 'ticket'] } }, fields: { groomer: { shape: 'person', values: ['Dana Reyes'] }, coat_type: { shape: 'category', values: ['Poodle Curly'] } }, staffNouns: ['groomer', 'groomers'] };
+  const lex = S3.maskLexicon(card3, ['Marcia Holloway']);
+  const gen = new Set(m3.generic);
+  check('shape3 :: the company\'s own nouns are masked, numbers become <n>, generic words stay', S3.maskText('How many grooming tickets did Dana Reyes do for coat_type poodle in 2025, total?', lex, gen).join(' ') === 'how many <k> did <k> do for <k> <k> in <n> total' || S3.maskText('How many grooming tickets did Dana Reyes do for coat_type poodle in 2025, total?', lex, gen).join(' ').startsWith('how many <k>'), S3.maskText('How many grooming tickets did Dana Reyes do for coat_type poodle in 2025, total?', lex, gen).join(' '));
+  check('shape3 :: model-v3.json is under 6 MB and has the four heads', fs.statSync(m3p).size < 6e6 && ['pat', 'multi', 'fu', 'meas'].every((h) => m3.heads[h]), String(fs.statSync(m3p).size));
+  const t0 = process.hrtime.bigint(); let hh;
+  for (let i = 0; i < 200; i++) hh = S3.shapeHeads('how many grooming tickets in 2025 and also the total dollar amount', card3, ['Marcia Holloway']);
+  const ms = Number(process.hrtime.bigint() - t0) / 1e6 / 200;
+  check(`shape3 :: inference under 1 ms (${ms.toFixed(2)} ms)`, ms < 1, String(ms));
+  check('shape3 :: a two-measure question reads as multi-part, a single one does not', hh?.multi.label === 'multi' && S3.shapeHeads('how many grooming tickets in 2025', card3, [])?.multi.label === 'single', JSON.stringify(hh?.multi));
+  check('shape3 :: a back-reference question reads as a follow-up', S3.shapeHeads('what about last year', card3, [])?.fu.label !== 'none');
+  check('shape3 :: veto releases a single-answer plan when the model is sure the question is multi-part', S3.shapeVeto('how many grooming tickets in 2025 and also the total dollar amount', card3, [], { op: 'count' }) !== null && S3.shapeVeto('how many grooming tickets in 2025 and also the total dollar amount', card3, [], { op: 'multi', parts: [{}, {}] }) === null);
+  process.env.DONOVAN_DQL_SHAPE3 = '0';
+  check('shape3 :: kill switch', S3.shapeVeto('how many grooming tickets in 2025 and also the total dollar amount', card3, [], { op: 'count' }) === null);
+  delete process.env.DONOVAN_DQL_SHAPE3;
+}
+
 console.log(`\n${passes} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

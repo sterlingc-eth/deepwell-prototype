@@ -183,7 +183,7 @@ async function summarizeDocument(client, deadlineAt, doc) {
           model: DOSSIER_MODEL,
           max_tokens: MAX_OUTPUT_TOKENS,
           ...samplingFor(DOSSIER_MODEL),
-          system: 'Extract at most 4 short, factual sentences a technician would want to remember from this ' +
+          system: 'Extract at most 4 short, factual sentences a colleague would want to remember from this ' +
             'document, each citing the page it came from. Skip boilerplate (form headers, signatures). If ' +
             'nothing is worth remembering, return an empty list. Never invent a page number. ' + FENCE_NOTE,
           tools: [SUMMARIZE_TOOL],

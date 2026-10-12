@@ -186,7 +186,7 @@ async function reduceFacts(question, facts, { deadlineAt }) {
           model, max_tokens: REDUCE_MAX_OUTPUT_TOKENS, ...samplingFor(model),
           system: 'Synthesize these cited facts (drawn from many documents) into a direct answer to the question. ' +
             'Every claim must keep its citation inline as (doc <id> p.<page>). If the facts don\'t fully answer the ' +
-            'question, say plainly what is and isn\'t covered — never fill a gap with something not in the facts.',
+            'question, say plainly what is and isn\'t covered — never fill a gap with something not in the facts. ' + FENCE_NOTE,
           messages: [{ role: 'user', content: `QUESTION: ${question}\n\nFACTS:\n${listing}` }],
         },
         { timeout: Math.max(1000, deadlineAt - Date.now()) }

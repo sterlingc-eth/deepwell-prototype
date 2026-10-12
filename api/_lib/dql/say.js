@@ -22,6 +22,8 @@ export function fmtDate(iso) {
 function pluralize(label) {
   return String(label).split(' / ').map((l) => {
     const w = l.toLowerCase();
+    const ofM = /^([a-z]+) (of|for|to) ([a-z ]+)$/.exec(w); // "bill of lading" -> "bills of lading"
+    if (ofM) return `${pluralize(ofM[1])} ${ofM[2]} ${ofM[3]}`;
     if (/(s|x|ch|sh)$/.test(w) && !/ss$/.test(w)) return w;
     if (/[^aeiou]y$/.test(w)) return `${w.slice(0, -1)}ies`;
     return `${w}s`;
@@ -37,18 +39,19 @@ export function nounOf(plan, n = 2) {
   if (plan.visit) return n === 1 ? 'service visit' : 'service visits';
   if (plan.jobWord && plan.entity === 'document' && !plan.docType) return n === 1 ? 'job' : 'jobs';
   if (plan.docType && !Array.isArray(plan.docType)) {
-    // the owner's own word for it, when it is a plain noun ("quotes", "work orders"); the type's label otherwise
+    // the company's own label for the stored kind of paper ("maintenance agreements", not the word the question used); the question's word only names a kind this company has no label for
     const w = plan.docWord;
-    if (w && w.length >= 4 && !/^(?:pos?|wo|pm|others?)$/.test(w) && /^[a-z -]+$/.test(w)) {
-      if (UNCOUNTABLE.test(w)) return w;
-      const base = /ss$/.test(w) ? w : w.replace(/s$/, '');
-      return n === 1 ? base : pluralize(base);
+    const label = plan.docLabel ?? (plan.docType === 'other' ? null : (documentTypeLabel(plan.docType) !== documentTypeLabel('other') ? documentTypeLabel(plan.docType) : null));
+    if (!label) {
+      if (w && w.length >= 4 && !/^(?:pos?|wo|pm|others?)$/.test(w) && /^[a-z -]+$/.test(w) && plan.docType !== 'other') { const base = /ss$/.test(w) ? w : w.replace(/s$/, ''); return n === 1 ? base : pluralize(base); }
+      if (plan.docType === 'other') { if (w && w.length >= 4 && !/^(?:pos?|wo|pm|others?)$/.test(w) && /^[a-z -]+$/.test(w)) { if (UNCOUNTABLE.test(w)) return w; const base = /ss$/.test(w) ? w : w.replace(/s$/, ''); return n === 1 ? base : pluralize(base); } return n === 1 ? 'other document' : 'other documents'; }
+      const lab0 = documentTypeLabel(plan.docType) ?? plan.docType.replace(/-/g, ' ');
+      return n === 1 ? singular(lab0) : pluralize(lab0);
     }
-    if (plan.docType === 'other') return n === 1 ? 'other document' : 'other documents'; // the papers filed under no other kind
-    const label = documentTypeLabel(plan.docType) ?? plan.docType.replace(/-/g, ' ');
     if (UNCOUNTABLE.test(label)) return singular(label);
     return n === 1 ? singular(label) : pluralize(label);
   }
+  if (Array.isArray(plan.docType) && plan.docWord && /^[a-z -]+$/.test(plan.docWord)) { const base = /ss$/.test(plan.docWord) ? plan.docWord : plan.docWord.replace(/s$/, ''); return n === 1 ? base : pluralize(base); } // "inspections": the owner's word for several stored kinds
   return n === 1 ? 'document' : 'documents';
 }
 
@@ -64,6 +67,7 @@ const DATE_RULE = {
 
 /** One condition as a phrase for the sentence ("for Linda Fitzgerald", "in Mesa", "over $5,000"). */
 function condPhrase(f, plan) {
+  if (f.neg && f.label) return f.label; // translator plans (translator/validate.js): "not in Mesa", "with no technician on file"
   switch (f.field) {
     case 'customer': case 'name': return `for ${f.value}`;
     case 'tech': return `with technician ${f.value}`;
@@ -113,7 +117,7 @@ export function recordFor(plan, row, snap) {
   if (entity === 'customer') return { type: 'customer', id: row.id, label: row.name ?? 'Unnamed customer', sublabel: row.address ?? undefined };
   if (entity === 'unit') return { type: 'unit', id: row.id, label: [row.brand, row.type].filter(Boolean).join(' ') || 'Equipment', sublabel: [row.model, row.serial ? `serial ${row.serial}` : null].filter(Boolean).join(' · '), customerId: row.custId ?? undefined };
   const label = row.filename ?? documentTypeLabel(row.type) ?? 'Document';
-  return { type: row.type === 'invoice' ? 'invoice' : 'document', id: row.id, documentId: row.id, label, sublabel: [documentTypeLabel(row.type), row.date ? fmtDate(row.date) : null, row.custName].filter(Boolean).join(' · ') };
+  return { type: row.type === 'invoice' ? 'invoice' : 'document', id: row.id, documentId: row.id, label, ...(plan.measure?.field === 'total' && row.totalPage ? { page: row.totalPage } : {}), sublabel: [documentTypeLabel(row.type), row.date ? fmtDate(row.date) : null, row.custName].filter(Boolean).join(' · ') };
 }
 const recordsOf = (plan, rows, snap, max = 200) => rows.slice(0, max).map((r) => recordFor(plan, r, snap));
 
@@ -146,6 +150,10 @@ const detailFor = (n) => (n <= 5 ? 2 : n <= 12 ? 1 : 0);
 const hasCustFilter = (plan) => (plan.filters ?? []).some((f) => f.field === 'customer' || f.field === 'name');
 
 const listNames = (arr, cap = 40, sep = ', ') => (arr.length > cap ? `${arr.slice(0, cap).join(sep)}${sep.trim() === ';' ? ';' : ','} and ${fmtInt(arr.length - cap)} more` : arr.join(sep));
+/** " on file" when nothing narrows the count; "are over $500" when the condition is a comparison. */
+const cmpCond = (cond, n) => (!cond ? ' on file' : /^ (?:over|under|above|below|at least|at most|more than|less than|between|exactly)\b/.test(cond) ? ` ${n === 1 ? 'is' : 'are'}${cond}` : cond);
+/** The question's own word for a paper, in parentheses, when it is a different word from the company's label for the kind ("40 donation receipts (gifts)"). */
+const aliasOf = (plan) => (plan.docAlias ? ` (${plan.docAlias})` : '');
 const cap1 = (s) => s[0].toUpperCase() + s.slice(1);
 const none = (plan, cond) => `No ${nounOf(plan, 2)}${cond}${/ on file$/.test(cond) ? "" : " on file"}.`;
 
@@ -234,7 +242,7 @@ export function sayResult(res, plan, { snap, today }) {
   if (plan.nth && ['top_n', 'bottom_n', 'latest', 'first_ever'].includes(plan.op)) return sayNth(res, plan, { snap, today }, out, cond, noun);
   switch (plan.op) {
     case 'count': {
-      out.text = n === 0 ? none(plan, cond) : `${fmtInt(n)} ${noun(n)}${cond}.`;
+      out.text = n === 0 ? none(plan, cond) : `${fmtInt(n)} ${noun(n)}${aliasOf(plan)}${cmpCond(cond, n)}.`;
       out.facts = [{ label: cap1(noun(2)), value: fmtInt(n) }];
       out.records = recordsOf(plan, rowsAll, snap); out.total = n; out.claimedCount = n;
       out.basis = basisLine('Counted', plan, res, snap);
@@ -251,6 +259,10 @@ export function sayResult(res, plan, { snap, today }) {
       if (res.distinctItems) {
         const items = res.distinctItems;
         const dn = DIM_NOUN[plan.distinct] ?? plan.distinct;
+        if (plan.distinct === 'tech' && items.length) { // technicians: busiest first, each with the number of jobs they are named on
+          const byJobs = [...items].sort((a, b) => b.rows.length - a.rows.length || String(a.value).localeCompare(String(b.value)));
+          out.text = `${fmtInt(items.length)} ${items.length === 1 ? dn : plural(dn)}${cond || ' on file'}: ${listNames(byJobs.map((i) => `${i.value} (${fmtInt(i.rows.length)} ${i.rows.length === 1 ? 'job' : 'jobs'})`))}.`;
+        } else
         out.text = items.length === 0 ? `No ${plural(dn)}${cond} are on file.` : `${fmtInt(items.length)} ${items.length === 1 ? dn : plural(dn)}${cond}: ${listNames(items.map((i) => i.value))}.`;
         out.facts = items.length <= 7 ? items.map((i) => ({ label: cap1(dn), value: i.value })) : [{ label: `Different ${plural(dn)}`, value: fmtInt(items.length) }];
         out.records = recordsOf(plan, items.flatMap((i) => i.rows), snap); out.total = out.records.length;
@@ -262,7 +274,7 @@ export function sayResult(res, plan, { snap, today }) {
       const names = list.map((r) => labelOf(plan, r, plan.showAmounts ? 2 : detailFor(list.length), hasCustFilter(plan)));
       out.text = plan.sort
         ? `The ${list.length === 1 ? '' : `${fmtInt(list.length)} `}${plan.sort.dir === 'desc' ? 'most recent' : 'oldest'} ${noun(list.length)}${cond}: ${listNames(names)}.`
-        : `${fmtInt(n)} ${noun(n)}${cond}: ${listNames(names)}.`;
+        : `${fmtInt(n)} ${noun(n)}${aliasOf(plan)}${cmpCond(cond, n)}: ${listNames(names)}.`;
       out.facts = list.length <= 7 ? list.map((r) => ({ label: cap1(noun(1)), value: labelOf(plan, r, 1, hasCustFilter(plan)) })) : [{ label: cap1(noun(2)), value: fmtInt(plan.sort ? list.length : n) }];
       out.records = recordsOf(plan, list, snap); out.total = plan.sort ? list.length : n; out.claimedCount = plan.sort ? null : n;
       out.basis = basisLine('Listed', plan, res, snap);
@@ -288,7 +300,14 @@ export function sayResult(res, plan, { snap, today }) {
     case 'avg': case 'median': {
       const word = plan.op === 'avg' ? 'average' : 'median';
       if (res.value == null) { out.text = `${none(plan, cond)} There is no ${word} to give.`; out.records = []; out.total = 0; out.basis = basisLine('Checked', plan, res, snap); break; }
-      out.text = `The ${word} ${plan.measure.field === 'total' ? `${noun(1)} total` : plan.measure.label} is ${valueText(plan, res.value)}${cond}, across ${fmtInt(res.nUsed)} ${noun(res.nUsed)} with ${plan.measure.field === 'total' ? 'an amount' : `${plan.measure.label} recorded`}.`;
+      const mlabel = plan.measure.field === 'total' ? `${noun(1)} total` : plan.measure.label;
+      const brandF = plan.entity === 'unit' ? (plan.filters ?? []).find((f) => f.field === 'brand' && typeof f.value === 'string') : null; // "16 Carrier units": a brand reads as part of the noun
+      const cond2 = brandF ? condText({ ...plan, filters: plan.filters.filter((f) => f !== brandF) }) : cond;
+      const nounN = (k) => (brandF ? `${brandF.value} ${noun(k)}` : noun(k));
+      const has = plan.measure.field === 'total' ? 'an amount' : plan.measure.field === 'age' ? 'an install date' : `${plan.measure.label} recorded`;
+      out.text = plan.measure.field === 'total'
+        ? `The ${word} ${mlabel} is ${valueText(plan, res.value)}${cond2}: the ${word} of ${fmtInt(res.nUsed)} ${nounN(res.nUsed)} that have ${has}.`
+        : `The ${word} ${mlabel} is ${valueText(plan, res.value)}${cond2}, across ${fmtInt(res.nUsed)} ${nounN(res.nUsed)} with ${has}.`;
       out.facts = [{ label: cap1(word), value: valueText(plan, res.value) }];
       out.records = recordsOf(plan, res.used ?? rowsAll, snap); out.total = (res.used ?? rowsAll).length;
       out.basis = basisLine(plan.op === 'avg' ? 'Averaged' : 'Took the middle value of', plan, res, snap);
@@ -332,7 +351,7 @@ export function sayResult(res, plan, { snap, today }) {
         : `${fmtInt(n - (res.groupLeftOut ?? 0))} ${noun(2)}`;
       if (!res.groups.length) { out.text = none(plan, cond); out.records = []; out.total = 0; out.basis = basisLine('Grouped', plan, res, snap); break; }
       out.text = `${head} by ${dims}${cond}${grand}: ${groupLines(plan, res, snap, today)}.`;
-      out.facts = res.groups.length <= 7 ? res.groups.map((g) => ({ label: g.parts.join(' / '), value: plan.measure ? valueText(plan, g.value) : fmtInt(g.value) })) : [{ label: `${cap1(dims)} groups`, value: fmtInt(res.groups.length) }];
+      out.facts = res.groups.length <= 40 ? res.groups.map((g) => ({ label: g.parts.join(' / '), value: plan.measure ? valueText(plan, g.value) : fmtInt(g.value) })) : [{ label: `${cap1(dims)} groups`, value: fmtInt(res.groups.length) }];
       out.records = recordsOf(plan, res.groups.flatMap((g) => g.rows), snap); out.total = res.groups.reduce((a, g) => a + g.rows.length, 0);
       out.basis = basisLine('Grouped', plan, { ...res, leftOut: (res.leftOut ?? 0) + (res.groupLeftOut ?? 0) }, snap);
       break;
@@ -357,6 +376,7 @@ export function sayResult(res, plan, { snap, today }) {
       out.text = plan.limit === 1 && r.length === 1
         ? `${displayKey(plan, 0, r[0].parts[0], snap)} (${plan.measure ? valueText(plan, r[0].value) : fmtInt(r[0].value)}) has the ${plan.dir === 'asc' ? 'fewest' : 'most'} ${by}${cond}.`
         : `${plan.limit === 1 ? `Tied for ${plan.dir === 'asc' ? 'fewest' : 'most'}` : `${word} ${fmtInt(plan.limit)}`} ${plural(dn)} by ${by}${cond}: ${listNames(lines, 25, '; ')}.${r.length > plan.limit ? ` ${fmtInt(r.length)} are shown because of a tie at ${plan.measure ? valueText(plan, res.cut) : fmtInt(res.cut)}.` : ''}`;
+      if (plan.measure?.field === 'total') { const k = Math.max(0, n - (res.leftOut ?? 0) - (res.groupLeftOut ?? 0)); out.text += ` Computed over ${fmtInt(k)} ${noun(k)} with an amount.`; }
       {
         // years / months / quarters: the running period is not finished, and periods with nothing in them are not ranked
         const by0 = plan.groupBy[0]?.by;

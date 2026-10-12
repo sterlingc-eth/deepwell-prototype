@@ -107,6 +107,8 @@ export function parseRecordsQuestion(question, { today = null, parsePeriodFn = n
   const tokens = tokensOf(text);
   const out = { raw: String(question ?? ""), text, tokens, facts: [], summary: false, docNumbers: [], serials: [], address: null, order: null, all: false, window: null, stepAside: null };
   if (!tokens.length || tokens.length > 40) { out.stepAside = "length"; return out; }
+  // R13: a question that connects two kinds of paper ("quotes that turned into invoices", "invoices with no matching work order", "agreements ending soon whose holders have ...") is not the facts of one record: the links reader (dql/families/links.js) answers it
+  if (/\b(?:turn(?:ed|s)? into|with(?:out)? (?:a |an |any )?(?:no )?matching|no matching|later billed|whose (?:holders?|owners?) (?:have|has))\b/.test(text)) { out.stepAside = "connect"; return out; }
   // R12: "is Ray Sutton a customer or a technician" asks what KIND of party someone is; this lane reads facts of one record, so it never answers a role question with a technician field
   if (/\b(?:customer|client|patient|tenant|donor)s? or (?:a |an |the )?(?:technician|tech|vendor|employee|supplier)\b|\b(?:technician|tech|vendor|employee|supplier) or (?:a |an |the )?(?:customer|client|patient|tenant|donor)\b|\b(?:is|are|was) [a-z' .-]{3,40} (?:a|an) (?:technician|tech|vendor|employee|supplier)\b/.test(text)) { out.stepAside = "role-question"; return out; }
   const vetoed = VETO.test(text);
@@ -134,6 +136,8 @@ export function parseRecordsQuestion(question, { today = null, parsePeriodFn = n
   // a street address: house number + street words + suffix
   const am = text.match(/\b(\d{1,6})\s+((?:[nsew]|north|south|east|west)\s+)?([a-z0-9]+(?:\s+[a-z0-9]+){0,2}?)\s+(st|street|ave|avenue|rd|road|dr|drive|ln|lane|ct|court|blvd|boulevard|way|pl|place|cir|circle|pkwy|parkway|hwy|trl|trail)\b/);
   if (am) out.address = { number: am[1], dir: (am[2] ?? "").trim(), street: am[3], suffix: am[4] };
+  // R13: "who else is at <address>" and "what happened at <address> in 2022" connect several customers and papers; the links reader (dql/families/links.js) answers them
+  if (am && /\b(?:what happened|what went on|who else)\b/.test(text)) { out.stepAside = "connect"; return out; }
 
   const exclude = new Set();
   tokens.forEach((t, i) => { if (nums.some((n) => alnum(t) === n.alnum || t === n.raw) || (nums.length && nums.some((n) => !n.prefixed && t === n.raw))) exclude.add(i); });

@@ -125,16 +125,17 @@ const total = (await truth(`SELECT count(*)::int AS n FROM entities WHERE entity
   const g = await ask('which homeowners signed a warranty extension');
   check('an unknown condition is never answered with the plain customer list', !/^\d+ customers\.$/.test(g.text), g);
   const same = await ask('which customers have a maintenance agreement');
-  check('homeowners signed a service plan = customers with a maintenance agreement', agree.text === same.text, { agree: agree.text, same: same.text });
+  // R13i: people keep the word the question used (homeowners), the paper keeps the company's own name (maintenance agreement), and the answer names them; the other lane gives the bare count
+  check('homeowners signed a service plan = customers with a maintenance agreement', num(agree.text) === num(same.text) && /^\d+ homeowners with a maintenance agreement/.test(agree.text), { agree: agree.text, same: same.text });
   void w;
   const ok = await ask('list all the customers please');
   check('plain list wording still answered', /^\d+ customers\.$/.test(ok.text) && noModel(ok), ok);
 }
 {
   const y = await ask('invoices 2025'); const y2 = await ask('how many invoices in 2025');
-  check('invoices 2025 is a year, not $2,025', !/\$2,025/.test(y.text) && y.text === y2.text && y.kind === 'answer', { y, y2 });
+  check('invoices 2025 is a year, not $2,025', !/\$2,025/.test(y.text) && num(y.text) === num(y2.text) && /in 2025/.test(y.text) && y.kind === 'answer', { y, y2 });
   const y3 = await ask('2025 invoices');
-  check('2025 invoices is a year', !/\$2,025/.test(y3.text) && y3.text === y2.text, y3);
+  check('2025 invoices is a year', !/\$2,025/.test(y3.text) && num(y3.text) === num(y2.text) && /in 2025/.test(y3.text), y3);
   const m = await ask('invoice for $2025');
   check('a $ sign keeps it an amount', /\$2,025/.test(m.text), m);
 }

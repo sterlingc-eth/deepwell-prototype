@@ -1062,6 +1062,9 @@ async function receivables(db, intent, ctx, direction = 'receivable') {
     text = a.n_overdue === 0
       ? `Nothing${who} is past due${thresholdNote} right now (${plural(a.n_open, `open ${noun}`)} totaling ${fmt(a.open_total)}).${excl}`
       : `${plural(a.n_overdue, `${noun}`)}${who} ${a.n_overdue === 1 ? 'is' : 'are'} past due${thresholdNote}, totaling ${fmt(a.overdue_total)} (of ${fmt(a.open_total)} open in all).${excl}${flaggedText(a.n_flagged)}`;
+  } else if (/\bhow many\b/i.test(String(intent?.rawOriginal ?? intent?.raw ?? ''))) {
+    // R43: a COUNT question leads with the count, not the dollar total ("how many bills are unpaid" -> "30 open bills (...)")
+    text = `${plural(a.n_open, `open ${noun}`)}${who} (${fmt(a.open_total)} in all); ${a.n_overdue} of ${a.n_open === 1 ? 'it is' : 'them are'} past due.${excl}${flaggedText(a.n_flagged)}`;
   } else {
     text = `${direction === 'receivable' ? `${(await customerWordForDb(db)).many.replace(/^./, (c) => c.toUpperCase())} owe us ${fmt(a.open_total)}${who}` : `We owe ${fmt(a.open_total)} on open bills`} across ${plural(a.n_open, `open ${noun}`)}; ${fmt(a.overdue_total)} of it (${plural(a.n_overdue, noun)}) is past due.${excl}${flaggedText(a.n_flagged)}`;
   }

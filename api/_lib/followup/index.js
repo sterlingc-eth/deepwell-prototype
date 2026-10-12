@@ -9,3 +9,5 @@ export { looksLikeContinuation, classifyFollowupKind, looksLikeDisambiguationRep
 export { subjectFromText, subjectFromEntities, brandMentionIn } from './subject.js';
 export { slotFollowup, slotRewrite } from './slots.js';
 export { dqlMergeFollowup, dqlMergeRewrite } from './dqlmerge.js';
+export { provenanceFollowup } from './provenance.js';
+export { correctionFollowup, correctionPayload } from './correction.js';

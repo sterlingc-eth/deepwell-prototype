@@ -147,7 +147,7 @@ function lex(text0, vocab, today, takeTime) {
     }
     if (hit) { items.push(hit.item); i += hit.len; continue; }
     // document types (and the short forms people use for a registration)
-    if (/^(?:registrations?|regs?)$/.test(tk) && !vocab.docPhrases.has(tk) && vocab.docTypesInUse?.has('warranty-registration')) { items.push({ t: 'doc', id: 'warranty-registration', word: 'warranty registration' }); i++; continue; }
+    if (/^(?:registrations?|regs?)$/.test(tk) && (!vocab.docPhrases.has(tk) || vocab.docPhrases.get(tk) === 'warranty-registration') && vocab.docTypesInUse?.has('warranty-registration')) { items.push({ t: 'doc', id: 'warranty-registration', word: 'warranty registration' }); i++; continue; }
     for (let n = Math.min(4, toks.length - i); n >= 1 && !hit; n--) {
       const ph = toks.slice(i, i + n).join(' ');
       if (n === 1 && /^(?:other|others)$/.test(ph)) continue;
@@ -1410,7 +1410,7 @@ function unitAdjectives(filters) {
 function describePred(p, plan) {
   switch (p.k) {
     case 'doc': case 'udoc': {
-      const noun = p.visit ? 'service visit' : p.type ? p.word : (p.tech ? 'service' : 'document');
+      const noun = p.visit ? 'service visit' : p.type ? (p.svc ? p.word : (documentTypeLabel(p.type)?.toLowerCase() ?? p.word)) : (p.tech ? 'service' : 'document'); // the company's own label for the stored type, not the word the question used
       const svc = p.svc ? `${p.svc.toLowerCase()} ` : '';
       let core;
       if (p.tech && !p.type && !p.visit) core = `service from technician ${p.tech}`;
@@ -1583,7 +1583,7 @@ function saySelect0(res, plan, { snap }) {
   }
   if (n === 0) {
     out.text = `No ${noun(2)}${c} on file.`;
-    out.facts = [{ label: cap1(noun(2)), value: '0' }];
+    out.facts = plan.mode === 'count' ? [{ label: cap1(noun(2)), value: '0' }] : []; // an empty list carries no facts
     out.basis = basisFor(plan, res, snap); out.total = 0; out.claimedCount = 0;
     return out;
   }

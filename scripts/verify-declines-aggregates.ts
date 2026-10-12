@@ -106,7 +106,7 @@ const invSum = inv.reduce((a: number, r: any) => a + Number(r.t), 0);
   const by = new Map<string, number>();
   for (const x of inv) by.set(x.customer_name, (by.get(x.customer_name) ?? 0) + Number(x.t));
   const top = [...by.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 5);
-  check('top N: customers by billing', !r.model && top.every(([n, v], i) => r.text.includes(`${i + 1}. ${n} ${money(v)}`)) && /Computed over \d+ invoices with an amount/.test(r.text), r.text);
+  check('top N: customers by billing', !r.model && top.every(([n, v], i) => r.text.includes(`${i + 1}. ${n}: ${money(v)}`)) && /Computed over \d+ invoices with an amount/.test(r.text), r.text);
 }
 {
   const r = await ask('top 3 technicians by service calls');
@@ -127,14 +127,14 @@ const invSum = inv.reduce((a: number, r: any) => a + Number(r.t), 0);
 {
   const r = await ask('units installed per year');
   const rows = await truth(`SELECT substr(data->>'installation_date',1,4) y, count(*)::int n FROM entities WHERE entity_type='equipment' AND merged_into IS NULL AND data->>'installation_date' IS NOT NULL AND tenant_id=(current_setting('app.tenant_id', true))::uuid GROUP BY 1 ORDER BY 1`);
-  check('per-group: units by install year', !r.model && rows.every((x: any) => r.text.includes(`${x.y} ${x.n}`)), r.text);
+  check('per-group: units by install year', !r.model && rows.every((x: any) => r.text.includes(`${x.y}: ${x.n}`)), r.text);
 }
 {
   const r = await ask('revenue by month in 2025');
   const by = new Map<string, number>();
   const rows = await truth(`SELECT substr(invoice_date::text,1,7) m, total::numeric t FROM document_financials WHERE doc_kind='invoice' AND direction='receivable' AND total IS NOT NULL AND invoice_date IS NOT NULL AND tenant_id=(current_setting('app.tenant_id', true))::uuid`);
   for (const x of rows) if (x.m.startsWith('2025')) by.set(x.m, (by.get(x.m) ?? 0) + Number(x.t));
-  check('per-group: invoice totals by month in a year', !r.model && [...by.entries()].every(([m, v]) => r.text.includes(`${MONTHS[Number(m.slice(5)) - 1]} ${m.slice(0, 4)} ${money(v)}`)), r.text);
+  check('per-group: invoice totals by month in a year', !r.model && [...by.entries()].every(([m, v]) => r.text.includes(`${MONTHS[Number(m.slice(5)) - 1]} ${m.slice(0, 4)}: ${money(v)}`)), r.text);
 }
 {
   const r = await ask('compare Carrier vs Trane unit counts and say which is older on average');

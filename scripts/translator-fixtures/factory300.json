@@ -1,0 +1,6899 @@
+[
+{
+"id": "auto-000449",
+"tenant": "auto",
+"bank": "out2",
+"family": "count",
+"q": "hi, i'm putting together a report and need to know what's the number of receipts we handled during february of 2023",
+"expect": {
+"kind": "number",
+"value": 1,
+"unit": "count"
+},
+"plan": {
+"op": "count",
+"entity": "document",
+"docType": "receipt",
+"time": {
+"words": "during february of 2023"
+}
+}
+},
+{
+"id": "auto-000981",
+"tenant": "auto",
+"bank": "out",
+"family": "count",
+"q": "How many service visits exist please?",
+"expect": {
+"kind": "number",
+"value": 314,
+"unit": "count"
+},
+"plan": {
+"op": "count",
+"entity": "document",
+"visit": true
+}
+},
+{
+"id": "auto-001608",
+"tenant": "auto",
+"bank": "out2",
+"family": "list_dim",
+"q": "I need names brands on inspections marked passed asap",
+"expect": {
+"kind": "list",
+"value": [
+"Chevrolet",
+"Dodge",
+"Ford",
+"GMC",
+"Hyundai",
+"Jeep",
+"Nissan",
+"Subaru",
+"Toyota"
+]
+},
+"plan": {
+"op": "list",
+"entity": "document",
+"docType": "inspection-report",
+"filters": [
+{
+"field": "status",
+"op": "eq",
+"words": "marked passed",
+"value": "Passed"
+}
+],
+"distinct": "brand"
+}
+},
+{
+"id": "auto-001625",
+"tenant": "auto",
+"bank": "out2",
+"family": "list_dim",
+"q": "can't recall, what are the different mechanics on service visits for owners based in los lunas during 2023?",
+"expect": {
+"kind": "list",
+"value": [
+"David Garza",
+"Gary Parker",
+"George Wheeler",
+"Ramon Reid",
+"Ray Coleman"
+]
+},
+"plan": {
+"op": "list",
+"entity": "document",
+"visit": true,
+"filters": [
+{
+"field": "city",
+"op": "eq",
+"words": "los lunas",
+"value": "Los Lunas"
+}
+],
+"time": {
+"words": "during 2023"
+},
+"distinct": "tech"
+}
+},
+{
+"id": "auto-001897",
+"tenant": "auto",
+"bank": "out2",
+"family": "list_dim",
+"q": "Can i get names of the types of service on shop visits mentioning \"light\" during the past 120 days asap?",
+"expect": {
+"kind": "list",
+"value": [
+"AC repair",
+"Alignment",
+"Battery replacement",
+"Brake service",
+"Oil change",
+"Transmission service"
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "auto-002327",
+"tenant": "auto",
+"bank": "out2",
+"family": "exists",
+"q": "Per the boss, is there anything in visits for the owner Jo Franklin for owners located in Santa Fe",
+"expect": {
+"kind": "yesno",
+"value": true
+},
+"plan": {
+"op": "exists_yes_no",
+"entity": "document",
+"visit": true,
+"filters": [
+{
+"field": "customer",
+"op": "eq",
+"words": "Jo Franklin",
+"value": "Jo Franklin"
+},
+{
+"field": "city",
+"op": "eq",
+"words": "Santa Fe",
+"value": "Santa Fe"
+}
+]
+}
+},
+{
+"id": "auto-002559",
+"tenant": "auto",
+"bank": "out2",
+"family": "sum",
+"q": "The wife wants to know what do all the estimates for customers located in Santa Fe between 7/26/2022 and 10/24/2022 add up to",
+"expect": {
+"kind": "number",
+"value": 90.01,
+"unit": "usd"
+},
+"plan": {
+"op": "sum",
+"entity": "document",
+"docType": "proposal-quote",
+"measure": {
+"field": "total"
+},
+"filters": [
+{
+"field": "city",
+"op": "eq",
+"words": "Santa Fe",
+"value": "Santa Fe"
+}
+],
+"time": {
+"words": "between 7/26/2022 and 10/24/2022"
+}
+}
+},
+{
+"id": "auto-002596",
+"tenant": "auto",
+"bank": "out",
+"family": "list_dim",
+"q": "Rundown of service type for visits not done by George Wheeler so far this year",
+"expect": {
+"kind": "list",
+"value": [
+"AC repair",
+"Alignment",
+"Battery replacement",
+"Brake service",
+"Diagnostic",
+"Oil change",
+"Tire rotation",
+"Transmission service"
+]
+},
+"plan": {
+"op": "list",
+"entity": "document",
+"visit": true,
+"filters": [
+{
+"field": "tech",
+"op": "neq",
+"words": "not done by George Wheeler",
+"value": "George Wheeler"
+}
+],
+"time": {
+"words": "so far this year"
+},
+"distinct": "serviceType"
+}
+},
+{
+"id": "auto-008632",
+"tenant": "auto",
+"bank": "out",
+"family": "extreme_tech",
+"q": "The most recent inspection mentioning \"order\" for 2018 was done by who thanks",
+"expect": {
+"kind": "name",
+"value": "Ray Coleman"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "auto-011602",
+"tenant": "auto",
+"bank": "out",
+"family": "compare_which",
+"q": "Tell me which has more visits with \"rotated\" mentioned, 2019 or 2024 please?",
+"expect": {
+"kind": "name",
+"value": "2019"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "auto-012050",
+"tenant": "auto",
+"bank": "out",
+"family": "compare_yes",
+"q": "Hi, Santa Fe versus Rio Rancho: does Santa Fe have higher number inspection reports",
+"expect": {
+"kind": "yesno",
+"value": true
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "auto-014840",
+"tenant": "auto",
+"bank": "out",
+"family": "days_since",
+"q": "Ok it's been how many dasy since Sam West's latest shop vsiit",
+"expect": {
+"kind": "number",
+"value": 1415,
+"unit": "days"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "auto-016216",
+"tenant": "auto",
+"bank": "out",
+"family": "cust_count",
+"q": "I need a headcount of owners who have exactly 1 receipts during Q2 of 2021 (need it for the books)",
+"expect": {
+"kind": "number",
+"value": 3,
+"unit": "count"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "auto-017316",
+"tenant": "auto",
+"bank": "out",
+"family": "cust_list",
+"q": "Can you find out which of our customers with an inspection in the year 2025",
+"expect": {
+"kind": "list",
+"value": [
+"Anna Torres",
+"Bryan Butler",
+"Casey Quinn",
+"Henry Sutton",
+"Jean Fisher",
+"Keith Russell",
+"Linda Cohen",
+"Ray Coleman"
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "auto-017349",
+"tenant": "auto",
+"bank": "out",
+"family": "cust_list",
+"q": "So basically please tell me which of our owners who got a shop visit in the last year located in Los Lunas?",
+"expect": {
+"kind": "list",
+"value": [
+"Anna Torres",
+"Christina Ward",
+"Donald Rose",
+"Jordan Gregory",
+"Marisol Le",
+"Noah Henderson",
+"Theresa Pena"
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "auto-b3-002812",
+"tenant": "auto",
+"bank": "out3/dev3",
+"family": "multi_count_top",
+"q": "nubmer of vehicle recorss in q4 2026 plus the owner with the most",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "count",
+"kind": "number",
+"value": 1,
+"unit": "count"
+},
+{
+"label": "top_customer",
+"kind": "name",
+"value": "Mark Sutton"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "church-b4-001583",
+"tenant": "church",
+"bank": "out4/dev4",
+"family": "sum",
+"q": "I need u to tell me the sum of the giving statement records on Sean Bates's account in dollars - just checking",
+"expect": {
+"kind": "number",
+"value": 5215.98,
+"unit": "usd"
+},
+"plan": {
+"op": "sum",
+"entity": "document",
+"docType": "giving-statement",
+"measure": {
+"field": "total"
+},
+"filters": [
+{
+"field": "customer",
+"op": "eq",
+"words": "Sean Bates",
+"value": "Sean Bates"
+}
+]
+}
+},
+{
+"id": "church-b4-001635",
+"tenant": "church",
+"bank": "out4/dev4",
+"family": "sum",
+"q": "quick, hands are full: check amount of money for giving statements (just from what's in the system) right now",
+"expect": {
+"kind": "number",
+"value": 469394.83,
+"unit": "usd"
+},
+"plan": {
+"op": "sum",
+"entity": "document",
+"docType": "giving-statement",
+"measure": {
+"field": "total"
+}
+}
+},
+{
+"id": "church-b4-001999",
+"tenant": "church",
+"bank": "out4/dev4",
+"family": "sum",
+"q": "Support the numbers: what is the combined amt of our contribution statements thx b4 my meeting?",
+"expect": {
+"kind": "number",
+"value": 469394.83,
+"unit": "usd"
+},
+"plan": {
+"op": "sum",
+"entity": "document",
+"docType": "giving-statement",
+"measure": {
+"field": "total"
+}
+}
+},
+{
+"id": "church-b4-015204",
+"tenant": "church",
+"bank": "out4/dev4",
+"family": "coming_up",
+"q": "trying to learn the ropes how many volunteer forms are up for renewal in the next 90 days",
+"expect": {
+"kind": "number",
+"value": 6,
+"unit": "count"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "church-b4-018174",
+"tenant": "church",
+"bank": "out4/dev4",
+"family": "yes_no",
+"q": "quick, since nov 1 2018, are there any pledge entries of $5,500 or less of stephanie martin",
+"expect": {
+"kind": "yesno",
+"value": false
+},
+"plan": {
+"op": "exists_yes_no",
+"entity": "document",
+"docType": "pledge-card",
+"filters": [
+{
+"field": "total",
+"op": "lte",
+"words": "$5,500 or less",
+"value": 5500
+},
+{
+"field": "customer",
+"op": "eq",
+"words": "stephanie martin",
+"value": "Stephanie Martin"
+}
+],
+"time": {
+"words": "since nov 1 2018"
+}
+}
+},
+{
+"id": "church-b4-019076",
+"tenant": "church",
+"bank": "out4/dev4",
+"family": "one_word",
+"q": "Running between jobs, Cedar Park number",
+"expect": {
+"kind": "number",
+"value": 40,
+"unit": "count"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "church-b4-019091",
+"tenant": "church",
+"bank": "out4/dev4",
+"family": "one_word",
+"q": "Owner here - uh benevolence requests",
+"expect": {
+"kind": "number",
+"value": 54,
+"unit": "count"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "cleaning-000901",
+"tenant": "cleaning",
+"bank": "out2",
+"family": "count",
+"q": "I was wondering what's the number of schedules we hnaeled in the year 2025",
+"expect": {
+"kind": "number",
+"value": 7,
+"unit": "count"
+},
+"plan": {
+"op": "count",
+"entity": "document",
+"docType": "schedule",
+"time": {
+"words": "in the year 2025"
+}
+}
+},
+{
+"id": "cleaning-001670",
+"tenant": "cleaning",
+"bank": "out2",
+"family": "list_dim",
+"q": "i keep forgetting what are the different supervisors on service tickets labelled nightly clean for sunrise church east from february 3, 2024 until now",
+"expect": {
+"kind": "list",
+"value": [
+"Denise Grant"
+]
+},
+"plan": {
+"op": "list",
+"entity": "document",
+"docType": "service-ticket",
+"filters": [
+{
+"field": "serviceType",
+"op": "eq",
+"words": "labelled nightly clean",
+"value": "Nightly clean"
+},
+{
+"field": "customer",
+"op": "eq",
+"words": "sunrise church east",
+"value": "Sunrise Church East"
+}
+],
+"time": {
+"words": "from february 3, 2024 until now"
+},
+"distinct": "tech"
+}
+},
+{
+"id": "cleaning-001911",
+"tenant": "cleaning",
+"bank": "out2",
+"family": "list_dim",
+"q": "Can you help me figure out what are the different customers on visits in Henderson",
+"expect": {
+"kind": "list",
+"value": [
+"Alex Wang",
+"Amanda Harrison",
+"Janice Campos",
+"Lakeview Church",
+"Silver State Gym",
+"Silver State Law Group East",
+"Silver State Offices Metro",
+"Sunrise Medical Center",
+"Vista Gym",
+"Vista Gym Metro",
+"Vista Medical Center"
+]
+},
+"plan": {
+"op": "list",
+"entity": "document",
+"visit": true,
+"filters": [
+{
+"field": "city",
+"op": "eq",
+"words": "in Henderson",
+"value": "Henderson"
+}
+],
+"distinct": "customer"
+}
+},
+{
+"id": "cleaning-003052",
+"tenant": "cleaning",
+"bank": "out",
+"family": "list_dim",
+"q": "rundown of accounts for service visits for customers located in las vegas hndled by margaret tran since feb 11 twenty twenty three",
+"expect": {
+"kind": "list",
+"value": [
+"Gabriel Hamilton",
+"Jessica Brewer",
+"Lakeview Gym Metro",
+"Lakeview Offices North",
+"Neon Dental Office Pro",
+"Neon Medical Center",
+"Vista Dental Office"
+]
+},
+"plan": {
+"op": "list",
+"entity": "document",
+"visit": true,
+"filters": [
+{
+"field": "city",
+"op": "eq",
+"words": "las vegas",
+"value": "Las Vegas"
+},
+{
+"field": "tech",
+"op": "eq",
+"words": "margaret tran",
+"value": "Margaret Tran"
+}
+],
+"time": {
+"words": "since feb 11 twenty twenty three"
+},
+"distinct": "customer"
+}
+},
+{
+"id": "cleaning-012937",
+"tenant": "cleaning",
+"bank": "out",
+"family": "busiest",
+"q": "I was looking through the files and couldn't tell - could you name our lightest day of the week for service tickets please",
+"expect": {
+"kind": "name",
+"value": "Thursday"
+},
+"plan": {
+"op": "bottom_n",
+"entity": "document",
+"docType": "service-ticket",
+"groupBy": [
+"weekday"
+],
+"limit": 1
+}
+},
+{
+"id": "cleaning-019742",
+"tenant": "cleaning",
+"bank": "out",
+"family": "dup_names",
+"q": "Hey, which customers are listed twice by name please?",
+"expect": {
+"kind": "list",
+"value": [
+"Aaron Carpenter",
+"Judy Cruz"
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "cleaning-b3-002276",
+"tenant": "cleaning",
+"bank": "out3/dev3",
+"family": "multi_count_date",
+"q": "Just curious, how many service tickets for the cust Lakeview Gym Metro btwn December 20, 2023 and August 16, 2024 and when was the earliest one?",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "count",
+"kind": "number",
+"value": 1,
+"unit": "count"
+},
+{
+"label": "first_date",
+"kind": "date",
+"value": "2024-07-19"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "cleaning-b3-002984",
+"tenant": "cleaning",
+"bank": "out3/dev3",
+"family": "multi_count_top",
+"q": "number of receipts during 2021 plus the account with the most",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "count",
+"kind": "number",
+"value": 1,
+"unit": "count"
+},
+{
+"label": "top_customer",
+"kind": "name",
+"value": "Neon Offices"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "cleaning-b3-003216",
+"tenant": "cleaning",
+"bank": "out3/dev3",
+"family": "multi_two_types",
+"q": "Give me the bid cunt and the purchase order count",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "count_proposal-quote",
+"kind": "number",
+"value": 27,
+"unit": "count"
+},
+{
+"label": "count_purchase-order",
+"kind": "number",
+"value": 19,
+"unit": "count"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "cleaning-b3-003242",
+"tenant": "cleaning",
+"bank": "out3/dev3",
+"family": "multi_two_types",
+"q": "long story short my partner thinks we did better than i do and we are trying to settle it today, can you tell me give service ticket count and contract count in March 2018",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "count_service-ticket",
+"kind": "number",
+"value": 5,
+"unit": "count"
+},
+{
+"label": "count_maintenance-agreement",
+"kind": "number",
+"value": 1,
+"unit": "count"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "cleaning-b4-000782",
+"tenant": "cleaning",
+"bank": "out4/dev4",
+"family": "count_distinct",
+"q": "so we were having a conversation in the shop earlier and nobody agreed on the answer and now it's a bet, distinct custmers on schedules - how many, thanks",
+"expect": {
+"kind": "number",
+"value": 23,
+"unit": "count"
+},
+"plan": {
+"op": "count_distinct",
+"entity": "document",
+"docType": "schedule",
+"distinct": "customer"
+}
+},
+{
+"id": "cleaning-b4-001750",
+"tenant": "cleaning",
+"bank": "out4/dev4",
+"family": "sum",
+"q": "Standing at the site right now - tell me the sum of the quote docs for the account Ruth Elliott in Las Vegas in the past 9 months in dollars, i keep losing track of it today if possible",
+"expect": {
+"kind": "number",
+"value": 305,
+"unit": "usd"
+},
+"plan": {
+"op": "sum",
+"entity": "document",
+"docType": "proposal-quote",
+"measure": {
+"field": "total"
+},
+"filters": [
+{
+"field": "customer",
+"op": "eq",
+"words": "Ruth Elliott",
+"value": "Ruth Elliott"
+},
+{
+"field": "city",
+"op": "eq",
+"words": "Las Vegas",
+"value": "Las Vegas"
+}
+],
+"time": {
+"words": "in the past 9 months"
+}
+}
+},
+{
+"id": "cleaning-b4-003898",
+"tenant": "cleaning",
+"bank": "out4/dev4",
+"family": "rank_of",
+"q": "Need this right now: tell me where Vista Medical Cemter falls in the customers ranking by tot value of service agreements during 2025",
+"expect": {
+"kind": "number",
+"value": 4,
+"unit": "rank"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "construction-001491",
+"tenant": "construction",
+"bank": "out2",
+"family": "list_dim",
+"q": "i keep forgetting what are the different cities on permits tied to summit development co for 2024",
+"expect": {
+"kind": "list",
+"value": [
+"Mesa"
+]
+},
+"plan": {
+"op": "list",
+"entity": "document",
+"docType": "permit",
+"filters": [
+{
+"field": "customer",
+"op": "eq",
+"words": "summit development co",
+"value": "Summit Development Co"
+}
+],
+"time": {
+"words": "for 2024"
+},
+"distinct": "city"
+}
+},
+{
+"id": "construction-002066",
+"tenant": "construction",
+"bank": "out2",
+"family": "list_numbers",
+"q": "An auditor asked me what material order numbers do we have ordered from Allied Materials",
+"expect": {
+"kind": "list",
+"value": [
+"PO-1802",
+"PO-1864"
+]
+},
+"plan": {
+"op": "list",
+"entity": "document",
+"docType": "purchase-order",
+"filters": [
+{
+"field": "vendor",
+"op": "eq",
+"words": "from Allied Materials",
+"value": "Allied Materials"
+}
+]
+}
+},
+{
+"id": "construction-002181",
+"tenant": "construction",
+"bank": "out2",
+"family": "exists",
+"q": "I never remember, is it true that we have insurance certificates with Cactus Distributors, appreciate it",
+"expect": {
+"kind": "yesno",
+"value": true
+},
+"plan": {
+"op": "exists_yes_no",
+"entity": "document",
+"docType": "insurance-certificate",
+"filters": [
+{
+"field": "vendor",
+"op": "eq",
+"words": "with Cactus Distributors",
+"value": "Cactus Distributors"
+}
+]
+}
+},
+{
+"id": "construction-002300",
+"tenant": "construction",
+"bank": "out2",
+"family": "exists",
+"q": "Ok so well earlier than 2024, is there anything in certificates of insurance with Metro Supply",
+"expect": {
+"kind": "yesno",
+"value": true
+},
+"plan": {
+"op": "exists_yes_no",
+"entity": "document",
+"docType": "insurance-certificate",
+"filters": [
+{
+"field": "vendor",
+"op": "eq",
+"words": "with Metro Supply",
+"value": "Metro Supply"
+}
+],
+"time": {
+"words": "earlier than 2024"
+}
+}
+},
+{
+"id": "construction-002523",
+"tenant": "construction",
+"bank": "out",
+"family": "list_dim",
+"q": "Rundown of sire leads for changge orders for the customer Cactus Homes LLC mentioning \"upgraded\" during the past 60 days thx",
+"expect": {
+"kind": "list",
+"value": [
+"Emily Winslow"
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "construction-003595",
+"tenant": "construction",
+"bank": "out",
+"family": "exists",
+"q": "I was wondering did have any permits for me?",
+"expect": {
+"kind": "yesno",
+"value": true
+},
+"plan": {
+"op": "exists_yes_no",
+"entity": "document",
+"docType": "permit"
+}
+},
+{
+"id": "construction-006291",
+"tenant": "construction",
+"bank": "out",
+"family": "minmax",
+"q": "Can you find out tell me the least expensive change order value assigned to Maria Bennett for Rosa Bowman when you get a chance",
+"expect": {
+"kind": "number",
+"value": 19245,
+"unit": "usd"
+},
+"plan": {
+"op": "min",
+"entity": "document",
+"docType": "work-order",
+"measure": {
+"field": "total"
+},
+"filters": [
+{
+"field": "tech",
+"op": "eq",
+"words": "Maria Bennett",
+"value": "Maria Bennett"
+},
+{
+"field": "customer",
+"op": "eq",
+"words": "Rosa Bowman",
+"value": "Rosa Bowman"
+}
+]
+}
+},
+{
+"id": "construction-006502",
+"tenant": "construction",
+"bank": "out",
+"family": "median",
+"q": "Hi, typical middle value change orders where customer is in Mesa done by foreman Maria Bennett",
+"expect": {
+"kind": "number",
+"value": 9849.71,
+"unit": "usd"
+},
+"plan": {
+"op": "median",
+"entity": "document",
+"docType": "work-order",
+"measure": {
+"field": "total"
+},
+"filters": [
+{
+"field": "city",
+"op": "eq",
+"words": "in Mesa",
+"value": "Mesa"
+},
+{
+"field": "tech",
+"op": "eq",
+"words": "Maria Bennett",
+"value": "Maria Bennett"
+}
+]
+}
+},
+{
+"id": "construction-008397",
+"tenant": "construction",
+"bank": "out",
+"family": "extreme_total",
+"q": "Help me out - how much was the newest change order in 2026 so far if you can?",
+"expect": {
+"kind": "number",
+"value": 17255,
+"unit": "usd"
+},
+"plan": {
+"op": "latest",
+"entity": "document",
+"docType": "work-order",
+"time": {
+"words": "in 2026 so far"
+},
+"sortField": "date",
+"ask": "amount"
+}
+},
+{
+"id": "construction-011813",
+"tenant": "construction",
+"bank": "out",
+"family": "compare_which",
+"q": "hey donovan, which has more inspections assigned, foreman maria bennett or foreman randy garza (need it for the books)",
+"expect": {
+"kind": "name",
+"value": "Maria Bennett"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "construction-022165",
+"tenant": "construction",
+"bank": "out",
+"family": "lookup_address",
+"q": "Ok Summit Properties LLC's address",
+"expect": {
+"kind": "name",
+"value": "6805 W Desert Willow Dr, Phoenix, AZ 85008"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "construction-b3-000072",
+"tenant": "construction",
+"bank": "out3/dev3",
+"family": "multi_count_total",
+"q": "I waNT THe dOllar TotaL of ChanGe oRdErs tHAt are PENDing in The Last Two yeArS AnD alsO HOw maNy",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "total",
+"kind": "number",
+"value": 85082.23,
+"unit": "usd"
+},
+{
+"label": "count",
+"kind": "number",
+"value": 7,
+"unit": "count"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "construction-b3-002654",
+"tenant": "construction",
+"bank": "out3/dev3",
+"family": "multi_count_top",
+"q": "Number of signed contracts during Q1 of 2021 plus the client with the most",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "count",
+"kind": "number",
+"value": 1,
+"unit": "count"
+},
+{
+"label": "top_customer",
+"kind": "name",
+"value": "Grace Sutton"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "construction-b3-002793",
+"tenant": "construction",
+"bank": "out3/dev3",
+"family": "multi_count_top",
+"q": "# of building permits in 2019 plus the client w/ the most",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "count",
+"kind": "number",
+"value": 2,
+"unit": "count"
+},
+{
+"label": "top_customer",
+"kind": "name",
+"value": "Mason Vargas"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "construction-b3-003665",
+"tenant": "construction",
+"bank": "out3/dev3",
+"family": "multi_two_types",
+"q": "give me the proposal count and the signed contract count",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "count_proposal-quote",
+"kind": "number",
+"value": 74,
+"unit": "count"
+},
+{
+"label": "count_agreement",
+"kind": "number",
+"value": 17,
+"unit": "count"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "construction-b4-000910",
+"tenant": "construction",
+"bank": "out4/dev4",
+"family": "list_dim",
+"q": "my supervisor said to ask you: can you tell me the statuses behind site visits with \"inspction\" mentioned pls",
+"expect": {
+"kind": "list",
+"value": [
+"Failed",
+"Passed"
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "construction-b4-002672",
+"tenant": "construction",
+"bank": "out4/dev4",
+"family": "extreme_date",
+"q": "Show me the most recent visit entry of Ridge Retail Partners that aren't failed was on what day",
+"expect": {
+"kind": "date",
+"value": "2025-04-13"
+},
+"plan": {
+"op": "latest",
+"entity": "document",
+"visit": true,
+"filters": [
+{
+"field": "customer",
+"op": "eq",
+"words": "Ridge Retail Partners",
+"value": "Ridge Retail Partners"
+},
+{
+"field": "status",
+"op": "neq",
+"words": "aren't failed",
+"value": "Failed"
+}
+],
+"sortField": "serviceDate"
+}
+},
+{
+"id": "construction-b4-004474",
+"tenant": "construction",
+"bank": "out4/dev4",
+"family": "compare_which",
+"q": "My supervisor said to ask you: 2025 or 2020 - which had a bigger contract total",
+"expect": {
+"kind": "name",
+"value": "2025"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "dental-b3-000494",
+"tenant": "dental",
+"bank": "out3/dev3",
+"family": "multi_count_total",
+"q": "I want the dollar total of patient bills from Rio Rancho within the last 60 days and also how many",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "total",
+"kind": "number",
+"value": 3640,
+"unit": "usd"
+},
+{
+"label": "count",
+"kind": "number",
+"value": 2,
+"unit": "count"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "dental-b3-010500",
+"tenant": "dental",
+"bank": "out3/dev3",
+"family": "coming_up",
+"q": "Whose Paperwork Expires in Next 90 days?",
+"expect": {
+"kind": "list",
+"value": [
+"Gabriel Sanders",
+"John Bates",
+"Shirley Martin"
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "dental-b3-010597",
+"tenant": "dental",
+"bank": "out3/dev3",
+"family": "coming_up",
+"q": "Which patients have insurance cards lapsing over the next 30 days?",
+"expect": {
+"kind": "list",
+"value": [
+"Shirley Martin"
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "dental-b3-011426",
+"tenant": "dental",
+"bank": "out3/dev3",
+"family": "coming_up",
+"q": "how many insurance records do we have expiring 90 days out",
+"expect": {
+"kind": "number",
+"value": 3,
+"unit": "count"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "dental-b3-012488",
+"tenant": "dental",
+"bank": "out3/dev3",
+"family": "this_vs_last",
+"q": "PATIENT BILLS DOLLARS THIS YEAR CMPD WITH LAST YEAR",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "total_this_year",
+"kind": "number",
+"value": 11350.06,
+"unit": "usd"
+},
+{
+"label": "total_last_year",
+"kind": "number",
+"value": 6929.83,
+"unit": "usd"
+}
+],
+"basis": "this_ytd_vs_same_period_last_year"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "dental-b3-014420",
+"tenant": "dental",
+"bank": "out3/dev3",
+"family": "top_ties",
+"q": "Back in 2021, who r the bottom 2 dentists by visit records?",
+"expect": {
+"kind": "list",
+"value": [
+"Rachel Guzman",
+"Rachel Andrews"
+],
+"ordered": true,
+"tie": false,
+"vals": [
+1,
+4
+]
+},
+"plan": {
+"op": "bottom_n",
+"entity": "document",
+"visit": true,
+"groupBy": [
+"tech"
+],
+"limit": 2,
+"time": {
+"words": "Back in 2021"
+}
+}
+},
+{
+"id": "dental-b3-015109",
+"tenant": "dental",
+"bank": "out3/dev3",
+"family": "top_ties",
+"q": "please tell me back in 2024 who are the bottom three doctors by number of appointment records",
+"expect": {
+"kind": "list",
+"value": [
+"Rachel Guzman",
+"Rachel Andrews",
+"Logan Ward"
+],
+"ordered": true,
+"tie": false,
+"vals": [
+2,
+6,
+9
+]
+},
+"plan": {
+"op": "bottom_n",
+"entity": "document",
+"visit": true,
+"groupBy": [
+"tech"
+],
+"limit": 3,
+"time": {
+"words": "back in 2024"
+}
+}
+},
+{
+"id": "dental-b3-021296",
+"tenant": "dental",
+"bank": "out3/dev3",
+"family": "one_word",
+"q": "Hey consent forms",
+"expect": {
+"kind": "number",
+"value": 45,
+"unit": "count"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "dental-b3-021524",
+"tenant": "dental",
+"bank": "out3/dev3",
+"family": "one_word",
+"q": "Hey Rio so basically Rancho",
+"expect": {
+"kind": "number",
+"value": 64,
+"unit": "count"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "dental-b4-001330",
+"tenant": "dental",
+"bank": "out4/dev4",
+"family": "exists",
+"q": "My supervisor said to ask you: any signed forms for the patient Pilar Griffin for patients located in Albuquerque in the previous 45 days? - from the documents we have",
+"expect": {
+"kind": "yesno",
+"value": true
+},
+"plan": {
+"op": "exists_yes_no",
+"entity": "document",
+"docType": "agreement",
+"filters": [
+{
+"field": "customer",
+"op": "eq",
+"words": "Pilar Griffin",
+"value": "Pilar Griffin"
+},
+{
+"field": "city",
+"op": "eq",
+"words": "Albuquerque",
+"value": "Albuquerque"
+}
+],
+"time": {
+"words": "in the previous 45 days"
+}
+}
+},
+{
+"id": "dental-b4-002523",
+"tenant": "dental",
+"bank": "out4/dev4",
+"family": "extreme_date",
+"q": "Could oldest appointment date for 2019 (just from what's in the system) \u2753",
+"expect": {
+"kind": "date",
+"value": "2019-02-15"
+},
+"plan": {
+"op": "first_ever",
+"entity": "document",
+"visit": true,
+"time": {
+"words": "for 2019"
+},
+"sortField": "serviceDate"
+}
+},
+{
+"id": "dental-b4-002642",
+"tenant": "dental",
+"bank": "out4/dev4",
+"family": "extreme_date",
+"q": "Fast one: newest signed form doc date for patients located in Santa Fe",
+"expect": {
+"kind": "date",
+"value": "2026-01-26"
+},
+"plan": {
+"op": "latest",
+"entity": "document",
+"docType": "agreement",
+"filters": [
+{
+"field": "city",
+"op": "eq",
+"words": "Santa Fe",
+"value": "Santa Fe"
+}
+],
+"sortField": "date"
+}
+},
+{
+"id": "electrical-000161",
+"tenant": "electrical",
+"bank": "out2",
+"family": "count",
+"q": "quick: visits count",
+"expect": {
+"kind": "number",
+"value": 98,
+"unit": "count"
+},
+"plan": {
+"op": "count",
+"entity": "document",
+"visit": true
+}
+},
+{
+"id": "electrical-001559",
+"tenant": "electrical",
+"bank": "out",
+"family": "count",
+"q": "how many inspection reports came through (need it for the books)",
+"expect": {
+"kind": "number",
+"value": 22,
+"unit": "count"
+},
+"plan": {
+"op": "count",
+"entity": "document",
+"docType": "inspection-report"
+}
+},
+{
+"id": "electrical-001587",
+"tenant": "electrical",
+"bank": "out2",
+"family": "list_dim",
+"q": "what are the different statuses on inspections steven ruiz worked on mentioning \"inspection\"?",
+"expect": {
+"kind": "list",
+"value": [
+"Failed",
+"Passed"
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "electrical-001737",
+"tenant": "electrical",
+"bank": "out2",
+"family": "list_dim",
+"q": "Ok so names of the statuses on service calls that Steven Ruiz did not do - the accountant needs it",
+"expect": {
+"kind": "list",
+"value": [
+"Completed",
+"Failed",
+"Open",
+"Passed"
+]
+},
+"plan": {
+"op": "list",
+"entity": "document",
+"visit": true,
+"filters": [
+{
+"field": "tech",
+"op": "neq",
+"words": "that Steven Ruiz did not do",
+"value": "Steven Ruiz"
+}
+],
+"distinct": "status"
+}
+},
+{
+"id": "electrical-002842",
+"tenant": "electrical",
+"bank": "out",
+"family": "list_dim",
+"q": "Quick one - rundown of brands for jobs not marked failed last year",
+"expect": {
+"kind": "list",
+"value": [
+"ChargePoint",
+"Eaton",
+"Generac"
+]
+},
+"plan": {
+"op": "list",
+"entity": "document",
+"visit": true,
+"filters": [
+{
+"field": "status",
+"op": "neq",
+"words": "not marked failed",
+"value": "Failed"
+}
+],
+"time": {
+"words": "last year"
+},
+"distinct": "brand"
+}
+},
+{
+"id": "electrical-003892",
+"tenant": "electrical",
+"bank": "out",
+"family": "exists",
+"q": "can you find out did we have any jobs whose status is completed for the client michael bailey during the pst 30 days",
+"expect": {
+"kind": "yesno",
+"value": true
+},
+"plan": {
+"op": "exists_yes_no",
+"entity": "document",
+"visit": true,
+"filters": [
+{
+"field": "status",
+"op": "eq",
+"words": "status is completed",
+"value": "Completed"
+},
+{
+"field": "customer",
+"op": "eq",
+"words": "michael bailey",
+"value": "Michael Bailey"
+}
+],
+"time": {
+"words": "during the pst 30 days"
+}
+}
+},
+{
+"id": "electrical-006709",
+"tenant": "electrical",
+"bank": "out",
+"family": "extreme_date",
+"q": "Hey, what's the date of our very first visit for Siemens equipment?",
+"expect": {
+"kind": "date",
+"value": "2019-04-22"
+},
+"plan": {
+"op": "first_ever",
+"entity": "document",
+"visit": true,
+"filters": [
+{
+"field": "brand",
+"op": "eq",
+"words": "Siemens",
+"value": "Siemens"
+}
+],
+"sortField": "serviceDate"
+}
+},
+{
+"id": "electrical-007277",
+"tenant": "electrical",
+"bank": "out",
+"family": "extreme_date",
+"q": "Can You Check What'S The Date Of Our Oldest Service Ticket With Service Type Troubleshooting Handled By Steven Ruiz Within The Last 9 Months",
+"expect": {
+"kind": "date",
+"value": "2026-02-08"
+},
+"plan": {
+"op": "first_ever",
+"entity": "document",
+"docType": "service-ticket",
+"filters": [
+{
+"field": "serviceType",
+"op": "eq",
+"words": "service type troubleshooting",
+"value": "Troubleshooting"
+},
+{
+"field": "tech",
+"op": "eq",
+"words": "Steven Ruiz",
+"value": "Steven Ruiz"
+}
+],
+"time": {
+"words": "within the last 9 months"
+},
+"sortField": "date"
+}
+},
+{
+"id": "electrical-010306",
+"tenant": "electrical",
+"bank": "out",
+"family": "rank_of",
+"q": "Tell me what rank is Paul Olson among our clients by job count - trying to settle something in the office?",
+"expect": {
+"kind": "number",
+"value": 3,
+"unit": "rank"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "electrical-014339",
+"tenant": "electrical",
+"bank": "out",
+"family": "days_docs",
+"q": "Donovan, numbre of days separating PQ-1365 and PQ-1378 asap",
+"expect": {
+"kind": "number",
+"value": 351,
+"unit": "days"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "electrical-020514",
+"tenant": "electrical",
+"bank": "out",
+"family": "dup_names",
+"q": "Which clients are listed twice by name?",
+"expect": {
+"kind": "list",
+"value": [
+"Jacqueline Ramos",
+"Janice Williamson"
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "electrical-b3-002556",
+"tenant": "electrical",
+"bank": "out3/dev3",
+"family": "multi_count_top",
+"q": "Number of facturas in year 2023 plus cliente with most",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "count",
+"kind": "number",
+"value": 7,
+"unit": "count"
+},
+{
+"label": "top_customer",
+"kind": "name",
+"value": "Canyon Storage LLC"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "electrical-b3-002671",
+"tenant": "electrical",
+"bank": "out3/dev3",
+"family": "multi_count_top",
+"q": "Number of inspection reports in Q4 2019 plus the client with the most thx",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "count",
+"kind": "number",
+"value": 1,
+"unit": "count"
+},
+{
+"label": "top_customer",
+"kind": "name",
+"value": "Paul Olson"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "electrical-b3-003351",
+"tenant": "electrical",
+"bank": "out3/dev3",
+"family": "multi_two_types",
+"q": "Give inspeciton rpeort count and quuote count this year",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "count_inspection-report",
+"kind": "number",
+"value": 3,
+"unit": "count"
+},
+{
+"label": "count_proposal-quote",
+"kind": "number",
+"value": 2,
+"unit": "count"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "electrical-b4-000313",
+"tenant": "electrical",
+"bank": "out4/dev4",
+"family": "count",
+"q": "I'm deciding something today - is it possible to get the # of inspections within the last 180 days, cheers?",
+"expect": {
+"kind": "number",
+"value": 2,
+"unit": "count"
+},
+"plan": {
+"op": "count",
+"entity": "document",
+"docType": "inspection-report",
+"time": {
+"words": "within the last 180 days"
+}
+}
+},
+{
+"id": "electrical-b4-000913",
+"tenant": "electrical",
+"bank": "out4/dev4",
+"family": "list_dim",
+"q": "Sorry if this is a dumb question, pull the technicians off the service call entries where the client is in Sandy when you get a sec when you can",
+"expect": {
+"kind": "list",
+"value": [
+"Alexander Palmer",
+"Steven Ruiz"
+]
+},
+"plan": {
+"op": "list",
+"entity": "document",
+"visit": true,
+"filters": [
+{
+"field": "city",
+"op": "eq",
+"words": "in Sandy",
+"value": "Sandy"
+}
+],
+"distinct": "tech"
+}
+},
+{
+"id": "electrical-b4-003543",
+"tenant": "electrical",
+"bank": "out4/dev4",
+"family": "top",
+"q": "so we were having a conversation in the shop earlier and nobody agreed on the answer and now it's a bet, name the citty with the largest count of estimtes in the past 9 months",
+"expect": {
+"kind": "name",
+"value": "Salt Lake City"
+},
+"plan": {
+"op": "top_n",
+"entity": "document",
+"docType": "proposal-quote",
+"groupBy": [
+"city"
+],
+"limit": 1,
+"time": {
+"words": "in the past 9 months"
+}
+}
+},
+{
+"id": "eventvenue-b4-007756",
+"tenant": "eventvenue",
+"bank": "out4/dev4",
+"family": "text",
+"q": "COupLEs WHosE loAd-in SheEt PaperWork In the el a\u00f1o pasado sAy tAblEs whEn YOu cAn (no RusH) \ud83d\udcc4",
+"expect": {
+"kind": "list",
+"value": [
+"Bryan Neal",
+"Buckeye Association East",
+"Jeremy Kelly",
+"Miguel Taylor"
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "eventvenue-b4-008336",
+"tenant": "eventvenue",
+"bank": "out4/dev4",
+"family": "lookup_phone",
+"q": "First week here, James Romero - phone, it's been bugging me if that's ok",
+"expect": {
+"kind": "name",
+"value": "(623) 555-6814"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "eventvenue-b4-009627",
+"tenant": "eventvenue",
+"bank": "out4/dev4",
+"family": "untracked",
+"q": "Running between jobs, tell me the diagnosis codes",
+"expect": {
+"kind": "decline",
+"value": null
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "eventvenue-b4-015576",
+"tenant": "eventvenue",
+"bank": "out4/dev4",
+"family": "coming_up",
+"q": "STANDING AT THE SITE RIGHT NOW - WHO IS UP FOR RENEWAL IN THE NEXT 90 DAYS (JUST FROM WHAT'S IN THE SYSTEM) BEFORE THE END OF THE DAY?",
+"expect": {
+"kind": "list",
+"value": [
+"Buckeye Association",
+"Eric Duran",
+"Jeremy Kelly",
+"Laura Hart",
+"Nora Moreno",
+"Riverside Group Premier"
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "eventvenue-b4-019120",
+"tenant": "eventvenue",
+"bank": "out4/dev4",
+"family": "one_word",
+"q": "aspa - clents for our records",
+"expect": {
+"kind": "number",
+"value": 240,
+"unit": "count"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "eventvenue-b4-022194",
+"tenant": "eventvenue",
+"bank": "out4/dev4",
+"family": "number_words",
+"q": "can you help me how many couples do we have with no fewer than a couple of vendor sheet files",
+"expect": {
+"kind": "number",
+"value": 20,
+"unit": "count"
+},
+"plan": {
+"op": "count",
+"entity": "customer",
+"filters": [
+{
+"field": "docCount",
+"op": "gte",
+"words": "no fewer than a couple of vendor sheet files",
+"value": 2,
+"docType": "vendor-load-in-sheet"
+}
+]
+}
+},
+{
+"id": "eventvenue-b4-024391",
+"tenant": "eventvenue",
+"bank": "out4/dev4",
+"family": "top_ties",
+"q": "who are the 5 biggest hosts by number of bookings for 2025 on our side",
+"expect": {
+"kind": "list",
+"value": [
+"Eric Duran",
+"Jeremy Kelly",
+"Laura Hart",
+"Patricia Miller",
+"Riverside Group Premier",
+"Vincent Moreno"
+],
+"ordered": false,
+"tie": true,
+"vals": [
+2,
+2,
+2,
+2,
+2,
+2
+]
+},
+"plan": {
+"op": "top_n",
+"entity": "document",
+"docType": "booking-contract",
+"groupBy": [
+"customer"
+],
+"limit": 5,
+"time": {
+"words": "for 2025"
+}
+}
+},
+{
+"id": "feedstore-b4-001344",
+"tenant": "feedstore",
+"bank": "out4/dev4",
+"family": "exists",
+"q": "Our admin needs this: were there any soil reports for the rancher Justin Riley out of everything we've uploaded",
+"expect": {
+"kind": "yesno",
+"value": true
+},
+"plan": {
+"op": "exists_yes_no",
+"entity": "document",
+"docType": "pasture-soil-test",
+"filters": [
+{
+"field": "customer",
+"op": "eq",
+"words": "Justin Riley",
+"value": "Justin Riley"
+}
+]
+}
+},
+{
+"id": "feedstore-b4-004728",
+"tenant": "feedstore",
+"bank": "out4/dev4",
+"family": "compare_diff",
+"q": "i have a meeting in ten minutes and the bank wants numbers and i can't find my notes, quick one for you: yo difference in count deliverys for Pflugerville against Cedar Park, thanks when can",
+"expect": {
+"kind": "number",
+"value": 5,
+"unit": "count"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "feedstore-b4-005056",
+"tenant": "feedstore",
+"bank": "out4/dev4",
+"family": "busiest",
+"q": "i have a meeting in ten minutes and the bank wants numbers and i can't find my notes, quick one for you: name heaviest calendar month (all years combined) for charge account forms",
+"expect": {
+"kind": "name",
+"value": "September"
+},
+"plan": {
+"op": "top_n",
+"entity": "document",
+"docType": "credit-application",
+"groupBy": [
+"monthOfYear"
+],
+"limit": 1
+}
+},
+{
+"id": "feedstore-b4-017098",
+"tenant": "feedstore",
+"bank": "out4/dev4",
+"family": "top_ties",
+"q": "for the accrual check - bottom three cities by number of credit hold notices if thats ok",
+"expect": {
+"kind": "list",
+"value": [
+"Georgetown",
+"Cedar Park",
+"Round Rock"
+],
+"ordered": true,
+"tie": false,
+"vals": [
+5,
+7,
+8
+]
+},
+"plan": {
+"op": "bottom_n",
+"entity": "document",
+"docType": "credit-hold-notice",
+"groupBy": [
+"city"
+],
+"limit": 3
+}
+},
+{
+"id": "feedstore-b4-017299",
+"tenant": "feedstore",
+"bank": "out4/dev4",
+"family": "top_ties",
+"q": "can you tell me Who Are the Three biggest Farm accounts By account Staement dollars during 2022 As Best you Can Tell",
+"expect": {
+"kind": "list",
+"value": [
+"Elizabeth Lopez",
+"Andrew Crawford",
+"Angela Harrison",
+"Lauren Jimenez"
+],
+"ordered": false,
+"tie": true,
+"vals": [
+1580,
+750,
+750,
+750
+]
+},
+"plan": {
+"op": "top_n",
+"entity": "document",
+"docType": "account-statement-month",
+"groupBy": [
+"customer"
+],
+"measure": {
+"field": "total"
+},
+"limit": 3,
+"time": {
+"words": "during 2022"
+}
+}
+},
+{
+"id": "feedstore-b4-019761",
+"tenant": "feedstore",
+"bank": "out4/dev4",
+"family": "nickname",
+"q": "How many account statements does n. kennedy have when you can",
+"expect": {
+"kind": "number",
+"value": 0,
+"unit": "count"
+},
+"plan": {
+"op": "count",
+"entity": "document",
+"docType": "account-statement-month",
+"filters": [
+{
+"field": "customer",
+"op": "eq",
+"words": "n. kennedy",
+"value": "N. Kennedy"
+}
+]
+}
+},
+{
+"id": "feedstore-b4-020671",
+"tenant": "feedstore",
+"bank": "out4/dev4",
+"family": "vague",
+"q": "are we going to have a good december",
+"expect": {
+"kind": "decline",
+"value": {
+"reason": "forecast"
+}
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "gym-b4-009399",
+"tenant": "gym",
+"bank": "out4/dev4",
+"family": "pay",
+"q": "Support the numbers: how many billing statements have been settled in full, thanks out of everything we've uploaded (no rush)?",
+"expect": {
+"kind": "number",
+"value": 0,
+"unit": "count"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "gym-b4-009905",
+"tenant": "gym",
+"bank": "out4/dev4",
+"family": "untracked",
+"q": "me puedes decir what is our check-in counts",
+"expect": {
+"kind": "decline",
+"value": null
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "gym-b4-016929",
+"tenant": "gym",
+"bank": "out4/dev4",
+"family": "top_ties",
+"q": "I'M UPDATING OUR BINDER: IN THE YEAR 2024, WHICH TWO CITIES HAVE THE MOST MOST SESSION LOGS?",
+"expect": {
+"kind": "list",
+"value": [
+"Raleigh",
+"Cary"
+],
+"ordered": true,
+"tie": false,
+"vals": [
+22,
+10
+]
+},
+"plan": {
+"op": "top_n",
+"entity": "document",
+"docType": "pt-session-log",
+"groupBy": [
+"city"
+],
+"limit": 2,
+"time": {
+"words": "In the year 2024"
+}
+}
+},
+{
+"id": "gym-b4-020428",
+"tenant": "gym",
+"bank": "out4/dev4",
+"family": "nickname",
+"q": "someone just called asking and whats logan josephs phone number thanks in advance",
+"expect": {
+"kind": "name",
+"value": "(520) 555-2818"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "gym-b4-021324",
+"tenant": "gym",
+"bank": "out4/dev4",
+"family": "date_formats",
+"q": "Quick check for office - how many session logs mentioning \"upper\" on or after 20 December before my meeting",
+"expect": {
+"kind": "number",
+"value": 5,
+"unit": "count"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "gym-b4-021690",
+"tenant": "gym",
+"bank": "out4/dev4",
+"family": "date_formats",
+"q": "i have a meeting in ten minutes and the bank wants numbers and i can't find my notes, quick one for you: can you quickly count the pt sessions from 10/5/26 through today thanks",
+"expect": {
+"kind": "number",
+"value": 1,
+"unit": "count"
+},
+"plan": {
+"op": "count",
+"entity": "document",
+"docType": "pt-session-log",
+"time": {
+"words": "from 10/5/26 through today"
+}
+}
+},
+{
+"id": "hoa-b3-003647",
+"tenant": "hoa",
+"bank": "out3/dev3",
+"family": "multi_two_types",
+"q": "give me the assessment count and the notice count",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "count_invoice",
+"kind": "number",
+"value": 207,
+"unit": "count"
+},
+{
+"label": "count_correspondence",
+"kind": "number",
+"value": 129,
+"unit": "count"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "hoa-b3-004872",
+"tenant": "hoa",
+"bank": "out3/dev3",
+"family": "multi_count_who",
+"q": "sorry to bug you again, it has been a crazy week and the office is a mess and my accountant is waiting on me - number of arc requests for jeffrey patterson in july 2021 and the names of the owners if you can",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "count",
+"kind": "number",
+"value": 1,
+"unit": "count"
+},
+{
+"label": "customers",
+"kind": "list",
+"value": [
+"Jeffrey Patterson"
+]
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "hoa-b3-011024",
+"tenant": "hoa",
+"bank": "out3/dev3",
+"family": "coming_up",
+"q": "DO WE HAE ANY DOCUMENTS EXPIRING IN THE NEXT 60 DAYS? \ud83d\udcca",
+"expect": {
+"kind": "yesno",
+"value": true
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "hoa-b3-011743",
+"tenant": "hoa",
+"bank": "out3/dev3",
+"family": "coming_up",
+"q": "Which vendors have insurance certificates lapsing over the next ninety days \ud83d\udc4d",
+"expect": {
+"kind": "list",
+"value": [
+"Frontier Supply Co",
+"Summit Equipment Rental"
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "hoa-b3-018178",
+"tenant": "hoa",
+"bank": "out3/dev3",
+"family": "yes_no",
+"q": "are we behind last year on work orders",
+"expect": {
+"kind": "yesno",
+"value": false
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "hoa-b3-020085",
+"tenant": "hoa",
+"bank": "out3/dev3",
+"family": "yes_no",
+"q": "got any visits in denver containing the word \"inspection\"",
+"expect": {
+"kind": "yesno",
+"value": true
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "hoa-b3-020649",
+"tenant": "hoa",
+"bank": "out3/dev3",
+"family": "one_word",
+"q": "Hey payment receipts",
+"expect": {
+"kind": "number",
+"value": 72,
+"unit": "count"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "hoa-b3-021237",
+"tenant": "hoa",
+"bank": "out3/dev3",
+"family": "one_word",
+"q": "hey purchase ordes",
+"expect": {
+"kind": "number",
+"value": 43,
+"unit": "count"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "hoa-b3-021337",
+"tenant": "hoa",
+"bank": "out3/dev3",
+"family": "one_word",
+"q": "\ud83e\uddfe Hey inspections",
+"expect": {
+"kind": "number",
+"value": 109,
+"unit": "count"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "hoa-b4-002745",
+"tenant": "hoa",
+"bank": "out4/dev4",
+"family": "extreme_date",
+"q": "show me the very first insurance certificate entry bought from allied materials was on what day",
+"expect": {
+"kind": "date",
+"value": "2021-04-23"
+},
+"plan": {
+"op": "first_ever",
+"entity": "document",
+"docType": "certificate-of-insurance",
+"filters": [
+{
+"field": "vendor",
+"op": "eq",
+"words": "allied materials",
+"value": "Allied Materials"
+}
+],
+"sortField": "date"
+}
+},
+{
+"id": "landscaping-000491",
+"tenant": "landscaping",
+"bank": "out2",
+"family": "count",
+"q": "Hw many maintenance cpntracts over $950 over the past 24 months",
+"expect": {
+"kind": "number",
+"value": 18,
+"unit": "count"
+},
+"plan": {
+"op": "count",
+"entity": "document",
+"docType": "maintenance-agreement",
+"filters": [
+{
+"field": "total",
+"op": "gt",
+"words": "over $950",
+"value": 950
+}
+],
+"time": {
+"words": "over the past 24 months"
+}
+}
+},
+{
+"id": "landscaping-001576",
+"tenant": "landscaping",
+"bank": "out2",
+"family": "list_dim",
+"q": "Please ok so names of the types of service on visits from Austin mentioning \"front\" within the last 6 months - the accountant needs it",
+"expect": {
+"kind": "list",
+"value": [
+"Irrigation repair"
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "landscaping-001743",
+"tenant": "landscaping",
+"bank": "out2",
+"family": "list_dim",
+"q": "Can u help me figure out what r the different foremans on visits Oakwood Church has in the year 2025?",
+"expect": {
+"kind": "list",
+"value": [
+"Louis Stewart",
+"Raymond Bryant"
+]
+},
+"plan": {
+"op": "list",
+"entity": "document",
+"visit": true,
+"filters": [
+{
+"field": "customer",
+"op": "eq",
+"words": "Oakwood Church",
+"value": "Oakwood Church"
+}
+],
+"time": {
+"words": "in the year 2025"
+},
+"distinct": "tech"
+}
+},
+{
+"id": "landscaping-002067",
+"tenant": "landscaping",
+"bank": "out2",
+"family": "list_numbers",
+"q": "got a request from a coworker what invoice numbers do we have tied to richard snyder in the year 2019",
+"expect": {
+"kind": "list",
+"value": [
+"GL-1874"
+]
+},
+"plan": {
+"op": "list",
+"entity": "document",
+"docType": "invoice",
+"filters": [
+{
+"field": "customer",
+"op": "eq",
+"words": "richard snyder",
+"value": "Richard Snyder"
+}
+],
+"time": {
+"words": "in the year 2019"
+}
+}
+},
+{
+"id": "landscaping-002283",
+"tenant": "landscaping",
+"bank": "out2",
+"family": "exists",
+"q": "Over the past 6 months, is there anything in service visits whose status is not completed from Pflugerville John Robinson has?",
+"expect": {
+"kind": "yesno",
+"value": true
+},
+"plan": {
+"op": "exists_yes_no",
+"entity": "document",
+"visit": true,
+"filters": [
+{
+"field": "status",
+"op": "neq",
+"words": "status is not completed",
+"value": "Completed"
+},
+{
+"field": "city",
+"op": "eq",
+"words": "Pflugerville",
+"value": "Pflugerville"
+},
+{
+"field": "customer",
+"op": "eq",
+"words": "John Robinson",
+"value": "John Robinson"
+}
+],
+"time": {
+"words": "Over the past 6 months"
+}
+}
+},
+{
+"id": "landscaping-003547",
+"tenant": "landscaping",
+"bank": "out",
+"family": "exists",
+"q": "just curious, did we have any work orders with a status other than completed brenda jones has?",
+"expect": {
+"kind": "yesno",
+"value": false
+},
+"plan": {
+"op": "exists_yes_no",
+"entity": "document",
+"docType": "work-order",
+"filters": [
+{
+"field": "status",
+"op": "neq",
+"words": "status other than completed",
+"value": "Completed"
+},
+{
+"field": "customer",
+"op": "eq",
+"words": "brenda jones",
+"value": "Brenda Jones"
+}
+]
+}
+},
+{
+"id": "landscaping-008568",
+"tenant": "landscaping",
+"bank": "out",
+"family": "extreme_tech",
+"q": "Donovan, the earliest job for May 2020 was donne by who for me",
+"expect": {
+"kind": "name",
+"value": "Judith George"
+},
+"plan": {
+"op": "first_ever",
+"entity": "document",
+"visit": true,
+"time": {
+"words": "for May 2020"
+},
+"sortField": "serviceDate",
+"ask": "tech"
+}
+},
+{
+"id": "landscaping-011513",
+"tenant": "landscaping",
+"bank": "out",
+"family": "compare_which",
+"q": "Just curious, which has a higher tot inv amt during Q2 of 2026, Kevin Curtis or client Abigail Hawkins (need it for the books)?",
+"expect": {
+"kind": "name",
+"value": "Abigail Hawkins"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "landscaping-011611",
+"tenant": "landscaping",
+"bank": "out",
+"family": "compare_which",
+"q": "My accountant keeps asking me this and which has more work orders with status completed, Brenda Jones or Sean Little if you can?",
+"expect": {
+"kind": "name",
+"value": "Brenda Jones"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "landscaping-015564",
+"tenant": "landscaping",
+"bank": "out",
+"family": "inactive",
+"q": "I need you to count the custokers whose last job was before 1/1/2026 when you get a chance",
+"expect": {
+"kind": "number",
+"value": 77,
+"unit": "count"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "landscaping-015621",
+"tenant": "landscaping",
+"bank": "out",
+"family": "inactive",
+"q": "Hi, count the clients whose last job was b4 April 2025",
+"expect": {
+"kind": "number",
+"value": 47,
+"unit": "count"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "landscaping-017305",
+"tenant": "landscaping",
+"bank": "out",
+"family": "cust_list",
+"q": "Can you tell me which of our clients whose name contains Megan?",
+"expect": {
+"kind": "list",
+"value": [
+"Megan Keller",
+"Megan Lopez",
+"Megan Perkins"
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "landscaping-b3-002684",
+"tenant": "landscaping",
+"bank": "out3/dev3",
+"family": "multi_count_top",
+"q": "Number of work orders in Q1 of 2026 plus the costumer with the most",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "count",
+"kind": "number",
+"value": 1,
+"unit": "count"
+},
+{
+"label": "top_customer",
+"kind": "name",
+"value": "Zachary Jimenez"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "landscaping-b3-002800",
+"tenant": "landscaping",
+"bank": "out3/dev3",
+"family": "multi_count_top",
+"q": "number of service visits during q3 of 2023 plus the client with the most",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "count",
+"kind": "number",
+"value": 16,
+"unit": "count"
+},
+{
+"label": "top_customer",
+"kind": "name",
+"value": "Cedar Church"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "landscaping-b3-002918",
+"tenant": "landscaping",
+"bank": "out3/dev3",
+"family": "multi_count_top",
+"q": "numver of deliveries during q2 of 2021 plus the customer with the most",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "count",
+"kind": "number",
+"value": 1,
+"unit": "count"
+},
+{
+"label": "top_customer",
+"kind": "name",
+"value": "Teresa Rose"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "landscaping-b4-000504",
+"tenant": "landscaping",
+"bank": "out4/dev4",
+"family": "count",
+"q": "For the working papers, cu\u00e1ntos delivery ticket docs would that be on Richard Fox's account",
+"expect": {
+"kind": "number",
+"value": 1,
+"unit": "count"
+},
+"plan": {
+"op": "count",
+"entity": "document",
+"docType": "delivery-ticket",
+"filters": [
+{
+"field": "customer",
+"op": "eq",
+"words": "Richard Fox",
+"value": "Richard Fox"
+}
+]
+}
+},
+{
+"id": "landscaping-b4-002936",
+"tenant": "landscaping",
+"bank": "out4/dev4",
+"family": "extreme_cust",
+"q": "My bookkeeper is asking: who was the client on the first work order paper by Louis Stewart in Q3 of 2024 from the stored files?",
+"expect": {
+"kind": "name",
+"value": "Kathryn Hunter"
+},
+"plan": {
+"op": "first_ever",
+"entity": "document",
+"docType": "work-order",
+"filters": [
+{
+"field": "tech",
+"op": "eq",
+"words": "Louis Stewart",
+"value": "Louis Stewart"
+}
+],
+"time": {
+"words": "in Q3 of 2024"
+},
+"sortField": "date",
+"ask": "customer"
+}
+},
+{
+"id": "landscaping-b4-003095",
+"tenant": "landscaping",
+"bank": "out4/dev4",
+"family": "extreme_num",
+"q": "short on time here: number on the newest invoice in austin back in 2020 if you don't mind",
+"expect": {
+"kind": "name",
+"value": "GL-1915"
+},
+"plan": {
+"op": "latest",
+"entity": "document",
+"docType": "invoice",
+"filters": [
+{
+"field": "city",
+"op": "eq",
+"words": "in austin",
+"value": "Austin"
+}
+],
+"time": {
+"words": "in 2020"
+},
+"sortField": "date"
+}
+},
+{
+"id": "legal-000209",
+"tenant": "legal",
+"bank": "out2",
+"family": "count",
+"q": "Headcount of meetings",
+"expect": {
+"kind": "number",
+"value": 71,
+"unit": "count"
+},
+"plan": {
+"op": "count",
+"entity": "document",
+"visit": true
+}
+},
+{
+"id": "legal-000354",
+"tenant": "legal",
+"bank": "out2",
+"family": "count",
+"q": "in the last 365 days, headcount of schedule entries containing the word \"client\"",
+"expect": {
+"kind": "number",
+"value": 1,
+"unit": "count"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "legal-000482",
+"tenant": "legal",
+"bank": "out2",
+"family": "count",
+"q": "i count how many schedule entries that mention meeting you tell me if right",
+"expect": {
+"kind": "number",
+"value": 8,
+"unit": "count"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "legal-001567",
+"tenant": "legal",
+"bank": "out2",
+"family": "list_dim",
+"q": "i keep forgetting what are the different statuses on meetings containing the word hearing",
+"expect": {
+"kind": "list",
+"value": [
+"Completed",
+"Rescheduled"
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "legal-001775",
+"tenant": "legal",
+"bank": "out2",
+"family": "list_dim",
+"q": "Hey names of the cities on payment receipts belonging to Carlos Fernandez asap",
+"expect": {
+"kind": "list",
+"value": [
+"Sahuarita"
+]
+},
+"plan": {
+"op": "list",
+"entity": "document",
+"docType": "receipt",
+"filters": [
+{
+"field": "customer",
+"op": "eq",
+"words": "Carlos Fernandez",
+"value": "Carlos Fernandez"
+}
+],
+"distinct": "city"
+}
+},
+{
+"id": "legal-002130",
+"tenant": "legal",
+"bank": "out2",
+"family": "list_numbers",
+"q": "i'm trying to get a handle on what statement numbers do we have from marana in q1 2019",
+"expect": {
+"kind": "list",
+"value": [
+"ST-1534"
+]
+},
+"plan": {
+"op": "list",
+"entity": "document",
+"docType": "statement",
+"filters": [
+{
+"field": "city",
+"op": "eq",
+"words": "from marana",
+"value": "Marana"
+}
+],
+"time": {
+"words": "in q1 2019"
+}
+}
+},
+{
+"id": "legal-002361",
+"tenant": "legal",
+"bank": "out2",
+"family": "exists",
+"q": "Yo is it true that we have appointments that say \"session\", you're a lifesaver",
+"expect": {
+"kind": "yesno",
+"value": true
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "legal-003380",
+"tenant": "legal",
+"bank": "out",
+"family": "list_numbers",
+"q": "Could you tell me which statement numbers r statements for clients in Green Valley in the first quarter of 2022?",
+"expect": {
+"kind": "list",
+"value": [
+"ST-1545"
+]
+},
+"plan": {
+"op": "list",
+"entity": "document",
+"docType": "statement",
+"filters": [
+{
+"field": "city",
+"op": "eq",
+"words": "in Green Valley",
+"value": "Green Valley"
+}
+],
+"time": {
+"words": "in the first quarter of 2022"
+}
+}
+},
+{
+"id": "legal-006130",
+"tenant": "legal",
+"bank": "out",
+"family": "minmax",
+"q": "ok so tell me the biggest statement value where the client is in marana between august 9 twenty twenty five and august 29 twenty twenty five",
+"expect": {
+"kind": "number",
+"value": 476.81,
+"unit": "usd"
+},
+"plan": {
+"op": "max",
+"entity": "document",
+"docType": "statement",
+"measure": {
+"field": "total"
+},
+"filters": [
+{
+"field": "city",
+"op": "eq",
+"words": "in marana",
+"value": "Marana"
+}
+],
+"time": {
+"words": "between august 9 twenty twenty five and august 29 twenty twenty five"
+}
+}
+},
+{
+"id": "legal-007068",
+"tenant": "legal",
+"bank": "out",
+"family": "extreme_date",
+"q": "So what's the date of our first appointment w/ the status \"Completed\" thajks?",
+"expect": {
+"kind": "date",
+"value": "2018-02-26"
+},
+"plan": {
+"op": "first_ever",
+"entity": "document",
+"visit": true,
+"filters": [
+{
+"field": "status",
+"op": "eq",
+"words": "the status \"Completed\"",
+"value": "Completed"
+}
+],
+"sortField": "serviceDate"
+}
+},
+{
+"id": "legal-008561",
+"tenant": "legal",
+"bank": "out",
+"family": "extreme_tech",
+"q": "QUICK ONE - THE LATEST MEEFING WAS DOONE BY WHO FOR ME",
+"expect": {
+"kind": "name",
+"value": "William Johnston"
+},
+"plan": {
+"op": "latest",
+"entity": "document",
+"visit": true,
+"sortField": "serviceDate",
+"ask": "tech"
+}
+},
+{
+"id": "legal-009522",
+"tenant": "legal",
+"bank": "out",
+"family": "top",
+"q": "Top city by total statement amount over the past 12 months",
+"expect": {
+"kind": "name",
+"value": "Sahuarita"
+},
+"plan": {
+"op": "top_n",
+"entity": "document",
+"docType": "statement",
+"groupBy": [
+"city"
+],
+"measure": {
+"field": "total"
+},
+"limit": 1,
+"time": {
+"words": "over the past 12 months"
+}
+}
+},
+{
+"id": "legal-012928",
+"tenant": "legal",
+"bank": "out",
+"family": "busiest",
+"q": "Uh please name our most active day of the week for appointments if you can",
+"expect": {
+"kind": "name",
+"value": "Wednesday"
+},
+"plan": {
+"op": "top_n",
+"entity": "document",
+"visit": true,
+"groupBy": [
+"weekday"
+],
+"limit": 1
+}
+},
+{
+"id": "legal-017855",
+"tenant": "legal",
+"bank": "out",
+"family": "cust_list",
+"q": "So which of our clients with \"Marie\" in the name please?",
+"expect": {
+"kind": "list",
+"value": [
+"Marie McDaniel",
+"Marie Park"
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "legal-021809",
+"tenant": "legal",
+"bank": "out",
+"family": "lookup_phone",
+"q": "ok marilyn curtis's number (need it for the books)",
+"expect": {
+"kind": "name",
+"value": "(520) 555-2631"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "legal-b3-000770",
+"tenant": "legal",
+"bank": "out3/dev3",
+"family": "multi_count_total",
+"q": "This is for a meeeting tomorrow so how many bills where the client is in Vail for Q1 2019 and what's the grand total?",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "count",
+"kind": "number",
+"value": 1,
+"unit": "count"
+},
+{
+"label": "total",
+"kind": "number",
+"value": 390,
+"unit": "usd"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "legal-b3-001561",
+"tenant": "legal",
+"bank": "out3/dev3",
+"family": "multi_count_total",
+"q": "i want the dollar total of bills where the client is in sahuarita tied to pamela hernandez and also how many",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "total",
+"kind": "number",
+"value": 13437.76,
+"unit": "usd"
+},
+{
+"label": "count",
+"kind": "number",
+"value": 4,
+"unit": "count"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "legal-b3-002537",
+"tenant": "legal",
+"bank": "out3/dev3",
+"family": "multi_count_date",
+"q": "How many letters and wehn was the earliest one?",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "count",
+"kind": "number",
+"value": 84,
+"unit": "count"
+},
+{
+"label": "first_date",
+"kind": "date",
+"value": "2018-02-22"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "legal-b3-002638",
+"tenant": "legal",
+"bank": "out3/dev3",
+"family": "multi_count_top",
+"q": "number of meetings for q1 2022 plus the cliente with the most",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "count",
+"kind": "number",
+"value": 1,
+"unit": "count"
+},
+{
+"label": "top_customer",
+"kind": "name",
+"value": "Alex Ward"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "legal-b3-003014",
+"tenant": "legal",
+"bank": "out3/dev3",
+"family": "multi_count_top",
+"q": "number of retainer agreements during q2 of 2023 plus the client with the most",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "count",
+"kind": "number",
+"value": 1,
+"unit": "count"
+},
+{
+"label": "top_customer",
+"kind": "name",
+"value": "Saguaro Properties LLC North"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "legal-b3-003098",
+"tenant": "legal",
+"bank": "out3/dev3",
+"family": "multi_count_top",
+"q": "number of schedule entries in q4 2021 plus the client with the most",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "count",
+"kind": "number",
+"value": 1,
+"unit": "count"
+},
+{
+"label": "top_customer",
+"kind": "name",
+"value": "Kayla Perez"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "legal-b4-002724",
+"tenant": "legal",
+"bank": "out4/dev4",
+"family": "extreme_date",
+"q": "quick, hands are full: on or after 6/28/2025, tell me the date of our last meeting paper for cleints located in tucson as best you can tell",
+"expect": {
+"kind": "date",
+"value": "2026-04-28"
+},
+"plan": {
+"op": "latest",
+"entity": "document",
+"visit": true,
+"filters": [
+{
+"field": "city",
+"op": "eq",
+"words": "located in tucson",
+"value": "Tucson"
+}
+],
+"time": {
+"words": "on or after 6/28/2025"
+},
+"sortField": "serviceDate"
+}
+},
+{
+"id": "legal-b4-003944",
+"tenant": "legal",
+"bank": "out4/dev4",
+"family": "rank_of",
+"q": "Hey, where Marie Park falls in clients ranking by dollar total engagement letters out everything we've uploaded",
+"expect": {
+"kind": "number",
+"value": 12,
+"unit": "rank"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "medical-000401",
+"tenant": "medical",
+"bank": "out2",
+"family": "count",
+"q": "I count how many copay receipts in the last 365 days, you tell me if right when you get a sec",
+"expect": {
+"kind": "number",
+"value": 10,
+"unit": "count"
+},
+"plan": {
+"op": "count",
+"entity": "document",
+"docType": "receipt",
+"time": {
+"words": "in the last 365 days"
+}
+}
+},
+{
+"id": "medical-000470",
+"tenant": "medical",
+"bank": "out2",
+"family": "count",
+"q": "during september of 2022, headcount of insurance cards where the patient is in phoenix for anna perry",
+"expect": {
+"kind": "number",
+"value": 1,
+"unit": "count"
+},
+"plan": {
+"op": "count",
+"entity": "document",
+"docType": "insurance-certificate",
+"filters": [
+{
+"field": "city",
+"op": "eq",
+"words": "in phoenix",
+"value": "Phoenix"
+},
+{
+"field": "customer",
+"op": "eq",
+"words": "anna perry",
+"value": "Anna Perry"
+}
+],
+"time": {
+"words": "during september of 2022"
+}
+}
+},
+{
+"id": "medical-001679",
+"tenant": "medical",
+"bank": "out2",
+"family": "list_dim",
+"q": "I was looking through the files and couldn't tell - hi, i need names of the statuses on visits of type Checkup aspa",
+"expect": {
+"kind": "list",
+"value": [
+"Cancelled",
+"Completed"
+]
+},
+"plan": {
+"op": "list",
+"entity": "document",
+"visit": true,
+"filters": [
+{
+"field": "serviceType",
+"op": "eq",
+"words": "of type Checkup",
+"value": "Checkup"
+}
+],
+"distinct": "status"
+}
+},
+{
+"id": "medical-001845",
+"tenant": "medical",
+"bank": "out2",
+"family": "list_dim",
+"q": "Can't recall, what are different patients on visits for patients based in Mesa done by provider Kelly Ford in 2019",
+"expect": {
+"kind": "list",
+"value": [
+"Carmen Johnston",
+"Victoria Juarez",
+"Willie Frazier"
+]
+},
+"plan": {
+"op": "list",
+"entity": "document",
+"visit": true,
+"filters": [
+{
+"field": "city",
+"op": "eq",
+"words": "in Mesa",
+"value": "Mesa"
+},
+{
+"field": "tech",
+"op": "eq",
+"words": "Kelly Ford",
+"value": "Kelly Ford"
+}
+],
+"time": {
+"words": "in 2019"
+},
+"distinct": "customer"
+}
+},
+{
+"id": "medical-001900",
+"tenant": "medical",
+"bank": "out2",
+"family": "list_dim",
+"q": "Ok so names of the cities on insurance records for the patient Donna Woods - the accountant needs it",
+"expect": {
+"kind": "list",
+"value": [
+"Chandler"
+]
+},
+"plan": {
+"op": "list",
+"entity": "document",
+"docType": "insurance-certificate",
+"filters": [
+{
+"field": "customer",
+"op": "eq",
+"words": "Donna Woods",
+"value": "Donna Woods"
+}
+],
+"distinct": "city"
+}
+},
+{
+"id": "medical-002009",
+"tenant": "medical",
+"bank": "out",
+"family": "count_distinct",
+"q": "go ahead and total number of distinct patients across signed forms when you get a chance",
+"expect": {
+"kind": "number",
+"value": 26,
+"unit": "count"
+},
+"plan": {
+"op": "count_distinct",
+"entity": "document",
+"docType": "agreement",
+"distinct": "customer"
+}
+},
+{
+"id": "medical-002268",
+"tenant": "medical",
+"bank": "out2",
+"family": "exists",
+"q": "alright is it true that we have lab results luis evans has where the patint is in phoenix with \"report\" mentioned, you'er a lifesaver",
+"expect": {
+"kind": "yesno",
+"value": true
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "medical-002509",
+"tenant": "medical",
+"bank": "out2",
+"family": "exists",
+"q": "I never remember, is it true that we have visits tied to Carmen Johnston, appreciate it",
+"expect": {
+"kind": "yesno",
+"value": true
+},
+"plan": {
+"op": "exists_yes_no",
+"entity": "document",
+"visit": true,
+"filters": [
+{
+"field": "customer",
+"op": "eq",
+"words": "Carmen Johnston",
+"value": "Carmen Johnston"
+}
+]
+}
+},
+{
+"id": "medical-006649",
+"tenant": "medical",
+"bank": "out",
+"family": "extreme_date",
+"q": "What's the date of our last consent form where the patient is in Glendale on Christine Frazier's account during the past 60 days when you get a chance?",
+"expect": {
+"kind": "date",
+"value": "2026-09-27"
+},
+"plan": {
+"op": "latest",
+"entity": "document",
+"docType": "agreement",
+"filters": [
+{
+"field": "city",
+"op": "eq",
+"words": "in Glendale",
+"value": "Glendale"
+},
+{
+"field": "customer",
+"op": "eq",
+"words": "Christine Frazier",
+"value": "Christine Frazier"
+}
+],
+"time": {
+"words": "during the past 60 days"
+},
+"sortField": "date"
+}
+},
+{
+"id": "medical-007127",
+"tenant": "medical",
+"bank": "out",
+"family": "extreme_date",
+"q": "What's the date of our oldest visit typed as Follow-up that Jo Burns did not do asap",
+"expect": {
+"kind": "date",
+"value": "2018-01-17"
+},
+"plan": {
+"op": "first_ever",
+"entity": "document",
+"visit": true,
+"filters": [
+{
+"field": "serviceType",
+"op": "eq",
+"words": "typed as Follow-up",
+"value": "Follow-up"
+},
+{
+"field": "tech",
+"op": "neq",
+"words": "that Jo Burns did not do",
+"value": "Jo Burns"
+}
+],
+"sortField": "serviceDate"
+}
+},
+{
+"id": "medical-017230",
+"tenant": "medical",
+"bank": "out",
+"family": "cust_list",
+"q": "Donovan, which of our patients with Hannah in their name please?",
+"expect": {
+"kind": "list",
+"value": [
+"Hannah Hollis",
+"Hannah Thornton"
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "medical-018019",
+"tenant": "medical",
+"bank": "out",
+"family": "cust_total",
+"q": "whats our patient count",
+"expect": {
+"kind": "number",
+"value": 260,
+"unit": "count"
+},
+"plan": {
+"op": "count",
+"entity": "customer"
+}
+},
+{
+"id": "medical-018040",
+"tenant": "medical",
+"bank": "out",
+"family": "cust_total",
+"q": "please tell me whats our patient counnt plesse",
+"expect": {
+"kind": "number",
+"value": 260,
+"unit": "count"
+},
+"plan": {
+"op": "count",
+"entity": "customer"
+}
+},
+{
+"id": "medical-018053",
+"tenant": "medical",
+"bank": "out",
+"family": "cust_total",
+"q": "I Was Wondering What'S Our Patient Count Asap",
+"expect": {
+"kind": "number",
+"value": 260,
+"unit": "count"
+},
+"plan": {
+"op": "count",
+"entity": "customer"
+}
+},
+{
+"id": "medical-018650",
+"tenant": "medical",
+"bank": "out",
+"family": "cust_repeat",
+"q": "Count patients who came back for second insurance record for me",
+"expect": {
+"kind": "number",
+"value": 8,
+"unit": "count"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "medical-019763",
+"tenant": "medical",
+"bank": "out",
+"family": "dup_names",
+"q": "hey donovan, which patients are listed twice by name thanks",
+"expect": {
+"kind": "list",
+"value": [
+"Andrew Carlson",
+"Luis Miranda"
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "medical-021462",
+"tenant": "medical",
+"bank": "out",
+"family": "missing",
+"q": "Can you tell me how many service tickets over the past 90 days came in with a missing doctor?",
+"expect": {
+"kind": "number",
+"value": 1,
+"unit": "count"
+},
+"plan": {
+"op": "count",
+"entity": "document",
+"docType": "service-ticket",
+"filters": [
+{
+"field": "tech",
+"op": "missing",
+"words": "a missing doctor"
+}
+],
+"time": {
+"words": "over the past 90 days"
+}
+}
+},
+{
+"id": "medical-b3-000133",
+"tenant": "medical",
+"bank": "out3/dev3",
+"family": "multi_count_total",
+"q": "I want the dollar total of patient bills within the last 6 months & also how many",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "total",
+"kind": "number",
+"value": 2644.2,
+"unit": "usd"
+},
+{
+"label": "count",
+"kind": "number",
+"value": 12,
+"unit": "count"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "medical-b3-002611",
+"tenant": "medical",
+"bank": "out3/dev3",
+"family": "multi_count_top",
+"q": "number of receipts in q2 of 2021 plus the patient with the most asap",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "count",
+"kind": "number",
+"value": 1,
+"unit": "count"
+},
+{
+"label": "top_customer",
+"kind": "name",
+"value": "Harold Nguyen"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "medical-b3-002967",
+"tenant": "medical",
+"bank": "out3/dev3",
+"family": "multi_count_top",
+"q": "number of bills in q1 2021 plus the patient with the most",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "count",
+"kind": "number",
+"value": 9,
+"unit": "count"
+},
+{
+"label": "top_customer",
+"kind": "name",
+"value": "Ronald Park"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "medical-b3-003083",
+"tenant": "medical",
+"bank": "out3/dev3",
+"family": "multi_count_top",
+"q": "number of referrals during q2 of 2018 plus the patient with the most",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "count",
+"kind": "number",
+"value": 1,
+"unit": "count"
+},
+{
+"label": "top_customer",
+"kind": "name",
+"value": "Donna Woods"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "msp-b4-003912",
+"tenant": "msp",
+"bank": "out4/dev4",
+"family": "rank_of",
+"q": "Tell me where Carolina Clinic Prime falls in the accounts ranking by dollar total of managed services bills for 2026, appreciate it if it's in there",
+"expect": {
+"kind": "number",
+"value": 5,
+"unit": "rank"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "msp-b4-005677",
+"tenant": "msp",
+"bank": "out4/dev4",
+"family": "days_since",
+"q": "Thank you for checking: cuantos days since Capital Realty North's last help desk case paper (just from what's in the system)",
+"expect": {
+"kind": "number",
+"value": 1034,
+"unit": "days"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "msp-b4-006204",
+"tenant": "msp",
+"bank": "out4/dev4",
+"family": "cust_count",
+"q": "for the financial statements, just count the clients with managed services bills but never any msp agreements, cheers",
+"expect": {
+"kind": "number",
+"value": 43,
+"unit": "count"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "msp-b4-006648",
+"tenant": "msp",
+"bank": "out4/dev4",
+"family": "cust_list",
+"q": "for the financial statements, which clients wih support contracts but never any managed services bills asap",
+"expect": {
+"kind": "list",
+"value": [
+"Blue Ridge Clinic Premier",
+"Capital Clinic",
+"Carmen Carlson",
+"Carolina Law Office",
+"Jacqueline Smith",
+"Kevin Caldwell",
+"Oakwood Law Office",
+"Steven Peterson"
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "msp-b4-009896",
+"tenant": "msp",
+"bank": "out4/dev4",
+"family": "untracked",
+"q": "Hey Donovan, tell me the vehicle mileage for the client Kenneth Oliver",
+"expect": {
+"kind": "decline",
+"value": null
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "msp-b4-016133",
+"tenant": "msp",
+"bank": "out4/dev4",
+"family": "coming_up",
+"q": "Do we have any documents expiring in the next sixty days?",
+"expect": {
+"kind": "yesno",
+"value": true
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "msp-b4-018562",
+"tenant": "msp",
+"bank": "out4/dev4",
+"family": "yes_no",
+"q": "quick within the last 24 months are there any equipment order entries 10000 dollars or under with summit equipment rental with a station line item",
+"expect": {
+"kind": "yesno",
+"value": true
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "nonprofit-000402",
+"tenant": "nonprofit",
+"bank": "out2",
+"family": "count",
+"q": "Number of event schedules we logged that Brenda Chen did",
+"expect": {
+"kind": "number",
+"value": 19,
+"unit": "count"
+},
+"plan": {
+"op": "count",
+"entity": "document",
+"docType": "schedule",
+"filters": [
+{
+"field": "tech",
+"op": "eq",
+"words": "that Brenda Chen did",
+"value": "Brenda Chen"
+}
+]
+}
+},
+{
+"id": "nonprofit-001091",
+"tenant": "nonprofit",
+"bank": "out2",
+"family": "count",
+"q": "I count how many letters over the past 45 days, you tell me if right when you get a sec",
+"expect": {
+"kind": "number",
+"value": 2,
+"unit": "count"
+},
+"plan": {
+"op": "count",
+"entity": "document",
+"docType": "correspondence",
+"time": {
+"words": "over the past 45 days"
+}
+}
+},
+{
+"id": "nonprofit-001760",
+"tenant": "nonprofit",
+"bank": "out2",
+"family": "list_dim",
+"q": "I was wondering can i get names of the coordinators on events marked cancelled aasp?",
+"expect": {
+"kind": "list",
+"value": [
+"Brenda Chen",
+"Mark Woods"
+]
+},
+"plan": {
+"op": "list",
+"entity": "document",
+"docType": "schedule",
+"filters": [
+{
+"field": "status",
+"op": "eq",
+"words": "marked cancelled",
+"value": "Cancelled"
+}
+],
+"distinct": "tech"
+}
+},
+{
+"id": "nonprofit-001833",
+"tenant": "nonprofit",
+"bank": "out2",
+"family": "list_dim",
+"q": "What are the different statuses on events?",
+"expect": {
+"kind": "list",
+"value": [
+"Cancelled",
+"Completed"
+]
+},
+"plan": {
+"op": "list",
+"entity": "document",
+"docType": "schedule",
+"distinct": "status"
+}
+},
+{
+"id": "nonprofit-001996",
+"tenant": "nonprofit",
+"bank": "out2",
+"family": "list_numbers",
+"q": "This is for a meeting tomorrow so an auditor asked me what statement numbers do we have over $14,500",
+"expect": {
+"kind": "list",
+"value": [
+"ST-1817",
+"ST-1819",
+"ST-1821",
+"ST-1843",
+"ST-1856",
+"ST-1857"
+]
+},
+"plan": {
+"op": "list",
+"entity": "document",
+"docType": "statement",
+"filters": [
+{
+"field": "total",
+"op": "gt",
+"words": "over $14,500",
+"value": 14500
+}
+]
+}
+},
+{
+"id": "nonprofit-002003",
+"tenant": "nonprofit",
+"bank": "out",
+"family": "count_distinct",
+"q": "Can you please total number distinct supporters across event schedules",
+"expect": {
+"kind": "number",
+"value": 30,
+"unit": "count"
+},
+"plan": {
+"op": "count_distinct",
+"entity": "document",
+"docType": "schedule",
+"distinct": "customer"
+}
+},
+{
+"id": "nonprofit-002345",
+"tenant": "nonprofit",
+"bank": "out2",
+"family": "exists",
+"q": "So yeah is it true that have invoices for Alex Clark where supporter is in Lakewood back in 2020, appreciate it",
+"expect": {
+"kind": "yesno",
+"value": true
+},
+"plan": {
+"op": "exists_yes_no",
+"entity": "document",
+"docType": "invoice",
+"filters": [
+{
+"field": "customer",
+"op": "eq",
+"words": "Alex Clark",
+"value": "Alex Clark"
+},
+{
+"field": "city",
+"op": "eq",
+"words": "in Lakewood",
+"value": "Lakewood"
+}
+],
+"time": {
+"words": "in 2020"
+}
+}
+},
+{
+"id": "nonprofit-006839",
+"tenant": "nonprofit",
+"bank": "out",
+"family": "extreme_date",
+"q": "Could you tell me what's the date of our last event that Mark Woods did not do with status cancelled over the past two years for me?",
+"expect": {
+"kind": "date",
+"value": "2026-03-25"
+},
+"plan": {
+"op": "latest",
+"entity": "document",
+"docType": "schedule",
+"filters": [
+{
+"field": "tech",
+"op": "neq",
+"words": "Mark Woods did not do",
+"value": "Mark Woods"
+},
+{
+"field": "status",
+"op": "eq",
+"words": "status cancelled",
+"value": "Cancelled"
+}
+],
+"time": {
+"words": "over the past two years"
+},
+"sortField": "date"
+}
+},
+{
+"id": "nonprofit-008863",
+"tenant": "nonprofit",
+"bank": "out",
+"family": "extreme_tech",
+"q": "The newest event scuedule for 2025 was done by who (ned it for the books)",
+"expect": {
+"kind": "name",
+"value": "Brenda Chen"
+},
+"plan": {
+"op": "latest",
+"entity": "document",
+"docType": "schedule",
+"time": {
+"words": "for 2025"
+},
+"sortField": "date",
+"ask": "tech"
+}
+},
+{
+"id": "nonprofit-011541",
+"tenant": "nonprofit",
+"bank": "out",
+"family": "compare_which",
+"q": "Which Has A Higher Total Pledge Agreement Amount, 2021 Or 2024",
+"expect": {
+"kind": "name",
+"value": "2024"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "nonprofit-011681",
+"tenant": "nonprofit",
+"bank": "out",
+"family": "compare_which",
+"q": "WHICH HAS A BIGGER PLEDGE AGREMEENT TOTAL IN THE YEAR 2021, DONOR MARTHA WASHINGTON OR SUPPORTER LARRY LUCAS IF YOU CAN",
+"expect": {
+"kind": "name",
+"value": "Martha Washington"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "nonprofit-013676",
+"tenant": "nonprofit",
+"bank": "out",
+"family": "share",
+"q": "Give me the share of the PO dollars that were bought from Allied Materials thx",
+"expect": {
+"kind": "number",
+"value": 25.8,
+"unit": "pct"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "nonprofit-013721",
+"tenant": "nonprofit",
+"bank": "out",
+"family": "share",
+"q": "So basically give me the share of the dollar total of donor statements that were on Walter Larson's account asap",
+"expect": {
+"kind": "number",
+"value": 8,
+"unit": "pct"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "nonprofit-015596",
+"tenant": "nonprofit",
+"bank": "out",
+"family": "inactive",
+"q": "Could you count the donors whose last thank-you letter was before the start of 2025",
+"expect": {
+"kind": "number",
+"value": 45,
+"unit": "count"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "nonprofit-017326",
+"tenant": "nonprofit",
+"bank": "out",
+"family": "cust_list",
+"q": "Jhst cuurious, which of our donors that have no street address recorded when you get a chance?",
+"expect": {
+"kind": "list",
+"value": [
+"Carol Jenkins",
+"David Flores",
+"David May",
+"Diane Banks",
+"Gabriel Johnston",
+"James Wallace",
+"Katherine Diaz",
+"Kevin Hernandez",
+"Philip Ramos",
+"Pilar Perez",
+"Summit Family Fund",
+"Willie Brewer"
+]
+},
+"plan": {
+"op": "list",
+"entity": "customer",
+"filters": [
+{
+"field": "address",
+"op": "missing",
+"words": "no street address recorded"
+}
+]
+}
+},
+{
+"id": "nonprofit-018040",
+"tenant": "nonprofit",
+"bank": "out",
+"family": "cust_total",
+"q": "HI, WHAT'S OUR DONOR COUNT",
+"expect": {
+"kind": "number",
+"value": 230,
+"unit": "count"
+},
+"plan": {
+"op": "count",
+"entity": "customer"
+}
+},
+{
+"id": "nonprofit-b3-002268",
+"tenant": "nonprofit",
+"bank": "out3/dev3",
+"family": "multi_count_date",
+"q": "How may statements Aspen Foundation West has for 2022 and when was the earlist one?",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "count",
+"kind": "number",
+"value": 1,
+"unit": "count"
+},
+{
+"label": "first_date",
+"kind": "date",
+"value": "2022-07-15"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "nonprofit-b3-003740",
+"tenant": "nonprofit",
+"bank": "out3/dev3",
+"family": "multi_two_types",
+"q": "gIve mE ThE donOr STATemeNt coUNt And The Donaton count",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "count_statement",
+"kind": "number",
+"value": 23,
+"unit": "count"
+},
+{
+"label": "count_receipt",
+"kind": "number",
+"value": 269,
+"unit": "count"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "nonprofit-b4-002659",
+"tenant": "nonprofit",
+"bank": "out4/dev4",
+"family": "extreme_date",
+"q": "just between us, show me the first factura in the year 2020 was on what day",
+"expect": {
+"kind": "date",
+"value": "2020-09-09"
+},
+"plan": {
+"op": "first_ever",
+"entity": "document",
+"docType": "invoice",
+"time": {
+"words": "in the year 2020"
+},
+"sortField": "date"
+}
+},
+{
+"id": "nonprofit-b4-003639",
+"tenant": "nonprofit",
+"bank": "out4/dev4",
+"family": "top",
+"q": "My spervisor said to ask you: top staff member by number of event scheedules as of today",
+"expect": {
+"kind": "name",
+"value": "Brenda Chen"
+},
+"plan": {
+"op": "top_n",
+"entity": "document",
+"docType": "schedule",
+"groupBy": [
+"tech"
+],
+"limit": 1
+}
+},
+{
+"id": "petgroom-b4-000008",
+"tenant": "petgroom",
+"bank": "out4/dev4",
+"family": "count",
+"q": "Per the records, how msny appointments have come through if you can according to the files por favor?",
+"expect": {
+"kind": "number",
+"value": 391,
+"unit": "count"
+},
+"plan": {
+"op": "count",
+"entity": "document",
+"visit": true
+}
+},
+{
+"id": "petgroom-b4-005991",
+"tenant": "petgroom",
+"bank": "out4/dev4",
+"family": "expiring",
+"q": "Quick check for the office - how many shot record entries have lapsed if that's possible from what's in system?",
+"expect": {
+"kind": "number",
+"value": 110,
+"unit": "count"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "petgroom-b4-007423",
+"tenant": "petgroom",
+"bank": "out4/dev4",
+"family": "doc_above_avg",
+"q": "Need this on go - cu\u00e1ntos treat orders are over average",
+"expect": {
+"kind": "number",
+"value": 8,
+"unit": "count"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "petgroom-b4-010006",
+"tenant": "petgroom",
+"bank": "out4/dev4",
+"family": "untracked",
+"q": "What is our tis received in the lat 90 days thank you?",
+"expect": {
+"kind": "decline",
+"value": null
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "petgroom-b4-011820",
+"tenant": "petgroom",
+"bank": "out4/dev4",
+"family": "nearmiss",
+"q": "Me puedes decir grooming logs marked completed in Mesa in company files",
+"expect": {
+"kind": "number",
+"value": 44,
+"unit": "count"
+},
+"plan": {
+"op": "list",
+"entity": "document",
+"docType": "grooming-log",
+"filters": [
+{
+"field": "status",
+"op": "eq",
+"words": "marked completed",
+"value": "Completed"
+},
+{
+"field": "city",
+"op": "eq",
+"words": "in Mesa",
+"value": "Mesa"
+}
+]
+}
+},
+{
+"id": "petgroom-b4-015630",
+"tenant": "petgroom",
+"bank": "out4/dev4",
+"family": "coming_up",
+"q": "can you help me which pet parents have liability waiver entries that expire within 60 days",
+"expect": {
+"kind": "list",
+"value": []
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "petgroom-b4-020809",
+"tenant": "petgroom",
+"bank": "out4/dev4",
+"family": "vague",
+"q": "They told me you can answer this - can you tell me our average groom time",
+"expect": {
+"kind": "decline",
+"value": {
+"reason": "untracked"
+}
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "photostudio-b4-001289",
+"tenant": "photostudio",
+"bank": "out4/dev4",
+"family": "list_numbers",
+"q": "as the owner hey donovan um for 2023 which print order numbers are those bought from metro supply that include prints",
+"expect": {
+"kind": "list",
+"value": [
+"LB-1665",
+"LB-1671"
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "photostudio-b4-001624",
+"tenant": "photostudio",
+"bank": "out4/dev4",
+"family": "sum",
+"q": "Asap - sum lab order paperwork $1,700 and up as fast as",
+"expect": {
+"kind": "number",
+"value": 26117.69,
+"unit": "usd"
+},
+"plan": {
+"op": "sum",
+"entity": "document",
+"docType": "print-lab-order",
+"measure": {
+"field": "total"
+},
+"filters": [
+{
+"field": "total",
+"op": "gte",
+"words": "$1,700 and up",
+"value": 1700
+}
+]
+}
+},
+{
+"id": "photostudio-b4-002092",
+"tenant": "photostudio",
+"bank": "out4/dev4",
+"family": "avg",
+"q": "let me see something. hey on a typical lab order file with pioneer wholesale within the last 12 monnths, how much from what you can see when you get a sec - need it in 5 min",
+"expect": {
+"kind": "number",
+"value": 1180,
+"unit": "usd"
+},
+"plan": {
+"op": "avg",
+"entity": "document",
+"docType": "print-lab-order",
+"measure": {
+"field": "total"
+},
+"filters": [
+{
+"field": "vendor",
+"op": "eq",
+"words": "with pioneer wholesale",
+"value": "Pioneer Wholesale"
+}
+],
+"time": {
+"words": "within the last 12 monnths"
+}
+}
+},
+{
+"id": "photostudio-b4-002641",
+"tenant": "photostudio",
+"bank": "out4/dev4",
+"family": "extreme_date",
+"q": "Quick, hands Are full: Tell date Last session paper For Client Joe Guerrero as Best",
+"expect": {
+"kind": "date",
+"value": "2026-09-10"
+},
+"plan": {
+"op": "latest",
+"entity": "document",
+"visit": true,
+"filters": [
+{
+"field": "customer",
+"op": "eq",
+"words": "Joe Guerrero",
+"value": "Joe Guerrero"
+}
+],
+"sortField": "serviceDate"
+}
+},
+{
+"id": "photostudio-b4-005292",
+"tenant": "photostudio",
+"bank": "out4/dev4",
+"family": "share",
+"q": "For the financial statements, what percent of the lab order dollars prior to 2026 were ordered from Southwest Parts Depot - need it in 5 min",
+"expect": {
+"kind": "number",
+"value": 6.6,
+"unit": "pct"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "photostudio-b4-016404",
+"tenant": "photostudio",
+"bank": "out4/dev4",
+"family": "coming_up",
+"q": "THANK YOU FOR CHECKING: WHAT'S COMING UP IN THE NEXT SIXTY DAYS, HOW MANY ITEMS - GOING BY WHAT'S ON FILE?",
+"expect": {
+"kind": "number",
+"value": 4,
+"unit": "count"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "photostudio-b4-018904",
+"tenant": "photostudio",
+"bank": "out4/dev4",
+"family": "yes_no",
+"q": "running between jobs, do we show any print orders in the previous 180 days placed with southwest parts depot $2,500 and up from the stored files?",
+"expect": {
+"kind": "yesno",
+"value": true
+},
+"plan": {
+"op": "exists_yes_no",
+"entity": "document",
+"docType": "print-lab-order",
+"filters": [
+{
+"field": "vendor",
+"op": "eq",
+"words": "with southwest parts depot",
+"value": "Southwest Parts Depot"
+},
+{
+"field": "total",
+"op": "gte",
+"words": "$2,500 and up",
+"value": 2500
+}
+],
+"time": {
+"words": "in the previous 180 days"
+}
+}
+},
+{
+"id": "plumbing-000780",
+"tenant": "plumbing",
+"bank": "out",
+"family": "count",
+"q": "Could you tell me how many warranty registrations came through when you get a chance",
+"expect": {
+"kind": "number",
+"value": 25,
+"unit": "count"
+},
+"plan": {
+"op": "count",
+"entity": "document",
+"docType": "warranty-registration"
+}
+},
+{
+"id": "plumbing-001461",
+"tenant": "plumbing",
+"bank": "out2",
+"family": "list_dim",
+"q": "Can i get nakes of the clients on service contracts where the customer is in Spokane Valley in the year 2024 asap?",
+"expect": {
+"kind": "list",
+"value": [
+"Nathan Moore"
+]
+},
+"plan": {
+"op": "list",
+"entity": "document",
+"docType": "maintenance-agreement",
+"filters": [
+{
+"field": "city",
+"op": "eq",
+"words": "in Spokane Valley",
+"value": "Spokane Valley"
+}
+],
+"time": {
+"words": "in the year 2024"
+},
+"distinct": "customer"
+}
+},
+{
+"id": "plumbing-001720",
+"tenant": "plumbing",
+"bank": "out2",
+"family": "list_dim",
+"q": "Can you help me figure out what are the different statuses on visits that Christine Chapman did in 2020 asap?",
+"expect": {
+"kind": "list",
+"value": [
+"Completed",
+"Return visit needed"
+]
+},
+"plan": {
+"op": "list",
+"entity": "document",
+"visit": true,
+"filters": [
+{
+"field": "tech",
+"op": "eq",
+"words": "Christine Chapman",
+"value": "Christine Chapman"
+}
+],
+"time": {
+"words": "in 2020"
+},
+"distinct": "status"
+}
+},
+{
+"id": "plumbing-001725",
+"tenant": "plumbing",
+"bank": "out2",
+"family": "list_dim",
+"q": "hey names of the types of service on calls for the client palouse diner last year asap",
+"expect": {
+"kind": "list",
+"value": [
+"Drain cleaning",
+"Sewer line camera"
+]
+},
+"plan": {
+"op": "list",
+"entity": "document",
+"visit": true,
+"filters": [
+{
+"field": "customer",
+"op": "eq",
+"words": "palouse diner",
+"value": "Palouse Diner"
+}
+],
+"time": {
+"words": "last year"
+},
+"distinct": "serviceType"
+}
+},
+{
+"id": "plumbing-002178",
+"tenant": "plumbing",
+"bank": "out2",
+"family": "exists",
+"q": "I never remember, is it true that we have visits labelled Drain cleaning, appreciate it",
+"expect": {
+"kind": "yesno",
+"value": true
+},
+"plan": {
+"op": "exists_yes_no",
+"entity": "document",
+"visit": true,
+"filters": [
+{
+"field": "serviceType",
+"op": "eq",
+"words": "labelled Drain cleaning",
+"value": "Drain cleaning"
+}
+]
+}
+},
+{
+"id": "plumbing-002180",
+"tenant": "plumbing",
+"bank": "out2",
+"family": "exists",
+"q": "My accountant keeps asking me this and per the boss, is there anything in visits labelled Drain cleaning",
+"expect": {
+"kind": "yesno",
+"value": true
+},
+"plan": {
+"op": "exists_yes_no",
+"entity": "document",
+"visit": true,
+"filters": [
+{
+"field": "serviceType",
+"op": "eq",
+"words": "labelled Drain cleaning",
+"value": "Drain cleaning"
+}
+]
+}
+},
+{
+"id": "plumbing-008679",
+"tenant": "plumbing",
+"bank": "out",
+"family": "extreme_tech",
+"q": "The newest service ticket on an A. O. Smith mentioning \"supply\" was done by who if you can",
+"expect": {
+"kind": "name",
+"value": "Debra Walsh"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "plumbing-011507",
+"tenant": "plumbing",
+"bank": "out",
+"family": "compare_which",
+"q": "just curious which has more quote dollars 2023 or 2026 asap",
+"expect": {
+"kind": "name",
+"value": "2026"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "plumbing-015059",
+"tenant": "plumbing",
+"bank": "out",
+"family": "days_since",
+"q": "It's been how many days since Dennis Watkins's latest service contract thanks",
+"expect": {
+"kind": "number",
+"value": 1359,
+"unit": "days"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "plumbing-018161",
+"tenant": "plumbing",
+"bank": "out",
+"family": "cust_total",
+"q": "can you tell me what's our client count?",
+"expect": {
+"kind": "number",
+"value": 105,
+"unit": "count"
+},
+"plan": {
+"op": "count",
+"entity": "customer"
+}
+},
+{
+"id": "plumbing-018778",
+"tenant": "plumbing",
+"bank": "out",
+"family": "cust_repeat",
+"q": "Which clients had more than one warranty regisrtation when you get a chnace?",
+"expect": {
+"kind": "list",
+"value": [
+"Carolyn Greene",
+"Charlotte Soto",
+"Falls Diner",
+"Michael Woods"
+]
+},
+"plan": {
+"op": "list",
+"entity": "customer",
+"filters": [
+{
+"field": "docCount",
+"op": "gt",
+"words": "more than one warranty registration",
+"value": 1,
+"docType": "warranty-registration"
+}
+]
+}
+},
+{
+"id": "plumbing-020500",
+"tenant": "plumbing",
+"bank": "out",
+"family": "dup_names",
+"q": "Can you tell me which clients are listed twice by name?",
+"expect": {
+"kind": "list",
+"value": [
+"Hector Stanley",
+"Raymond Burton"
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "plumbing-b3-000701",
+"tenant": "plumbing",
+"bank": "out3/dev3",
+"family": "multi_count_total",
+"q": "cuantos facturas of carlos peterson from spokane valley in june 2023 and what's the grand total when you get a chance",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "count",
+"kind": "number",
+"value": 1,
+"unit": "count"
+},
+{
+"label": "total",
+"kind": "number",
+"value": 517.97,
+"unit": "usd"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "plumbing-b3-001891",
+"tenant": "plumbing",
+"bank": "out3/dev3",
+"family": "multi_count_date",
+"q": "This is for a meeting tomorrow so how many visits for customers located in Spokane Valley and when was the last one?",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "count",
+"kind": "number",
+"value": 39,
+"unit": "count"
+},
+{
+"label": "last_date",
+"kind": "date",
+"value": "2026-08-27"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "plumbing-b3-002942",
+"tenant": "plumbing",
+"bank": "out3/dev3",
+"family": "multi_count_top",
+"q": "Number of service contracts in Q1 2021 pllus client with most",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "count",
+"kind": "number",
+"value": 1,
+"unit": "count"
+},
+{
+"label": "top_customer",
+"kind": "name",
+"value": "Falls Diner"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "plumbing-b3-003197",
+"tenant": "plumbing",
+"bank": "out3/dev3",
+"family": "multi_two_types",
+"q": "Guve me the estimate count and the permit count",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "count_proposal-quote",
+"kind": "number",
+"value": 40,
+"unit": "count"
+},
+{
+"label": "count_permit",
+"kind": "number",
+"value": 23,
+"unit": "count"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "plumbing-b3-003252",
+"tenant": "plumbing",
+"bank": "out3/dev3",
+"family": "multi_two_types",
+"q": "Give me the purchase order count and the service contract count",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "count_purchase-order",
+"kind": "number",
+"value": 22,
+"unit": "count"
+},
+{
+"label": "count_maintenance-agreement",
+"kind": "number",
+"value": 17,
+"unit": "count"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "plumbing-b3-003306",
+"tenant": "plumbing",
+"bank": "out3/dev3",
+"family": "multi_two_types",
+"q": "\u2753 Give me the pemrit count & the warranty registration count",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "count_permit",
+"kind": "number",
+"value": 23,
+"unit": "count"
+},
+{
+"label": "count_warranty-registration",
+"kind": "number",
+"value": 25,
+"unit": "count"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "property-000656",
+"tenant": "property",
+"bank": "out2",
+"family": "count",
+"q": "I count how many move-out inspections, tell if right, appreciate it",
+"expect": {
+"kind": "number",
+"value": 37,
+"unit": "count"
+},
+"plan": {
+"op": "count",
+"entity": "document",
+"docType": "move-out-inspection"
+}
+},
+{
+"id": "property-001525",
+"tenant": "property",
+"bank": "out2",
+"family": "list_dim",
+"q": "I ask you what are the different statuses on work orders in Phoenix",
+"expect": {
+"kind": "list",
+"value": [
+"Completed",
+"Open",
+"Scheduled"
+]
+},
+"plan": {
+"op": "list",
+"entity": "document",
+"docType": "work-order",
+"filters": [
+{
+"field": "city",
+"op": "eq",
+"words": "in Phoenix",
+"value": "Phoenix"
+}
+],
+"distinct": "status"
+}
+},
+{
+"id": "property-001658",
+"tenant": "property",
+"bank": "out2",
+"family": "list_dim",
+"q": "Can i get names of the statuses on move-out inspections tied to Valley Dental Group asap?",
+"expect": {
+"kind": "list",
+"value": [
+"Completed"
+]
+},
+"plan": {
+"op": "list",
+"entity": "document",
+"docType": "move-out-inspection",
+"filters": [
+{
+"field": "customer",
+"op": "eq",
+"words": "Valley Dental Group",
+"value": "Valley Dental Group"
+}
+],
+"distinct": "status"
+}
+},
+{
+"id": "property-002113",
+"tenant": "property",
+"bank": "out2",
+"family": "list_numbers",
+"q": "an auditor asked me what permit numbers do we have since october 6, 2026",
+"expect": {
+"kind": "list",
+"value": [
+"BP-2026-1499"
+]
+},
+"plan": {
+"op": "list",
+"entity": "document",
+"docType": "permit",
+"time": {
+"words": "since october 6, 2026"
+}
+}
+},
+{
+"id": "property-002384",
+"tenant": "property",
+"bank": "out",
+"family": "list_dim",
+"q": "I know i should know this but hey, rundown of maintenance techs for visits of Paul Carr that mention \"condition\" (need it for the books)",
+"expect": {
+"kind": "list",
+"value": [
+"Marilyn Winslow"
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "property-006592",
+"tenant": "property",
+"bank": "out",
+"family": "extreme_date",
+"q": "help me out - what's the date of our newest work order for the tenant sharon obrien in the last 18 months please?",
+"expect": {
+"kind": "date",
+"value": "2025-07-10"
+},
+"plan": {
+"op": "latest",
+"entity": "document",
+"docType": "work-order",
+"filters": [
+{
+"field": "customer",
+"op": "eq",
+"words": "sharon obrien",
+"value": "Sharon Obrien"
+}
+],
+"time": {
+"words": "in the last 18 months"
+},
+"sortField": "date"
+}
+},
+{
+"id": "property-013203",
+"tenant": "property",
+"bank": "out",
+"family": "busiest",
+"q": "Can you name most active month of the year, across all years for work orders thx",
+"expect": {
+"kind": "name",
+"value": "August"
+},
+"plan": {
+"op": "top_n",
+"entity": "document",
+"docType": "work-order",
+"groupBy": [
+"monthOfYear"
+],
+"limit": 1
+}
+},
+{
+"id": "property-016751",
+"tenant": "property",
+"bank": "out",
+"family": "cust_count",
+"q": "quick one - i need a headcount of residents with tenant charges adding up to under $280 if you can",
+"expect": {
+"kind": "number",
+"value": 40,
+"unit": "count"
+},
+"plan": {
+"op": "count",
+"entity": "customer",
+"filters": [
+{
+"field": "billed",
+"op": "lt",
+"words": "tenant charges adding up to under $280",
+"value": 280
+}
+]
+}
+},
+{
+"id": "property-016891",
+"tenant": "property",
+"bank": "out",
+"family": "cust_count",
+"q": "I need a headcount of tenants with maintenance requests but never any maintenance tickets based in Phoenix (need it for the books)",
+"expect": {
+"kind": "number",
+"value": 5,
+"unit": "count"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "property-020012",
+"tenant": "property",
+"bank": "out",
+"family": "eq_models",
+"q": "donovan, tell me the models of roger green's appliances when you get a chance?",
+"expect": {
+"kind": "list",
+"value": [
+"SAM-630B",
+"WHI-403X"
+]
+},
+"plan": {
+"op": "list",
+"entity": "unit",
+"filters": [
+{
+"field": "customer",
+"op": "eq",
+"words": "roger green's",
+"value": "Roger Green"
+}
+],
+"distinct": "model"
+}
+},
+{
+"id": "property-b3-002550",
+"tenant": "property",
+"bank": "out3/dev3",
+"family": "multi_count_top",
+"q": "Number Of Visits For 2024 plus the resident with most",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "count",
+"kind": "number",
+"value": 50,
+"unit": "count"
+},
+{
+"label": "top_customer",
+"kind": "name",
+"value": "Janet Maldonado"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "property-b3-002701",
+"tenant": "property",
+"bank": "out3/dev3",
+"family": "multi_count_top",
+"q": "# of maintenance tickets in the year 2018 plus the inquilino w/ the most",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "count",
+"kind": "number",
+"value": 15,
+"unit": "count"
+},
+{
+"label": "top_customer",
+"kind": "name",
+"value": "Jacob Lane"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "property-b3-002757",
+"tenant": "property",
+"bank": "out3/dev3",
+"family": "multi_count_top",
+"q": "Number of lease agreements back in 2024 plus resident with most",
+"expect": {
+"kind": "multi",
+"value": [
+{
+"label": "count",
+"kind": "number",
+"value": 7,
+"unit": "count"
+},
+{
+"label": "top_customer",
+"kind": "name",
+"value": "Albert Lucas"
+}
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "property-b4-003128",
+"tenant": "property",
+"bank": "out4/dev4",
+"family": "extreme_num",
+"q": "On site and can't scroll - me tennat charge paper number newest one for residents based in Chandler right now",
+"expect": {
+"kind": "name",
+"value": "INV-1848"
+},
+"plan": {
+"op": "latest",
+"entity": "document",
+"docType": "invoice",
+"filters": [
+{
+"field": "city",
+"op": "eq",
+"words": "in Chandler",
+"value": "Chandler"
+}
+],
+"sortField": "date"
+}
+},
+{
+"id": "restaurant-b4-001308",
+"tenant": "restaurant",
+"bank": "out4/dev4",
+"family": "list_numbers",
+"q": "Show me equipment repair numbers for equipment repairs bought from Cactus Distributors please, i keep losing track of it",
+"expect": {
+"kind": "list",
+"value": [
+"ER-1627",
+"ER-1635",
+"ER-1653",
+"ER-1673",
+"ER-1691",
+"ER-1700",
+"ER-1726",
+"ER-1735"
+]
+},
+"plan": {
+"op": "list",
+"entity": "document",
+"docType": "equipment-repair-bill",
+"filters": [
+{
+"field": "vendor",
+"op": "eq",
+"words": "from Cactus Distributors",
+"value": "Cactus Distributors"
+}
+]
+}
+},
+{
+"id": "restaurant-b4-004477",
+"tenant": "restaurant",
+"bank": "out4/dev4",
+"family": "compare_which",
+"q": "Urgent: between 2021 and 2022, which one had a higher total equipment repair amount",
+"expect": {
+"kind": "name",
+"value": "2022"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "restaurant-b4-009504",
+"tenant": "restaurant",
+"bank": "out4/dev4",
+"family": "lookup_eq_mfr",
+"q": "On site and can't scroll - i'm doing books and need to know who manufactured serial it's been bugging",
+"expect": {
+"kind": "name",
+"value": "Hobart"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "restaurant-b4-010984",
+"tenant": "restaurant",
+"bank": "out4/dev4",
+"family": "pivot",
+"q": "The front desk needs to know how many event records last year for every inspector and city combination, appreciate it if that's ok?",
+"expect": {
+"kind": "list",
+"value": [
+{
+"a": "Amber Wong",
+"b": "Chandler",
+"v": 1
+},
+{
+"a": "Amber Wong",
+"b": "Gilbert",
+"v": 2
+},
+{
+"a": "Amber Wong",
+"b": "Mesa",
+"v": 6
+},
+{
+"a": "Amber Wong",
+"b": "Tempe",
+"v": 1
+},
+{
+"a": "Danny Shaw",
+"b": "Chandler",
+"v": 1
+},
+{
+"a": "Danny Shaw",
+"b": "Gilbert",
+"v": 3
+},
+{
+"a": "Danny Shaw",
+"b": "Mesa",
+"v": 6
+},
+{
+"a": "Danny Shaw",
+"b": "Queen Creek",
+"v": 1
+},
+{
+"a": "Jeffrey Ruiz",
+"b": "Queen Creek",
+"v": 2
+},
+{
+"a": "Jeffrey Ruiz",
+"b": "Scottsdale",
+"v": 1
+},
+{
+"a": "Jeffrey Ruiz",
+"b": "Tempe",
+"v": 1
+}
+],
+"triples": true,
+"unit": "count"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "restaurant-b4-015601",
+"tenant": "restaurant",
+"bank": "out4/dev4",
+"family": "coming_up",
+"q": "thank you for checking: what's coming up in the next 60 days, how many items - going by what's on file?",
+"expect": {
+"kind": "number",
+"value": 3,
+"unit": "count"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "restaurant-b4-015637",
+"tenant": "restaurant",
+"bank": "out4/dev4",
+"family": "coming_up",
+"q": "Need this on go - do any documents run out in next sixty days before my meeting",
+"expect": {
+"kind": "yesno",
+"value": true
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "restaurant-b4-018346",
+"tenant": "restaurant",
+"bank": "out4/dev4",
+"family": "yes_no",
+"q": "Are we behind lqst year on vendor factura stuff?",
+"expect": {
+"kind": "yesno",
+"value": false
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "salon-b4-002161",
+"tenant": "salon",
+"bank": "out4/dev4",
+"family": "avg",
+"q": "For the accrual check - i'm sitting here trying to work out what's the usual service ticket amount in Q1 2020 - can't find it myself thanks in advance",
+"expect": {
+"kind": "number",
+"value": 168.63,
+"unit": "usd"
+},
+"plan": {
+"op": "avg",
+"entity": "document",
+"docType": "appointment-ticket",
+"measure": {
+"field": "total"
+},
+"time": {
+"words": "in Q1 2020"
+}
+}
+},
+{
+"id": "salon-b4-003474",
+"tenant": "salon",
+"bank": "out4/dev4",
+"family": "count_range",
+"q": "my supErvisOR sAID To asK yoU: how Many Of THe SUPPly order entrIes wEre AbOve $230 & bELoW $1,300 WHen YoU caN?",
+"expect": {
+"kind": "number",
+"value": 38,
+"unit": "count"
+},
+"plan": {
+"op": "count",
+"entity": "document",
+"docType": "product-order-form",
+"filters": [
+{
+"field": "total",
+"op": "between",
+"words": "above $230 & below $1,300",
+"value": [
+230,
+1300
+]
+}
+]
+}
+},
+{
+"id": "salon-b4-003940",
+"tenant": "salon",
+"bank": "out4/dev4",
+"family": "rank_of",
+"q": "working on the ledger, tell me where martha wright falls in the clients ranking by total value of service tickets from willie harvey's work from 8/3/2022 until now thank you before my meeting",
+"expect": {
+"kind": "number",
+"value": 3,
+"unit": "rank"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "salon-b4-005745",
+"tenant": "salon",
+"bank": "out4/dev4",
+"family": "days_since",
+"q": "on my phone in the truck - how long since tyler morales last had a service please",
+"expect": {
+"kind": "number",
+"value": 543,
+"unit": "days"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "salon-b4-007506",
+"tenant": "salon",
+"bank": "out4/dev4",
+"family": "dup_numbers",
+"q": "For the books, do we have repeated service ticket numbers, which?",
+"expect": {
+"kind": "list",
+"value": [
+"CA-1861",
+"CA-1865",
+"CA-1919"
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "salon-b4-011509",
+"tenant": "salon",
+"bank": "out4/dev4",
+"family": "docs_all",
+"q": "ME PUEDES DECIR JUST THE COUNT OF DOCUMENTS FOR CLIENTS IN BOULDER CITY PLS",
+"expect": {
+"kind": "number",
+"value": 34,
+"unit": "count"
+},
+"plan": {
+"op": "count",
+"entity": "document",
+"filters": [
+{
+"field": "city",
+"op": "eq",
+"words": "in Boulder City",
+"value": "Boulder City"
+}
+]
+}
+},
+{
+"id": "salon-b4-019429",
+"tenant": "salon",
+"bank": "out4/dev4",
+"family": "one_word",
+"q": "RUNNING BETWEEN JOBS CLIENTS NUMBER",
+"expect": {
+"kind": "number",
+"value": 320,
+"unit": "count"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "storage-b4-005744",
+"tenant": "storage",
+"bank": "out4/dev4",
+"family": "days_since",
+"q": "training question: how long since jean davis last had a walkthrough please out of everything weve uploaded",
+"expect": {
+"kind": "number",
+"value": 3011,
+"unit": "days"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "storage-b4-007779",
+"tenant": "storage",
+"bank": "out4/dev4",
+"family": "text",
+"q": "Buenas, would find after in lien letters and count",
+"expect": {
+"kind": "number",
+"value": 10,
+"unit": "count"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "storage-b4-008776",
+"tenant": "storage",
+"bank": "out4/dev4",
+"family": "lookup_total",
+"q": "My bookkeeper is asking: supply Order LK-1705, how many dollars",
+"expect": {
+"kind": "number",
+"value": 540,
+"unit": "usd"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "trucking-b4-003702",
+"tenant": "trucking",
+"bank": "out4/dev4",
+"family": "top",
+"q": "Rank top five statuses by number loads so far this year according to files",
+"expect": {
+"kind": "list",
+"value": [
+"Delivered",
+"Rejected",
+"In transit",
+"Delayed",
+"Passed"
+],
+"ordered": true
+},
+"plan": {
+"op": "top_n",
+"entity": "document",
+"docType": "bill-of-lading",
+"groupBy": [
+"status"
+],
+"limit": 5,
+"time": {
+"words": "so far this year"
+}
+}
+},
+{
+"id": "trucking-b4-005717",
+"tenant": "trucking",
+"bank": "out4/dev4",
+"family": "days_since",
+"q": "how mANy dAys HAS it BeEN sinCE THe Last deTenTioN claIm eNtry foR joAN SIms toDAY if pOssible?",
+"expect": {
+"kind": "number",
+"value": 547,
+"unit": "days"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "trucking-b4-008571",
+"tenant": "trucking",
+"bank": "out4/dev4",
+"family": "lookup_phone",
+"q": "Short on time here: Catalina Furniture East - phone, it's been bugging me",
+"expect": {
+"kind": "name",
+"value": "(602) 555-0482"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "trucking-b4-009934",
+"tenant": "trucking",
+"bank": "out4/dev4",
+"family": "untracked",
+"q": "As the owner, what is our overtime hours on Catalina Foods Central's account?",
+"expect": {
+"kind": "decline",
+"value": null
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "trucking-b4-015742",
+"tenant": "trucking",
+"bank": "out4/dev4",
+"family": "coming_up",
+"q": "TRYING TO LEARN THE ROPES HOW MANY DQ FILES ARE UP FOR RENEWAL IN THE NEXT 30 DAYS",
+"expect": {
+"kind": "number",
+"value": 3,
+"unit": "count"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "trucking-b4-020888",
+"tenant": "trucking",
+"bank": "out4/dev4",
+"family": "vague",
+"q": "Hey, should I be worried if it's in",
+"expect": {
+"kind": "decline",
+"value": {
+"reason": "advice"
+}
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "trucking-b4-021752",
+"tenant": "trucking",
+"bank": "out4/dev4",
+"family": "date_formats",
+"q": "I'm reconciling and need to know how many bipls of lading did we get starting the first of last month according to the files?",
+"expect": {
+"kind": "number",
+"value": 5,
+"unit": "count"
+},
+"plan": {
+"op": "count",
+"entity": "document",
+"docType": "bill-of-lading",
+"time": {
+"words": "starting the first of last month"
+}
+}
+},
+{
+"id": "tutoring-b4-004154",
+"tenant": "tutoring",
+"bank": "out4/dev4",
+"family": "group",
+"q": "PLEASE HELP, SINCE THE START 2021, AVERAGE BOOK ORDER AMOUNT SPLIT OUT BY YEAR OUT EVERYTHING WE'VE UPLOADED TODAY IF POSSIBLE",
+"expect": {
+"kind": "list",
+"value": [
+{
+"k": "2021",
+"v": 681.17
+},
+{
+"k": "2022",
+"v": 543.57
+},
+{
+"k": "2023",
+"v": 1025.65
+},
+{
+"k": "2024",
+"v": 316.42
+},
+{
+"k": "2025",
+"v": 755.85
+},
+{
+"k": "2026",
+"v": 607.94
+}
+],
+"pairs": true,
+"unit": "usd"
+},
+"plan": {
+"op": "group_avg",
+"entity": "document",
+"docType": "curriculum-order",
+"measure": {
+"field": "total"
+},
+"groupBy": [
+"year"
+],
+"time": {
+"words": "since the start 2021"
+}
+}
+},
+{
+"id": "tutoring-b4-007939",
+"tenant": "tutoring",
+"bank": "out4/dev4",
+"family": "line_item",
+"q": "My call tomorrow depends on this - practice charges on tuition statement papers belonging to Roy McCoy in 2026, tot - going by what's on file",
+"expect": {
+"kind": "number",
+"value": 1386.79,
+"unit": "usd"
+},
+"plan": {
+"op": "sum",
+"entity": "document",
+"docType": "tuition-statement",
+"measure": {
+"field": "total"
+},
+"filters": [
+{
+"field": "customer",
+"op": "eq",
+"words": "Roy McCoy",
+"value": "Roy McCoy"
+}
+],
+"time": {
+"words": "in 2026"
+}
+}
+},
+{
+"id": "tutoring-b4-011357",
+"tenant": "tutoring",
+"bank": "out4/dev4",
+"family": "docs_all",
+"q": "for the working papers, i need papers from the stored files",
+"expect": {
+"kind": "number",
+"value": 703,
+"unit": "count"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "tutoring-b4-015828",
+"tenant": "tutoring",
+"bank": "out4/dev4",
+"family": "coming_up",
+"q": "are any enrollment forms ending within 60 days from the stored files",
+"expect": {
+"kind": "yesno",
+"value": true
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "tutoring-b4-017221",
+"tenant": "tutoring",
+"bank": "out4/dev4",
+"family": "top_ties",
+"q": "i'm updating our binder: which 2 cities have the most most sessions",
+"expect": {
+"kind": "list",
+"value": [
+"Salt Lake City",
+"Sandy"
+],
+"ordered": true,
+"tie": false,
+"vals": [
+75,
+56
+]
+},
+"plan": {
+"op": "top_n",
+"entity": "document",
+"docType": "session-note",
+"groupBy": [
+"city"
+],
+"limit": 2
+}
+},
+{
+"id": "tutoring-b4-018224",
+"tenant": "tutoring",
+"bank": "out4/dev4",
+"family": "yes_no",
+"q": "audit prep: do we show any report cards back in 2023 for kelly armstrong that mention \"progress\"",
+"expect": {
+"kind": "yesno",
+"value": true
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "tutoring-b4-019254",
+"tenant": "tutoring",
+"bank": "out4/dev4",
+"family": "one_word",
+"q": "Let me see something. Patricia Morgan?",
+"expect": {
+"kind": "number",
+"value": 34,
+"unit": "count"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "hoa-b3-011766",
+"tenant": "hoa",
+"bank": "out3/dev3",
+"family": "coming_up",
+"q": "Do have any documents expiring in the next 30 days?",
+"expect": {
+"kind": "yesno",
+"value": true
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "nonprofit-001953",
+"tenant": "nonprofit",
+"bank": "out2",
+"family": "list_numbers",
+"q": "I'm trying to get a hande on what gift numbers do we have of more than 1650 dollars for November 2021",
+"expect": {
+"kind": "list",
+"value": [
+"DR-2149",
+"DR-2150",
+"DR-2152"
+]
+},
+"plan": {
+"op": "list",
+"entity": "document",
+"docType": "receipt",
+"filters": [
+{
+"field": "total",
+"op": "gt",
+"words": "more than 1650 dollars",
+"value": 1650
+}
+],
+"time": {
+"words": "for November 2021"
+}
+}
+},
+{
+"id": "nonprofit-000408",
+"tenant": "nonprofit",
+"bank": "out2",
+"family": "count",
+"q": "number of events we logged",
+"expect": {
+"kind": "number",
+"value": 34,
+"unit": "count"
+},
+"plan": {
+"op": "count",
+"entity": "document",
+"docType": "schedule"
+}
+},
+{
+"id": "plumbing-002143",
+"tenant": "plumbing",
+"bank": "out2",
+"family": "exists",
+"q": "is there a purchase orders from november 1 twenty twenty five to december 16 twenty twenty five",
+"expect": {
+"kind": "yesno",
+"value": true
+},
+"plan": {
+"op": "exists_yes_no",
+"entity": "document",
+"docType": "purchase-order",
+"time": {
+"words": "from november 1 twenty twenty five to december 16 twenty twenty five"
+}
+}
+},
+{
+"id": "cleaning-002355",
+"tenant": "cleaning",
+"bank": "out2",
+"family": "exists",
+"q": "per the boss, is there anythig in schedules for kevin shelton in las vegas mentioning \"summer\"",
+"expect": {
+"kind": "yesno",
+"value": true
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "hoa-b3-014277",
+"tenant": "hoa",
+"bank": "out3/dev3",
+"family": "top_ties",
+"q": "who are the bottom three community managers by maintenance request count?",
+"expect": {
+"kind": "list",
+"value": [
+"Teresa Clark",
+"Justin Gilbert",
+"Ryan Ward"
+],
+"ordered": true,
+"tie": false,
+"vals": [
+8,
+34,
+37
+]
+},
+"plan": {
+"op": "bottom_n",
+"entity": "document",
+"docType": "work-order",
+"groupBy": [
+"tech"
+],
+"limit": 3
+}
+},
+{
+"id": "medical-001734",
+"tenant": "medical",
+"bank": "out2",
+"family": "list_dim",
+"q": "Can't recall, what are the different cities on insurance records of Andrea Quinn",
+"expect": {
+"kind": "list",
+"value": [
+"Surprise"
+]
+},
+"plan": {
+"op": "list",
+"entity": "document",
+"docType": "insurance-certificate",
+"filters": [
+{
+"field": "customer",
+"op": "eq",
+"words": "Andrea Quinn",
+"value": "Andrea Quinn"
+}
+],
+"distinct": "city"
+}
+},
+{
+"id": "dental-b3-011049",
+"tenant": "dental",
+"bank": "out3/dev3",
+"family": "coming_up",
+"q": "Number of expirations in next thirty days",
+"expect": {
+"kind": "number",
+"value": 1,
+"unit": "count"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "cleaning-002418",
+"tenant": "cleaning",
+"bank": "out2",
+"family": "exists",
+"q": "So basically yo is it tre that we have service visits by Diana Hunt in Las Vegas that say \"break\", you're a lifesaver",
+"expect": {
+"kind": "yesno",
+"value": true
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "legal-000326",
+"tenant": "legal",
+"bank": "out2",
+"family": "count",
+"q": "Appointments for the client Saguaro Builders Inc that are completed count",
+"expect": {
+"kind": "number",
+"value": 1,
+"unit": "count"
+},
+"plan": {
+"op": "count",
+"entity": "document",
+"visit": true,
+"filters": [
+{
+"field": "customer",
+"op": "eq",
+"words": "Saguaro Builders Inc",
+"value": "Saguaro Builders Inc"
+},
+{
+"field": "status",
+"op": "eq",
+"words": "that are completed",
+"value": "Completed"
+}
+]
+}
+},
+{
+"id": "hoa-b3-016293",
+"tenant": "hoa",
+"bank": "out3/dev3",
+"family": "top_ties",
+"q": "For 2023, who r the bottom 2 managers by work orders thanks?",
+"expect": {
+"kind": "list",
+"value": [
+"Teresa Clark",
+"Jerry Mendoza",
+"Ryan Ward"
+],
+"ordered": false,
+"tie": true,
+"vals": [
+1,
+4,
+4
+]
+},
+"plan": {
+"op": "bottom_n",
+"entity": "document",
+"docType": "work-order",
+"groupBy": [
+"tech"
+],
+"limit": 2,
+"time": {
+"words": "For 2023"
+}
+}
+},
+{
+"id": "hoa-b3-013985",
+"tenant": "hoa",
+"bank": "out3/dev3",
+"family": "top_ties",
+"q": "Which three cities have the most most visits for 2022?",
+"expect": {
+"kind": "list",
+"value": [
+"Denver",
+"Arvada",
+"Boulder"
+],
+"ordered": true,
+"tie": false,
+"vals": [
+9,
+6,
+5
+]
+},
+"plan": {
+"op": "top_n",
+"entity": "document",
+"visit": true,
+"groupBy": [
+"city"
+],
+"limit": 3,
+"time": {
+"words": "for 2022"
+}
+}
+},
+{
+"id": "nonprofit-000015",
+"tenant": "nonprofit",
+"bank": "out2",
+"family": "count",
+"q": "i count how many expense orders, you tell me if right if that's possible",
+"expect": {
+"kind": "number",
+"value": 33,
+"unit": "count"
+},
+"plan": {
+"op": "count",
+"entity": "document",
+"docType": "purchase-order"
+}
+},
+{
+"id": "legal-001721",
+"tenant": "legal",
+"bank": "out2",
+"family": "list_dim",
+"q": "what are the different clients on letters from green valley in the last 45 days",
+"expect": {
+"kind": "list",
+"value": [
+"Catalina Builders Inc"
+]
+},
+"plan": {
+"op": "list",
+"entity": "document",
+"docType": "correspondence",
+"filters": [
+{
+"field": "city",
+"op": "eq",
+"words": "from green valley",
+"value": "Green Valley"
+}
+],
+"time": {
+"words": "in the last 45 days"
+},
+"distinct": "customer"
+}
+},
+{
+"id": "hoa-b3-021415",
+"tenant": "hoa",
+"bank": "out3/dev3",
+"family": "one_word",
+"q": "Hey Hal Kim",
+"expect": {
+"kind": "number",
+"value": 1,
+"unit": "count"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "construction-000033",
+"tenant": "construction",
+"bank": "out2",
+"family": "count",
+"q": "I count how many change orders in October, 2025, tel if right when get sec",
+"expect": {
+"kind": "number",
+"value": 3,
+"unit": "count"
+},
+"plan": {
+"op": "count",
+"entity": "document",
+"docType": "work-order",
+"time": {
+"words": "in October, 2025"
+}
+}
+},
+{
+"id": "medical-001923",
+"tenant": "medical",
+"bank": "out2",
+"family": "list_dim",
+"q": "can you help me figure out what are the different service types on appointments that are completed containing the word \"specialist\"",
+"expect": {
+"kind": "list",
+"value": [
+"Checkup",
+"Follow-up",
+"Lab review",
+"Physical",
+"Sick visit",
+"Vaccination"
+]
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "hoa-b3-011949",
+"tenant": "hoa",
+"bank": "out3/dev3",
+"family": "coming_up",
+"q": "Do we have any documennts expiring in the next 30 days",
+"expect": {
+"kind": "yesno",
+"value": true
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "hoa-b3-014195",
+"tenant": "hoa",
+"bank": "out3/dev3",
+"family": "top_ties",
+"q": "WHICH 2 COMMUNITY MANAGERS HAVE MOST NUMBER INSPCTION REPORTS?",
+"expect": {
+"kind": "list",
+"value": [
+"Jerry Mendoza",
+"Justin Gilbert"
+],
+"ordered": true,
+"tie": false,
+"vals": [
+51,
+30
+]
+},
+"plan": {
+"op": "top_n",
+"entity": "document",
+"docType": "inspection-report",
+"groupBy": [
+"tech"
+],
+"limit": 2
+}
+},
+{
+"id": "dental-b3-021381",
+"tenant": "dental",
+"bank": "out3/dev3",
+"family": "one_word",
+"q": "hey ramon james",
+"expect": {
+"kind": "number",
+"value": 4,
+"unit": "count"
+},
+"plan": {
+"op": "none",
+"reason": "not expressible as one plan over the stored records (or not a look-up of stored records)"
+}
+},
+{
+"id": "plumbing-002206",
+"tenant": "plumbing",
+"bank": "out2",
+"family": "exists",
+"q": "Hi, is there a calls type Fixture install not marked completed?",
+"expect": {
+"kind": "yesno",
+"value": true
+},
+"plan": {
+"op": "exists_yes_no",
+"entity": "document",
+"visit": true,
+"filters": [
+{
+"field": "serviceType",
+"op": "eq",
+"words": "type Fixture install",
+"value": "Fixture install"
+},
+{
+"field": "status",
+"op": "neq",
+"words": "not marked completed",
+"value": "Completed"
+}
+]
+}
+}
+]

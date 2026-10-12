@@ -50,8 +50,10 @@ import { parseMoneyIntent } from "../financials/answers.js";
 import { extraDocTypeAlternation, stemWord } from "../lookups/lexicon.js";
 import { detectAnalyticsPlan } from "../analytics/detPlan.js";
 import { parseDql, dqlEnabled } from "../dql/index.js";
-import { arbiterAllows, arbiterMode, laneLabel, dqlLabel, arbiterLastHit, TWO_BOUND_AMOUNT_RE } from "./dqlArbiter.js";
+import { dqlStepsAside, arbiterAllows, arbiterMode, laneLabel, dqlLabel, arbiterLastHit, TWO_BOUND_AMOUNT_RE } from "./dqlArbiter.js";
 import { hasOrdinalRank } from "../dql/ordinal.js";
+import { twoMeasureSignal } from "../dql/multi.js";
+import { classifyTranslate } from "../dql/translator/index.js";
 import { isMerged, isReleased } from "../followup/handoff.js";
 import { ENTITY_SYNONYMS } from "../analytics.js";
 import { leftoverWords, leftoverEnabled, domainWordsFromVocab, NEGATION_WORDS, unusedGrammar, grammarSpans, yearPairRewrite } from "./leftover.js";
@@ -553,6 +555,13 @@ async function withDql(out, question, ctx) {
       if (mi && !mi.plain) return { ...out, winner: { name: "decompose", intent: mi }, gated: { ...(out.gated ?? {}), deterministic: null, relations: null, fastPath: null, contactLookup: null, docLookup: null, contentCount: null, money: null, decompose: mi, analytics: false }, claimed: [...new Set([...(out.claimed ?? []).filter((n) => n !== "analytics"), "decompose"])], dql: true };
       return { ...out, winner: null, claimed: [], gated: Object.fromEntries(Object.keys(out.gated ?? {}).map((k) => [k, k === "analytics" ? false : null])), leftoverDeclined: { reason: "followup-merge", words: [] } }; // DQL cannot read the merged question: no older lane may answer it while dropping a condition
     }
+    // R15: "how many invoices in 2022 and what was the total": two measures of the same papers. DQL answers both parts or releases the whole question; an older lane never answers one half as if it were all of it
+    // (the clause-splitting compound lane checks every clause itself, so it keeps its own claim when DQL cannot read the question)
+    if (w && !w.futureDate && !mergedFollowup && (OLDER_LANES.has(w.name) || (w.name === "decompose" && ["compound", "filter"].includes(w.intent?.mode))) && twoMeasureSignal(question)) {
+      const mi = parseDql(question, { tenantVocab: ctx.tenantVocab, pack: ctx.pack, today: ctx?.today, original: question });
+      if (mi && mi.plan?.op === "multi") return { ...out, winner: { name: "decompose", intent: mi }, gated: { ...(out.gated ?? {}), deterministic: null, relations: null, fastPath: null, contactLookup: null, docLookup: null, contentCount: null, money: null, decompose: mi, analytics: false }, claimed: [...new Set([...(out.claimed ?? []).filter((n) => n !== "analytics"), "decompose"])], effectiveQuestion: out.effectiveQuestion ?? question, dql: true };
+      if (OLDER_LANES.has(w.name) || w.intent?.mode === "filter") return releaseClaims(out, "multi-measure");
+    }
     if (w) {
       // Arbitration: an older lane's claim that DQL also explains completely. DQL takes it only for the pairs on the allowlist (router/dqlArbiter.js).
       if (arbiterMode() !== "off" && !w.futureDate) {
@@ -586,6 +595,14 @@ async function withDql(out, question, ctx) {
     const intent = parseDql(text, { tenantVocab: ctx.tenantVocab, pack: ctx.pack, today: ctx?.today, original: question });
     // two amount bounds ("over 1000, under 2000", "under $A or over $B") that DQL does not read: an older lane would keep one bound and answer for the whole range, so the question is released
     if (!intent && w && OLDER_LANES.has(w.name) && (TWO_BOUND_AMOUNT_RE.test(text) || TWO_BOUND_AMOUNT_RE.test(question))) return releaseClaims(out, "two-bounds");
+    if (intent && !intent.plain && dqlStepsAside(question, intent.plan)) return out; // R13i: a shape the older lanes read exactly
+    if (!intent && !out?.leftoverDeclined && (!w || w.name === "analytics")) {
+      // DONOVAN_PLAN_TRANSLATOR=1 (default off): a question no lane and no DQL reading answers, which would go to a language model, may instead have the
+      // cheapest model write a PLAN that DQL validates and runs. It travels behind the earlier claim like any "after" lane: when the plan is rejected
+      // or cannot run, the question goes on exactly as it always did.
+      const ti = classifyTranslate(text, { tenantVocab: ctx.tenantVocab, pack: ctx.pack, today: ctx?.today });
+      if (ti) return { ...out, gated: { ...(out?.gated ?? {}), decompose: ti }, claimed: [...new Set([...(out?.claimed ?? []), "decompose"])], dql: "translate" };
+    }
     if (!intent || intent.plain) return out; // a plain inventory question stays with the lanes that have always answered it
     if (place === "after") return { ...out, gated: { ...out.gated, decompose: intent }, claimed: [...new Set([...(out.claimed ?? []), "decompose"])], dql: "after" };
     const gated = { ...(out?.gated ?? {}), decompose: intent, analytics: false };

@@ -13,6 +13,7 @@ import { attachCitations, customerRecord } from "../citations/records.js";
 import { documentRecordsFor } from "../citations/enrich.js";
 import { TENANT_SQL, answerEnvelope } from "../scope.js";
 import { notPrivateSql } from "../privacy/privateDocs.js";
+import { parseAttrAbsence, runAttrAbsence } from "./attrAbsence.js";
 
 const VAL = (a) => `COALESCE(NULLIF(${a}.corrected_value, ''), ${a}.value)`;
 const STOP = new Set("a an the in on of at with and to for from by is it that this was were".split(" "));
@@ -40,6 +41,9 @@ export function parseFindingWho(question) {
   const tail = body.replace(/\s+(?:please|lol|thanks|for me|real quick|thx|pls)$/i, "").trim();
   let m = new RegExp(`^who\\s+([a-z]{3,10})\\s+${NAME}'s\\s+(.+)$`, "i").exec(tail);
   if (m && /^[A-Z]/.test(m[2]) && ["tested", "inspected", "serviced", "scoped", "checked", "did", "ran", "performed"].some((v) => near(m[1].toLowerCase(), v))) return { kind: "find-who", shape: "who-did", verb: m[1].toLowerCase(), name: m[2].trim(), term: m[3].trim(), question: raw };
+  // R43: "which customers failed their backflow test" -> the customers whose test certificate records FAILED (result words are read from the tenant's own findings)
+  m = /^(?:who|which customers?|which ones|what customers?)\s+(?:has\s+|have\s+|had\s+)?(failed|flunked|passed)\s+(?:their\s+|the\s+|a\s+|an\s+)?([a-z][a-z -]{2,30})$/i.exec(tail);
+  if (m) return { kind: "find-who", shape: "finding", mode: "list", phrase: /^pass/i.test(m[1]) ? "passed" : "failed", term: m[2].trim(), question: raw };
   m = /^(?:who|which customers?)\s+(?:got|had|has|have|saw|showed|found|with)\s+(?:an?\s+|the\s+)?(.+?)\s+(?:on|in|from)\s+(?:the\s+)?([a-z][a-z -]{2,30})$/i.exec(tail);
   if (m) return { kind: "find-who", shape: "finding", mode: "list", phrase: m[1].trim(), term: m[2].trim(), question: raw };
   m = /^how many\s+([a-z][a-z -]{2,30}?)\s+(?:found|had|showed|have|with|got)\s+(?:an?\s+|the\s+)?(.+)$/i.exec(tail);
@@ -49,6 +53,8 @@ export function parseFindingWho(question) {
   if (m) return { kind: "find-who", shape: "city-type", city: m[1].trim(), type: m[2].trim(), question: raw };
   m = new RegExp(`^${NAME}'s\\s+([A-Z][A-Za-z-]{2,})\\s*[-,:–]?\\s*what(?:'s| is)?\\s+(?:the\\s+)?model(?:\\s+(?:is it|number))?$`).exec(tail);
   if (m) return { kind: "find-who", shape: "brand-unit", name: m[1].trim(), brand: m[2].trim(), question: raw };
+  const aa = parseAttrAbsence(raw); // R43: a thing this organization does not record, asked about a customer who is on file
+  if (aa) return { ...aa, kind: "find-who", shape: "attr" };
   return null;
 }
 
@@ -99,14 +105,17 @@ async function whoDid(db, it) {
 }
 
 async function finding(db, it) {
-  const type = await resolveDocType(db, it.term); if (!type) return null;
+  const type = await resolveDocType(db, it.term);
+  if (!type && /^(?:failed|passed)$/.test(it.phrase)) return empty(`I don't have any "${it.term}" records on file, so nobody ${it.phrase === "failed" ? "failed" : "passed"} one.`, `Looked for a document type matching "${it.term}"; none exists.`);
+  if (!type) return null;
   const pw = content(it.phrase).filter((w) => !FINDING_GENERIC.has(w)); if (!pw.length) return null;
   const { rows: vals } = await db.raw(
     `SELECT x.field_key, ${VAL("x")} AS v, array_agg(DISTINCT x.document_id::text) AS docs FROM extractions x JOIN documents d ON d.id = x.document_id AND d.${TENANT_SQL} AND ${notPrivateSql("d")}
       WHERE x.${TENANT_SQL} AND d.document_type = $1 AND x.field_key NOT LIKE '%name%' AND x.field_key NOT LIKE '%address%' AND x.field_key NOT LIKE '%date%' AND x.field_key <> 'technician'
-        AND length(${VAL("x")}) BETWEEN 4 AND 120 AND ${VAL("x")} ~ '[A-Za-z]{3}' AND ${VAL("x")} !~ '^[A-Z0-9-]{6,}$' GROUP BY 1, 2`, [type]);
+        AND length(${VAL("x")}) BETWEEN 4 AND 120 AND ${VAL("x")} ~ '[A-Za-z]{3}' AND ${VAL("x")} !~ '^(?=.*[0-9])[A-Z0-9-]{6,}$' GROUP BY 1, 2`, [type]);
   const label = type.replace(/[-_]/g, " ");
-  const hits = vals.filter((r) => { const vw = content(r.v); return pw.every((w) => vw.some((x) => near(w, x))); });
+  const resultWord = /^(?:failed|passed)$/.test(it.phrase);
+  const hits = vals.filter((r) => (!resultWord || /result|status|outcome/.test(r.field_key)) && (() => { const vw = content(r.v); return pw.every((w) => vw.some((x) => near(w, x))); })());
   if (!hits.length) return null;
   if (new Set(hits.map((h) => h.field_key)).size > 1) return null;
   const docIds = [...new Set(hits.flatMap((h) => h.docs))];
@@ -168,5 +177,6 @@ export async function runFindingWho(db, it) {
   if (it.shape === "finding") return finding(db, it);
   if (it.shape === "city-type") return cityType(db, it);
   if (it.shape === "brand-unit") return brandUnit(db, it);
+  if (it.shape === "attr") return runAttrAbsence(db, it);
   return null;
 }
