@@ -16,6 +16,7 @@ import { isRestricting, ORDER_WORDS, DOC_KIND_WORDS } from "./pick.js";
 import { isGivenName } from "../lookups/commonWords.js";
 import * as store from "./store.js";
 import { financeViewsSql } from "../agent/financeViews.js";
+import { notPrivateSql, notPrivateIdSql } from "../privacy/privateDocs.js";
 
 const T = (a) => `${a}.tenant_id = (current_setting('app.tenant_id', true))::uuid`;
 export const SUBJECT_KINDS = Object.freeze(["entity", "document", "unit", "address"]);
@@ -131,8 +132,8 @@ export const clearInventoryCache = () => cache.clear();
 export async function loadInventory(db, { key = null, now = Date.now() } = {}) {
   if (key) { const e = cache.get(key); if (e && now - e.at < CACHE_MS) return e.inv; }
   const q = async (sql, params = []) => (await db.raw(sql, params)).rows;
-  const docs = await q(`SELECT d.id, d.document_type, d.original_filename AS filename, d.created_at::text AS created_at FROM documents d WHERE ${T("d")} ORDER BY d.created_at DESC, d.id LIMIT ${MAX_DOCS}`);
-  const pages = await q(`SELECT p.document_id, p.page_no, p.text FROM document_pages p WHERE ${T("p")} ORDER BY p.created_at DESC, p.document_id, p.page_no LIMIT ${MAX_PAGES}`);
+  const docs = await q(`SELECT d.id, d.document_type, d.original_filename AS filename, d.created_at::text AS created_at FROM documents d WHERE ${T("d")} AND ${notPrivateSql("d")} ORDER BY d.created_at DESC, d.id LIMIT ${MAX_DOCS}`);
+  const pages = await q(`SELECT p.document_id, p.page_no, p.text FROM document_pages p WHERE ${T("p")} AND ${notPrivateIdSql("p.document_id")} ORDER BY p.created_at DESC, p.document_id, p.page_no LIMIT ${MAX_PAGES}`);
   let heads = [];
   if (await store.hasFinancials(db)) {
     try {

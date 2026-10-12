@@ -180,7 +180,7 @@ export function parseDql(question, ctx = {}) {
   if (!dqlEnabled()) return null;
   const tv = ctx.tenantVocab;
   if (!tv) return null;
-  const raw0 = String(question ?? '').trim().replace(/\bw\/o\b/gi, 'without').replace(/\bw\/(?=\s)/gi, 'with');
+  const raw0 = String(question ?? '').trim().replace(/\bw\/o\b/gi, 'without').replace(/\bw\/(?=\s)/gi, 'with').replace(/\b(?:the\s+)?(?:last|previous|past)\s+calendar\s+year\b/gi, 'last year').replace(/\b(?:the\s+)?(?:this|current)\s+calendar\s+year\b/gi, 'this year'); // round 11: "last calendar year" is the previous calendar year
   if (!raw0 || raw0.length > 240) return null;
   const today = ctx.today ?? new Date().toISOString().slice(0, 10);
   const vocab = compileVocab(tv, ctx.pack);

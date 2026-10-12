@@ -107,6 +107,8 @@ export function parseRecordsQuestion(question, { today = null, parsePeriodFn = n
   const tokens = tokensOf(text);
   const out = { raw: String(question ?? ""), text, tokens, facts: [], summary: false, docNumbers: [], serials: [], address: null, order: null, all: false, window: null, stepAside: null };
   if (!tokens.length || tokens.length > 40) { out.stepAside = "length"; return out; }
+  // R12: "is Ray Sutton a customer or a technician" asks what KIND of party someone is; this lane reads facts of one record, so it never answers a role question with a technician field
+  if (/\b(?:customer|client|patient|tenant|donor)s? or (?:a |an |the )?(?:technician|tech|vendor|employee|supplier)\b|\b(?:technician|tech|vendor|employee|supplier) or (?:a |an |the )?(?:customer|client|patient|tenant|donor)\b|\b(?:is|are|was) [a-z' .-]{3,40} (?:a|an) (?:technician|tech|vendor|employee|supplier)\b/.test(text)) { out.stepAside = "role-question"; return out; }
   const vetoed = VETO.test(text);
   out.softVeto = SOFT_VETO.test(text);
 

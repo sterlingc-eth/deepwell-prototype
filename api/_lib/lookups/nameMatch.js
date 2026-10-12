@@ -8,6 +8,8 @@
  * Every lane that wants to deny calls nameVerdict() and may emit denialText() only when verdict.deny is true. Data is read only inside the asking organization (tenant_id of the session).
  */
 import { attachCitations } from "../citations/records.js";
+import { isNotAPerson } from "./notAPerson.js";
+import { isGlueWord } from "../records/glueWords.js";
 const TENANT = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 export const TITLE_TOKENS = new Set(["mr", "mrs", "ms", "miss", "mx", "dr", "sr", "jr", "mister", "missus", "doctor", "prof", "esq", "ii", "iii", "iv"]);
 // words that carry no identity on their own: company suffixes and glue. (A shared "supply" or "heating" still counts: only these are ignored.)
@@ -37,6 +39,9 @@ export function tokenSame(a, b) {
   return null;
 }
 
+/** R12: an ordinary word of the sentence ("back", "many", "books", "second") is never a misspelled person: a typo match is allowed only for a word that could be a name */
+const ordinaryAskedWord = (t) => isNotAPerson(t) || isGlueWord(t);
+
 async function loadEntities(db) {
   const out = [];
   const c = await db.raw(`SELECT id, data->>'customer_name' AS n FROM entities WHERE entity_type = 'customer' AND merged_into IS NULL AND ${TENANT}`, []);
@@ -58,7 +63,7 @@ export async function nameVerdict(db, raw) {
   for (const e of ents) {
     const key = `${e.type}:${e.name.toLowerCase()}`; if (seen.has(key)) continue; seen.add(key);
     const et = nameTokens(e.name); if (!et.length) continue;
-    const hits = asked.map((t) => { let best = null; for (const x of et) { const s = tokenSame(t, x); if (s === "exact") return "exact"; if (s) best = "typo"; } return best; });
+    const hits = asked.map((t) => { let best = null; for (const x of et) { const s = tokenSame(t, x); if (s === "exact") return "exact"; if (s && !ordinaryAskedWord(t)) best = "typo"; } return best; });
     if (!hits.some(Boolean)) continue;
     // a share by misspelling alone counts only when it covers at least half of the asked words ("Thmas Mercer", "Kaen Abernathy"); one near-spelled word among several unmatched ones does not
     if (!hits.includes("exact") && hits.filter(Boolean).length * 2 < asked.length) continue;

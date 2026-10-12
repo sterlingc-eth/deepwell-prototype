@@ -30,6 +30,8 @@ const TWO_ENDED_PERIOD = /\b(?:between\s+\S+(?:\s+\S+){0,3}\s+and\s+(?:\S+\s+)?(
 const TWO_BOUND_AMOUNT = /\b(?:between\s+\$?\d[\d,.k]*\s+and\s+\$?\d|from\s+\$?\s?(?!(?:19|20)\d\d\s+(?:to|through|thru|until|-)\s+(?:19|20)\d\d\b)\d[\d,.k]*\s+(?:to|through|thru|until|-)\s+\$?\d|(?:over|above|more than|greater than|at least|exceeding|under|below|less than|at most|no more than)\s+\$?\d[\d,.k]*(?:\s+dollars)?(?:\s*,\s*(?:and\s+|but\s+)?|\s+(?:and|but|or)\s+)(?:over|above|more than|greater than|at least|exceeding|under|below|less than|at most|no more than)\s+\$?\d)/i;
 const NEGATED_SET = /\b(?:with(?:out)?\s+(?:no|any)\b|without\b|who\s+never\b|that\s+never\b|never\s+(?:got|had|received|have|has|been|issued|sent)\b|(?:have|has|had)\s+no\b|(?:have|has|had)n'?t\b|lack(?:s|ing)?\b)/i;
 
+import { RANK_SHAPE_RE, PERIOD_GROUP_RE } from "../analytics/detPlan.js";
+
 export const ARBITER_ALLOWLIST = [
   { from: "deterministic:aggregate", ops: ["sum","set_per_entity","share_pct","tm_compare","set_above_avg","tm_rate","compare_two_values","first_ever","tm_expiry","set_rank:tech"],
     why: "the aggregate route answers a different question (grand total, ungrouped numbers) when the question has a comparison, a share, a rank among rows or a set condition",
@@ -110,6 +112,10 @@ export const ARBITER_ALLOWLIST = [
   { from: "contactLookup:slotFill", ops: ["duplicates"],
     why: "asks nothing useful of a duplicate-serial question",
     dev: "1 answers improved (wrong, declined or punted before, right now), 0 regressions (per op: duplicates 1)" },
+
+  { id: "rank-shape", from: "analytics:", ops: ["top_n","bottom_n","tm_series","group_count","pivot_two_dims"], only: new RegExp(RANK_SHAPE_RE.source + "|" + PERIOD_GROUP_RE.source, "i"),
+    why: "round 12a: a ranking (\"top 5 customers by quotes\", \"which city has the most invoices\"), a busiest period or a count by period: the analytics planner has no plan for these any more (it released them), so DQL takes the question when it reads all of it",
+    dev: "R11 mass sample, analytics lane: top_n 63 wrong, busiest_period 35, group_count 48; after: see the round 12a report" },
 
   /* ---- round 8: shapes where the older lanes drop a condition that DQL reads whole. Each is limited by the question's own wording AND a plan condition. ---- */
   { id: "ordinal", from: "*", ops: ["*"], plan: { has: ["nth"] },

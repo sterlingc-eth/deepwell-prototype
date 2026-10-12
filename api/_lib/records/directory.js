@@ -105,6 +105,14 @@ export const NOT_A_FACT = Object.freeze(new Set([
  * to contain a directory phrase, so a paraphrase can never point at a fact that does not exist. Kept as data, not as code in the lane.
  */
 export const PARAPHRASES = Object.freeze([
+  // R12: "whose change order is CO-1624" asks the customer of that document
+  [/\bwhose (?=(?:[a-z]+ ){0,2}(?:order|invoice|ticket|permit|estimate|quote|po|wo|bill|receipt|statement)\b)/g, "customer name for "],
+  // R12: "<document> from March 15, 2025" (a full date) names the one dated that day; "from" would read as an open-ended "since"
+  [/\b(invoice|invoices|estimate|estimates|quote|quotes|receipt|receipts|permit|permits|ticket|tickets|statement|statements|bill|bills|contract|contracts|proposal|proposals|order|orders|bid|bids|notice|notices|report|reports|application|applications|dispatch|dispatches|form|forms|agreement|agreements|visit|visits|call|calls) from (?=(?:(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.? \d{1,2}(?:st|nd|rd|th)?,? \d{4}|\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}|\d{4}-\d{2}-\d{2})\b)/g, "$1 on "],
+  // R12: "<document> dated <a date>" names WHICH document, it does not ask for the date ("find Randy Hall's invoice dated 12/3/2021" wants the invoice, not its date)
+  [/\b(invoice|invoices|estimate|estimates|quote|quotes|receipt|receipts|permit|permits|ticket|tickets|statement|statements|bill|bills|contract|contracts|proposal|proposals|order|orders|bid|bids|notice|notices|report|reports|application|applications|agreement|agreements) dated (?=\d|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b)/g, "$1 on "],
+  // R12: "<document number> was done by who" asks who worked it
+  [/\b(?:was |were |is |are |got |gets )?done by who\b/g, "who worked on"],
   // "last time we were at X" / "the last time we went to X" -> "last visit at X"
   [/\b(?:the |our )?(?:last|latest|most recent|previous) time\b(?: that)?(?: we| i)?(?: were| was| went| got| came| came out| drove)?(?: out)?(?: at| to| over at)?\b/g, "last visit at"],
   [/\bwhen we (?:were|went|got|came)(?: out)?(?: at| to| over at)\b/g, "at"],

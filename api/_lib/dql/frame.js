@@ -91,6 +91,10 @@ const PARAPHRASE = [
   [/\bas\s+well\s+as\b/gi, 'and'],
   [/\bwhat\s+(?:do|does|did)\s+(?:the\s+|our\s+)?(.+?)\s+come\s+to(?:\s+in\s+dollars)?\s*\??$/gi, 'what is the total amount of $1'],
   [/\b(?:which|what)\s+(customers?|clients?|patients?|tenants?|residents?|owners?|donors?|supporters?|members?|accounts?|cit(?:y|ies)|brands?|vendors?)\s+comes?\s+out\s+on\s+top\s+by\b/gi, 'top $1 by'],
+  // round 12a: other ways of asking for the top one of a group, in the form the parser reads ("top city by number of ...")
+  [/\b(?:which|what)\s+(customers?|clients?|patients?|tenants?|residents?|owners?|donors?|supporters?|members?|accounts?|cit(?:y|ies)|brands?|vendors?|suppliers?|statuse?s?|technicians?|techs?)\s+(?:has|have|had|with)\s+(?:the\s+)?(?:greatest|largest|highest|biggest|most)\s+(?:number|count)\s+of\b/gi, 'top $1 by number of'],
+  [/\b(?:which|what)\s+(customers?|clients?|patients?|tenants?|residents?|owners?|donors?|supporters?|members?|accounts?|cit(?:y|ies)|brands?|vendors?|suppliers?|statuse?s?|technicians?|techs?)\s+(?:is|are)?\s*(?:ranks?\s+first|ranked\s+first|number\s+one|#\s?1|the\s+top)\s+(?:by|for|in|on)\s+(?:the\s+)?(?=number|count|how\s+many|total)/gi, 'top $1 by '],
+  [/\b(customers?|clients?|patients?|tenants?|residents?|owners?|donors?|supporters?|members?|accounts?|cit(?:y|ies)|brands?|vendors?|suppliers?|statuse?s?|technicians?|techs?)\s+(?:ranks?\s+first|ranked\s+first|ranking\s+first)\s+(?:by|for|in|on)\s+/gi, 'top $1 by '],
   [/\bwhich\s+(year|month|quarter)\s+stands\s+out\s+as\s+the\s+(?:heaviest|busiest|biggest)\b/gi, 'busiest $1'],
   [/\b(look|pull|bring|call)\s+up\b/gi, '$1'],
   [/\bearlier\s+than\b/gi, 'before'],
@@ -184,6 +188,7 @@ export function dqlParaphrase(text) {
   q = q.replace(new RegExp(`(?<!\\b(?:percent|percentage|share|proportion|fraction|number|count|list|many|total|ratio|which|what)\\s)\\b(?:for|of|from)\\s+(?:the\\s+|our\\s+|all\\s+)?${CUSTW}\\s+(?=(?:in|at|located|based)\\b)`, 'gi'), '');
   q = compareRewrite(numbersRewrite(perEntityRewrite(rankRewrite(q.replace(/\s+/g, ' ').trim()))));
   for (const [re, to] of PARAPHRASE) q = q.replace(re, to);
+  q = rankRewrite(q.replace(/\s+/g, ' ').trim()); // round 12a: a ranking the paraphrases above wrote as "top city by ..." is put in the form the parser reads
   // "greater than $250 and less than $1,200": a two-bound amount is written with the plain words the planner was checked on ("over $250 and under $1,200")
   q = q.replace(new RegExp(`\\b(${BOUNDW})\\s+(\\$\\s?\\d[\\d,]*(?:\\.\\d+)?|\\d[\\d,]*(?:\\.\\d+)?(?=\\s+(?:and|or|but)\\s+(?:${BOUNDW})\\s+\\$))\\s+(and|or|but)\\s+(${BOUNDW})\\s+(\\$?\\s?\\d[\\d,]*(?:\\.\\d+)?)`, 'gi'), (_, c1, n1, j, c2, n2) => `${cmpPlain(c1)} ${n1.replace(/\\s+/g, '')} ${j.toLowerCase() === 'but' ? 'and' : j} ${cmpPlain(c2)} ${n2.replace(/\\s+/g, '')}`);
   // "which tenants have leases ending ...": who holds the papers is what the answer lists; the question is about the papers
@@ -223,7 +228,7 @@ export function rankRewrite(q) {
   m = WHICH.exec(q);
   if (m) {
     const dir = new RegExp(`^${BOTW}$`, 'i').test(m[3]) ? 'bottom' : 'top'; const n = numOf(m[1]) ?? 1;
-    const tail = m[4]; const money = /\b(?:dollars?|amount|total|value)\b/i.test(tail);
+    const tail = m[4].replace(/^(?:the\s+)?(?:total\s+)?(?:number|count)\s+of\s+/i, ''); const money = /\b(?:dollars?|amount|total|value)\b/i.test(tail);
     return `${dir} ${n} ${tail.replace(/\b(?:dollars?|amount|total|value)\b/gi, ' ')}${money ? ' dollars' : ''} by ${m[2]}`.replace(/\s+/g, ' ');
   }
   return q;

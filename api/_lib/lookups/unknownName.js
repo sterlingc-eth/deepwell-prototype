@@ -11,6 +11,7 @@
  * of it (a typo of a real customer keeps the existing Did-you-mean / auto-resolve path). Anything else returns null and behaves as before.
  * Kill switch: DONOVAN_UNKNOWN_NAME_DECLINE=0.
  */
+import { isGlueWord } from "../records/glueWords.js";
 import { denyOr } from "./nameMatch.js";
 import { attachCitations } from "../citations/records.js";
 import { stripConversationalFrame } from "../router/frame.js";
@@ -89,6 +90,7 @@ export function extractNamePhrase(question) {
     const tokens = m[1].split(/\s+/).map((t) => t.replace(/['’]s?$/i, "")).filter((t) => t && !STOP.has(t.toLowerCase()) && !TAIL_WORDS.has(t.toLowerCase()));
     if (!tokens.length || tokens.length > 3) continue;
     if (isNotAPerson(tokens.join(" "))) continue; // R10
+    if (tokens.every((t) => isNotAPerson(t) || isGlueWord(t))) continue; // R12: "many books", "back": ordinary words of the sentence, never a person nobody has heard of
     return tokens.join(" ");
   }
   if (nfEnabled()) for (const re of NF_SHAPES) {

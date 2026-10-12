@@ -5,6 +5,7 @@
  */
 import { financeViewsSql, docCustomerCte } from "../agent/financeViews.js";
 import { financialsTableExists } from "../financials/store.js";
+import { notPrivateSql } from "../privacy/privateDocs.js";
 
 const T = (a) => `${a}.tenant_id = (current_setting('app.tenant_id', true))::uuid`;
 export const CUSTOMERS_CTE = `customers AS (SELECT e.id AS customer_id, e.customer_number, e.data->>'customer_name' AS name, e.data->>'service_address' AS address, e.data->>'phone' AS phone, e.data->>'email' AS email FROM entities e WHERE e.entity_type = 'customer' AND e.merged_into IS NULL AND ${T("e")})`;
@@ -23,7 +24,7 @@ export async function docsForCustomer(db, customerId) {
   return rows(db, `WITH ${CUSTOMERS_CTE}, ${docCustomerCte("doc_customer")}
     SELECT d.id AS document_id, d.document_type, d.original_filename AS filename, d.created_at::text AS created_at, dc.customer_id, dc.customer_name
       FROM documents d JOIN doc_customer dc ON dc.document_id = d.id
-     WHERE dc.customer_id = $1 AND ${T("d")}
+     WHERE dc.customer_id = $1 AND ${T("d")} AND ${notPrivateSql("d")}
      ORDER BY d.created_at DESC, d.id`, [customerId]);
 }
 
@@ -38,7 +39,7 @@ export async function docsByNumber(db, codes) {
   return rows(db, `WITH ${CUSTOMERS_CTE}, ${docCustomerCte("doc_customer")}
     SELECT d.id AS document_id, d.document_type, d.original_filename AS filename, d.created_at::text AS created_at, dc.customer_id, dc.customer_name
       FROM documents d LEFT JOIN doc_customer dc ON dc.document_id = d.id
-     WHERE ${T("d")} AND d.id IN (
+     WHERE ${T("d")} AND ${notPrivateSql("d")} AND d.id IN (
        SELECT x.document_id FROM extractions x WHERE ${T("x")} AND x.field_key IN ('invoice_number','po_number','permit_number')
           AND (regexp_replace(upper(coalesce(NULLIF(x.corrected_value,''), x.value, '')), '[^A-Z0-9]', '', 'g') = ANY($1::text[])
                OR (cardinality($2::text[]) > 0 AND regexp_replace(coalesce(NULLIF(x.corrected_value,''), x.value, ''), '\\D', '', 'g') = ANY($2::text[])))
@@ -59,7 +60,7 @@ export async function docsForUnit(db, unitId) {
   return rows(db, `WITH ${CUSTOMERS_CTE}, ${docCustomerCte("doc_customer")}
     SELECT d.id AS document_id, d.document_type, d.original_filename AS filename, d.created_at::text AS created_at, dc.customer_id, dc.customer_name
       FROM documents d LEFT JOIN doc_customer dc ON dc.document_id = d.id
-     WHERE ${T("d")} AND d.id IN (SELECT l.document_id FROM document_entity_links l WHERE l.entity_id = $1 AND ${T("l")} UNION SELECT x.document_id FROM extractions x WHERE x.entity_id = $1 AND ${T("x")})
+     WHERE ${T("d")} AND ${notPrivateSql("d")} AND d.id IN (SELECT l.document_id FROM document_entity_links l WHERE l.entity_id = $1 AND ${T("l")} UNION SELECT x.document_id FROM extractions x WHERE x.entity_id = $1 AND ${T("x")})
      ORDER BY d.created_at DESC, d.id`, [unitId]);
 }
 /** customers whose service address (customer record or any of their units) contains the street number AND the street word */

@@ -13,16 +13,19 @@ import { FACTS, factById } from "./directory.js";
 import * as store from "./store.js";
 import { nameTokens, tokenSame } from "../lookups/nameMatch.js";
 import { isNonNameWord, isGivenName, isRealWordOrName } from "../lookups/commonWords.js";
+import { isNotAPerson } from "../lookups/notAPerson.js";
+import { isGlueWord, isNoiseWord, SHAPE_RE, AGG_RE } from "./glueWords.js";
+import { notPrivateIdSql } from "../privacy/privateDocs.js";
 import { attachCitations, documentRecord, customerRecord, unitRecord } from "../citations/records.js";
 import { bindPick, subjectAgrees, readAsSentence, isRestricting } from "./pick.js";
 import { bindOrgPick, slugOf, dynamicFact, parseRecordsQuestion as _prq } from "./orgMenu.js";
 
 export const CAP = 5;
-const RESIDUAL_OK = /^(?:invoice|invoices|inv|ticket|tickets|permit|job|jobs|visit|visits|house|home|place|property|site|customer|customers|last|latest|first|oldest|newest|recent|all|every|each|please|thanks|unit|units|doc|docs|document|documents|record|records|file|files|number|numbers|date|dates|way|exactly|today|them|they|their|theirs|his|her|hers|he|she|summarize|summarise|summary|recap|rundown|overview|detail|details|happened|everything|story|visit|service|call|ticket|work|system|systems)$/;
+const RESIDUAL_OK = /^(?:change|invoice|invoices|inv|ticket|tickets|permit|job|jobs|visit|visits|house|home|place|property|site|customer|customers|last|latest|first|oldest|newest|recent|all|every|each|please|thanks|unit|units|doc|docs|document|documents|record|records|file|files|number|numbers|date|dates|way|exactly|today|them|they|their|theirs|his|her|hers|he|she|summarize|summarise|summary|recap|rundown|overview|detail|details|happened|everything|story|visit|service|call|ticket|work|system|systems)$/;
 /** glue words that never make the pick path step aside (the same ones the document / customer unread-word checks already allow) */
 const UNREAD_OK = /^(?:order|purchase|pls|number|no|po|wo|inv|invoice|ticket|permit|worked|performed|completed|did|listed|stored|printed|written|recorded|say|says|said|shows|show|there|been|got|gets|was|were|tell|give|get|charge|charged|cost|bill|billed|spend|spent|how|much|many|long|latest|last|first|oldest|newest|earliest|recent|recently|most|account|accounts|invoices|tickets|list|lists|items|item)$/;
 /** words that never ask for a fact (RECORDS-R2): they are the glue of a spoken sentence, so they must not make the lane refuse a question it can read */
-const FILLER = /^(?:january|february|march|april|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept?|oct|nov|dec|take|took|taking|taken|spend|spent|spending|them|ever|always|again|there|over|time|times|ones?|thing|things|stuff|done|got|gets|put|came|went|were|was|been|being|know|need|needed|want|wanted|like|really|actually|exactly|anything|something|everything|ago|back|once|twice|whole|entire|total)$/;
+const FILLER = /^(?:january|february|march|april|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept?|oct|nov|dec|take|took|taking|taken|spend|spent|spending|them|ever|always|again|there|over|time|times|ones?|thing|things|stuff|done|got|gets|put|came|went|were|was|been|being|know|need|needed|want|wanted|like|really|actually|exactly|anything|something|everything|ago|back|once|twice|whole|entire|total|thx|thanks|thank|boss|asap|books|book|quick|basic|random|real|just|kind|sort|dollars|dollar|bucks)$/;
 export function recordsFirstEnabled() { return !/^(?:0|false|off|no)$/i.test(String(process.env.DONOVAN_RECORDS_FIRST ?? "1").trim()); }
 
 /** facts the older lanes already answer correctly or that are computed elsewhere: answered by this lane only as a late safety net (after the older lanes declined) */
@@ -407,7 +410,7 @@ async function runCore(db, question, { today, phase = "early", customers = null,
     if (/\b(?:purchase order|po)\s*#?\s*(?:no\.?\s*)?[a-z]*-?\d/i.test(p.text) && !/\b(?:invoice|inv|ticket|permit|work order)\b/i.test(p.text) && docHits.some((d) => d.document_type !== "purchase-order")) return { skip: "purchase-order-number-on-another-kind" };
     // words the directory does not know ("city", "expire", "inspection") mean the question asks for something this lane cannot read: step aside, never answer a different fact
     const ownerWords = new Set(docHits.flatMap((d) => String(d.customer_name ?? "").toLowerCase().split(/[^a-z]+/).filter(Boolean)));
-    const leftover = p.tokens.filter((t, i) => !used.has(i) && !ownerWords.has(t) && !(t === "status" && factIds.includes("job_status")) && /^[a-z]{3,}$/.test(t) && !STOP.has(t) && !RESIDUAL_OK.test(t) && !FILLER.test(t) && !/^(?:order|purchase|pls|number|no|po|wo|inv|invoice|ticket|permit|worked|performed|completed|did|listed|stored|printed|written|recorded|say|says|said|shows|show|there|been|got|gets|was|were|tell|give|get|charge|charged|cost|bill|billed|spend|spent|how|much|many|long)$/.test(t));
+    const leftover = p.tokens.filter((t, i) => !used.has(i) && !ownerWords.has(t) && !isNoiseWord(t) && !(t === "status" && factIds.includes("job_status")) && /^[a-z]{3,}$/.test(t) && !STOP.has(t) && !RESIDUAL_OK.test(t) && !FILLER.test(t) && !/^(?:order|purchase|pls|number|no|po|wo|inv|invoice|ticket|permit|worked|performed|completed|did|listed|stored|printed|written|recorded|say|says|said|shows|show|there|been|got|gets|was|were|tell|give|get|charge|charged|cost|bill|billed|spend|spent|how|much|many|long)$/.test(t));
     if (leftover.length) return { skip: "unread-words-with-document-number" };
     if (factIds.includes("line_items") && docHits.some((d) => d.document_type === "purchase-order")) return { skip: "purchase-order-parts-owned-by-older-lane" };
     if (factIds.length === 1 && factIds[0] === "customer_name" && !docHits.some((d) => d.document_type === "proposal-quote") && p.docNumbers.every((n) => n.prefixed)) return { skip: "customer-of-a-document-owned-by-older-lane" };
@@ -478,7 +481,7 @@ async function runCore(db, question, { today, phase = "early", customers = null,
   // words the directory does not know ("city", "term", "expires") mean the question asks for something this lane cannot read: step aside rather than answer a different fact
   if (named || scope?.kind === "customer") {
     const nameWords = new Set(cust.flatMap((c) => String(c.name).toLowerCase().split(/[^a-z]+/).filter(Boolean)));
-    const unread = p.tokens.filter((t, i) => !used.has(i) && /^[a-z]{4,}$/.test(t) && !STOP.has(t) && !RESIDUAL_OK.test(t) && !FILLER.test(t) && !nameWords.has(t) && !/^(?:order|purchase|pls|number|worked|performed|completed|did|listed|stored|printed|written|recorded|say|says|said|shows|show|there|been|got|gets|was|were|tell|give|charge|charged|cost|bill|billed|spend|spent|much|many|long|how|latest|last|first|oldest|newest|earliest|recent|most|account|customer|accounts|invoice|invoices|ticket|tickets|list|lists|items|item)$/.test(t));
+    const unread = p.tokens.filter((t, i) => !used.has(i) && /^[a-z]{4,}$/.test(t) && !isNoiseWord(t) && !STOP.has(t) && !RESIDUAL_OK.test(t) && !FILLER.test(t) && !nameWords.has(t) && !/^(?:order|purchase|pls|number|worked|performed|completed|did|listed|stored|printed|written|recorded|say|says|said|shows|show|there|been|got|gets|was|were|tell|give|charge|charged|cost|bill|billed|spend|spent|much|many|long|how|latest|last|first|oldest|newest|earliest|recent|most|account|customer|accounts|invoice|invoices|ticket|tickets|list|lists|items|item)$/.test(t));
     if (unread.length && !p.summary) return { skip: "unread-words-with-customer" };
   }
   const answerFor = async (scope) => {
@@ -525,7 +528,8 @@ async function runCore(db, question, { today, phase = "early", customers = null,
     if (p.window) {
       const inWin = (iso) => iso && (!p.window.from || iso >= p.window.from) && (!p.window.to || iso <= p.window.to);
       scoped = docs.filter((d) => inWin(docDate(d, bundle)));
-      if (!scoped.length) return { data: envelope({ text: `No stored document for ${scope.label ?? "that number"} is dated in ${p.window.label}.`, cards: [], sources: [], records: [customerRec].filter(Boolean), total: 1, basis: `Checked the dates of the ${plural(docs.length, "stored document")} for ${scope.label ?? "that number"}; none falls in ${p.window.label}.` }), ...trace("window-empty") };
+      if (!scoped.length && (/\b(?:by|technicians?|techs?|assigned|handled|worked)\b/.test(p.text) || p.tokens.some((t, i) => !used.has(i) && !nameSkip.has(i) && /^[a-z]{4,}$/.test(t) && !STOP.has(t) && !RESIDUAL_OK.test(t) && !FILLER.test(t) && !isGlueWord(t) && !nameTokens(scope.label ?? "").includes(t)))) return { skip: "window-empty-unread-or-role" };
+      if (!scoped.length) return { data: envelope({ text: `No stored document for ${scope.label ?? "that number"} ${datedIn(p.window.label)}.`, cards: [], sources: [], records: [customerRec].filter(Boolean), total: 1, basis: `Checked the dates of the ${plural(docs.length, "stored document")} for ${scope.label ?? "that number"}; none falls in ${p.window.label}.` }), ...trace("window-empty") };
     }
 
     if (scope.kind === "customer" || scope.kind === "multi") {
@@ -682,6 +686,19 @@ const CUSTOMER_DUMP = ["service_type", "work_performed", "technician", "labor_ho
 function lev(a, b) { const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]); for (let j = 1; j <= b.length; j++) d[0][j] = j; for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[a.length][b.length]; }
 const R42_INTENT = ["biggest", "largest", "highest", "lowest", "smallest", "average", "cheapest", "expensive", "unpaid", "overdue", "expired", "upcoming", "outstanding", "longest", "model", "serial", "latest", "last", "recent", "recently", "newest", "oldest", "first", "billing", "billed", "invoiced", "invoice", "invoices", "paid", "payment", "payments", "owed", "owes", "total", "cost", "costs", "price", "amount", "charge", "charged", "spend", "spent", "history", "visit", "visits", "visited", "service", "serviced", "services", "technician", "tech", "techs", "plumber", "name", "phone", "email", "address", "date", "when", "number", "count", "many", "much", "agreement", "contract", "plan", "warranty", "equipment", "unit", "units", "ticket", "tickets", "estimate", "quote", "permit", "report", "record", "records", "document", "documents", "file", "details", "info", "information", "everything", "balance"];
 const R42_FILLER = /^(?:hang|real|quick|sorry|lol|thanks|thank|please|yo|alright|more|just|kinda|maybe|actually|anyway|hey|okay|ok|um|uh|usually|typically)$/;
+/** R12: a word one letter away from an ordinary English word (a dropped, doubled, swapped or inserted letter) is a typo, not an attribute */
+async function nearRealWord(lw) {
+  if (lw.length < 3 || lw.length > 14) return false;
+  const seen = new Set([lw]);
+  const cand = [];
+  for (let i = 0; i <= lw.length; i++) {
+    if (i < lw.length) { cand.push(lw.slice(0, i) + lw.slice(i + 1)); if (i + 1 < lw.length) cand.push(lw.slice(0, i) + lw[i + 1] + lw[i] + lw.slice(i + 2)); }
+    for (const c of "abcdefghijklmnopqrstuvwxyz") { cand.push(lw.slice(0, i) + c + lw.slice(i)); if (i < lw.length) cand.push(lw.slice(0, i) + c + lw.slice(i + 1)); }
+  }
+  for (const v of cand) { if (seen.has(v) || v.length < 3) continue; seen.add(v); if (isRealWordOrName(v)) return true; }
+  return false;
+}
+
 /** R42: does a word (or, for a longer word, its first five letters, so a typo or inflection still counts as "possibly present") occur anywhere in THIS organization's own pages, stored values or field names? Errors count as present (keep the old dump). */
 async function wordInOrgData(db, w) {
   const stem = String(w).toLowerCase().replace(/[^a-z]/g, ""); if (stem.length < 3) return true;
@@ -690,7 +707,7 @@ async function wordInOrgData(db, w) {
   await db.raw("SAVEPOINT r42_word", []).catch(() => {});
   try {
     const like = `%${needle}%`;
-    const r1 = await db.raw("SELECT 1 FROM document_pages WHERE tenant_id = (current_setting('app.tenant_id', true))::uuid AND text ILIKE $1 LIMIT 1", [like]); if (r1.rows.length) return true;
+    const r1 = await db.raw("SELECT 1 FROM document_pages WHERE tenant_id = (current_setting('app.tenant_id', true))::uuid AND " + notPrivateIdSql("document_id") + " AND text ILIKE $1 LIMIT 1", [like]); if (r1.rows.length) return true;
     const r2 = await db.raw("SELECT 1 FROM extractions WHERE tenant_id = (current_setting('app.tenant_id', true))::uuid AND (value ILIKE $1 OR replace(field_key, '_', ' ') ILIKE $1) LIMIT 1", [like]); if (r2.rows.length) return true;
     const r3 = await db.raw("SELECT 1 FROM entities WHERE tenant_id = (current_setting('app.tenant_id', true))::uuid AND data::text ILIKE $1 LIMIT 1", [like]); if (r3.rows.length) return true;
     if (stem.length >= 5) { const keys = (await db.raw("SELECT DISTINCT field_key FROM extractions WHERE tenant_id = (current_setting('app.tenant_id', true))::uuid")).rows; for (const k of keys) for (const t of String(k.field_key).toLowerCase().split(/[^a-z]+/)) if (t.length >= 4 && Math.abs(t.length - stem.length) <= 2 && lev(t, stem) <= 2) return true; } // a typo of a stored field name ("perimt" for permit)
@@ -750,7 +767,7 @@ async function storedRecordFallback(db, question, { today, customers = null } = 
   if (/\b(?:arriv\w*|what time|gate code|eta|on ?site)\b|\btech(?:nician)?s?\s+(?:phone|email|number|address|cell)\b/.test(p.text)) return null;
   if (/\b(?:staff|internal|private|confidential|secret|hidden|admin|office only|owner only)\b/.test(p.text)) return null;
   if (/\b(?:bills?|vendors?|suppliers?)\b/.test(p.text) && !p.docNumbers.length) return null;
-  if (/\b(?:warranty|agreement|expire\w*|due|balance|owe\w*|paid|unpaid|overdue)\b/.test(p.text) && !p.docNumbers.length && !p.serials.length) return null; // money state / coverage across a customer's documents belongs to the older lanes
+  if (/\b(?:warranty|agreement|expire\w*|due|balance|owe\w*|paid|unpaid|overdue|outstanding|receivables?|pending|open|late|past due|collected)\b/.test(p.text) && !p.docNumbers.length && !p.serials.length) return null; // money state / coverage across a customer's documents belongs to the older lanes
   p.serials = p.serials.filter((sn) => !p.docNumbers.some((d) => d.alnum === sn));
   const cust = customers ?? await store.loadCustomers(db);
   const codes = [...p.docNumbers];
@@ -773,6 +790,8 @@ async function storedRecordFallback(db, question, { today, customers = null } = 
     ...rawWords.slice(1).filter((w) => /^[A-Z][a-z]{2,}$/.test(w) && !usedWords.has(w.toLowerCase()) && !STOP.has(w.toLowerCase()) && !RESIDUAL_OK.test(w.toLowerCase()) && !FILLER.test(w.toLowerCase()) && ![...(several ? nm.hits : named ? [named] : [])].some((h) => nameTokens(h.c.name).includes(w.toLowerCase()))).map((w) => w.toLowerCase()),
   ];
   if ((named || several) && /\b(?:and|or|plus|both)\b|&/.test(p.text) && unused.length) return null;
+  // R12: a fact word the main lane recognised but did not answer ("number", "email", "address" ...), a shape (list, share, comparison, order, count) or a role word is a question this fallback does not read: it never answers it with a dump of the file
+  if ((named || several) && !codes.length && !p.serials.length && !/\b(?:everything|all|history|summary|summari[sz]e|recap|rundown of (?:the )?(?:file|account|record))\b/.test(p.text) && (f2.ids.length || AGG_RE.test(p.text) || /\b(?:number|phone|cell|email|address|reach|call|contact|located|location|by|than|versus|technicians?|techs?)\b/.test(p.text))) return null;
 
   let docHits = codes.length ? await store.docsByNumber(db, codes) : [];
   const unitHits = p.serials.length ? await store.unitsBySerial(db, p.serials) : [];
@@ -843,9 +862,15 @@ async function storedRecordFallback(db, question, { today, customers = null } = 
         if (absent.length) allAbsent = true;
       }
       if (!allAbsent) absent.length = 0;
+      // R12: an "attribute the organization lacks" is a word nobody uses: an ordinary English word ("dollars", "days", "during", "random"), a typo of one ("whre") or a word the pages hold in another form is a word of the SENTENCE, never a stored thing that is missing. Such words never build a decline.
+      if (absent.length) { const keep = []; for (const w of absent) { const lw = String(w).toLowerCase(); if (isRealWordOrName(lw) || isNotAPerson(lw) || isGlueWord(lw) || await nearRealWord(lw)) continue; keep.push(w); } absent.length = 0; absent.push(...keep); if (SHAPE_RE.test(p.text) || p.order || p.window || p.all || p.summary) absent.length = 0; }
       if (absent.length) return { data: envelope({ text: `I don't have ${absent.map((w) => `"${w}"`).join(" or ")} on file: nothing stored for ${named.c.name}, or in this organization's records at all, is about it.`, cards: [], sources: [], records: [], total: 0, basis: `No page, stored value or field name in this organization's data contains ${absent.join(", ")}.` }), lane: "records", detail: "stored-record-not-on-file" };
     }
-    return stillMissed.length ? docListDump({ docs: docsN, db, label: named.c.name, customer: named.c, win, intro: `None of the stored fields is about ${stillMissed.map((w) => `"${w}"`).join(", ")} (the page text was not searched for it); this is what is stored instead.` }) : first;
+    // R12: words of the question that matched nothing are conditions or facts this lane did not read. It never dumps a file under "none of the stored fields is about <filler>": it steps aside so the later lanes (and the DQL engine) can answer.
+    if (stillMissed.length) return null;
+    // a customer with no linked document and a question about something else (phone, address, vehicles ...) is not a "no documents" answer
+    if (!docsN.length && (f2.ids.length || unused.length || p.order)) return null;
+    return first;
   }
   if (several) {
     // two or three customers named: each one's stored record, separately and labelled (never merged, never one invoice line for each)
@@ -879,7 +904,11 @@ function documentDump(d, bundle, customer, p) {
   }
   const base = answerForDocs({ docs: [d], bundle, factsWanted: ids, who: null, order: null, all: true, askText, scopeLabel: `Here is everything on file for ${head}`, customerRec });
   base.text = clean(base.text.replace(" — ", ": "));
-  if (p.facts.includes("customer_name") && d.customer_name) base.text = clean(`${docTitle(d, bundle).replace(/^./, (c) => c.toUpperCase())} is for ${d.customer_name}. ${base.text}`);
+  if (p.facts.includes("customer_name") && d.customer_name) {
+    // R12: when the only thing asked is whose document it is, that is the whole answer (the dump of the document is not repeated after it)
+    if (p.facts.length === 1) { base.text = `${docTitle(d, bundle).replace(/^./, (c) => c.toUpperCase())} is for ${d.customer_name}.`; return { data: base, lane: "records", detail: "stored-record-document" }; }
+    base.text = clean(`${docTitle(d, bundle).replace(/^./, (c) => c.toUpperCase())} is for ${d.customer_name}. ${base.text}`);
+  }
   // a fact the question named that is not stored on this document is said plainly (a yes/no question gets the plain yes / no first)
   const asked = p.facts.map(factById).filter((f) => f && !f.elsewhere && f.belongs !== "customer" && !DOC_DUMP_SKIP.has(f.id));
   const absent = asked.filter((f) => !observe(f, d, bundle).length && f.id !== "labor_charge" && f.id !== "parts_charge");
@@ -894,6 +923,9 @@ function documentDump(d, bundle, customer, p) {
   return { data: base, lane: "records", detail: "stored-record-document" };
 }
 
+/** "is dated in 2024" / "is dated since March 3" (a window label that already starts with a preposition is not given a second one) */
+const datedIn = (label) => (/^(?:since|before|after|until|from|between|on or|on)\b/i.test(String(label)) ? `is dated ${label}` : `is dated in ${label}`);
+
 async function docListDump({ docs, db, label, intro = "", customer, unit = null, win = null }) {
   const customerRec = customer ? customerRecord({ id: customer.id, name: customer.name, service_address: customer.address }) : null;
   if (!docs.length) return { data: envelope({ text: `${label} is on file, but no stored document is linked to it yet.`, cards: [], sources: [], records: [customerRec].filter(Boolean), total: 1, basis: "Checked the documents linked to this record; none." }), lane: "records", detail: "stored-record-no-documents" };
@@ -905,7 +937,7 @@ async function docListDump({ docs, db, label, intro = "", customer, unit = null,
     const all = dated; dated = all.filter((x) => inWin(x.date));
     if (!dated.length) {
       const dates = all.map((x) => x.date).filter(Boolean).sort();
-      return { data: envelope({ text: clean(`No stored document for ${label} is dated in ${win.label}.${all.length ? ` ${plural(all.length, "document")} ${all.length === 1 ? "is" : "are"} on file for ${label}${dates.length ? `, dated ${humanDate(dates[0])}${dates.length > 1 ? ` to ${humanDate(dates[dates.length - 1])}` : ""}` : ""}.` : ""}`), cards: [], sources: [], records: [customerRec].filter(Boolean), total: 1, basis: `Checked the dates of the ${plural(all.length, "stored document")} for ${label}; none falls in ${win.label}.` }), lane: "records", detail: "stored-record-window-empty" };
+      return { data: envelope({ text: clean(`No stored document for ${label} ${datedIn(win.label)}.${all.length ? ` ${plural(all.length, "document")} ${all.length === 1 ? "is" : "are"} on file for ${label}${dates.length ? `, dated ${humanDate(dates[0])}${dates.length > 1 ? ` to ${humanDate(dates[dates.length - 1])}` : ""}` : ""}.` : ""}`), cards: [], sources: [], records: [customerRec].filter(Boolean), total: 1, basis: `Checked the dates of the ${plural(all.length, "stored document")} for ${label}; none falls in ${win.label}.` }), lane: "records", detail: "stored-record-window-empty" };
     }
   }
   const withFacts = dated.map((x) => ({ ...x, ids: factsOnDoc(x.d, bundle, CUSTOMER_DUMP) })).filter((x) => x.ids.length);
@@ -917,7 +949,7 @@ async function docListDump({ docs, db, label, intro = "", customer, unit = null,
     pieces.push(one.text); cards.push(...(one.facts ?? [])); sources.push(...(one.sources ?? [])); records.push(...(one.records ?? []));
   }
   const none = dated.length - withFacts.length;
-  const text = clean(`Here is everything on file for ${label}${win ? ` in ${win.label}` : ""}:${intro ? ` ${intro}` : ""} ${plural(withFacts.length, "document")} with details, newest first. ${pieces.map((x) => x.replace(/^./, (c) => c.toUpperCase())).join(" ")}${more > 0 ? ` And ${more} more.` : ""}${!withFacts.length ? ` ${plural(dated.length, "document")} on file, none with work, technician, hours, notes or total stored.` : ""}${withFacts.length && none ? ` ${plural(none, "other document")} on file carry none of these.` : ""}`);
+  const text = clean(`Here is everything on file for ${label}${win ? (/^(?:since|before|after|until|from|between|on or|on)\b/i.test(String(win.label)) ? ` ${win.label}` : ` in ${win.label}`) : ""}:${intro ? ` ${intro}` : ""} ${plural(withFacts.length, "document")} with details, newest first. ${pieces.map((x) => x.replace(/^./, (c) => c.toUpperCase())).join(" ")}${more > 0 ? ` And ${more} more.` : ""}${!withFacts.length ? ` ${plural(dated.length, "document")} on file, none with work, technician, hours, notes or total stored.` : ""}${withFacts.length && none ? ` ${plural(none, "other document")} on file ${none === 1 ? "carries" : "carry"} none of these.` : ""}`);
   return { data: envelope({ text, cards: cards.slice(0, 12), sources, records: [customerRec, ...records].filter(Boolean), total: dated.length + (customerRec ? 1 : 0), basis: `Listed the stored details of the ${plural(shown.length, "newest document")} for ${label}; each value is cited to its document and page.` }), lane: "records", detail: unit ? "stored-record-unit" : "stored-record-customer" };
 }
 

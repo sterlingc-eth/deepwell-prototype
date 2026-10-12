@@ -378,8 +378,13 @@ function parseSeries(q, feat) {
   const weekday = r.take(rx('(?:day|days)\\s+of\\s+(?:the\\s+)?week|weekdays?|week\\s*days?'));
   const moy = r.take(rx('(?:month|months)\\s+of\\s+(?:the\\s+)?year|time\\s+of\\s+(?:the\\s+)?year'));
   const allYears = r.take(rx('over\\s+all\\s+years|across\\s+(?:all\\s+)?years|all\\s+years|of\\s+all\\s+time|all\\s+time|ever|on\\s+record'));
-  const busiest = r.take(rx('busiest|peak'));
+  const busiestOld = r.take(rx('busiest|peak'));
+  const busiestNew = busiestOld ? null : r.take(rx('heaviest|most\\s+active|largest|biggest|highest|strongest'));
+  const busiest = busiestOld ?? busiestNew;
+  // the new top words need the measure said ("by number of ...", "total ... amount"): "which month was highest" and "biggest invoice month" stay released
+  if (busiestNew && !/\b(?:number|count|how\s+many|total|totals|amount|amounts|dollars|revenue|billed|invoiced|sales|income|hours)\b/.test(q.r.s)) return null; // round 11: the top direction only ("largest month by total invoice dollars"); the low direction stays with the older lanes
   const mostW = r.take(rx('the\\s+most|most'));
+  if (busiest || mostW) r.take(rx('active'));
   const seasonal = r.take(rx('seasonal(?:ity)?|seasons?|busy\\s+season|pattern'));
   const trendAll = r.takeAll(rx('trends?|trending|going\\s+up\\s+or\\s+down|up\\s+or\\s+down|growing\\s+or\\s+shrinking|month\\s+by\\s+month|year\\s+by\\s+year|over\\s+the\\s+years'));
   const trendW = trendAll[0] ?? null;
@@ -589,13 +594,16 @@ function parseSince(q) {
   const cues = [];
   for (const c of CUES) { const m = r.take(rx(c)); if (m) cues.push(m[0].replace(/\s+/g, ' ').trim()); }
   if (!cues.length) return null;
+  // round 11: "how long since X had an invoice - in days", "when was X's last letter, in days ago", "it's been how many days since X's latest ...": the unit is asked for at the end
+  const inDays = r.take(rx('(?:it\\s+s\\s+been\\s+)?in\\s+days?(?:\\s+ago)?|days?\\s+ago')) ? 'days' : null;
+  r.takeAll(rx('latest|most\\s+recent'));
   const cueText = cues.join(' | ');
-  const mode = /last time|when|date/.test(cueText) ? 'date' : 'days';
+  const mode = inDays ? 'days' : /last time|when|date/.test(cueText) ? 'date' : 'days';
   const unitAsked = (/\b(weeks?|months?|years?)\b/.exec(cues.find((c) => /since|ago/.test(c)) ?? '') ?? [null, 'day'])[1].replace(/s$/, '');
   const lastW = r.takeAll(rx('last'));
   const lastCount = lastW.length + cues.filter((c) => /\blast\b/.test(c)).length;
   // "how long since we serviced X" means since the last time we did
-  const sinceVerb = /\b(?:since|ago)\b/.test(cueText) && /\b(?:serviced|visited|invoiced|billed|installed|quoted)\b/.test(q.r.s);
+  const sinceVerb = /\b(?:since|ago)\b/.test(cueText) && /\b(?:serviced|visited|invoiced|billed|installed|quoted|had|got|received)\b/.test(q.r.s);
   if (lastCount > 1 || (lastCount === 0 && !sinceVerb)) return null;
   if (r.has(rx('previous|prior|second|before\\s+last|first|next|ever'))) return null;
   const cameIn = r.take(rx('came\\s+in|uploaded|added|scanned|received|entered'));
