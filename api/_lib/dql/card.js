@@ -21,6 +21,7 @@ const RE_DATE = /^(?:\d{4}-\d{2}-\d{2}(?:[T ].*)?|\d{1,2}\/\d{1,2}\/\d{2,4}|[A-Z
 const RE_MONEY = /^-?\$\s?\d[\d,]*(?:\.\d{1,2})?$|^-?\d{1,3}(?:,\d{3})*\.\d{2}$|^-?\d+\.\d{2}$/;
 const RE_PERSON = /^(?:Dr\.? |Mr\.? |Mrs\.? |Ms\.? )?[A-Z][a-zA-Z'.-]+(?: [A-Z][a-zA-Z'.-]+){1,2}$/;
 const RE_COUNT = /^\d{1,6}$/;
+const RE_RANGE = /^\d{1,2}\/\d{1,2}\/\d{2,4}\s*(?:-|to|through|–)\s*\d{1,2}\/\d{1,2}\/\d{2,4}$|^\d{4}-\d{2}-\d{2}\s*(?:to|through|–|—|-)\s*\d{4}-\d{2}-\d{2}$/;
 const RE_PHONE = /^\(?\d{3}\)?[ .-]?\d{3}[ .-]?\d{4}$/;
 const RE_EMAIL = /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i;
 const RE_ID = /^(?=.*\d)[A-Za-z0-9][A-Za-z0-9._/#-]{2,}$/;
@@ -70,6 +71,7 @@ export function buildCard({ rows = [], docTypes = [], custNames = [], nDocs = 0 
   for (const [k, e] of [...byKey].sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
     const s = shapeOf(e.vals);
     const f = { shape: s.shape, n: e.n, distinct: s.distinct, cover: e.n / total, types: [...e.types.keys()].sort() };
+    { const vs = e.vals.map((v) => String(v ?? '').trim()).filter(Boolean); if (vs.length && vs.filter((v) => RE_RANGE.test(v)).length / vs.length >= 0.8) f.range = true; } // "start - end" terms (a lease, a licence, a waiver)
     if (s.shape === 'category' || s.shape === 'person') f.values = [...new Set(e.vals.map((v) => String(v).trim()))].slice(0, 80);
     if (s.shape === 'person') { const dv = [...new Set(e.vals.map((v) => lc(v).replace(/\s+/g, ' ').trim()))]; f.custShare = dv.filter((v) => cust.has(v)).length / dv.length; }
     fields[k] = f;

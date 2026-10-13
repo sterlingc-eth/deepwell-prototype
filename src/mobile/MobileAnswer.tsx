@@ -149,9 +149,14 @@ export const MobileAnswer = memo(function MobileAnswer({
   const keyFact = hasHero ? undefined : answer.facts.find((f, i) => i === 0 && (f.status || f.basis === 'computed' || !textLower.includes(f.value.toLowerCase())))
   const restFacts = hasHero ? [] : keyFact ? answer.facts.slice(1) : answer.facts
 
-  const claimNote = claimCheckNote(answer)
-  const chips = onAsk ? followupChips(answer, question, 3, role) : []
-  const resolveDocName = (id: string) => { const d = docs[id]; return d ? documentName(d) : undefined }
+  const claimNote = useMemo(() => claimCheckNote(answer), [answer])
+  const hasAsk = !!onAsk
+  const chips = useMemo(() => (hasAsk ? followupChips(answer, question, 3, role) : []), [hasAsk, answer, question, role])
+  // Share text only matters on tap: built once per answer/docs change, not on every panel toggle.
+  const shareBody = useMemo(() => {
+    const resolveDocName = (id: string) => { const d = docs[id]; return d ? documentName(d) : undefined }
+    return shareText(question, answer, resolveDocName)
+  }, [question, answer, docs])
 
   const records = useMemo(() => answer.records ?? [], [answer.records])
   const hasRecords = showRecordsPanel(answer)
@@ -238,7 +243,7 @@ export const MobileAnswer = memo(function MobileAnswer({
           )
         )}
         <span className="ml-auto shrink-0 inline-flex items-center gap-1">
-          <ShareButton text={shareText(question, answer, resolveDocName)} />
+          <ShareButton text={shareBody} />
           <Feedback question={question} />
         </span>
       </div>

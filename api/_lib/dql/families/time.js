@@ -692,12 +692,13 @@ function expiryNouns(q, subj, docType = 'maintenance-agreement') {
   return { noun: pl, nounOne: /^(\w+)s of /.test(pl) ? pl.replace(/^(\w+)s of /, '$1 of ') : pl.replace(/s$/, ''), docType };
 }
 
+const endFieldPlan = (q, subj, expType) => { if (subj === 'warranty' || EXPIRING_TYPES.has(expType)) return {}; const f = endFieldOf(q.vocab, expType); return f ? { endField: f } : {}; };
 function parseExpiry(q, feat) {
   const r = q.r.clone();
   const termM = r.take(rx('(\\d+)\\s*-?\\s*(?:years?|yrs?)(?=\\s+(?:parts\\s+)?warrant)'));
   const termYears = termM ? Number(/\d+/.exec(termM[0])[0]) : null;
   const warr = r.take(rx('warrant(?:y|ies)|warrenty|warrenties'));
-  const agrDocIdx = q.docs.map((d, i) => i).filter((i) => r.s.includes(`@d${i}`) && EXPIRING_TYPES.has(q.docs[i].id));
+  const agrDocIdx = q.docs.map((d, i) => i).filter((i) => r.s.includes(`@d${i}`) && (EXPIRING_TYPES.has(q.docs[i].id) || endFieldOf(q.vocab, q.docs[i].id)));
   const expType = agrDocIdx.length === 1 ? q.docs[agrDocIdx[0]].id : 'maintenance-agreement';
   let subj = null;
   if (warr && !agrDocIdx.length) subj = 'warranty';
@@ -708,7 +709,7 @@ function parseExpiry(q, feat) {
   if ((subj === 'warranty' || expType === 'maintenance-agreement') && !rawLike(feat.raw, subj === 'warranty' ? ['warranty', 'warranties', 'warrenty'] : ['agreement', 'agreements', 'maintenance', 'contract', 'contracts'])) return null;
   if (q.docs.length > (subj === 'agreement' ? 1 : 0)) return null;
   const nextW = r.take(rx('next\\s+(?:warranty\\s+)?to\\s+(?:expire|end)|next\\s+(?:one\\s+)?(?:to\\s+)?(?:expires?|expiring|ends?|ending)'));
-  const verb = r.take(rx('expires?|expiring|expire|expiration|ends?|ending|run\\s+out|runs\\s+out|running\\s+out|lapses?|lapsing'));
+  const verb = r.take(rx('expires?|expiring|expire|expiration|ends?|ending|run\\s+out|runs\\s+out|running\\s+out|lapses?|lapsing|up\\s+for\\s+renewal|due\\s+for\\s+renewal|renews|renewing'));
   const pastVerb = r.take(rx('expired|ended|ran\\s+out|lapsed'));
   if (!verb && !pastVerb && !nextW) return null;
   const how = r.take(rx('how\\s+many|number\\s+of|count'));
@@ -732,16 +733,16 @@ function parseExpiry(q, feat) {
     if (p) return null;
     if (!clean(r)) return null;
     if (termYears != null) return null;
-    return { op: 'tm_expiry', subject: subj, mode: 'next', ...expiryNouns(q, subj, expType) };
+    return { op: 'tm_expiry', subject: subj, mode: 'next', ...expiryNouns(q, subj, expType), ...endFieldPlan(q, subj, expType) };
   }
   if (!p) {
     // "certificates that expire after today": everything still in force after today (an open end)
     if (verb && !pastVerb && /\b(?:after|since|from)\s+(?:today|now)\b|\bgoing\s+forward\b/i.test(feat.raw) && (r.takeAll(rx('after|since|from|today|now|on|onwards?|going\\s+forward|here')), true)) {
       if (!clean(r)) return null;
-      return { op: 'tm_expiry', subject: subj, mode, from: addDays(today, 1), to: null, label: 'after today', past: false, term: termYears, ...expiryNouns(q, subj, expType) };
+      return { op: 'tm_expiry', subject: subj, mode, from: addDays(today, 1), to: null, label: 'after today', past: false, term: termYears, ...expiryNouns(q, subj, expType), ...endFieldPlan(q, subj, expType) };
     }
     // "agreements that already ended": everything whose end date is before today
-    if (pastVerb && /\balready\b/.test(q.text0) && subj === 'agreement') { r.takeAll(rx('already')); if (!clean(r)) return null; return { op: 'tm_expiry', subject: subj, mode, from: null, to: addDays(today, -1), label: 'before today', past: true, ...expiryNouns(q, subj, expType) }; }
+    if (pastVerb && /\balready\b/.test(q.text0) && subj === 'agreement') { r.takeAll(rx('already')); if (!clean(r)) return null; return { op: 'tm_expiry', subject: subj, mode, from: null, to: addDays(today, -1), label: 'before today', past: true, ...expiryNouns(q, subj, expType), ...endFieldPlan(q, subj, expType) }; }
     return null;
   }
   if ((p.kind === 'month' || p.kind === 'quarter') && !p.dir) { from = p.from; to = p.to; label = `in ${p.label}`; }
@@ -756,7 +757,7 @@ function parseExpiry(q, feat) {
   if (!clean(r)) return null;
   if (pastVerb && from && from > today) return null;
   if (termYears != null && subj !== 'warranty') return null;
-  return { op: 'tm_expiry', subject: subj, mode, from, to, label, past: Boolean(pastVerb), term: termYears, ...expiryNouns(q, subj, expType) };
+  return { op: 'tm_expiry', subject: subj, mode, from, to, label, past: Boolean(pastVerb), term: termYears, ...expiryNouns(q, subj, expType), ...endFieldPlan(q, subj, expType) };
 }
 
 /* ---------------------------------------------------------------- days between two dates */
@@ -1123,7 +1124,15 @@ function execInactive(plan, x) {
 /** "01/01/2025 - 12/31/2026" -> {start, end} */
 const isoOf2 = (v) => { const t = String(v ?? '').trim(); let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(t); if (m) return `${m[1]}-${m[2]}-${m[3]}`; m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(t); return m ? `${m[3]}-${pad(Number(m[1]))}-${pad(Number(m[2]))}` : null; };
 /** The day a paper stops being in force: the end of its term, a lease end date, the day an insurance certificate runs out. */
-function endOf(d) { return agreementTerm(d)?.end ?? isoOf2(d.f?.lease_end_date) ?? isoOf2(d.f?.coi_expires) ?? isoOf2(d.f?.expiration_date) ?? isoOf2(d.f?.expires) ?? null; }
+/** R20: the field that holds the day a kind of paper stops being in force, from the company's own card: the one date (or "start - end" term) field stored on that kind whose key says expires / valid / renews / ends / term. Two fits means none. */
+function endFieldOf(vocab, id) {
+  const fields = vocab?.card?.fields; if (!fields || process.env.R20_END === '0') return null;
+  const END = new Set('expire expires expired expiry expiration valid validity term terms ends end ending renews renew renewal renewals until through'.split(' '));
+  const c = Object.entries(fields).filter(([k, f]) => (f.types ?? []).includes(id) && (f.shape === 'date' || f.range) && k.toLowerCase().split(/[^a-z0-9]+/).some((t) => END.has(t)) && !/start|begin|issue|sign|effective/i.test(k)).map(([k]) => k);
+  return c.length === 1 ? c[0] : null;
+}
+const endFromField = (d, field) => { const t = String(d.f?.[field] ?? '').trim(); const last = /\d/.test(t) && /\s(?:-|to|through|–|—)\s/.test(t) ? t.split(/\s(?:-|to|through|–|—)\s/).pop() : t; return isoOf2(last.trim()); };
+function endOf(d, field) { if (field) return endFromField(d, field); return agreementTerm(d)?.end ?? isoOf2(d.f?.lease_end_date) ?? isoOf2(d.f?.coi_expires) ?? isoOf2(d.f?.expiration_date) ?? isoOf2(d.f?.expires) ?? null; }
 const EXPIRING_TYPES = new Set(['maintenance-agreement', 'agreement', 'lease-agreement', 'certificate-of-insurance', 'insurance-certificate']);
 function agreementTerm(d) {
   const t = String(d.f?.agreement_term ?? '');
@@ -1134,14 +1143,14 @@ function agreementTerm(d) {
   return { start: s, end: e };
 }
 
-function expiryRows(subject, snap, term = null, docType = 'maintenance-agreement') {
+function expiryRows(subject, snap, term = null, docType = 'maintenance-agreement', endField = null) {
   if (subject === 'warranty') {
     const have = snap.units.filter((u) => u.warrantyExpires && (term == null || u.warrantyTermYears === term));
     return { rows: have.map((u) => ({ row: u, d: u.warrantyExpires })), unknown: snap.units.filter((u) => !u.warrantyExpires).length };
   }
   const ag = snap.documents.filter((d) => d.type === docType);
   const out = []; let unknown = 0;
-  for (const d of ag) { const e = endOf(d); if (e) out.push({ row: d, d: e }); else unknown++; }
+  for (const d of ag) { const e = endOf(d, endField); if (e) out.push({ row: d, d: e }); else unknown++; }
   return { rows: out, unknown };
 }
 
@@ -1152,7 +1161,7 @@ function execExpiry(plan, x) {
     if (!u) return { notFound: plan.serial };
     return { unit: u };
   }
-  const { rows, unknown } = expiryRows(plan.subject, snap, plan.term ?? null, plan.docType ?? 'maintenance-agreement');
+  const { rows, unknown } = expiryRows(plan.subject, snap, plan.term ?? null, plan.docType ?? 'maintenance-agreement', plan.endField ?? null);
   if (!rows.length && plan.subject !== 'warranty' && plan.docType && plan.docType !== 'maintenance-agreement') return { abstain: 'no-end-dates' }; // this kind of paper carries no end date here
   if (plan.mode === 'next') {
     const fut = rows.filter((o) => o.d >= today).sort((a, b) => a.d.localeCompare(b.d));
@@ -1167,7 +1176,8 @@ function execExpiry(plan, x) {
 function execBetween(plan, x) {
   const { snap, today } = x;
   if (plan.mode === 'docs') {
-    const find = (num) => snap.documents.filter((d) => [d.f?.invoice_number, d.f?.po_number, d.f?.permit_number].some((v) => lc(v) === num));
+    // the number may sit under any key the company chose (receipt_no, ticket_id ...): a paper whose stored values hold exactly this number; two papers holding it is not answered
+    const find = (num) => snap.documents.filter((d) => [d.f?.invoice_number, d.f?.po_number, d.f?.permit_number].some((v) => lc(v) === num) || (process.env.R20_DOCNO !== '0' && Object.values(d.f ?? {}).some((v) => typeof v === 'string' && lc(v) === num)));
     const a = find(plan.numbers[0]); const b = find(plan.numbers[1]);
     if (a.length !== 1 || b.length !== 1) return { abstain: 'doc-number' };
     const da = a[0].date; const db = b[0].date;
@@ -1470,8 +1480,8 @@ function sayExpiry(res, plan, x) {
   const dateName = isW ? 'warranty end date' : 'agreement end date';
   const lab = (o) => (isW ? `${o.row.serial ?? 'unit'}${[o.row.brand, o.row.custName].filter(Boolean).length ? ` (${[o.row.brand, o.row.custName].filter(Boolean).join(', ')})` : ''} on ${fmtDate(o.d)}` : `${o.row.custName ?? o.row.vendor ?? 'agreement'} on ${fmtDate(o.d)}`);
   const rec = (o) => (isW ? recUnit(o.row, snap) : (snap.custById.get(o.row.custId) ? recCust(snap.custById.get(o.row.custId), snap) : recDoc(o.row, snap)));
-  const unk = res.unknown ? (isW ? ` ${fmtInt(res.unknown)} unit${res.unknown === 1 ? ' has' : 's have'} no warranty end date on file and ${res.unknown === 1 ? 'is' : 'are'} not counted.` : ` ${fmtInt(res.unknown)} agreement${res.unknown === 1 ? ' has' : 's have'} no readable term and ${res.unknown === 1 ? 'is' : 'are'} not counted.`) : '';
-  const basis = isW ? 'Used each unit\'s warranty end date (the installation date plus the brand\'s term; five years is assumed when no registration is on file); claims and payments are not tracked.' : 'Used the end of each maintenance agreement\'s term; nothing about renewals or payments is tracked.';
+  const unk = res.unknown ? (isW ? ` ${fmtInt(res.unknown)} unit${res.unknown === 1 ? ' has' : 's have'} no warranty end date on file and ${res.unknown === 1 ? 'is' : 'are'} not counted.` : ` ${fmtInt(res.unknown)} ${plan.endField ? (res.unknown === 1 ? nounOne : nounPl) : `agreement${res.unknown === 1 ? '' : 's'}`}${res.unknown === 1 ? ' has' : ' have'} no readable ${plan.endField ? 'end date' : 'term'} and ${res.unknown === 1 ? 'is' : 'are'} not counted.`) : '';
+  const basis = isW ? 'Used each unit\'s warranty end date (the installation date plus the brand\'s term; five years is assumed when no registration is on file); claims and payments are not tracked.' : plan.endField ? `Used the "${plan.endField}" field stored on each ${nounOne}; nothing about renewals or payments is tracked.` : 'Used the end of each maintenance agreement\'s term; nothing about renewals or payments is tracked.';
   if (plan.mode === 'unit') {
     if (res.notFound) return { text: `Not found: no unit with serial ${res.notFound.toUpperCase()} is on file.`, facts: [], records: [], total: 0, basis: 'Looked for the serial number among the units on file.' };
     const u = res.unit; const rec1 = [recUnit(u, snap)];

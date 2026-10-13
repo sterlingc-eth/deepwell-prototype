@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { ChevronDown, History } from 'lucide-react';
 import type { Answer } from '../../core/types';
 import { replacedOnLabel, supersededOf, whyThisAnswer } from '../../core/answerLayout';
@@ -26,8 +26,8 @@ export function AnswerTrust({ answer, onOpenDocument }: { answer: Answer; onOpen
   const docs = useGraph((s) => s.docs);
   const [open, setOpen] = useState(false);
   const panelId = useId();
-  const notes = supersededOf(answer);
-  const why = whyOn() ? whyThisAnswer(answer) : null;
+  const notes = useMemo(() => supersededOf(answer), [answer]);
+  const why = useMemo(() => (whyOn() ? whyThisAnswer(answer) : null), [answer]);
   if (!notes.length && !why) return null;
   const nameOf = (id: string, fallback?: string | null) => {
     const d = docs[id];

@@ -11,6 +11,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isPrivateDocType, typeScore } from '../api/_lib/privacy/privateDocs.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 let failures = 0; let passes = 0;
@@ -77,7 +78,7 @@ for (const key of Object.keys(COMPANIES)) {
   check(`${key}: card paper date is ${s.invoiceDate}`, c.card.roles.invoice_date?.key === s.invoiceDate);
   check(`${key}: card staff noun is ${s.staffNoun}`, c.card.staffNoun === s.staffNoun, String(c.card.staffNoun));
   check(`${key}: card types the shapes (person, date, category)`, c.card.fields[s.staff]?.shape === 'person' && c.card.fields[s.date]?.shape === 'date' && c.card.fields[s.status]?.shape === 'category');
-  check(`${key}: card knows every stored kind with a readable label`, Object.keys(c.card.kinds).length === new Set(c.docs.map((d) => d.type)).size && c.card.kinds[k].plural.length > 0);
+  check(`${key}: card knows every stored kind with a readable label`, (() => { const all = new Set(c.docs.map((d) => d.type)); const shown = Object.keys(c.card.kinds); const missing = [...all].filter((t) => !shown.includes(t)); return shown.every((t) => all.has(t)) && missing.every((t) => isPrivateDocType(t) || typeScore(t) >= 1); })() /* a kind may be left out only when the privacy rule flags it (round 21) */ && c.card.kinds[k].plural.length > 0);
   check(`${key}: card lists the money field kinds`, Object.keys(c.card.moneyByKind).length >= 0);
 
   // counts in the company's own words

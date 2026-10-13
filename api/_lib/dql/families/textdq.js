@@ -231,7 +231,8 @@ const CUE_RE = {
 };
 const CUE_BASES = { mention: 'mention', mentions: 'mention', mentioning: 'mention', search: 'search', searching: 'search', containing: 'contain', involved: 'involve', involving: 'involve' };
 /** A cue word as typed; a long word one or two letters off a cue word is that cue word (the same forgiveness the core gives other words). */
-function cueOf(w) {
+function cueOf(w, prev = '') {
+  if (/^(?:has|have|holds|prints)$/.test(w) && /^(?:text|texts|wording)$/.test(prev)) return 'contain'; // R21: "files whose text has \"net 30\""
   for (const [k, re] of Object.entries(CUE_RE)) if (re.test(w)) return k;
   if (w.length >= 6) {
     for (const [c, k] of Object.entries(CUE_BASES)) {
@@ -311,13 +312,13 @@ function textual(feat, h, T) {
   // cue
   let cueIdx = -1;
   for (let i = 0; i < T.length; i++) {
-    if (T[i].consumed || !cueOf(T[i].w)) continue;
+    if (T[i].consumed || !cueOf(T[i].w, T[i - 1]?.w)) continue;
     // "anything about X" / "anything mentioning X"; a bare "anything" is not a search cue
-    if (cueOf(T[i].w) === 'about' && !(/^(?:about|on|regarding|concerning|re)$/.test(T[i + 1]?.w ?? '') || (T[i + 1] && !T[i + 1].consumed && cueOf(T[i + 1].w) && cueOf(T[i + 1].w) !== 'about'))) continue;
+    if (cueOf(T[i].w, T[i - 1]?.w) === 'about' && !(/^(?:about|on|regarding|concerning|re)$/.test(T[i + 1]?.w ?? '') || (T[i + 1] && !T[i + 1].consumed && cueOf(T[i + 1].w) && cueOf(T[i + 1].w) !== 'about'))) continue;
     cueIdx = i; break;
   }
-  while (cueIdx >= 0 && cueIdx + 1 < T.length && !T[cueIdx + 1].consumed && cueOf(T[cueIdx + 1].w)) cueIdx++; // "anything mentioning"
-  const cueKind = cueIdx >= 0 ? cueOf(T[cueIdx].w) : null;
+  while (cueIdx >= 0 && cueIdx + 1 < T.length && !T[cueIdx + 1].consumed && cueOf(T[cueIdx + 1].w, T[cueIdx].w)) cueIdx++; // "anything mentioning"
+  const cueKind = cueIdx >= 0 ? cueOf(T[cueIdx].w, T[cueIdx - 1]?.w) : null;
   const timesIdx = T.findIndex((x) => !x.consumed && x.w === 'times');
   const chargeIdx = T.findIndex((x) => !x.consumed && /^charges?$/.test(x.w));
   const chargeWord = chargeIdx >= 0 && cueIdx < 0 && !lineScope && Boolean(t.howMuch || t.howMany || feat.flags.listVerb || /^what/.test(T[0]?.w ?? '') || t.exists);
@@ -664,6 +665,14 @@ const DUP_KNOWN = new Set(('duplicate duplicates duplicated dupe dupes twice dou
   'file files invoice invoices serial serials po pos permit permits phone email emails address addresses customer customers tenant tenants client clients patient patients visit visits day amount bill billed billing job jobs anyone anybody ' +
   'double this work order orders purchase record records time times entries per of different in on at among across and or that appear appears appearing got do did we have has are there with for to a an the doc docs document documents paperwork ' +
   'mistake multiple anywhere somewhere possible possibly potential perimt nmbers').split(' '));
+/** R20: the field that carries the paper's own number for one kind of paper, read from the company's card: the one id-shaped field stored on that kind (when several, the one whose key says number/no/ref). Two fits means none. */
+function cardIdField(vocab, docType) {
+  const fields = vocab?.card?.fields; if (!fields) return null;
+  const ids = Object.entries(fields).filter(([, f]) => f.shape === 'id' && (f.types ?? []).includes(docType)).map(([k]) => k);
+  if (ids.length === 1) return ids[0];
+  const named = ids.filter((k) => k.toLowerCase().split(/[^a-z0-9]+/).some((t) => ['number', 'no', 'num', 'ref', 'nbr'].includes(t)));
+  return named.length === 1 ? named[0] : null;
+}
 function duplicates(feat, h, T) {
   const t = feat.trig ?? {};
   const lowerAll = T.map((x) => x.w);
@@ -684,6 +693,7 @@ function duplicates(feat, h, T) {
   else if (has(/\bpo numbers?\b|purchase order numbers?/) || (docType === 'purchase-order' && has(/numbers?/))) num('po_number', 'PO number', 'purchase-order');
   else if (has(/permit numbers?|\bperm\w* numbers?\b/) || (docType === 'permit' && has(/numbers?/))) num('permit_number', 'permit number', 'permit');
   else if (has(/invoice numbers?/) || (docType === 'invoice' && has(/numbers?/))) num('invoice_number', 'invoice number', 'invoice');
+  else if (process.env.R20_DUPNUM !== '0' && docType && has(/\bnumbers?\b/) && cardIdField(h.vocab, docType)) { const f = cardIdField(h.vocab, docType); num(f, `${String(f).replace(/_/g, ' ')}`, docType); }
   else if (has(/phone/)) { key = { kind: 'customerField', field: 'phone' }; label = 'phone number'; }
   else if (has(/e ?mail/)) { key = { kind: 'customerField', field: 'email' }; label = 'email address'; }
   else if (has(/address/)) { key = { kind: 'customerField', field: 'address' }; label = 'service address'; }

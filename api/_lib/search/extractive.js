@@ -45,6 +45,7 @@ const SYN_SETS = [
   'confidential confidentiality disclose disclosure',
   'dispute disputes arbitration mediation',
   'pay payment payments',
+  'terms term due net payable',
   'note notes comment comments remark remarks observation observations',
 ];
 const SYN = new Map();

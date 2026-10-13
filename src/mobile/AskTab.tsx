@@ -119,6 +119,11 @@ const Composer = memo(
         if (ta.scrollHeight > ta.clientHeight && ta.clientHeight < 128) ta.style.height = `${Math.min(ta.scrollHeight, 128)}px`
         return
       }
+      // Cleared (a send): back to the CSS height with no measuring — no forced layout in the same frame the answer starts.
+      if (!input) {
+        ta.style.height = ''
+        return
+      }
       ta.style.height = 'auto'
       ta.style.height = `${Math.min(ta.scrollHeight, 128)}px`
     }, [input])
@@ -325,11 +330,12 @@ export const AskTab = memo(function AskTab({
   // Bring the newest question to the top of the view (not the bottom), so the
   // headline of a long answer is what the tech sees first.
   const lastId = turns.length ? turns[turns.length - 1]!.id : 0
-  const lastAnswered = turns.length ? !!(turns[turns.length - 1]!.answer || turns[turns.length - 1]!.error) : false
+  // Once per new question: the answer lands below the question's top edge, so a second scroll when it arrives
+  // only forced another layout (and yanked the view if the tech had already scrolled).
   useEffect(() => {
     if (!lastId) return
     scrollRef.current?.querySelector(`[data-turn="${lastId}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' })
-  }, [lastId, lastAnswered])
+  }, [lastId])
 
   const submit = useCallback(async (q: string) => {
     const question = q.trim()

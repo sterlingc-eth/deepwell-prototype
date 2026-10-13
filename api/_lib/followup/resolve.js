@@ -23,6 +23,7 @@ import { looksLikeContinuation, classifyFollowupKind, detectSwapTarget, looksLik
 import { slotFollowup, isSlotOnlyFollowup } from './slots.js';
 import { dqlMergeFollowup, plainScope } from './dqlmerge.js';
 import { provenanceFollowup } from './provenance.js';
+import { readerFollowup } from './readerfu.js';
 import { correctionFollowup, correctionPayload } from './correction.js';
 import { isBareMeasureFollowup } from './convo.js';
 import { markMerged, markReleased, isFragment } from './handoff.js';
@@ -294,6 +295,9 @@ export function resolveFollowup(context, question) {
     const resolved = resolveDisambiguationReply(q, priorTurn);
     if (resolved) return resolved;
   }
+
+  // R21: a follow-up to a "what does the paper say" question stays on the same paper ("who signed it", "and what about late fees", "which page is that on")
+  { const rf = readerFollowup(turns, q); if (rf) { markMerged(clip(rf.query)); return { query: clip(rf.query), filters: {}, isFollowup: true, kind: 'dql-merge', needsClarification: false }; } }
 
   // R15: "where did that come from" / "which documents say that": the previous question again, with its source papers
   const prov = provenanceFollowup(turns, q);

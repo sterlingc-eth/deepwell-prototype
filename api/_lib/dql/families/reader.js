@@ -30,7 +30,65 @@ const lc = (s) => norm(s).toLowerCase();
 const VISIT_TYPE = /work-?order|service|ticket|inspection|visit|dispatch|call/;
 const LATEST = /\b(?:last|latest|most\s+recent|newest|previous)\b/i;
 /** Topics a plain "what is the X on ..." may ask for (clause words); structured fields (a total, a date, an address) are left to the other lanes. */
-const CLAUSE_WORD = /^(?:terminat\w*|cancel\w*|renew\w*|warrant\w*|guarant\w*|governing|late|terms|conditions|liabilit\w*|confidential\w*|indemn\w*|arbitrat\w*|dispute\w*|refund\w*)$/;
+const CLAUSE_WORD = /^(?:terminat\w*|cancel\w*|renew\w*|warrant\w*|guarant\w*|governing|late|terms|conditions|liabilit\w*|confidential\w*|indemn\w*|arbitrat\w*|dispute\w*|refund\w*|deposits?|retainers?|insurance|jurisdiction|notice)$/;
+
+
+const DOCW = '(?:agreement|contract|lease|invoice|policy|quote|estimate|proposal|warranty|permit|statement)';
+const CLAUSE_TAIL = '(?:clause|section|provision|part|language|wording|paragraph)';
+const TOPIC = "([a-z][a-z' -]{2,40}?)";
+/**
+ * R21: the other ways to ask what a paper says about a clause. "does X have a deposit clause in their agreement", "is there a retainer clause in X's agreement",
+ * "are late fees part of X's agreement", "warranty in X's agreement", "how long is the warranty in X's lease", "read me the insurance part of X's agreement",
+ * "what's the governing law in the contract with X". Returns {mode, topicSrc} or null. `dw` = the question's own document word(s), when the parser has one.
+ */
+export function clauseAsk(body, dw = null) {
+  const D = dw ? `(?:${DOCW}|${String(dw).replace(/[^a-z0-9 -]/gi, '').trim().replace(/\s+/g, '\\s+')})` : DOCW;
+  const IN = "(?:in|on|under|within|inside|of)";
+  const rx = [
+    ['yesno', new RegExp(`^(?:does|do|did)\\s+.+?\\s+have\\s+(?:an?\\s+|any\\s+|the\\s+|some\\s+)?${TOPIC}\\s+(?:${CLAUSE_TAIL}\\s+)?${IN}\\s+(?:their|his|her|its|the|this|that)\\s+(?:[a-z -]+?\\s+)?${D}s?$`)],
+    ['yesno', new RegExp(`^(?:is|are)\\s+there\\s+(?:an?\\s+|any\\s+|some\\s+)?${TOPIC}\\s+(?:${CLAUSE_TAIL}\\s+)?${IN}\\s+.+?\\b${D}s?$`)],
+    ['yesno', new RegExp(`^(?:is|are)\\s+(?:the\\s+)?${TOPIC}\\s+(?:part|included|covered|listed|stated|mentioned|specified|spelled\\s+out)\\s*(?:${IN})?\\s+.+?\\b${D}s?$`)],
+    ['quote', new RegExp(`^(?:what(?:'s|s|\\s+is|\\s+are)?\\s+|how\\s+(?:long|much|big|many)\\s+(?:is|are)\\s+|show\\s+me\\s+|read\\s+me\\s+|tell\\s+me\\s+|give\\s+me\\s+)?(?:the\\s+|their\\s+)?${TOPIC}\\s+(?:${CLAUSE_TAIL}\\s+)?${IN}\\s+(?:the\\s+|this\\s+|that\\s+|their\\s+)?(?:[a-z0-9' .-]+?'s\\s+)?${D}\\b.*$`)],
+  ];
+  for (const [mode, re] of rx) {
+    const m = re.exec(body);
+    if (!m) continue;
+    const topic = m[1].replace(/^(?:the|a|an|any|their)\s+/, '').trim();
+    if (!topic.split(' ').some((w) => CLAUSE_WORD.test(w))) continue;
+    return { mode, topicSrc: topic };
+  }
+  return null;
+}
+
+/** Structured fields the other lanes read (a total, a date ...): never a clause topic on their own. */
+const FIELD_WORD = /^(?:total|amount|balance|date|address|phone|email|e-?mail|status|number|name|price|cost|customer|tech|technician|city|due\s+date|invoice\s+date|subtotal|tax|model|serial|brand|make|tonnage|btu|seer|refrigerant|type|kind|hours|labor|parts|unit|equipment|work(?:\s+performed)?|notes?)$/;
+/**
+ * R21: the other ways to name the topic of a "what does the paper say" ask ("tell me what X says on freshness", "what number is given for the deposit in ...",
+ * "what was agreed regarding ...", "what payment terms is written in ...", "check the invoice ... and tell me the lot", "find the freshness wording in ...").
+ */
+export function cueTopic(body) {
+  const END = "(?:in|on|for|from|of|at|dated|stated|written|listed|we|that)";
+  const rx = [
+    /\b(?:says?|said)\s+(?:about|on|regarding|concerning)\s+(?:the\s+)?(.+)$/,
+    /\bwhat\s+([a-z][a-z' -]{2,40}?)\s+(?:is|are|was|were)\s+(?:written|stated|listed|specified|given|noted)\b/,
+    new RegExp(`\\bagreed\\s+(?:regarding|about|on|for|in)\\s+(?:the\\s+)?([a-z][a-z' -]{2,40}?)\\s+${END}\\b`),
+    new RegExp(`\\bwhat\\s+(?:number|amount|figure|value|rate|percent|percentage)\\s+(?:is|was|are)\\s+(?:given|listed|stated|written|noted|shown)\\s+(?:for|on|about)\\s+(?:the\\s+)?([a-z][a-z' -]{2,40}?)\\s+${END}\\b`),
+    new RegExp(`\\b(?:tell\\s+me|find|show\\s+me|pull|read|get|give\\s+me)\\s+(?:me\\s+)?(?:the\\s+)?([a-z][a-z' -]{2,40}?)\\s+(?:wording|clause|language|part|section|line|text|stated|written)\\b`),
+    new RegExp(`\\b(?:tell\\s+me|pull|read|show\\s+me)\\s+(?:me\\s+)?(?:the\\s+)?([a-z][a-z' -]{2,30}?)\\s+${END}\\s+(?:the|this|that)\\b`),
+    /\b(?:tell\s+me|find|pull|read)\s+(?:me\s+)?(?:the\s+)?([a-z][a-z' -]{2,30})$/,
+    /\bthe\s+part\s+(?:about|on)\s+(?:the\s+)?([a-z][a-z' -]{2,40})$/,
+    new RegExp(`\\b(?:tell\\s+me|what\\s+is|what's|whats)\\s+(?:the\\s+)?([a-z][a-z' -]{2,30}?)\\s+(?:stated|written|listed|specified|noted)\\s+${END}\\b`),
+  ];
+  for (const re of rx) {
+    const m = re.exec(body);
+    if (!m) continue;
+    if (/\s(?:and|but|then|also|plus)\s/.test(` ${m[1]} `)) continue; // two asks in one: not a single clause
+    const t = m[1].replace(/^(?:the|a|an|any)\s+/, '').trim();
+    if (t.length < 3 || FIELD_WORD.test(t)) continue;
+    return t;
+  }
+  return null;
+}
 
 const CODE_RE = /\b([A-Za-z]{1,5}-?\d{3,}(?:-\d+)?)\b/;
 
@@ -39,14 +97,25 @@ export function readerShaped(raw) {
   if (!on()) return false;
   const b = norm(raw).toLowerCase();
   return /\b(?:say|says|mention|mentions|include|includes|cover|covers|contain|contains|specify|specifies|state|states)\b/.test(b) && /\b(?:agreement|contract|lease|invoice|policy|quote|estimate|proposal|warranty|permit|statement)\b/.test(b)
-    || /\bwhat\b.*\b(?:late|governing|terms|terminat\w*|cancel\w*|renew\w*)\b.*\b(?:agreement|contract|lease|invoice)\b/.test(b);
+    || /\bwhat\b.*\b(?:late|governing|terms|terminat\w*|cancel\w*|renew\w*)\b.*\b(?:agreement|contract|lease|invoice)\b/.test(b)
+    || Boolean(clauseAsk(b.replace(/^(?:hey|hi|please|pls|can you|could you|tell me|show me|i need to know|do you know)\s*,?\s*/, '')));
+}
+
+/** Narrower than readerShaped: the question asks whether / what a paper says about a TOPIC (not "what does line 1 say"). Used by the records lane to leave such a question to the reader. */
+export function readerTopicAsk(raw) {
+  if (!readerShaped(raw)) return false;
+  const b = norm(raw).toLowerCase();
+  if (/\b(?:line|item|page)\s+\d/.test(b)) return false;
+  return Boolean(clauseAsk(b.replace(/^(?:hey|hi|please|pls|can you|could you|tell me|show me|i need to know|do you know)\s*,?\s*/, ''))) || /\b(?:mention|mentions|include|includes|cover|covers|contain|contains|specify|specifies|state|states)\b/.test(b) || /\bsays?\s+(?:about|on|regarding|concerning)\b/.test(b);
 }
 
 function analyze(feat) {
   if (!on() || !feat?.raw) return null;
   const q = norm(feat.raw).replace(/[?.!]+$/, '');
-  if (q.length > 200) return null;
-  if (feat.time || (feat.times?.length ?? 0)) return null;
+  if (q.length > 320) return null;
+  // one exact day ("the agreement for X dated 8 July 2023") picks the paper; any other period is not a single-paper question
+  const day = feat.time && (feat.times?.length ?? 1) === 1 && feat.time.from && feat.time.from === feat.time.to ? feat.time : null;
+  if ((feat.time && !day) || (feat.times?.length ?? 0) > 1) return null;
   const cust = (feat.filters ?? []).filter((f) => f.role === 'customer');
   if ((feat.filters ?? []).length !== cust.length || cust.length > 1) return null;
   const docTypes = feat.docTypes ?? [];
@@ -55,16 +124,23 @@ function analyze(feat) {
   const code = codeM && /\d/.test(codeM[1]) && /^[A-Za-z]/.test(codeM[1]) ? codeM[1] : null;
   const L = q.toLowerCase();
   const GLUE = /^(?:hey|hi|please|pls|can you|could you|tell me|show me|i need to know|do you know)\s*,?\s*/;
-  const body = L.replace(GLUE, '');
-  let mode = null; let topicSrc = null;
-  if (/\bwho\s+(?:signed|executed|countersigned)\b/.test(body)) { mode = 'who'; topicSrc = 'signed'; }
+  let body = L.replace(GLUE, '');
+  // R21: a lead-in before the question itself ("urgent: ...", "we're cleaning up the filing system, so what does ...", "i want to know what does ...")
+  { const cue = /(?:^|[:;.!?,]\s*|\b(?:so|and|know|but|then|anyway)\s+)((?:(?:what|which)\s+(?:does|do|did|is|are|was|page)|whats|what's)\b.*)$/.exec(body); if (cue && cue[1] !== body && cue[1].length >= 30 && !/^what\s+does\s+it\s+say\b/.test(cue[1])) body = cue[1]; }
+  let mode = null; let topicSrc = null; let pageAsk = false;
+  const pageM = /\bwhat\s+page\s+(?:has|is|mentions?|covers?|talks\s+about|states?|says)\s+(?:the\s+)?(.+?)\s*(?:&|and)\s*what\s+does\s+it\s+say\b/.exec(body);
+  if (pageM) { mode = 'quote'; topicSrc = pageM[1]; pageAsk = true; }
+  else if (/\bwho\s+(?:signed|executed|countersigned)\b/.test(body)) { mode = 'who'; topicSrc = 'signed'; }
   else if (/\b(?:notes?|comments?|remarks?)\b/.test(body) && LATEST.test(body) && /\b(?:visit|service|call|appointment|inspection|job)\b/.test(body) && cust.length === 1) { mode = 'note'; topicSrc = 'note'; }
   else if (/^(?:what|which)\b.*\b(?:does|do|did)\b.*\b(?:say|state|specify|provide|spell\s+out)\b.*\b(?:about|on|regarding|concerning|for)\b/.test(body)) { mode = 'quote'; topicSrc = body.replace(/^.*\b(?:say|says|state|states|specify|specifies|provide|provides|spell\s+out)\b\s*(?:about|on|regarding|concerning|for)?\s*/, ''); }
   else if (/^(?:does|do|did|is\s+there|are\s+there)\b.*\b(?:mention|mentions|include|includes|say|says|cover|covers|contain|contains|specify|specifies|state|states|provide|provides)\b/.test(body)) { mode = 'yesno'; topicSrc = body.replace(/^.*\b(?:mention|mentions|include|includes|say|says|cover|covers|contain|contains|specify|specifies|state|states|provide|provides)\b\s*(?:anything\s+about|about|any|a|an|the)?\s*/, ''); }
   else if (/^(?:what|whats|what's)\b/.test(body)) {
     const m = /^(?:what|whats|what's)\s+(?:is|are|was|were)?\s*(?:the|our|their)?\s*([a-z][a-z -]{2,40}?)\s+(?:on|in|under|of|for)\s+(?:the|this|that)?\s*(?:.+)$/.exec(body);
-    if (m && m[1].split(' ').some((w) => CLAUSE_WORD.test(w))) { mode = 'quote'; topicSrc = m[1]; }
+    if (m && (m[1].split(' ').some((w) => CLAUSE_WORD.test(w)) || (day && cust.length === 1 && docTypes.length === 1 && !FIELD_WORD.test(m[1].replace(/^(?:the|a|an)\s+/, '').trim())))) { mode = 'quote'; topicSrc = m[1]; }
   }
+  if (!mode) { const ca = clauseAsk(body, feat.docWord); if (ca) { mode = ca.mode; topicSrc = ca.topicSrc; } }
+  if (!mode) { const ct = cueTopic(body); if (ct) { mode = 'quote'; topicSrc = ct; } }
+  if (process.env.READER_DEBUG) { try { fsAppend(process.env.READER_DEBUG, `analyze ${body} :: mode=${mode} filters=${JSON.stringify(feat.filters)} docTypes=${JSON.stringify(feat.docTypes)} docWord=${feat.docWord} left=${JSON.stringify(feat.left)}\n`); } catch { /* debug only */ } }
   if (!mode) return null;
   // the question must name WHICH paper: a customer's paper kind, a document number, or (notes) a customer
   const hasDocKind = docTypes.length === 1 || /\b(?:agreement|contract|lease|invoice|policy|quote|estimate|proposal|warranty|permit|statement)\b/.test(body);
@@ -72,15 +148,16 @@ function analyze(feat) {
   if (mode !== 'note' && cust.length === 1 && docTypes.length !== 1) return null; // "the contract" must resolve to one kind of paper in this company
   if (mode === 'who' && !cust.length && !code) return null;
   // trailing clauses / second asks are not a single span question
-  if (/\b(?:and|also|plus|compare|versus|vs)\b.*\b(?:what|who|how|when|total|amount|date)\b/.test(body.replace(/payment and /g, ''))) return null;
-  const drop = [...cust.map((f) => f.value), feat.docWord ?? '', code ?? '', 'agreement', 'contract', 'lease', 'invoice', 'paperwork', 'document', 'paper', 'visit'];
+  { const second = mode === 'who' ? body.replace(/^.*\bsigned\b/, '') : (topicSrc ?? ''); if (!pageAsk && /\b(?:and|also|plus|compare|versus|vs)\b.*\b(?:what|who|how|when|total|amount|date)\b/.test(second.replace(/payment and /g, ''))) return null; }
+  if (topicSrc) topicSrc = topicSrc.replace(/[?!].*$/, '').replace(/\s+(?:-|–|—|and\s+what\s+does\s+it\s+say|from\b|out\s+of\b|in\s+the\s+(?:system|documents|files|company)|much\s+appreciated|thanks|thank\s+you|please|pls|asap|include\s+the\s+page|with\s+the\s+page|and\s+the\s+page|when\s+you\s+get|if\s+you\s+can|according\s+to)\b.*$/i, '').trim();
+  const drop = [...cust.map((f) => f.value), code ?? '', 'agreement', 'contract', 'lease', 'invoice', 'paperwork', 'document', 'paper', 'visit'];
   const { concepts } = mode === 'who' ? topicOf('signed', []) : mode === 'note' ? topicOf('note', []) : topicOf(topicSrc, drop);
   if (concepts.length === 1 && concepts[0].word === 'terms' && code) concepts[0].soft = false; // "the terms on invoice INV-12": the paper's own terms line
   if (!concepts.length || concepts.every((c) => c.soft)) return null;
   if (concepts.length > 3) return null;
   return {
     v: 1, op: 'read_span', entity: 'document', docType: docTypes[0] ?? null, docWord: feat.docWord ?? null, visit: false,
-    filters: cust.map((f) => ({ ...f })), time: null, measure: null, groupBy: [], limit: null, dir: 'desc',
+    filters: cust.map((f) => ({ ...f })), time: day ? { field: day.field ?? 'date', from: day.from, to: day.to, label: day.label } : null, measure: null, groupBy: [], limit: null, dir: 'desc',
     mode, code, latest: LATEST.test(body), concepts, topic: norm(topicSrc ?? ''),
   };
 }

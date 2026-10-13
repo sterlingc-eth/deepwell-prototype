@@ -8,6 +8,7 @@
  * Several documents: each is listed with its date, newest first, capped at CAP, and the rest are counted. Two customers with the same name are named, never merged.
  * Turn it off with DONOVAN_RECORDS_FIRST=0 (no redeploy of code needed beyond the environment setting).
  */
+import { readerTopicAsk } from "../dql/families/reader.js";
 import { parseRecordsQuestion, findFacts, tokensOf, MAY_HAVE_WINDOW, alnum, STOP } from "./parse.js";
 import { FACTS, factById } from "./directory.js";
 import * as store from "./store.js";
@@ -325,6 +326,8 @@ export async function runRecordsLane(db, question, opts = {}) {
   applyYesNo(r, state);
   // RECORDS-R3C: an unread wording about a resolvable subject may be read by the menu pick first (ask.js asks for it, then calls this again with { pick, afterPick: true })
   if (opts.pickWanted && !opts.afterPick && r?.skip && PICK_SKIPS.has(r.skip)) { try { if (await hasSubject(db, question, opts)) return { skip: r.skip, pickable: true }; } catch { /* no pick: carry on */ } }
+  // R21: a question about what a paper SAYS (the extractive reader's shape) that the reader could not quote is not answered with a dump of everything stored on the customer
+  if (r?.skip && SUBJECT_FOUND_SKIPS.has(r.skip) && readerTopicAsk(question)) return r;
   if (r?.skip && SUBJECT_FOUND_SKIPS.has(r.skip)) {
     try { const f = await storedRecordFallback(db, question, opts); if (f) return f; } catch (err) { console.error("Records fallback failed:", err?.message); }
   }

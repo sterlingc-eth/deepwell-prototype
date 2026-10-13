@@ -15,6 +15,7 @@ import { translatorEnabled, requestPlan } from './call.js';
 import { validateTranslatedPlan } from './validate.js';
 import { answerFromSnapshot } from '../index.js';
 import { loadSnapshot } from '../load.js';
+import { localProposerEnabled, proposeAndValidate } from '../proposer/index.js';
 import { todayIso } from '../../scope.js';
 import { compileVocab } from '../vocab.js';
 import { tokenize } from '../text.js';
@@ -47,7 +48,7 @@ function recordNouns(tv, pack) {
 }
 
 export function classifyTranslate(question, { tenantVocab, pack, today } = {}) {
-  if (!translatorEnabled() || !tenantVocab) return null;
+  if ((!translatorEnabled() && !localProposerEnabled()) || !tenantVocab) return null; // the model translator (DONOVAN_PLAN_TRANSLATOR=1) and/or the local proposer (DONOVAN_LOCAL_PROPOSER)
   const q = String(question ?? '').trim();
   if (q.length < 8 || q.length > 300 || !ASKS_RECORDS.test(q) || NOT_RECORDS.test(q) || LEANS_ON_EARLIER.test(q)) return null;
   const nouns = recordNouns(tenantVocab, pack);
@@ -65,8 +66,24 @@ export function answerFromRawPlan(snap, raw, question, { tv, pack, today }) {
 }
 
 export async function runTranslated(db, intent, { today } = {}) {
-  if (!translatorEnabled() || !intent?.question || !intent.tv) return null;
+  if ((!translatorEnabled() && !localProposerEnabled()) || !intent?.question || !intent.tv) return null;
   const t = todayIso(today);
+  // the LOCAL PROPOSER (dql/proposer, no model call): its plan must pass the same strict gate and agree with the learned heads; anything else carries on exactly as before
+  if (localProposerEnabled()) {
+    try {
+      const pre = proposeAndValidate(intent.question, { tv: intent.tv, pack: intent.pack, today: t });
+      if (pre.ok) {
+        const snap = await loadSnapshot(db, { today: t });
+        if (!snap.truncated) {
+          const again = proposeAndValidate(intent.question, { tv: intent.tv, pack: intent.pack, today: t, snap });
+          const data = again.ok ? answerFromSnapshot(snap, again.plan, t) : null;
+          console.log(JSON.stringify({ route: 'ask', proposer: data ? 'answered' : 'rejected', op: pre.plan.op }));
+          if (data) return data;
+        }
+      }
+    } catch { /* fall through to the model translator or the normal chain */ }
+  }
+  if (!translatorEnabled()) return null;
   const { withTenant, ctxArg } = await withTenantFor(db);
   const raw = await requestPlan({ withTenant, ctxArg, question: intent.question, tv: intent.tv, pack: intent.pack });
   if (!raw) return null;

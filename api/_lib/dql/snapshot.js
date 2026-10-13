@@ -14,6 +14,7 @@
  * `f` on a document is every extracted field (corrected value first, newest row wins); the typed fields above are views of it.
  * `fMulti` holds every distinct value of a field the paper states more than once (null when there is none): only text search reads it.
  */
+import { isPrivateDoc } from '../privacy/privateDocs.js';
 import { deriveGeo, warrantyStatusOf } from '../analytics.js';
 import { buildCard, aliasMap } from './card.js';
 
@@ -150,9 +151,10 @@ export function buildSnapshot(raw, { today } = {}) {
   const documents = [];
   for (const d of raw.documents ?? []) {
     const type = normType(d.document_type);
-    if (EXCLUDED_DOC_TYPES.has(type) || internal.has(d.id)) continue;
     const f = fieldsByDoc.get(d.id) ?? {};
-    if (f._audience === 'internal') continue;
+    // R21: the shared private-paper rule (type words, audience, staff named) - privacy/privateDocs.js
+    if (EXCLUDED_DOC_TYPES.has(type) || isPrivateDoc({ document_type: type, audience: internal.has(d.id) || f._audience === 'internal' ? 'internal' : '', staffNamed: !!clean(f.technician) })) continue;
+    if (internal.has(d.id) || f._audience === 'internal') continue;
     const fin = finByDoc.get(d.id) ?? null;
     const cs = custsByDoc.get(d.id);
     const custId = cs && cs.size === 1 ? [...cs][0] : null;
