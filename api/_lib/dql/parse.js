@@ -17,6 +17,8 @@
  * technician, or a name on file twice (the executor abstains on that one; the existing clarify path asks).
  */
 import { resolveAnyTimeRange } from '../analytics.js';
+import { nounVeto } from './nounVeto.js';
+import { applyRewrites } from '../handoffLearning/overlay.js';
 import { stripConversationalFrame } from '../router/frame.js';
 import { wordsToNumber } from '../lookups/countQualifiers.js';
 import { untrackedConcept, jargonEnabled, respellJargon } from '../lexicon/jargon.js';
@@ -189,6 +191,9 @@ const dimIdOf = (phrase) => {
  */
 /** Words the learned planner set aside as filler: harmless chatter ("excuse me", "por favor", "asap") stays harmless, but an ignored word that could name a second measure or a comparison releases a pair / comparison. */
 const MEASURE_LIKE = /^(?:count|counts|number|numbers|total|totals|tot|sum|dollars?|amounts?|average|avg|mean|median|revenue|billed|billing|hours?|cost|costs|price|worth|value|spend|spent|paid|owed|balance|percent|pct|percentage|rate|ratio|share|many|much|most|least|top|biggest|largest|highest|lowest|first|last|latest|earliest|oldest|newest|max|min|each|per|every|both|also|plus|vs|versus|against|compare|compared|difference|gap|more|less|fewer)$/i;
+/** R24: words of a two-measure question that point back at the papers (pronoun stand-ins) or join / frame the two asks; never a condition. */
+const MULTI_LINK = new Set('they them those these it one ones both plus also two things thing stuff give help'.split(' '));
+const MULTI_EXT_LINK = new Set(['when', 'date']);
 const typoOfMeasure = (w) => { const lev = (a, b) => { const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]); for (let j = 1; j <= b.length; j++) d[0][j] = j; for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[a.length][b.length]; }; return ['total', 'totals', 'average', 'median', 'number', 'amount', 'dollars', 'highest', 'lowest', 'biggest', 'largest', 'count'].some((m) => w !== m && Math.abs(w.length - m.length) <= 2 && lev(w, m) <= (m.length >= 5 ? 2 : 1)); }; // a near-miss spelling of a measure word
 const measureishLeft = (feat) => (feat.learnedLeft ?? []).some((w) => MEASURE_LIKE.test(String(w?.w ?? w ?? '').trim())) || !feat.learnedLeft;
 /** R23: true when the question carries a quoted word or a line-item / text-search condition that a "filler" reading of the leftover words would drop. */
@@ -200,23 +205,95 @@ function textConditionDropped(raw, left) {
   return /\b(?:includ(?:e|es|ed|ing)|(?:as|a|on|in|per)\s+(?:an?\s+|the\s+)?line(?:\s+items?)?|line\s+items?|items?\s+lines?|mention\w*|contain\w*)\b/i.test(text);
 }
 
-export function parseDql(question, ctx = {}) {
+/** R24: spelled-out numbers with "hundred" / "thousand" ("one hundred twenty days", "nine hundred dollars", "two hundred fifty") are read as digits before anything else; shorter spelled numbers are read by the parts that already know them. */
+const NUM_WORD = 'one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety';
+const NUM_RUN = new RegExp(`\\b(?:(?:a|an|${NUM_WORD}|hundred|thousand|and)\\b[\\s-]*)+`, 'gi');
+export function compoundNumbers(text) {
+  return String(text).replace(NUM_RUN, (run) => {
+    if (!/\b(?:hundred|thousand)\b/i.test(run)) return run;
+    const trail = /\s+$/.exec(run)?.[0] ?? '';
+    const all = run.trim().split(/[\s-]+/);
+    let a = 0; let b = all.length;
+    while (a < b && /^and$/i.test(all[a])) a++;
+    while (b > a && /^(?:and|a|an)$/i.test(all[b - 1])) b--;
+    const core = all.slice(a, b);
+    if (core.length < 2 || (/^(?:a|an)$/i.test(core[0]) && !/^(?:hundred|thousand)$/i.test(core[1] ?? ''))) return run;
+    const n = wordsToNumber(core.join(' '));
+    if (n == null || n < 100) return run;
+    return [...all.slice(0, a), String(n), ...all.slice(b)].join(' ') + trail;
+  });
+}
+
+/** R24: "was 2022 higher than 2018 on the total invoice amount" is the yes/no comparison the engine reads as "did 2022 have a higher total invoice amount than 2018" (same ask, same two sides). */
+const CMP_UP = 'higher|greater|bigger|larger|more|up'; const CMP_DOWN = 'lower|smaller|less|fewer|down';
+export function compareRewrite(text) {
+  const t = String(text);
+  { // "between 2026 and 2020, which one had a higher number of invoices" / "which year had more invoices, 2020 or 2026" -> "which is higher on <measure>, 2026 or 2020"
+    const dirOf = (w) => (new RegExp(`^(?:${CMP_UP})$`, 'i').test(w) ? 'higher' : 'lower');
+    const m1 = new RegExp(`^(\\s*(?:[a-z ]{0,30},\\s*)?)(?:between|of|from)\\s+((?:19|20)\\d\\d|q[1-4]\\s+(?:19|20)\\d\\d)\\s+(?:and|vs\\.?|versus|to)\\s+((?:19|20)\\d\\d|q[1-4]\\s+(?:19|20)\\d\\d)\\s*,?\\s+which(?:\\s+(?:one|year|period))?\\s+(?:had|has|is|was|did)\\s+(?:a\\s+|the\\s+)?(${CMP_UP}|${CMP_DOWN})\\s+(.+?)\\s*([?.!]*)\\s*$`, 'i').exec(t);
+    if (m1) return `${m1[1]}which is ${dirOf(m1[4])} on ${m1[5].replace(/^(?:the\\s+)?/i, 'the ')}, ${m1[2]} or ${m1[3]}${m1[6] || ''}`;
+    const m2 = new RegExp(`^(\\s*(?:[a-z ]{0,30},\\s*)?)which\\s+(?:year|period)\\s+(?:had|has|is|was|did)\\s+(?:a\\s+|the\\s+)?(${CMP_UP}|${CMP_DOWN})\\s+(.+?)\\s*,\\s*((?:19|20)\\d\\d|q[1-4]\\s+(?:19|20)\\d\\d)\\s+(?:or|vs\\.?|versus)\\s+((?:19|20)\\d\\d|q[1-4]\\s+(?:19|20)\\d\\d)\\s*([?.!]*)\\s*$`, 'i').exec(t);
+    if (m2) return `${m2[1]}which is ${dirOf(m2[2])} on the ${m2[3]}, ${m2[4]} or ${m2[5]}${m2[6] || ''}`;
+  }
+  const m = new RegExp(`^(\\s*(?:hey\\s+|ok(?:ay)?\\s+|hmm\\s+)?)(?:was|is|were|are)\\s+((?:\\S+\\s+){0,2}?\\S+)\\s+(${CMP_UP}|${CMP_DOWN})\\s+than\\s+((?:\\S+\\s+){0,2}?\\S+)\\s+(?:on|in|for|by|at)\\s+(?:the\\s+)?(.+?)\\s*([?.!]*)\\s*$`, 'i').exec(t);
+  if (!m) return t;
+  const up = new RegExp(`^(?:${CMP_UP})$`, 'i').test(m[3]);
+  return `${m[1]}did ${m[2]} have a ${up ? 'higher' : 'lower'} ${m[5]} than ${m[4]}${m[6] || ''}`;
+}
+
+/** R24: "my top 5 customers by invoice dollars" reads like "our top 5 ...", and "top 5 customers by most invoices" like "... by number of invoices" (same ask, the engine's own words) */
+export function rankRewrite(text) {
+  return String(text)
+    .replace(/^(\s*(?:(?:so|ok|okay|hey|hmm|um)\s+)*)(?:who|which\s+[a-z]+)\s+(?:are|were|is)\s+(?:the\s+|my\s+|our\s+)?(?=(?:top|bottom|best|worst)\s+(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s)/i, '$1')
+    .replace(/\b(?:percent(?:age)?|pct)\s+(?:change|difference|increase|decrease|growth)\s+(?:in|of)\s+(?:the\s+)?(.+?)\s+((?:from|between)\s+\S+\s+(?:to|and)\s+\S+)\s*([?.!]*)\s*$/i, 'how did the $1 change $2 in percent$3')
+    .replace(/\bnumber\s+(?:one|1)\s+(?=(?:[a-z]+\s+){1,3}by\s)/gi, 'top 1 ')
+    .replace(/\bmy\s+(?=(?:top|bottom|best|worst|biggest|largest|highest|lowest|smallest)\b)/gi, 'our ')
+    .replace(/\b((?:top|bottom|best|worst)\s+(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+[a-z ]{3,40}?)\s+by\s+(?:the\s+)?(?:most|highest|largest|biggest)\s+(?=[a-z])/gi, '$1 by number of ');
+}
+
+/** a release with its reason (debug only) */
+function relw(ctx, why) { if (ctx?.debug && !ctx.debug.why) ctx.debug.why = why; return null; }
+
+/** R25: the company's vocabulary card says which of its words are a visit word and a kind of paper at once; such a question is released, whichever family built the plan */
+function parseGuarded(question, ctx) {
   const r = parseDqlOnce(question, ctx);
+  if (!r || r.plain || !r.plan || !ctx.tenantVocab) return r;
+  try {
+    const v = compileVocab(ctx.tenantVocab, ctx.pack);
+    const nv = nounVeto(ctx.original ?? question, v.card, r.plan, { industryKind: v.industryKind, nameWords: v.nameWords, cityWords: new Set([...v.cities.keys()].flatMap((c) => c.split(' '))) });
+    if (nv) { if (ctx.debug) ctx.debug.why = `vocabulary card: ${nv}`; return null; }
+  } catch { /* no card: nothing changes */ }
+  return r;
+}
+
+export function parseDql(question, ctx = {}) {
+  const r = parseGuarded(question, ctx);
   if (r || ctx.noUnwrap || process.env.DONOVAN_DQL_UNWRAP === '0' || !dqlEnabled() || !ctx.tenantVocab) return r;
   // R23: the text as typed was released. When it is ONE question wrapped in provably inert chatter (greeting, context, urgency, thanks, sign-off), the core question goes through the very same gates.
   let core = null;
   try { core = unwrapQuestion(question, compileVocab(ctx.tenantVocab, ctx.pack)); } catch { core = null; }
   if (!core) return r;
   const dbg = ctx.debug ? {} : undefined;
-  const r2 = parseDqlOnce(core, { ...ctx, original: core, debug: dbg, noUnwrap: true });
+  const r2 = parseGuarded(core, { ...ctx, original: core, debug: dbg, noUnwrap: true });
   if (r2 && !r2.plain && !unwrapAllowsCore(r2.plan, core)) { if (ctx.debug) { ctx.debug.unwrapped = core; ctx.debug.coreWhy = `unwrap guard: ${r2.plan?.op}`; } return r; }
   if (r2) { if (ctx.debug) { Object.assign(ctx.debug, dbg, { unwrapped: core }); delete ctx.debug.why; } return r2; }
   if (ctx.debug) { ctx.debug.unwrapped = core; ctx.debug.coreWhy = dbg?.why ?? 'core released (no reason)'; }
   return r2;
 }
 
+/** R24: a spoken lead-in ("so", "uh so", "okay so basically") before a question that stands on its own: the "so" does not lean on an earlier turn when the rest names its own papers and has no pointer back ("it", "them", "those", "same", "again") */
+const SO_LEAD = /^\s*(?:(?:uh+|um+|er|hmm+|ok(?:ay)?|well|yeah|alright|now|oh)\s*,?\s+)*so\b\s*,?\s*(?:(?:basically|anyway|um+|uh+|like|then|now|okay|ok|yeah|well|really|actually|honestly|quick(?:ly)?)\b\s*,?\s*)*/i;
+const BACK_POINTER = /\b(?:it|its|them|they|those|these|that|same|again|too|also|instead|former|latter|above|previous|prior|other|others|else|rest|remaining|those|him|her|his|hers|their)\b/i;
+function stripSoLead(q) {
+  const m = SO_LEAD.exec(String(q ?? '')); if (!m) return q;
+  const rest = String(q).slice(m[0].length).trim();
+  if (rest.split(/\s+/).length < 5 || BACK_POINTER.test(rest) || /^(?:and|also|then|but|or|what about|how about|same)\b/i.test(rest)) return q;
+  return rest;
+}
+
 function parseDqlOnce(question, ctx = {}) {
   if (!dqlEnabled()) return null;
+  if (process.env.R24_SO_LEAD !== '0') { const q2 = stripSoLead(question); if (q2 !== question) { question = q2; if (ctx.original != null) ctx = { ...ctx, original: q2 }; } }
   const tv = ctx.tenantVocab;
   if (!tv) return null;
   const citeAsk = stripSourceAsk(question);
@@ -225,32 +302,33 @@ function parseDqlOnce(question, ctx = {}) {
   { // "from 27 May 2023" / "as of 2026-08-25" with no second date: the papers ON that day, or from that day onward (or up to it)? Not guessed.
     const MON = '(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\\.?';
     const D1 = `(?:\\d{4}-\\d{1,2}-\\d{1,2}|\\d{1,2}[/.-]\\d{1,2}[/.-]\\d{2,4}|\\d{1,2}(?:st|nd|rd|th)?\\s+(?:of\\s+)?${MON},?\\s+\\d{4}|${MON}\\s+\\d{1,2}(?:st|nd|rd|th)?,?\\s+\\d{4})`;
-    const q0 = String(citeAsk.q ?? '').toLowerCase();
+    const q0 = String(citeAsk.q ?? '').toLowerCase().replace(/\b(?:before|by|at|until|till)\s+(?:the\s+)?end\s+of\s+(?:the\s+)?(?:day|business|work\s*day|week)\b/g, ' '); // R24: "before the end of the day" is a deadline for the answer, not a date limit on the papers
     const nDates = (q0.match(new RegExp(D1, 'g')) ?? []).length;
     if (nDates === 1 && new RegExp(`\\b(?:from|as\\s+of|as|starting|beginning|by)\\s+${D1}`).test(q0) && !/\b(?:since|after|before|prior|until|till|through|thru|on\s+or|between)\b/.test(q0)) { if (ctx.debug) ctx.debug.why = 'a single date after "from" / "as of": on that day or onward is not guessed'; return null; }
   }
-  const raw0 = respellVersusLast(multiRespell(citeAsk.q)).trim().replace(/\bgrand\s+total(?=s?\b)/gi, 'total').replace(/\bw\/o\b/gi, 'without').replace(/\bw\/(?=\s)/gi, 'with').replace(/\b(?:the\s+)?(?:last|previous|past)\s+calendar\s+year\b/gi, 'last year').replace(/\b(?:the\s+)?(?:this|current)\s+calendar\s+year\b/gi, 'this year'); // round 11: "last calendar year" is the previous calendar year
-  if (!raw0 || raw0.length > 240) return null;
+  const ho = ctx.handoff ?? tv?.handoff ?? null; // R24 (DONOVAN_HANDOFF_LEARNING): what this organization's own handed-off questions taught Donovan (null = nothing, the parser is untouched)
+  const raw0 = respellVersusLast(multiRespell(process.env.R24_NUMWORDS === '0' ? (ho ? applyRewrites(citeAsk.q, ho, tv) : citeAsk.q) : compoundNumbers(process.env.R24_CMPREWRITE === '0' ? (ho ? applyRewrites(citeAsk.q, ho, tv) : citeAsk.q) : rankRewrite(compareRewrite(ho ? applyRewrites(citeAsk.q, ho, tv) : citeAsk.q))))).trim().replace(/\bgrand\s+total(?=s?\b)/gi, 'total').replace(/^\s*g['’]?day\b[\s,.!-]*/i, '').replace(/\b(did|do|have|had|should|would)\s+we\s+log\b/gi, '$1 we have').replace(/\b(?:total|overall|combined|whole|grand|full)\s+(count|tally|headcount|head\s+count)\b/gi, '$1').replace(/\bw\/o\b/gi, 'without').replace(/\bw\/(?=\s)/gi, 'with').replace(/\b(?:the\s+)?(?:last|previous|past)\s+calendar\s+year\b/gi, 'last year').replace(/\b(?:the\s+)?(?:this|current)\s+calendar\s+year\b/gi, 'this year'); // round 11: "last calendar year" is the previous calendar year
+  if (!raw0 || raw0.length > 240) return relw(ctx, 'gate: longer than 240 characters');
   const today = ctx.today ?? new Date().toISOString().slice(0, 10);
   const vocab = compileVocab(tv, ctx.pack);
   // R22: a quoted phrase asked of the TEXT of the papers ("files whose text has \"net 30\"", "papers that mention \"x\"", with or without page references) is a page search, read before the core parser
   { const pf = pagefindParse(raw0, { vocab, mode: 'early', cite: citeAsk.cite }); if (pf) return { mode: 'dql', plan: pf, text: raw0, plain: false }; }
   // a topic the shared jargon table lists as not recorded ("donation", "lease") is recorded when this organization keeps that kind of paper under that very word
   let readerOnly = false; // R18: a clause the papers may state in words ("late fees", "governing law") is not a field this company keeps, but the extractive reader can still READ it; only the reader may answer such a question
-  try { const uc = jargonEnabled() ? untrackedConcept(raw0) : null; if (uc && !vocab.scopedPhrases?.has(String(uc.phrase).toLowerCase().replace(/\s+/g, ' '))) { if (readerShaped(raw0)) readerOnly = true; else return null; } } catch { /* ignore */ }
+  try { const uc = jargonEnabled() ? untrackedConcept(raw0) : null; if (uc && !vocab.scopedPhrases?.has(String(uc.phrase).toLowerCase().replace(/\s+/g, ' '))) { if (readerShaped(raw0)) readerOnly = true; else return relw(ctx, 'silent: untracked concept (jargon)'); } } catch { /* ignore */ }
   // payment status, balances and what is owed are not read from the papers by this engine: the older lanes answer or decline those
-  if (/\b(?:overdue|past\s+due|unpaid|outstanding|owed|owing|owes?|balances?|delinquent|paid|pay(?:ment)?s?\s+status|still\s+owe|behind\s+on)\b/i.test(raw0)) return null;
+  if (/\b(?:overdue|past\s+due|unpaid|outstanding|owed|owing|owes?|balances?|delinquent|paid|pay(?:ment)?s?\s+status|still\s+owe|behind\s+on)\b/i.test(raw0)) return relw(ctx, 'gate: payment-status words');
   // R23: a forecast ("what will revenue be next month", "how many bills will we get next month") is not in the papers: it is released, never answered as if it were a count of what exists
-  if (process.env.R23_FORECAST !== '0' && /\b(?:will|going\s+to|gonna|would)\b[^?.]{0,40}\b(?:be|get|receive|bring|make|earn|see|come\s+in|sell|total|bill|invoice)\b/i.test(raw0) && /\b(?:next|coming|upcoming|following|future|tomorrow|rest\s+of)\b/i.test(raw0) && !/\b(?:expir\w*|renew\w*|due|end(?:s|ing)?|lapse\w*|run\s+out|ran\s+out|mature\w*|finish\w*|scheduled|booked|appointments?)\b/i.test(raw0)) return null;
+  if (process.env.R23_FORECAST !== '0' && /\b(?:will|going\s+to|gonna|would)\b[^?.]{0,40}\b(?:be|get|receive|bring|make|earn|see|come\s+in|sell|total|bill|invoice)\b/i.test(raw0) && /\b(?:next|coming|upcoming|following|future|tomorrow|rest\s+of)\b/i.test(raw0) && !/\b(?:expir\w*|renew\w*|due|end(?:s|ing)?|lapse\w*|run\s+out|ran\s+out|mature\w*|finish\w*|scheduled|booked|appointments?)\b/i.test(raw0)) return relw(ctx, 'gate: forecast');
   // R16: "as of <date>" is a running position up to that date, which this engine does not total; "what's the number of the earliest ... " asks for the paper's own number, not its file name: both are released
-  if (process.env.R16_ASOF !== '0' && /\bas\s+of\b(?!\s+(?:today|now)\b)/i.test(raw0) || (/\bnumbers?\s+of\s+the\s+(?:earliest|latest|first|last|oldest|newest|most\s+recent|biggest|largest|smallest|top)\b/i.test(raw0) && !/\bhow\s+many\b/i.test(raw0))) return null;
+  if (process.env.R16_ASOF !== '0' && /\bas\s+of\b(?!\s+(?:today|now)\b)/i.test(raw0) || (/\bnumbers?\s+of\s+the\s+(?:earliest|latest|first|last|oldest|newest|most\s+recent|biggest|largest|smallest|top)\b/i.test(raw0) && !/\bhow\s+many\b/i.test(raw0))) return relw(ctx, "gate: as of / number of the earliest");
   // "what's the number of the invoice for $115" asks for the paper's own number, not a count
-  if (/\bnumber\s+of\s+the\s+[a-z -]+?\s+(?:for|from|of|on|dated|with)\b/i.test(raw0) && !/\bhow\s+many\b/i.test(raw0)) return null;
+  if (/\bnumber\s+of\s+the\s+[a-z -]+?\s+(?:for|from|of|on|dated|with)\b/i.test(raw0) && !/\bhow\s+many\b/i.test(raw0)) return relw(ctx, 'gate: number of the <paper>');
   // "bills": the invoices we send, or what vendors send us. A company that keeps purchase orders reads the vendor side as those; a bare "bills" there is asked, not guessed.
   let raw1 = raw0;
   if (vocab.docTypesInUse.has('purchase-order')) {
     const bs = billSense(raw0);
-    if (bs === 'bare' && vocab.docTypesInUse.has('invoice')) return null;
+    if (bs === 'bare' && vocab.docTypesInUse.has('invoice')) return relw(ctx, 'gate: bare bills');
     if (bs === 'vendor') raw1 = vendorBillsAsPurchaseOrders(raw0);
   }
   const rawOpen = openEndRewrite(raw1);
@@ -260,7 +338,7 @@ function parseDqlOnce(question, ctx = {}) {
   // "the second highest invoice and who is it for": the listed paper already names its customer, so the clause is answered by the same line (only for a ranking of single papers: checked after the plan)
   let whoClause = false;
   framed = chronoOrdinalRewrite(hashOrdinalRewrite(framed));
-  { const od = readOrdinal(framed); if (od?.bad) return null; if (od) {
+  { const od = readOrdinal(framed); if (od?.bad) return relw(ctx, 'gate: ordinal not placeable'); if (od) {
     ordinal = od.n; let t0 = od.text;
     if (ORD_WHO_TAIL.test(t0)) { t0 = t0.replace(ORD_WHO_TAIL, ''); whoClause = true; }
     framed = ordinalCustomerRewrite(ordinalTechRewrite(t0));
@@ -274,11 +352,11 @@ function parseDqlOnce(question, ctx = {}) {
   }
   // a question that opens by leaning on the one before it is a follow-up, not a query of its own
   const OPENER = /^\s*(?:and|also|then|but|or|so|what about|how about|same|those|these)\b/i;
-  if (OPENER.test(raw0) || OPENER.test(framed) || (ctx.original && OPENER.test(String(ctx.original)))) return null;
+  if (OPENER.test(raw0) || OPENER.test(framed) || (ctx.original && OPENER.test(String(ctx.original)))) return relw(ctx, 'gate: opens like a follow-up');
 
   // ---- tokens + conservative repair
   const toks = tokenize(framed);
-  if (!toks.length || toks.length > 40) return null;
+  if (!toks.length || toks.length > 40) return relw(ctx, 'gate: more than 40 words');
   const words = toks.map((t) => {
     const r = repairWord(t.w, vocab.repairByLen, { has: vocab.known });
     return r ?? t.w;
@@ -458,6 +536,13 @@ function parseDqlOnce(question, ctx = {}) {
   for (const k of ['visit', 'document', 'unit', 'customer', 'technician', 'install']) {
     const hits = w.takeAll(noun(k));
     feat.nouns[k === 'technician' ? 'tech' : k] = hits.length > 0;
+    // R24: "the client Heather Stevens", "customer named X", "technician Sam": the role noun right before a resolved name is only a label of that name, not a second thing asked about
+    if (hits.length && (k === 'customer' || k === 'technician')) {
+      const role = k === 'customer' ? 'customer' : 'tech';
+      const labels = feat.filters.filter((x) => x.role === role && x.label).map((x) => String(x.label).replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+'));
+      const rolesAlt = ENTITY_WORDS[k].concat(vocab.nounExtra?.[k] ?? []).filter((p) => !/s$/.test(p) || /(?:ss|us)$/.test(p)).sort((a, b) => b.length - a.length).map((p) => p.replace(/\s+/g, '\\s+')).join('|');
+      if (labels.length && rolesAlt && hits.length === 1 && !/s\s*$/.test(hits[0][0].trim().replace(/(?:ss|us)\s*$/, 'x')) && new RegExp(`\\b(?:${rolesAlt})\\s+(?:named\\s+|called\\s+|by\\s+the\\s+name\\s+of\\s+)?(?:${labels.join('|')})\\b`, 'i').test(raw0)) { feat.nouns[k === 'technician' ? 'tech' : k] = false; w.takeAll(rx('named|called')); } // the label words ("named", "called") go with the noun: no other family may read them as a word to search for
+    }
     if (hits.some((m) => /s\s*$/.test(m[0].trim()) && !/(?:ss|us)\s*$/.test(m[0].trim()))) feat.flags.plural = true;
   }
 
@@ -521,7 +606,7 @@ function parseDqlOnce(question, ctx = {}) {
   }
   // "which tech has the most X" / "who has the fewest X"
   {
-    const m = w.take(rx(`(?:which|what|who)\\s+(?:(${DIM_ALT})\\s+)?(?:(?:has|have|had|did|does|do|is|are|was|were|with|got|gets|brings?|in|made|makes|sold|generated|handled|done|completed|we|our|us|the|a|an)\\s+){0,4}(most|highest|biggest|largest|busiest|top|least|fewest|lowest|smallest)`));
+    const m = w.take(rx(`(?:which|what|who)\\s+(?:(${DIM_ALT})\\s+)?(?:(?:has|have|had|did|does|do|is|are|was|were|with|got|gets|brings?|in|made|makes|sold|generated|handled|done|completed|we|our|us|the|a|an)\\s+){0,4}(most|highest|biggest|largest|busiest|top|least|fewest|lowest|smallest)(?!\\s+(?:\\d+|${NUMW})\\b)`)); // R24: "who are the top 3 customers" is a ranking of N, read below; not a bare "who ... top"
     if (m) {
       const dir = /^(least|fewest|lowest|smallest)$/.test(m[2]) ? 'asc' : 'desc';
       if (m[1]) t.argmax = { dim: dimIdOf(m[1]), dir };
@@ -571,6 +656,8 @@ function parseDqlOnce(question, ctx = {}) {
   t.howMuch = Boolean(w.take(R.howMuch));
   t.share = Boolean(w.take(R.share));
   t.versus = Boolean(w.take(R.versus));
+  // R24: "invoices this year and last year": two relative spans joined by "and" are the two sides of a comparison (both numbers are answered)
+  if (!t.versus && feat.times.length === 2 && !t.share && /\b(?:this|last|previous|current|prior)\s+(?:calendar\s+)?(?:year|month|quarter|week)\s*(?:,|and|&|plus)\s*(?:the\s+)?(?:this|last|previous|current|prior)\s+(?:calendar\s+)?(?:year|month|quarter|week)\b/i.test(raw0)) t.versus = true;
   t.median = Boolean(w.take(R.median));
   t.avg = Boolean(w.take(R.avg));
   t.exists = Boolean(w.take(R.exists));
@@ -638,7 +725,7 @@ function parseDqlOnce(question, ctx = {}) {
   const valueWords = new Set(Object.values(vocab.cat ?? {}).flatMap((m) => [...m.keys()]).flatMap((k) => k.split(' ')).filter((x) => x.length >= 4 && !VALUE_STOP.has(x)));
   // "2024 to now", "until today": the end of a range is a condition; "now" is only filler when it does not close a span
   const spanEnd = /\b(?:to|until|till|through|thru|and|up to)\s+(?:now|today|present)\b/.test(w.s) ? new Set(['now', 'today', 'present']) : null;
-  feat.left = w.left().filter((x) => !FILLER.has(x) || (spanEnd && spanEnd.has(x)) || (valueWords.has(x) && !feat.times.length && !feat.time));
+  feat.left = w.left().filter((x) => !(FILLER.has(x) || ho?.fillers?.has(x)) || (spanEnd && spanEnd.has(x)) || (valueWords.has(x) && !feat.times.length && !feat.time));
   if (ctx.debug) ctx.debug.feat = feat;
   if (feat.flags.badNumber) return null;
   // R22: no other family read the question: "which papers mention X", "find the document about X", "what page talks about X", "do we have anything on X" are searches of the papers' text
@@ -651,6 +738,15 @@ function parseDqlOnce(question, ctx = {}) {
     if (early && (early.op === 'line_search' || early.op === 'text_search') && twoMeasureSignal(raw0)) return null; // two measures beside a text / line-item condition
     if (early && (early.op === 'text_search' || early.op === 'find_document')) { const pf = latePageFind(early); if (pf) return pf; } // R22: the page search takes a plain phrase search from the older text search; when it cannot answer, the older plan runs as before
     if (early) { const ep = ordinal ? applyOrdinal(early, ordinal) : early; return ep && !whoClause ? { mode: 'dql', plan: ep, text: framed, plain: false } : null; }
+    // R24: a two-measure question ("how many X and what do they add up to", "count of X plus the date of the latest one", "I need two things: ...") carries little words that only point back at the papers
+    // or join the two asks. They are explained ONLY when the two-measure reader builds BOTH halves for the same papers; any other leftover word keeps the question released.
+    if (process.env.R24_MULTI_LEFT !== '0' && feat.left.every((x) => MULTI_LINK.has(x) || (MULTI_EXT_LINK.has(x) && (feat.trig.latest || feat.trig.earliest)))) {
+      const keep = feat.left; feat.left = [];
+      let mpe = null; try { mpe = multiPlan(feat, vocab); } catch { mpe = null; }
+      if (mpe && mpe !== 'release' && mpe.op === 'multi') { if (ctx.debug) ctx.debug.multiLeft = keep.join(' '); } else feat.left = keep;
+    }
+  }
+  if (feat.left.length) {
     // LEARNED PLANNER (dql/learned): Donovan's own small model may mark the leftover words as filler, only above a high calibrated threshold
     // and only when its guards pass; slots always came from the detectors above. DONOVAN_DQL_LEARNED=0 turns it off.
     const lg = leftoverGate({ raw: raw0, framed, orig: w.orig, rest: w.s, left: feat.left, feat, vocab, debug: ctx.debug });

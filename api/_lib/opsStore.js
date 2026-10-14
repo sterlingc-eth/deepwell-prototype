@@ -481,6 +481,10 @@ export const DELETE_ORDER = Object.freeze([
   'intake_field_inferences',
   'document_entity_links',
   'kg_edges',
+  // Google Drive / Gmail sync (M3-config/71): the per-file ledger first (it points at documents), then the connections
+  // (which hold the encrypted Google token). Both are simply skipped where that migration has not been run.
+  'google_sync_items',
+  'google_connections',
   'documents',
   // hang off entities (or nothing)
   'notifications_sent',

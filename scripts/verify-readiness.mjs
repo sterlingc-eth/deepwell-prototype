@@ -213,6 +213,7 @@ eq('LIVE schema (PGlite after all migrations): every tenant table is in DELETE_O
   missingFromDeletePath(new Set(liveTenantTables), DELETE_ORDER, RETAINED_TABLES), []);
 
 const OVERRIDE = {
+  google_connections: { provider: 'drive' },
   document_financials: { doc_kind: 'invoice', direction: 'receivable' },
   outreach_messages: { tier: 'expired' },
   dossiers: { entity_type: 'customer' },
@@ -256,6 +257,7 @@ async function seedEverything(tid) {
       if (table === 'document_financials') fk.financial_id = r.rows[0].id;
       if (table === 'donovan_scorecard_runs') fk.run_id = r.rows[0].id;
       if (table === 'support_access_grants') fk.grant_id = r.rows[0].id;
+      if (table === 'google_connections') fk.connection_id = r.rows[0].id;
     }
     seeded.add(table);
   }

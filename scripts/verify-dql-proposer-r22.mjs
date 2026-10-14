@@ -79,9 +79,9 @@ delete process.env.DONOVAN_LOCAL_PROPOSER;
 /* ================================================================== 1. the flag */
 check('flag :: DONOVAN_LOCAL_PROPOSER=0 is the kill switch', P.localProposerEnabled({ DONOVAN_LOCAL_PROPOSER: '0' }) === false);
 check('flag :: =1 forces it on, unset follows the shipped default', P.localProposerEnabled({ DONOVAN_LOCAL_PROPOSER: '1' }) === true && P.localProposerEnabled({}) === P.DEFAULT_ON);
-process.env.DONOVAN_LOCAL_PROPOSER = '0';
+process.env.DONOVAN_LOCAL_PROPOSER = '0'; process.env.DONOVAN_LEARNED_READER = '0'; // R25: the learned reader is a second local planner and is ON by default; this test is about the proposer alone
 check('flag :: off => no intent for a question about the records', classifyTranslate('how many invoices over 5000 per city this quarter', { tenantVocab: tv, pack, today: TODAY }) === null);
-process.env.DONOVAN_LOCAL_PROPOSER = '1';
+process.env.DONOVAN_LOCAL_PROPOSER = '1'; delete process.env.DONOVAN_LEARNED_READER;
 check('flag :: on => an intent {mode: dql-translate}', classifyTranslate(`how many invoices for ${NAME}`, { tenantVocab: tv, pack, today: TODAY })?.mode === 'dql-translate');
 check('flag :: on => a follow-up ("those") is never planned', classifyTranslate('how many of those were in Mesa', { tenantVocab: tv, pack }) === null);
 

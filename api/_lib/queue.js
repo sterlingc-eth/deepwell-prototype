@@ -525,5 +525,24 @@ function buildFunctions(inngest, NonRetriableError) {
     }
   );
 
-  return [readDocument, extractFields, accountExport];
+  // Google Drive / Gmail sync (api/_lib/googleSync): checks every connected company every 20 minutes. Defined ONLY when
+  // DEEPWELL_GOOGLE_SYNC=1, so with the switch off the function list is exactly what it was.
+  const extra = [];
+  if (process.env.DEEPWELL_GOOGLE_SYNC === "1") {
+    extra.push(inngest.createFunction(
+      {
+        id: "google-sync",
+        name: "Check connected Google Drive and Gmail accounts for new files",
+        concurrency: [{ limit: 1 }],
+        retries: 1,
+        triggers: [{ cron: "*/20 * * * *" }],
+      },
+      async ({ step }) => step.run("sync-connected-sources", async () => {
+        const { runGoogleSyncSweep } = await import("./googleSync/sync.js");
+        return runGoogleSyncSweep({ deadlineAt: Date.now() + 40_000, deps: { limits: { runBudgetMs: 30_000 } } });
+      })
+    ));
+  }
+
+  return [readDocument, extractFields, accountExport, ...extra];
 }

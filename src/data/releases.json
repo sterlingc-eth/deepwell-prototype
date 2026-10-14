@@ -79,6 +79,22 @@
    "internal": {
     "sha": "eba3ad8"
    }
+  },
+  {
+   "track": "donovan",
+   "version": "1.2.0",
+   "date": "2026-10-14",
+   "type": "update",
+   "released": true,
+   "public": true,
+   "notes": [
+    "Donovan understands each business\u2019s own words for jobs, visits and paperwork, and asks you instead of guessing when a word could mean two things.",
+    "He answers more of your questions directly from your records.",
+    "The website has a new Integrations page, with Google Drive and Gmail coming soon."
+   ],
+   "internal": {
+    "sha": "e852c46"
+   }
   }
  ]
 }

@@ -42,6 +42,8 @@ import { deriveGeo } from '../analytics.js';
 import { withinEditDistance1, VOCAB } from '../nlNormalize.js';
 import { notPrivateSql } from "../privacy/privateDocs.js";
 import { buildCard } from '../dql/card.js';
+import { loadHandoffOverlay, handoffVersion } from '../handoffLearning/load.js';
+import { handoffLearningEnabled } from '../handoffLearning/flag.js';
 
 const VOCAB_SCAN_LIMIT = 5000;
 const CACHE_TTL_MS = 10 * 60 * 1000; // backstop only — the data-version key is what really invalidates this
@@ -245,8 +247,11 @@ export async function getTenantVocab(db, tenantKey, pack) {
   } catch {
     version = null; // a probe failure never blocks the caller — fall back to whatever's cached (or rebuild)
   }
+  // R24 (DONOVAN_HANDOFF_LEARNING, default off): a learning adopted or retired for this organization rebuilds its vocabulary; with the switch off nothing below runs
+  if (handoffLearningEnabled() && version !== null) version = `${version}|h:${await handoffVersion(db)}`;
   if (cached && cached.expiresAt > now && (version === null || cached.version === version)) return cached.vocab;
   const vocab = await buildTenantVocab(db, pack);
+  if (handoffLearningEnabled()) { const ho = await loadHandoffOverlay(db); if (ho) vocab.handoff = ho; }
   cacheByTenant.set(tenantKey, { version, vocab, expiresAt: now + CACHE_TTL_MS });
   return vocab;
 }

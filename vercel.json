@@ -5,7 +5,7 @@
   "installCommand": "npm install",
   "env": {},
   "functions": {
-    "api/ask.js": { "includeFiles": "api/_lib/{wording,dql/learned}/*.json" },
+    "api/ask.js": { "includeFiles": "api/_lib/{wording/*.json,dql/learned/*.json,dql/reader-ml/data/*}" },
     "api/review.js": { "includeFiles": "test-docs/scorecard/exam.json" },
     "api/account.js": { "includeFiles": "test-docs/scorecard/exam.json" }
   },
@@ -70,6 +70,14 @@
     {
       "source": "/api/cron-sweep",
       "destination": "/api/account?action=sweep"
+    },
+    {
+      "source": "/api/google-sync/callback",
+      "destination": "/api/account?action=google-sync&op=callback"
+    },
+    {
+      "source": "/api/google-sync",
+      "destination": "/api/account?action=google-sync"
     },
     {
       "source": "/api/merge-tenant",

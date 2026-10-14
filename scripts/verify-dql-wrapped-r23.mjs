@@ -99,7 +99,6 @@ for (const [q, base] of COND) {
 const REL = [
   'What is the average invoice amount? And what is the median estimate? Thanks',
   'Hi!\n1. what is the average invoice amount\n2. what is the median estimate',
-  'Hola, por fa: how many invoices in 2024, mil gracias',
   'Hola, por fa: list the customers in Phoenix, mil gracias',
   'Hi, how many invoices will we get next month? Thanks',
   'how many invoices will we get next month',
@@ -108,7 +107,7 @@ const REL = [
   'asdf qwer zxcv invoices zxcv in the 2024 thanks por fa',
 ];
 for (const q of REL) check(`released: ${q.slice(0, 60).replace(/\n/g, ' / ')}`, planOf(q) == null);
-check('the plain count with a year is answered but its wrapped form stays with the model (guard)', planOf('how many invoices in 2024') != null && planOf('Hola, por fa: how many invoices in 2024, mil gracias') == null);
+check('R24: a plain count with a year and its wrapped form read the same plan (counts with a period are now safe once unwrapped)', planOf('how many invoices in 2024') != null && planOf('Hola, por fa: how many invoices in 2024, mil gracias') === planOf('how many invoices in 2024'));
 
 /* ---------- 4. the kill switch and the unit helpers */
 process.env.DONOVAN_DQL_UNWRAP = '0';
@@ -122,7 +121,7 @@ check('stripPhrases: closer', U.stripPhrases('how many invoices in 2024, por fa,
 check('stripPhrases: opener', U.stripPhrases('Oiga, hola, how many invoices in 2024', vocab) === 'how many invoices in 2024');
 check('stripPhrases: a company word is never stripped', U.stripPhrases('how many invoices', vocab) === 'how many invoices');
 check('unwrapQuestion: two questions are not unwrapped', U.unwrapQuestion('Hi, how many invoices? And how many estimates?', vocab) == null);
-check('unwrapAllows: safe kinds only', U.unwrapAllows({ op: 'max' }) && U.unwrapAllows({ op: 'count', filters: [] }) && !U.unwrapAllows({ op: 'count', time: { from: 'x' } }) && !U.unwrapAllows({ op: 'tm_compare' }) && !U.unwrapAllows(null));
+check('unwrapAllows: safe kinds only', U.unwrapAllows({ op: 'max' }) && U.unwrapAllows({ op: 'count', filters: [] }) && U.unwrapAllows({ op: 'tm_compare' }) && !U.unwrapAllows({ op: 'group_count' }) && !U.unwrapAllows(null));
 check('unwrapQuestion: digits in a side sentence block it', U.unwrapQuestion('Only 2023 please. Hi there. what is the average invoice amount', vocab) == null);
 check('unwrapQuestion: plain question has nothing to strip', U.unwrapQuestion('what is the average invoice amount', vocab) == null);
 check('api/ keeps its 12 top-level files', fs.readdirSync(path.join(ROOT, 'api')).filter((f) => fs.statSync(path.join(ROOT, 'api', f)).isFile()).length === 12);

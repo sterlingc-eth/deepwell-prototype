@@ -18,7 +18,7 @@ const HEAD = [
   'disculpa la molestia', 'perdona la molestia', 'perdon la molestia', 'perd\u00f3n la molestia', 'disculpe la molestia', 'sorry to bother you', 'sorry for the bother', 'sorry for the trouble', 'excuse the interruption', 'si no es molestia', 'if it is not too much trouble', 'if its not too much trouble',
   'es urgente', 'pero urgente', 'it is urgent', 'its urgent', 'urgente', 'urgent', 'no rush', 'sin prisa', 'no hay prisa', 'por fa', 'porfa', 'por favor', 'pls', 'please', 'ok so', 'okay so', 'ok', 'okay', 'oh', 'um', 'uh',
   'when you get a sec', 'when you get a second', 'when you get a chance', 'when you get a minute', 'when you have a moment', 'whenever you get a chance', 'one quick thing', 'one more thing', 'please help', 'help please', 'help me out', 'i need your help', 'i could use your help', 'need your help',
-  "it's urgent", "it's urgent please", 'thanks in advance', 'gracias de antemano', 'gracias', 'thanks', 'thank you', 'back to business', 'getting to the point', 'to the point', 'anyway back to it', 'the actual question is this', 'the actual question is', 'my question is', 'here is my question', 'heres my question', 'here is what i need', 'heres what i need',
+  "it's urgent", "it's urgent please", 'thanks in advance', 'gracias de antemano', 'gracias', 'thanks', 'thank you', 'back to business', 'here goes', 'here we go', 'getting to the point', 'to the point', 'anyway back to it', 'the actual question is this', 'the actual question is', 'my question is', 'here is my question', 'heres my question', 'here is what i need', 'heres what i need',
   'not for nothing but', 'long story short', 'for what it is worth', 'for what its worth', 'heads up', 'una cosita', 'una duda', 'dime una cosa', 'mira esto', 'hola amigo', 'amigo', 'okay pues', 'pues', 'alright', 'right', 'as an aside', 'quick aside', 'by the way', 'btw', 'fast one', 'ahorita necesito saber', 'necesito saber', 'necesito algo', 'cuando puedas', 'si puede', 'si es molestia', 'si no te molesta', 'hola cuando puedas', 'perdon pero', 'perdon', 'sorry', 'bueno', 'entonces', 'a ver', 'una pregunta',
   'pero', 'ya', 'dime ya', 'tell me this', 'please tell me this', 'si puedes', 'could you answer this for me', 'can you answer this for me', 'can you help me with this', 'could you help me with this', 'can you help with this', 'i have a question for you', 'i have a question', 'i got a question', 'got a question', 'question for you',
 ];
@@ -101,7 +101,7 @@ const BLOCK_WORDS = new Set(('how many much often old far number count counts ta
 const IDIOM_OK = new Set('out little long plan planning office note new'.split(' '));
 const NEW_BLOCK = /\bnew\s+(?:one|ones|stuff|items?|entries|entry|things?|additions?|ones)\b/i;
 const NUMW = /^(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|dozen|half|couple|several|few|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|twice|thrice|double|triple)$/;
-const FILLER_PHRASES = /\b(?:which|that)\s+(?:has|have|is|was)\s+nothing\s+to\s+do\s+with\s+(?:this|that|anything)\b|\bbetween\s+you\s+and\s+me\b|\bevery\s+time\b|\bmuch\s+appreciated\b|\bmany\s+thanks\b|\bhope\s+your\s+day\s+is\s+going\s+(?:better|well)(?:\s+than\s+mine)?\b|\bwhole\s+street\b|\bwi-?fi\b|\bkeep\s+this\s+between\s+us\b|\bif\s+you\s+need\s+to\s+reach\s+me\b|\bno\s+rush\s+on\s+(?:the|this|that)\s+[a-z]+\s+thing\b|\bmr\.?\s|\bmrs\.?\s|\bms\.?\s|\bdr\.?\s/gi;
+const FILLER_PHRASES = /\blast\s+night\b|\bthis\s+(?:morning|afternoon|evening)\b|\b(?:which|that)\s+(?:has|have|is|was)\s+nothing\s+to\s+do\s+with\s+(?:this|that|anything)\b|\bbetween\s+you\s+and\s+me\b|\bevery\s+time\b|\bmuch\s+appreciated\b|\bmany\s+thanks\b|\bhope\s+your\s+day\s+is\s+going\s+(?:better|well)(?:\s+than\s+mine)?\b|\bwhole\s+street\b|\bwi-?fi\b|\bkeep\s+this\s+between\s+us\b|\bif\s+you\s+need\s+to\s+reach\s+me\b|\bno\s+rush\s+on\s+(?:the|this|that)\s+[a-z]+\s+thing\b|\bmr\.?\s|\bmrs\.?\s|\bms\.?\s|\bdr\.?\s/gi;
 const BENIGN_ONLY = /\b(?:i\s+am|i'?m|we\s+are|we'?re|just)\s+only\s+(?:mentioning|saying|telling|writing|bringing|sharing|venting)(?:\s+(?:it|this|that))?\b/gi;
 /** a sentence on its own that names nothing, asks nothing and limits nothing: "the stapler vanished and I am blaming the intern" */
 export function contextSentence(text, vocab, { intent = false, min = 3, why = null, allow = null } = {}) {
@@ -109,7 +109,7 @@ export function contextSentence(text, vocab, { intent = false, min = 3, why = nu
   let t = String(text ?? '').replace(/[’‘`]/g, "'").trim();
   if (!t) return true;
   const words0 = t.split(/\s+/);
-  if (words0.length > 40) return no('long');
+  if (words0.length > 70) return no('long');
   if (/[\d$%#@&?\\/=<>+*]/.test(t) || /[\p{Extended_Pictographic}]/u.test(t)) return no('symbol');
   const t0 = t;
   t = t.replace(BENIGN_ONLY, ' ').replace(FILLER_PHRASES, ' ');
@@ -167,7 +167,7 @@ function ownCore(text, vocab) {
   for (let i = 0; i < 5; i++) {
     const m = /^([^:]{3,160}):\s+(.+)$/s.exec(t);
     if (m && !/\d{1,2}$/.test(m[1]) && (requestFrame(m[1], vocab) || phraseOnly(m[1], vocab))) { t = m[2]; continue; }
-    const d = /^([^-–—]{3,100}?)\s[-–—]\s+(.+)$/s.exec(t);
+    const d = /^([^-–—]{3,240}?)\s[-–—]\s+(.+)$/s.exec(t);
     if (d && (contextSentence(d[1], vocab) || phraseOnly(d[1], vocab) || requestFrame(d[1], vocab))) { t = d[2]; continue; }
     const hw = /^(?:now|well|anyway|anyhow|okay|ok|alright|right|oh|yes|yeah|listen|look|honestly|basically|actually)\s*,\s+(.+)$/is.exec(t);
     if (hw) { t = hw[1]; continue; }
@@ -198,14 +198,15 @@ function stripEmailShell(text, vocab) {
     out.push(l);
   }
   // a name on the last line right after a sign-off line
-  if (out.length >= 3 && SIGNOFF.test(out[out.length - 2]) && /^[A-Z][\w.'-]*(?:\s+[A-Z][\w.'-]*)?$/.test(out[out.length - 1])) out.pop();
-  else if (out.length >= 2 && /^[A-Z][\w.'-]*(?:\s+[A-Z][\w.'-]*)?$/.test(out[out.length - 1]) && SIGNOFF.test(out[out.length - 2])) out.pop();
+  if (out.length >= 3 && (SIGNOFF.test(out[out.length - 2]) || phraseOnly(out[out.length - 2].replace(/[.!,]+$/, ''), vocab)) && /^[A-Z][\w.'-]*(?:\s+[A-Z][\w.'-]*)?$/.test(out[out.length - 1])) out.pop();
+  else if (out.length >= 2 && /^[A-Z][\w.'-]*(?:\s+[A-Z][\w.'-]*)?$/.test(out[out.length - 1]) && (SIGNOFF.test(out[out.length - 2]) || phraseOnly(out[out.length - 2].replace(/[.!,]+$/, ''), vocab))) out.pop();
   return out.join('\n');
 }
 
 /** the one real question inside a wrapped text, or null (nothing to take away, or not provably one question) */
 export function unwrapQuestion(q, vocab) {
-  const raw = String(q ?? '').replace(/\r/g, '').trim();
+  // R24: pictures carry no condition, and the full stop of a title ("Mr. Donovan") is not the end of a sentence
+  const raw = String(q ?? '').replace(/\r/g, '').replace(/[\p{Extended_Pictographic}\u200d\ufe0f]+/gu, ' ').replace(/\b(Mr|Mrs|Ms|Dr)\.(?=\s)/g, '$1').replace(/[ \t]+/g, ' ').replace(/ ?\n ?/g, '\n').trim();
   if (raw.length < 12 || !vocab) return null;
   // a list of questions is not one question
   const lines = raw.split('\n').map((x) => x.trim()).filter(Boolean);
@@ -234,17 +235,21 @@ export function explain(q, vocab) {
 /* An unwrapped question is answered only when the plan it reads to is a kind of answer this engine gets right on its own (measured on bank 6, tier 1 and tier 2).
    The wrapper never changes what is asked, but the answer to the core is only as good as the engine is on that kind of question; the kinds below were right in at least
    98% of the unwrapped answers checked. Anything else stays released as before (the model answers it). DONOVAN_DQL_UNWRAP_ALL=1 lifts this list (used only to measure). */
-const SAFE_OPS = new Set(['count_distinct', 'group_sum', 'tm_expiry', 'tm_since', 'pivot_two_dims', 'max', 'bottom_n', 'duplicates', 'tm_between', 'min', 'median', 'tm_series', 'tm_inactive', 'group_avg', 'set_per_entity', 'find_document', 'missing_field', 'share_pct', 'avg', 'set_ratio']);
+const SAFE_OPS = new Set(['count_distinct', 'group_sum', 'tm_expiry', 'tm_since', 'pivot_two_dims', 'max', 'bottom_n', 'duplicates', 'tm_between', 'min', 'median', 'tm_series', 'tm_inactive', 'group_avg', 'set_per_entity', 'find_document', 'missing_field', 'share_pct', 'avg', 'set_ratio',
+  /* R24: measured on bank 6 (train, every company): the same plans the plain question gets right at 98%+ once the chatter is gone */
+  'count', 'exists_yes_no', 'latest', 'sum', 'top_n', 'tm_compare', 'compare_two_values']);
 export function unwrapAllows(plan) {
   if (process.env.DONOVAN_DQL_UNWRAP_ALL === '1') return true;
   if (!plan) return false;
   if (SAFE_OPS.has(plan.op)) return true;
   const money = (plan.filters ?? []).some((f) => f.money);
-  if (plan.op === 'count' && !plan.time && !money) return true;
+  if (plan.op === 'count' && !money) return true;
   return false;
 }
 export function unwrapAllowsCore(plan, core) {
   if (!unwrapAllows(plan)) return false;
+  if (plan.op === 'count' && /\b(?:count|number|how\s+many)\s+(?:of\s+)?[^?]{2,60}?\s(?:and|plus|&)\s+(?:of\s+|the\s+(?:count|number)\s+of\s+|how\s+many\s+)/i.test(String(core ?? ''))) return false; // R24: "count of A and of B": two counts are asked, one plan counts one of them
+  if (plan.op === 'latest' && (plan.ask === 'tech' || /\b(?:who|whom|whose|which\s+(?!(?:one|date|day|month|year)\b)[a-z]+)\b/i.test(String(core ?? '')))) return false; // R24: "who worked on the last X": the person is not always on the paper (bank 6 measured)
   if (plan.op === 'missing_field' && /\b(?:not|never|n't)\s+(?:\w+\s+)?(?:by|done|handled|made|performed|worked|assigned|completed)\b/i.test(core)) return false; // "not handled by X" is a negated name, not a missing field
   return true;
 }

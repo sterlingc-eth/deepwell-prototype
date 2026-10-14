@@ -16,6 +16,7 @@ import { validateTranslatedPlan } from './validate.js';
 import { answerFromSnapshot } from '../index.js';
 import { loadSnapshot } from '../load.js';
 import { localProposerEnabled, proposeAndValidate } from '../proposer/index.js';
+import { learnedReaderEnabled, proposeLearned } from '../reader-ml/index.js';
 import { todayIso } from '../../scope.js';
 import { compileVocab } from '../vocab.js';
 import { tokenize } from '../text.js';
@@ -48,7 +49,7 @@ function recordNouns(tv, pack) {
 }
 
 export function classifyTranslate(question, { tenantVocab, pack, today } = {}) {
-  if ((!translatorEnabled() && !localProposerEnabled()) || !tenantVocab) return null; // the model translator (DONOVAN_PLAN_TRANSLATOR=1) and/or the local proposer (DONOVAN_LOCAL_PROPOSER)
+  if ((!translatorEnabled() && !localProposerEnabled() && !learnedReaderEnabled()) || !tenantVocab) return null; // the model translator (DONOVAN_PLAN_TRANSLATOR=1), the local proposer (DONOVAN_LOCAL_PROPOSER) and/or the learned reader (DONOVAN_LEARNED_READER)
   const q = String(question ?? '').trim();
   if (q.length < 8 || q.length > 300 || !ASKS_RECORDS.test(q) || NOT_RECORDS.test(q) || LEANS_ON_EARLIER.test(q)) return null;
   const nouns = recordNouns(tenantVocab, pack);
@@ -66,7 +67,7 @@ export function answerFromRawPlan(snap, raw, question, { tv, pack, today }) {
 }
 
 export async function runTranslated(db, intent, { today } = {}) {
-  if ((!translatorEnabled() && !localProposerEnabled()) || !intent?.question || !intent.tv) return null;
+  if ((!translatorEnabled() && !localProposerEnabled() && !learnedReaderEnabled()) || !intent?.question || !intent.tv) return null;
   const t = todayIso(today);
   // the LOCAL PROPOSER (dql/proposer, no model call): its plan must pass the same strict gate and agree with the learned heads; anything else carries on exactly as before
   if (localProposerEnabled()) {
@@ -80,6 +81,19 @@ export async function runTranslated(db, intent, { today } = {}) {
           console.log(JSON.stringify({ route: 'ask', proposer: data ? 'answered' : 'rejected', op: pre.plan.op }));
           if (data) return data;
         }
+      }
+    } catch { /* fall through to the model translator or the normal chain */ }
+  }
+  // R25: the LEARNED READER (dql/reader-ml, DONOVAN_LEARNED_READER, off by default). Only a question the rules engine released gets here; the reader's plan must clear its calibrated confidence,
+  // the skeleton/slot checks and this same strict validator, and agree with the filler's own period and values. Any doubt: carry on exactly as before. It never overrides a rules answer.
+  if (learnedReaderEnabled()) {
+    try {
+      const snap = await loadSnapshot(db, { today: t });
+      if (!snap.truncated) {
+        const lr = await proposeLearned(intent.question, { tv: intent.tv, pack: intent.pack, today: t, snap });
+        const data = lr.ok ? answerFromSnapshot(snap, lr.plan, t) : null;
+        console.log(JSON.stringify({ route: 'ask', learnedReader: data ? 'answered' : lr.ok ? 'abstained' : 'released', why: lr.ok ? undefined : String(lr.reason).slice(0, 40), op: lr.ok ? lr.plan.op : undefined }));
+        if (data) return data;
       }
     } catch { /* fall through to the model translator or the normal chain */ }
   }

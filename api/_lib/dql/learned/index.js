@@ -48,6 +48,21 @@ const COND = /^(?:single|stand|stands|mean|means|meant|meaning|define|definition
 const DEICTIC = /^(?:those|these|them|they|their|theirs|it|its|ones|former|latter|aforementioned|same|above|earlier|previous|prior|before|that|this|such|he|she|his|her|him|hers)$/;
 const NOUNISH = /^(?:tickets?|payments?|calls?|visits?|jobs?|invoices?|quotes?|proposals?|estimates?|bids?|orders?|permits?|agreements?|warrant(?:y|ies)|customers?|clients?|units?|systems?|technicians?|techs?|documents?|appointments?|bills?|contracts?|plans?|equipment|address(?:es)?|phones?|emails?|models?|brands?|serials?|labor|vendors?|installs?|installations?|repairs?|maintenance|startups?|dispatch(?:es)?|inspections?|registrations?|purchases?|receipts?|statements?|deposits?|refunds?|credits?|discounts?|taxes|tax|fees?|charges?|costs?|prices?|amounts?|balances?|hours?|minutes?|revenue|sales|profit|margin|income|expenses?|payroll|salary|salaries|wages?|tips?|rent|leases?|tenants?|patients?|donors?|gifts?|pledges?|matters?|filings?|cases?|vehicles?|vins?|mileage|miles)$/;
 
+/** R24 (handoff learning): why a word may never be learned as filler or rewritten (negation, modality, future, scope, condition, back-reference, a measure / concept noun, a number), or null. */
+export function wordBlocked(word) {
+  const w = String(word ?? '').toLowerCase().replace(/'/g, '');
+  if (!/^[a-z]{2,20}$/.test(w)) return 'shape';
+  if (DEICTIC.test(w)) return 'deictic';
+  if (NEG.test(w)) return 'negation';
+  if (MODAL.test(w)) return 'modality';
+  if (FUTURE.test(w)) return 'future';
+  if (SCOPE.test(w)) return 'scope';
+  if (COND.test(w)) return 'condition';
+  if (NOUNISH.test(w)) return 'noun';
+  if (/^(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|grand|dozen|half)$/.test(w)) return 'number-word';
+  return null;
+}
+
 /** Words that look like a condition or a concept noun but are mostly plain wording ("number of", "repair" visits): no hard guard, the calibrated models decide (measured on factory dev: no wrong answers at the shipped thresholds). */
 const SOFT = new Set(['number', 'repair', 'models', 'address']);
 

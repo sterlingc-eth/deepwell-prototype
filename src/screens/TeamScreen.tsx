@@ -11,6 +11,7 @@ import { deleteShopData, downloadTenantExportJson } from '../services/exportClie
 import { memberDisplayName } from '../core/memberNames';
 import { FollowupsCard } from '../components/FollowupsCard';
 import { PhoneAppCard } from '../components/PhoneAppCard';
+import { ConnectedSourcesCard } from '../components/ConnectedSourcesCard';
 import { DataExportButtons } from '../components/records/DataExportButtons';
 import { AccountFilesExport } from '../components/records/AccountFilesExport';
 import { SUPPORT_ACCESS_CHANGED } from '../services/supportClient';
@@ -607,6 +608,7 @@ export function TeamScreen() {
               <strong className="text-ink-2">Invitations</strong> tabs of the panel at the bottom of this page.
             </p>
             <PhoneAppCard />
+            <ConnectedSourcesCard />
             <FollowupsCard />
         {/* Round 17 (U2 top fix #3): Team used to carry 7 stacked cards —
             Donovan misses/learning and Search by meaning moved to their own

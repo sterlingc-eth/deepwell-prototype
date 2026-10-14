@@ -482,6 +482,18 @@ export default async function handler(req, res) {
     await captureException(err, { route: "/api/cron-sweep", stage: "notifications" });
   }
 
+  // Google Drive / Gmail sync safety net (api/_lib/googleSync): the 20-minute Inngest schedule is the main driver; this nightly
+  // pass catches anything it missed. Does nothing (and imports nothing) unless DEEPWELL_GOOGLE_SYNC=1.
+  if (process.env.DEEPWELL_GOOGLE_SYNC === "1") {
+    try {
+      const { runGoogleSyncSweep } = await import("../googleSync/sync.js");
+      summary.googleSync = await runGoogleSyncSweep({ deadlineAt: Math.min(deadlineAt + 60_000, Date.now() + 90_000) });
+    } catch (err) {
+      summary.googleSync = { error: err?.message };
+      await captureException(err, { route: "/api/cron-sweep", stage: "google-sync" });
+    }
+  }
+
   // Customer outreach (handoffs/OUTREACH_2026-09-20.md): same shared deadline,
   // own cross-tenant listing (opt-in tenants only — list_outreach_enabled_tenants,
   // M3-config/18-outreach.sql), never allowed to fail the rest of this sweep.

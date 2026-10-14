@@ -194,7 +194,7 @@ endpoint is what runs. In this order:
    parents (`DELETE_ORDER` in `api/_lib/opsStore.js`): `extractions`, `facets`, `document_pages`,
    `page_chunks`, `document_financial_lines`, `document_financials`, `intake_needs_info`,
    `intake_field_inferences`, `document_entity_links`, `kg_edges`, `documents`, `notifications_sent`,
-   `notifications`, `outreach_messages`, `tenant_outreach_settings`, `entity_merge_suggestions`,
+   `notifications`, `outreach_messages`, `google_sync_items`, `google_connections`, `tenant_outreach_settings`, `entity_merge_suggestions`,
    `dossiers`, `knowledge_reports`, `tenant_rollups`, `tenant_insights_cache`, `ask_miss_replays`,
    `ask_misses`, `ask_answer_cache`, `ask_semantic_cache`, `embedding_usage`, `rate_limit_windows`,
    `donovan_gap_promotions`, `donovan_learned_tenant`, `donovan_promoted_tests`,

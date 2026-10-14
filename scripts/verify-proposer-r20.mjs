@@ -80,6 +80,7 @@ delete process.env.DONOVAN_LOCAL_PROPOSER;
 check('flag :: DONOVAN_LOCAL_PROPOSER=0 is the kill switch', P.localProposerEnabled({ DONOVAN_LOCAL_PROPOSER: '0' }) === false);
 check('flag :: =1 forces it on, unset follows the shipped default', P.localProposerEnabled({ DONOVAN_LOCAL_PROPOSER: '1' }) === true && P.localProposerEnabled({}) === P.DEFAULT_ON);
 process.env.DONOVAN_LOCAL_PROPOSER = '0';
+process.env.DONOVAN_LEARNED_READER = '0'; // R25: this check isolates the proposer lane from the learned reader
 check('flag :: off => no intent for a question about the records', classifyTranslate('how many invoices over 5000 per city this quarter', { tenantVocab: tv, pack, today: TODAY }) === null);
 process.env.DONOVAN_LOCAL_PROPOSER = '1';
 check('flag :: on => an intent {mode: dql-translate}', classifyTranslate(`how many invoices for ${NAME}`, { tenantVocab: tv, pack, today: TODAY })?.mode === 'dql-translate');
