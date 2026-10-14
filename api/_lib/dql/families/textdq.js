@@ -222,10 +222,11 @@ const TERM_STOP = new Set('per each average avg mean typical every more than onc
 const ARTICLES = new Set('a an the of any some my our their its this that those these'.split(' '));
 const SCOPE_WORDS = new Set('notes note work performed text comments comment details detail records record paperwork descriptions description wording'.split(' '));
 const PRE_CUE_OK = new Set('they people anyone anybody someone everyone everything anything something wat wats wich whch wut whihc'.split(' '));
+const TAIL_CHATTER = new Set('possible asap urgent urgently quick quickly please pls thanks thx give fast soon today now'.split(' '));
 const QUOTE_WORDS = new Set('word words phrase term saying'.split(' '));
 const BOUNDARY = new Set('in on at from by since during before after between within per across over under through until till for with to into and or but'.split(' '));
 const CUE_RE = {
-  mention: /^(?:mention|mentions|mentioned|mentioning)$/, say: /^(?:say|says|said|saying)$/, contain: /^(?:contain|contains|contained|containing)$/,
+  mention: /^(?:mention|mentions|mentioned|mentioning|reference|references|referenced|referencing|talk|talks|talked|talking)$/, say: /^(?:say|says|said|saying)$/, contain: /^(?:contain|contains|contained|containing)$/,
   search: /^(?:search|searches|searched|searching)$/, about: /^(?:anything|anyting|something)$/, involve: /^(?:involve|involves|involved|involving)$/,
   include: /^(?:include|includes|included|including)$/,
 };
@@ -370,6 +371,8 @@ function textual(feat, h, T) {
   } else {
     for (let i = 0; i < T.length; i++) if (isLeft(T[i]) && !/^(?:jobs?|wat|wich|whch)$/.test(T[i].w)) regionIdx.push(i);
   }
+  // R23: a trailing chatter word ("possible", "asap", "give") is not part of the phrase; a quoted word never is chatter
+  while (regionIdx.length > 1 && TAIL_CHATTER.has(T[regionIdx[regionIdx.length - 1]].w) && !/["'\u201c\u201d]/.test(T[regionIdx[regionIdx.length - 1]].w)) regionIdx.pop();
   const region = regionIdx.map((i) => T[i]);
   if (!region.length || region.length > 6) return null;
 
@@ -1042,6 +1045,8 @@ function execText(plan, x) {
       if (m === 'pos') pos.push(r); else if (m === 'neg') { neg.push(r); if (negEx.length < 3) negEx.push(sn.text); }
     }
   }
+  // R23: the snapshot keeps the fields, notes and line items, not the page text the owner's papers were read from: finding nothing here is only a lower bound, so "No ... mention" is never said; the question is released to the page search / the model
+  if (!pos.length) return { abstain: 'zero-is-lower-bound' };
   // a question with no cue word is only read as a text search when it finds something; "nothing" would be a guess about what was meant
   if (plan.term.needCorpus && !pos.length) return { abstain: 'no-cue-no-match' };
   const res = { n: pos.length, rows: pos, neg, negEx, term, leftOut: sel.leftOut ?? 0, scanned: sel.rows.length, posLines };

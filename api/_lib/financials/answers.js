@@ -1557,6 +1557,10 @@ const titleCity = (c) => String(c).replace(/\b[a-z]/g, (x) => x.toUpperCase());
  *  applied through the customer's address; any other qualifier it cannot apply is named in the answer. */
 async function thresholdInvoices(db, intent, ctx) {
   const { thresholdDir, thresholdAmount, thresholdInclusive } = intent;
+  { // a second amount in the question ("above $19,000 and below $57,500") is a second bound this one-threshold count cannot apply: never answer with half of the range
+    const amts = new Set([...String(intent.raw ?? '').toLowerCase().matchAll(/\$\s*(\d[\d,]*(?:\.\d+)?)\s*(k)?\b|\b(\d{1,3}(?:,\d{3})+|\d{4,})\b|\b(\d+(?:\.\d+)?)\s*k\b/g)].map((m) => String(Number(String((m[1] ?? m[3] ?? m[4]) ?? '').replace(/,/g, '')) * (m[2] || m[4] ? 1000 : 1))).filter((v) => v !== 'NaN' && !/^(?:19|20)\d\d$/.test(v)));
+    if (amts.size >= 2) return null;
+  }
   // Any money-document noun ("documents", "receipts", "POs", "contracts") scopes the count to that type; no docScope = the long-standing invoice lane.
   const ds = intent.docScope ?? null;
   const SCOPE = ds

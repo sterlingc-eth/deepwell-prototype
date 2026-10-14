@@ -646,7 +646,7 @@ function parseAbove(items, vocab) {
   if (a < 0) return null;
   let c = a - 1;
   while (c >= 0 && items[c].t === 'w' && /^(?:the|our|an|a|of)$/.test(items[c].v)) c--;
-  let cmp = null; let cIdx = -1;
+  let cmp = null; let cIdx = -1; const viaThan = c >= 0 && items[c].t === 'w' && items[c].v === 'than';
   if (c >= 0 && items[c].t === 'w' && items[c].v === 'than') {
     for (let k = c - 1; k >= Math.max(0, c - 6); k--) {
       if (items[k].t === 'w' && /^(?:more|higher|bigger|larger|greater)$/.test(items[k].v)) { cmp = 'cmp_gt'; cIdx = k; break; }
@@ -682,9 +682,15 @@ function parseAbove(items, vocab) {
     return { v: 1, op: 'set_above_avg', entity: 'document', type: ids[0], word: docs[0].word, dir, time, mode };
   }
   if (!['customer', 'tech', 'year', 'month', 'city', 'brand'].includes(hd.v)) return null;
-  const m = measureIn(clean);
+  let m = measureIn(clean);
   if (!m) return null;
-  if (!DIM_PAIRS[DIM_OF_SUBJ[hd.v]]?.includes(m.kind)) return null;
+  // "above the average receipt dollars / total": the dollars on that kind of paper per customer, never the paper count
+  if ((m.kind === 'docs' || m.kind === 'tickets') && m.type && clean.some((it) => it.t === 'w' && (TOTAL_WORDS.test(it.v) || isMoneyWord(it.v)))) {
+    if (hd.v !== 'customer') return null;
+    m = { kind: 'doctotal', type: m.type, svc: null };
+  }
+  if ((m.kind === 'docs' || m.kind === 'tickets') && hd.v === 'customer' && !viaThan) return null; // "customers above average on receipts" may mean the count or the dollars: only "more receipts than average" is a count
+  if (!DIM_PAIRS[DIM_OF_SUBJ[hd.v]]?.includes(m.kind === 'doctotal' ? 'docs' : m.kind)) return null;
   if (!okRest(clean, (it) => it === hd || it.t === 'doc' || it.t === 'cat' || (it.t === 'subj' && ['visit', 'unit', 'document'].includes(it.v)) || (it.t === 'w' && /^(?:hours?|hrs?|labor|calls|jobs|spent|spend|billed|invoiced|billings?|revenue|sales|did|had|have|has|with|who|which|are|is|were|was|do|done|completed|worked|made|brought|total)$/.test(it.v)))) return null;
   if (m.svc && m.kind !== 'tickets') return null;
   return { v: 1, op: 'set_above_avg', entity: 'group', dim: DIM_OF_SUBJ[hd.v], measure: m, dir, time, mode };
@@ -1160,8 +1166,8 @@ function measureDocs(m, snap, time) {
   }
   return out;
 }
-const measureLabel = (m) => ({ billed: 'invoice total', visits: 'service visits', tickets: m.svc ? `${m.svc.toLowerCase()} tickets` : 'service tickets', docs: m.type ? `${documentTypeLabel(m.type)?.toLowerCase() ?? m.type} count` : 'documents', hours: 'labor hours', units: 'units', customers: 'customers' }[m.kind]);
-const fmtMeasure = (m, v) => (m.kind === 'billed' ? usd(v) : m.kind === 'hours' ? `${fmtNum(v)} hours` : fmtNum(v));
+const measureLabel = (m) => ({ doctotal: `${documentTypeLabel(m.type)?.toLowerCase() ?? m.type} total`, billed: 'invoice total', visits: 'service visits', tickets: m.svc ? `${m.svc.toLowerCase()} tickets` : 'service tickets', docs: m.type ? `${documentTypeLabel(m.type)?.toLowerCase() ?? m.type} count` : 'documents', hours: 'labor hours', units: 'units', customers: 'customers' }[m.kind]);
+const fmtMeasure = (m, v) => (m.kind === 'billed' || m.kind === 'doctotal' ? usd(v) : m.kind === 'hours' ? `${fmtNum(v)} hours` : fmtNum(v));
 
 function typeCheck(m, snap) {
   if (m.type && !snap.documents.some((d) => d.type === m.type)) return { abstain: 'type-not-on-file' };
@@ -1195,6 +1201,10 @@ function groupValues(dim, m, snap, time, ix) {
 function customerValues(m, snap, time, ix) {
   const out = new Map();
   if (m.kind === 'units') { for (const c of snap.customers) out.set(c.id, (ix.unitsByCust.get(c.id) ?? []).length); return out; }
+  if (m.kind === 'doctotal') {
+    for (const d of snap.documents) if (d.type === m.type && d.total != null && inWindow(d.date, time)) for (const cid of d.custIds ?? []) out.set(cid, (out.get(cid) ?? 0) + d.total);
+    return out;
+  }
   if (m.kind === 'billed') {
     for (const d of snap.documents) if (d.type === 'invoice' && d.total != null && inWindow(d.date, time)) for (const cid of d.custIds ?? []) out.set(cid, (out.get(cid) ?? 0) + d.total);
     return out;
@@ -1615,7 +1625,7 @@ function sayAbove(res, plan, { snap }) {
     out.records = recs(res.sel.map((o) => o.row), 'unit');
   } else if (res.kind === 'customer') {
     const m = plan.measure;
-    noun = (n) => (n === 1 ? 'customer' : 'customers'); measureText = `${measureLabel(m)} per customer`; avgText = fmtMeasure(m, res.avg); popNoun = m.kind === 'billed' ? 'customers with an invoice' : 'customers';
+    noun = (n) => (n === 1 ? 'customer' : 'customers'); measureText = `${measureLabel(m)} per customer`; avgText = fmtMeasure(m, res.avg); popNoun = m.kind === 'billed' ? 'customers with an invoice' : m.kind === 'doctotal' ? `customers with a ${documentTypeLabel(m.type)?.toLowerCase() ?? m.type} total` : 'customers';
     names = res.sel.map((o) => `${labelRow({ entity: 'customer' }, o.row, snap)} (${fmtMeasure(m, o.value)})`);
     out.records = recs(res.sel.map((o) => o.row), 'customer');
   } else {

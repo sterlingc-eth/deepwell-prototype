@@ -112,18 +112,18 @@ r = await ask('which inspection reports mention leaks');
 check('negation :: "no leaks found" is not a leak', leakPos.length === 0 && /No inspection reports/.test(r.data?.text ?? ''), r.data?.text);
 check('negation :: the answer says how many were left out because they were negated', leakNeg.length > 0 && new RegExp(`${leakNeg.length} inspection reports? say it only in a negated form`).test(r.data?.text ?? ''), r.data?.text);
 r = await ask('anything about a leak');
-check('negation :: basis line says negated mentions were left out', /Negated mentions/.test(r.data?.basis ?? ''), r.data?.basis);
+check('negation :: R23: a zero from the stored fields is a lower bound, so it is released (or read from the pages) and never said as a plain none', !r.data || !/^No .* mention/.test(r.data.text) || /I read the text of (?:all|every)/.test(r.data.text), r.data?.text);
 
 r = await ask('search for water damage');
-check('empty :: a real word that is not in the records is an honest zero with the condition', has(r, 'No documents mention "water damage"'), r.data?.text);
+check('empty :: R23: a real word not in the stored fields is not answered "No ... mention" from the fields (the page search may say none after reading every page)', !r.data || /I read the text of (?:all|every)/.test(r.data.text), r.data?.text);
 r = await ask('any notes mentioning R-22');
-check('empty :: a code that is not in the records is an honest zero', has(r, 'R-22', 'No notes'), r.data?.text);
+check('empty :: R23: a code not in the stored fields is not answered "No ... mention" from the fields', !r.data || /I read the text of (?:all|every)/.test(r.data.text), r.data?.text);
 await released('a search word nobody can read', 'search for zxqvbn');
 await released('a search word that is not in the records when no cue word was typed', 'how many tickets involved flurbing');
 
 const tix = docs.filter((d) => d.type === 'service-ticket' && textsOf(d).some((t) => /capacitor/i.test(t)));
 r = await ask('which tickets mention a capacitor');
-check('text :: a kind of paper with no match says which other papers do', tix.length === 0 && /^No (?:service )?tickets mention/.test(r.data?.text ?? '') && new RegExp(`${cap.length} invoices? do`).test(r.data?.text ?? ''), r.data?.text);
+check('text :: a kind of paper with no match says which other papers do', tix.length === 0 && /^No (?:service )?tickets mention/.test(r.data?.text ?? '') && (r.intent.plan.op === 'page_find' || new RegExp(`${cap.length} invoices? do`).test(r.data?.text ?? '')), r.data?.text); // R22: a list ask is the page search, which names the kind it read
 
 const yr = docs.filter((d) => d.type === 'service-ticket' && textsOf(d).some((t) => /replaced\s+air\s+filter/i.test(t)) && String(last(d.id, 'service_date') ?? last(d.id, 'invoice_date') ?? d.created_at).startsWith('2024'));
 r = await ask('how many service tickets replaced an air filter in 2024');
@@ -145,11 +145,11 @@ const t3 = lines.filter((l) => /\b3\s*ton\b/i.test(l.description) && /install/i.
 r = await ask('how much did we charge for 3 ton installs');
 check('lines :: a tonnage and the word install', has(r, money(sum(t3.map((l) => Number(l.amount))))), r.data?.text);
 r = await ask('any line items mentioning compressor replacement');
-check('lines :: a service that was never billed is an honest zero when the person asked for a search', has(r, 'No line items mention', 'compressor replacement'), r.data?.text);
+check('lines :: R23: a service not in the stored lines is released, not an honest zero', !r.data, r.data?.text);
 await released('a price question with no match is not answered as if nothing was billed', 'what did we charge for the compressor replacement');
 r = await ask('which invoices have a parts line');
 const partsInv = new Set(lines.filter((l) => /^parts$/i.test(l.description) && docs.find((d) => d.id === l.document_id)?.type === 'invoice').map((l) => l.document_id));
-check('lines :: the kind of paper is respected (purchase orders are not invoices)', partsInv.size === 0 ? has(r, 'No invoice line items') : has(r, int(partsInv.size)), r.data?.text);
+check('lines :: the kind of paper is respected (purchase orders are not invoices)', partsInv.size === 0 ? !r.data : has(r, int(partsInv.size)), r.data?.text);
 
 const kind = (d) => { const w = /^[A-Za-z]+/.exec(String(d ?? '').trim()); return w && w[0].length >= 3 && /^[A-Za-z]+(?:[\s,:(]|$)/.test(String(d).trim()) ? w[0][0].toUpperCase() + w[0].slice(1).toLowerCase() : 'Other'; };
 const byKind = new Map(); for (const l of lines) { if (l.amount == null) continue; const k = kind(l.description); byKind.set(k, (byKind.get(k) ?? 0) + Number(l.amount)); }

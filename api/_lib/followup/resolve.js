@@ -27,6 +27,7 @@ import { readerFollowup } from './readerfu.js';
 import { correctionFollowup, correctionPayload } from './correction.js';
 import { isBareMeasureFollowup } from './convo.js';
 import { markMerged, markReleased, isFragment } from './handoff.js';
+import { orphanEnabled, isOrphanFragment } from './orphan.js';
 import { subjectFromText, subjectFromEntities, pronounReplacement, substitutePronouns, stripTrailingPunct, brandMentionIn, inferNoun, anchorAlreadyPresent, pronounNeedsBrandFromEarlierTurn } from './subject.js';
 
 /** Runs a pronoun substitution and guarantees the anchor's own raw text (address/name/customer
@@ -281,7 +282,7 @@ function resolvePronoun(question, anchor, priorTurn) {
  * @returns {{query: string, filters: object, isFollowup: boolean, kind: string, needsClarification: boolean,
  *            clarifyText?: string, resolvedEntityId?: string}}
  */
-export function resolveFollowup(context, question) {
+function resolveFollowupInner(context, question) {
   const turns = context?.turns ?? [];
   const q = String(question ?? '');
   if (!turns.length) return passthrough(q);
@@ -381,4 +382,22 @@ export function resolveFollowup(context, question) {
 
   if (kind === 'refinement') return resolveRefinement(q, anchor, priorTurn);
   return resolvePronoun(q, anchor, priorTurn);
+}
+
+/**
+ * Entry point. R22 (DONOVAN_ORPHAN_FOLLOWUP, default OFF): a subject-less fragment that every resolver left as a fresh question is released
+ * (typed alone an older lane would answer a different question), exactly like the other fragments above.
+ */
+export function resolveFollowup(context, question) {
+  const r = resolveFollowupInner(context, question);
+  try {
+    const turns = context?.turns ?? [];
+    if (turns.length && orphanEnabled() && r && r.isFollowup === false && r.kind === 'fresh' && isOrphanFragment(question)) {
+      const priorTurn = turns[turns.length - 1];
+      const carried = clip(`Earlier question: "${String(priorTurn.question).trim().replace(/[?.!\s]+$/, '')}". Follow-up: ${String(question).trim()}`);
+      markReleased(carried);
+      return { query: carried, filters: {}, isFollowup: true, kind: 'fragment', needsClarification: false };
+    }
+  } catch { /* never block a question */ }
+  return r;
 }

@@ -48,6 +48,7 @@ const A = {
 /** Words that a business of one kind uses for a paper, and that mean nothing (or something else) to the others. Taken only when the organization's industry setting says so. */
 const SCOPED = {
   construction: { 'work-order': ['change order'] },
+  property: { 'work-order': ['maintenance request'] }, // the property pack's own word: a maintenance request is a work order
   nonprofit: { receipt: ['donation', 'gift', 'donation receipt', 'gift receipt'], agreement: ['pledge', 'pledge agreement'], statement: ['donor statement'] },
 };
 const ALIAS = new Map(); // phrase -> Set(type ids)

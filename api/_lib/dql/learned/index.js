@@ -68,6 +68,7 @@ export function guardReason(raw, words) {
     if (COND.test(w)) return `condition:${w}`;
     if (NOUNISH.test(w)) return `noun:${w}`;
     if (/\d/.test(w)) return `number:${w}`;
+    if (/^(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fourty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|grand|dozen|half)$/.test(w)) return `number-word:${w}`;
   }
   // a negation the parser itself consumed is fine (it is explained); one it left standing in the raw text next to an unexplained word is not
   const rawNeg = /\b(?:not|no|never|without|except|excluding|besides|isn'?t|aren'?t|wasn'?t|weren'?t|don'?t|doesn'?t|didn'?t|hasn'?t|haven'?t|hadn'?t|none|nobody|nothing|neither|nor)\b|n't\b/i;

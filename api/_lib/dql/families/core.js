@@ -5,7 +5,7 @@
  * detect(feat)  reads the slots parse.js collected and returns a plan or null (never a guess).
  * exec(plan, x) computes over the snapshot with the helpers in exec.js. say lives in ../say.js.
  */
-import { ynOf } from '../yn.js';
+import { ynOf, gapOf } from '../yn.js';
 import { registerFamily } from '../registry.js';
 import { ENTITIES, yearsBetween } from '../fields.js';
 import { sayResult } from '../say.js';
@@ -57,6 +57,7 @@ function resolveNumberFilters(f, entity, today) {
     if (x.dollar || /^(dollar|buck)/.test(unit) || unit === '') {
       if (entity !== 'document') return null;
       if (unit === '' && !x.dollar && !(f.trig.money?.length || f.docTypes.some((d) => MONEY_TYPES_HINT.has(d)))) return null;
+      if ((f.docTypes ?? []).length && f.docTypes.every((t) => /lease|rental/i.test(String(t))) && !/\b(?:total|worth|value|valued|contract\s+value|rent|rental|monthly|per\s+month|a\s+month)\b/i.test(String(f.raw ?? '') + ' ' + String(f.text0 ?? ''))) return null; // an amount on a lease may be its rent or its printed total: only the word rent (or total / worth) settles it
       out.push({ field: (f.docTypes ?? []).length && f.docTypes.every((t) => /lease|rental/i.test(String(t))) && !/\b(?:total|worth|value|valued|contract\s+value)\b/i.test(f.text0 ?? '') ? 'rent' : 'total', op: x.op, value: x.value, label: x.op === 'outside' ? `under ${usd(x.value[0])} or over ${usd(x.value[1])}` : Array.isArray(x.value) ? `between ${usd(x.value[0])} and ${usd(x.value[1])}` : `${x.word} ${usd(x.value)}`, money: true });
       continue;
     }
@@ -269,7 +270,7 @@ function detect(f) {
     const twoTimes = (f.times?.length ?? 0) === 2;
     const cm = measure ? { ...measure, agg: agg ?? 'sum' } : null;
     if (inF.length === 1 && !twoTimes && filters.filter((x) => x.op === 'in').length === 1) {
-      return fin({ ...base, op: 'compare_two_values', measure: cm, compare: { field: inF[0].field, values: inF[0].value }, filters: filters.filter((x) => x !== inF[0]), ...ynOf(f.raw) }, 'versus', 'howMany', ...aggKeys);
+      return fin({ ...base, op: 'compare_two_values', measure: cm, compare: { field: inF[0].field, values: inF[0].value }, filters: filters.filter((x) => x !== inF[0]), ...ynOf(f.raw), ...gapOf(f.raw) }, 'versus', 'howMany', ...aggKeys);
     }
     if (twoTimes && !inF.length && timeField) {
       let spans = f.times.map((s) => ({ field: timeField, from: s.from, to: s.to, label: s.label }));
@@ -285,7 +286,10 @@ function detect(f) {
           spans = spans[0] === a ? [na, nb] : [nb, na];
         }
       }
-      return fin({ ...base, op: 'compare_two_values', time: null, measure: cm, ...ynOf(f.raw), compare: { time: spans } }, 'versus', 'howMany', ...aggKeys);
+      // a year still in progress set against another year, with no year typed and no "so far / same stretch" adjustment made above (the words were misspelled): the sides would not cover the same stretch, so it is released
+      if (tdy && spans.length === 2 && spans.some((x) => x.to > tdy) && !/\b(?:19|20)\d\d\b/.test(String(f.raw ?? '')) && !spans.some((x) => / so far$/.test(x.label))) return null;
+      if (cm && cm.agg === 'sum' && t.howMany) return null; // "the count and the dollars": two measures, never one of them alone
+      return fin({ ...base, op: 'compare_two_values', time: null, measure: cm, ...ynOf(f.raw), ...gapOf(f.raw), compare: { time: spans } }, 'versus', 'howMany', ...aggKeys);
     }
     return null;
   }
@@ -610,7 +614,7 @@ function execCore(plan, x) {
         for (const tm of plan.compare.time) {
           const side = mk(tm.label, { ...plan, time: tm });
           if (!side) return { abstain: 'compare' };
-          sides.push(side);
+          sides.push({ ...side, from: tm.from });
         }
       }
       return { ...res, sides, rows: sides.flatMap((s) => s.rows) };

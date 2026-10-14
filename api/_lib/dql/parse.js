@@ -22,6 +22,8 @@ import { wordsToNumber } from '../lookups/countQualifiers.js';
 import { untrackedConcept, jargonEnabled, respellJargon } from '../lexicon/jargon.js';
 import { tokenize, repairWord, findRun } from './text.js';
 import { compileVocab, normName } from './vocab.js';
+import { unwrapQuestion, unwrapAllowsCore } from './unwrap.js';
+import { pagefindParse } from './families/pagefind.js';
 import { FILLER, ENTITY_WORDS, DIM_WORDS, MONEY_WORDS, docTypePhraseMap } from './lex.js';
 import { detectPlan, allFamilies, rescuePlan } from './registry.js';
 import { readerShaped } from './families/reader.js';
@@ -40,7 +42,7 @@ import { billSense, vendorBillsAsPurchaseOrders } from './billSense.js';
 import { moneyRewrite, asksAmounts } from './moneyPhrases.js';
 import { readOrdinal, applyOrdinal, chronoOrdinalRewrite, ordinalTechRewrite, hashOrdinalRewrite, ORD_WHO_TAIL } from './ordinal.js';
 import { parseAddress } from './linkAddress.js';
-import { multiPlan, multiRespell, respellVersusLast } from './multi.js';
+import { multiPlan, multiRespell, respellVersusLast, twoMeasureSignal } from './multi.js';
 import { stripSourceAsk } from './cite.js';
 import './families/index.js';
 
@@ -185,20 +187,61 @@ const dimIdOf = (phrase) => {
  * @param {{tenantVocab?:object, pack?:object, today?:string}} ctx
  * @returns {{mode:'dql', plan:object, text:string}|null}
  */
+/** Words the learned planner set aside as filler: harmless chatter ("excuse me", "por favor", "asap") stays harmless, but an ignored word that could name a second measure or a comparison releases a pair / comparison. */
+const MEASURE_LIKE = /^(?:count|counts|number|numbers|total|totals|tot|sum|dollars?|amounts?|average|avg|mean|median|revenue|billed|billing|hours?|cost|costs|price|worth|value|spend|spent|paid|owed|balance|percent|pct|percentage|rate|ratio|share|many|much|most|least|top|biggest|largest|highest|lowest|first|last|latest|earliest|oldest|newest|max|min|each|per|every|both|also|plus|vs|versus|against|compare|compared|difference|gap|more|less|fewer)$/i;
+const typoOfMeasure = (w) => { const lev = (a, b) => { const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]); for (let j = 1; j <= b.length; j++) d[0][j] = j; for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[a.length][b.length]; }; return ['total', 'totals', 'average', 'median', 'number', 'amount', 'dollars', 'highest', 'lowest', 'biggest', 'largest', 'count'].some((m) => w !== m && Math.abs(w.length - m.length) <= 2 && lev(w, m) <= (m.length >= 5 ? 2 : 1)); }; // a near-miss spelling of a measure word
+const measureishLeft = (feat) => (feat.learnedLeft ?? []).some((w) => MEASURE_LIKE.test(String(w?.w ?? w ?? '').trim())) || !feat.learnedLeft;
+/** R23: true when the question carries a quoted word or a line-item / text-search condition that a "filler" reading of the leftover words would drop. */
+function textConditionDropped(raw, left) {
+  const text = String(raw ?? '');
+  const quoted = [...text.matchAll(/["\u201c\u201d]([^"\u201c\u201d]{2,60})["\u201c\u201d]/g)].flatMap((m) => m[1].toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
+  if (quoted.length && /\b(?:talk\w*|says?|saying|said|referenc\w+|words?|wording|text)\b/i.test(text)) return true; // a quoted phrase beside a text cue is a text condition, even when a field value happens to share the word
+  if (quoted.length && (left ?? []).some((w) => quoted.includes(String(w).toLowerCase().replace(/[^a-z0-9]+/g, '')))) return true;
+  return /\b(?:includ(?:e|es|ed|ing)|(?:as|a|on|in|per)\s+(?:an?\s+|the\s+)?line(?:\s+items?)?|line\s+items?|items?\s+lines?|mention\w*|contain\w*)\b/i.test(text);
+}
+
 export function parseDql(question, ctx = {}) {
+  const r = parseDqlOnce(question, ctx);
+  if (r || ctx.noUnwrap || process.env.DONOVAN_DQL_UNWRAP === '0' || !dqlEnabled() || !ctx.tenantVocab) return r;
+  // R23: the text as typed was released. When it is ONE question wrapped in provably inert chatter (greeting, context, urgency, thanks, sign-off), the core question goes through the very same gates.
+  let core = null;
+  try { core = unwrapQuestion(question, compileVocab(ctx.tenantVocab, ctx.pack)); } catch { core = null; }
+  if (!core) return r;
+  const dbg = ctx.debug ? {} : undefined;
+  const r2 = parseDqlOnce(core, { ...ctx, original: core, debug: dbg, noUnwrap: true });
+  if (r2 && !r2.plain && !unwrapAllowsCore(r2.plan, core)) { if (ctx.debug) { ctx.debug.unwrapped = core; ctx.debug.coreWhy = `unwrap guard: ${r2.plan?.op}`; } return r; }
+  if (r2) { if (ctx.debug) { Object.assign(ctx.debug, dbg, { unwrapped: core }); delete ctx.debug.why; } return r2; }
+  if (ctx.debug) { ctx.debug.unwrapped = core; ctx.debug.coreWhy = dbg?.why ?? 'core released (no reason)'; }
+  return r2;
+}
+
+function parseDqlOnce(question, ctx = {}) {
   if (!dqlEnabled()) return null;
   const tv = ctx.tenantVocab;
   if (!tv) return null;
   const citeAsk = stripSourceAsk(question);
+  if (/\bwith\s+(?:us|me)\s+again\b|\b(?:did|done|do|had|have)\b[^?]{0,40}\bagain\b/i.test(String(citeAsk.q ?? ''))) { if (ctx.debug) ctx.debug.why = '"again" / repeat wording: how many times is not guessed'; return null; }
+  if (/\b(?:in|over|within|during|across|throughout)\s+the\s+last\s+year\b/i.test(String(citeAsk.q ?? ''))) { if (ctx.debug) ctx.debug.why = '"in the last year" is the calendar year or the last twelve months: not guessed'; return null; }
+  { // "from 27 May 2023" / "as of 2026-08-25" with no second date: the papers ON that day, or from that day onward (or up to it)? Not guessed.
+    const MON = '(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\\.?';
+    const D1 = `(?:\\d{4}-\\d{1,2}-\\d{1,2}|\\d{1,2}[/.-]\\d{1,2}[/.-]\\d{2,4}|\\d{1,2}(?:st|nd|rd|th)?\\s+(?:of\\s+)?${MON},?\\s+\\d{4}|${MON}\\s+\\d{1,2}(?:st|nd|rd|th)?,?\\s+\\d{4})`;
+    const q0 = String(citeAsk.q ?? '').toLowerCase();
+    const nDates = (q0.match(new RegExp(D1, 'g')) ?? []).length;
+    if (nDates === 1 && new RegExp(`\\b(?:from|as\\s+of|as|starting|beginning|by)\\s+${D1}`).test(q0) && !/\b(?:since|after|before|prior|until|till|through|thru|on\s+or|between)\b/.test(q0)) { if (ctx.debug) ctx.debug.why = 'a single date after "from" / "as of": on that day or onward is not guessed'; return null; }
+  }
   const raw0 = respellVersusLast(multiRespell(citeAsk.q)).trim().replace(/\bgrand\s+total(?=s?\b)/gi, 'total').replace(/\bw\/o\b/gi, 'without').replace(/\bw\/(?=\s)/gi, 'with').replace(/\b(?:the\s+)?(?:last|previous|past)\s+calendar\s+year\b/gi, 'last year').replace(/\b(?:the\s+)?(?:this|current)\s+calendar\s+year\b/gi, 'this year'); // round 11: "last calendar year" is the previous calendar year
   if (!raw0 || raw0.length > 240) return null;
   const today = ctx.today ?? new Date().toISOString().slice(0, 10);
   const vocab = compileVocab(tv, ctx.pack);
+  // R22: a quoted phrase asked of the TEXT of the papers ("files whose text has \"net 30\"", "papers that mention \"x\"", with or without page references) is a page search, read before the core parser
+  { const pf = pagefindParse(raw0, { vocab, mode: 'early', cite: citeAsk.cite }); if (pf) return { mode: 'dql', plan: pf, text: raw0, plain: false }; }
   // a topic the shared jargon table lists as not recorded ("donation", "lease") is recorded when this organization keeps that kind of paper under that very word
   let readerOnly = false; // R18: a clause the papers may state in words ("late fees", "governing law") is not a field this company keeps, but the extractive reader can still READ it; only the reader may answer such a question
   try { const uc = jargonEnabled() ? untrackedConcept(raw0) : null; if (uc && !vocab.scopedPhrases?.has(String(uc.phrase).toLowerCase().replace(/\s+/g, ' '))) { if (readerShaped(raw0)) readerOnly = true; else return null; } } catch { /* ignore */ }
   // payment status, balances and what is owed are not read from the papers by this engine: the older lanes answer or decline those
   if (/\b(?:overdue|past\s+due|unpaid|outstanding|owed|owing|owes?|balances?|delinquent|paid|pay(?:ment)?s?\s+status|still\s+owe|behind\s+on)\b/i.test(raw0)) return null;
+  // R23: a forecast ("what will revenue be next month", "how many bills will we get next month") is not in the papers: it is released, never answered as if it were a count of what exists
+  if (process.env.R23_FORECAST !== '0' && /\b(?:will|going\s+to|gonna|would)\b[^?.]{0,40}\b(?:be|get|receive|bring|make|earn|see|come\s+in|sell|total|bill|invoice)\b/i.test(raw0) && /\b(?:next|coming|upcoming|following|future|tomorrow|rest\s+of)\b/i.test(raw0) && !/\b(?:expir\w*|renew\w*|due|end(?:s|ing)?|lapse\w*|run\s+out|ran\s+out|mature\w*|finish\w*|scheduled|booked|appointments?)\b/i.test(raw0)) return null;
   // R16: "as of <date>" is a running position up to that date, which this engine does not total; "what's the number of the earliest ... " asks for the paper's own number, not its file name: both are released
   if (process.env.R16_ASOF !== '0' && /\bas\s+of\b(?!\s+(?:today|now)\b)/i.test(raw0) || (/\bnumbers?\s+of\s+the\s+(?:earliest|latest|first|last|oldest|newest|most\s+recent|biggest|largest|smallest|top)\b/i.test(raw0) && !/\bhow\s+many\b/i.test(raw0))) return null;
   // "what's the number of the invoice for $115" asks for the paper's own number, not a count
@@ -598,17 +641,24 @@ export function parseDql(question, ctx = {}) {
   feat.left = w.left().filter((x) => !FILLER.has(x) || (spanEnd && spanEnd.has(x)) || (valueWords.has(x) && !feat.times.length && !feat.time));
   if (ctx.debug) ctx.debug.feat = feat;
   if (feat.flags.badNumber) return null;
+  // R22: no other family read the question: "which papers mention X", "find the document about X", "what page talks about X", "do we have anything on X" are searches of the papers' text
+  const latePageFind = (older) => { if (feat.filters.length || feat.times.length || feat.time || feat.recentN || feat.dims.length) return null; const pf = pagefindParse(raw0, { vocab, mode: 'late', cite: citeAsk.cite }); if (pf && older && pf.show === 'count') return null; /* a plain count of papers that mention a word stays with the older, content-tuned count */ if (pf && older) pf.older = older; return pf ? { mode: 'dql', plan: pf, text: raw0, plain: false } : null; };
   feat.work = { orig: w.orig, s: w.s, raw: toks.map((t) => t.w), text: framed }; // families that explain leftover words themselves (registry.rescuePlan) read the question word by word
   if (feat.left.length) {
     // COVERAGE RULE: an unexplained word releases the question, unless exactly one family explains EVERY leftover word itself
     const early = rescuePlan(feat, { vocab });
     if (early && readerOnly && early.op !== 'read_span') return null;
+    if (early && (early.op === 'line_search' || early.op === 'text_search') && twoMeasureSignal(raw0)) return null; // two measures beside a text / line-item condition
+    if (early && (early.op === 'text_search' || early.op === 'find_document')) { const pf = latePageFind(early); if (pf) return pf; } // R22: the page search takes a plain phrase search from the older text search; when it cannot answer, the older plan runs as before
     if (early) { const ep = ordinal ? applyOrdinal(early, ordinal) : early; return ep && !whoClause ? { mode: 'dql', plan: ep, text: framed, plain: false } : null; }
     // LEARNED PLANNER (dql/learned): Donovan's own small model may mark the leftover words as filler, only above a high calibrated threshold
     // and only when its guards pass; slots always came from the detectors above. DONOVAN_DQL_LEARNED=0 turns it off.
     const lg = leftoverGate({ raw: raw0, framed, orig: w.orig, rest: w.s, left: feat.left, feat, vocab, debug: ctx.debug });
-    if (lg?.clear) { if (ctx.debug) ctx.debug.learned = lg; feat.left = []; feat.learned = lg; } else {
+    // R23: the learned planner may call leftover words filler, but never a quoted word, nor the words of a line-item / text condition ("that include wiper", "has "barrel" as a line"): the answer would leave the condition out
+    if (lg?.clear && textConditionDropped(raw0, feat.left)) { if (ctx.debug) ctx.debug.why = 'a quoted or line-item/text condition would be dropped'; return null; }
+    if (lg?.clear) { if (ctx.debug) ctx.debug.learned = lg; feat.learnedLeft = feat.left.slice(); feat.left = []; feat.learned = lg; } else {
       if (ctx.debug) ctx.debug.why = `unexplained: ${feat.left.join(' ')}`;
+      { const pf = latePageFind(); if (pf) return pf; }
       return null;
     }
   }
@@ -617,6 +667,7 @@ export function parseDql(question, ctx = {}) {
   {
     const mp = multiPlan(feat, vocab);
     if (mp === 'release') { if (ctx.debug) { ctx.debug.why = 'two measures that cannot both be answered for the same papers'; ctx.debug.multiRelease = true; } return null; }
+    if (mp && feat.learned && measureishLeft(feat)) { if (ctx.debug) ctx.debug.why = 'two measures with words the learned planner had to ignore'; return null; } // the learned planner's check is made on a single plan: never trust it for a pair
     if (mp) return { mode: 'dql', plan: citeAsk.cite ? { ...mp, cite: true } : mp, text: framed, plain: false };
   }
   // ---- families
@@ -633,7 +684,20 @@ export function parseDql(question, ctx = {}) {
   if (plan && ordinal) { plan = applyOrdinal(plan, ordinal); if (!plan && ctx.debug) ctx.debug.why = 'ordinal: not a ranking that can be placed'; }
   if (plan && whoClause && !(plan.rank === 'rows' && plan.entity === 'document')) { if (ctx.debug) ctx.debug.why = 'who-clause beside a ranking that does not list single papers'; return null; }
   if (plan && readerOnly && plan.op !== 'read_span') return null;
-  if (!plan) { if (ctx.debug) ctx.debug.why = `no family claimed it${feat.unusedTriggers ? ` (unused: ${feat.unusedTriggers.join(',')})` : ''}`; return null; }
+  if (!plan) { const pf = latePageFind(); if (pf) return pf; if (ctx.debug) ctx.debug.why = `no family claimed it${feat.unusedTriggers ? ` (unused: ${feat.unusedTriggers.join(',')})` : ''}`; return null; }
+  { // COVERAGE: a year the owner typed must show up in the plan; a year that silently vanished (read as chatter, or eaten by another phrase) is a dropped condition
+    const ys = [...String(citeAsk.q ?? '').matchAll(/(?<![\w#$.,\/-])((?:19|20)\d\d)(?![\w\/-]|,\d|\.\d)/g)].map((m) => m[1]);
+    if (ys.length && plan.op !== 'read_span') { const js = JSON.stringify(plan); const qy = String(citeAsk.q ?? ''); const nextTo = (y, words) => new RegExp(`\\b(?:${words})\\s+(?:the\\s+(?:year|start|end)\\s+(?:of\\s+)?|year\\s+|in\\s+)?${y}\\b`, 'i').test(qy); /* "before 2028" is stored as up to 2027-12-31, "after 2020" as from 2021-01-01: the year is there, one step over */ if (ys.some((y) => !js.includes(y) && !(nextTo(y, 'before|prior\\s+to|earlier\\s+than|older\\s+than|ahead\\s+of|preceding') && js.includes(String(+y - 1))) && !(nextTo(y, 'after|following|later\\s+than|newer\\s+than|past|beyond') && js.includes(String(+y + 1))))) { if (ctx.debug) ctx.debug.why = 'a year in the question is not in the plan'; return null; } }
+  }
+  if (plan.entity === 'customer' && /^(?:count|list)$/.test(plan.op) && !(plan.filters ?? []).some((x) => x.field === 'docCount') && /\b(?:files?|documents?|docs?|papers?|paperwork)\b/i.test(String(citeAsk.q ?? '').replace(/\b(?:on|in|from|off|by|per|under|according\s+to|going\s+by|based\s+on)\s+(?:what(?:'s|\s+is)\s+(?:on\s+|in\s+)?)?(?:our\s+|the\s+|your\s+)?(?:files?|records?|papers?|documents?)\b/gi, ' ').replace(/\bwhat(?:'s|\s+is)\s+on\s+file\b/gi, ' '))) { if (ctx.debug) ctx.debug.why = 'files asked, people counted'; return null; } // "count the files for the owner X": the papers, not the people
+  if (/\b(?:will|going\s+to|gonna|forecast|predict|projected?|projection|expected|expect)\b/i.test(String(citeAsk.q ?? '')) && JSON.stringify(plan).match(/"(?:from|to)":"(\d{4}-\d{2}-\d{2})"/g)?.some((m) => m.slice(-11, -1) > today)) { if (ctx.debug) ctx.debug.why = 'a forecast of a period that has not happened'; return null; }
+  if ((plan.ask === 'customer' || plan.ask === 'tech' || plan.ask === 'amount') && /(?:\b(?:number|num|nbr|id|no)\b|#)/i.test(String(citeAsk.q ?? ''))) { if (ctx.debug) ctx.debug.why = 'the paper number was asked beside another detail'; return null; }
+  if (plan.op === 'list' && plan.distinct && /\b(?:does|do|did|is|was|where\s+is)\s+(?!the\b|our\b|any\b|every\b|all\b|a\b|an\b|we\b|you\b|it\b|that\b|this\b)[^\s?]+(?:\s+[^\s?]+)?\s+(?:live|lives|living|located|based|reside|resides|work|works|from|stay|stays)\b/i.test(String(citeAsk.q ?? ''))) { if (ctx.debug) ctx.debug.why = 'where does <name> live: the name did not resolve, so the whole list is not an answer'; return null; }
+  if ((plan.op === 'line_search' || plan.op === 'text_search') && (twoMeasureSignal(String(citeAsk.q ?? '')) || twoMeasureSignal(raw0))) { if (ctx.debug) ctx.debug.why = 'two measures beside a text / line-item condition'; return null; }
+  if (feat.learned && (feat.learnedLeft ?? []).some((x) => { const w = String(x?.w ?? x ?? '').toLowerCase(); return w.length >= 4 && typoOfMeasure(w); })) { if (ctx.debug) ctx.debug.why = 'the learned planner ignored a misspelled measure word'; return null; } // R23: "toal", "averge", "summ" left out as chatter: the plan may be missing the very figure asked
+  if (feat.learned && measureishLeft(feat) && /^(?:compare_two_values|tm_compare)$/.test(plan.op)) { if (ctx.debug) ctx.debug.why = 'a comparison with words the learned planner had to ignore'; return null; } // an ignored word may be a second measure ("count and dollars")
+  // R22: the older text search / document finder claimed a plain "which papers mention X" / "find the document about X" / "do we have anything on X": the page search reads the text of every candidate paper and cites the page, so it takes these
+  if ((plan.op === 'text_search' || plan.op === 'find_document') && !feat.learned) { const pf = latePageFind(plan); if (pf) return pf; }
   if (feat.learned && !verifyPlan(feat.learned, plan)) { if (ctx.debug) ctx.debug.why = 'learned planner disagrees with the plan'; return null; }
   // LEARNED PLANNER v3 (dql/learned/shape3.js): a slot-masked reading of the question's shape; a strict, calibrated "this asks for several things" against a single-answer plan RELEASES (never opens anything)
   { const sv = shapeVeto(raw0, vocab.card, vocab.customerNames, plan); if (sv) { if (ctx.debug) ctx.debug.why = `learned planner v3: ${sv}`; return null; } }

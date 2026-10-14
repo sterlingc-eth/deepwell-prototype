@@ -24,15 +24,25 @@ const deep = (o, seen = new Map()) => {
   return o;
 };
 const copy = (f) => { const { vocab, work, ...rest } = f; return { ...deep(rest), vocab, work }; };
-const moneyOn = (t) => Boolean(t.total || t.howMuch || t.money?.length);
+const TOTAL_W = '(?:total|totals|tot|sum|dollars?|add(?:s|ed)?\\s+up|altogether|combined)';
+const AVG_W = '(?:average|avg|mean|typical)';
+// a real pair: a total word and an average word joined by and/plus/&/also/comma, in either order ("total and average", "average plus the sum")
+const SUM_AVG_PAIR = new RegExp(`\\b${TOTAL_W}\\b[^?]{0,40}?(?:\\b(?:and|plus|also|along\\s+with|as\\s+well\\s+as)\\b|&|[,;])[^?]{0,40}?\\b${AVG_W}\\b|\\b${AVG_W}\\b[^?]{0,40}?(?:\\b(?:and|plus|also|along\\s+with|as\\s+well\\s+as)\\b|&|[,;])[^?]{0,40}?\\b${TOTAL_W}\\b`, 'i');
+const moneyOn =(t) => Boolean(t.total || t.howMuch || t.money?.length);
 const moneyOff = (t) => { t.total = false; t.howMuch = false; t.money = []; };
 const scopeOf = (p) => JSON.stringify({ e: p.entity, d: p.docType, v: p.visit, f: p.filters, t: p.time, w: p.docWord });
 
 /** @returns {null | 'release' | {v:1, op:'multi', parts:object[]}}  null = this is not a two-measure sentence. */
+// a misspelled "average" ("agerage", "averge", "avrage") that the engine already read as an average: spell it out so the total-and-average pair is still seen
+function avgRespell(raw) {
+  const lev = (a, b) => { const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]); for (let j = 1; j <= b.length; j++) d[0][j] = j; for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[a.length][b.length]; };
+  return raw.replace(/\b[a-z]{5,9}\b/gi, (w) => (w.toLowerCase() !== 'average' && /^a[vg]/i.test(w) && /e$/i.test(w) && lev(w.toLowerCase(), 'average') <= 2 ? 'average' : w));
+}
 export function multiPlan(feat, vocab) {
   const t = feat?.trig;
   if (!t || !feat.work) return null;
-  const raw = String(feat.raw ?? feat.work.text ?? '');
+  const raw0 = String(feat.raw ?? feat.work.text ?? '');
+  const raw = t.avg ? avgRespell(raw0) : raw0;
   if (!JOINER.test(raw)) return null;
   const others = ['negation', 'missing', 'share', 'versus', 'median', 'exists', 'distinct', 'topN', 'argmax', 'max', 'min'].some((k) => t[k]);
   const money = moneyOn(t) && MONEY_WORD.test(raw);
@@ -45,8 +55,10 @@ export function multiPlan(feat, vocab) {
   else if (t.howMany && !others && !money && !t.avg && !t.latest && !t.earliest && namesW && feat.nouns.customer && feat.docTypes.length === 1 && !feat.docGroup) kind = 'count+names';
   else if (t.howMany && !others && !money && !t.avg && !t.latest && !t.earliest && feat.docTypes.length === 2 && !feat.docGroup && !feat.nouns.customer && (raw.match(/\b(?:how\s+many|number\s+of|count)\b/gi) ?? []).length >= 2) kind = 'count+count'; // one count word for each kind of paper (a shared "how many invoices and permits" may mean the two together)
   else if (!others && t.howMany && money && !t.avg && !t.latest && !t.earliest) kind = 'count+sum';
-  else if (!others && t.avg && money && !t.howMany && !t.latest && !t.earliest) kind = 'sum+avg';
+  else if (!others && t.avg && money && !t.howMany && !t.latest && !t.earliest && SUM_AVG_PAIR.test(raw)) kind = 'sum+avg'; // "average amount" / "average invoice total" alone asks ONE figure, the average
+  else if (!others && t.avg && !t.howMany && !t.latest && !t.earliest && !SUM_AVG_PAIR.test(raw) && !twoMeasureSignal(raw)) return null;
   else if (!others && t.howMany && ext && !money && !t.avg) kind = 'count+ext';
+  if (kind && /\bl[ie]{1,2}ne?s?\s*-?\s*it[ea]?ms?\b|\bas\s+a\s+line\b|\b(?:mention|mentions|mentioned|mentioning|includ\w*|contain\w*|says?|saying|reads?|reading)\b|["\u201c\u201d]|(?:^|\s)'[^']{2,}'(?:\s|[.,?!]|$)/i.test(raw)) return 'release'; // a text or line-item condition beside two measures: both halves would have to carry it
   if (!kind) return twoMeasureSignal(raw) ? 'release' : null; // two measures asked, but not a pair this engine answers together: never answer one of them alone
   if (process.env.MULTI_DEBUG) process.stderr.write('MULTI-kind ' + kind + ' ' + JSON.stringify({ sets: !!feat.sets, timeq: !!feat.timeq, links: !!feat.links, dims: feat.dims, dd: feat.distinctDim, rn: feat.recentN, each: feat.flags?.each }) + '\n');
   if (feat.sets || feat.timeq || feat.links || (feat.dims?.length ?? 0) || feat.distinctDim || (feat.recentN && !(kind === 'count+ext' && feat.recentN === 1)) || feat.flags?.each) return 'release';
@@ -87,10 +99,10 @@ export function twoMeasureSignal(question) {
     .replace(/\btotal(?:s|ing)?\s+(?:is\s+|are\s+)?(?:over|above|under|below|more|less|greater|exceed\w*|at\s+least|at\s+most|of\s+\$?\d|\$?\d)|\b(?:in|a)\s+total\b|\btotal\s+(?:number|count)\b|\bnumber\s+in\s+total\b|,\s*(?:in\s+)?total\s*[?.!]*\s*$/g, ' '); // \"how many calls has X been out on, total\": a trailing \", total\" is emphasis on the count, not a second measure
   if (!/(?:\b(?:and|plus|also|then)\b|&|[,;])/.test(q)) return false;
   const count = /\b(?:how\s+many|number\s+of|count\s+of|the\s+count|cuantos|cuantas|tally)\b/.test(q) || /\bcount\b/.test(q);
-  const total = /\b(?:total|totals|tot|sum|how\s+much|dollar\s+(?:total|amount)|dollars|add(?:s)?\s+up|altogether|grand\s+total)\b/.test(q);
+  const total = /\b(?:total|totals|tot|sum|how\s+much|dollar\s+(?:total|amount)|dollars|add(?:s)?\s+up|altogether|grand\s+total|come\s+to|came\s+to|comes\s+to)\b/.test(q);
   const avg = /\b(?:average|avg|mean)\b/.test(q);
   const ext = /\bwhen\s+(?:was|is|did)\b[^?]*\b(?:first|earliest|last|latest|oldest|newest|most\s+recent)\b|\bthe\s+(?:first|earliest|last|latest)\s+one\b/.test(q);
-  const who = /\b(?:client|customer|patient|tenant|resident|owner|member|donor|account)s?\s+with\s+the\s+most\b|\bwho\s+(?:is|has|was)\s+the\s+(?:top|biggest|largest)\b|\bnames?\s+of\s+the\b/.test(q);
+  const who = /\b(?:client|customer|patient|tenant|resident|owner|member|donor|account)s?\s+with\s+the\s+most\b|\band\s+who\s+(?:has|had|is|was)\s+(?:got\s+)?(?:the\s+)?(?:most|highest|top|biggest|largest)\b|\bwho\s+has\s+the\s+most\b|\bwho\s+(?:is|has|was)\s+the\s+(?:top|biggest|largest)\b|\bnames?\s+of\s+the\b/.test(q);
   if (/\bhow\s+many\b[^?]*(?:\band\b|[,;&])[^?]*\bhow\s+many\b/.test(q) && !/\bof\s+(?:those|them|these|that)\b/.test(q)) return true; // "how many customers in Pinal County -- and of those, how many are out of warranty" narrows the first set: not two measures
   if (count && total && !avg) return true;
   if (total && avg && !count) return true;

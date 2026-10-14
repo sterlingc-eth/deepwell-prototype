@@ -19,6 +19,7 @@ import { classify2 } from '../learned/linear.js';
 import { shapeFeats, shapeHeads } from '../learned/shape3.js';
 import { detectSlots, maskView, maskLexicon } from './slots.js';
 import { parseSkeleton } from './skeleton.js';
+import { extractCore } from './core.js';
 
 export const DEFAULT_ON = false;
 export const localProposerEnabled = (env = process.env) => (env?.DONOVAN_LOCAL_PROPOSER === '1' ? true : env?.DONOVAN_LOCAL_PROPOSER === '0' ? false : DEFAULT_ON);
@@ -78,6 +79,10 @@ function extraGuard(q, qt, slots, sk, vocab) {
   if (sk.entity === 'document' && !sk.visit && !slots.docType) { const extra = qt.find((t, i) => !slots.taken[i] && !ALL_DOCS_OK.has(t.w) && !/^\d+$/.test(t.w)); if (extra) return `all-docs-extra-word:${extra.w}`; }
   if (qt.some((t, i) => !slots.taken[i] && /^[b-hj-z]$/.test(t.w))) return 'initial'; // "deb r.": a name the records may know only in full
   const lex = lexWords();
+  // R22: a single common English word read as a brand / city / stored value ("true", "will", "may") is a slot the detectors guessed - release
+  for (const sp of slots.spans) if ((sp.kind === 'brand' || sp.kind === 'city' || sp.kind === 'cat') && sp.j - sp.i === 1 && lex.has(qt[sp.i].w)) return `common-word-slot:${qt[sp.i].w}`;
+  if (sk.op === 'latest' || sk.op === 'earliest') return 'extreme-date';
+  if (/\b(?:on|onward|onwards|forward|and (?:later|earlier|after|before))\b/i.test(q) && slots.time) return 'open-ended-time';
   for (let i = 0; i < qt.length; i++) {
     const w = qt[i].w;
     if (!slots.taken[i] && w.length >= 4 && vocab.nameWords.has(w) && !lex.has(w)) return 'partial-name';
@@ -139,7 +144,7 @@ export function headsAgree(question, vocab) {
   return { ok: true };
 }
 
-export function proposeAndValidate(question, { tv, pack, today, snap } = {}) {
+function proposeOne(question, { tv, pack, today, snap }) {
   const p = proposePlan(question, { tv, pack, today });
   if (!p.raw) return { ok: false, reason: p.none, label: p.label, prob: p.prob };
   const v = validateTranslatedPlan(p.raw, question, { tv, pack, today, snap });
@@ -147,4 +152,16 @@ export function proposeAndValidate(question, { tv, pack, today, snap } = {}) {
   const a = headsAgree(question, p.vocab);
   if (!a.ok) return { ok: false, reason: a.why, label: p.label, prob: p.prob, raw: p.raw };
   return { ok: true, plan: v.plan, label: p.label, prob: p.prob, raw: p.raw };
+}
+
+/** R22: the question as typed first; when that is released and the text is one question wrapped in inert filler, the same gates again over the core question alone */
+export function proposeAndValidate(question, { tv, pack, today, snap } = {}) {
+  const ctx = { tv, pack, today, snap };
+  const r = proposeOne(question, ctx);
+  if (r.ok || process.env.DONOVAN_PROPOSER_CORE === '0') return r;
+  let c = null;
+  try { c = extractCore(question, compileVocab(tv, pack)); } catch { c = null; }
+  if (!c) return r;
+  const r2 = proposeOne(c.core, ctx);
+  return r2.ok ? { ...r2, core: c.core } : { ...r, coreReason: r2.reason };
 }

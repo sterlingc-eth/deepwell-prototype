@@ -5,7 +5,7 @@
  *   sayResult(result, plan, {snap, today}) -> {text, facts, records, basis, total, claimedCount}
  */
 import { documentTypeLabel } from '../documentTypes.js';
-import { ynText } from './yn.js';
+import { ynText, gapText } from './yn.js';
 import { ENTITIES } from './fields.js';
 import { dimLabel, displayKey, monthName } from './exec.js';
 import { nthWord } from './ordinal.js';
@@ -134,8 +134,10 @@ function labelOf(plan, row, detail = 2, skipCustomer = false) {
   const num = row.f?.invoice_number ?? row.f?.po_number ?? row.f?.permit_number ?? null;
   if (detail >= 2) {
     // a short list: the paper's own number or file name, then who it is for, when, and the amount
-    const id = num ?? row.filename ?? documentTypeLabel(row.type);
-    const bits = [num && row.filename ? row.filename : null, !skipCustomer ? row.custName : null, row.date ? fmtDate(row.date) : null, row.total != null ? fmtMoney(row.total) : null].filter(Boolean);
+    // the company's own number field ("ledger_no": GS-1768, "ref": CL-204) is the paper's number too
+    const own = num ?? (() => { for (const [k, v] of Object.entries(row.f ?? {})) if (/(?:^|_)(?:no|num|number|nr|nbr|ref|id|code)$/i.test(k) && /^[A-Za-z]{1,6}[-# ]?\d{2,}[\w-]*$/.test(String(v ?? '').trim())) return String(v).trim(); return null; })();
+    const id = own ?? row.filename ?? documentTypeLabel(row.type);
+    const bits = [own && row.filename ? row.filename : null, !skipCustomer ? row.custName : null, row.date ? fmtDate(row.date) : null, row.total != null ? fmtMoney(row.total) : null].filter(Boolean);
     return bits.length ? `${id} (${bits.join(', ')})` : id;
   }
   // a longer list has to stay readable: a numbered paper by its number, an unnumbered one (a quote, a ticket) by whose it is
@@ -414,6 +416,7 @@ export function sayResult(res, plan, { snap, today }) {
       const lead = a.value === b.value ? 'They are equal.' : `${cap1(L(a.value > b.value ? a : b))} is higher by ${plan.measure ? valueText(plan, Math.abs(a.value - b.value)) : fmtInt(Math.abs(a.value - b.value))}.`;
       out.text = `${cap1(L(a))} has ${f(a)} and ${L(b)} has ${f(b)}${cond}. ${lead}`;
       if (plan.yn) out.text = ynText(plan.yn, a, b, out.text);
+      else if (plan.gap) out.text = gapText(plan.measure ? valueText(plan, Math.abs(a.value - b.value)) : fmtInt(Math.abs(a.value - b.value)), a, b, out.text);
       out.facts = res.sides.map((s) => ({ label: s.label, value: f(s) }));
       out.records = recordsOf(plan, res.rows, snap); out.total = res.rows.length;
       out.basis = basisLine('Compared two values over', plan, res, snap);

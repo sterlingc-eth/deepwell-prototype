@@ -526,7 +526,7 @@ function arbitrate(out, question, ctx) {
   // decompose slot) is handed to DQL as its fallback (decompose/index.js runs it when DQL has no answer at run time).
   // an ordinal question has no older fall-through: when DQL cannot place the Nth (a tie before it, too few items) every older lane would answer with the extreme
   // R21: a reader question (what a paper SAYS) has no older fall-through either: when the reader cannot quote the paper, a count of papers that mention the word is a different answer to a different question
-  if (intent.plan?.nth || intent.plan?.op === "read_span") {
+  if (intent.plan?.nth || intent.plan?.op === "read_span" || intent.plan?.op === "page_find") {
     const g = { ...(out.gated ?? {}), deterministic: null, relations: null, fastPath: null, contactLookup: null, docLookup: null, contentCount: null, money: null, decompose: intent, analytics: false };
     return { ...out, winner: { name: "decompose", intent }, gated: g, claimed: [...new Set([...(out.claimed ?? []).filter((n) => n !== "analytics"), "decompose"])], effectiveQuestion: out.effectiveQuestion ?? question, dql: true, dqlArbiter: { from: oldLabel, to: dqlLabel(intent.plan) } };
   }

@@ -9,7 +9,7 @@ export function tokenize(text) {
   const s = String(text ?? '').toLowerCase().replace(/[’‘`]/g, "'")
     .replace(/(\d),(\d{3})/g, '$1$2')               // 5,000 -> 5000
     .replace(/\$\s+(\d)/g, '$$$1')                  // "$ 500" -> "$500"
-    .replace(/(\$?)\b(\d+(?:\.\d+)?)\s*k\b/g, (_, d, n) => `$${String(Math.round(Number(n) * 1000))}`) // 5k -> $5000 (a k is always money: 2k must not be read as the year 2000)
+    .replace(/(\$?)\b(\d+(?:\.\d+)?)\s*(?:k|grand(?!\s+totals?\b))\b/g, (_, d, n) => `$${String(Math.round(Number(n) * 1000))}`) // 5k -> $5000 (a k is always money: 2k must not be read as the year 2000)
     .replace(/\b(\d+)\s*(?:st|nd|rd|th)\b/g, '$1')
     .replace(/%/g, ' percent ');
   const out = [];
@@ -60,7 +60,12 @@ export function repairWord(w, vocabByLen, known) {
       if (d < bestD) { best = v; bestD = d; tie = false; } else if (d === bestD && v !== best) tie = true;
     }
   }
-  return best && !tie && bestD <= max ? best : null;
+  if (best && !tie && bestD <= max) {
+    // two neighbouring letters swapped ("hepl" for "help") is that known word, not a different word one letter away (a brand, a city)
+    for (let i = 0; i < w.length - 1; i++) { if (w[i] === w[i + 1]) continue; const sw = w.slice(0, i) + w[i + 1] + w[i] + w.slice(i + 2); if (sw !== best && known.has(sw)) return sw; }
+    return best;
+  }
+  return null;
 }
 
 export function indexByLen(vocab) {

@@ -239,6 +239,8 @@ export function arbiterAllows(winner, intent, { oldLabel, question, industryKind
   const plan = intent?.plan;
   if (!plan || intent.plain) return false;
   if (mode === "all") return true;
+  // R22: a phrase searched in the text of the papers (dql/families/pagefind.js): every older lane answers from stored fields, so DQL takes it from any of them
+  if (plan.op === "page_find") { lastHit = "page-find"; return true; }
   if (otherIndustry(industryKind)) {
     // R13: two guards that hold for every company (they were measured on the HVAC dev set, where taking everything made them wrong): a "when" question is not answered in days, and a yes/no question is not turned into a list
     if (DATE_OPS.has(plan.op) && WHEN_QUESTION.test(String(question ?? ""))) { lastHit = null; return false; }

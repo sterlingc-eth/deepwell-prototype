@@ -9,3 +9,4 @@ import './textdq.js';
 import './reader.js';
 import './links.js';
 import './multi.js';
+import './pagefind.js';

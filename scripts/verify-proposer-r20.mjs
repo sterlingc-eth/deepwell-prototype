@@ -19,6 +19,7 @@ const ROOT = path.resolve(__dirname, '..');
 let failures = 0; let passes = 0;
 const check = (name, ok, detail = '') => { if (ok) passes++; else failures++; console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${ok || !detail ? '' : `\n      ${String(detail).slice(0, 400)}`}`); };
 
+process.env.DONOVAN_PROPOSER_TH = '0.6'; // R22: the shipped threshold is 0.99; the tiny golden export exercises the plan machinery at a low one
 delete process.env.ANTHROPIC_API_KEY; delete process.env.DONOVAN_PLAN_TRANSLATOR; delete process.env.DONOVAN_DQL;
 const realLog = console.log;
 console.log = (...a) => { if (typeof a[0] === 'string' && /^\{"/.test(a[0])) return; realLog(...a); };

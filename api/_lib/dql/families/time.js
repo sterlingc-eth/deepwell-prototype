@@ -22,7 +22,7 @@
  *  - only dates that are really on file are used (a unit's warranty end date, a maintenance agreement's term, an installation date).
  */
 import { VISIT_ALT } from '../industryLex.js';
-import { ynOf, ynText } from '../yn.js';
+import { ynOf, ynText, gapOf, gapText } from '../yn.js';
 import { registerFamily } from '../registry.js';
 import { FILLER } from '../lex.js';
 import { normName } from '../vocab.js';
@@ -463,8 +463,20 @@ function parseCompare(q, feat) {
   const sameTime = r.take(rx('same\\s+(?:time|period|point|date)(?:\\s+(?:in|of))?|whole\\s+of|all\\s+of'));
   const yoy = r.take(rx('year\\s+over\\s+year|yoy|quarter\\s+over\\s+quarter|qoq|month\\s+over\\s+month|mom'));
   const soFar = r.take(rx('so\\s+far'));
-  const measure = takeMeasure(r, q);
+  let measure = takeMeasure(r, q);
   if (!measure) return null;
+  // an open ask ("how are we doing this year vs last on invoices") wants the count AND the dollars; "how much in X" wants the dollars; only a count word asks for the count alone
+  const rawQ = String(feat?.raw ?? q.text0 ?? '').toLowerCase();
+  const countW = /\bhow\s+ma(?:ny|y)\b|\bnumber\s+of\b|\bcounts?\b|\bconts\b|#|\btally\b|\bno\.\s*of\b/.test(rawQ);
+  const moneyW = Boolean(q.howMuch) || /\bhow\s+muc?h\b|\bdollars?\b|\btotals?\b|\brevenue\b|\bamounts?\b|\$/.test(rawQ);
+  let pair = false;
+  if (measure.docType && measure.entity === 'document' && !measure.visit && !measure.hours && (measure.money || measure.agg === 'count')) {
+    const d = q.docs.find((x) => x.id === measure.docType);
+    if (countW && moneyW && d) { measure = { agg: 'count', entity: 'document', docType: d.id, visit: false, dateField: 'date', ...nounsOf(d), word: d.word }; pair = true; }
+    else if (!measure.money && !countW && q.howMuch) measure = { ...measure, agg: 'sum', valueField: 'total', money: true, moneyNoun: `${measure.noun} total` };
+    else if (!measure.money && !countW && !moneyW) pair = true;
+  }
+  const openAsk = measure.agg === 'count' && !measure.money && !measure.hours && !countW && !(measure.docType && measure.entity === 'document' && !measure.visit);
   let ps = q.periods.slice();
   let baseHint = null;
   // "grow last year": one period and the one before it
@@ -501,6 +513,12 @@ function parseCompare(q, feat) {
     const f = a.unit === 'day' ? addDays(a.from, -a.n) : a.unit === 'week' ? addDays(a.from, -7 * a.n) : a.unit === 'month' ? addMonths(a.from, -a.n) : addYears(a.from, -a.n);
     ps = [a, { kind: 'range', from: f, to: e, label: `the ${a.n} ${a.unit}${a.n === 1 ? '' : 's'} before`, short: 'prior' }];
   }
+  if (openAsk && ps.some((p) => p.kind === 'ytd' || p.rel === 'thisYear' || p.rel === 'lastYear')) return null; // "how are we doing this year vs last on visits": count or dollars? not guessed
+  if (pair && !ps.some((p) => p.kind === 'ytd' || p.rel === 'thisYear' || p.rel === 'lastYear')) pair = false; // the count-and-dollars pair is for "this year vs last"
+  { // a number after "more than / over / at least ..." is an amount, not a year ("quotes more than 2000 during 2019")
+    const amt = [...String(q.text0 ?? '').matchAll(/\b(?:more|less|greater|fewer|higher|lower|bigger|smaller)\s+than\s+\$?(\d{4})\b|\b(?:over|above|under|below|exceeding|at\s+least|at\s+most|upwards\s+of)\s+\$?(\d{4})\b/g)].map((m) => m[1] ?? m[2]);
+    if (amt.length && ps.some((p) => amt.some((n) => String(p.label ?? '').includes(n) || String(p.from ?? '').startsWith(n)))) return null;
+  }
   if (ps.some((p) => p.dir || p.kind === 'prior' || p.over)) return null;
   if (ps.length !== 2) return null;
   if (ps.some((p) => !['year', 'quarter', 'month', 'ytd', 'roll', 'range'].includes(p.kind))) return null;
@@ -517,7 +535,7 @@ function parseCompare(q, feat) {
     if (/\bthan\b/.test(t0)) { if (/\bfrom\b/.test(t0)) return null; baseIdx = 1; } else if (!fromTo && /\b(?:up|down)\s+from\b/.test(t0)) baseIdx = 1; else if (!/\bfrom\b/.test(t0) && ps[0].from > ps[1].from) baseIdx = 1; // chronological when nothing says otherwise
   }
   const wantsPct = Boolean(pctW) && !/\bup\s+or\s+down\b/.test(q.r.s) ? true : Boolean(pctW);
-  return { op: 'tm_compare', ...ynOf(feat?.raw), measure, filters, periods: ps.map(({ from, to, label, kind, matched, short }) => ({ from, to, label, kind, matched: matched ?? false, short: short ?? null })), baseIdx, wantsPct, soFar: Boolean(soFar), sameTime: Boolean(sameTime), asIs: Boolean(yoy) };
+  return { op: 'tm_compare', ...ynOf(feat?.raw), measure, filters, periods: ps.map(({ from, to, label, kind, matched, short }) => ({ from, to, label, kind, matched: matched ?? false, short: short ?? null })), baseIdx, wantsPct, soFar: Boolean(soFar), sameTime: Boolean(sameTime), asIs: Boolean(yoy), ...(pair ? { pair: true } : {}), ...gapOf(feat?.raw) };
 }
 
 /* ---------------------------------------------------------------- one period */
@@ -950,16 +968,16 @@ function execCompareValue(meas, filters, period, x) {
   const { snap, today, h } = x;
   const sel = rowsOf(meas, filters, snap, today, h);
   if (sel.abstain) return { abstain: sel.abstain };
-  let value = 0; const rows = []; let leftOut = 0;
+  let value = 0; const rows = []; let leftOut = 0; let noValue = 0;
   for (const row of sel.rows) {
     const d = dateOfRow(row, meas);
     if (!d) { leftOut++; continue; }
     if (d < period.from || d > period.to) continue;
     const v = valueOfRow(row, meas);
-    if (v == null) { leftOut++; continue; }
+    if (v == null) { leftOut++; noValue++; continue; }
     value += v; rows.push(row);
   }
-  return { value, rows, leftOut };
+  return { value, rows, leftOut, noValue };
 }
 
 
@@ -1013,7 +1031,14 @@ function execCompare(plan, x) {
     const e = addYears(ytd.to, -1);
     matched = { ...execCompareValue(plan.measure, plan.filters, { from: `${other.from.slice(0, 4)}-01-01`, to: e }, x), to: e, year: other.from.slice(0, 4) };
   }
-  return { sides, matched };
+  let pairSides = null;
+  if (plan.pair) {
+    const m2 = { ...plan.measure, agg: 'sum', valueField: 'total', money: true, moneyNoun: `${plan.measure.noun} total` };
+    pairSides = [];
+    for (const p of plan.periods) { const v = execCompareValue(m2, plan.filters, p, x); if (v.abstain) return v; pairSides.push({ ...p, ...v }); }
+    if (pairSides.every((s) => s.rows.length === 0)) return { abstain: 'no totals on file' };
+  }
+  return { sides, matched, pairSides };
 }
 
 function execWindow(plan, x) {
@@ -1389,9 +1414,10 @@ function sayCompare(res, plan, x) {
   const [a, b] = res.sides;
   const lab = (s) => (s.kind === 'ytd' ? (s.matched ? s.label : `${s.label.replace(' so far', '')} so far (through ${fmtDate(today)})`) : s.label);
   const val = (s) => fmtVal(meas, s.value);
-  const word = meas.money ? 'invoiced' : meas.hours ? 'labor hours' : meas.noun;
+  const word = meas.money ? meas.moneyNoun ?? 'invoiced' : meas.hours ? 'labor hours' : meas.noun;
   let text = `${cap1(word)}${cond}: ${lab(a)} had ${val(a)} and ${lab(b)} had ${val(b)}.`;
-  if (plan.yn) text = ynText(plan.yn, { label: lab(a), value: a.value }, { label: lab(b), value: b.value }, text);
+  if (plan.yn) text = ynText(plan.yn, { label: lab(a), value: a.value, from: a.from }, { label: lab(b), value: b.value, from: b.from }, text);
+  else if (plan.gap && !plan.pair) text = gapText(meas.money ? fmtMoney(Math.abs(a.value - b.value)) : meas.hours ? `${fmtNum(Math.abs(a.value - b.value), 1)} hours` : fmtInt(Math.abs(a.value - b.value)), a, b, text);
   const notes = [];
   for (const s of res.sides) if (s.to > today && s.kind !== 'ytd' && s.kind !== 'roll') notes.push(`${s.label} is not over yet (counted through ${fmtDate(today)})`);
   const base = res.sides[plan.baseIdx]; const neu = res.sides[1 - plan.baseIdx];
@@ -1409,6 +1435,13 @@ function sayCompare(res, plan, x) {
       const neg = pct < 0 ? '-' : sign;
       text += ` From ${lab(base)} to ${lab(neu)} that is a change of ${neg}${d.main.replace(/\.0$/, '')}%.`;
     }
+  }
+  if (res.pairSides) {
+    const [pa, pb] = res.pairSides; const m2 = { money: true };
+    text += ` ${cap1(plan.measure.noun)} total${cond}: ${lab(pa)} had ${fmtVal(m2, pa.value)} and ${lab(pb)} had ${fmtVal(m2, pb.value)}.`;
+    if (pa.value !== pb.value) text += ` ${cap1(lab(pa.value > pb.value ? pa : pb))} is higher by ${fmtMoney(Math.abs(pa.value - pb.value))}.`;
+    const lo = res.pairSides.reduce((n, s) => n + s.noValue, 0);
+    if (lo) text += ` ${fmtInt(lo)} of them have no total on file and are not in the dollar figures.`;
   }
   if (res.matched && res.matched.value != null) text += ` For a like-for-like look, ${res.matched.year} through ${fmtDate(res.matched.to)} was ${fmtVal(meas, res.matched.value)}.`;
   if (notes.length) text += ` Note: ${notes.join('; ')}.`;

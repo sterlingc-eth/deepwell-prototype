@@ -16,6 +16,7 @@ import { familyForOp } from './registry.js';
 import { resolveProvenance } from '../citations/provenance.js';
 import { sourcesSentence } from './cite.js';
 import { loadReaderPages } from './families/reader.js';
+import { loadFindPages } from './families/pagefind.js';
 
 export { parseDql, dqlEnabled };
 
@@ -26,7 +27,10 @@ export async function runDql(db, intent, { today } = {}) {
   if (snap.truncated) return null; // more records than one read holds: no answer is better than a partial one
   // the snapshot is shared between requests, so the reader's pages go on a shallow copy
   if (intent.plan.op === 'read_span') { snap = { ...snap }; try { await loadReaderPages(db, snap, intent.plan, t); } catch { return null; } } // the extractive reader reads the pages of the few candidate papers only
-  const ans = await resolveProvenance(db, answerFromSnapshot(snap, intent.plan, t));
+  if (intent.plan.op === 'page_find') { snap = { ...snap }; try { await loadFindPages(db, snap, intent.plan); } catch { return null; } } // the page search reads the pages that could hold the phrase (private papers never)
+  let ans = await resolveProvenance(db, answerFromSnapshot(snap, intent.plan, t));
+  // R22: the page search took a plain "which papers mention X" from the older text search / document finder; when it cannot answer (papers without readable text, an unknown word), the older plan answers exactly as it did before
+  if (!ans && intent.plan.op === 'page_find' && intent.plan.older) { const o = intent.plan.older; intent = { ...intent, plan: o }; snap = { ...snap }; ans = await resolveProvenance(db, answerFromSnapshot(snap, o, t)); }
   // the "Sources:" sentence was written before the pages were looked up: write it again with them
   if (ans && intent.plan.cite && ans.records?.length && /\sSources: /.test(ans.text)) {
     const src = sourcesSentence(ans.records, ans.recordsTotal);
