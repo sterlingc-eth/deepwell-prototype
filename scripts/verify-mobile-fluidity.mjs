@@ -22,7 +22,7 @@
  *      logged during that one interaction, not the whole session, so an
  *      unrelated shift earlier in the walk can't mask (or fail) one later.
  *   3. The mobile entry chunk (dist/assets/mobile-*.js, gzip) stays under
- *      MOBILE_ENTRY_BUDGET_GZIP (23 KB since R36; the sheets, account menu
+ *      MOBILE_ENTRY_BUDGET_GZIP (20 KB since 2026-10-13, was 23 KB since R36; the sheets, account menu
  *      and install guide are lazy chunks prefetched at idle) — this is the mobile-SPECIFIC bundle (the
  *      shared Clerk/Wordmark/jsx-runtime chunks it modulepreloads are common
  *      to every DeepWell surface, including desktop, and aren't this budget's
@@ -54,8 +54,8 @@ const DOC_ID = '44444444-4444-4444-8444-000000000001';
 /** Throttled-budget: see the file comment above for why this isn't 50ms. */
 const LONG_TASK_BUDGET_MS = 80;
 const CLS_BUDGET = 0.05;
-/** The mobile entry chunk alone, gzip. R23 baseline ~22.5 KB; R36: 21.2 KB after moving the sheets out. */
-const MOBILE_ENTRY_BUDGET_GZIP = 23 * 1024;
+/** The mobile entry chunk alone, gzip. R23 baseline ~22.5 KB; R36: 21.2 KB; R39 (2026-10-13): 18.4 KB measured, tightened to 20 KB. */
+const MOBILE_ENTRY_BUDGET_GZIP = 20 * 1024;
 
 /** "Slow 4G" (Chrome DevTools' own preset: ~400 Kbps, 400ms RTT) applied as
  *  a per-response delay on every mocked API call below, rather than as a
