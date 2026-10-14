@@ -111,6 +111,21 @@
    "internal": {
     "sha": "0822f1c"
    }
+  },
+  {
+   "track": "donovan",
+   "version": "1.3.0",
+   "date": "2026-10-14",
+   "type": "update",
+   "released": false,
+   "public": true,
+   "notes": [
+    "Donovan double-checks his own answers before replying, so more questions are answered instantly and accurately.",
+    "When he isn't sure, he still hands off to the full assistant, so accuracy comes first."
+   ],
+   "internal": {
+    "sha": "55d1b2b"
+   }
   }
  ]
 }

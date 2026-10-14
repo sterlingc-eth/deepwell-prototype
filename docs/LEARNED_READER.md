@@ -46,3 +46,11 @@ Known issue found while testing the kit: the kit's `--smoke` model (from-scratch
 ## Files
 
 `api/_lib/dql/reader-ml/{index,model,anon,fill,map,onnx}.js`, `data/*`, `scripts/learned-reader/export_cpu_model.py`, `scripts/verify-learned-reader-r25.mjs` (`npm run verify:learned-reader-r25`), `scripts/golden/learned-reader-fixture.json`, `scripts/golden/roberta-tokenizer.json.gz`. Wired in `api/_lib/dql/translator/index.js` (`classifyTranslate`, `runTranslated`).
+
+## The verifier (R26, `DONOVAN_READER_VERIFIER`, default OFF)
+
+`verifier.mjs` (dependency-free) plus `data/verifier.json` (0.66 MB: 300 small decision trees, per-head temperatures, thresholds) judge the reader's whole nine-part answer instead of the per-head miss-mass thresholds: a width-30 beam finds the best joint combination of the nine heads (never one with `<OTHER>`), the model's confidence signals for it become 41 features, and the trees score how likely the combination is exactly right. With `DONOVAN_READER_VERIFIER=1` the reader answers only when that score reaches the threshold; every later test (trained skeleton, closed literals, filler, validator, period and values agreement) still applies, and any doubt releases the question to the full assistant as before. Unset or `0` the code path, and every result, is exactly as before (`verify:reader-verifier` records and checks this).
+
+- Threshold: shipped is the Clopper-Pearson 99.5 percent threshold on held-out companies (`cp995`). `DONOVAN_VERIFIER_THRESHOLD` takes a number or `cp99` / `emp995` / `emp99` for more coverage and less margin.
+- Fitted to `model-cpu.bin` only (it learns that model's confidence), so it is not applied to the ONNX backend (release `verifier-backend`). Refit when the model file changes: `node scripts/learned-reader/score-top5.mjs dev-bank7.jsonl.gz labels.json /tmp/cpu_scores`, then `python scripts/learned-reader/fit_verifier.py /tmp/cpu_scores OUT_DIR split.json` (needs numpy, scipy, scikit-learn, lightgbm), then copy `OUT_DIR/verifier.json` into `data/` and `OUT_DIR/reader-verifier-parity.json` into `scripts/golden/`.
+- Cost: about 1.5 ms per question on top of the model's 13 ms; it reads `predictTop5`, the same forward pass as `predict`.

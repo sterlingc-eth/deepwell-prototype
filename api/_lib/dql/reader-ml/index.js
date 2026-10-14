@@ -15,10 +15,16 @@
  *      explained (the coverage rule), nothing invented, private papers never
  *   6. the period and the values of the validated plan equal the filler's own
  * Any doubt: {ok: false} and the question goes to the model exactly as before.
+ *
+ * R26: the VERIFIER (verifier.mjs + data/verifier.json), behind DONOVAN_READER_VERIFIER (default OFF). When ON it replaces test 1 (the per-head miss-mass thresholds): a small
+ * tree model judges the whole nine-part answer (joint beam over the heads, confidence features) and the reader answers only if it accepts; tests 2 to 6 still apply, to the
+ * combination the verifier judged. Unset or =0, nothing below changes: the same code path, the same results. DONOVAN_VERIFIER_THRESHOLD picks a threshold (a number or
+ * cp995 | cp99 | emp995 | emp99); the shipped one is the Clopper-Pearson 99.5 percent threshold on held-out companies. Needs the CPU model (the verifier is fitted to its outputs).
  */
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { loadCpuModel, predict, skeletonKey } from './model.js';
+import { loadCpuModel, predict, predictTop5, skeletonKey, HEADS } from './model.js';
+import { scoreFromTop5, pickThreshold } from './verifier.mjs';
 import { loadOnnx, predictOnnx } from './onnx.js';
 import { buildAnonVocab, mentions, anonText } from './anon.js';
 import { loadFillData, skeletonSeen, makeCtx, unskel, literalOk } from './fill.js';
@@ -29,6 +35,9 @@ import { validateTranslatedPlan } from '../translator/validate.js';
 export const DEFAULT_ON = true; // R25: measured on never-seen wording (tier 1, tier 2 and every suite): no wrong answer added, 100 percent of the newly answered right; set DONOVAN_LEARNED_READER=0 to turn it off
 export const DEFAULT_TARGET = '0.995';
 export const learnedReaderEnabled = (env = process.env) => (env?.DONOVAN_LEARNED_READER === '1' ? true : env?.DONOVAN_LEARNED_READER === '0' ? false : DEFAULT_ON);
+/** DONOVAN_READER_VERIFIER=1 turns the verifier on; unset or anything else is off (the reader then works exactly as before) */
+export const DEFAULT_VERIFIER_ON = false;
+export const verifierEnabled = (env = process.env) => (env?.DONOVAN_READER_VERIFIER === '1' ? true : DEFAULT_VERIFIER_ON);
 const DIR = () => process.env.DONOVAN_LEARNED_MODEL_DIR || fileURLToPath(new URL('./data', import.meta.url));
 
 let CAL = null;
@@ -50,6 +59,14 @@ async function predictAny(an) {
   const b = backendName();
   if (b === 'onnx') return { pr: await predictOnnx(an, await loadOnnx(DIR())), backend: 'onnx' };
   return { pr: predict(an, loadCpuModel(DIR())), backend: 'cpu' };
+}
+
+let VCFG = null;
+/** data/verifier.json (trees, temperatures, thresholds), read once per folder; null when it is missing or unreadable */
+function loadVerifier(dir) {
+  if (VCFG?.dir === dir) return VCFG.cfg;
+  let cfg = null; try { cfg = JSON.parse(fs.readFileSync(`${dir}/verifier.json`, 'utf8')); if (!cfg?.tree_dump?.tree_info?.length || !cfg.temperatures) cfg = null; } catch { cfg = null; }
+  VCFG = { dir, cfg }; return cfg;
 }
 
 const normType = (t) => String(t ?? '').trim().toLowerCase().replace(/_/g, '-');
@@ -89,13 +106,23 @@ async function propose(question, { tv, pack, today, snap }) {
   const dir = DIR(); const D = loadFillData(dir);
   const V = anonVocabFor(snap, tv);
   const ms = mentions(q, V); const an = anonText(q, ms);
-  const { pr, backend } = await predictAny(an);
-  if (pr.labels.some((l) => l === '<OTHER>')) return rej('other');
-  const th = thresholds(backend); const total = pr.Q.reduce((a, b) => a + b, 0);
-  if (!(total <= th.total)) return rej('low-confidence', { total });
-  for (let j = 0; j < pr.Q.length; j++) if (!(pr.Q[j] <= Math.max(th.head[j], th.total / 4))) return rej(`low-confidence:${j}`, { total });
-  if (!skeletonSeen(D, skeletonKey(pr.labels))) return rej('unseen-skeleton', { total });
-  const [op, ent, dt, meas, time, grp, filt, args, rest] = pr.labels;
+  let pr; let total; let labels; let backend;
+  if (verifierEnabled()) { // R26: the verifier judges the whole combination (replaces the miss-mass thresholds); everything after it is unchanged
+    if (backendName() !== 'cpu') return rej('verifier-backend');
+    const vcfg = loadVerifier(dir); if (!vcfg) return rej('verifier-config');
+    const M = loadCpuModel(dir); pr = predictTop5(an, M);
+    const v = scoreFromTop5(pr.top5, vcfg, pickThreshold(vcfg, process.env.DONOVAN_VERIFIER_THRESHOLD));
+    total = 1 - v.score; if (!v.answer) return rej('verifier', { total, score: v.score });
+    labels = v.labels.map((c, j) => M.classes[HEADS[j]][c]);
+  } else {
+    ({ pr, backend } = await predictAny(an)); labels = pr.labels;
+    if (pr.labels.some((l) => l === '<OTHER>')) return rej('other');
+    const th = thresholds(backend); total = pr.Q.reduce((a, b) => a + b, 0);
+    if (!(total <= th.total)) return rej('low-confidence', { total });
+    for (let j = 0; j < pr.Q.length; j++) if (!(pr.Q[j] <= Math.max(th.head[j], th.total / 4))) return rej(`low-confidence:${j}`, { total });
+  }
+  if (!skeletonSeen(D, skeletonKey(labels))) return rej('unseen-skeleton', { total });
+  const [op, ent, dt, meas, time, grp, filt, args, rest] = labels;
   let sk;
   try { sk = { ...(op != null ? { op } : {}), entity: ent, doc_type: dt, measure: meas, time: JSON.parse(time), group_by: JSON.parse(grp), filters: JSON.parse(filt), args: JSON.parse(args), ...JSON.parse(rest) }; } catch { return rej('skeleton-parse'); }
   if (!literalOk(sk, V.allowed, D)) return rej('literal', { total });
@@ -112,7 +139,7 @@ async function propose(question, { tv, pack, today, snap }) {
     const gv = (plan.filters ?? []).filter((f) => f.field !== 'total').map((f) => lcj(f.value)).sort().join('|');
     const pv = (p.filters ?? []).filter((f) => f.field !== 'total').map((f) => lcj(f.value)).sort().join('|');
     if (gv !== pv) { last = 'values-disagree'; continue; }
-    return { ok: true, plan: p, raw, labels: pr.labels, miss: total, Q: pr.Q, skeletonOp: plan.op };
+    return { ok: true, plan: p, raw, labels, miss: total, Q: pr.Q, skeletonOp: plan.op };
   }
   return rej(last, { total, op: plan.op });
 }

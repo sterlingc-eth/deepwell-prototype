@@ -61,7 +61,12 @@ export function loadCpuModel(dir) {
 }
 
 /** anonymized text -> { A: [class index per head], P: [probability per head], Q: [miss mass 1-p per head, precise near 1], labels: [class per head] } */
-export function predict(an, M) {
+export function predict(an, M) { return run(an, M, false); }
+
+/** same forward pass as predict, plus per head the five most probable classes (ix, pv) and the full-distribution entropy (ent): the verifier's input */
+export function predictTop5(an, M) { return run(an, M, true); }
+
+function run(an, M, wantTop5) {
   const { H, T, rowmap, D } = M; const NB = H.NB;
   const f = featurize(an, NB); const w = 1 / Math.sqrt(Math.max(f.length, 1));
   const x = new Float32Array(D);
@@ -71,15 +76,24 @@ export function predict(an, M) {
   for (let d = 0; d < D; d++) z0[d] = (x[d] - mu) * inv * T['mlp.0.weight'][d] + T['mlp.0.bias'][d];
   const lin = (inp, W, bias, nout, nin) => { const out = new Float32Array(nout); for (let o = 0; o < nout; o++) { let s = bias[o]; const base = o * nin; for (let i = 0; i < nin; i++) s += W[base + i] * inp[i]; out[o] = gelu(s); } return out; };
   const h1 = lin(z0, T['mlp.1.weight'], T['mlp.1.bias'], 512, D); const h2 = lin(h1, T['mlp.4.weight'], T['mlp.4.bias'], 512, 512);
-  const A = []; const P = []; const Q = []; const labels = [];
+  const A = []; const P = []; const Q = []; const labels = []; const top5 = [];
   for (let j = 0; j < HEADS.length; j++) {
     const n = H.heads[j].n; const q = T[`h${j}_q`]; const sc = T[`h${j}_s`]; const bias = T[`h${j}_b`];
     let best = -1; let bz = -Infinity; const z = new Float32Array(n);
     for (let o = 0; o < n; o++) { let s = 0; const base = o * 512; for (let i = 0; i < 512; i++) s += q[base + i] * h2[i]; s = s * sc[o] + bias[o]; z[o] = s; if (s > bz) { bz = s; best = o; } }
     bz = z[best]; let den = 0; for (let o = 0; o < n; o++) den += Math.exp(z[o] - bz);
     A.push(best); P.push(1 / den); Q.push((den - 1) / den); labels.push(M.classes[HEADS[j]][best]);
+    if (wantTop5) top5.push(topFive(z, bz, den));
   }
-  return { A, P, Q, labels };
+  return wantTop5 ? { A, P, Q, labels, top5 } : { A, P, Q, labels };
+}
+function topFive(z, bz, den) {
+  const ix = [-1, -1, -1, -1, -1]; const pv = [-1, -1, -1, -1, -1]; let ent = 0;
+  for (let o = 0; o < z.length; o++) {
+    const v = Math.exp(z[o] - bz) / den; if (v > 1e-12) ent -= v * Math.log(v);
+    if (v > pv[4]) { let k = 4; while (k > 0 && pv[k - 1] < v) { pv[k] = pv[k - 1]; ix[k] = ix[k - 1]; k--; } pv[k] = v; ix[k] = o; }
+  }
+  return { ix, pv, ent };
 }
 
 /** crc32 over bytes with a starting value (used for the trained-skeleton table) */
