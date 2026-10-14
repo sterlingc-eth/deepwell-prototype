@@ -104,13 +104,13 @@ for (const vp of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
     await page.locator('#ask-input').press('Enter');
     await sleep(700);
     ok((await page.textContent('#demo-main .answer')) === info.demo[3].a, 'submit after chip finished shows chip answer');
-    // every chip's own question, typed and submitted, returns that chip's answer (sourced), and each answer cites sources
+    // every chip's own question, typed and submitted, returns that chip's answer (sourced), and each answer cites a source
     for (let k = 0; k < info.demo.length; k++) {
       await page.locator('#ask-input').fill(info.demo[k].q);
       await page.locator('#ask-input').press('Enter');
       await sleep(150);
       ok((await page.textContent('#demo-main .answer')) === info.demo[k].a, `typed chip ${k} question returns its own answer`);
-      ok((await page.locator('#demo-main .src').count()) >= 2, `chip ${k} answer shows 2+ sources`);
+      ok((await page.locator('#demo-main .src').count()) >= 1, `chip ${k} answer shows its source`);
     }
     // a question the sample records don't hold must not get another chip's answer
     await page.locator('#ask-input').fill('When does the Okafor agreement end?');

@@ -95,6 +95,22 @@
    "internal": {
     "sha": "e852c46"
    }
+  },
+  {
+   "track": "app",
+   "version": "1.2.0",
+   "date": "2026-10-14",
+   "type": "update",
+   "released": true,
+   "public": true,
+   "notes": [
+    "Try DeepWell with examples from your own industry, starting with real estate.",
+    "Pick your industry on the website to see example documents and questions, with every answer showing the document and page it came from.",
+    "Each industry has its own link, so you can send someone straight to the examples that fit their work."
+   ],
+   "internal": {
+    "sha": "0822f1c"
+   }
   }
  ]
 }
