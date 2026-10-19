@@ -125,6 +125,7 @@ import { tryPropertyPack, isResidentTenantsQuestion } from "./_lib/lookups/prope
 import { parseCustomerCount, runCustomerCount } from "./_lib/lookups/namedCompare.js";
 import { buildClarifyAnswer, clarifyEnabled, ADDRESS_RE } from "./_lib/lookups/clarify.js";
 import { answerAddressConflict, softConflictNote } from "./_lib/addressConflict.js";
+import { readerV2Wanted, readerV2Hook } from "./_lib/dql/reader-v2/gate.js"; // Donovan Reader V2: DONOVAN_READER_V2 / DONOVAN_READER_V2_SHADOW, both OFF unless set
 import { capInlineNameList } from "./_lib/router/brevity.js";
 import { resolvePartialNameInQuestion, buildPartialNameClarify } from "./_lib/vocab/partialNames.js";
 import { classifySafety, buildSafetyAnswer, unverifiedTypeNote, normalizeInputText, neutralizeMarkup } from "./_lib/router/safetyGate.js";
@@ -825,7 +826,9 @@ export default async function handler(req, res) {
   // R31 3b: this tenant's replaced-document map (api/_lib/supersession.js), loaded once per ask after auth; null until then.
   let supersededMap = null;
   const recordsFirstOn = () => !/^(?:0|false|off|no)$/i.test(String(process.env.DONOVAN_RECORDS_FIRST ?? "1").trim());
-  const send = (status, body) => {
+  // Reader V2 hook: set once the question is known; send() below only looks at it when one of the two switches is on (unset = byte-for-byte the old path)
+  let readerV2Ctx = null;
+  const sendBase = (status, body) => {
     // R2: an answer with no text and no cards is never sent (a clear decline instead)
     if (body?.success && body.data && typeof body.data === "object" && (body.data.kind === "answer" || body.data.kind === "no-answer") && !String(body.data.text ?? "").trim() && !(Array.isArray(body.data.facts) && body.data.facts.length)) {
       body = { ...body, data: { ...body.data, kind: "no-answer", text: "I couldn't find an answer to that in your records. Try naming the customer, the document or an amount.", facts: [], sources: body.data.sources ?? [], confidence: 0 } };
@@ -903,6 +906,7 @@ export default async function handler(req, res) {
     }
     return handleCors(res, req).status(status).json(body);
   };
+  const send = (status, body) => (readerV2Ctx && status === 200 && readerV2Wanted() ? readerV2Hook(readerV2Ctx, body).then((b) => sendBase(status, b)) : sendBase(status, body));
 
   // Scorecard call (hook.js): null for every real request. When set it supplies the auth, skips the rate
   // limiter / billing gate, never counts against the monthly allowance and never touches the answer cache.
@@ -1235,6 +1239,7 @@ export default async function handler(req, res) {
     // view of the shop's local date (R30 M10: TENANT_DEFAULT_TZ / America/Phoenix, not UTC).
     const todayResolved = resolveToday(today);
     claimsToday = todayResolved;
+    if (!conversationContext && question) readerV2Ctx = { withTenant, ctxArg, question, today: todayResolved };
     // Cache key (handoffs/ASK_CACHE_AND_INDEX_2026-09-20.md): normalized so
     // near-identical phrasings ("What's the warranty?" / "whats the warranty")
     // share a cache entry — same normalization the meta-router already uses.

@@ -5,7 +5,7 @@
   "installCommand": "npm install",
   "env": {},
   "functions": {
-    "api/ask.js": { "includeFiles": "api/_lib/{wording/*.json,dql/learned/*.json,dql/reader-ml/data/*}" },
+    "api/ask.js": { "includeFiles": "api/_lib/{wording/*.json,dql/learned/*.json,dql/reader-ml/data/*,dql/reader-v2/data/*,dql/reader-v2/vendor/ort/*}" },
     "api/review.js": { "includeFiles": "test-docs/scorecard/exam.json" },
     "api/account.js": { "includeFiles": "test-docs/scorecard/exam.json" }
   },

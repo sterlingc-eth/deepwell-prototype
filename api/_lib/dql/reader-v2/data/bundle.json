@@ -1,0 +1,3445 @@
+{
+ "format": "donovan-reader-v2-bundle/1",
+ "version": "v002",
+ "round": 312,
+ "promoted": "2026-10-17 16:39:09",
+ "parent": "v001",
+ "recipe_name": "team21-core2-reader+realtyv2+clause2+typo+datenorm+precfix+grounding(noGT)+retrv2+agg+guard",
+ "recipe_hash": "cf23051c",
+ "recipe_hash_note": "first 8 hex of the recipe digest recorded by the training loop at promotion",
+ "recipe_json_sha256": "a44c62ea6b4934ea1a80487396cb7b6cb0859869f9e1a1cc5fb18f78efb089e0",
+ "loop_code_hash_at_promotion": "244782921081fb4d",
+ "frozen_manifest_sha": "18d4d96f140abed4e0d29d76ea7b6bb4f671ea899cbaca73f40e9a65e696d1b5",
+ "questions_trained": 345128,
+ "classes": [
+  "text",
+  "total",
+  "date",
+  "party",
+  "find",
+  "count",
+  "sum",
+  "latest",
+  "earliest",
+  "list",
+  "count_year",
+  "max",
+  "min",
+  "contact",
+  "who_addr",
+  "mention",
+  "unsupported"
+ ],
+ "tensors": {
+  "intent.W0": {
+   "offset": 0,
+   "shape": [
+    392,
+    256
+   ]
+  },
+  "intent.b0": {
+   "offset": 401408,
+   "shape": [
+    256
+   ]
+  },
+  "intent.W1": {
+   "offset": 402432,
+   "shape": [
+    256,
+    17
+   ]
+  },
+  "intent.b1": {
+   "offset": 419840,
+   "shape": [
+    17
+   ]
+  },
+  "pair.W1": {
+   "offset": 419908,
+   "shape": [
+    1153,
+    256
+   ]
+  },
+  "pair.b1": {
+   "offset": 1600580,
+   "shape": [
+    256
+   ]
+  },
+  "pair.W2": {
+   "offset": 1601604,
+   "shape": [
+    256,
+    1
+   ]
+  },
+  "pair.b2": {
+   "offset": 1602628,
+   "shape": [
+    1
+   ]
+  }
+ },
+ "thresholds": {
+  "thr": 0.93,
+  "level": 0.99,
+  "thr_fixed": 0.93,
+  "group_thr": null,
+  "precfix": {
+   "grounding_hard": true
+  },
+  "guard": null,
+  "at_fixed": {
+   "thr": 0.93,
+   "answered": 73150,
+   "precision": 0.99224,
+   "cp_lower": 0.99168
+  },
+  "guard_report": {
+   "groups": [
+    {
+     "group": "syn",
+     "thr": 0.97,
+     "wrong_removed": 99,
+     "correct_lost": 1953,
+     "eff": 0.051,
+     "kept": false
+    },
+    {
+     "group": "unk3",
+     "thr": 0.95,
+     "wrong_removed": 75,
+     "correct_lost": 1628,
+     "eff": 0.046,
+     "kept": false
+    }
+   ],
+   "kept": [],
+   "loss_rel": 0,
+   "prec_before": 0.99224,
+   "prec_after": 0.99224
+  }
+ },
+ "switches": {
+  "syn": {
+   "on": true,
+   "thr": 0.62,
+   "margin": 0.04
+  },
+  "clause": {
+   "on": true,
+   "override": true,
+   "absent": true,
+   "absent_thr": 0.8,
+   "yesno": true,
+   "version": 2,
+   "head_w": [
+    -0.0027054829988628626,
+    -0.04707443341612816,
+    -0.021660013124346733,
+    0.04656064510345459,
+    0.03529137745499611,
+    0.01624198816716671,
+    0.003346926998347044,
+    -0.013908455148339272,
+    0.0372774712741375,
+    -0.029851915314793587,
+    0.042164817452430725,
+    -0.00036287144757807255,
+    0.054781701415777206,
+    -0.07213619351387024,
+    0.012686274945735931,
+    0.08640927821397781,
+    0.015502468682825565,
+    0.08119567483663559,
+    0.08061685413122177,
+    -0.012238028459250927,
+    0.03106214851140976,
+    -0.09954673051834106,
+    -0.02453160285949707,
+    -0.07777909934520721,
+    0.009623220190405846,
+    0.06063556671142578,
+    0.05762121453881264,
+    -0.021515486761927605,
+    -0.015582459047436714,
+    -0.01117134653031826,
+    -0.024800477549433708,
+    -0.012811130844056606,
+    -0.03201515972614288,
+    0.040148161351680756,
+    -0.042192451655864716,
+    0.04297485575079918,
+    0.0009624567464925349,
+    -0.006572452373802662,
+    0.028767678886651993,
+    -0.07967256754636765,
+    -0.05716455355286598,
+    0.009239733219146729,
+    0.06837287545204163,
+    -0.012979171238839626,
+    0.00250040739774704,
+    -0.025977078825235367,
+    0.04847826436161995,
+    -0.005937544163316488,
+    0.08958190679550171,
+    0.014372508972883224,
+    -0.04013600945472717,
+    -0.06424078345298767,
+    -0.056034065783023834,
+    -0.02501007914543152,
+    -0.0516350083053112,
+    -0.03579302877187729,
+    -0.0016852382104843855,
+    -0.019976146519184113,
+    0.009155542589724064,
+    0.10719649493694305,
+    0.023766353726387024,
+    0.06424994766712189,
+    -0.017998678609728813,
+    0.0646936446428299,
+    0.06062253937125206,
+    0.03805721551179886,
+    -0.015131300315260887,
+    0.009766639210283756,
+    -0.013255849480628967,
+    -0.010614652186632156,
+    0.01700441539287567,
+    -0.009681927971541882,
+    0.08473148196935654,
+    -0.01800241321325302,
+    0.1002722755074501,
+    -0.030235925689339638,
+    -0.014146357774734497,
+    -0.02490072138607502,
+    0.01088730152696371,
+    0.03534059599041939,
+    -0.047795481979846954,
+    0.06826653331518173,
+    -0.07077974826097488,
+    -0.04441807419061661,
+    -0.004775805398821831,
+    0.040676429867744446,
+    0.049112528562545776,
+    -0.009884888306260109,
+    -0.0704660564661026,
+    -0.07199827581644058,
+    -0.00440939562395215,
+    0.022931789979338646,
+    0.0005387917626649141,
+    -0.04749605804681778,
+    0.040963172912597656,
+    -0.049479592591524124,
+    0.003710666671395302,
+    -0.024255242198705673,
+    -0.06490186601877213,
+    0.05463741347193718,
+    -0.08773033320903778,
+    0.0164930559694767,
+    0.010125471279025078,
+    0.04536733403801918,
+    -0.02342568151652813,
+    0.021421238780021667,
+    -0.053255241364240646,
+    -0.029051797464489937,
+    0.0029192422516644,
+    -0.05637785419821739,
+    -0.03687961399555206,
+    0.07285582274198532,
+    0.004643617197871208,
+    0.10885386168956757,
+    -0.015297905541956425,
+    0.016872720792889595,
+    0.05433481186628342,
+    -0.009962988086044788,
+    0.004048330243676901,
+    0.004689422436058521,
+    0.05000458285212517,
+    0.028411559760570526,
+    0.03908355161547661,
+    -0.0035736237186938524,
+    -0.058648936450481415,
+    0.04246867820620537,
+    -0.031796637922525406,
+    -0.024772530421614647,
+    -0.0070040118880569935,
+    -0.0464530847966671,
+    -0.03220626711845398,
+    0.0022432568948715925,
+    -0.044092681258916855,
+    0.017441892996430397,
+    -0.023990387097001076,
+    -0.061875250190496445,
+    -0.13305939733982086,
+    -0.0001945449912454933,
+    0.06176961585879326,
+    -0.02950647845864296,
+    0.07761387526988983,
+    0.0754394680261612,
+    0.0405440516769886,
+    -0.056230850517749786,
+    -0.03620292618870735,
+    -0.014086284674704075,
+    -0.039419811218976974,
+    0.0035567739978432655,
+    0.01614638976752758,
+    0.02737588994204998,
+    -0.05800522863864899,
+    0.0710814893245697,
+    0.02863442339003086,
+    -0.08548231422901154,
+    0.03803950920701027,
+    0.0702190175652504,
+    -0.050432801246643066,
+    0.09456133097410202,
+    0.002190312370657921,
+    -0.023396234959363937,
+    0.07644933462142944,
+    -0.05497071146965027,
+    0.049930453300476074,
+    0.07451529055833817,
+    -0.020135335624217987,
+    -0.02078871987760067,
+    0.08027968555688858,
+    0.010526621714234352,
+    0.03448178991675377,
+    -0.04097307100892067,
+    -0.06336861103773117,
+    -0.01725980080664158,
+    0.03209546208381653,
+    0.041695110499858856,
+    -0.06137862801551819,
+    0.02341248095035553,
+    -0.023307442665100098,
+    -0.02532060630619526,
+    -0.0012024211464449763,
+    0.0422232523560524,
+    -0.021741462871432304,
+    -0.062097642570734024,
+    0.032654743641614914,
+    0.05066694691777229,
+    -0.02515336498618126,
+    -0.019661352038383484,
+    0.04027114063501358,
+    0.07383634150028229,
+    -0.04399345442652702,
+    0.040056828409433365,
+    0.04625234007835388,
+    -0.018356168642640114,
+    0.034864380955696106,
+    -0.0023483801633119583,
+    0.05051315575838089,
+    -0.018460236489772797,
+    -0.037605881690979004,
+    -0.0744020938873291,
+    -0.03376787155866623,
+    0.07224633544683456,
+    -0.027798058465123177,
+    -0.02647315338253975,
+    -0.024644115939736366,
+    -0.06494225561618805,
+    -0.07695069164037704,
+    0.0022304074373096228,
+    -0.0462847538292408,
+    -0.03353329747915268,
+    0.014870142564177513,
+    0.05349716916680336,
+    0.015590027906000614,
+    -0.03471919521689415,
+    -0.040282536298036575,
+    -0.015305767767131329,
+    -0.10931634157896042,
+    -0.07234878838062286,
+    -0.023381635546684265,
+    -0.01297511626034975,
+    0.04526683688163757,
+    0.08991684764623642,
+    0.0706295594573021,
+    -0.06880338490009308,
+    -0.002917361678555608,
+    -0.023672891780734062,
+    -0.007825391367077827,
+    -0.055219296365976334,
+    -0.028199926018714905,
+    0.04830370098352432,
+    0.035456106066703796,
+    0.034055303782224655,
+    0.007764121517539024,
+    -0.021468764171004295,
+    -0.05159724876284599,
+    0.05909643694758415,
+    0.0434090718626976,
+    -0.08602357655763626,
+    -0.06729210168123245,
+    0.0017252942780032754,
+    0.044977817684412,
+    -0.05218912288546562,
+    0.06810805201530457,
+    0.11233749240636826,
+    0.01117093488574028,
+    -0.07421012222766876,
+    -0.047381527721881866,
+    0.010500376112759113,
+    0.08592651039361954,
+    -0.004971649497747421,
+    0.015405555255711079,
+    -0.005544748157262802,
+    0.045297425240278244,
+    0.04328462854027748,
+    0.013132760301232338,
+    -0.03531919792294502,
+    -0.00890613067895174,
+    -0.05817032232880592,
+    -0.04444980248808861,
+    -0.0682552307844162,
+    0.05884021893143654,
+    0.025959843769669533,
+    -0.10049152374267578,
+    0.003262873739004135,
+    0.04387155920267105,
+    -0.004804887343198061,
+    0.03676885738968849,
+    -0.006861601024866104,
+    0.00034026114735752344,
+    0.0929187461733818,
+    -0.025887833908200264,
+    -0.03941509500145912,
+    -0.023758433759212494,
+    0.0331011526286602,
+    0.011598735116422176,
+    0.010917672887444496,
+    0.022280022501945496,
+    0.031687188893556595,
+    0.006757081486284733,
+    -0.04493485763669014,
+    0.031037217006087303,
+    -0.032553788274526596,
+    -0.044192761182785034,
+    -0.008883664384484291,
+    -0.0021414028014987707,
+    -0.09384845942258835,
+    -0.019706647843122482,
+    -0.037477366626262665,
+    0.03731045126914978,
+    -0.02189638465642929,
+    0.04013744369149208,
+    -0.017131227999925613,
+    -0.08992046117782593,
+    0.057539671659469604,
+    0.008934374898672104,
+    0.049226708710193634,
+    0.06522828340530396,
+    0.007011687383055687,
+    -0.027483221143484116,
+    -0.014923354610800743,
+    0.01084575243294239,
+    0.007256537675857544,
+    0.055512551218271255,
+    0.03374483063817024,
+    -0.04737633466720581,
+    -0.04010869190096855,
+    -0.046630628407001495,
+    -0.02928685024380684,
+    -0.008698463439941406,
+    -0.00796783808618784,
+    0.0422232449054718,
+    -0.00151880644261837,
+    0.030455609783530235,
+    0.013882158324122429,
+    -0.02191123552620411,
+    -0.0360865443944931,
+    -0.01932276226580143,
+    0.0908816009759903,
+    0.10116519778966904,
+    -0.04883679747581482,
+    0.1630644053220749,
+    -0.01113174483180046,
+    0.062320251017808914,
+    -0.05692243203520775,
+    0.08563236147165298,
+    0.014896908774971962,
+    -0.06482702493667603,
+    0.09536761790513992,
+    0.009679077193140984,
+    -0.05204536020755768,
+    0.016366472467780113,
+    0.002350357361137867,
+    -0.03879919275641441,
+    0.05533108115196228,
+    -0.01987997628748417,
+    -0.043642785400152206,
+    -0.002175629371777177,
+    -0.015450484119355679,
+    -0.02649400569498539,
+    -0.02904922515153885,
+    -0.03094901144504547,
+    -0.024098150432109833,
+    -0.028027724474668503,
+    0.01747293397784233,
+    -0.018820518627762794,
+    0.03777990862727165,
+    -0.032834671437740326,
+    0.04176589474081993,
+    0.06692058593034744,
+    0.019278166815638542,
+    -0.0722234845161438,
+    -0.005646885838359594,
+    0.0651015043258667,
+    0.033132147043943405,
+    -0.0017516249790787697,
+    -0.007316583301872015,
+    0.01854223944246769,
+    -0.027393300086259842,
+    -0.026982147246599197,
+    0.0692368596792221,
+    0.030157756060361862,
+    -0.02274465188384056,
+    -0.06624136120080948,
+    0.06794589757919312,
+    0.02975175902247429,
+    0.08284029364585876,
+    -0.03435135632753372,
+    0.047307807952165604,
+    -0.019847426563501358,
+    -0.01917967014014721,
+    0.08738116174936295,
+    0.028611421585083008,
+    0.05012527108192444,
+    0.0015995537396520376,
+    0.0047796061262488365,
+    0.0011067292653024197,
+    0.03562847524881363,
+    0.011388938874006271,
+    0.016172358766198158,
+    0.01050596684217453,
+    0.014003625139594078,
+    -0.026438552886247635,
+    0.020635364577174187,
+    -0.030760331079363823,
+    0.019352000206708908,
+    0.0435476116836071,
+    0.38847577571868896,
+    0.41688746213912964,
+    0.32441192865371704,
+    0.03478359058499336,
+    0.05104497820138931,
+    -0.25235316157341003
+   ],
+   "head_b": 0.006316381972283125,
+   "null_w": [
+    0.24539245665073395,
+    0.11644231528043747,
+    -0.1044686883687973,
+    0.022999564185738564
+   ],
+   "null_b": -0.09579716622829437,
+   "cal": {
+    "w": [
+     0.14766786011855404,
+     0.4279283149447989,
+     1.55514851616537,
+     -1.597263089169418,
+     0.27961805730899014,
+     -0.10140225774537773
+    ],
+    "b": -1.3011989006988212
+   },
+   "val_top1": 0.9232558139534883,
+   "val_absent": 0.8028169014084507,
+   "n_train": 18538,
+   "n_val": 931,
+   "n_val_absent": 71
+  },
+  "doctype": {
+   "on": true,
+   "thr": 0.52,
+   "margin": 0.1,
+   "pairs": [
+    [
+     "appraisal report",
+     "appraised value report",
+     31
+    ],
+    [
+     "hoa doc packet",
+     "hoa document packet",
+     20
+    ],
+    [
+     "hoa document packet",
+     "hoa paperwork",
+     20
+    ],
+    [
+     "appraisal",
+     "property appraisal",
+     17
+    ],
+    [
+     "appraisal report",
+     "property appraisal",
+     17
+    ],
+    [
+     "appraised value report",
+     "property appraisal",
+     17
+    ],
+    [
+     "cma",
+     "cma report",
+     17
+    ],
+    [
+     "cma report",
+     "comp sheet",
+     17
+    ],
+    [
+     "cma report",
+     "market analysi",
+     17
+    ],
+    [
+     "appraisal",
+     "appraisal report",
+     16
+    ],
+    [
+     "community rule and budget",
+     "hoa doc packet",
+     15
+    ],
+    [
+     "community rule and budget",
+     "hoa paperwork",
+     15
+    ],
+    [
+     "appraisal",
+     "appraised value report",
+     15
+    ],
+    [
+     "deposit receipt",
+     "earnest money receipt",
+     14
+    ],
+    [
+     "association document set",
+     "hoa doc packet",
+     14
+    ],
+    [
+     "association document set",
+     "hoa paperwork",
+     14
+    ],
+    [
+     "listing data sheet",
+     "mls sheet",
+     12
+    ],
+    [
+     "listing data sheet",
+     "listing sheet",
+     12
+    ],
+    [
+     "rent roll",
+     "unit rent schedule",
+     12
+    ],
+    [
+     "rent schedule",
+     "unit rent schedule",
+     12
+    ],
+    [
+     "move checklist",
+     "move out condition checklist",
+     12
+    ],
+    [
+     "move out condition checklist",
+     "turnover checklist",
+     12
+    ],
+    [
+     "commission payout",
+     "commission statement",
+     12
+    ],
+    [
+     "mls input sheet",
+     "mls sheet",
+     12
+    ],
+    [
+     "listing sheet",
+     "mls input sheet",
+     12
+    ],
+    [
+     "commitment",
+     "title commitment schedule",
+     12
+    ],
+    [
+     "prelim",
+     "title commitment schedule",
+     12
+    ],
+    [
+     "title commitment",
+     "title commitment schedule",
+     12
+    ],
+    [
+     "commitment",
+     "commitment for title insurance",
+     12
+    ],
+    [
+     "commitment for title insurance",
+     "prelim",
+     12
+    ],
+    [
+     "commitment for title insurance",
+     "title commitment",
+     12
+    ],
+    [
+     "closing paper",
+     "settlement statement",
+     11
+    ],
+    [
+     "wire instruction",
+     "wiring instruction sheet",
+     11
+    ],
+    [
+     "wire sheet",
+     "wiring instruction sheet",
+     11
+    ],
+    [
+     "showing log",
+     "showing sheet",
+     11
+    ],
+    [
+     "exclusive listing contract",
+     "listing contract",
+     11
+    ],
+    [
+     "disclosure form",
+     "property condition disclosure",
+     11
+    ],
+    [
+     "buyer repair list",
+     "repair list",
+     11
+    ],
+    [
+     "buyer repair list",
+     "repair ask",
+     11
+    ],
+    [
+     "fund transfer detail",
+     "wire instruction",
+     11
+    ],
+    [
+     "fund transfer detail",
+     "wire sheet",
+     11
+    ],
+    [
+     "vendor bill",
+     "vendor invoice",
+     11
+    ],
+    [
+     "wire instruction",
+     "wire instruction sheet",
+     11
+    ],
+    [
+     "wire instruction sheet",
+     "wire sheet",
+     11
+    ],
+    [
+     "monthly rent roll",
+     "rent roll",
+     11
+    ],
+    [
+     "monthly rent roll",
+     "rent schedule",
+     11
+    ],
+    [
+     "contractor bill",
+     "vendor bill",
+     10
+    ],
+    [
+     "cda",
+     "cda form",
+     10
+    ],
+    [
+     "cda form",
+     "disbursement form",
+     10
+    ],
+    [
+     "cda form",
+     "commission authorization",
+     10
+    ],
+    [
+     "mls listing sheet",
+     "mls sheet",
+     10
+    ],
+    [
+     "listing sheet",
+     "mls listing sheet",
+     10
+    ],
+    [
+     "violation letter",
+     "violation notice",
+     10
+    ],
+    [
+     "cma",
+     "comparative market analysi",
+     10
+    ],
+    [
+     "comp sheet",
+     "comparative market analysi",
+     10
+    ],
+    [
+     "comparative market analysi",
+     "market analysi",
+     10
+    ],
+    [
+     "commitment",
+     "preliminary title report",
+     9
+    ],
+    [
+     "prelim",
+     "preliminary title report",
+     9
+    ],
+    [
+     "preliminary title report",
+     "title commitment",
+     9
+    ],
+    [
+     "ownership change certificate",
+     "resale packet",
+     9
+    ],
+    [
+     "advisory",
+     "buyer information sheet",
+     9
+    ],
+    [
+     "addendum",
+     "amendment to contract",
+     9
+    ],
+    [
+     "amendment",
+     "amendment to contract",
+     9
+    ],
+    [
+     "community rule notice",
+     "violation letter",
+     9
+    ],
+    [
+     "buy sell agreement",
+     "sale contract",
+     9
+    ],
+    [
+     "move checklist",
+     "unit turnover checklist",
+     9
+    ],
+    [
+     "turnover checklist",
+     "unit turnover checklist",
+     9
+    ],
+    [
+     "supplier statement",
+     "vendor bill",
+     9
+    ],
+    [
+     "move checklist",
+     "move in move out checklist",
+     9
+    ],
+    [
+     "move in move out checklist",
+     "turnover checklist",
+     9
+    ],
+    [
+     "key term digest",
+     "lease abstract",
+     9
+    ],
+    [
+     "cam statement",
+     "operating expense statement",
+     8
+    ],
+    [
+     "due diligence notice",
+     "inspection notice",
+     8
+    ],
+    [
+     "arrival walkthrough report",
+     "move in report",
+     8
+    ],
+    [
+     "managed unit lease",
+     "pm lease",
+     8
+    ],
+    [
+     "managed lease",
+     "managed unit lease",
+     8
+    ],
+    [
+     "commission contract",
+     "fee agreement",
+     8
+    ],
+    [
+     "rent roll",
+     "rent schedule",
+     8
+    ],
+    [
+     "counter",
+     "counter offer",
+     8
+    ],
+    [
+     "addendum",
+     "contract addendum",
+     8
+    ],
+    [
+     "amendment",
+     "contract addendum",
+     8
+    ],
+    [
+     "maintenance request",
+     "repair ticket",
+     8
+    ],
+    [
+     "closing paper",
+     "closing statement",
+     7
+    ],
+    [
+     "inspection",
+     "inspection report",
+     7
+    ],
+    [
+     "inspection report",
+     "inspector report",
+     7
+    ],
+    [
+     "rent ledger",
+     "rent statement",
+     7
+    ],
+    [
+     "ground maintenance ticket",
+     "service ticket",
+     7
+    ],
+    [
+     "closing paper",
+     "final closing figure",
+     7
+    ],
+    [
+     "due bill",
+     "owner charge notice",
+     7
+    ],
+    [
+     "inspection contingency notice",
+     "inspection notice",
+     7
+    ],
+    [
+     "cma",
+     "market comparison sheet",
+     7
+    ],
+    [
+     "comp sheet",
+     "market comparison sheet",
+     7
+    ],
+    [
+     "market analysi",
+     "market comparison sheet",
+     7
+    ],
+    [
+     "closing instruction",
+     "escrow instruction",
+     6
+    ],
+    [
+     "property tour record",
+     "site visit sheet",
+     6
+    ],
+    [
+     "architectural form",
+     "modification application",
+     6
+    ],
+    [
+     "deposit receipt",
+     "escrow deposit slip",
+     6
+    ],
+    [
+     "lease",
+     "lease agreement",
+     6
+    ],
+    [
+     "title opinion letter",
+     "title report",
+     6
+    ],
+    [
+     "rep agreement",
+     "tenant rep agreement",
+     6
+    ],
+    [
+     "diligence list",
+     "property review checklist",
+     6
+    ],
+    [
+     "site visit log",
+     "site visit sheet",
+     6
+    ],
+    [
+     "disclosure form",
+     "seller property report",
+     6
+    ],
+    [
+     "advisory",
+     "buyer notice packet",
+     6
+    ],
+    [
+     "inspection",
+     "property inspection summary",
+     6
+    ],
+    [
+     "inspector report",
+     "property inspection summary",
+     6
+    ],
+    [
+     "renewal letter",
+     "renewal offer",
+     6
+    ],
+    [
+     "payoff letter",
+     "payoff statement",
+     6
+    ],
+    [
+     "funding confirmation",
+     "wire receipt",
+     6
+    ],
+    [
+     "listing contract",
+     "seller representation agreement",
+     6
+    ],
+    [
+     "showing record",
+     "showing sheet",
+     6
+    ],
+    [
+     "home inspection report",
+     "inspection",
+     6
+    ],
+    [
+     "home inspection report",
+     "inspector report",
+     6
+    ],
+    [
+     "lease",
+     "rental agreement",
+     6
+    ],
+    [
+     "lease proposal",
+     "term outline",
+     6
+    ],
+    [
+     "counter",
+     "seller counter proposal",
+     6
+    ],
+    [
+     "counter offer",
+     "seller counter proposal",
+     6
+    ],
+    [
+     "bulk bid",
+     "bulk quote",
+     6
+    ],
+    [
+     "mortgage payoff quote",
+     "payoff letter",
+     5
+    ],
+    [
+     "wire receipt",
+     "wire verification sheet",
+     5
+    ],
+    [
+     "rep agreement",
+     "space search engagement",
+     5
+    ],
+    [
+     "amenity repair request",
+     "service ticket",
+     5
+    ],
+    [
+     "counter",
+     "counteroffer form",
+     5
+    ],
+    [
+     "counter offer",
+     "counteroffer form",
+     5
+    ],
+    [
+     "extension proposal",
+     "renewal letter",
+     5
+    ],
+    [
+     "file note",
+     "transaction memo",
+     5
+    ],
+    [
+     "lease abstract",
+     "lease summary sheet",
+     5
+    ],
+    [
+     "rule compliance letter",
+     "violation letter",
+     5
+    ],
+    [
+     "cda",
+     "commission disbursement authorization",
+     5
+    ],
+    [
+     "commission disbursement authorization",
+     "disbursement form",
+     5
+    ],
+    [
+     "commission authorization",
+     "commission disbursement authorization",
+     5
+    ],
+    [
+     "title commitment",
+     "title report",
+     5
+    ],
+    [
+     "closing disclosure",
+     "closing paper",
+     5
+    ],
+    [
+     "coordinator memo",
+     "file note",
+     5
+    ],
+    [
+     "acquisition diligence list",
+     "diligence list",
+     5
+    ],
+    [
+     "rent ledger",
+     "tenant ledger",
+     5
+    ],
+    [
+     "pm lease",
+     "property management lease",
+     5
+    ],
+    [
+     "managed lease",
+     "property management lease",
+     5
+    ],
+    [
+     "lease renewal notice",
+     "renewal letter",
+     5
+    ],
+    [
+     "purchase contract",
+     "sale contract",
+     5
+    ],
+    [
+     "fuel order",
+     "fuel purchase",
+     5
+    ],
+    [
+     "supply po",
+     "supply purchase",
+     5
+    ],
+    [
+     "repair bid",
+     "repair quote",
+     5
+    ],
+    [
+     "repair list",
+     "request for repair",
+     5
+    ],
+    [
+     "repair ask",
+     "request for repair",
+     5
+    ],
+    [
+     "lease proposal",
+     "letter of intent",
+     4
+    ],
+    [
+     "diligence list",
+     "due diligence checklist",
+     4
+    ],
+    [
+     "covenant breach notice",
+     "violation letter",
+     4
+    ],
+    [
+     "repair ticket",
+     "work order",
+     4
+    ],
+    [
+     "due bill",
+     "due statement",
+     4
+    ],
+    [
+     "architectural form",
+     "architectural request",
+     4
+    ],
+    [
+     "lease",
+     "residential lease",
+     4
+    ],
+    [
+     "monthly rent summary",
+     "rent ledger",
+     4
+    ],
+    [
+     "occupier representation contract",
+     "rep agreement",
+     4
+    ],
+    [
+     "inspection notice",
+     "inspection response notice",
+     4
+    ],
+    [
+     "move in report",
+     "unit condition report",
+     4
+    ],
+    [
+     "closing checklist",
+     "file progres sheet",
+     4
+    ],
+    [
+     "cam reconciliation",
+     "cam statement",
+     4
+    ],
+    [
+     "architectural form",
+     "exterior change form",
+     4
+    ],
+    [
+     "agent payout statement",
+     "commission payout",
+     4
+    ],
+    [
+     "advisory",
+     "buyer advisory",
+     4
+    ],
+    [
+     "move in inspection",
+     "move in report",
+     4
+    ],
+    [
+     "supply agreement",
+     "supply contract",
+     4
+    ],
+    [
+     "package bid",
+     "package quote",
+     4
+    ],
+    [
+     "enrollment agreement",
+     "enrollment contract",
+     4
+    ],
+    [
+     "material po",
+     "material purchase",
+     4
+    ],
+    [
+     "part po",
+     "part purchase",
+     4
+    ],
+    [
+     "event bid",
+     "event quote",
+     4
+    ],
+    [
+     "cda",
+     "disbursement authorization",
+     4
+    ],
+    [
+     "disbursement authorization",
+     "disbursement form",
+     4
+    ],
+    [
+     "commission authorization",
+     "disbursement authorization",
+     4
+    ],
+    [
+     "title report",
+     "title search report",
+     3
+    ],
+    [
+     "broker commission agreement",
+     "fee agreement",
+     3
+    ],
+    [
+     "assessment invoice",
+     "due bill",
+     3
+    ],
+    [
+     "escrow instruction",
+     "settlement instruction letter",
+     3
+    ],
+    [
+     "lender payoff letter",
+     "payoff letter",
+     3
+    ],
+    [
+     "closing paper",
+     "final fund statement",
+     3
+    ],
+    [
+     "wire instruction receipt",
+     "wire receipt",
+     3
+    ],
+    [
+     "closing checklist",
+     "transaction tracker",
+     3
+    ],
+    [
+     "annual common area bill",
+     "cam statement",
+     3
+    ],
+    [
+     "commission disbursement",
+     "commission payout",
+     3
+    ],
+    [
+     "pm lease",
+     "pm lease contract",
+     3
+    ],
+    [
+     "managed lease",
+     "pm lease contract",
+     3
+    ],
+    [
+     "deposit receipt",
+     "deposit received slip",
+     3
+    ],
+    [
+     "site visit sheet",
+     "space showing note",
+     3
+    ],
+    [
+     "deposit receipt",
+     "fund held notice",
+     3
+    ],
+    [
+     "resale packet",
+     "transfer disclosure packet",
+     3
+    ],
+    [
+     "repair bill",
+     "repair invoice",
+     3
+    ],
+    [
+     "gear po",
+     "gear purchase",
+     3
+    ],
+    [
+     "supply order",
+     "supply purchase",
+     3
+    ],
+    [
+     "repair bid",
+     "repair estimate",
+     3
+    ],
+    [
+     "progres memo",
+     "progres note",
+     3
+    ],
+    [
+     "training bid",
+     "training quote",
+     3
+    ],
+    [
+     "service agreement",
+     "service contract",
+     3
+    ],
+    [
+     "repair list",
+     "repair request",
+     3
+    ],
+    [
+     "repair ask",
+     "repair request",
+     3
+    ],
+    [
+     "resale certificate",
+     "resale packet",
+     2
+    ],
+    [
+     "compliance letter",
+     "violation letter",
+     2
+    ],
+    [
+     "disclosure form",
+     "seller disclosure",
+     2
+    ],
+    [
+     "chemical order",
+     "chemical purchase",
+     2
+    ],
+    [
+     "decorative rock ticket",
+     "delivery load ticket",
+     2
+    ],
+    [
+     "material bill",
+     "material invoice",
+     2
+    ],
+    [
+     "contractor account agreement",
+     "contractor account contract",
+     2
+    ],
+    [
+     "load dispute memo",
+     "load dispute note",
+     2
+    ],
+    [
+     "restoration bid",
+     "restoration quote",
+     2
+    ],
+    [
+     "lumber po",
+     "lumber purchase",
+     2
+    ],
+    [
+     "manicure ticket",
+     "nail service ticket",
+     2
+    ],
+    [
+     "bridal bid",
+     "bridal quote",
+     2
+    ],
+    [
+     "nail bill",
+     "nail invoice",
+     2
+    ],
+    [
+     "booth rental agreement",
+     "booth rental contract",
+     2
+    ],
+    [
+     "polish po",
+     "polish purchase",
+     2
+    ],
+    [
+     "allergy memo",
+     "allergy note",
+     2
+    ],
+    [
+     "part order",
+     "part purchase",
+     2
+    ],
+    [
+     "setup memo",
+     "setup note",
+     2
+    ],
+    [
+     "event play sheet",
+     "wedding dj ticket",
+     2
+    ],
+    [
+     "dj bill",
+     "dj invoice",
+     2
+    ],
+    [
+     "song list memo",
+     "song list note",
+     2
+    ],
+    [
+     "membership agreement",
+     "membership contract",
+     2
+    ],
+    [
+     "annual inspection ticket",
+     "squawk work order",
+     2
+    ],
+    [
+     "aviation bill",
+     "aviation invoice",
+     2
+    ],
+    [
+     "hangar agreement",
+     "hangar contract",
+     2
+    ],
+    [
+     "logbook memo",
+     "logbook note",
+     2
+    ],
+    [
+     "puppy clas ticket",
+     "training session log",
+     2
+    ],
+    [
+     "program bid",
+     "program quote",
+     2
+    ],
+    [
+     "training bill",
+     "training invoice",
+     2
+    ],
+    [
+     "training package agreement",
+     "training package contract",
+     2
+    ],
+    [
+     "duct job ticket",
+     "whole home duct clean ticket",
+     2
+    ],
+    [
+     "duct bid",
+     "duct quote",
+     2
+    ],
+    [
+     "duct bill",
+     "duct invoice",
+     2
+    ],
+    [
+     "annual service contract",
+     "annual service plan",
+     2
+    ],
+    [
+     "air quality memo",
+     "air quality note",
+     2
+    ],
+    [
+     "full board ticket",
+     "stall care log",
+     2
+    ],
+    [
+     "board bill",
+     "board invoice",
+     2
+    ],
+    [
+     "boarding agreement",
+     "boarding contract",
+     2
+    ],
+    [
+     "feed po",
+     "feed purchase",
+     2
+    ],
+    [
+     "vet farrier memo",
+     "vet farrier note",
+     2
+    ],
+    [
+     "document translation ticket",
+     "project assignment ticket",
+     2
+    ],
+    [
+     "word count bid",
+     "word count quote",
+     2
+    ],
+    [
+     "translation bill",
+     "translation invoice",
+     2
+    ],
+    [
+     "master service agreement",
+     "master service contract",
+     2
+    ],
+    [
+     "vendor po",
+     "vendor purchase",
+     2
+    ],
+    [
+     "glossary memo",
+     "glossary note",
+     2
+    ],
+    [
+     "cnc milling ticket",
+     "work order traveler",
+     2
+    ],
+    [
+     "job bid",
+     "job quote",
+     2
+    ],
+    [
+     "shop bill",
+     "shop invoice",
+     2
+    ],
+    [
+     "blanket order agreement",
+     "blanket order contract",
+     2
+    ],
+    [
+     "inspection report memo",
+     "inspection report note",
+     2
+    ],
+    [
+     "behind wheel lesson ticket",
+     "behind wheel log",
+     2
+    ],
+    [
+     "driving bill",
+     "driving invoice",
+     2
+    ],
+    [
+     "road test memo",
+     "road test note",
+     2
+    ],
+    [
+     "common area work order",
+     "service ticket",
+     2
+    ],
+    [
+     "copper ticket",
+     "weigh ticket",
+     2
+    ],
+    [
+     "settlement bill",
+     "settlement invoice",
+     2
+    ],
+    [
+     "roll off po",
+     "roll off purchase",
+     2
+    ],
+    [
+     "contamination memo",
+     "contamination note",
+     2
+    ],
+    [
+     "corporate account agreement",
+     "corporate account contract",
+     2
+    ],
+    [
+     "property tour log",
+     "showing sheet",
+     2
+    ],
+    [
+     "device repair ticket",
+     "screen repair ticket",
+     2
+    ],
+    [
+     "busines account agreement",
+     "busines account contract",
+     2
+    ],
+    [
+     "screen po",
+     "screen purchase",
+     2
+    ],
+    [
+     "device condition memo",
+     "device condition note",
+     2
+    ],
+    [
+     "listing agreement",
+     "listing contract",
+     2
+    ],
+    [
+     "addendum",
+     "purchase addendum",
+     2
+    ],
+    [
+     "amendment",
+     "purchase addendum",
+     2
+    ],
+    [
+     "recall memo",
+     "recall note",
+     2
+    ],
+    [
+     "driveway wash ticket",
+     "wash job ticket",
+     1
+    ],
+    [
+     "wash bid",
+     "wash quote",
+     1
+    ],
+    [
+     "wash bill",
+     "wash invoice",
+     1
+    ],
+    [
+     "recurring wash agreement",
+     "recurring wash contract",
+     1
+    ],
+    [
+     "before after memo",
+     "before after note",
+     1
+    ],
+    [
+     "refinish ticket",
+     "strip and stain ticket",
+     1
+    ],
+    [
+     "refinish bill",
+     "refinish invoice",
+     1
+    ],
+    [
+     "commission agreement",
+     "commission contract",
+     1
+    ],
+    [
+     "stain po",
+     "stain purchase",
+     1
+    ],
+    [
+     "finish memo",
+     "finish note",
+     1
+    ],
+    [
+     "new pallet ticket",
+     "pallet order ticket",
+     1
+    ],
+    [
+     "pallet bill",
+     "pallet invoice",
+     1
+    ],
+    [
+     "pickup memo",
+     "pickup note",
+     1
+    ],
+    [
+     "appointment ticket",
+     "haircut ticket",
+     1
+    ],
+    [
+     "barber bill",
+     "barber invoice",
+     1
+    ],
+    [
+     "chair rental agreement",
+     "chair rental contract",
+     1
+    ],
+    [
+     "style memo",
+     "style note",
+     1
+    ],
+    [
+     "garment intake ticket",
+     "shirt laundry ticket",
+     1
+    ],
+    [
+     "cleaner bill",
+     "cleaner invoice",
+     1
+    ],
+    [
+     "commercial account agreement",
+     "commercial account contract",
+     1
+    ],
+    [
+     "solvent order",
+     "solvent purchase",
+     1
+    ],
+    [
+     "damage claim memo",
+     "damage claim note",
+     1
+    ],
+    [
+     "chimney sweep ticket",
+     "sweep job sheet",
+     1
+    ],
+    [
+     "sweep bill",
+     "sweep invoice",
+     1
+    ],
+    [
+     "annual sweep contract",
+     "annual sweep plan",
+     1
+    ],
+    [
+     "sat prep ticket",
+     "session attendance log",
+     1
+    ],
+    [
+     "course bid",
+     "course quote",
+     1
+    ],
+    [
+     "tuition bill",
+     "tuition invoice",
+     1
+    ],
+    [
+     "score memo",
+     "score note",
+     1
+    ],
+    [
+     "repair intake ticket",
+     "viru removal ticket",
+     1
+    ],
+    [
+     "managed plan agreement",
+     "managed plan contract",
+     1
+    ],
+    [
+     "data backup memo",
+     "data backup note",
+     1
+    ],
+    [
+     "equipment delivery ticket",
+     "hospital bed ticket",
+     1
+    ],
+    [
+     "rental bid",
+     "rental quote",
+     1
+    ],
+    [
+     "dme bill",
+     "dme statement",
+     1
+    ],
+    [
+     "rental agreement",
+     "rental contract",
+     1
+    ],
+    [
+     "equipment po",
+     "equipment purchase",
+     1
+    ],
+    [
+     "custom piece ticket",
+     "tattoo session ticket",
+     1
+    ],
+    [
+     "design bid",
+     "design quote",
+     1
+    ],
+    [
+     "tattoo bill",
+     "tattoo invoice",
+     1
+    ],
+    [
+     "deposit agreement",
+     "deposit contract",
+     1
+    ],
+    [
+     "ink po",
+     "ink purchase",
+     1
+    ],
+    [
+     "touch up memo",
+     "touch up note",
+     1
+    ],
+    [
+     "clas attendance log",
+     "drop in clas ticket",
+     1
+    ],
+    [
+     "workshop bid",
+     "workshop quote",
+     1
+    ],
+    [
+     "membership bill",
+     "membership invoice",
+     1
+    ],
+    [
+     "prop order",
+     "prop purchase",
+     1
+    ],
+    [
+     "injury memo",
+     "injury note",
+     1
+    ],
+    [
+     "bouquet ticket",
+     "floral order ticket",
+     1
+    ],
+    [
+     "event floral bid",
+     "event floral quote",
+     1
+    ],
+    [
+     "floral bill",
+     "floral invoice",
+     1
+    ],
+    [
+     "standing order agreement",
+     "standing order contract",
+     1
+    ],
+    [
+     "flower po",
+     "flower purchase",
+     1
+    ],
+    [
+     "sympathy memo",
+     "sympathy note",
+     1
+    ],
+    [
+     "loan signing ticket",
+     "signing appointment log",
+     1
+    ],
+    [
+     "signing bid",
+     "signing quote",
+     1
+    ],
+    [
+     "notary bill",
+     "notary invoice",
+     1
+    ],
+    [
+     "signing service agreement",
+     "signing service contract",
+     1
+    ],
+    [
+     "journal entry memo",
+     "journal entry note",
+     1
+    ],
+    [
+     "event booth ticket",
+     "wedding booth ticket",
+     1
+    ],
+    [
+     "booth bill",
+     "booth invoice",
+     1
+    ],
+    [
+     "prop po",
+     "prop purchase",
+     1
+    ],
+    [
+     "lesson log",
+     "piano lesson ticket",
+     1
+    ],
+    [
+     "recital bid",
+     "recital quote",
+     1
+    ],
+    [
+     "lesson bill",
+     "lesson invoice",
+     1
+    ],
+    [
+     "lesson agreement",
+     "lesson contract",
+     1
+    ],
+    [
+     "instrument po",
+     "instrument purchase",
+     1
+    ],
+    [
+     "practice memo",
+     "practice note",
+     1
+    ],
+    [
+     "drywall job ticket",
+     "hang and finish ticket",
+     1
+    ],
+    [
+     "drywall bill",
+     "drywall invoice",
+     1
+    ],
+    [
+     "subcontract agreement",
+     "subcontract contract",
+     1
+    ],
+    [
+     "board po",
+     "board purchase",
+     1
+    ],
+    [
+     "punch list memo",
+     "punch list note",
+     1
+    ],
+    [
+     "custom gate ticket",
+     "fab job traveler",
+     1
+    ],
+    [
+     "fab bid",
+     "fab quote",
+     1
+    ],
+    [
+     "fab bill",
+     "fab invoice",
+     1
+    ],
+    [
+     "steel po",
+     "steel purchase",
+     1
+    ],
+    [
+     "inspection memo",
+     "inspection note",
+     1
+    ],
+    [
+     "boat work order",
+     "engine service ticket",
+     1
+    ],
+    [
+     "marine bill",
+     "marine invoice",
+     1
+    ],
+    [
+     "winter storage agreement",
+     "winter storage contract",
+     1
+    ],
+    [
+     "marine part po",
+     "marine part purchase",
+     1
+    ],
+    [
+     "sea trial memo",
+     "sea trial note",
+     1
+    ],
+    [
+     "restock visit log",
+     "snack machine ticket",
+     1
+    ],
+    [
+     "placement bid",
+     "placement quote",
+     1
+    ],
+    [
+     "vending bill",
+     "vending invoice",
+     1
+    ],
+    [
+     "placement agreement",
+     "placement contract",
+     1
+    ],
+    [
+     "product po",
+     "product purchase",
+     1
+    ],
+    [
+     "machine fault memo",
+     "machine fault note",
+     1
+    ],
+    [
+     "roof reseal ticket",
+     "rv repair ticket",
+     1
+    ],
+    [
+     "rv bill",
+     "rv invoice",
+     1
+    ],
+    [
+     "warranty claim memo",
+     "warranty claim note",
+     1
+    ],
+    [
+     "site visit log",
+     "structural review ticket",
+     1
+    ],
+    [
+     "scope bid",
+     "scope proposal",
+     1
+    ],
+    [
+     "engineering bill",
+     "engineering invoice",
+     1
+    ],
+    [
+     "consulting agreement",
+     "consulting contract",
+     1
+    ],
+    [
+     "software po",
+     "software purchase",
+     1
+    ],
+    [
+     "review memo",
+     "review note",
+     1
+    ],
+    [
+     "audiology visit note",
+     "hearing test ticket",
+     1
+    ],
+    [
+     "hearing aid bid",
+     "hearing aid quote",
+     1
+    ],
+    [
+     "hearing bill",
+     "hearing statement",
+     1
+    ],
+    [
+     "care package agreement",
+     "care package contract",
+     1
+    ],
+    [
+     "device po",
+     "device purchase",
+     1
+    ],
+    [
+     "adjustment memo",
+     "adjustment note",
+     1
+    ],
+    [
+     "build stage ticket",
+     "new pool ticket",
+     1
+    ],
+    [
+     "pool design bid",
+     "pool design quote",
+     1
+    ],
+    [
+     "draw bill",
+     "draw invoice",
+     1
+    ],
+    [
+     "stage memo",
+     "stage note",
+     1
+    ],
+    [
+     "custom order ticket",
+     "wedding cake ticket",
+     1
+    ],
+    [
+     "cake bid",
+     "cake quote",
+     1
+    ],
+    [
+     "bakery bill",
+     "bakery invoice",
+     1
+    ],
+    [
+     "wholesale agreement",
+     "wholesale contract",
+     1
+    ],
+    [
+     "ingredient po",
+     "ingredient purchase",
+     1
+    ],
+    [
+     "allergen memo",
+     "allergen note",
+     1
+    ],
+    [
+     "flight mission log",
+     "roof inspection ticket",
+     1
+    ],
+    [
+     "mission bid",
+     "mission quote",
+     1
+    ],
+    [
+     "drone bill",
+     "drone invoice",
+     1
+    ],
+    [
+     "battery po",
+     "battery purchase",
+     1
+    ],
+    [
+     "airspace memo",
+     "airspace note",
+     1
+    ],
+    [
+     "airport transfer ticket",
+     "trip dispatch ticket",
+     1
+    ],
+    [
+     "trip bill",
+     "trip invoice",
+     1
+    ],
+    [
+     "trip complaint memo",
+     "trip complaint note",
+     1
+    ],
+    [
+     "glas work order",
+     "window replace ticket",
+     1
+    ],
+    [
+     "glas bid",
+     "glas quote",
+     1
+    ],
+    [
+     "glas bill",
+     "glas invoice",
+     1
+    ],
+    [
+     "glas po",
+     "glas purchase",
+     1
+    ],
+    [
+     "measure memo",
+     "measure note",
+     1
+    ],
+    [
+     "flight log entry",
+     "intro flight ticket",
+     1
+    ],
+    [
+     "flight bill",
+     "flight invoice",
+     1
+    ],
+    [
+     "training agreement",
+     "training contract",
+     1
+    ],
+    [
+     "fuel po",
+     "fuel purchase",
+     1
+    ],
+    [
+     "lesson debrief memo",
+     "lesson debrief note",
+     1
+    ],
+    [
+     "resole ticket",
+     "shoe repair ticket",
+     1
+    ],
+    [
+     "shoe bill",
+     "shoe invoice",
+     1
+    ],
+    [
+     "leather po",
+     "leather purchase",
+     1
+    ],
+    [
+     "resole memo",
+     "resole note",
+     1
+    ],
+    [
+     "irrigation service ticket",
+     "sprinkler repair ticket",
+     1
+    ],
+    [
+     "system bid",
+     "system quote",
+     1
+    ],
+    [
+     "irrigation bill",
+     "irrigation invoice",
+     1
+    ],
+    [
+     "maintenance contract",
+     "maintenance plan",
+     1
+    ],
+    [
+     "zone memo",
+     "zone note",
+     1
+    ],
+    [
+     "tire mount ticket",
+     "tire service ticket",
+     1
+    ],
+    [
+     "tire bid",
+     "tire quote",
+     1
+    ],
+    [
+     "tire bill",
+     "tire invoice",
+     1
+    ],
+    [
+     "fleet account agreement",
+     "fleet account contract",
+     1
+    ],
+    [
+     "tire po",
+     "tire purchase",
+     1
+    ],
+    [
+     "clas sign in log",
+     "kid clas ticket",
+     1
+    ],
+    [
+     "testing bid",
+     "testing quote",
+     1
+    ],
+    [
+     "dojo bill",
+     "dojo invoice",
+     1
+    ],
+    [
+     "promotion memo",
+     "promotion note",
+     1
+    ],
+    [
+     "gutter clean ticket",
+     "gutter job ticket",
+     1
+    ],
+    [
+     "gutter bid",
+     "gutter quote",
+     1
+    ],
+    [
+     "gutter bill",
+     "gutter invoice",
+     1
+    ],
+    [
+     "seasonal contract",
+     "seasonal plan",
+     1
+    ],
+    [
+     "gutter po",
+     "gutter purchase",
+     1
+    ],
+    [
+     "downspout memo",
+     "downspout note",
+     1
+    ],
+    [
+     "cleaning work ticket",
+     "steam clean ticket",
+     1
+    ],
+    [
+     "cleaning bid",
+     "cleaning estimate",
+     1
+    ],
+    [
+     "cleaning bill",
+     "cleaning invoice",
+     1
+    ],
+    [
+     "stain warranty memo",
+     "stain warranty note",
+     1
+    ],
+    [
+     "eye exam record",
+     "eye exam ticket",
+     1
+    ],
+    [
+     "frame bid",
+     "frame quote",
+     1
+    ],
+    [
+     "optical bill",
+     "optical statement",
+     1
+    ],
+    [
+     "contact len agreement",
+     "contact len contract",
+     1
+    ],
+    [
+     "len po",
+     "len purchase",
+     1
+    ],
+    [
+     "full groom ticket",
+     "grooming ticket",
+     1
+    ],
+    [
+     "groom bill",
+     "groom invoice",
+     1
+    ],
+    [
+     "recurring groom contract",
+     "recurring groom plan",
+     1
+    ],
+    [
+     "coat care memo",
+     "coat care note",
+     1
+    ],
+    [
+     "cabinet job ticket",
+     "kitchen cabinet ticket",
+     1
+    ],
+    [
+     "cabinet bid",
+     "cabinet quote",
+     1
+    ],
+    [
+     "cabinet bill",
+     "cabinet invoice",
+     1
+    ],
+    [
+     "design agreement",
+     "design contract",
+     1
+    ],
+    [
+     "install memo",
+     "install note",
+     1
+    ],
+    [
+     "group lesson ticket",
+     "lesson attendance log",
+     1
+    ],
+    [
+     "party bid",
+     "party quote",
+     1
+    ],
+    [
+     "swim bill",
+     "swim invoice",
+     1
+    ]
+   ],
+   "heads": [
+    [
+     "bill",
+     "invoice",
+     70
+    ],
+    [
+     "memo",
+     "note",
+     61
+    ],
+    [
+     "bid",
+     "quote",
+     56
+    ],
+    [
+     "contract",
+     "agreement",
+     53
+    ],
+    [
+     "purchase",
+     "po",
+     48
+    ],
+    [
+     "sheet",
+     "log",
+     17
+    ],
+    [
+     "purchase",
+     "order",
+     14
+    ],
+    [
+     "payout",
+     "statement",
+     12
+    ],
+    [
+     "letter",
+     "notice",
+     10
+    ],
+    [
+     "schedule",
+     "roll",
+     8
+    ],
+    [
+     "paper",
+     "statement",
+     7
+    ],
+    [
+     "ledger",
+     "statement",
+     7
+    ],
+    [
+     "bill",
+     "statement",
+     7
+    ],
+    [
+     "letter",
+     "offer",
+     6
+    ],
+    [
+     "letter",
+     "statement",
+     6
+    ],
+    [
+     "sheet",
+     "record",
+     6
+    ],
+    [
+     "contract",
+     "plan",
+     6
+    ],
+    [
+     "report",
+     "commitment",
+     5
+    ],
+    [
+     "paper",
+     "disclosure",
+     5
+    ],
+    [
+     "form",
+     "request",
+     4
+    ],
+    [
+     "statement",
+     "reconciliation",
+     4
+    ],
+    [
+     "report",
+     "inspection",
+     4
+    ],
+    [
+     "bid",
+     "estimate",
+     4
+    ],
+    [
+     "form",
+     "authorization",
+     4
+    ],
+    [
+     "payout",
+     "disbursement",
+     3
+    ],
+    [
+     "list",
+     "request",
+     3
+    ],
+    [
+     "ask",
+     "request",
+     3
+    ],
+    [
+     "packet",
+     "certificate",
+     2
+    ]
+   ]
+  },
+  "clause_reader": {
+   "on": true,
+   "steps": 900,
+   "bs_q": 12,
+   "lr": 0.00003,
+   "train_q_per_co": 150,
+   "override": true,
+   "version": 2,
+   "absent": true,
+   "absent_thr": 0.8,
+   "yesno": true
+  },
+  "doctype_match": {
+   "on": true,
+   "thr": 0.52,
+   "margin": 0.1
+  },
+  "date_value_norm": {
+   "on": true,
+   "apply_conf": 0.7,
+   "release_ambiguous": false,
+   "decline_unparsed": true,
+   "factory": true,
+   "tot_fallback": false,
+   "fiscal_start_month": null
+  },
+  "typo_match": {
+   "on": true,
+   "thr": 0.82,
+   "margin": 0.04,
+   "addr": true,
+   "addr_thr": 0.74,
+   "phonetic": true,
+   "max_dist": 3
+  },
+  "grounding_check": {
+   "on": true,
+   "hard_rule": true,
+   "question_side": true,
+   "answer_side": true
+  },
+  "group_thresholds": {
+   "on": false,
+   "margin": 0.5,
+   "max_loss_rel": 0.06
+  },
+  "text_agreement": {
+   "on": false
+  },
+  "retrieval_v2": {
+   "on": true,
+   "hdr": true,
+   "layout": true,
+   "ocr": true,
+   "train_noise": 0.3
+  },
+  "agg_v2": {
+   "on": true,
+   "rank": true,
+   "link_check": true,
+   "amount_check": true,
+   "status_check": true,
+   "soft_check": true,
+   "unk_gate": false
+  },
+  "precision_guard": {
+   "on": true,
+   "groups": [
+    [
+     "syn",
+     0.97
+    ],
+    [
+     "unk3",
+     0.95
+    ]
+   ],
+   "max_loss_rel": 0.04,
+   "min_eff": 0.07,
+   "min_wrong": 3
+  },
+  "off_in_this_version": [
+   "fields_v2",
+   "clause_v3",
+   "rank_v2",
+   "xdoc_v1",
+   "hard_v1..v4",
+   "realty_prec_v1",
+   "main_prec_v1/v2",
+   "wild_prec_v1/v2",
+   "mr_prec_v2",
+   "watch6_veto",
+   "syn_lex_v1",
+   "clause_free_v2",
+   "agree_v1",
+   "label_clause_v1",
+   "agg_filter_v1",
+   "present_value_v1",
+   "precision_match"
+  ]
+ },
+ "measured": {
+  "ledger_row": "round 312, v002 PROMOTED (pooled +7.341 pts, 95% CI lower 6.474)",
+  "metrics": {
+   "main": {
+    "overall": {
+     "n": 819,
+     "n_answerable": 705,
+     "answered": 594,
+     "correct": 589,
+     "wrong": 5,
+     "cov": 83.55,
+     "prec": 99.158,
+     "abstain_ok": 100
+    },
+    "realty": {
+     "n": 274,
+     "n_answerable": 236,
+     "answered": 188,
+     "correct": 188,
+     "wrong": 0,
+     "cov": 79.66,
+     "prec": 100,
+     "abstain_ok": 100
+    },
+    "other": {
+     "n": 545,
+     "n_answerable": 469,
+     "answered": 406,
+     "correct": 401,
+     "wrong": 5,
+     "cov": 85.5,
+     "prec": 98.768,
+     "abstain_ok": 100
+    },
+    "by_type": {
+     "abstain": {
+      "n": 114,
+      "n_answerable": 0,
+      "answered": 0,
+      "correct": 0,
+      "wrong": 0,
+      "cov": 0,
+      "prec": 100,
+      "abstain_ok": 100
+     },
+     "clause": {
+      "n": 96,
+      "n_answerable": 96,
+      "answered": 48,
+      "correct": 43,
+      "wrong": 5,
+      "cov": 44.79,
+      "prec": 89.583,
+      "abstain_ok": 0
+     },
+     "contact": {
+      "n": 48,
+      "n_answerable": 48,
+      "answered": 48,
+      "correct": 48,
+      "wrong": 0,
+      "cov": 100,
+      "prec": 100,
+      "abstain_ok": 0
+     },
+     "count_by_cust_type": {
+      "n": 54,
+      "n_answerable": 54,
+      "answered": 54,
+      "correct": 54,
+      "wrong": 0,
+      "cov": 100,
+      "prec": 100,
+      "abstain_ok": 0
+     },
+     "count_by_type_year": {
+      "n": 36,
+      "n_answerable": 36,
+      "answered": 3,
+      "correct": 3,
+      "wrong": 0,
+      "cov": 8.33,
+      "prec": 100,
+      "abstain_ok": 0
+     },
+     "date_by_doc": {
+      "n": 36,
+      "n_answerable": 36,
+      "answered": 27,
+      "correct": 27,
+      "wrong": 0,
+      "cov": 75,
+      "prec": 100,
+      "abstain_ok": 0
+     },
+     "earliest": {
+      "n": 30,
+      "n_answerable": 30,
+      "answered": 30,
+      "correct": 30,
+      "wrong": 0,
+      "cov": 100,
+      "prec": 100,
+      "abstain_ok": 0
+     },
+     "field_by_doc": {
+      "n": 72,
+      "n_answerable": 72,
+      "answered": 65,
+      "correct": 65,
+      "wrong": 0,
+      "cov": 90.28,
+      "prec": 100,
+      "abstain_ok": 0
+     },
+     "find_doc": {
+      "n": 36,
+      "n_answerable": 36,
+      "answered": 30,
+      "correct": 30,
+      "wrong": 0,
+      "cov": 83.33,
+      "prec": 100,
+      "abstain_ok": 0
+     },
+     "latest": {
+      "n": 36,
+      "n_answerable": 36,
+      "answered": 36,
+      "correct": 36,
+      "wrong": 0,
+      "cov": 100,
+      "prec": 100,
+      "abstain_ok": 0
+     },
+     "list_cust_type": {
+      "n": 36,
+      "n_answerable": 36,
+      "answered": 35,
+      "correct": 35,
+      "wrong": 0,
+      "cov": 97.22,
+      "prec": 100,
+      "abstain_ok": 0
+     },
+     "max_total": {
+      "n": 18,
+      "n_answerable": 18,
+      "answered": 18,
+      "correct": 18,
+      "wrong": 0,
+      "cov": 100,
+      "prec": 100,
+      "abstain_ok": 0
+     },
+     "mention": {
+      "n": 30,
+      "n_answerable": 30,
+      "answered": 29,
+      "correct": 29,
+      "wrong": 0,
+      "cov": 96.67,
+      "prec": 100,
+      "abstain_ok": 0
+     },
+     "min_total": {
+      "n": 15,
+      "n_answerable": 15,
+      "answered": 15,
+      "correct": 15,
+      "wrong": 0,
+      "cov": 100,
+      "prec": 100,
+      "abstain_ok": 0
+     },
+     "party_by_doc": {
+      "n": 30,
+      "n_answerable": 30,
+      "answered": 29,
+      "correct": 29,
+      "wrong": 0,
+      "cov": 96.67,
+      "prec": 100,
+      "abstain_ok": 0
+     },
+     "sum_by_cust_type": {
+      "n": 48,
+      "n_answerable": 48,
+      "answered": 48,
+      "correct": 48,
+      "wrong": 0,
+      "cov": 100,
+      "prec": 100,
+      "abstain_ok": 0
+     },
+     "total_by_doc": {
+      "n": 54,
+      "n_answerable": 54,
+      "answered": 49,
+      "correct": 49,
+      "wrong": 0,
+      "cov": 90.74,
+      "prec": 100,
+      "abstain_ok": 0
+     },
+     "who_by_address": {
+      "n": 30,
+      "n_answerable": 30,
+      "answered": 30,
+      "correct": 30,
+      "wrong": 0,
+      "cov": 100,
+      "prec": 100,
+      "abstain_ok": 0
+     }
+    }
+   },
+   "wild": {
+    "overall": {
+     "n": 819,
+     "n_answerable": 705,
+     "answered": 529,
+     "correct": 522,
+     "wrong": 7,
+     "cov": 74.04,
+     "prec": 98.677,
+     "abstain_ok": 100
+    },
+    "realty": {
+     "n": 274,
+     "n_answerable": 236,
+     "answered": 171,
+     "correct": 171,
+     "wrong": 0,
+     "cov": 72.46,
+     "prec": 100,
+     "abstain_ok": 100
+    },
+    "other": {
+     "n": 545,
+     "n_answerable": 469,
+     "answered": 358,
+     "correct": 351,
+     "wrong": 7,
+     "cov": 74.84,
+     "prec": 98.045,
+     "abstain_ok": 100
+    }
+   },
+   "hard": {
+    "overall": {
+     "n": 1948,
+     "n_answerable": 1710,
+     "answered": 1123,
+     "correct": 1089,
+     "wrong": 34,
+     "cov": 63.68,
+     "prec": 96.972,
+     "abstain_ok": 100
+    },
+    "realty": {
+     "n": 660,
+     "n_answerable": 570,
+     "answered": 373,
+     "correct": 368,
+     "wrong": 5,
+     "cov": 64.56,
+     "prec": 98.66,
+     "abstain_ok": 100
+    },
+    "other": {
+     "n": 1288,
+     "n_answerable": 1140,
+     "answered": 750,
+     "correct": 721,
+     "wrong": 29,
+     "cov": 63.25,
+     "prec": 96.133,
+     "abstain_ok": 100
+    }
+   },
+   "realty": {
+    "overall": {
+     "n": 3646,
+     "n_answerable": 3221,
+     "answered": 2423,
+     "correct": 2386,
+     "wrong": 37,
+     "cov": 74.08,
+     "prec": 98.473,
+     "abstain_ok": 99.3
+    },
+    "realty": {
+     "n": 3646,
+     "n_answerable": 3221,
+     "answered": 2423,
+     "correct": 2386,
+     "wrong": 37,
+     "cov": 74.08,
+     "prec": 98.473,
+     "abstain_ok": 99.3
+    },
+    "other": {
+     "n": 0,
+     "n_answerable": 0,
+     "answered": 0,
+     "correct": 0,
+     "wrong": 0,
+     "cov": 0,
+     "prec": 100,
+     "abstain_ok": 0
+    }
+   },
+   "fresh": {
+    "overall": {
+     "n": 20986,
+     "n_answerable": 18111,
+     "answered": 13884,
+     "correct": 13791,
+     "wrong": 93,
+     "cov": 76.15,
+     "prec": 99.33,
+     "abstain_ok": 99.7
+    },
+    "realty": {
+     "n": 11724,
+     "n_answerable": 10223,
+     "answered": 7386,
+     "correct": 7320,
+     "wrong": 66,
+     "cov": 71.6,
+     "prec": 99.106,
+     "abstain_ok": 99.4
+    },
+    "other": {
+     "n": 9262,
+     "n_answerable": 7888,
+     "answered": 6498,
+     "correct": 6471,
+     "wrong": 27,
+     "cov": 82.04,
+     "prec": 99.584,
+     "abstain_ok": 99.9
+    }
+   }
+  },
+  "decision": {
+   "pooled_n": 6341,
+   "pooled_best": 65.163,
+   "pooled_cand": 72.504,
+   "pooled_gain": 7.341,
+   "pooled_ci_lo": 6.474,
+   "pooled_ci_hi": 8.224,
+   "main.gain": 3.972,
+   "main.ci_lo": 1.736,
+   "wild.gain": 7.589,
+   "wild.ci_lo": 4.752,
+   "realty.gain": 7.063,
+   "realty.ci_lo": 5.899,
+   "hard.gain": 9.152,
+   "hard.ci_lo": 7.147,
+   "fresh.gain": 11.126,
+   "fresh.ci_lo": 10.557,
+   "old_rule_seed0": "pass",
+   "old_rule_seed1": "pass",
+   "seed_scores": [
+    72.323,
+    72.686
+   ],
+   "chosen_seed": 0,
+   "sealed_best": 66.38,
+   "sealed_cand": 75.67,
+   "sealed_delta": 9.29,
+   "sealed_prec": 99.009,
+   "sealed_n": 3337
+  }
+ },
+ "models": {
+  "enc_base": {
+   "file": "enc_base.int8.onnx",
+   "sha256": "0941928759f94d2c3b6e7a89b2c3527d53e9e3bc9a9156f3da45bac17407e70d"
+  },
+  "intent_enc": {
+   "file": "intent_enc.int8.onnx",
+   "sha256": "0fe488c8eec8a26187722c048830ca7b05ccbdfacaccd4b7bb08ab1f8a69fb30"
+  },
+  "clause_ce": {
+   "file": "clause_ce.int8.onnx",
+   "sha256": "face0b84bb7948fc0514667c62cec8533d6f14c3c5905cb9d82116563b3c004a"
+  },
+  "ranker": {
+   "file": "lgb_ranker.json",
+   "sha256": "128e20c070288b2a9af7475be8641b96985a6bf72557b2610f133fd1ed2581c9"
+  },
+  "verifier": {
+   "file": "lgb_verifier.json",
+   "sha256": "cbba27eed4271650993627424f8c60e4a6ecb243351b1c25a03584e403b24486"
+  },
+  "vocab": {
+   "file": "vocab.txt",
+   "sha256": "07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3"
+  },
+  "weights": {
+   "file": "weights.bin",
+   "sha256": "8a5c81665a183e307ab1e8a70455c294b82a249267aacc79205d74a7008a55a2"
+  }
+ },
+ "source_files_sha256": {
+  "clause.json": "678ea6bbed6bbe7abb196cdb9d57f228dfe3477883c4bb0e73ba47cfeefca66a",
+  "clause_ce.pt": "5d42fe3c0e6726c8de15c74d60cc6ca57628ff7519560d3f6d229ea7e5b175e6",
+  "doctype.json": "ebbf5b139e0d3bb00e453650a6358181e57fc57e3d5f7fbf18f9a174c2643d6a",
+  "frozen_rows_c4804dd729bbc5f8.json.gz": "363b7638cf7da240b47733fedbeba05b2106e04f53ea7eaf3d2f88d9104377a6",
+  "intent_enc.pt": "0daf993be6a147565da3240d15c5e4496b669d0ecef2259603cdb5cb5b0a71c3",
+  "intent_head.npz": "e504db3dccb2b646d82d8d66b273f7325c45926ce086fc676ae6fd856e92723e",
+  "pair.npz": "a3a622bae9d10b224dfd379de9bf157b4c5b1d3c634d5d57d36adb4da8fc0bf6",
+  "ranker.txt": "14746b96bad9cf922eac057f29ec0fe54ba5f65c51be33c99bfc5436cde8426e",
+  "syn.json": "2fadb646a1d0721908dd86d4b51a1e7c84211de9c2a19ca88e876b736b068a3d",
+  "thresholds.json": "1172c89b85fcaa89adca29c4c97a93134a4660d1ef777ec5e444817eca50b2d9",
+  "verifier.txt": "ba61c73df4cb96301c922774167f8f51492feba3a04411e738aadb9f6b9adfbc"
+ },
+ "parity": {
+  "questions": 6202,
+  "companies": 14,
+  "mismatches": 0,
+  "answeredIdentically": 4361,
+  "against": "training-loop Python pipeline (lib code + v002 recipe, determinism patches disclosed in the report)",
+  "stampedAt": "2026-10-19"
+ }
+}

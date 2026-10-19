@@ -126,6 +126,22 @@
    "internal": {
     "sha": "55d1b2b"
    }
+  },
+  {
+   "track": "donovan",
+   "version": "1.4.0",
+   "date": "2026-10-19",
+   "type": "update",
+   "released": false,
+   "public": true,
+   "notes": [
+    "Smarter answers from your documents.",
+    "Donovan now finds and reads the exact answer in your files more often — including totals and counts across many documents, dates and amounts written different ways, and clauses inside long agreements.",
+    "Every answer still shows the document it came from, and when Donovan isn't sure, he says so instead of guessing."
+   ],
+   "internal": {
+    "sha": "55d1b2b"
+   }
   }
  ]
 }
