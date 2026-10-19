@@ -87,7 +87,7 @@ const isoOf = (s) => { const m = /(\d{4})-(\d{2})-(\d{2})/.exec(String(s ?? ""))
 const MONTH = (n) => ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"][n - 1];
 const when = (w, mode) => (mode === "open" ? w.label : mode === "range" ? `from ${w.label}` : w.from === w.to ? `on ${w.label}` : `in ${w.label}`);
 const joinAnd = (xs) => (xs.length < 3 ? xs.join(" and ") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`);
-const none = (text, basis) => attachCitations({ kind: "no-answer", text, facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [] }, { records: [], total: 0, kind: "searched", basis });
+const none = (text, basis) => attachCitations({ kind: "no-answer", finalDecline: "absent-text", text, facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [] }, { records: [], total: 0, kind: "searched", basis });
 
 export async function runDocWindow(db, it) {
   const plural = (n) => it.noun[n === 1 ? 0 : 1];

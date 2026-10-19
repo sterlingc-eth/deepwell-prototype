@@ -156,7 +156,7 @@ export async function runDateQualifier(db, intent) {
     const noun = intent.kind === "service" ? ["service visit", "service visits"] : ["invoice", "invoices"];
     const w = whenIn(intent);
     if (!hits.length) {
-      return attachCitations({ kind: "no-answer", text: `No ${noun[1]} on file ${w}.`, facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [] },
+      return attachCitations({ kind: "no-answer", finalDecline: "absent-text", text: `No ${noun[1]} on file ${w}.`, facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [] },
         { records: [], total: 0, kind: "searched", basis: `Compared the ${field.replace("_", " ")} on ${dated.length} dated documents to ${intent.from} through ${intent.to}; none fall in it.` });
     }
     let split = "";

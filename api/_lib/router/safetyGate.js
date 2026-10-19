@@ -63,6 +63,7 @@ const BULK_CONTACT_RES = [
 const BULK_CONTACT_VETO_RE = /\b(?:how\s+many|count|number\s+of|which|who|missing|without|no\s+e-?mail|named|called|bounced|duplicate\w*|invalid|have\s+an?|has\s+an?|with\s+an?)\b/i;
 
 const PREDICT_RES = [
+  /\bwhen\s+(?:will|is|are)\s+(?:it|that|this|the\s+[\w\s]{1,30}?)\s+(?:going\s+to\s+|gonna\s+)?(?:fail|break\s+down|break|die)\b/i,
   /\b(?:predict|forecast|projection|projected|prognos\w+)\b/i,
   /\bwhat\s+will\s+(?:our|my|the)\s+(?:revenue|sales|income|profit|earnings|expenses|costs?|invoices?|customers?|bookings?)\b[^?]*\b(?:be|look\s+like|come\s+to)\b/i,
   /\bhow\s+(?:many|much)\b[^?]{0,50}\b(?:will|are\s+we\s+going\s+to|are\s+we\s+gonna|are\s+going\s+to)\s+(?:we|you|i|they|our)\b[^?]{0,30}\b(?:get|have|do|see|make|earn|bring\s+in|book|sell|complete|take\s+in|receive|bill|invoice)\b/i,

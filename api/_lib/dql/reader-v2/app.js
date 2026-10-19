@@ -13,6 +13,7 @@ import { documentsHaveAudience } from '../../audience/probe.js';
 import { audienceFilterSql } from '../../audience/sql.js';
 import { getCorpusStamp } from '../../askCache.js';
 import { attachCitations, makeRecord } from '../../citations/records.js';
+import { isFinalDecline } from '../../router/releaseGate.js';
 import { fileURLToPath } from 'node:url';
 const DATA_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'data');
 
@@ -83,26 +84,31 @@ async function indexFor(db, today) {
 }
 // one question at a time: the wasm session and the per-organization caches are shared state
 let chain = Promise.resolve(); let lastTenant = null;
-const serial = (fn) => { const p = chain.then(fn, fn); chain = p.catch(() => {}); return p; };
+// HANDOFF: a job that never settles must not freeze the queue for every later question on this instance, so each job is cut off after twice the reader budget
+const serial = (fn) => {
+  const run = () => { let t; return Promise.race([fn(), new Promise((_, rej) => { t = setTimeout(() => rej(new Error('reader job timeout')), Math.max(2 * BUDGET_MS(), 15000)); })]).finally(() => clearTimeout(t)); };
+  const p = chain.then(run, run); chain = p.catch(() => {}); return p;
+};
 
 /** run the reader for one question inside the organization. Returns { answered, text, docs, page, pv, reason, ms, ix } or { skipped } */
 export async function runReader(withTenant, ctxArg, question, today) {
   if (!paritySealed()) return { skipped: 'parity' };
   const t0 = Date.now();
-  return serial(async () => {
+  // HANDOFF: the budget covers the wait in the one-at-a-time queue too, so a busy or slow reader can never hold a customer past BUDGET_MS: the question then goes on to the Claude path
+  let timer;
+  const budget = new Promise((resolve) => { timer = setTimeout(() => resolve({ skipped: 'budget' }), BUDGET_MS()); });
+  const job = serial(async () => {
     const R = await reader();
-    const out = await Promise.race([
-      withTenant(ctxArg, async (db) => {
-        if (lastTenant !== (db.tenantId ?? null)) { R.M.emb.cache.clear(); R.M.intent_emb.cache.clear(); lastTenant = db.tenantId ?? null; }
-        const ix = await indexFor(db, today);
-        if (ix.tooBig) return { skipped: 'size' };
-        const r = await R.answer(ix, String(question).slice(0, 400));
-        return { ...r, ix };
-      }),
-      new Promise((resolve) => setTimeout(() => resolve({ skipped: 'budget' }), BUDGET_MS())),
-    ]);
-    return { ...out, ms: Date.now() - t0 };
+    return withTenant(ctxArg, async (db) => {
+      if (lastTenant !== (db.tenantId ?? null)) { R.M.emb.cache.clear(); R.M.intent_emb.cache.clear(); lastTenant = db.tenantId ?? null; }
+      const ix = await indexFor(db, today);
+      if (ix.tooBig) return { skipped: 'size' };
+      const r = await R.answer(ix, String(question).slice(0, 400));
+      return { ...r, ix };
+    });
   });
+  job.catch(() => {});
+  try { const out = await Promise.race([job, budget]); return { ...out, ms: Date.now() - t0 }; } finally { clearTimeout(timer); }
 }
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 const hum = (t) => String(t).replace(/[_-]+/g, ' ');
@@ -127,6 +133,25 @@ export function toAnswerData(r) {
   const data = { kind: 'answer', text: polish(r.text, ix), facts: [], sources, confidence: Math.min(1, Math.max(0, Number(r.pv) || 0)), verifiedCount: sources.length, unverifiedCount: 0, closest: [] };
   return attachCitations(data, { records, total: records.length, basis });
 }
+/**
+ * Does the reader's answer address the fact the question asked? (HANDOFF) The reader is trained on other kinds of companies: on a field-service tenant it can read "has this unit had a compressor replaced? <address>"
+ * as the intent "who is at this address" and answer with the customer's name (a broad answer where one fact was asked). A reader answer that does not fit goes to the Claude path instead.
+ * Permissive on purpose: it only rejects when the question names a different fact, or lacks every cue its intent needs. A false reject costs one model call, never a wrong answer.
+ */
+const OTHER_FACT_RE = /\b(?:compressor|capacitor|refrigerant|tonnage|btu|seer|filter|thermostat|permits?|warrant\w*|serial|model|brand|install\w*|servic\w*|repair\w*|replac\w*|maintenance|visits?|last time|invoices?|quotes?|estimates?|proposals?|balance|owe\w*)\b/i;
+const NEED_CUE = {
+  who_addr: /\b(?:who|whose|who'?s|whos|cust\w*|clients?|owner|lives?|living|resid\w*|tenants?|occupant|staying|name|located)\b/i,
+  contact: /\b(?:phone|cell|mobile|e-?mail|contact|number|reach|call|text|address|fax)\b/i,
+  date: /\b(?:when|date|dated|day|month|year|signed|filed|recorded|received|closed|due|expires?|expir\w*)\b/i,
+};
+export function answerFits(question, r) {
+  const q = String(question ?? '');
+  const intent = r?.intent;
+  if (intent === 'who_addr' && OTHER_FACT_RE.test(q)) return false;
+  const need = NEED_CUE[intent];
+  if (need && !need.test(q)) return intent === 'who_addr' ? !/\b(?:what|when|how|which|do we|does|did|has|have)\b/i.test(q) : false;
+  return true;
+}
 const docsOf = (d) => [...new Set([...(d?.sources || []).map((s) => s?.documentId), ...(d?.records || []).map((x) => x?.documentId)].filter(Boolean))].slice(0, 8);
 const normText = (t) => String(t ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
 /**
@@ -138,7 +163,7 @@ export async function readerV2Hook(ctx, body) {
     const data = body?.data;
     if (!ctx || !body?.success || !data || typeof data !== 'object' || (data.kind !== 'answer' && data.kind !== 'no-answer')) return body;
     const on = readerV2On(); const shadow = readerV2ShadowOn();
-    const released = data.kind === 'no-answer' && !data.help;
+    const released = data.kind === 'no-answer' && !data.help && !isFinalDecline(data); // a decline the lane VERIFIED (absent from this company's records, policy, privacy) is never rescued
     const live = on && released;                                    // the only case where a customer can see the reader
     if (!shadow && !live) return body;
     const r = await runReader(ctx.withTenant, ctx.ctxArg, ctx.question, ctx.today);
@@ -148,7 +173,8 @@ export async function readerV2Hook(ctx, body) {
     entry.agree = data.kind === 'answer' ? Boolean(r.answered && entry.cur.h === entry.v2.h) : null;
     if (truthy(process.env.DONOVAN_READER_V2_LOG_TEXT) && r.answered) entry.v2.text = String(r.text).slice(0, 300);
     log(entry);
-    if (!live || !r.answered) return body;                         // shadow, an existing answer, or a release the reader also keeps: send what the current path produced
+    if (!live || !r.answered) return body;                         // shadow, an existing answer, or a release the reader also keeps: send what the current path produced (the Claude path takes it from there)
+    if (!answerFits(ctx.question, r)) { log({ unfit: true, intent: r.intent || null, pv: Number((r.pv || 0).toFixed(4)) }); return body; }
     return { ...body, data: toAnswerData(r) };
   } catch (e) { log({ error: String(e?.message || e).slice(0, 80) }); return body; }
 }

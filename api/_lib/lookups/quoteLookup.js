@@ -44,8 +44,10 @@ export async function runQuoteLookup(db, intent) {
   const invoices = rows.filter((r) => r.document_type === "invoice");
   if (!quotes.length) {
     const inv = invoices.length ? ` (${invoices.length === 1 ? "There is an invoice" : `There are ${invoices.length} invoices`} on file for ${display}, but an invoice is not a quote.)` : "";
+    // HANDOFF: a FINAL "not on file" only when this organization has no quote-like paper of any type at all (a company may call them "reupholster-quote" or "program-quote", and a quote with no printed total is still a quote)
+    const quoteLike = rows.some((r) => r.document_type === "proposal-quote") || (await db.raw(`SELECT 1 FROM documents d WHERE d.${TENANT_SQL} AND d.document_type ~* '(quote|estimate|proposal|bid)' LIMIT 1`, [])).rows.length > 0;
     return attachCitations(
-      { kind: "no-answer", text: `No quote on file for ${display}.${inv}`, facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [] },
+      { kind: "no-answer", text: `No quote on file for ${display}.${inv}`, facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [], ...(quoteLike ? {} : { finalDecline: "absent-doctype" }) },
       { records: invoices.length ? await documentRecordsFor(db, invoices.slice(0, 5).map((r) => r.document_id)) : [], total: invoices.length, kind: "searched", basis: `Looked for proposal / quote documents for ${display}; none on file.` }
     );
   }

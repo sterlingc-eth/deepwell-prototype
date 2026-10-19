@@ -89,6 +89,8 @@ export function extractNamePhrase(question) {
     if (WHO_SHAPES.has(re) && NOT_A_PERSON_RE.test(m[1])) continue;
     const tokens = m[1].split(/\s+/).map((t) => t.replace(/['’]s?$/i, "")).filter((t) => t && !STOP.has(t.toLowerCase()) && !TAIL_WORDS.has(t.toLowerCase()));
     if (!tokens.length || tokens.length > 3) continue;
+    // HANDOFF: "phone number for the newsletter" / "invoices for the holiday": a lower-case single word right after "the" is a thing, not a person nobody has heard of ("the smith unit" keeps its trailing noun and is unaffected)
+    if (tokens.length === 1 && m[1].trim().split(/\s+/).length === 1 && m[1] === m[1].toLowerCase() && new RegExp(String.raw`\bthe\s+${m[1].replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\s*$`, "i").test(q)) continue;
     if (isNotAPerson(tokens.join(" "))) continue; // R10
     if (tokens.every((t) => isNotAPerson(t) || isGlueWord(t))) continue; // R12: "many books", "back": ordinary words of the sentence, never a person nobody has heard of
     return tokens.join(" ");
@@ -131,6 +133,7 @@ export function buildUnknownNameAnswer(phrase) {
       kind: "no-answer",
       text: `I don't have anyone named "${phrase}" on file or in any document — nothing to look up.`, // R35 brevity
       facts: [], sources: [], confidence: 0, verifiedCount: 0, unverifiedCount: 0, closest: [],
+      finalDecline: "absent-name", // HANDOFF: verified absent from this company's entities AND page text (releaseGate.js)
     },
     { records: [], total: 0, kind: "searched", basis: `Searched every customer and entity record and the full text of every document page for "${phrase}"; nothing matches.` }
   );
@@ -159,7 +162,7 @@ async function technicianContactDecline(db, question, phrase) {
   const uniq = [...new Set(hits)];
   if (uniq.length !== 1) return null;
   return attachCitations(
-    { kind: "no-answer", text: `${uniq[0]} is one of your technicians — no technician contact details are on file.`, facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [] },
+    { kind: "no-answer", finalDecline: "absent-text", text: `${uniq[0]} is one of your technicians — no technician contact details are on file.`, facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [] },
     { records: [], total: 0, kind: "searched", basis: `Matched "${phrase}" to the technician ${uniq[0]} named on your documents; customer records carry contact details, technician records do not.` }
   );
 }

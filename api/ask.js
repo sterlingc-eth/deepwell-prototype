@@ -125,12 +125,13 @@ import { tryPropertyPack, isResidentTenantsQuestion } from "./_lib/lookups/prope
 import { parseCustomerCount, runCustomerCount } from "./_lib/lookups/namedCompare.js";
 import { buildClarifyAnswer, clarifyEnabled, ADDRESS_RE } from "./_lib/lookups/clarify.js";
 import { answerAddressConflict, softConflictNote } from "./_lib/addressConflict.js";
-import { readerV2Wanted, readerV2Hook } from "./_lib/dql/reader-v2/gate.js"; // Donovan Reader V2: DONOVAN_READER_V2 / DONOVAN_READER_V2_SHADOW, both OFF unless set
+import { releaseEscalationEnabled, isFinalDecline, isEscalatableRelease, releaseCause, markFinal, stripReleaseMarker } from "./_lib/router/releaseGate.js"; // HANDOFF: a release always goes to the Claude path unless the decline is verified-final
+import { readerV2Wanted, readerV2LiveOn, readerV2ShadowOn, readerV2Hook } from "./_lib/dql/reader-v2/gate.js"; // Donovan Reader V2: DONOVAN_READER_V2 / DONOVAN_READER_V2_SHADOW, both OFF unless set
 import { capInlineNameList } from "./_lib/router/brevity.js";
 import { resolvePartialNameInQuestion, buildPartialNameClarify } from "./_lib/vocab/partialNames.js";
 import { classifySafety, buildSafetyAnswer, unverifiedTypeNote, normalizeInputText, neutralizeMarkup } from "./_lib/router/safetyGate.js";
 import { normalizeRephrase, typoFixes, applyTypoFixes, rephraseEnabled } from "./_lib/router/rephrase.js";
-import { classifyEarlyDecline, buildEarlyDeclineAnswer, earlyDeclineEnabled, triggerMatchesCustomerName } from "./_lib/router/earlyDecline.js";
+import { classifyEarlyDecline, buildEarlyDeclineAnswer, earlyDeclineEnabled, triggerMatchesCustomerName, hasRecordHandle } from "./_lib/router/earlyDecline.js";
 // Round 20 (J1): the general precision guard (THE #1 PROBLEM — false confidence, r19_blind3_clusters.json's
 // F1/F6) — see guard/check.js's own header for what each function checks and why, and the untracked-concept
 // registry (api/_lib/concepts/registry.js) for the honest-decline half.
@@ -496,7 +497,7 @@ async function showCustomerEverything(db, number) {
   const { row, documentIds, via } = await resolveCustomerDocumentIds(db, number);
   if (!row) {
     return attachCitations(
-      { kind: "no-answer", text: `No customer found for ${number}.`, facts: [], sources: [], confidence: 0, verifiedCount: 0, unverifiedCount: 0, closest: [] },
+      { kind: "no-answer", text: `No customer found for ${number}.`, facts: [], sources: [], confidence: 0, verifiedCount: 0, unverifiedCount: 0, closest: [], finalDecline: "absent-number" },
       { records: [], total: 0, kind: "searched", basis: `Looked up customer number ${number} in your customer records; no customer has that number.` } // TEAM C
     );
   }
@@ -626,7 +627,7 @@ const IMPERATIVE_TEXT = {
 async function runMetaQuestion(db, meta) {
   if (meta.kind === "imperative") {
     return attachCitations(
-      { kind: "no-answer", text: IMPERATIVE_TEXT[meta.action], facts: [], sources: [], confidence: 0, verifiedCount: 0, unverifiedCount: 0, closest: [] },
+      { kind: "no-answer", text: IMPERATIVE_TEXT[meta.action], facts: [], sources: [], confidence: 0, verifiedCount: 0, unverifiedCount: 0, closest: [], finalDecline: "policy" },
       { records: [], total: 0, basis: "This is a how-to about the app, not something drawn from your records." } // TEAM C
     );
   }
@@ -906,7 +907,48 @@ export default async function handler(req, res) {
     }
     return handleCors(res, req).status(status).json(body);
   };
-  const send = (status, body) => (readerV2Ctx && status === 200 && readerV2Wanted() ? readerV2Hook(readerV2Ctx, body).then((b) => sendBase(status, b)) : sendBase(status, body));
+  // HANDOFF (api/_lib/router/releaseGate.js): a response that is about to go out as a plain "no-answer" first gets Reader V2 (when its switch is on), then the Claude path
+  // (agent / retrieval+model), unless the decline is FINAL (verified absent from this company's records, or a policy / privacy refusal). The decline is only the fallback.
+  let releaseEscalate = null;      // set below, once tryAgent / retrievalAndModel exist
+  const release = { tried: false, active: false, delivered: false, held: null, pendingClarify: null, modelTouched: false };
+  const releaseOn = () => releaseEscalationEnabled() && (!scorecardCall || scorecardCall.releaseEscalation === true);
+  const send = async (status, body) => {
+    // while the escalation runs, an ANSWER is delivered at once; a decline is held (the original decline, or the chips, is the fallback)
+    if (release.active && status === 200) {
+      if (body?.data && body.data.kind !== "no-answer") { release.delivered = true; release.active = false; stripReleaseMarker(body.data); return sendBase(status, body); }
+      release.held = body; return undefined;
+    }
+    let b = body;
+    // Reader V2 answers a released question BEFORE the reply goes out (live); when only the shadow switch is on it runs AFTER the reply, so logging never holds a customer
+    let v2ShadowLater = false;
+    if (readerV2Ctx && status === 200 && readerV2Wanted()) {
+      if (readerV2LiveOn() && b?.data?.kind === "no-answer" && !isFinalDecline(b.data)) b = await readerV2Hook(readerV2Ctx, b);
+      else if (readerV2ShadowOn()) v2ShadowLater = true;
+    }
+    if (status === 200 && releaseEscalate && !release.tried && releaseOn() && isEscalatableRelease(b?.data, { touched: release.modelTouched })) {
+      release.tried = true; release.active = true; release.delivered = false; release.held = null;
+      const cause = releaseCause(b.data);
+      let outcome = "declined";
+      try {
+        await releaseEscalate();
+        outcome = release.delivered ? "answered" : "declined";
+      } catch (err) {
+        outcome = err?.name === "ModelBudgetExceededError" ? "budget" : "error";
+        if (err?.name === "ModelBudgetExceededError" && !release.delivered) { release.active = false; console.log(JSON.stringify({ route: "ask", release: { cause, outcome } })); throw err; }
+        console.error("release escalation failed, sending the original decline:", err?.message);
+      } finally { release.active = false; }
+      console.log(JSON.stringify({ route: "ask", release: { cause, outcome, v2: readerV2Wanted() ? "tried" : "off" } }));
+      if (release.delivered) return undefined;
+      // nothing better came back: the chips (when the question named a recognised entity) or the original decline
+      if (release.pendingClarify && !isFinalDecline(b.data)) b = { ...b, data: release.pendingClarify };
+    } else if (release.pendingClarify && status === 200 && b?.data?.kind === "no-answer" && !b.data.clarify && !isFinalDecline(b.data)) {
+      b = { ...b, data: release.pendingClarify };
+    }
+    if (b?.data && typeof b.data === "object") stripReleaseMarker(b.data);
+    const sent = sendBase(status, b);
+    if (v2ShadowLater) await readerV2Hook(readerV2Ctx, b); // shadow log only (never replaces the reply that has already gone out)
+    return sent;
+  };
 
   // Scorecard call (hook.js): null for every real request. When set it supplies the auth, skips the rate
   // limiter / billing gate, never counts against the monthly allowance and never touches the answer cache.
@@ -1014,7 +1056,7 @@ export default async function handler(req, res) {
       const nq = classifyNonQuestion(question);
       if (nq) {
         console.log(JSON.stringify({ route: "ask", non_question: nq.kind }));
-        return send(200, { success: true, data: attachCitations(nonQuestionAnswer(nq), { records: [], total: 0, basis: "This isn't a question about your records, so nothing was searched." }) });
+        return send(200, { success: true, data: markFinal(attachCitations(nonQuestionAnswer(nq), { records: [], total: 0, basis: "This isn't a question about your records, so nothing was searched." }), "policy") });
       }
     }
 
@@ -1028,7 +1070,7 @@ export default async function handler(req, res) {
       }
       if (safety) {
         console.log(JSON.stringify({ route: "ask", safety_gate: safety.kind }));
-        return send(200, { success: true, data: buildSafetyAnswer(safety) });
+        return send(200, { success: true, data: markFinal(buildSafetyAnswer(safety), "policy") });
       }
     }
 
@@ -1038,8 +1080,8 @@ export default async function handler(req, res) {
     if (!meta && earlyDeclineEnabled()) {
       const early = classifyEarlyDecline(question, { hasConversation: !!conversationContext, contextHasEntity });
       let vetoed = false;
-      if (early?.kind === "off_domain") { try { vetoed = await withTenant(ctxArg, async (db) => (await triggerMatchesCustomerName(db, early.trigger)) || (await questionNamesEntity(db, question))); } catch { vetoed = false; } }
-      if (early && !vetoed) return send(200, { success: true, data: buildEarlyDeclineAnswer(early.kind, early) });
+      if (early?.kind === "off_domain") { if (hasRecordHandle(question)) vetoed = true; else try { vetoed = await withTenant(ctxArg, async (db) => (await triggerMatchesCustomerName(db, early.trigger)) || (await questionNamesEntity(db, question))); } catch { vetoed = false; } }
+      if (early && !vetoed) return send(200, { success: true, data: markFinal(buildEarlyDeclineAnswer(early.kind, early), "policy") });
     }
     // Never throws (see getActiveOverlay's own doc comment) — safe to await
     // directly with no try/catch here.
@@ -1285,7 +1327,7 @@ export default async function handler(req, res) {
         }
         if (!rr?.data) { if (rr?.skip) console.log(JSON.stringify({ route: "ask", records_skip: rr.skip, phase })); return false; }
         console.log(JSON.stringify({ route: "ask", records_first: rr.detail, phase }));
-        send(200, { success: true, data: rr.data });
+        await send(200, { success: true, data: rr.data });
         await timer.time("bookkeeping", () =>
           withTenant(ctxArg, (db) => db.logAction({
             action: "document.queried", resource_type: "question", clerk_user_id: auth.userId,
@@ -1314,7 +1356,7 @@ export default async function handler(req, res) {
         const rr = await timer.time("records", () => withTenant(ctxArg, (db) => mod.runOrgPicked(db, question, { pick: got.pick, inv: got.inv, today: todayResolved })));
         if (!rr?.data) { if (rr?.skip) console.log(JSON.stringify({ route: "ask", org_pick_skip: rr.skip })); return false; }
         console.log(JSON.stringify({ route: "ask", records_first: rr.detail, phase: "org-pick" }));
-        send(200, { success: true, data: rr.data });
+        await send(200, { success: true, data: rr.data });
         // DONOVAN-R5 step 3 (switch DONOVAN_EXAMPLE_BANK, default OFF): the reading the server verified and answered from is kept for THIS organization (thumbs-up confirms it, thumbs-down retires it)
         try {
           const bank = await import("./_lib/records/exampleBank.js");
@@ -1336,10 +1378,10 @@ export default async function handler(req, res) {
       }
     };
     const tryClarify = async () => {
-      if (conversationContext) return false;
+      if (conversationContext || release.active) return false; // while the Claude path runs, chips are only the fallback (release.pendingClarify)
       try {
         const miss = await withTenant(ctxArg, (db) => buildAddressMissAnswer(db, question));
-        if (miss) { send(200, { success: true, data: miss }); return true; }
+        if (miss) { await send(200, { success: true, data: miss }); return true; }
       } catch { /* best-effort: fall through to the normal path */ }
       if (!clarifyEnabled() || !tenantVocab) return false; // a follow-up turn carries context the chips would drop
       const { routesWithoutModel } = await import("./_lib/suggest/classify.js"); // lazy: pulls the analytics route (-> @anthropic-ai/sdk), see clarify.js
@@ -1348,7 +1390,10 @@ export default async function handler(req, res) {
       if (addr) { try { knownAddress = (await withTenant(ctxArg, (db) => resolveAddressCandidates(db, addr))).length > 0; } catch { knownAddress = false; } }
       const clarify = buildClarifyAnswer(question, tenantVocab, { overlay, pack, tenantVocab, routesWithoutModel, knownAddress });
       if (!clarify) return false;
-      send(200, { success: true, data: clarify });
+      // HANDOFF: chips for a RECOGNISED entity are a fallback, not an answer: the question goes on to the Claude path and the chips are shown only if Claude has nothing.
+      // An ambiguous surname is the one case only the person can settle, so that one is sent at once.
+      if (clarify.clarifyReason !== "ambiguous-surname" && releaseOn()) { release.pendingClarify = clarify; console.log(JSON.stringify({ route: "ask", clarify_deferred: clarify.clarifyReason ?? "chips" })); return false; }
+      await send(200, { success: true, data: clarify });
       return true;
     };
     const tryAgent = async ({ extraUsage = null, budgetMs, recordMiss = true } = {}) => {
@@ -1357,6 +1402,7 @@ export default async function handler(req, res) {
       const agentOn = await getAgentOn();
       if (!agentOn) return false;
       agentTried = true;
+      release.modelTouched = true;
       const agentDebug = Boolean(scorecardCall) || (req.body?.debug === true && isPlatformOperator(auth));
       const researchV2Enabled = await getResearchV2Enabled();
       // The research agent budgets up to ~240s of tool-use (loopV2.js); the v1 Haiku loop stays at its
@@ -1388,7 +1434,7 @@ export default async function handler(req, res) {
             corpusStamp = probe.corpusStamp;
             if (isCacheHit(probe.row, probe.corpusStamp)) {
               const cachedData = { ...probe.row.answer, cached: true };
-              send(200, { success: true, data: cachedData });
+              await send(200, { success: true, data: cachedData });
               await timer.time("bookkeeping", async () => {
                 try {
                   await withTenant(ctxArg, async (db) => {
@@ -1424,6 +1470,11 @@ export default async function handler(req, res) {
           result = researchV2Enabled
             ? await timer.time("agent", () => researchAgentModule.runResearchAgent({ withTenant, ctxArg, question, today: todayResolved, overlay, deadlineAt, onEvent }))
             : await timer.time("agent", () => agentModule.runDonovanAgent({ withTenant, ctxArg, question, today: todayResolved, overlay, deadlineAt, escalate: scorecardCall?.escalate === true }));
+          // HANDOFF: the research agent's own daily cap (DONOVAN_RESEARCH_DAILY_USD) is spent: the cheaper Haiku agent still reads the records, instead of the question having no agent at all today
+          if (researchV2Enabled && !result?.handled && String(result?.reason ?? "").startsWith("budget:")) {
+            console.log(JSON.stringify({ route: "ask", research_cap_fallback: "haiku-agent" }));
+            result = await timer.time("agent", () => agentModule.runDonovanAgent({ withTenant, ctxArg, question, today: todayResolved, overlay, deadlineAt, escalate: false }));
+          }
         }
       } catch (err) {
         // Includes ModelBudgetExceededError: the standard fallback below decides what a
@@ -1454,7 +1505,7 @@ export default async function handler(req, res) {
           data = applyGrounding(data, new Map(), { question, agent: true, today: todayResolved, evidenceFailed: true });
         }
       }
-      send(200, { success: true, data: agentDebug ? { ...data, debug: agentModule.agentDebugTrace(result) } : data });
+      await send(200, { success: true, data: agentDebug ? { ...data, debug: agentModule.agentDebugTrace(result) } : data });
       await timer.time("bookkeeping", async () => {
         try {
           await withTenantRetry(ctxArg, async (db) => {
@@ -1495,6 +1546,379 @@ export default async function handler(req, res) {
       return true;
     };
 
+    // ---- retrieval + model (the Claude path), as a function so a RELEASED question can be sent here from send() (see releaseGate.js) ----
+    let budgetPromise = null; let retrievalPromise = null; // assigned in the overlap section below
+    const retrievalAndModel = async () => {
+    // ---- 1. retrieve (already in flight above unless meta, fast path, or analytics fell through) ---
+    const { passages, extractions, cacheHit, cachedAnswer, corpusStamp } = retrievalPromise
+      ? await retrievalPromise
+      : await retrieveEvidence(ctxArg, question, customerNumber, timer, { today: todayResolved, questionHash, noCache: Boolean(scorecardCall) });
+
+    // ---- cache hit: no retrieval was even needed above, no model call -----
+    if (cacheHit) {
+      const data = { ...cachedAnswer, cached: true };
+      await send(200, { success: true, data });
+      await timer.time("bookkeeping", () =>
+        withTenant(ctxArg, (db) => db.logAction({
+          action: "document.queried",
+          resource_type: "question",
+          clerk_user_id: auth.userId,
+          changes: {
+            question_hash: hashQuestion(question),
+            documents: [...new Set((data.sources ?? []).map((s) => s.documentId))],
+            passages: 0,
+            cached: true,
+          },
+        })).catch((err) => console.error("Failed to write document.queried audit row (cache hit):", err?.message))
+      );
+      return;
+    }
+
+    if (passages.length === 0 && extractions.length === 0) {
+      if (await tryAgent()) return;
+      // Miss loop: fired with no await — nothing else on this path is
+      // awaited before the response either, and this must never delay it.
+      recordAskMiss(ctxArg, { question, questionNormalized: normalizedForAnalytics, outcome: MISS_OUTCOMES.NO_ANSWER }).catch(() => {});
+      // Item 8 (100-question persona sample, 2026-09-22): a single-record
+      // question ("do we have anything about a compressor replacement for
+      // Thomas Mercer") that resolves to exactly one known customer/address
+      // gets a specific honest zero naming them, instead of the generic
+      // "Nothing in your records answers that yet" — see docLookup.js's own
+      // doc comment. Only attempted for a question that already looks like a
+      // single-record reference (never for an aggregate/analytics-shaped one
+      // that merely happened to retrieve nothing); any failure here falls
+      // back to the generic line rather than risking a wrong/500 response on
+      // an already-given-up path.
+      let honestZeroText = null;
+      // TEAM C: what was searched, from the same transaction (documents linked to the resolved customer, or the whole library).
+      let zeroCitations = null;
+      try {
+        zeroCitations = await withTenant(ctxArg, async (db) => {
+          let cites = null;
+          if (looksLikeSingleRecordReference(question)) {
+            try {
+              const ctx = await resolveHonestZeroContext(db, question);
+              if (ctx) {
+                honestZeroText = buildHonestZeroText(ctx);
+                cites = await honestZeroCitations(db, ctx, { documentIdsFor: customerDocumentIds });
+              }
+            } catch (err) {
+              console.error("Honest-zero context resolution failed, using generic no-answer:", err?.message);
+            }
+          }
+          return cites ?? { records: [], total: 0, kind: "searched", basis: await searchedLibraryBasis(db) };
+        });
+      } catch (err) {
+        console.error("Honest-zero context resolution failed, using generic no-answer:", err?.message);
+      }
+      return send(200, {
+        success: true,
+        data: attachCitations({
+          kind: "no-answer",
+          text: honestZeroText ?? "Nothing in your records answers that yet. Your documents may still be processing.",
+          facts: [], sources: [], confidence: 0,
+          verifiedCount: 0, unverifiedCount: 0, closest: [],
+        }, zeroCitations ?? { records: [], total: 0, kind: "searched", basis: "Searched your documents; nothing matched." }),
+      });
+    }
+
+    const mappedPassages = passages.map((p) => ({
+      documentId: p.document_id,
+      filename: p.original_filename,
+      documentType: p.document_type,
+      page: p.page_no,
+      excerpt: String(p.excerpt ?? "").slice(0, /^card/.test(String(p.matched_by ?? "")) ? MAX_EXCERPT + 840 : MAX_EXCERPT), // a merged document card (<= 760 chars + label) must not eat into the page text
+      stage: p.stage,
+    }));
+    const mappedExtractions = extractions.map((x) => ({
+      documentId: x.document_id,
+      filename: x.original_filename,
+      field: x.field_key,
+      value: String(x.value ?? "").replace(/\s+/g, " ").trim(), // one line: a stored value can not forge a separate "field = value" line
+      entityType: x.entity_type,
+      stage: x.stage,
+    }));
+
+    // Cost cut (2026-09-20, owner decision): dedupe by (documentId, page) and
+    // cap the context block to ~6K tokens — see selectPassagesForContext's
+    // doc comment. `candidates` below (for the no-answer "closest" list)
+    // still uses the FULL retrieved set; only what's actually SHOWN to the
+    // model, and therefore what a citation may point at, is capped.
+    const contextPassages = selectPassagesForContext(mappedPassages);
+
+    // What a citation is allowed to point at: exactly the documents (and,
+    // per document, the pages/fields) actually shown to the model above.
+    const allowed = buildAllowed({ passages: contextPassages, extractions: mappedExtractions });
+
+    // B1 (2026-09-19 adversarial audit): /api/ask is the single most
+    // expensive call site in the codebase (Sonnet, one call per question) and
+    // used to be gated only by the `ask` bucket's REQUEST-count cap above —
+    // a different number from the tenant's daily model-spend budget, and the
+    // only one of the two ever checked here. Checked AFTER retrieval (a
+    // question retrieval finds nothing already short-circuits above with no
+    // model call) and right before the one Anthropic call this route makes,
+    // so a tenant that is over budget never pays for it. Already IN FLIGHT
+    // (fired concurrently with the gate check and retrieval above) — this
+    // just consults the result at the same point in the flow it always was.
+    if (await tryClarify()) return;
+    await budgetPromise;
+
+    // Enumerations ("who all has ...", "list every ...") and repair-history questions ("has this unit had a
+    // compressor replaced?") go to the agent BEFORE the retrieval model: retrieval answers from the top few
+    // pages and caps a reply at 5 facts, which silently truncated a 13-customer list. Falls through to
+    // retrieval when the agent cannot answer (its budget leaves room for the retrieval call inside maxDuration).
+    if (isAgentFirstQuestion(question) && !isInstallDateExtremeQuestion(question) && (await tryAgent({ budgetMs: (await getResearchV2Enabled()) ? 90_000 : 20_000, recordMiss: false }))) return;
+
+    // ---- 2. ask ------------------------------------------------------------
+    // Three separate blocks, not one flat prompt string, so an Anthropic
+    // cache breakpoint can land after the stable ones. See answer.js's
+    // "Prompt-caching split" comment for why the split falls exactly here.
+    //
+    //   system  -> SYSTEM_PROMPT: fixed task framing + RULES, identical on
+    //              every call for every tenant.
+    //   tools   -> ANSWER_TOOL: fixed schema.
+    //   content -> [context block (passages+extractions), question block],
+    //              IN THAT ORDER — the question block never gets a breakpoint
+    //              (it's different on every single call, cached or not) so a
+    //              follow-up question that retrieves the same top passages
+    //              reuses the cache through the end of the context block and
+    //              pays full price for only the question after it.
+    //
+    // planCacheBreakpoints() (api/_lib/promptCache.js, corrected 2026-09-20
+    // late) decides breakpoints off the CUMULATIVE estimated prefix in
+    // Anthropic's own billed order (tools -> system -> content), not each
+    // block measured alone — so a context block that's individually short
+    // still gets cached once the (now-large) system prompt ahead of it has
+    // already cleared the model's minimum. See handoffs/COST_REPORT_2026-09-20.md's
+    // "Correction" section for current measured sizes.
+    const contextText = buildContextBlock({ passages: contextPassages, extractions: mappedExtractions });
+    const questionText = buildQuestionBlock({
+      question,
+      today: todayResolved,
+    });
+
+    const { tools: cachedTools, system: cachedSystem, messageBlocks: cachedContent } = planCacheBreakpoints(
+      {
+        tools: [{ block: ANSWER_TOOL, breakpoint: true }],
+        system: [{ block: { type: "text", text: withGroundingV2(SYSTEM_PROMPT, { path: "grounded" }) }, breakpoint: true }],
+        messageBlocks: [
+          { block: { type: "text", text: contextText }, breakpoint: true },
+          { block: { type: "text", text: questionText }, breakpoint: false }, // never cached — always different
+        ],
+      },
+      ASK_MODEL
+    );
+
+    release.modelTouched = true;
+    const { default: Anthropic } = await loadAnthropicSdk();
+    const client = new Anthropic({ apiKey: getApiKey(), timeout: MODEL_TIMEOUT_MS, maxRetries: 0 });
+    const startedAt = Date.now();
+    // Retries only 429/529/overloaded, with jitter, and never past the model
+    // timeout budget — a burst of questions during a big import must not turn
+    // into a wall of "try again" for the tech in the truck.
+    const deadlineAt = startedAt + MODEL_TIMEOUT_MS;
+    const response = await withBackoff(() => client.messages.create({
+      model: ASK_MODEL,
+      // 900, not 700 (2026-09-20 late correction): the disambiguation fix
+      // below (RULES + the text/facts descriptions in answer.js) means an
+      // ambiguous question's answer now legitimately names other candidate
+      // records or returns up to 5 per-record facts instead of refusing —
+      // both cost a few more output tokens than a single-match answer. 700
+      // was sized for the single-match case only; 900 keeps headroom for
+      // 5 facts + a text clause naming the other matches without reintroducing
+      // the unused 1500 headroom this was cut from in the first place.
+      max_tokens: 900,
+      // Deterministic on purpose: identical question, identical retrieved
+      // evidence -> identical answer. The 2026-09-19 walkthrough saw the
+      // SAME question return different dollar figures on two runs; that
+      // can't happen at temperature 0.
+      ...samplingFor(ASK_MODEL), // temperature 0 (unchanged) unless DONOVAN_GROUNDING_V2 is on and the model is a 5.x model, which rejects it
+      system: cachedSystem,
+      tools: cachedTools,
+      tool_choice: { type: "tool", name: "answer" },
+      messages: [{ role: "user", content: cachedContent }],
+    }, { timeout: Math.max(1000, deadlineAt - Date.now()) }), { deadlineAt });
+    const latencyMs = Date.now() - startedAt;
+    timer.add("model", latencyMs);
+
+    // ---- 3. enforce sourcing ------------------------------------------------
+    // allowComputed defaults to false here: nothing on this endpoint's
+    // evidence path is a computed value (extraction never does arithmetic —
+    // see warrantyRules.js), so a model claiming basis "computed" is
+    // overruled back to "printed" and held to the ordinary page/field check
+    // rather than getting a free pass around it.
+    const toolUse = response.content.find((b) => b.type === "tool_use");
+    // candidates: what retrieval actually returned, for shapeAnswer to build
+    // `closest` from IF everything gets downgraded to no-answer — see the
+    // Bug 1 fix in answer.js's shapeAnswer doc comment.
+    const candidates = [
+      ...mappedPassages.map((p) => ({ documentId: p.documentId })),
+      ...mappedExtractions.map((x) => ({ documentId: x.documentId })),
+    ];
+    let data = shapeAnswer(toolUse?.input, allowed, { candidates });
+    // R40 GROUNDING GATE: every amount / number / date / address / name the model stated (headline and each fact card) must be on the document it cites.
+    // A card whose value is not on its cited document is removed; an unsupported headline withdraws the answer (no-answer, never "verified"), after which the
+    // agent below still gets its one shot. Fails closed (an evidence read that fails withdraws the answer too).
+    if (data.kind === "answer" && process.env.DONOVAN_GROUNDING_GATE !== "0") {
+      try {
+        const ev = await withTenantRetry(ctxArg, async (db) => {
+          const m = await loadGroundingEvidence(db, [...data.facts.flatMap((f) => (f.sources ?? []).map((s) => s.documentId)), ...(data.sources ?? []).map((s) => s.documentId)]);
+          await loadFinancialRows(db, m);
+          return m;
+        });
+        data = applyGrounding(data, ev, { question, today: todayResolved });
+      } catch (err) {
+        console.error("grounding gate failed, withdrawing the answer:", err?.message);
+        data = applyGrounding(data, new Map(), { question, today: todayResolved, evidenceFailed: true });
+      }
+      if (Array.isArray(data.facts)) data.facts = data.facts.map(({ modelBasis, ...rest }) => rest);
+    }
+    // TEAM C: label the cited pages and say what the answer was selected from (a no-answer cites what was searched).
+    attachRetrievalCitations(data, { passages: mappedPassages, extractions: mappedExtractions });
+    // Retrieval+model shaped an honest no-answer: the agent gets one shot (its own answer is
+    // counted once, and this call's usage is recorded with it).
+    if (data.kind === "no-answer" && (await tryAgent({
+      extraUsage: {
+        inputTokens: response.usage?.input_tokens, outputTokens: response.usage?.output_tokens,
+        cacheReadInputTokens: response.usage?.cache_read_input_tokens, cacheCreationInputTokens: response.usage?.cache_creation_input_tokens,
+      },
+    }))) return;
+
+    // Retrieval caps a reply at 5 facts. When an enumeration question still ends up here (the agent
+    // could not answer it) and hit that cap, never let 5 read as the whole list.
+    if (data.kind === "answer" && data.facts.length >= 5 && isEnumerationQuestion(question)) {
+      data.text = `${String(data.text ?? "").replace(/[.\s]+$/, "")}. These are the 5 closest matches, not necessarily every one.`;
+    }
+
+    // One structured line per call, no PII and no question text (see
+    // hashQuestion's doc comment above for why questions never get logged
+    // anywhere) — so Vercel logs show cache hit rates across tenants. Logged
+    // (and the response sent) BEFORE the bookkeeping below runs — neither
+    // needs the customer to wait on it. `timingsMs` is the same snapshot the
+    // Server-Timing header below carries; see handoffs/ASK_LATENCY_2026-09-20.md.
+    //
+    // stop_reason/facts_raw/facts_kept (2026-09-20 late): counts only, no
+    // content — stop_reason tells "genuine no-answer" apart from "the model
+    // got cut off"; facts_raw vs. facts_kept is how many facts the model
+    // actually cited that shapeAnswer's grounding check then dropped, which
+    // is exactly the signal for whether the disambiguation-vs-no-answer
+    // regression fix above is doing its job in production.
+    console.log(
+      JSON.stringify(
+        modelCallLogLine({
+          route: "ask",
+          model: ASK_MODEL,
+          inputTokens: response.usage?.input_tokens,
+          cacheReadInputTokens: response.usage?.cache_read_input_tokens,
+          cacheCreationInputTokens: response.usage?.cache_creation_input_tokens,
+          outputTokens: response.usage?.output_tokens,
+          latencyMs,
+          timingsMs: timer.snapshot(),
+          stopReason: response.stop_reason,
+          factsRaw: Array.isArray(toolUse?.input?.facts) ? toolUse.input.facts.length : 0,
+          factsKept: data.facts.length,
+        })
+      )
+    );
+
+    // ---- respond FIRST, bookkeeping after (2026-09-20, handoffs/
+    // ASK_LATENCY_2026-09-20.md) --------------------------------------------
+    // The customer already has a correct, sourced answer at this point.
+    // Recording spend and writing the audit row are real work that must
+    // still happen, but neither should make the customer wait on it — this
+    // sends the response now, then keeps the function alive (Vercel does not
+    // freeze a serverless function until its handler's own promise settles)
+    // to finish both, same non-fatal try/catch semantics as before, just run
+    // together instead of one after the other after the response.
+    await send(200, { success: true, data });
+
+    // ---- 4. bookkeeping (post-response) ------------------------------------
+    // "Who saw this customer's document" has to be answerable, and cost
+    // accounting is not request rate limiting (./_lib/rateLimit.js already
+    // ran above) — both best-effort and non-fatal: a customer who already got
+    // their answer must not see anything different because either write
+    // failed after the fact. The question text itself is NEVER stored — see
+    // hashQuestion's doc comment — only its hash, which documents were cited,
+    // and how many passages were considered.
+    const citedDocumentIds = [...new Set((data.sources ?? []).map((s) => s.documentId))];
+    // ONE connection, sequential (2026-09-20 fix): running the three writes
+    // as parallel withTenant calls exhausted the 5-client pool under Fluid
+    // compute — production logged "Failed to upsert ask cache row: timeout
+    // exceeded when trying to connect", so answers were never cached. The
+    // response is already sent; nothing here is on the customer's clock.
+    await timer.time("bookkeeping", async () => {
+      try {
+        await withTenantRetry(ctxArg, async (db) => {
+          try {
+            await db.logAction({
+              action: "document.queried",
+              resource_type: "question",
+              clerk_user_id: auth.userId,
+              changes: {
+                question_hash: hashQuestion(question),
+                documents: citedDocumentIds,
+                passages: passages.length,
+              },
+            });
+          } catch (err) {
+            console.error("Failed to write document.queried audit row:", err?.message);
+          }
+          // Miss loop: the model itself declined (shapeAnswer downgraded
+          // every fact to no-answer, e.g. nothing it cited actually
+          // grounded) — reuses this same connection/transaction.
+          if (data.kind === "no-answer") {
+            await insertAskMiss(db, { question, questionNormalized: normalizedForAnalytics, outcome: MISS_OUTCOMES.NO_ANSWER });
+          }
+          // Monthly ask allowance (owner decision, 2026-09-21): this branch is
+          // only ever reached after the one Anthropic call above succeeded —
+          // cache hits and the "no evidence" no-answer both already returned
+          // earlier — so it always counts, regardless of whether shapeAnswer's
+          // result kind ended up "answer" or "no-answer" (the model was still
+          // reached either way; see usage.js's isCountableAskSource doc comment).
+          if (isCountableAskSource("model")) await incrementAsksThisMonth(db);
+          // Cache write (handoffs/ASK_CACHE_AND_INDEX_2026-09-20.md): a cache
+          // miss above means `corpusStamp` came from the SAME transaction that
+          // just ran retrieval, so it is still the stamp this answer was built
+          // against.
+          if (ASK_CACHE_ENABLED && corpusStamp && shouldCache(data.kind, passages.length, extractions.length)) {
+            // SAVEPOINT: a failed upsert must not abort the transaction and
+            // silently roll back the audit row written just above.
+            await db.raw("SAVEPOINT ask_cache_upsert", []);
+            try {
+              await upsertCacheEntry(db, { questionHash, corpusStamp, today: todayResolved, answer: data });
+              await db.raw("RELEASE SAVEPOINT ask_cache_upsert", []);
+            } catch (err) {
+              console.error("Failed to upsert ask cache row:", err?.message);
+              await db.raw("ROLLBACK TO SAVEPOINT ask_cache_upsert", []).catch(() => {});
+            }
+            await storeSemantic(db, { question, corpusStamp, answer: data }).catch((err) => {
+              console.error("Failed to store semantic cache row:", err?.message);
+            });
+          }
+        });
+      } catch (err) {
+        console.error("Ask bookkeeping transaction failed:", err?.message);
+      }
+      try {
+        await recordModelCall(ctxArg, {
+          inputTokens: response.usage?.input_tokens,
+          outputTokens: response.usage?.output_tokens,
+          cacheReadInputTokens: response.usage?.cache_read_input_tokens,
+          cacheCreationInputTokens: response.usage?.cache_creation_input_tokens,
+        });
+      } catch (err) {
+        console.error("Failed to record ask usage:", err?.message);
+      }
+    });
+    };
+    // The handoff: what happens to a plain "no-answer" that no lane verified as final. The Claude path runs with the chips / original decline held back as the fallback.
+    releaseEscalate = async () => {
+      if (!budgetPromise) { budgetPromise = Promise.resolve().then(() => assertModelBudget(ctxArg)); budgetPromise.catch(() => {}); }
+      if (await tryAgent({ recordMiss: false })) return;
+      if (release.delivered) return;
+      await retrievalAndModel();
+    };
+
     // ---- overlap, not a chain (handoffs/ASK_LATENCY_2026-09-20.md) --------
     // Three independent reads that used to run one after another. `limit`
     // above stays first (it writes the 429 itself and must do so before
@@ -1517,13 +1941,13 @@ export default async function handler(req, res) {
     // Pool is max 5 (recordsStore.js) — cap this request at 2 concurrent
     // connections: gate→budget chained on one, retrieval on the other.
     const gatePromise = scorecardCall ? Promise.resolve({ allowed: true }) : timer.time("gate", () => checkAskGate(auth));
-    const budgetPromise = gatePromise.then(() => timer.time("budget", () => assertModelBudget(ctxArg)));
+    budgetPromise = gatePromise.then(() => timer.time("budget", () => assertModelBudget(ctxArg)));
     budgetPromise.catch(() => {});
     // Neither a meta question nor a fast-path candidate needs retrieval fired
     // early — both may answer without it. A fast-path candidate that turns out
     // to have no DB answer (ambiguous subject, no value on file) re-runs
     // retrieval inline below, same fallback shape as the meta-router's own.
-    const retrievalPromise = meta || relationsIntent || detIntent || decomposeIntent || fastPathIntent || contactLookupIntent || docLookupIntent || contentCountIntent || moneyQuestion || analyticsCandidate || amountInvoiceIntent
+    retrievalPromise = meta || relationsIntent || detIntent || decomposeIntent || fastPathIntent || contactLookupIntent || docLookupIntent || contentCountIntent || moneyQuestion || analyticsCandidate || amountInvoiceIntent
       ? null
       : retrieveEvidence(ctxArg, question, customerNumber, timer, { today: todayResolved, questionHash, noCache: Boolean(scorecardCall) });
 
@@ -1544,7 +1968,7 @@ export default async function handler(req, res) {
       const amountGate = await loadMoneyGateModule();
       const fin = await timer.time("financials", () => amountGate.answerAmountInvoiceQuestion({ withTenant, ctxArg, question, today: todayResolved, understanding: understood }));
       if (fin.handled) {
-        send(200, { success: true, data: fin.data });
+        await send(200, { success: true, data: fin.data });
         await timer.time("bookkeeping", () =>
           withTenant(ctxArg, (db) => db.logAction({
             action: "document.queried", resource_type: "question", clerk_user_id: auth.userId,
@@ -1557,7 +1981,7 @@ export default async function handler(req, res) {
 
     if (!amountInvoiceIntent && /\binvoic\w*/i.test(question) && /\b(?:tech(?:nician)?s?|who (?:did|worked|handled|serviced|visited|installed))\b/i.test(question) && amountMentioned(question)) {
       // R40: a technician/who question that names an amount is not a count of every invoice (and not answerable by amount here)
-      send(200, { success: true, data: { kind: "no-answer", text: "I can't tie a technician to an invoice by its dollar amount. Give me the invoice number or the customer's name and I'll look it up.", facts: [], sources: [], confidence: 0, verifiedCount: 0, unverifiedCount: 0, closest: [] } });
+      await send(200, { success: true, data: { kind: "no-answer", text: "I can't tie a technician to an invoice by its dollar amount. Give me the invoice number or the customer's name and I'll look it up.", facts: [], sources: [], confidence: 0, verifiedCount: 0, unverifiedCount: 0, closest: [], finalDecline: "policy" } });
       return;
     }
 
@@ -1981,7 +2405,7 @@ export default async function handler(req, res) {
         const mg = await loadMoneyGateModule();
         const nf = await timer.time("financials", () => mg.answerNamedMoneyQuestion({ withTenant, ctxArg, question, today: todayResolved }));
         if (!nf.handled) return false;
-        send(200, { success: true, data: nf.data });
+        await send(200, { success: true, data: nf.data });
         await timer.time("bookkeeping", () =>
           withTenant(ctxArg, (db) => db.logAction({ action: "document.queried", resource_type: "question", clerk_user_id: auth.userId, changes: { question_hash: hashQuestion(question), documents: [...new Set((nf.data.sources ?? []).map((x) => x.documentId))], passages: 0, financials: nf.intent } }))
             .catch((err) => console.error("Failed to write document.queried audit row (named money):", err?.message)));
@@ -2003,7 +2427,7 @@ export default async function handler(req, res) {
       // is false and everything below is exactly the old honest refusal.
       const fin = await timer.time("financials", () => moneyGateModule.answerMoneyQuestion({ withTenant, ctxArg, question, today: todayResolved }));
       if (fin.handled) {
-        send(200, { success: true, data: fin.data });
+        await send(200, { success: true, data: fin.data });
         await timer.time("bookkeeping", () =>
           withTenant(ctxArg, (db) => db.logAction({
             action: "document.queried", resource_type: "question", clerk_user_id: auth.userId,
@@ -2016,7 +2440,7 @@ export default async function handler(req, res) {
       if (await tryRecordsFirst("late")) return;
       if (fin.hasData && (await tryAgent())) return;
       const data = fin.hasData ? moneyGateModule.moneyNoMatchAnswer() : moneyFallbackAnswer();
-      send(200, { success: true, data });
+      await send(200, { success: true, data });
       await timer.time("bookkeeping", () =>
         withTenant(ctxArg, async (db) => {
           await db.logAction({
@@ -2115,7 +2539,7 @@ export default async function handler(req, res) {
         // comment), so computing it fresh on every response costs nothing. (Module already loaded above
         // to reach this branch at all; loadAnalyticsRouteModule's cache makes this a no-op re-fetch.)
         const { applyExistenceShape } = await loadAnalyticsRouteModule();
-        send(200, { success: true, data: applyExistenceShape(data, question) });
+        await send(200, { success: true, data: applyExistenceShape(data, question) });
         await timer.time("bookkeeping", async () => {
           try {
             await withTenantRetry(ctxArg, async (db) => {
@@ -2205,366 +2629,8 @@ export default async function handler(req, res) {
       }).catch(() => {});
     }
 
-    // ---- 1. retrieve (already in flight above unless meta, fast path, or analytics fell through) ---
-    const { passages, extractions, cacheHit, cachedAnswer, corpusStamp } = retrievalPromise
-      ? await retrievalPromise
-      : await retrieveEvidence(ctxArg, question, customerNumber, timer, { today: todayResolved, questionHash, noCache: Boolean(scorecardCall) });
-
-    // ---- cache hit: no retrieval was even needed above, no model call -----
-    if (cacheHit) {
-      const data = { ...cachedAnswer, cached: true };
-      send(200, { success: true, data });
-      await timer.time("bookkeeping", () =>
-        withTenant(ctxArg, (db) => db.logAction({
-          action: "document.queried",
-          resource_type: "question",
-          clerk_user_id: auth.userId,
-          changes: {
-            question_hash: hashQuestion(question),
-            documents: [...new Set((data.sources ?? []).map((s) => s.documentId))],
-            passages: 0,
-            cached: true,
-          },
-        })).catch((err) => console.error("Failed to write document.queried audit row (cache hit):", err?.message))
-      );
-      return;
-    }
-
-    if (passages.length === 0 && extractions.length === 0) {
-      if (await tryAgent()) return;
-      // Miss loop: fired with no await — nothing else on this path is
-      // awaited before the response either, and this must never delay it.
-      recordAskMiss(ctxArg, { question, questionNormalized: normalizedForAnalytics, outcome: MISS_OUTCOMES.NO_ANSWER }).catch(() => {});
-      // Item 8 (100-question persona sample, 2026-09-22): a single-record
-      // question ("do we have anything about a compressor replacement for
-      // Thomas Mercer") that resolves to exactly one known customer/address
-      // gets a specific honest zero naming them, instead of the generic
-      // "Nothing in your records answers that yet" — see docLookup.js's own
-      // doc comment. Only attempted for a question that already looks like a
-      // single-record reference (never for an aggregate/analytics-shaped one
-      // that merely happened to retrieve nothing); any failure here falls
-      // back to the generic line rather than risking a wrong/500 response on
-      // an already-given-up path.
-      let honestZeroText = null;
-      // TEAM C: what was searched, from the same transaction (documents linked to the resolved customer, or the whole library).
-      let zeroCitations = null;
-      try {
-        zeroCitations = await withTenant(ctxArg, async (db) => {
-          let cites = null;
-          if (looksLikeSingleRecordReference(question)) {
-            try {
-              const ctx = await resolveHonestZeroContext(db, question);
-              if (ctx) {
-                honestZeroText = buildHonestZeroText(ctx);
-                cites = await honestZeroCitations(db, ctx, { documentIdsFor: customerDocumentIds });
-              }
-            } catch (err) {
-              console.error("Honest-zero context resolution failed, using generic no-answer:", err?.message);
-            }
-          }
-          return cites ?? { records: [], total: 0, kind: "searched", basis: await searchedLibraryBasis(db) };
-        });
-      } catch (err) {
-        console.error("Honest-zero context resolution failed, using generic no-answer:", err?.message);
-      }
-      return send(200, {
-        success: true,
-        data: attachCitations({
-          kind: "no-answer",
-          text: honestZeroText ?? "Nothing in your records answers that yet. Your documents may still be processing.",
-          facts: [], sources: [], confidence: 0,
-          verifiedCount: 0, unverifiedCount: 0, closest: [],
-        }, zeroCitations ?? { records: [], total: 0, kind: "searched", basis: "Searched your documents; nothing matched." }),
-      });
-    }
-
-    const mappedPassages = passages.map((p) => ({
-      documentId: p.document_id,
-      filename: p.original_filename,
-      documentType: p.document_type,
-      page: p.page_no,
-      excerpt: String(p.excerpt ?? "").slice(0, /^card/.test(String(p.matched_by ?? "")) ? MAX_EXCERPT + 840 : MAX_EXCERPT), // a merged document card (<= 760 chars + label) must not eat into the page text
-      stage: p.stage,
-    }));
-    const mappedExtractions = extractions.map((x) => ({
-      documentId: x.document_id,
-      filename: x.original_filename,
-      field: x.field_key,
-      value: String(x.value ?? "").replace(/\s+/g, " ").trim(), // one line: a stored value can not forge a separate "field = value" line
-      entityType: x.entity_type,
-      stage: x.stage,
-    }));
-
-    // Cost cut (2026-09-20, owner decision): dedupe by (documentId, page) and
-    // cap the context block to ~6K tokens — see selectPassagesForContext's
-    // doc comment. `candidates` below (for the no-answer "closest" list)
-    // still uses the FULL retrieved set; only what's actually SHOWN to the
-    // model, and therefore what a citation may point at, is capped.
-    const contextPassages = selectPassagesForContext(mappedPassages);
-
-    // What a citation is allowed to point at: exactly the documents (and,
-    // per document, the pages/fields) actually shown to the model above.
-    const allowed = buildAllowed({ passages: contextPassages, extractions: mappedExtractions });
-
-    // B1 (2026-09-19 adversarial audit): /api/ask is the single most
-    // expensive call site in the codebase (Sonnet, one call per question) and
-    // used to be gated only by the `ask` bucket's REQUEST-count cap above —
-    // a different number from the tenant's daily model-spend budget, and the
-    // only one of the two ever checked here. Checked AFTER retrieval (a
-    // question retrieval finds nothing already short-circuits above with no
-    // model call) and right before the one Anthropic call this route makes,
-    // so a tenant that is over budget never pays for it. Already IN FLIGHT
-    // (fired concurrently with the gate check and retrieval above) — this
-    // just consults the result at the same point in the flow it always was.
-    if (await tryClarify()) return;
-    await budgetPromise;
-
-    // Enumerations ("who all has ...", "list every ...") and repair-history questions ("has this unit had a
-    // compressor replaced?") go to the agent BEFORE the retrieval model: retrieval answers from the top few
-    // pages and caps a reply at 5 facts, which silently truncated a 13-customer list. Falls through to
-    // retrieval when the agent cannot answer (its budget leaves room for the retrieval call inside maxDuration).
-    if (isAgentFirstQuestion(question) && !isInstallDateExtremeQuestion(question) && (await tryAgent({ budgetMs: (await getResearchV2Enabled()) ? 90_000 : 20_000, recordMiss: false }))) return;
-
-    // ---- 2. ask ------------------------------------------------------------
-    // Three separate blocks, not one flat prompt string, so an Anthropic
-    // cache breakpoint can land after the stable ones. See answer.js's
-    // "Prompt-caching split" comment for why the split falls exactly here.
-    //
-    //   system  -> SYSTEM_PROMPT: fixed task framing + RULES, identical on
-    //              every call for every tenant.
-    //   tools   -> ANSWER_TOOL: fixed schema.
-    //   content -> [context block (passages+extractions), question block],
-    //              IN THAT ORDER — the question block never gets a breakpoint
-    //              (it's different on every single call, cached or not) so a
-    //              follow-up question that retrieves the same top passages
-    //              reuses the cache through the end of the context block and
-    //              pays full price for only the question after it.
-    //
-    // planCacheBreakpoints() (api/_lib/promptCache.js, corrected 2026-09-20
-    // late) decides breakpoints off the CUMULATIVE estimated prefix in
-    // Anthropic's own billed order (tools -> system -> content), not each
-    // block measured alone — so a context block that's individually short
-    // still gets cached once the (now-large) system prompt ahead of it has
-    // already cleared the model's minimum. See handoffs/COST_REPORT_2026-09-20.md's
-    // "Correction" section for current measured sizes.
-    const contextText = buildContextBlock({ passages: contextPassages, extractions: mappedExtractions });
-    const questionText = buildQuestionBlock({
-      question,
-      today: todayResolved,
-    });
-
-    const { tools: cachedTools, system: cachedSystem, messageBlocks: cachedContent } = planCacheBreakpoints(
-      {
-        tools: [{ block: ANSWER_TOOL, breakpoint: true }],
-        system: [{ block: { type: "text", text: withGroundingV2(SYSTEM_PROMPT, { path: "grounded" }) }, breakpoint: true }],
-        messageBlocks: [
-          { block: { type: "text", text: contextText }, breakpoint: true },
-          { block: { type: "text", text: questionText }, breakpoint: false }, // never cached — always different
-        ],
-      },
-      ASK_MODEL
-    );
-
-    const { default: Anthropic } = await loadAnthropicSdk();
-    const client = new Anthropic({ apiKey: getApiKey(), timeout: MODEL_TIMEOUT_MS, maxRetries: 0 });
-    const startedAt = Date.now();
-    // Retries only 429/529/overloaded, with jitter, and never past the model
-    // timeout budget — a burst of questions during a big import must not turn
-    // into a wall of "try again" for the tech in the truck.
-    const deadlineAt = startedAt + MODEL_TIMEOUT_MS;
-    const response = await withBackoff(() => client.messages.create({
-      model: ASK_MODEL,
-      // 900, not 700 (2026-09-20 late correction): the disambiguation fix
-      // below (RULES + the text/facts descriptions in answer.js) means an
-      // ambiguous question's answer now legitimately names other candidate
-      // records or returns up to 5 per-record facts instead of refusing —
-      // both cost a few more output tokens than a single-match answer. 700
-      // was sized for the single-match case only; 900 keeps headroom for
-      // 5 facts + a text clause naming the other matches without reintroducing
-      // the unused 1500 headroom this was cut from in the first place.
-      max_tokens: 900,
-      // Deterministic on purpose: identical question, identical retrieved
-      // evidence -> identical answer. The 2026-09-19 walkthrough saw the
-      // SAME question return different dollar figures on two runs; that
-      // can't happen at temperature 0.
-      ...samplingFor(ASK_MODEL), // temperature 0 (unchanged) unless DONOVAN_GROUNDING_V2 is on and the model is a 5.x model, which rejects it
-      system: cachedSystem,
-      tools: cachedTools,
-      tool_choice: { type: "tool", name: "answer" },
-      messages: [{ role: "user", content: cachedContent }],
-    }, { timeout: Math.max(1000, deadlineAt - Date.now()) }), { deadlineAt });
-    const latencyMs = Date.now() - startedAt;
-    timer.add("model", latencyMs);
-
-    // ---- 3. enforce sourcing ------------------------------------------------
-    // allowComputed defaults to false here: nothing on this endpoint's
-    // evidence path is a computed value (extraction never does arithmetic —
-    // see warrantyRules.js), so a model claiming basis "computed" is
-    // overruled back to "printed" and held to the ordinary page/field check
-    // rather than getting a free pass around it.
-    const toolUse = response.content.find((b) => b.type === "tool_use");
-    // candidates: what retrieval actually returned, for shapeAnswer to build
-    // `closest` from IF everything gets downgraded to no-answer — see the
-    // Bug 1 fix in answer.js's shapeAnswer doc comment.
-    const candidates = [
-      ...mappedPassages.map((p) => ({ documentId: p.documentId })),
-      ...mappedExtractions.map((x) => ({ documentId: x.documentId })),
-    ];
-    let data = shapeAnswer(toolUse?.input, allowed, { candidates });
-    // R40 GROUNDING GATE: every amount / number / date / address / name the model stated (headline and each fact card) must be on the document it cites.
-    // A card whose value is not on its cited document is removed; an unsupported headline withdraws the answer (no-answer, never "verified"), after which the
-    // agent below still gets its one shot. Fails closed (an evidence read that fails withdraws the answer too).
-    if (data.kind === "answer" && process.env.DONOVAN_GROUNDING_GATE !== "0") {
-      try {
-        const ev = await withTenantRetry(ctxArg, async (db) => {
-          const m = await loadGroundingEvidence(db, [...data.facts.flatMap((f) => (f.sources ?? []).map((s) => s.documentId)), ...(data.sources ?? []).map((s) => s.documentId)]);
-          await loadFinancialRows(db, m);
-          return m;
-        });
-        data = applyGrounding(data, ev, { question, today: todayResolved });
-      } catch (err) {
-        console.error("grounding gate failed, withdrawing the answer:", err?.message);
-        data = applyGrounding(data, new Map(), { question, today: todayResolved, evidenceFailed: true });
-      }
-      if (Array.isArray(data.facts)) data.facts = data.facts.map(({ modelBasis, ...rest }) => rest);
-    }
-    // TEAM C: label the cited pages and say what the answer was selected from (a no-answer cites what was searched).
-    attachRetrievalCitations(data, { passages: mappedPassages, extractions: mappedExtractions });
-    // Retrieval+model shaped an honest no-answer: the agent gets one shot (its own answer is
-    // counted once, and this call's usage is recorded with it).
-    if (data.kind === "no-answer" && (await tryAgent({
-      extraUsage: {
-        inputTokens: response.usage?.input_tokens, outputTokens: response.usage?.output_tokens,
-        cacheReadInputTokens: response.usage?.cache_read_input_tokens, cacheCreationInputTokens: response.usage?.cache_creation_input_tokens,
-      },
-    }))) return;
-
-    // Retrieval caps a reply at 5 facts. When an enumeration question still ends up here (the agent
-    // could not answer it) and hit that cap, never let 5 read as the whole list.
-    if (data.kind === "answer" && data.facts.length >= 5 && isEnumerationQuestion(question)) {
-      data.text = `${String(data.text ?? "").replace(/[.\s]+$/, "")}. These are the 5 closest matches, not necessarily every one.`;
-    }
-
-    // One structured line per call, no PII and no question text (see
-    // hashQuestion's doc comment above for why questions never get logged
-    // anywhere) — so Vercel logs show cache hit rates across tenants. Logged
-    // (and the response sent) BEFORE the bookkeeping below runs — neither
-    // needs the customer to wait on it. `timingsMs` is the same snapshot the
-    // Server-Timing header below carries; see handoffs/ASK_LATENCY_2026-09-20.md.
-    //
-    // stop_reason/facts_raw/facts_kept (2026-09-20 late): counts only, no
-    // content — stop_reason tells "genuine no-answer" apart from "the model
-    // got cut off"; facts_raw vs. facts_kept is how many facts the model
-    // actually cited that shapeAnswer's grounding check then dropped, which
-    // is exactly the signal for whether the disambiguation-vs-no-answer
-    // regression fix above is doing its job in production.
-    console.log(
-      JSON.stringify(
-        modelCallLogLine({
-          route: "ask",
-          model: ASK_MODEL,
-          inputTokens: response.usage?.input_tokens,
-          cacheReadInputTokens: response.usage?.cache_read_input_tokens,
-          cacheCreationInputTokens: response.usage?.cache_creation_input_tokens,
-          outputTokens: response.usage?.output_tokens,
-          latencyMs,
-          timingsMs: timer.snapshot(),
-          stopReason: response.stop_reason,
-          factsRaw: Array.isArray(toolUse?.input?.facts) ? toolUse.input.facts.length : 0,
-          factsKept: data.facts.length,
-        })
-      )
-    );
-
-    // ---- respond FIRST, bookkeeping after (2026-09-20, handoffs/
-    // ASK_LATENCY_2026-09-20.md) --------------------------------------------
-    // The customer already has a correct, sourced answer at this point.
-    // Recording spend and writing the audit row are real work that must
-    // still happen, but neither should make the customer wait on it — this
-    // sends the response now, then keeps the function alive (Vercel does not
-    // freeze a serverless function until its handler's own promise settles)
-    // to finish both, same non-fatal try/catch semantics as before, just run
-    // together instead of one after the other after the response.
-    send(200, { success: true, data });
-
-    // ---- 4. bookkeeping (post-response) ------------------------------------
-    // "Who saw this customer's document" has to be answerable, and cost
-    // accounting is not request rate limiting (./_lib/rateLimit.js already
-    // ran above) — both best-effort and non-fatal: a customer who already got
-    // their answer must not see anything different because either write
-    // failed after the fact. The question text itself is NEVER stored — see
-    // hashQuestion's doc comment — only its hash, which documents were cited,
-    // and how many passages were considered.
-    const citedDocumentIds = [...new Set((data.sources ?? []).map((s) => s.documentId))];
-    // ONE connection, sequential (2026-09-20 fix): running the three writes
-    // as parallel withTenant calls exhausted the 5-client pool under Fluid
-    // compute — production logged "Failed to upsert ask cache row: timeout
-    // exceeded when trying to connect", so answers were never cached. The
-    // response is already sent; nothing here is on the customer's clock.
-    await timer.time("bookkeeping", async () => {
-      try {
-        await withTenantRetry(ctxArg, async (db) => {
-          try {
-            await db.logAction({
-              action: "document.queried",
-              resource_type: "question",
-              clerk_user_id: auth.userId,
-              changes: {
-                question_hash: hashQuestion(question),
-                documents: citedDocumentIds,
-                passages: passages.length,
-              },
-            });
-          } catch (err) {
-            console.error("Failed to write document.queried audit row:", err?.message);
-          }
-          // Miss loop: the model itself declined (shapeAnswer downgraded
-          // every fact to no-answer, e.g. nothing it cited actually
-          // grounded) — reuses this same connection/transaction.
-          if (data.kind === "no-answer") {
-            await insertAskMiss(db, { question, questionNormalized: normalizedForAnalytics, outcome: MISS_OUTCOMES.NO_ANSWER });
-          }
-          // Monthly ask allowance (owner decision, 2026-09-21): this branch is
-          // only ever reached after the one Anthropic call above succeeded —
-          // cache hits and the "no evidence" no-answer both already returned
-          // earlier — so it always counts, regardless of whether shapeAnswer's
-          // result kind ended up "answer" or "no-answer" (the model was still
-          // reached either way; see usage.js's isCountableAskSource doc comment).
-          if (isCountableAskSource("model")) await incrementAsksThisMonth(db);
-          // Cache write (handoffs/ASK_CACHE_AND_INDEX_2026-09-20.md): a cache
-          // miss above means `corpusStamp` came from the SAME transaction that
-          // just ran retrieval, so it is still the stamp this answer was built
-          // against.
-          if (ASK_CACHE_ENABLED && corpusStamp && shouldCache(data.kind, passages.length, extractions.length)) {
-            // SAVEPOINT: a failed upsert must not abort the transaction and
-            // silently roll back the audit row written just above.
-            await db.raw("SAVEPOINT ask_cache_upsert", []);
-            try {
-              await upsertCacheEntry(db, { questionHash, corpusStamp, today: todayResolved, answer: data });
-              await db.raw("RELEASE SAVEPOINT ask_cache_upsert", []);
-            } catch (err) {
-              console.error("Failed to upsert ask cache row:", err?.message);
-              await db.raw("ROLLBACK TO SAVEPOINT ask_cache_upsert", []).catch(() => {});
-            }
-            await storeSemantic(db, { question, corpusStamp, answer: data }).catch((err) => {
-              console.error("Failed to store semantic cache row:", err?.message);
-            });
-          }
-        });
-      } catch (err) {
-        console.error("Ask bookkeeping transaction failed:", err?.message);
-      }
-      try {
-        await recordModelCall(ctxArg, {
-          inputTokens: response.usage?.input_tokens,
-          outputTokens: response.usage?.output_tokens,
-          cacheReadInputTokens: response.usage?.cache_read_input_tokens,
-          cacheCreationInputTokens: response.usage?.cache_creation_input_tokens,
-        });
-      } catch (err) {
-        console.error("Failed to record ask usage:", err?.message);
-      }
-    });
+    // ---- 1. retrieve + 2. ask + 3. enforce sourcing + 4. bookkeeping: see retrievalAndModel above ----
+    await retrievalAndModel();
   } catch (error) {
     try {
       const header = formatServerTiming(timer.snapshot());

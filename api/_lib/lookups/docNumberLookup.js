@@ -189,6 +189,22 @@ async function totalBelongsTo(db, digits, name) {
   } catch { return false; }
 }
 
+/** true when the typed number (any dash / space spelling) is printed in an extracted field or on any page of this organization, or when the check itself failed (never "absent" on doubt) */
+export async function typedNumberPresent(db, typed) {
+  try {
+    const raw = String(typed ?? "").trim();
+    const flat = raw.replace(/[^A-Za-z0-9]/g, "");
+    if (flat.length < 3) return true;
+    const esc = (s) => s.replace(/[\\%_]/g, "\\$&");
+    const m = /^([A-Za-z]*)(\d+)$/.exec(flat);
+    const likes = [`%${esc(raw)}%`]; if (m && m[1]) likes.push(`%${esc(m[1])}-${esc(m[2])}%`, `%${esc(m[1])} ${esc(m[2])}%`, `%${esc(flat)}%`); else if (m) likes.push(`%${esc(m[2])}%`);
+    const ex = await db.raw(`SELECT 1 FROM extractions WHERE ${TENANT_SQL} AND value ILIKE ANY ($1::text[]) LIMIT 1`, [likes]);
+    if (ex.rows.length) return true;
+    const pg = await db.raw(`SELECT 1 FROM document_pages WHERE ${TENANT_SQL} AND text ILIKE ANY ($1::text[]) LIMIT 1`, [likes]);
+    return pg.rows.length > 0;
+  } catch { return true; }
+}
+
 /** @returns an /api/ask data object, or null (nothing typed matches and the question was not clearly about a numbered document). */
 export async function runDocNumberLookup(db, intent) {
   const rows = await docsByNumber(db, intent);
@@ -205,8 +221,11 @@ export async function runDocNumberLookup(db, intent) {
   const distinctNumbers = new Set(docs.map((d) => canonDocNo(d.number)));
   const shownTyped = intent.digitsOnly ? `${intent.kind} ${intent.typed}` : `${intent.kind} ${intent.typed.toUpperCase()}`;
   if (!docs.length) {
+    // HANDOFF: this search only reads the invoice / work-order / PO / permit numbers. It is a FINAL "not on file" only when the typed number appears nowhere else either (another
+    // extracted field such as a document reference, or the page text); a number that is there under another kind of document goes on to the Claude path instead.
+    const present = await typedNumberPresent(db, intent.typed);
     return attachCitations(
-      { kind: "no-answer", text: `No ${shownTyped} on file.`, facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [] },
+      { kind: "no-answer", text: `No ${shownTyped} on file.`, facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [], ...(present ? {} : { finalDecline: "absent-number" }) },
       { records: [], total: 0, kind: "searched", basis: `Searched the invoice, work-order, PO and permit numbers printed on every document for ${intent.typed} (ignoring case, dashes and spaces); none matches.` }
     );
   }

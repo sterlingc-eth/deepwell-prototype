@@ -64,7 +64,7 @@ export async function runFalsePremise(db, intent) {
   const label = scope.customers[0]?.service_address?.split(",")[0] || intent.address.split(",")[0];
   const who = [...new Set(scope.customers.map((c) => c.customer_name).filter(Boolean))].slice(0, 2).join(", ");
   return attachCitations(
-    { kind: "no-answer", text: `No ${intent.part} work is on file for ${label}${who ? ` (${who})` : ""}.`, facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [] },
+    { kind: "no-answer", finalDecline: "absent-text", text: `No ${intent.part} work is on file for ${label}${who ? ` (${who})` : ""}.`, facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [] },
     { records: [], total: 0, kind: "searched", basis: `Searched every page of the ${docIds.length} document${docIds.length === 1 ? "" : "s"} tied to ${label} for "${intent.part}"; none mentions it.` }
   );
 }

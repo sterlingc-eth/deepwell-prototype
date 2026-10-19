@@ -887,7 +887,7 @@ export function buildNotHeldAnswer(kind) {
     ? "I don't store or give out sensitive identifiers such as social security, tax ID, card or bank numbers, so there is nothing on file to answer that."
     : "I only hold this company's own records, so I can't see another company's customers or anything about them.";
   return attachCitations(
-    { kind: "no-answer", text, facts: [], sources: [], confidence: 0, verifiedCount: 0, unverifiedCount: 0, closest: [] },
+    { kind: "no-answer", finalDecline: "policy", text, facts: [], sources: [], confidence: 0, verifiedCount: 0, unverifiedCount: 0, closest: [] },
     { records: [], total: 0, kind: "searched", basis: kind === "sensitive" ? "Sensitive identifiers are never stored or returned; nothing was looked up." : "Only this company's own records are available; nothing was looked up." }
   );
 }

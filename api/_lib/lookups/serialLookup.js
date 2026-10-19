@@ -19,6 +19,7 @@ import { attachCitations, unitRecord, customerRecord } from "../citations/record
 import { documentRecordsFor } from "../citations/enrich.js";
 import { TENANT_SQL, todayIso, humanDate, answerEnvelope, fetchVisits, splitFuture } from "../scope.js";
 import { damerauLevenshteinDistance } from "../integrity.js";
+import { typedNumberPresent } from "./docNumberLookup.js";
 
 const ANCHOR_RE = /\b(?:serial|seriel|serail|sereal|serial#)(?:\s*(?:number|num|nbr|no\.?|#))?|\bs\s*\/\s*n\b|\bs\.n\.?|\bsn\b|\bser\s*(?:no\.?|#)/gi;
 // Words that may sit between the anchor and the serial ("serial number is X", "serial no: X").
@@ -252,7 +253,10 @@ export async function runSerialLookup(db, intent, { today } = {}) {
       );
     }
     const modelCount = await modelMatchCount(db, typed);
-    return noUnitAnswer(typed, { modelCount, near: modelCount ? [] : await nearestSerials(db, typed) });
+    const noUnit = noUnitAnswer(typed, { modelCount, near: modelCount ? [] : await nearestSerials(db, typed) });
+    // verified absent only when the serial is in no unit AND in no document text; otherwise Claude may still find it
+    if (!(await typedNumberPresent(db, typed).catch(() => true))) noUnit.finalDecline = "absent-number";
+    return noUnit;
   }
   if (units.length > 1) {
     const list = units.map((u) => `${brandModel(u)}${u.customer_name ? ` (${u.customer_name}` : " ("}${u.address ? `${u.customer_name ? ", " : ""}${shortAddr(u.address)}` : ""})`).join("; ");
