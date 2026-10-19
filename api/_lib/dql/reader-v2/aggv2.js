@@ -2,6 +2,7 @@
 import { words, stem, hum, STOP, reEscape } from './text.js';
 import { parseFilters } from './ext.js';
 import { cap as capitalize } from './pyc.js';
+import * as AF from './aggfilter1.js';
 
 const DEF = { on: false, soft_check: true, rank: true, link_check: true, amount_check: true, status_check: true, unk_gate: false, unk_min: 1 };
 let CFG = { ...DEF };
@@ -32,6 +33,7 @@ export function fixCues(ix, q) {
   return q.replace(/[A-Za-z]+/g, (w) => {
     const lw = w.toLowerCase();
     if (Object.prototype.hasOwnProperty.call(FIXED, lw)) return FIXED[lw];
+    try { if (AF.enabled() && AF.protectedWord(lw, ix)) return w; } catch (e) { /* swallowed like the reference */ }
     if (lw.length < 4 || CUEW_SET.has(lw) || voc.has(lw) || voc.has(stem(lw)) || (lw.endsWith('s') && voc.has(lw.slice(0, -1))) || STOP.has(lw)) return w;
     const k = lw.length <= 7 ? 1 : 2; let best = []; let bd = k + 1;
     for (const c of CUEW) {
@@ -56,7 +58,7 @@ export function fieldVals(ix, g, ql, vals, F) {
   const ag = F.ag; const tw = new Set();
   for (const [t] of g.types || []) for (const w of words(hum(t))) tw.add(stem(w));
   for (const w of words(g.syn_phrase || '')) tw.add(stem(w));
-  const out = [];
+  let out = [];
   for (const [p, keys] of vals) {
     const pw = words(p).map(stem);
     if (pw.length && tw.size && pw.every((w) => tw.has(w)) && (ql.match(new RegExp('(?<![a-z0-9])' + reEscape(p) + '(?![a-z0-9])', 'g')) || []).length === 1) { ag.drop = (ag.drop || 0) + 1; continue; }
@@ -76,6 +78,7 @@ export function fieldVals(ix, g, ql, vals, F) {
       ag.unres = (ag.unres || 0) + 1;
     }
   }
+  try { if (AF.enabled()) out = AF.dropCollisions(ix, g, ql, out, F); } catch (e) { /* swallowed like the reference */ }
   return out;
 }
 export function realKeep(g, keep) {
@@ -85,9 +88,9 @@ export function realKeep(g, keep) {
 }
 const OPSX = /^(?:over|under|above|below|more|less|greater|at least|at most|exceeding|between)\b/;
 const SKIPV = new Set(['is', 'are', 'of', 'as', 'equals', 'equal', 'to', 'the', '=']);
-const DATE_RX = /\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{2,4}/;
+export const DATE_RX = /\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{2,4}/;
 const NUM_RX = /-?\d[\d,]*(?:\.\d+)?/;
-function num(v) {
+export function num(v) {
   if (v === null || v === undefined) return null;
   const s = String(v).trim();
   if (!s || DATE_RX.test(s)) return null;
@@ -96,7 +99,7 @@ function num(v) {
   if (rest.length > 8) return null;
   const f = Number(m[0].replace(/,/g, '')); return Number.isNaN(f) ? null : f;
 }
-function numericKeys(ix, t) {
+export function numericKeys(ix, t) {
   let c = ix._ag_nk; if (!c) c = ix._ag_nk = new Map();
   if (c.has(t)) return c.get(t);
   const docs = ix.by_t.get(t) || []; const cnt = new Map(); const tot = new Map();
@@ -179,6 +182,7 @@ export function gate(ix, t, ent, allx, xs, FL, unk = 0) {
   const f = { agg_res: (nres + unres) ? nres / (nres + unres) : 1.0, agg_amb: Number(amb + unres), agg_n: Number(xs.length), agg_unk: Number(unk) };
   return [why, f];
 }
+export const SUP_SRC = { max: String.raw`\b(highest|largest|biggest|greatest|maximum|most|top|priciest)\b`, min: String.raw`\b(lowest|smallest|least|minimum|tiniest|fewest|cheapest|bottom)\b` };
 const SUP = { max: /\b(highest|largest|biggest|greatest|maximum|most|top|priciest)\b/, min: /\b(lowest|smallest|least|minimum|tiniest|fewest|cheapest|bottom)\b/ };
 export function rank(ix, g, F, no, ok, intent) {
   if (CFG.rank === false) return null;

@@ -99,6 +99,7 @@ export class Reader2 {
     if (!cands.length || !cw.length) return [null, {}];
     const info = build2(ix, x, cands, cw, sc, parseInt(this.cfg.kmax ?? 8, 10)); const zz = await this.logits(g.masked, info);
     const [best, F] = v2Features(zz, info, g.masked, this.cal);
+    this._last = { sel: info.sel, ps: info.ps, q: g.masked };      // clause_retrain_v2: shortlist for the compat veto
     if ((this.cfg.absent ?? true) && F.cr2_pnull >= parseFloat(this.cfg.absent_thr ?? 0.8) && F.cr2_pnull > F.cr2_p) return [-1, F];
     return [best, F];
   }

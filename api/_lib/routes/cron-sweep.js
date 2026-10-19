@@ -608,5 +608,15 @@ export default async function handler(req, res) {
     );
   }
 
+  // Data backup heartbeat (ships OFF; only when DEEPWELL_BACKUP=1): alert the owner if no good backup in 36 hours.
+  // Independent of the backup cron itself, so a backup job that stopped running is noticed here.
+  if (process.env.DEEPWELL_BACKUP === "1") {
+    try {
+      summary.backup = await (await import("../backup/health.js")).sweepBackupHealth();
+    } catch (err) {
+      summary.backup = { error: err?.message };
+    }
+  }
+
   return res.status(200).json(summary);
 }

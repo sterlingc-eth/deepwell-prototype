@@ -423,6 +423,45 @@ async function notifyReady(ctx, msg) {
     .catch((err) => console.error('account export: could not add the bell notification:', err?.message));
 }
 
+/**
+ * DEEPWELL_CUSTOMER_EXPORT=1 (ships OFF): also EMAIL the admin who asked, when the files are ready. The email carries no file
+ * link: it points at the signed-in Team and Settings screen, where the admin gets a fresh 1-hour download link per part
+ * (a link sitting in an inbox for 7 days would be a standing key to the company's files). Tenant-scoped: the address is
+ * looked up in THIS company's own member list. Never throws; the bell notice above is unaffected.
+ */
+export const customerExportEmailEnabled = (env = process.env) => env.DEEPWELL_CUSTOMER_EXPORT === '1';
+
+export function readyEmail({ company, files, parts, expiresAt, appUrl }) {
+  const until = new Date(expiresAt).toISOString().slice(0, 10);
+  const name = company ? ` for ${company}` : '';
+  const text = `Your files${name} are ready to download.\n\n` +
+    `${Number(files).toLocaleString('en-US')} files are packed into ${parts} zip file${parts === 1 ? '' : 's'}, with a list of every file's name, date and type.\n\n` +
+    `Sign in and open Team and Settings to download them: ${appUrl}${NOTIFY_LINK}\n\n` +
+    `They stay available until ${until}. For your security, each download link is created when you click and works for one hour.\n\n` +
+    `If you did not ask for this, tell us right away at support@deepwelltechnology.com.`;
+  const html = `<p>Your files${name ? ` for <strong>${String(company).replace(/&/g, '&amp;').replace(/</g, '&lt;')}</strong>` : ''} are ready to download.</p>` +
+    `<p>${Number(files).toLocaleString('en-US')} files are packed into ${parts} zip file${parts === 1 ? '' : 's'}, with a list of every file's name, date and type.</p>` +
+    `<p><a href="${appUrl}${NOTIFY_LINK}">Sign in and open Team and Settings to download them</a>. They stay available until ${until}. For your security, each download link is created when you click and works for one hour.</p>` +
+    `<p>If you did not ask for this, tell us right away at support@deepwelltechnology.com.</p>`;
+  return { subject: 'Your DeepWell files are ready to download', text, html };
+}
+
+async function emailReady(ctx, state) {
+  try {
+    if (!customerExportEmailEnabled() || !state.createdBy) return;
+    const to = await withTenant(ctx, async (db) => {
+      const { rows } = await db.raw(`SELECT email FROM users WHERE clerk_user_id = $1 AND tenant_id = (current_setting('app.tenant_id', true))::uuid LIMIT 1`, [state.createdBy]);
+      return rows[0]?.email ?? null;
+    });
+    if (!to) return;
+    const { sendEmail } = await import('./email.js');
+    const appUrl = (process.env.APP_URL ?? 'https://deepwelltechnology.com').replace(/\/$/, '');
+    await sendEmail({ to: [to], ...readyEmail({ company: state.company, files: state.includedFiles, parts: state.parts.length + 1, expiresAt: state.expiresAt, appUrl }) });
+  } catch (err) {
+    console.error('account export: could not send the ready email:', err?.message);
+  }
+}
+
 /* ------------------------------------------------------------------------------------------------ the engine */
 
 /**
@@ -606,6 +645,7 @@ export async function runExportStep(ctx, jobId, { storage = realStorage, now = D
   if (justFinished) {
     await audit(ctx, state.createdBy, 'account.files_export.completed', { jobId, files: state.includedFiles, skipped: state.skippedFiles, parts: state.parts.length });
     if (notify) await notifyReady(ctx, readyNotice({ parts: state.parts.length + 1, files: state.includedFiles, expiresAt: state.expiresAt }));
+    if (notify) await emailReady(ctx, state);
   }
   return { job: publicJob(state, now), justFinished };
 }

@@ -22,7 +22,7 @@ export async function run({ ROOT, FX, PGlite, contrib, check, eq, R, expected, k
   const ctxA = { tenantKey: 'org_readerv2_a', tenantName: 'Reader A' }; const ctxB = { tenantKey: 'org_readerv2_b', tenantName: 'Reader B' };
   const tenA = (await RS.getTenantContext(ctxA.tenantKey, ctxA.tenantName)).id; const tenB = (await RS.getTenantContext(ctxB.tenantKey, ctxB.tenantName)).id;
   const load = (key) => JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(FX, 'companies', `${key}.json.gz`))).toString('utf8'));
-  const KA = 'pg_re0_title', KB = 'pg_ot0_horseboarding';
+  const KA = 'pg_re0_title', KB = 'pg_ot3_recycling';
   async function seed(tenant, d) {
     const many = async (table, cols, rows, cast = {}) => {
       for (let i = 0; i < rows.length; i += 200) {

@@ -45,6 +45,13 @@ const TEXT = {
   adminOnly: 'Only a company admin can connect Google accounts.',
   signIn: 'Google asked you to sign in again. Choose Connect to continue.',
   paused: 'Paused. Nothing is being checked.',
+  pickerBlurb: 'Choose the files you want DeepWell to read. DeepWell can see only the files you choose, nothing else in your Drive, and checks them regularly for changes.',
+  pickerChoose: 'Choose files',
+  pickerAddMore: 'Add more files',
+  pickerFolderNote: 'Choose the files themselves. Open a folder in the window and select the files inside it. When you add new files to Drive later, choose them here too so DeepWell can see them.',
+  pickerFoldersNotTaken: "Folders can't be chosen. Open the folder in the window and select the files inside it.",
+  pickerSyncNote: 'DeepWell re-checks the files you chose and brings in new versions automatically.',
+  pickerNeedsFiles: 'Choose the files DeepWell should bring in.',
 };
 
 const FLASH: Record<string, string> = {
@@ -101,9 +108,11 @@ export function ConnectedSourcesCard() {
       )}
       <div className="grid gap-4 lg:grid-cols-2">
         <SourceBlock provider="drive" conn={byProvider('drive')} status={status} onChanged={reload} />
-        <SourceBlock provider="gmail" conn={byProvider('gmail')} status={status} onChanged={reload} />
+        {status.scopeMode !== 'picker' && <SourceBlock provider="gmail" conn={byProvider('gmail')} status={status} onChanged={reload} />}
       </div>
-      {status.dailyLimit ? (
+      {status.scopeMode === 'picker' && status.monthlyLimit ? (
+        <p className="text-caption text-ink-3" data-testid="monthly-usage">Files brought in this month: {status.usedThisMonth ?? 0} of {status.monthlyLimit}.</p>
+      ) : status.dailyLimit ? (
         <p className="text-caption text-ink-3">Files brought in today: {used} of {status.dailyLimit}.</p>
       ) : null}
     </section>
@@ -150,8 +159,8 @@ function SourceBlock({ provider, conn, status, onChanged }: { provider: GooglePr
 
       {!conn ? (
         <>
-          <p className="text-caption text-ink-2">{isDrive ? TEXT.driveBlurb : TEXT.gmailBlurb}</p>
-          {isDrive && (
+          <p className="text-caption text-ink-2">{isDrive ? (status.scopeMode === 'picker' ? TEXT.pickerBlurb : TEXT.driveBlurb) : TEXT.gmailBlurb}</p>
+          {isDrive && status.scopeMode !== 'picker' && (
             <fieldset className="space-y-2">
               <legend className="sr-only">How much of Google Drive DeepWell can see</legend>
               {([['narrow', TEXT.modeNarrow, TEXT.modeNarrowHelp], ['full', TEXT.modeFull, TEXT.modeFullHelp]] as const).map(([value, label, help]) => (
@@ -181,6 +190,13 @@ function SourceBlock({ provider, conn, status, onChanged }: { provider: GooglePr
             <div><dt className="text-ink-3">{TEXT.lastChecked}</dt><dd className="text-ink">{relativeTime(conn.lastSyncAt)}</dd></div>
             <div><dt className="text-ink-3">{TEXT.imported}</dt><dd className="text-ink">{conn.filesImported}</dd></div>
             {conn.removedCount > 0 && <div><dt className="text-ink-3">{TEXT.removed}</dt><dd className="text-ink">{conn.removedCount}</dd></div>}
+            {isDrive && status.scopeMode === 'picker' && (
+              <>
+                <div><dt className="text-ink-3">Files chosen</dt><dd className="text-ink" data-testid="count-chosen">{conn.choices.picked?.length ?? 0}</dd></div>
+                <div><dt className="text-ink-3">Files read so far</dt><dd className="text-ink" data-testid="count-imported">{conn.importedCount}</dd></div>
+                {(conn.skippedCount ?? 0) + conn.errorCount > 0 && <div><dt className="text-ink-3">Not brought in</dt><dd className="text-ink" data-testid="count-skipped">{(conn.skippedCount ?? 0) + conn.errorCount}</dd></div>}
+              </>
+            )}
           </dl>
           {conn.status === 'needs-reconnect' ? (
             <p className="text-body text-ink">{TEXT.signIn}</p>
@@ -258,6 +274,8 @@ function DriveChoices({ conn, status, run, onChanged }: { conn: GoogleConnection
   const [trail, setTrail] = useState<Array<{ id: string; name: string }>>([]);
   const [folders, setFolders] = useState<Array<{ id: string; name: string }> | null>(null);
   const full = conn.scopeMode === 'full';
+  const pickerMode = status.scopeMode === 'picker';
+  const [folderMsg, setFolderMsg] = useState<string | null>(null);
 
   const save = (next: Picked[]) => run('save', async () => { await googleSyncClient.saveDrive(next); onChanged(); });
   const open = (parentId?: string) => run('browse', async () => { setFolders(null); setFolders(await googleSyncClient.folders(parentId)); });
@@ -265,10 +283,10 @@ function DriveChoices({ conn, status, run, onChanged }: { conn: GoogleConnection
   return (
     <div className="space-y-2">
       {picked.length === 0 ? (
-        <p className="text-body text-ink">Choose what DeepWell should bring in.</p>
+        <p className="text-body text-ink">{pickerMode ? TEXT.pickerNeedsFiles : 'Choose what DeepWell should bring in.'}</p>
       ) : (
         <ul className="space-y-1" aria-label="Chosen folders and files">
-          {picked.map((p) => (
+          {picked.slice(0, 25).map((p) => (
             <li key={p.id} className="flex items-center gap-2 rounded-md border border-line pl-3">
               <span className="flex-1 text-body text-ink break-words py-2">{p.name || p.id}</span>
               <button type="button" aria-label={`Stop bringing in ${p.name || 'this item'}`} className="min-h-touch min-w-touch inline-flex items-center justify-center"
@@ -277,6 +295,7 @@ function DriveChoices({ conn, status, run, onChanged }: { conn: GoogleConnection
               </button>
             </li>
           ))}
+          {picked.length > 25 && <li className="text-caption text-ink-3 pl-3">and {picked.length - 25} more</li>}
         </ul>
       )}
       {full ? (
@@ -307,13 +326,24 @@ function DriveChoices({ conn, status, run, onChanged }: { conn: GoogleConnection
           )}
         </>
       ) : (
-        <button type="button" className="dw-btn-secondary" disabled={!status.pickerReady}
-          onClick={() => void run('picker', async () => {
-            const tok = await googleSyncClient.pickerToken();
-            await openGooglePicker(tok, (items) => { const merged = [...picked]; for (const it of items) if (!merged.some((m) => m.id === it.id)) merged.push(it); void save(merged); });
-          })}>
-          {TEXT.chooseFiles}
-        </button>
+        <>
+          <button type="button" className="dw-btn-secondary" disabled={!status.pickerReady}
+            onClick={() => void run('picker', async () => {
+              setFolderMsg(null);
+              const tok = await googleSyncClient.pickerToken();
+              await openGooglePicker(tok, (items) => {
+                const files = pickerMode ? items.filter((it) => it.kind !== 'folder') : items;
+                if (files.length < items.length) setFolderMsg(TEXT.pickerFoldersNotTaken);
+                const merged = [...picked]; for (const it of files) if (!merged.some((m) => m.id === it.id)) merged.push(it);
+                if (files.length) void save(merged);
+              });
+            })}>
+            {pickerMode ? (picked.length ? TEXT.pickerAddMore : TEXT.pickerChoose) : TEXT.chooseFiles}
+          </button>
+          {pickerMode && <p className="text-caption text-ink-2" data-testid="picker-note">{TEXT.pickerFolderNote}</p>}
+          {pickerMode && picked.length > 0 && <p className="text-caption text-ink-3">{TEXT.pickerSyncNote}</p>}
+          {folderMsg && <p role="status" className="text-caption text-ink-2">{folderMsg}</p>}
+        </>
       )}
     </div>
   );

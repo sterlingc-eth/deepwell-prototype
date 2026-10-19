@@ -9,6 +9,15 @@ import * as RV from './retr.js';
 import { parseFilters } from './ext.js';
 import { dot } from './doctype.js';
 import { cap, fmtMoney, sortedBy } from './pyc.js';
+import * as AF from './aggfilter1.js';
+import * as LC from './labelclause.js';
+import * as FX from './fieldsv2.js';
+import * as RP from './realtyprec.js';
+import * as RK from './rankv2.js';
+import * as XD from './xdocv1.js';
+import * as HP from './hardprec.js';
+import * as CC from './clausecompat.js';
+import * as CF2 from './clausefree2.js';
 
 export const INTENTS = ['text', 'total', 'date', 'party', 'find', 'count', 'sum', 'latest', 'earliest', 'list', 'count_year', 'max', 'min', 'contact', 'who_addr', 'mention', 'unsupported'];
 const MARK = new Set(['say', 'clause', 'term', 'language', 'handle', 'about', 'written', 'provision']);
@@ -16,7 +25,7 @@ const GEN = new Set(['total', 'amount', 'much', 'dollar', 'price', 'date', 'when
 const SEP = '\u0001';
 const nd = (s) => s.replace(/\d+/g, '#');
 const fr = Math.fround;
-export const norm = (t) => t.toLowerCase().replace(/[^a-z0-9]/g, '');
+export const norm = (t) => (RP.enabled() ? RP.canon(t) : t.toLowerCase().replace(/[^a-z0-9]/g, ''));
 export async function groundFull(ix, q, M) {
   const g = ground(ix, q); Object.assign(g, { syn: 0, syn_cos: -1.0, syn_margin: -1.0, syn_phrase: '' });
   const dtc = M.doctype;
@@ -59,6 +68,7 @@ export async function candidates(ix, M, x, g) {
     const allw = fw.length && fw.every((w) => qw.has(w)) ? 1.0 : 0.0;
     meta.push({ kind: 'field', key: k, text: hum(k), val: v, lex, allw, nw: fw.length, digit: 0 }); texts.push(hum(k));
   }
+  try { LC.ensure(ix, x.id); } catch (e) { /* swallowed like the reference */ }
   for (const [pg, ln, ws] of ix.lines.get(x.id)) {
     let lex = 0; for (const w of cw) if (ws.has(w)) lex += idfOf(ix, w); lex /= den;
     meta.push({ kind: 'line', page: pg, text: ln, val: ln, lex, allw: 0.0, nw: ws.size, digit: /\d/.test(ln) ? 1 : 0 });
@@ -80,13 +90,19 @@ export async function candidates(ix, M, x, g) {
 }
 const featvec = (m) => FEATS.map((f) => Number(m[f]));
 export async function decide2(ix, q, M, probs = null, cleaned = 0) {
-  q = AG.fixCues(ix, q);
+  if (AF.enabled()) q = AF.normQ(q);
+  if (AG.enabled()) q = AG.fixCues(ix, q);
   const g = await groundFull(ix, q, M); const ql = g.ql;
-  AG.cleanEnts(g);
+  if (AG.enabled()) AG.cleanEnts(g);
   let unk = 0; for (const w of words(g.mask)) if (!ix.vocab.has(w) && !ix.vocab.has(stem(w)) && w.length > 2) unk++;
   const F = { ncorr: g.ncorr, fuzzy: g.fuzzy, syn: g.syn, syn_cos: g.syn_cos, syn_margin: g.syn_margin, dt_conf: g.dt_conf ?? -1.0, dt_margin: g.dt_margin ?? -1.0, dt_kind: g.dt_kind ?? -1, unk, email: cleaned, qlen_masked: g.masked.split(/\s+/).filter((s) => s).length, ent_conf: g.ent_conf ?? -1.0, ent_margin: g.ent_margin ?? -1.0, ent_kind: g.ent_kind ?? -1 };
   const no = (reason, intent = null, kw = {}) => ({ answered: false, text: 'Not on file / released: ' + reason, docs: [], conf: 0.0, intent, reason, feat: { ...F, ...kw }, g });
   const ok = (text, docs, intent, conf = 1.0, kw = {}) => ({ answered: true, text, docs, conf, intent, reason: '', feat: { ...F, ...kw }, g });
+  if (XD.enabled() && !g.restricted.length) {      // xdoc_v1: cross-document difference / comparison computed in code from the two documents' stored totals
+    let r_ = null;
+    try { r_ = XD.solve(ix, q, g, no, ok, hum, (x) => ix.cite(x)); } catch (e) { r_ = null; }
+    if (r_ !== null && r_ !== undefined) { r_._rk_direct = true; r_._xd = true; return r_; }
+  }
   if (g.ambiguous) return no('ambiguous number');
   if (g.ent_ambig) return no('name or address matches more than one record');
   if (g.restricted.length) return no('restricted document type', 'restricted');
@@ -98,13 +114,15 @@ export async function decide2(ix, q, M, probs = null, cleaned = 0) {
   const s1 = S1.decide(ix, q);
   F.s1_answered = +s1.answered;
   F.s1_intent_match = +(s1.intent === intent || (intent === 'text' && ['field', 'clause'].includes(s1.intent)) || (intent === 'count' && ['count', 'count0'].includes(s1.intent)) || (intent === 'latest' && s1.intent === 'latest') || (intent === 'maxmin' && s1.intent === 'maxmin'));
-  const out = await dispatch(ix, g, M, intent, F, no, ok);
+  let out = await dispatch(ix, g, M, intent, F, no, ok);
   out.s1 = s1; out.g = g;
+  if (FX.enabled()) out = FX.post(ix, g, out, out.feat, intent);
   out.feat.agree = +(out.answered && s1.answered && norm(out.text) === norm(s1.text));
   return out;
 }
 async function dispatch(ix, g, M, intent, F, no, ok) {
   const ql = g.ql, { nums, ents } = g; let { types } = g; const q = g.q;
+  if (AF.enabled()) intent = AF.fixIntent(g, intent);
   if (intent === 'unsupported') return no('not something your records track', intent);
   let ent = null;
   if (ents.length) { const [, eids] = ents[0]; if (eids.length > 1) return no('name matches more than one record', intent); ent = eids[0]; }
@@ -124,20 +142,38 @@ async function dispatch(ix, g, M, intent, F, no, ok) {
   if (intent === 'contact') {
     if (!ent) return no('person not found', intent);
     let kw = [['phone', 'phone'], ['email', 'email'], ['address', 'service_address']].filter(([w]) => has(ql, w)).map(([, k]) => k);
+    try {      // hard_v1: a misspelled email/phone word selects that field (instead of defaulting to the address)
+      if (HP.enabled() && (HP.cfg().contact_fuzzy ?? true)) for (const k_ of HP.contactFields(ql)) if (!kw.includes(k_)) kw.push(k_);
+    } catch (e) { /* swallowed like the reference */ }
     if (kw.length > 1 && kw.includes('email')) kw = ['email'];
+    if (!kw.length && RP.enabled()) kw = RP.contactKw(ql);
     if (kw.length !== 1) return no('which contact detail?', intent);
     const v = ix.c.cust.get(ent).data[kw[0]];
     if (!v) return no('not on file', intent);
     return ok(`${ix.name(ent)}: ${v}`, [], intent);
   }
+  if (RK.enabled() && !nums.length) {      // rank_v2: superlative over a stored field -> exact computed answer
+    const r_ = RK.rank(ix, g, F, no, ok, intent); if (r_ !== null && r_ !== undefined) return r_;
+  }
+  if (AG.enabled() && RP.enabled() && ['text', 'max', 'min'].includes(intent) && !nums.length && types.length !== 1) {
+    const t_ = RP.rankType(ix, g);      // realty_prec_v1: superlative on a field concept, document type unclear -> the one type that has that field
+    if (t_) { g.types = types = [t_]; }
+  }
   if (AG.enabled() && ['text', 'max', 'min'].includes(intent) && !nums.length && types.length === 1) {
-    const r = AG.rank(ix, g, F, no, ok, intent); if (r !== null && r !== undefined) return r;
+    let r_ = AG.rank(ix, g, F, no, ok, intent);
+    if ((r_ === null || r_ === undefined) && RP.enabled()) r_ = RP.rank2(ix, g, F, no, ok, intent);
+    if (r_ !== null && r_ !== undefined) return r_;
   }
   if (['total', 'date', 'party', 'find', 'text'].includes(intent)) {
     const [x, why] = resolveDoc(ix, g);
     if (why) return no(why, intent);
     if (!x) return no('no document identified', intent);
     F.docref = nums.length ? 1 : 2;
+    if (FX.enabled() && ['text', 'total', 'date', 'party'].includes(intent)) {
+      const r_ = FX.route(ix, g, x, intent, F, no, ok, [stem, words, hum]);
+      if (r_ !== null && r_ !== undefined) return r_;
+      if (F.fx_force_text) { delete F.fx_force_text; intent = 'text'; }
+    }
     if (intent === 'total') { if (x.tot === null) return no('no total on that document', intent); return ok(`Total: ${fmtMoney(x.tot)} (${ix.cite(x)})`, [x.id], intent); }
     if (intent === 'date') return ok(`Date: ${x.date} (${ix.cite(x)})`, [x.id], intent);
     if (intent === 'party') { if (!x.cust) return no('no name on that document', intent); return ok(`${ix.name(x.cust)} (${ix.cite(x)})`, [x.id], intent); }
@@ -151,7 +187,7 @@ async function dispatch(ix, g, M, intent, F, no, ok) {
     const cr = M.clause; let yes_prefix = '';
     if (cr && cw.length) {
       let bi = null, CF = {};
-      try { [bi, CF] = await cr.read(ix, x, g, cands, cw.map(stem), sc); } catch (e) { if (process.env.DONOVAN_V2_DEBUG) throw e; bi = null; CF = {}; }
+      try { cr._last = null; [bi, CF] = await cr.read(ix, x, g, cands, cw.map(stem), sc); } catch (e) { if (process.env.DONOVAN_V2_DEBUG) throw e; bi = null; CF = {}; }
       if (bi !== null) {
         Object.assign(F, CF);
         if (bi === -1) return no('no matching clause found', intent, { ...CF });
@@ -159,10 +195,20 @@ async function dispatch(ix, g, M, intent, F, no, ok) {
         if (CF.cr2_yn && (cr.cfg.yesno ?? true)) yes_prefix = 'Yes. ';
       }
     }
+    try {      // clause_retrain_v2: selective veto - release when another shortlist sentence fits the question's unit class by > T logits more than the chosen one
+      const l_ = cr ? cr._last : null;
+      if (l_ && CC.enabled() && cands[bidx].kind === 'line' && l_.sel.includes(bidx) && CC.veto(l_.q, l_.ps, l_.sel.indexOf(bidx))) {
+        return no('clause topic mismatch', intent, Object.fromEntries(Object.entries(F).filter(([, v]) => typeof v === 'number' || typeof v === 'boolean')));
+      }
+    } catch (e) { /* swallowed like the reference */ }
     Object.assign(F, { r_top: s1_, r_gap: s1_ - s2_, r_cos: b.cos, r_lex: b.lex, r_field: b.is_field, r_allw: b.allw, r_ncw: cw.length, r_pm: b.pm, r_pm_gap: pms[0] - (pms.length > 1 ? pms[1] : -9.0) });
     if (!cw.length) return no('could not tell what to read', intent);
     if (b.kind === 'field') return ok(`${yes_prefix}${cap(hum(b.key))}: ${b.val} (${ix.cite(x)})`, [x.id], intent, s1_);
-    { const r = ok(`${yes_prefix}${b.val} (page ${b.page}, ${ix.cite(x)})`, [x.id], intent, s1_); r.page = b.page; return r; }
+    {
+      const r = ok(`${yes_prefix}${b.val} (page ${b.page}, ${ix.cite(x)})`, [x.id], intent, s1_); r.page = b.page;
+      try { if (CF2.enabled()) r._cf2_ctx = CF2.ctx(cw, cands, bidx, sc, words(g.mask).filter((w_) => w_.length > 2 && !STOP.has(w_))); } catch (e) { /* swallowed like the reference */ }      // clause_free_v2: keep what the strict rescue needs
+      return r;
+    }
   }
   // aggregates
   if (!types.length) return no('document type unclear', intent);
@@ -175,7 +221,7 @@ async function dispatch(ix, g, M, intent, F, no, ok) {
   const fdesc = FL.desc.join(', '); const sfx = fdesc ? ` (${fdesc})` : '';
   if (['count', 'sum', 'latest', 'earliest', 'list'].includes(intent)) {
     let allx, nm;
-    if (ent) { allx = ix.by_ct.get(ent + SEP + t) || []; nm = ix.name(ent) + "'s"; } else if (FL.truthy()) { allx = ix.by_t.get(t) || []; nm = 'All'; } else return no('which customer?', intent);
+    if (ent) { allx = ix.by_ct.get(ent + SEP + t) || []; nm = ix.name(ent) + "'s"; } else if (FL.truthy()) { if (AF.enabled() && AF.nameOrphan(ix, g, ql)) return no('customer name not recognized', intent); allx = ix.by_t.get(t) || []; nm = 'All'; } else return no('which customer?', intent);
     const xs = allx.filter((x) => FL.ok(x)); const who = ent ? ix.name(ent) : null;
     if (AG.enabled()) { const [why, af] = AG.gate(ix, t, ent, allx, xs, FL, F.unk ?? 0); Object.assign(F, af); if (why) return no(why, intent); }
     const s = xs.length !== 1 ? 's' : '';

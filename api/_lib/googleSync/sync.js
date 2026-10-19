@@ -10,7 +10,7 @@
  * database transaction is open; each file gets its own short transaction, so one bad file cannot undo the others.
  */
 import { withTenant } from "../recordsStore.js";
-import { isGoogleSyncEnabled, limits as limitsFor, WORDING } from "./config.js";
+import { isGoogleSyncEnabled, limits as limitsFor, scopeMode as scopeModeOf, providersFor, WORDING } from "./config.js";
 import { decryptToken } from "./crypto.js";
 import { createGoogleClient, GoogleAuthError, GoogleRateLimitError, GoogleError } from "./googleApi.js";
 import { defaultImportDeps, importBytes } from "./importer.js";
@@ -22,6 +22,8 @@ export const RESULT = Object.freeze({
   upToDate: "Up to date.",
   waitingGoogle: "Google is limiting requests right now. DeepWell will try again shortly.",
   dailyLimit: WORDING.dailyLimit,
+  monthlyLimit: WORDING.monthlyLimit,
+  initialLimit: WORDING.initialLimit,
   planInactive: "Waiting for your DeepWell plan to be active.",
   totalLimit: "This connection has reached the number of files it can bring in.",
   signIn: WORDING.needsReconnect,
@@ -51,16 +53,23 @@ export async function syncConnection(ctx, provider, deps = {}) {
   const env = deps.env ?? process.env;
   if (!isGoogleSyncEnabled(env)) return { skipped: "off" };
   const lim = { ...limitsFor(env), ...(deps.limits ?? {}) };
+  // Picker mode (the default) syncs Drive connections made with drive.file only. A connection left over from the old full mode, or Gmail, is not touched.
+  const pickerMode = scopeModeOf(env) === "picker";
+  if (!providersFor(env).includes(provider)) return { skipped: "mode" };
   const tx = (fn) => withTenant({ tenantKey: ctx.tenantKey, tenantName: ctx.tenantName ?? ctx.tenantKey }, fn);
 
-  const claim = await tx(async (db) => ({ ...(await S.claimConnection(db, provider, lim.runBudgetMs + 60_000)), tenantId: db.tenantId, today: await S.importedToday(db) }));
+  const claim = await tx(async (db) => ({ ...(await S.claimConnection(db, provider, lim.runBudgetMs + 60_000)), tenantId: db.tenantId, today: await S.importedToday(db), month: await S.importedThisMonth(db) }));
   if (claim.none) return { skipped: "not-connected" };
   if (claim.inactive) return { skipped: claim.inactive };
   if (claim.busy) return { skipped: "busy" };
+  if (pickerMode && claim.row.scope_mode !== "narrow") {
+    await tx((db) => S.patchConnection(db, claim.row.id, { last_result: WORDING.needsReconnect, sync_state: { lease: null } }));
+    return { skipped: "mode" };
+  }
 
   let conn = claim.row;
   const tally = newTally();
-  const release = async (patch = {}, opts) => { conn = await tx((db) => S.patchConnection(db, conn.id, { ...patch, sync_state: { lease: null } }, opts)); return conn; };
+  const release = async (patch = {}, opts) => { conn = await tx((db) => S.patchConnection(db, conn.id, { ...patch, sync_state: { ...(patch.sync_state ?? {}), lease: null } }, opts)); return conn; };
   let result = null;
   let error = null;
   let status;
@@ -74,9 +83,21 @@ export async function syncConnection(ctx, provider, deps = {}) {
 
     // Quota reached: say so without touching Google at all.
     const dailyRoom = lim.maxFilesPerDay - claim.today;
+    const monthRoom = lim.maxFilesPerMonth - claim.month;
     const totalRoom = lim.maxFilesPerConnection - (Number(conn.files_imported) || 0);
-    if (dailyRoom <= 0 || totalRoom <= 0) {
-      result = dailyRoom <= 0 ? RESULT.dailyLimit : RESULT.totalLimit;
+    // First import (picker mode): capped at initialImportCap files. When it is reached the rest waits for the next calendar month.
+    const monthKey = new Date().toISOString().slice(0, 7);
+    let initialDone = Boolean(conn.sync_state?.initialDone);
+    let initialRoom = Infinity;
+    if (pickerMode && !initialDone) {
+      initialRoom = lim.initialImportCap - (Number(conn.files_imported) || 0);
+      if (initialRoom <= 0) {
+        if (conn.sync_state?.initialCapMonth && conn.sync_state.initialCapMonth !== monthKey) { initialDone = true; initialRoom = Infinity; await tx((db) => S.patchConnection(db, conn.id, { sync_state: { initialDone: true } })); }
+        else if (!conn.sync_state?.initialCapMonth) await tx((db) => S.patchConnection(db, conn.id, { sync_state: { initialCapMonth: monthKey } }));
+      }
+    }
+    if (dailyRoom <= 0 || monthRoom <= 0 || totalRoom <= 0 || initialRoom <= 0) {
+      result = totalRoom <= 0 ? RESULT.totalLimit : monthRoom <= 0 ? RESULT.monthlyLimit : initialRoom <= 0 ? RESULT.initialLimit : RESULT.dailyLimit;
       await release({ last_sync_at: new Date().toISOString(), last_result: result, last_error: null });
       return { ok: true, tally, result };
     }
@@ -92,24 +113,28 @@ export async function syncConnection(ctx, provider, deps = {}) {
     let filesLeft = lim.maxFilesPerRun;
     let dailyLeft = lim.maxFilesPerDay - claim.today;
     let totalLeft = lim.maxFilesPerConnection - (Number(conn.files_imported) || 0);
+    let monthLeft = lim.maxFilesPerMonth - claim.month;
+    let initialLeft = initialRoom;
     let stopReason = null;
 
     const run = {
-      ctx, conn, tx, google: session, limits: lim, tally, stopped: false,
+      ctx, conn, tx, google: session, limits: lim, tally, stopped: false, pickerMode,
       outOfBudget: () => run.stopped || Date.now() > deadlineAt,
       count: (o) => { if (o in tally) tally[o]++; },
       reserve: () => {
         if (filesLeft <= 0) { run.stopped = true; stopReason = "run"; return false; }
         if (dailyLeft <= 0) { run.stopped = true; stopReason = "daily"; return false; }
         if (totalLeft <= 0) { run.stopped = true; stopReason = "total"; return false; }
-        filesLeft--; dailyLeft--; totalLeft--;
+        if (monthLeft <= 0) { run.stopped = true; stopReason = "month"; return false; }
+        if (initialLeft <= 0) { run.stopped = true; stopReason = "initial"; return false; }
+        filesLeft--; dailyLeft--; totalLeft--; monthLeft--; initialLeft--;
         return true;
       },
-      release: () => { filesLeft++; dailyLeft++; totalLeft++; },
+      release: () => { filesLeft++; dailyLeft++; totalLeft++; monthLeft++; initialLeft++; },
       async storeFile({ externalId, filename, contentType, bytes, marker, item, modifiedAt }) {
         try {
           const out = await tx(async (db) => {
-            const r = await importBytes(db, importDeps, { filename, contentType, bytes, billingRow });
+            const r = await importBytes(db, importDeps, { filename, contentType, bytes, billingRow, source: provider === "gmail" ? "gmail_attachment" : "google_drive", externalId });
             if (r.outcome === "refused") {
               await S.upsertItem(db, { connectionId: conn.id, externalId, filename, sourceChecksum: marker, state: "skipped", note: r.note });
               return r;
@@ -145,8 +170,12 @@ export async function syncConnection(ctx, provider, deps = {}) {
     await (provider === "gmail" ? runGmailPass(run) : runDrivePass(run));
     if (stopReason === "daily") tally.note = RESULT.dailyLimit;
     else if (stopReason === "total") tally.note = RESULT.totalLimit;
+    else if (stopReason === "month") tally.note = RESULT.monthlyLimit;
+    else if (stopReason === "initial") tally.note = RESULT.initialLimit;
     result = describe(tally);
-    await release({ last_sync_at: new Date().toISOString(), last_result: result, last_error: null }, { addImported: created });
+    // The first import is finished once a whole pass ran without hitting any limit; later passes only look for changes.
+    const finishedFirst = pickerMode && !initialDone && !stopReason && tally.deferred === 0 && tally.error === 0;
+    await release({ last_sync_at: new Date().toISOString(), last_result: result, last_error: null, ...(finishedFirst ? { sync_state: { initialDone: true } } : {}) }, { addImported: created });
     return { ok: true, tally, result };
   } catch (err) {
     if (err instanceof GoogleAuthError || err?.name === "GoogleAuthError") {

@@ -25,7 +25,10 @@ export function driveFileName(meta) {
 }
 
 /** The marker that says "this file changed": the content checksum for real files, the modified time for Google Docs/Sheets. */
-export function changeMarker(meta) {
+export function changeMarker(meta, pickerMode = false) {
+  // Picker mode: the Drive file id (the item's key) plus its modifiedTime decide "has this changed". Identical bytes are still
+  // recognised afterwards by their SHA-256, so a touched-but-unchanged file never becomes a second document.
+  if (pickerMode) return `mod:${meta.modifiedTime ?? ""}`;
   return meta.md5Checksum ? `md5:${meta.md5Checksum}` : `mod:${meta.modifiedTime ?? ""}:${meta.version ?? ""}`;
 }
 
@@ -63,7 +66,7 @@ export async function processDriveFile(run, meta) {
   if (meta.trashed) return handleRemoved(run, meta.id);
 
   const item = await tx((db) => S.getItem(db, conn.id, meta.id));
-  const marker = changeMarker(meta);
+  const marker = changeMarker(meta, run.pickerMode);
   if (item && item.source_checksum === marker && item.state === "imported") return "unchanged";
   if (item && item.source_checksum === marker && item.state === "removed-in-source") {
     await tx((db) => S.markReturned(db, conn.id, meta.id));
@@ -109,8 +112,46 @@ async function handleRemoved(run, fileId) {
   return row ? "removed" : "ignored";
 }
 
+/**
+ * Picker mode (drive.file). Only the files the admin picked are looked at, one by one, by id:
+ *   - Google answers 404/403 when access to a file is gone (deleted, or the admin removed DeepWell's access to it): flagged
+ *     "no longer in Google", DeepWell keeps its copy.
+ *   - a trashed file is flagged the same way.
+ *   - otherwise the file's modifiedTime is compared with the one recorded at the last import; a different time means re-import.
+ * A cursor (sync_state.pickCursor) lets a long list continue across passes, so a pass that runs out of time or room resumes.
+ * Folders are never expanded: with drive.file Google gives an app a picked folder itself, not what is inside it (see DRIVE_PICKER_REPORT).
+ */
+export async function runPickedPass(run) {
+  const { conn, tx } = run;
+  const files = (conn.config?.picked ?? []).filter((p) => p.kind !== "folder");
+  if (!files.length) { run.tally.note = "Choose the files to bring in."; return { more: false }; }
+  let cursor = Math.min(Number(conn.sync_state?.pickCursor) || 0, files.length);
+  const save = async (n) => { run.conn = await tx((db) => S.patchConnection(db, conn.id, { sync_state: { pickCursor: n } })); };
+  while (cursor < files.length) {
+    if (run.outOfBudget()) { await save(cursor); return { more: true }; }
+    const p = files[cursor];
+    let meta = null;
+    try {
+      meta = await run.google.getFile(p.id);
+    } catch (err) {
+      if (err instanceof GoogleRateLimitError) { await save(cursor); throw err; }
+      if (err instanceof GoogleError && (err.status === 404 || err.status === 403)) run.count(await handleRemoved(run, p.id));
+      else { run.count("error"); }
+      cursor++;
+      continue;
+    }
+    const outcome = await processDriveFile(run, meta);
+    if (outcome === "deferred" || run.stopped) { await save(cursor); run.count(outcome); return { more: true }; }
+    run.count(outcome);
+    cursor++;
+  }
+  await save(0);
+  return { more: false };
+}
+
 /** One pass. Returns { more: boolean } (true = work is left for the next pass). */
 export async function runDrivePass(run) {
+  if (run.pickerMode) return runPickedPass(run);
   const { conn, tx } = run;
   const cfg = conn.config ?? {};
   let st = { ...(conn.sync_state ?? {}) };

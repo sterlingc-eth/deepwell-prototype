@@ -4,6 +4,25 @@ import { decide2, INTENTS, norm } from './reader2.js';
 import * as S1 from './s1.js';
 import { cues } from './models.js';
 import { sortedBy } from './pyc.js';
+import * as HP from './hardprec.js';
+import * as RP from './realtyprec.js';
+import * as HV2 from './hardv2.js';
+import * as HV3 from './hardv3.js';
+import * as HV4 from './hardv4.js';
+import * as SL1 from './synlex1.js';
+import * as MPR from './mainprec.js';
+import * as W6 from './watch6.js';
+import * as WPR from './wildprec.js';
+import * as MR2 from './mrprec2.js';
+import * as CF2 from './clausefree2.js';
+import * as MP2 from './mainprec2.js';
+import * as WP2 from './wildprec2.js';
+import * as PV1 from './pv1.js';
+import * as FX from './fieldsv2.js';
+import * as AG1 from './agree1.js';
+import * as MP1 from './mentionparty.js';
+import * as CA from './cueagree.js';
+import * as TRP from './typorepair.js';
 
 const CUEK = ['min', 'max', 'early', 'late', 'sum', 'count', 'list', 'many'];
 const CAND_INT = { field: 'text', clause: 'text', count0: 'count', who_by_address: 'who_addr', count_year: 'count_year' };
@@ -78,29 +97,79 @@ export function grounding(ix, c, q, cfg) {
   } catch (e) { /* the Python version swallows the same way */ }
   return out;
 }
-export async function candidates(ix, q, M) {
+async function candidatesBase(ix, q, M, probs = null) {
   const [q2, cleaned] = cleanQuestion(q);
-  const out = await decide2(ix, q2, M, null, cleaned);
+  const out = await decide2(ix, q2, M, probs, cleaned);
   const s1 = out.s1 || { answered: false }; delete out.s1; const g = out.g; delete out.g; const masked = g.masked;
-  const P = await M.intentProba(masked); const res = [];
+  const P = probs !== null ? probs : await M.intentProba(masked); let res = [];
   if (out.answered) res.push([2, out, vec(out, 2, out, q2, P, masked)]);
   if (s1.answered && !(out.answered && norm(s1.text) === norm(out.text))) res.push([1, s1, vec(s1, 1, out, q2, P, masked)]);
   out.masked = masked;
-  const gcfg = M.switches.grounding_check || {}; const gi = gcfg.on ? VF.indexOf('gr_n') : -1;
-  for (const [, c, v] of res) {
-    c._v = v;
-    if (gi >= 0) { const gr = grounding(ix, c, q2, gcfg); v.splice(gi, 6, gr.gr_n, gr.gr_miss, gr.gr_qn, gr.gr_qspan, gr.gr_qdoc, gr.gr_qnone); c._ungrounded = gr.ungrounded; }
+  if (out._rk_direct && out.answered) {      // rank_v2: exact computed answer; the legacy second reader's different answer is dropped
+    res = res.filter((z) => z[0] === 2);
+    for (const [, c] of res) c._rk_direct = true;
   }
+  if (out._fx_direct) {      // fields_v2: a verified field answer (rule extractor and reader agree) is released without the verifier floor
+    for (const [src, c] of res) if (src === 2 || norm(c.text) === norm(out.text)) c._fx_direct = true;
+  }
+  try {      // precfix: keep the verifier vector on the candidate and add verbatim-grounding features / the hard-rule flag
+    const gcfg = M.switches.grounding_check || {}; const gi = gcfg.on ? VF.indexOf('gr_n') : -1;
+    for (const [, c, v] of res) {
+      c._v = v;
+      if (gi >= 0) { const gr = grounding(ix, c, q2, gcfg); v.splice(gi, 6, gr.gr_n, gr.gr_miss, gr.gr_qn, gr.gr_qspan, gr.gr_qdoc, gr.gr_qnone); c._ungrounded = gr.ungrounded; }
+    }
+  } catch (e) { /* swallowed like the reference */ }
+  const blk = (fn) => { try { fn(); } catch (e) { /* every hook is wrapped like the reference */ } };
+  blk(() => {      // hard_v1
+    if (HP.cfg().on || HP.cfg().sig) {
+      const sg = {};
+      for (const [, c] of res) { c._hp_sig = sg; if (HP.enabled()) { const r_ = HP.veto(q2, c, sg); if (r_) c._hp_veto = r_; } }
+    }
+  });
+  blk(() => {      // realty_prec_v1: answer-format normaliser + stricter-only veto
+    if (RP.enabled()) for (const [, c] of res) { c.text = RP.fixText(c.text); const rs = RP.veto(q2, c.text); if (rs) c._rp_veto = rs; }
+  });
+  blk(() => HV2.mark(q2, res));
+  blk(() => HV3.mark(q2, res));
+  blk(() => HV4.mark(q2, res, ix));
+  blk(() => SL1.mark(q2, res));
+  blk(() => { if (MPR.enabled()) for (const [, c] of res) { const r_ = MPR.veto(q2, c.text || ''); if (r_) c._mp_veto = r_; } });
+  blk(() => W6.mark(q2, res));
+  blk(() => { if (WPR.enabled()) for (const [, c] of res) { const r_ = WPR.veto(q2, c.text || ''); if (r_) c._wp_veto = r_; } });
+  blk(() => { if (MR2.enabled()) for (const [, c] of res) { const r_ = MR2.veto(q2, c.text || ''); if (r_) c._mr2_veto = r_; } });
+  blk(() => { if (CF2.enabled()) for (const [, c] of res) c._cf2_n = res.length; });
+  blk(() => { if (MP2.enabled()) for (const [, c] of res) { const r_ = MP2.veto(q2, c.text || ''); if (r_) c._mp2_veto = r_; } });
+  blk(() => { if (WP2.enabled()) for (const [, c] of res) { const r_ = WP2.veto(q2, c.text || ''); if (r_) c._wp2_veto = r_; } });
+  blk(() => { if (PV1.enabled()) for (const [, c] of res) { const r_ = PV1.veto(q2, c, ix); if (r_) c._pv1_veto = r_; } });
   return [res, out, q2];
 }
-/** the release rule of this version (precfix.passes): verifier score against the version threshold, plus the verbatim-grounding hard rule */
+export async function candidates(ix, q, M, probs = null) {
+  let [res, out, q2] = await candidatesBase(ix, q, M, probs);
+  const base = async (ix_, q_, M_, p_) => { const r = await candidatesBase(ix_, q_, M_, p_); return [r[0], r[1]]; };
+  let rr = null;
+  try { if (probs === null && AG1.enabled()) { rr = await AG1.reroute(ix, q, M, res, out, base); if (rr !== null && rr !== undefined) return [rr[0], rr[1], q2]; } } catch (e) { /* swallowed like the reference */ }
+  try { if (probs === null && MP1.enabled()) { rr = await MP1.reroute(ix, q, M, res, out, base); if (rr !== null && rr !== undefined) return [rr[0], rr[1], q2]; } } catch (e) { /* swallowed like the reference */ }
+  try { if (CA.enabled()) CA.stamp(ix, q, res); } catch (e) { /* swallowed like the reference */ }
+  try { if (probs === null && TRP.enabled()) { rr = await TRP.rerun(ix, q, M, res, out, base); if (rr !== null && rr !== undefined) return [rr[0], rr[1], q2]; } } catch (e) { /* swallowed like the reference */ }
+  return [res, out, q2];
+}
+/** the release rule of this version (precfix.passes): vetoes, direct releases, verifier score against the version threshold, strict rescues, plus the verbatim-grounding hard rule */
 export function passes(M, c, pv) {
   const T = M.thr; const pf = T.precfix || {};
   if (T.group_thr || pf.pmatch || pf.agree_hard) throw new Error('release options not supported by this port: ' + JSON.stringify({ group_thr: !!T.group_thr, pmatch: !!pf.pmatch, agree_hard: !!pf.agree_hard }));
-  let thr = Number(T.thr);
+  if (c._wp2_veto || c._wp_veto || c._mp_veto || c._mp2_veto || c._pv1_veto || c._mr2_veto || c._hv2 || c._hv3 || c._hv4 || c._sl1 || c._rp_veto) return false;
+  const gh = !!(pf.grounding_hard && c._ungrounded);
+  if (c._rk_direct && !gh) return true;      // rank_v2: exact computed rank answer
+  if (c._hp_veto) return false;      // hard_v1: stricter-only veto
+  if (c._fx_direct && pv >= Math.max(Number(FX.cfg().floor ?? 0.0), 0.0) && !gh) return true;      // fields_v2: dual-extraction verified field
+  const thr = Number(T.thr);
   if (pf.guard && c._v) throw new Error('guard not supported by this port');
-  if (pv < thr) return false;
-  if (pf.grounding_hard && c._ungrounded) return false;
+  if (pv < thr) {
+    if (CF2.rescue(pf, c)) return true;      // clause_free_v2: strict rescue of an unambiguous clause answer
+    if (CA.rescue(pf, c, pv)) return true;      // cue_agree_v1: strict rescue of an unfiltered lowest/highest answer
+    return false;
+  }
+  if (gh) return false;
   return true;
 }
 /** the answer decision: both readers' candidates -> verifier -> release rule -> answer, or release */

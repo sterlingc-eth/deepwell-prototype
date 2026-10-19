@@ -17,7 +17,7 @@ import { requireAuth, denyAuth, hasShop, requireRole, AuthError } from "../auth.
 import { handleCors, handleError } from "../claude.js";
 import { limit as rateLimit } from "../rateLimit.js";
 import { withTenant } from "../recordsStore.js";
-import { isGoogleSyncEnabled, scopesFor, limits as limitsFor, PROVIDERS, WORDING } from "./config.js";
+import { isGoogleSyncEnabled, scopesFor, scopeMode as scopeModeOf, providersFor, limits as limitsFor, PROVIDERS, WORDING } from "./config.js";
 import { encryptToken, decryptToken, signState, verifyState, looksEncrypted } from "./crypto.js";
 import { createGoogleClient, GoogleAuthError, GoogleError } from "./googleApi.js";
 import { normalizeSenders } from "./gmail.js";
@@ -55,12 +55,15 @@ async function sessionFor(auth, provider, deps) {
   return { client, row, session: client.session(await getAccess(), getAccess), accessToken: null, getAccess };
 }
 
-function cleanPicked(list, max) {
+function cleanPicked(list, max, { filesOnly = false } = {}) {
   if (!Array.isArray(list)) return [];
   const out = [];
+  const seen = new Set();
   for (const p of list) {
     if (out.length >= max) break;
-    if (!p || typeof p.id !== "string" || !ID_RE.test(p.id) || out.some((o) => o.id === p.id)) continue;
+    if (!p || typeof p.id !== "string" || !ID_RE.test(p.id) || seen.has(p.id)) continue;
+    if (filesOnly && p.kind === "folder") continue;
+    seen.add(p.id);
     out.push({ id: p.id, name: String(p.name ?? "").slice(0, 200), kind: p.kind === "folder" ? "folder" : "file" });
   }
   return out;
@@ -74,7 +77,8 @@ export async function handleOp(auth, body, deps = {}) {
   assertAdmin(auth);
   const lim = limitsFor(env);
   const provider = body?.provider;
-  const needProvider = () => (PROVIDERS.includes(provider) ? null : fail(400, MESSAGES.badProvider));
+  const pickerMode = scopeModeOf(env) === "picker";
+  const needProvider = () => (PROVIDERS.includes(provider) ? (providersFor(env).includes(provider) ? null : fail(404, MESSAGES.notAvailable)) : fail(400, MESSAGES.badProvider));
 
   if (op === "status") {
     const client = deps.google ?? createGoogleClient({ env });
@@ -85,14 +89,20 @@ export async function handleOp(auth, body, deps = {}) {
         const counts = await S.itemCounts(db, c.id);
         out.push(S.publicConnection(c, counts, { problems: await S.recentProblems(db, c.id, 3), removed: await S.removedFiles(db, c.id, 10) }));
       }
-      return { connections: out, usedToday: await S.importedToday(db) };
+      return { connections: out, usedToday: await S.importedToday(db), usedThisMonth: await S.importedThisMonth(db) };
     });
     return ok({
       enabled: true,
       configured: client.isConfigured() && Boolean(env.GOOGLE_TOKEN_KEY),
       pickerReady: Boolean(env.GOOGLE_PICKER_API_KEY && env.GOOGLE_CLOUD_PROJECT_NUMBER),
+      scopeMode: pickerMode ? "picker" : "full",
+      providers: providersFor(env),
       dailyLimit: lim.maxFilesPerDay,
       usedToday: data.usedToday,
+      monthlyLimit: lim.maxFilesPerMonth,
+      usedThisMonth: data.usedThisMonth,
+      initialCap: lim.initialImportCap,
+      pickedLimit: pickerMode ? lim.maxPickedFiles : lim.maxPicked,
       lookbackChoices: lim.gmailLookbackDays,
       connections: data.connections,
     });
@@ -102,7 +112,8 @@ export async function handleOp(auth, body, deps = {}) {
     const bad = needProvider(); if (bad) return bad;
     const client = deps.google ?? createGoogleClient({ env });
     if (!client.isConfigured() || !env.GOOGLE_TOKEN_KEY) return fail(503, MESSAGES.notSetUp);
-    const mode = provider === "gmail" ? "full" : body.scopeMode === "full" ? "full" : "narrow";
+    // Picker mode ignores whatever the browser asks for: the only Drive access ever requested is drive.file.
+    const mode = pickerMode ? "narrow" : provider === "gmail" ? "full" : body.scopeMode === "full" ? "full" : "narrow";
     const state = signState({ t: auth.tenantId, tn: auth.orgId ?? auth.tenantId, u: auth.userId, p: provider, m: mode }, env);
     return ok({ url: client.authUrl({ scopes: scopesFor(provider, mode), state, loginHint: auth.email }) });
   }
@@ -112,10 +123,13 @@ export async function handleOp(auth, body, deps = {}) {
     const conn = await dbTx(auth, (db) => S.getConnection(db, provider));
     if (!conn || conn.status === "disconnected") return fail(409, MESSAGES.notConnected);
     if (provider === "drive") {
-      const picked = cleanPicked(body.picked, lim.maxPicked);
-      if (Array.isArray(body.picked) && body.picked.length > lim.maxPicked) return fail(400, MESSAGES.tooMany);
-      // new choices start the initial import again (files already brought in are recognised and skipped)
-      await dbTx(auth, (db) => S.patchConnection(db, conn.id, { config: { ...(conn.config ?? {}), picked }, sync_state: { pageToken: null, startToken: null, initial: {} } }));
+      const max = pickerMode ? lim.maxPickedFiles : lim.maxPicked;
+      if (Array.isArray(body.picked) && body.picked.length > max) return fail(400, MESSAGES.tooMany);
+      // Picker mode: Google only ever gives DeepWell the files themselves, so a folder is refused with a plain explanation.
+      if (pickerMode && Array.isArray(body.picked) && body.picked.some((p) => p?.kind === "folder")) return fail(400, WORDING.pickerFoldersNotTaken);
+      const picked = cleanPicked(body.picked, max, { filesOnly: pickerMode });
+      // new choices start the import again (files already brought in are recognised by Drive file id + modified time and skipped)
+      await dbTx(auth, (db) => S.patchConnection(db, conn.id, { config: { ...(conn.config ?? {}), picked }, sync_state: { pageToken: null, startToken: null, initial: {}, pickCursor: 0 } }));
     } else {
       const senders = normalizeSenders(body.senders, lim.maxSenders);
       const labels = (Array.isArray(body.labels) ? body.labels : []).filter((l) => l && ID_RE.test(String(l.id))).slice(0, lim.maxLabels).map((l) => ({ id: String(l.id), name: String(l.name ?? "").slice(0, 100) }));
@@ -130,6 +144,7 @@ export async function handleOp(auth, body, deps = {}) {
 
   if (op === "folders" || op === "labels" || op === "picker-token") {
     const p = op === "labels" ? "gmail" : "drive";
+    if (pickerMode && op !== "picker-token") return fail(404, MESSAGES.notAvailable);
     const s = await sessionFor(auth, p, deps);
     if (s.error) return s.error;
     try {
@@ -180,7 +195,7 @@ export async function handleOp(auth, body, deps = {}) {
   if (op === "sync-now") {
     const bad = needProvider(); if (bad) return bad;
     const r = await syncConnection(tenantCtx(auth), provider, { ...deps, env });
-    if (r.skipped === "not-connected") return fail(409, MESSAGES.notConnected);
+    if (r.skipped === "not-connected" || r.skipped === "disconnected") return fail(409, MESSAGES.notConnected);
     if (r.skipped === "busy") return ok({ busy: true, result: WORDING.working });
     return ok({ ok: r.ok !== false, result: r.result ?? r.error ?? null, created: r.tally?.created ?? 0 });
   }
@@ -198,7 +213,9 @@ export async function handleCallback(query, deps = {}) {
   const back = (flag) => `/app/?screen=team&google=${flag}`;
   if (!isGoogleSyncEnabled(env)) return { status: 404, body: { error: MESSAGES.notAvailable } };
   const st = verifyState(query?.state, env);
-  if (!st || !st.t || !PROVIDERS.includes(st.p)) return { redirect: back("error") };
+  if (!st || !st.t || !providersFor(env).includes(st.p)) return { redirect: back("error") };
+  // picker mode never accepts a connection that was started in full mode (and never stores a wider grant than it asked for)
+  if (scopeModeOf(env) === "picker" && st.m === "full") return { redirect: back("error") };
   if (query?.error || !query?.code) return { redirect: back(query?.error === "access_denied" ? "cancelled" : "error") };
   try {
     const client = deps.google ?? createGoogleClient({ env });

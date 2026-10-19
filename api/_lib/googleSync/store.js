@@ -83,6 +83,12 @@ export async function importedToday(db) {
   return r?.n ?? 0;
 }
 
+/** Files brought in from Google this calendar month (UTC), all sources: the per-organization monthly allowance. */
+export async function importedThisMonth(db) {
+  const r = await one(db, `SELECT COUNT(*)::int AS n FROM google_sync_items WHERE ${TENANT} AND imported_at >= date_trunc('month', NOW() AT TIME ZONE 'utc') AT TIME ZONE 'utc'`);
+  return r?.n ?? 0;
+}
+
 export async function itemCounts(db, connectionId) {
   const rows = await q(db, `SELECT state, COUNT(*)::int AS n FROM google_sync_items WHERE ${TENANT} AND connection_id = $1 GROUP BY state`, [connectionId]);
   const out = { imported: 0, removed: 0, skipped: 0, error: 0 };
@@ -123,6 +129,7 @@ export function publicConnection(row, counts = {}, extra = {}) {
     importedCount: counts.imported ?? 0,
     removedCount: counts.removed ?? 0,
     errorCount: counts.error ?? 0,
+    skippedCount: counts.skipped ?? 0,
     choices: row.provider === "drive"
       ? { picked: (cfg.picked ?? []).map((p) => ({ id: p.id, name: p.name, kind: p.kind })) }
       : { labelIds: cfg.labelIds ?? [], labelNames: cfg.labelNames ?? [], senders: cfg.senders ?? [], lookbackDays: cfg.lookbackDays ?? 30 },

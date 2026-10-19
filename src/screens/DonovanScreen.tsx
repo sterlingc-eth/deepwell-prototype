@@ -4,6 +4,7 @@ import { DonovanMissesCard } from '../components/DonovanMissesCard';
 import { DonovanLearningCard } from '../components/DonovanLearningCard';
 import { DonovanScoresCard } from '../components/DonovanScoresCard';
 import { SemanticSearchCard } from '../components/SemanticSearchCard';
+import { BackupStatusCard } from '../components/BackupStatusCard';
 
 interface DonovanScreenProps {
   onClose: () => void;
@@ -78,6 +79,7 @@ export function DonovanScreen({ onClose }: DonovanScreenProps) {
         <DonovanMissesCard />
         <DonovanLearningCard />
         <SemanticSearchCard />
+        <BackupStatusCard />
       </main>
     </div>
   );

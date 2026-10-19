@@ -1090,7 +1090,9 @@ async function answerDocField(db, docField, rows, { subject, docLabel, docLabelL
   if (!got.length) {
     return attachCitations({
       kind: "answer",
-      text: FIELD_NOUN[key]
+      text: docField.field === "exists"
+        ? `Yes. ${subject} has ${rows.length} ${docLabelLower}${rows.length === 1 ? "" : "s"} on file.`
+        : FIELD_NOUN[key]
         ? `${subject} has ${rows.length} ${docLabelLower}${rows.length === 1 ? "" : "s"} on file, but ${rows.length === 1 ? "it prints" : "none prints"} no ${FIELD_NOUN[key]}.`
         : `${subject} has ${rows.length} ${docLabelLower}${rows.length === 1 ? "" : "s"} on file, but none prints that detail.`,
       facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],

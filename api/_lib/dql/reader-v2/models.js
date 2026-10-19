@@ -106,6 +106,8 @@ export async function loadModels(dir = DATA_DIR) {
   M.syn = B.switches.syn || {};
   const dcfg = B.switches.doctype; M.doctype = [DT.makeCfg(dcfg), new DT.Learned(dcfg)];
   M.thr = B.thresholds; M.switches = B.switches;
+  if (B.models.cf2_lex) { const CF2 = await import('./clausefree2.js'); CF2.setData(readJson(path.join(dir, B.models.cf2_lex.file)), readJson(path.join(dir, B.models.cf2_meta.file))); }
+  if (B.models.pv1_w) { const PV1 = await import('./pv1.js'); PV1.setData(f32(fs.readFileSync(path.join(dir, B.models.pv1_w.file)), 0, 1 << 18), B.models.pv1_w.b); }
   const cc = B.switches.clause;
   if (cc && cc.on) { const CL = await import('./clause.js'); M.clause = new CL.Reader2(new PairEnc(await makeSession(path.join(dir, B.models.clause_ce.file)), wp, 96), cc); }
   return M;

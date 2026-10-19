@@ -68,7 +68,7 @@ export function precheck({ filename, contentType, sizeBytes }) {
  * @returns {Promise<{outcome: 'created'|'duplicate'|'refused', documentId?: string, sha256?: string, filename?: string, note?: string}>}
  * @throws UploadGateRefusal when the plan has no room (the caller stops the pass)
  */
-export async function importBytes(db, deps, { filename, contentType, bytes, billingRow }) {
+export async function importBytes(db, deps, { filename, contentType, bytes, billingRow, source = null, externalId = null }) {
   if (!bytes?.length) return { outcome: "refused", note: "The file is empty." };
   const pre = precheck({ filename, contentType, sizeBytes: bytes.length });
   if (!pre.ok) return { outcome: "refused", note: pre.note };
@@ -96,7 +96,8 @@ export async function importBytes(db, deps, { filename, contentType, bytes, bill
     resource_type: "document",
     resource_id: doc.id,
     clerk_user_id: null,
-    changes: { filename: pre.filename, sizeBytes: bytes.length },
+    // source tag: where this document came from. For Drive: source=google_drive and the Drive file id (also kept in google_sync_items.external_id).
+    changes: { filename: pre.filename, sizeBytes: bytes.length, ...(source ? { source } : {}), ...(source === "google_drive" && externalId ? { driveFileId: externalId } : {}) },
   });
   return { outcome: "created", documentId: doc.id, sha256: sha, filename: pre.filename };
 }

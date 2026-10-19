@@ -142,6 +142,21 @@
    "internal": {
     "sha": "55d1b2b"
    }
+  },
+  {
+   "track": "donovan",
+   "version": "1.4.1",
+   "date": "2026-10-19",
+   "type": "patch",
+   "released": true,
+   "public": true,
+   "notes": [
+    "Donovan now answers more of your questions on his own and handles tricky wording and misspellings better.",
+    "Every answer still shows the document it came from, and when Donovan isn't sure, he says so instead of guessing."
+   ],
+   "internal": {
+    "sha": "55d1b2b"
+   }
   }
  ]
 }

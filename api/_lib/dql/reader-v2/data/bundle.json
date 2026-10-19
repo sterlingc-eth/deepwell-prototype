@@ -4,10 +4,10 @@
  "round": 312,
  "promoted": "2026-10-17 16:39:09",
  "parent": "v001",
- "recipe_name": "team21-core2-reader+realtyv2+clause2+typo+datenorm+precfix+grounding(noGT)+retrv2+agg+guard",
- "recipe_hash": "cf23051c",
+ "recipe_name": "team21-core2-reader+realtyv2+clause2+typo+datenorm+precfix+grounding(noGT)+retrv2+agg+guard+fields+clause3+rprec+rank2+hardv2+mainprec+xdoc1+watch6+hardv3+wildprec+mrprec2+cf2+hardv4+missteach+mainprec2+synlex1+wildprec2+pmatch+agree1+lc1+aggfilter1+mp1+pv1+mp2+mpv1",
+ "recipe_hash": "cebdde3a",
  "recipe_hash_note": "first 8 hex of the recipe digest recorded by the training loop at promotion",
- "recipe_json_sha256": "a44c62ea6b4934ea1a80487396cb7b6cb0859869f9e1a1cc5fb18f78efb089e0",
+ "recipe_json_sha256": "a37d670a64e77cadca838bafa5028e9c4a9ba6e8ebd24e1c09d046651816e17c",
  "loop_code_hash_at_promotion": "244782921081fb4d",
  "frozen_manifest_sha": "18d4d96f140abed4e0d29d76ea7b6bb4f671ea899cbaca73f40e9a65e696d1b5",
  "questions_trained": 345128,
@@ -3012,7 +3012,214 @@
    "agg_filter_v1",
    "present_value_v1",
    "precision_match"
-  ]
+  ],
+  "agg_filter_v1": {
+   "on": true,
+   "collide": "drop",
+   "list_fix": true,
+   "name_gate": true,
+   "b4": true,
+   "protect": true
+  },
+  "label_clause_v1": {
+   "on": true
+  },
+  "fields_v2": {
+   "on": true,
+   "route": true,
+   "direct": true,
+   "floor": 0,
+   "rel_min": 0.5,
+   "min_docs": 3,
+   "direct_p1": 0.6,
+   "doc_level": true
+  },
+  "realty_prec_v1": {
+   "on": true,
+   "rules": [
+    "contact",
+    "status",
+    "unit_kind",
+    "when_date",
+    "money_bound",
+    "order_flip",
+    "frag_case",
+    "frag_end",
+    "frag_ocr"
+   ],
+   "rank": true,
+   "format": true
+  },
+  "rank_v2": {
+   "on": true,
+   "direct": true,
+   "direct_unk": 5,
+   "direct_syn": true,
+   "typo": true,
+   "type_by_field": true
+  },
+  "xdoc_v1": {
+   "on": true,
+   "typo": true
+  },
+  "hard_v1": {
+   "on": true,
+   "rules": [
+    "list_shape",
+    "cond_miss",
+    "cue_conflict"
+   ],
+   "contact_fuzzy": true
+  },
+  "hard_v2": {
+   "on": true,
+   "rules": [
+    "field_qual",
+    "units_rank_money",
+    "delinq_total"
+   ]
+  },
+  "hard_v3": {
+   "on": true,
+   "rules": [
+    "dom_cue",
+    "tot_cue",
+    "field_cue",
+    "contact_suffix",
+    "contact_addr",
+    "appr_cue"
+   ]
+  },
+  "hard_v4": {
+   "on": true,
+   "rules": [
+    "type_swap",
+    "type_name",
+    "file_note"
+   ]
+  },
+  "syn_lex_v1": {
+   "on": true,
+   "rules": [
+    "field_sentence"
+   ]
+  },
+  "main_prec_v1": {
+   "on": true,
+   "rules": [
+    "phantom",
+    "filt_dropped",
+    "clause_concept",
+    "rank_field",
+    "label_foreign",
+    "date_event"
+   ]
+  },
+  "main_prec_v2": {
+   "on": true,
+   "rules": [
+    "field_look",
+    "cc2",
+    "tail_hoa"
+   ]
+  },
+  "watch6_veto": {
+   "on": true,
+   "rules": [
+    "keys_clause",
+    "units_rank",
+    "funds_cutoff",
+    "inspect_foreign",
+    "assoc_price",
+    "cam_foreign"
+   ]
+  },
+  "wild_prec_v1": {
+   "on": true,
+   "rules": [
+    "delinq_total",
+    "appr_looked"
+   ]
+  },
+  "wild_prec_v2": {
+   "on": true,
+   "rules": [
+    "buildout_foreign",
+    "ownerpays_foreign",
+    "closing_head"
+   ]
+  },
+  "mr_prec_v2": {
+   "on": true,
+   "rules": [
+    "field_cue",
+    "label_conflict"
+   ]
+  },
+  "clause_free_v2": {
+   "on": true,
+   "pmi": 2.6
+  },
+  "present_value_v1": {
+   "on": true,
+   "modes": [
+    "veto",
+    "veto_sub"
+   ],
+   "sub_topic": false,
+   "tau_veto": 0.8,
+   "tau_route": 0.7
+  },
+  "clause_retrain_v2": {
+   "on": true,
+   "T": 3
+  },
+  "agree_v1": {
+   "on": true,
+   "rules": [
+    "L1",
+    "P1",
+    "T1"
+   ]
+  },
+  "mention_party_v1": {
+   "on": true,
+   "rules": [
+    "F1",
+    "M1",
+    "P1",
+    "V1"
+   ]
+  },
+  "typo_repair_v1": {
+   "on": true,
+   "min_len": 5,
+   "max_changes": 3,
+   "skip_clause": true,
+   "agree": true
+  },
+  "cue_agree_v1": {
+   "on": true,
+   "floor": 0.5
+  },
+  "mainpair_v1": {
+   "on": true,
+   "rules": [
+    "fs_docname"
+   ]
+  },
+  "clause_v3": {
+   "on": false,
+   "rescue": false
+  },
+  "mainpair_v2": {
+   "on": false,
+   "pv_floor": 0.7,
+   "p_floor": 0.6,
+   "intents": [
+    "find"
+   ]
+  }
  },
  "measured": {
   "ledger_row": "round 312, v002 PROMOTED (pooled +7.341 pts, 95% CI lower 6.474)",
@@ -3389,6 +3596,57 @@
    "sealed_delta": 9.29,
    "sealed_prec": 99.009,
    "sealed_n": 3337
+  },
+  "refresh_2026_10_19": {
+   "note": "v002 with the current training code and recipe (census r349 and sealed re-run); exported values in parentheses",
+   "main": {
+    "cov": 90.78,
+    "prec": 99.219,
+    "was": [
+     83.55,
+     99.158
+    ]
+   },
+   "wild": {
+    "cov": 77.87,
+    "prec": 99.454,
+    "was": [
+     74.04,
+     98.677
+    ]
+   },
+   "realty": {
+    "cov": 77.74,
+    "prec": 99.361,
+    "was": [
+     74.08,
+     98.4
+    ]
+   },
+   "hard": {
+    "cov": 66.14,
+    "prec": 97.613,
+    "was": [
+     63.68,
+     96.9
+    ]
+   },
+   "fresh": {
+    "cov": 82.35,
+    "prec": 99.854,
+    "was": [
+     76.15,
+     99.33
+    ]
+   },
+   "sealed": {
+    "cov": 80.11,
+    "prec": 99.658,
+    "was": [
+     null,
+     99.009
+    ]
+   }
   }
  },
  "models": {
@@ -3419,6 +3677,31 @@
   "weights": {
    "file": "weights.bin",
    "sha256": "8a5c81665a183e307ab1e8a70455c294b82a249267aacc79205d74a7008a55a2"
+  },
+  "clausecompat": {
+   "file": "clausecompat_model.json",
+   "sha256": "80f68ce939d9b55bac20d939a55cbc4c96729976dee054410ebf1209049ee163"
+  },
+  "synlex1_labels": {
+   "file": "synlex1_labels.json",
+   "sha256": "45e4763e267141cd737b058aa0381a835d0c3a005af6aadc8b14475adf3e160b"
+  },
+  "typo_static": {
+   "file": "typo_static.json",
+   "sha256": "359be51a991f1d082af78fadd98e1fabec8278c17c7caba8f1c4193832ff9b14"
+  },
+  "cf2_lex": {
+   "file": "cf2_lex.json",
+   "sha256": "fa3fbd46703694f34939f01700eb2daf9296e892554b402c85955431f5dcc874"
+  },
+  "cf2_meta": {
+   "file": "cf2_meta.json",
+   "sha256": "d461d11d78de7da7aa07fe788af64c0ddaf450e6407fd9daa54ed452a2f4568b"
+  },
+  "pv1_w": {
+   "file": "pv1_w.bin",
+   "sha256": "f9990357c8a97c8afce4acd87c463fbf2c87f21726f716dfe72188d45b6c236a",
+   "b": -0.7686954736709595
   }
  },
  "source_files_sha256": {
@@ -3435,11 +3718,18 @@
   "verifier.txt": "ba61c73df4cb96301c922774167f8f51492feba3a04411e738aadb9f6b9adfbc"
  },
  "parity": {
-  "questions": 6202,
-  "companies": 14,
+  "questions": 7146,
+  "companies": 16,
   "mismatches": 0,
-  "answeredIdentically": 4361,
+  "answeredIdentically": 5502,
   "against": "training-loop Python pipeline (lib code + v002 recipe, determinism patches disclosed in the report)",
   "stampedAt": "2026-10-19"
+ },
+ "loop_lib_hash_at_refresh": "379b42f453fd1a26",
+ "export_refresh": {
+  "from_code_hash": "244782921081fb4d",
+  "refreshed": "2026-10-19",
+  "note": "same v002 model files; post-processing, release vetoes and field/rank routing re-ported from the current training code and recipe",
+  "loop_code_hash_exported": "0321ca119a86f3de"
  }
 }

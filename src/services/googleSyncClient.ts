@@ -18,6 +18,7 @@ export interface GoogleConnection {
   importedCount: number;
   removedCount: number;
   errorCount: number;
+  skippedCount?: number;
   choices: {
     picked?: Array<{ id: string; name: string; kind: 'folder' | 'file' }>;
     labelIds?: string[];
@@ -33,8 +34,14 @@ export interface GoogleStatus {
   enabled: boolean;
   configured?: boolean;
   pickerReady?: boolean;
+  scopeMode?: 'picker' | 'full';
+  providers?: GoogleProvider[];
   dailyLimit?: number;
   usedToday?: number;
+  monthlyLimit?: number;
+  usedThisMonth?: number;
+  initialCap?: number;
+  pickedLimit?: number;
   lookbackChoices?: number[];
   connections?: GoogleConnection[];
 }
@@ -87,6 +94,9 @@ export function relativeTime(iso: string | null, now = Date.now()): string {
   return `${days} day${days === 1 ? '' : 's'} ago`;
 }
 
+/** What DeepWell can read from Drive: PDFs, photos, and Google Docs/Sheets (which Google converts on the way in). */
+export const PICKER_MIME_TYPES = 'application/pdf,image/png,image/jpeg,image/webp,image/heic,application/vnd.google-apps.document,application/vnd.google-apps.spreadsheet';
+
 /** Open Google's own file picker (needs the picker script, which the page loads on demand). */
 export async function openGooglePicker(
   tok: { accessToken: string; apiKey: string; appId: string },
@@ -104,13 +114,19 @@ export async function openGooglePicker(
   }
   await new Promise<void>((resolve) => w.gapi!.load('picker', () => resolve()));
   const g = w.google!.picker;
-  const view = new g.DocsView(g.ViewId.DOCS).setIncludeFolders(true).setSelectFolderEnabled(true);
+  // Files only. Folders are shown so people can open them, but cannot be selected: with the narrow Drive permission Google gives
+  // DeepWell the files that are picked, not everything inside a picked folder.
+  const view = new g.DocsView(g.ViewId.DOCS)
+    .setIncludeFolders(true)
+    .setSelectFolderEnabled(false)
+    .setMimeTypes(PICKER_MIME_TYPES);
   const picker = new g.PickerBuilder()
     .addView(view)
     .enableFeature(g.Feature.MULTISELECT_ENABLED)
     .setOAuthToken(tok.accessToken)
     .setDeveloperKey(tok.apiKey)
     .setAppId(tok.appId)
+    .setOrigin(window.location.origin)
     .setCallback((data: any) => {
       if (data?.action !== g.Action.PICKED) return;
       onPicked((data.docs ?? []).map((d: any) => ({ id: String(d.id), name: String(d.name ?? ''), kind: d.mimeType === 'application/vnd.google-apps.folder' ? 'folder' : 'file' })));

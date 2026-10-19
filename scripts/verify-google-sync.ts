@@ -23,6 +23,7 @@ let realFetchCalls = 0;
 globalThis.fetch = (async () => { realFetchCalls++; throw new Error('real network call attempted in a test'); }) as any;
 delete process.env.ANTHROPIC_API_KEY;
 delete process.env.DEEPWELL_GOOGLE_SYNC;
+process.env.DEEPWELL_GOOGLE_SCOPE_MODE = 'full'; // this suite covers the old full mode (drive.readonly + Gmail); scripts/verify-google-picker.ts covers the default picker mode
 process.env.GOOGLE_TOKEN_KEY = Buffer.alloc(32, 7).toString('base64');
 process.env.GOOGLE_OAUTH_CLIENT_ID = 'client-id.apps.test';
 process.env.GOOGLE_OAUTH_CLIENT_SECRET = 'client-secret-xyz';

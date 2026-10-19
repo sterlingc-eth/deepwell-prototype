@@ -382,9 +382,9 @@ async function vendorLane(db, raw, q) {
     const f = rows.map(([v, o]) => ({ label: "Vendor with insurance on file", value: `${v}${o.f.coi_expires ? ` (expires ${prettyDate(o.f.coi_expires)})` : ""}`, sources: srcFor(o) }));
     return ok(`${rows.length} vendor${rows.length === 1 ? " has" : "s have"} a certificate of insurance on file: ${f.map((x) => x.value).join("; ")}.`, f, rows.map(([, o]) => recFor(o, "Certificate of insurance")), "Read the vendor on every certificate-of-insurance document.");
   }
-  if (!(/\bwork\s*orders?\b/.test(l) && /\bhow many\b|\bnumber of\b|\bcount\b|\btotal\b/.test(l))) return null;
+  if (!(/\b(?:work\s*orders?|jobs?)\b/.test(l) && /\bhow many\b|\bnumber of\b|\bcount\b|\btotal\b/.test(l))) return null;
   const vendors = await vendorNames(db);
-  const WO_OK = new Set("how many work order orders did does do has have had handle handled handling done we they the number of count total on file for".split(" "));
+  const WO_OK = new Set("how many work order orders jobs job done us completed did does do has have had handle handled handling done we they the number of count total on file for".split(" "));
   const restWords = (txt) => norm(txt).trim().split(" ").filter((w) => w && !WO_OK.has(w));
   let hit = null; const qn = norm(raw);
   for (const v of vendors) { const k = norm(v); if (qn.includes(k) && (!hit || k.length > hit.k.length)) hit = { v, k }; }
@@ -406,6 +406,33 @@ async function vendorLane(db, raw, q) {
   const known = await db.raw(`SELECT 1 FROM entities WHERE entity_type IN ('customer','technician') AND (data->>'customer_name' ILIKE $1 OR data->>'technician_name' ILIKE $1 OR data->>'name' ILIKE $1) LIMIT 1`, [`%${esc(cand)}%`]);
   if (known.rows.length) return null;
   return ok(`0 work orders on file for ${cand}: I don't have a vendor by that name. The vendors I do have work orders from are ${vendors.sort().join(", ")}.`, [{ label: `Work orders for ${cand}`, value: "0", sources: [] }], [], `Searched the vendor on every work order for ${cand}; none matched.`);
+}
+
+/** "how many leases are month to month": leases with no end date recorded (read from the tenant's own lease extractions). */
+async function monthToMonthLane(db, q) {
+  if (!/^how many (?:of (?:our|the) )?(?:leases|tenants|units) (?:are|is) (?:on (?:a )?)?(?:month[\s-]*to[\s-]*month|mtm)$/i.test(q.trim())) return null;
+  const all = [...(await docsByType(db, "lease-agreement")).values()];
+  if (!all.length) return null;
+  const mtm = all.filter((o) => !String(o.f.lease_end_date ?? "").trim());
+  const f = [{ label: "Leases with no end date (month to month)", value: String(mtm.length), sources: mtm.slice(0, 20).map(srcFor).flat() }];
+  return ok(`${mtm.length} of the ${all.length} lease agreement${all.length === 1 ? "" : "s"} on file ${mtm.length === 1 ? "has" : "have"} no lease end date recorded, which is how a month-to-month lease appears here.`, f, mtm.slice(0, 20).map((o) => recFor(o, "Lease agreement")), "Counted the lease agreements with no lease end date extracted.");
+}
+
+/** "how many units does <owner> own": property entities whose owner (customer_name) is that exact owner. Unknown owner -> not on file. */
+async function ownerUnitsLane(db, raw, q) {
+  const m = /^how many (?:rental )?(?:units|properties|doors) (?:does|do|did) ([A-Za-z][A-Za-z .'&-]{2,50}?) (?:own|have|hold|manage)$/i.exec(q.trim());
+  if (!m || YEAR_OR_PERIOD.test(q)) return null;
+  const name = m[1].trim();
+  if (/^(?:we|you|they|the|our)$/i.test(name) || name.split(/\s+/).length < 2) return null;
+  const r = await db.raw(`SELECT id, data->>'unit_number' AS u, data->>'service_address' AS a FROM entities WHERE entity_type = 'property' AND merged_into IS NULL AND lower(data->>'customer_name') = lower($1) ORDER BY 3, 2`, [name]);
+  if (!r.rows.length) {
+    const known = await db.raw(`SELECT 1 FROM entities WHERE entity_type = 'customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1 LIMIT 1`, [`%${esc(name)}%`]);
+    if (known.rows.length) return null;
+    return noAnswer(`I don't have an owner named ${name} on file, so there are no units to count for them.`, `Searched the owner on every unit record for ${name}; none matched.`);
+  }
+  const n = r.rows.length;
+  const recs = r.rows.map((x) => makeRecord({ type: "unit", id: x.id, label: `Rental unit ${x.u ?? "?"}`, sublabel: x.a }));
+  return ok(`${n} unit${n === 1 ? "" : "s"} for ${name}.`, [{ label: "Units", value: String(n), sources: [] }], recs, `Counted the unit records whose owner is ${name}.`);
 }
 
 /** Rent-roll statistics over the lease agreements on file (count above/below a rent, highest / lowest / average rent). */
@@ -458,7 +485,7 @@ export async function tryPropertyPack(db, question, { today } = {}) {
   if (!q || q.length > 300) return null;
   const t = /^\d{4}-\d{2}-\d{2}$/.test(String(today ?? "")) ? today : new Date().toISOString().slice(0, 10);
   try {
-    return (await countLane(db, raw)) ?? (await unitLane(db, q, raw, t)) ?? (await vendorLane(db, raw, q)) ?? (await rentStatsLane(db, raw, q)) ?? (await noBuildingLane(db, q)) ?? (await notOnFileLane(db, q)) ?? (await personLane(db, q, raw, t));
+    return (await countLane(db, raw)) ?? (await unitLane(db, q, raw, t)) ?? (await vendorLane(db, raw, q)) ?? (await monthToMonthLane(db, q)) ?? (await ownerUnitsLane(db, raw, q)) ?? (await rentStatsLane(db, raw, q)) ?? (await noBuildingLane(db, q)) ?? (await notOnFileLane(db, q)) ?? (await personLane(db, q, raw, t));
   } catch (err) {
     console.error("propertyPack lane failed, falling through:", err?.message);
     return null;

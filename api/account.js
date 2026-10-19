@@ -53,6 +53,8 @@ import audience from "./_lib/audience/route.js";
  *                                                      document's audience, one-tap override — any
  *                                                      member — round 18, owner ask (a))
  *
+ *   GET/POST backup           -> ?action=backup    (nightly encrypted data backup + status; OFF unless DEEPWELL_BACKUP=1;
+ *                                                      cron secret or platform operator only; lazy-imported)
  *   GET/POST google-sync      -> ?action=google-sync (Connected sources: Google Drive + Gmail attachments; OFF unless
  *                                                      DEEPWELL_GOOGLE_SYNC=1; admin only; lazy-imported)
  *   GET/POST support          -> ?action=support    (DeepWell Support Assistant, round 28: website widget (no auth,
@@ -71,6 +73,9 @@ export const config = { api: { bodyParser: { sizeLimit: "64kb" } }, maxDuration:
 
 const ACTIONS = { keys, export: tenantExport, "export-files": accountExport, delete: tenantDelete, sweep: cronSweep, merge: mergeTenant, notifications, outreach, followups, expenses, financials, graph, "entity-merge": entityMerge, naming, intake, grid, "ask-suggest": askSuggest, "unit-address": unitAddress, insights, audience, support: (q, s) => import("./_lib/support/route.js").then((m) => m.default(q, s)),
   // Google Drive / Gmail sync: ships OFF. With DEEPWELL_GOOGLE_SYNC unset nothing from googleSync/ is even imported.
+  // Data backup (nightly encrypted copy to a separate bucket): ships OFF. With DEEPWELL_BACKUP unset the handler answers
+  // 404 / {enabled:false} and nothing else in backup/ is loaded. Cron-secret or platform operator only.
+  backup: (q, s) => import("./_lib/backup/route.js").then((m) => m.default(q, s)),
   "google-sync": (q, s) => process.env.DEEPWELL_GOOGLE_SYNC === "1"
     ? import("./_lib/googleSync/route.js").then((m) => m.default(q, s))
     : s.status(q.method === "POST" && q.body?.op === "status" ? 200 : 404).json(q.method === "POST" && q.body?.op === "status" ? { enabled: false } : { error: "Not available." }) };

@@ -13,6 +13,23 @@ export function isGoogleSyncEnabled(env = process.env) {
 export const PROVIDERS = Object.freeze(["drive", "gmail"]);
 
 /**
+ * DEEPWELL_GOOGLE_SCOPE_MODE (read each call):
+ *   "picker" (default when sync is on) : ONLY https://www.googleapis.com/auth/drive.file (+ openid/email). The admin picks FILES in
+ *                                        Google's own picker; DeepWell can see only those. Gmail is not offered. This mode needs
+ *                                        no restricted-scope security assessment from Google.
+ *   "full"                             : the older mode (drive.readonly + gmail.readonly). Both are RESTRICTED scopes: Google
+ *                                        requires its annual security assessment (CASA) before this can be used by the public.
+ *                                        Keep it OFF for launch. Anything other than the exact word "full" means "picker".
+ */
+export function scopeMode(env = process.env) {
+  return String(env.DEEPWELL_GOOGLE_SCOPE_MODE ?? "").trim().toLowerCase() === "full" ? "full" : "picker";
+}
+/** Providers offered in the current mode. Picker mode: Drive only. */
+export function providersFor(env = process.env) {
+  return scopeMode(env) === "full" ? PROVIDERS : Object.freeze(["drive"]);
+}
+
+/**
  * OAuth scopes.
  *  - drive.file     : NON-sensitive. DeepWell sees only the files/folders the admin picks in Google's own picker.
  *  - drive.readonly : RESTRICTED. DeepWell can read every file in the Drive (never change it); the admin then chooses folders.
@@ -52,7 +69,13 @@ export function limits(env = process.env) {
     gmailLookbackDays: [7, 30, 90],
     /** Gmail: attachments smaller than this that are inline images (signature logos) are skipped. */
     gmailMinImageBytes: 15 * 1024,
-    /** Folders / files / labels / senders an admin can choose. */
+    /** Picker mode: the first import of one connection brings in at most this many documents (plan-sized; env can lower or raise to 5000). */
+    initialImportCap: intFromEnv(env.GOOGLE_SYNC_INITIAL_CAP, 500, 1, 5000),
+    /** Documents one organization can bring in from Google per UTC calendar month (all sources together). */
+    maxFilesPerMonth: intFromEnv(env.GOOGLE_SYNC_MONTHLY_CAP, 2000, 1, 100000),
+    /** Picker mode: files one connection can keep picked. */
+    maxPickedFiles: intFromEnv(env.GOOGLE_SYNC_MAX_PICKED_FILES, 500, 1, 2000),
+    /** Folders / files / labels / senders an admin can choose (full mode). */
     maxPicked: 50,
     maxSenders: 25,
     maxLabels: 20,
@@ -109,4 +132,20 @@ export const WORDING = Object.freeze({
   working: "Working",
   adminOnly: "Only a company admin can connect Google accounts.",
   dailyLimit: "Today's limit for bringing in files from Google has been reached. DeepWell continues tomorrow.",
+  monthlyLimit: "This month's allowance for bringing in files from Google has been reached. DeepWell continues when the new month starts.",
+  initialLimit: "Your first import is limited to a set number of files. DeepWell brings in the rest when your monthly allowance renews.",
+  // Picker mode (default): the admin picks files one by one in Google's own window.
+  pickerBlurb: "Choose the files you want DeepWell to read. DeepWell can see only the files you choose, nothing else in your Drive, and checks them regularly for changes.",
+  pickerConnect: "Connect Google Drive",
+  pickerChoose: "Choose files",
+  pickerAddMore: "Add more files",
+  pickerFolderNote: "Choose the files themselves. Open a folder in the window and select the files inside it. When you add new files to Drive later, choose them here too so DeepWell can see them.",
+  pickerFoldersNotTaken: "Folders can't be chosen. Open the folder in the window and select the files inside it.",
+  pickerSyncNote: "DeepWell re-checks the files you chose and brings in new versions automatically.",
+  pickerCounts: "Brought in",
+  pickerSkipped: "Not brought in",
+  pickerChosen: "Files chosen",
+  pickerMonthly: "This month",
+  pickerNeedsFiles: "Choose the files DeepWell should bring in.",
+  pickerNotAvailable: "Choosing files from Google Drive is not available on this account yet.",
 });
