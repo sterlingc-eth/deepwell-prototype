@@ -132,7 +132,7 @@
    "version": "1.4.0",
    "date": "2026-10-19",
    "type": "update",
-   "released": false,
+   "released": true,
    "public": true,
    "notes": [
     "Smarter answers from your documents.",
