@@ -388,8 +388,10 @@ export default async function handler(req, res) {
       try {
         const fixed = await integrityFixTenant(ctx, {
           apply: [
-            'mergeDuplicates', 'linkDocuments', 'linkEquipmentCustomers', 'createMissingUnits', 'healMergedSurvivors',
-            'stripShopContact', 'healSplitUnits', 'refillCustomerContacts', 'absorbAddressPlaceholders',
+            // ENTITY SAFETY: merging customers is never unattended - 'mergeDuplicates' and 'absorbAddressPlaceholders' are left out. Duplicates are SUGGESTED
+            // (Customers tab banner, Review duplicates) and an admin confirms each merge.
+            'linkDocuments', 'linkEquipmentCustomers', 'createMissingUnits', 'healMergedSurvivors',
+            'stripShopContact', 'healSplitUnits', 'refillCustomerContacts',
             'classifyShopRecords', 'linkBodyNames',
           ],
           minMergeScore: 0.95,

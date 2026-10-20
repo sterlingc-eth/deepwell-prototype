@@ -82,6 +82,9 @@ export interface DidYouMeanChip {
   text: string;
   /** R32: optional row heading (the "Not who you meant?" chip after an auto-resolved typo); default "Did you mean". */
   heading?: string;
+  /** Entity safety: a customer chip shows its name (label) and what tells it apart (detail: address, last 4 of the phone, last job date); `text` is the re-ask. */
+  label?: string;
+  detail?: string;
 }
 export type AskRole = 'tech' | 'office';
 

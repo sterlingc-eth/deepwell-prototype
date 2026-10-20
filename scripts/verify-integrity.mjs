@@ -55,12 +55,12 @@ eq('empty -> empty', normalizeSurname(''), '');
 // The exact cases named in handoffs/TEAM_BRIEF_2026-09-19.md's owner findings.
 
 gte(
-  'Castillo pair: same household, differently worded name + address -> >= 0.95',
+  'Castillo pair: same household, differently worded name + address -> suggestion only (>= 0.8, < auto bar; ENTITY SAFETY: the address lacks city/unit on one side)',
   customerMatchScore(
     { name: 'Castillo', address: '1519 W Juniper' },
     { name: 'Ray & Linda Castillo', address: '1519 W Juniper Ave, Mesa AZ 85202' }
   ),
-  0.95
+  0.8
 );
 
 lt(
@@ -73,12 +73,12 @@ lt(
 );
 
 gte(
-  '"Plaza Dental Group" vs "Plaza Dental" at the same address -> >= 0.9',
+  '"Plaza Dental Group" vs "Plaza Dental" at the same address -> suggestion only (>= 0.55; ENTITY SAFETY: a different business name is never auto-matched)',
   customerMatchScore(
     { name: 'Plaza Dental Group', address: '412 Elm St, Mesa AZ' },
     { name: 'Plaza Dental', address: '412 Elm St, Mesa AZ' }
   ),
-  0.9
+  0.55
 );
 
 lt(

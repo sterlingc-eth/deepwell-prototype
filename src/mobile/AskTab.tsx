@@ -4,7 +4,8 @@ import { ask, AskApiError } from '../services/answerService'
 import { friendlyErrorMessage } from '../services/httpError'
 import { authHeader } from '../services/authToken'
 import { buildSuggestions, nearMissRetryChips, useDidYouMean, useSamplePrompts, useTypeahead } from '../core/suggestions'
-import { PreflightPill, TypeaheadDropdown, DidYouMeanChips, SamplePromptRowsPlaceholder, turnFrom, type ThreadTurn } from '../components/ask'
+import { normalizeSpoken } from '../core/voiceNormalize'
+import { PreflightPill, TypeaheadDropdown, useVoiceInput, VoiceMicButton, VoiceStatus, type VoiceInput, DidYouMeanChips, SamplePromptRowsPlaceholder, turnFrom, type ThreadTurn } from '../components/ask'
 import { useGraph } from '../core/entityGraph'
 import { DonovanMark } from '../components/DonovanMark'
 import type { Answer } from '../core/types'
@@ -81,11 +82,19 @@ interface ComposerHandle {
 
 /** Owns its own text state so typing never re-renders the answer thread. */
 const Composer = memo(
-  forwardRef<ComposerHandle, { busy: boolean; onSubmit: (q: string) => void }>(function Composer(
+  forwardRef<ComposerHandle, { busy: boolean; onSubmit: (q: string, voice?: boolean) => void }>(function Composer(
     { busy, onSubmit },
     ref
   ) {
     const [input, setInput] = useState('')
+    const graphEntities = useGraph((s) => s.entities)
+    const entityList = useMemo(() => Object.values(graphEntities), [graphEntities])
+    const voice: VoiceInput = useVoiceInput({
+      value: input,
+      setValue: setInput,
+      entities: entityList,
+      send: (text) => send(text, true),
+    })
     const taRef = useRef<HTMLTextAreaElement>(null)
     // Round 14 K1: typeahead completions + a preflight hint, same no-model server route the desktop Ask
     // composer uses (src/core/suggestions.ts). Big touch targets, works in sunlight — see TypeaheadDropdown.
@@ -96,6 +105,7 @@ const Composer = memo(
 
     useImperativeHandle(ref, () => ({
       fill(text: string) {
+        voice.noteManualEdit()
         setInput(text)
         requestAnimationFrame(() => {
           const ta = taRef.current
@@ -128,9 +138,10 @@ const Composer = memo(
       ta.style.height = `${Math.min(ta.scrollHeight, 128)}px`
     }, [input])
 
-    const send = (text = input) => {
+    const send = (text = input, asVoice = voice.dictated) => {
       if (busy || !text.trim()) return
-      onSubmit(text)
+      voice.markSent()
+      onSubmit(text, asVoice)
       setInput('')
       setDropdownOpen(false)
       setActiveIndex(-1)
@@ -144,6 +155,7 @@ const Composer = memo(
             <PreflightPill hint={hint} />
           </p>
         )}
+        <VoiceStatus voice={voice} className="max-w-2xl mx-auto px-4 pt-1.5 short:hidden" />
         <form
           className="max-w-2xl mx-auto px-3 py-2 short:py-1.5 flex items-end gap-2 relative"
           onSubmit={(e) => {
@@ -160,6 +172,7 @@ const Composer = memo(
             rows={1}
             value={input}
             onChange={(e) => {
+              voice.noteManualEdit()
               setInput(e.target.value)
               setDropdownOpen(true)
               setActiveIndex(-1)
@@ -184,18 +197,19 @@ const Composer = memo(
               }
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault()
-                if (showDropdown && activeIndex >= 0 && completions[activeIndex]) send(completions[activeIndex].text)
+                if (showDropdown && activeIndex >= 0 && completions[activeIndex]) send(completions[activeIndex].text, false)
                 else send()
               }
             }}
-            placeholder="Ask Donovan…"
+            placeholder={voice.listening ? 'Listening…' : 'Ask Donovan…'}
             enterKeyHint="send"
             autoComplete="off"
             className="flex-1 min-h-12 resize-none rounded-2xl bg-surface-2 text-ink px-4 py-3 placeholder:text-ink-3 border border-transparent focus:outline-none focus:border-accent"
           />
           {showDropdown && (
-            <TypeaheadDropdown items={completions} activeIndex={activeIndex} onHover={setActiveIndex} onSelect={(text) => send(text)} />
+            <TypeaheadDropdown items={completions} activeIndex={activeIndex} onHover={setActiveIndex} onSelect={(text) => send(text, false)} />
           )}
+          <VoiceMicButton voice={voice} className="!w-12 !h-12 shrink-0 !rounded-full" />
           <button
             type="submit"
             disabled={busy || !input.trim()}
@@ -229,13 +243,14 @@ const TurnView = memo(function TurnView({
   const serverDidYouMean = useDidYouMean(turn.answer?.kind === 'no-answer' ? turn.question : null)
   // R24: a near-miss customer name ("Did you mean Sandra Wyckoff?") becomes a one-tap corrected re-ask.
   const nearMiss = useMemo(() => nearMissRetryChips(turn.question, turn.answer?.text), [turn.question, turn.answer?.text])
-  const didYouMean = nearMiss.length ? nearMiss : serverDidYouMean
+  const entityChips = useMemo(() => (turn.answer?.entityChoices ? turn.answer.entityChoices.chips.map((c) => ({ ...c, heading: turn.answer!.entityChoices!.heading })) : []), [turn.answer])
+  const didYouMean = entityChips.length ? entityChips : nearMiss.length ? nearMiss : serverDidYouMean
   return (
     <div className="grid grid-cols-1 gap-2 min-w-0 scroll-mt-3" data-turn={turn.id}>
       <div className="justify-self-end max-w-[85%] px-4 py-2.5 rounded-2xl rounded-br-md bg-forest-600 text-stone-0 text-body-lg break-words">{turn.question}</div>
       {turn.answer && (turn.answer.help ? <HelpAnswerCard answer={turn.answer} variant="mobile" /> : <MobileAnswer question={turn.question} answer={turn.answer} onOpenDoc={onOpenDoc} onOpenCustomer={onOpenCustomer} onAsk={onAsk} />)}
       {turn.answer?.helpHint && turn.answer.kind === 'no-answer' && <HelpHint variant="mobile" />}
-      {(turn.answer?.kind === 'no-answer' || nearMiss.length > 0) && didYouMean.length > 0 && <DidYouMeanChips chips={didYouMean} onPick={onAsk} />}
+      {(turn.answer?.kind === 'no-answer' || nearMiss.length > 0 || entityChips.length > 0) && didYouMean.length > 0 && <DidYouMeanChips chips={didYouMean} onPick={onAsk} />}
       {turn.error && (
         <div role="alert" className="rounded-2xl bg-bad-bg text-bad-ink p-4 text-body grid gap-2">
           <span>{turn.error}</span>
@@ -337,9 +352,11 @@ export const AskTab = memo(function AskTab({
     scrollRef.current?.querySelector(`[data-turn="${lastId}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' })
   }, [lastId])
 
-  const submit = useCallback(async (q: string) => {
+  const submit = useCallback(async (q: string, voice = false) => {
     const question = q.trim()
     if (!question) return
+    // Dictated: the bubble keeps the transcript as heard; spoken numbers are tidied only in what is sent.
+    const sent = voice ? normalizeSpoken(question).text : question
     const id = nextId.current++
     setTurns((t) => [...t, { id, question }])
     setInFlight((n) => n + 1)
@@ -349,11 +366,11 @@ export const AskTab = memo(function AskTab({
     // Captured before this turn is added — prior turns only, per composeFollowup's contract.
     const priorTurns = contextTurns
     try {
-      const answer = await ask(question, { signal: controller.signal, conversationContext: { turns: priorTurns } })
+      const answer = await ask(sent, { signal: controller.signal, ...(voice ? { inputMode: 'voice' as const } : {}), conversationContext: { turns: priorTurns } })
       // The answer card (headline, citations, trust row, hero, chips) mounts as a transition: its render is time-sliced
       // instead of one long task when the response lands.
       startTransition(() => update(id, { answer }))
-      setContextTurns((t) => [...t, turnFrom(question, answer)].slice(-MAX_CONTEXT_TURNS))
+      setContextTurns((t) => [...t, turnFrom(sent, answer)].slice(-MAX_CONTEXT_TURNS))
     } catch (err) {
       const aborted = controller.signal.aborted
       const message = aborted
@@ -371,7 +388,7 @@ export const AskTab = memo(function AskTab({
     }
   }, [contextTurns])
 
-  const send = useCallback((q: string) => void submit(q), [submit])
+  const send = useCallback((q: string, voice?: boolean) => void submit(q, voice), [submit])
 
   return (
     <div className="h-full flex flex-col">

@@ -298,6 +298,8 @@ export interface Answer {
   help?: { article: string; title: string; entry: string };
   /** Round 29: a no-answer to what looks like an app how-to question; the UI points to the Help chat. */
   helpHint?: boolean;
+  /** Entity safety: tappable customer choices. heading "Did you mean" (several / close customers) or "Not this customer?" (after "Showing results for ..."); a tap re-asks `text`. */
+  entityChoices?: { heading: string; chips: { text: string; label: string; detail: string }[]; match?: { id: string; name: string; address: string; typed: string } };
 }
 
 /**
@@ -325,6 +327,12 @@ export interface AskOptions {
    * layer) simply never calls it — this is cosmetic only, never load-bearing for the answer itself.
    */
   onStep?: (step: { message: string }) => void;
+  /**
+   * How the question was entered. "voice" = dictated through the browser's speech recognition, so names and
+   * addresses may be misspelled: the server shows a "Did you mean...?" suggestion more readily and never guesses
+   * silently. Omitted for typed questions, so every existing caller is unchanged.
+   */
+  inputMode?: 'voice';
   /** The prior turns in this thread, so a follow-up like "and last year?" composes with them. */
   conversationContext?: ConversationContext;
   /** Cancels the in-flight request (the mobile app's slow-network timeout). */

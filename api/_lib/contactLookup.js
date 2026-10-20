@@ -53,6 +53,7 @@ import { fetchFileData, attachFileSummary, fetchNotes, buildNotesAnswer } from "
 import { citeNotes } from "./citations/history.js"; // TEAM C
 // TEAM E (2026-09-24): full-name (not just surname) typo tolerance — see tokenFuzzyMatches below.
 import { damerauLevenshteinDistance } from "./integrity.js";
+import { entityHintFor } from "./entities/entityGate.js";
 import { typoAutoResolveEnabled, decideTypoResolution, isQuotedAsTyped, recordTypoResolution, withTypoNote } from "./lookups/typoResolve.js";
 import { nicknameCandidateRows, nicknamesEnabled, isKnownFirstName } from "./vocab/nicknames.js";
 import { isGivenName } from "./lookups/commonWords.js";
@@ -1760,6 +1761,19 @@ const FUZZY_SCAN_LIMIT = 3000;
 export async function resolveContactCandidatesDetailed(db, namePhrase) {
   const searchTokens = nameTokens(namePhrase);
   if (!searchTokens.length) return { rows: [], tier: 'none' };
+
+  // ENTITY SAFETY (entities/entityGate.js): the gate already resolved WHICH customer this name phrase means (verbatim spelling, the only fit, or a unique
+  // misspelling with a large margin). Use that customer, so a name that is the front of a longer one ("ABC Plumbing" in "ABC Plumbing & Heating"),
+  // a missing period or a "Last, First" order can never land on a look-alike.
+  const hinted = entityHintFor(namePhrase);
+  if (hinted) {
+    const { rows: pinned } = await db.raw(
+      `SELECT ${CUSTOMER_ROW_COLUMNS} FROM entities WHERE id = $1 AND entity_type = 'customer' AND merged_into IS NULL AND ${TENANT_SQL}`, [hinted.target.id]);
+    if (pinned.length === 1) {
+      if (hinted.typo && typoAutoResolveEnabled()) recordTypoResolution(hinted.text, pinned[0].customer_name);
+      return { rows: pinned, tier: 'exact' };
+    }
+  }
 
   const { rows: exact } = await db.raw(
     `SELECT ${CUSTOMER_ROW_COLUMNS}

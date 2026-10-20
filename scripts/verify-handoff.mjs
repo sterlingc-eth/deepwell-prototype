@@ -38,6 +38,8 @@ if (!CHILD) {
   // Reader V2 answer fit: a broad answer where one fact was asked goes to Claude instead
   check("V2 fit: 'who is at this address' is not an answer to a question about the compressor", !A.answerFits("has this unit had a compressor replaced? 174 n college ave, mesa, az 85201", { intent: "who_addr" }) && !A.answerFits("do we have the permit for the mesa install at 174 n college ave", { intent: "who_addr" }));
   check("V2 fit: a real who-question still fits", A.answerFits("cust at 618 n power rd casa grande", { intent: "who_addr" }) && A.answerFits("who is staying at 6940 S Kingfisher Ct", { intent: "who_addr" }) && A.answerFits("total on er-1896", { intent: "total" }));
+  const AM = await import("../api/_lib/lookups/addressMiss.js");
+  check("address-miss: a year after a written date ('from august 18, 2022 take place') is not a street address", AM.extractAddressPhrase("when did cobalt trust west's broker commission agreement from august 18, 2022 take place") === null && AM.extractAddressPhrase("what is the serial number at 6940 S Kingfisher Ct")?.number === "6940");
   const U = await import("../api/_lib/lookups/unknownName.js");
   check("unknown-name gate: 'for the newsletter' is not a person nobody has heard of", U.extractNamePhrase("List customers missing a phone number for the newsletter") == null && U.extractNamePhrase("phone number for Zelda Pemberton") === "Zelda Pemberton");
 }

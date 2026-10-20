@@ -99,6 +99,8 @@ function normalizeNamePlain(raw) {
 }
 
 const HONORIFICS = new Set(['mr', 'mrs', 'ms', 'dr', 'the']);
+/** Generation suffixes: always part of identity (a father and son are two customers). */
+export const GENERATION_TOKENS = new Set(['jr', 'sr', 'ii', 'iii', 'iv']);
 
 /**
  * Business suffix / generic words. They describe the KIND of organisation, not
@@ -259,6 +261,8 @@ export function planAddressPlaceholderAbsorptions(customers) {
   const named = rows.filter((c) => !c.isPlaceholder);
   const placeholders = rows.filter((c) => c.isPlaceholder && !c.isLocked);
 
+  // ENTITY SAFETY: unit and city are part of the address. A placeholder is only ever absorbed into a customer at the SAME unit in the SAME city.
+  const sameSite = (x, y) => normalizeUnitKey(x) === normalizeUnitKey(y) && cityOfAddress(x) && cityOfAddress(x) === cityOfAddress(y);
   const namedByStreet = new Map();
   for (const c of named) {
     const key = normalizeAddressKey(c.address);
@@ -271,11 +275,7 @@ export function planAddressPlaceholderAbsorptions(customers) {
   for (const p of placeholders) {
     const key = normalizeAddressKey(p.address);
     if (!key) continue;
-    let candidates = namedByStreet.get(key) ?? [];
-    if (candidates.length > 1) {
-      const unitKey = normalizeUnitKey(p.address);
-      candidates = unitKey ? candidates.filter((c) => normalizeUnitKey(c.address) === unitKey) : [];
-    }
+    const candidates = (namedByStreet.get(key) ?? []).filter((c) => sameSite(c.address, p.address));
     if (candidates.length === 1) plans.push({ keepId: candidates[0].id, dropId: p.id });
   }
   return plans;
@@ -444,11 +444,21 @@ export function compareNamesStrict(a, b) {
     const ta2 = na.split(' ').filter(Boolean);
     const tb2 = nb.split(' ').filter(Boolean);
     const [sh, lo] = ta2.length <= tb2.length ? [ta2, new Set(tb2)] : [tb2, new Set(ta2)];
-    if (sh.length < Math.max(ta2.length, tb2.length) && nameCoreTokens(sh.join(' ')).length >= 2 && sh.every((t) => lo.has(t))) return 'subset';
+    if (sh.length < Math.max(ta2.length, tb2.length) && nameCoreTokens(sh.join(' ')).length >= 2 && sh.every((t) => lo.has(t))) {
+      // ENTITY SAFETY: "Desert Ridge Dental" vs "Desert Ridge Dental LLC" is one business; "... Dental Hygiene Center" adds words that are not a suffix - only a hint
+      const shSet = new Set(sh); const extra = [...lo].filter((t) => !shSet.has(t));
+      return extra.every((t) => BUSINESS_SUFFIXES.has(t)) ? 'subset' : 'partial';
+    }
     if (isBusinessName(a) && isBusinessName(b)) {
       const ca = new Set(nameCoreTokens(a));
       const cb = new Set(nameCoreTokens(b));
-      if (ca.size && ca.size === cb.size && [...ca].every((t) => cb.has(t))) return 'subset';
+      if (ca.size && ca.size === cb.size && [...ca].every((t) => cb.has(t))) {
+        // ENTITY SAFETY: the same identifying word with a DIFFERENT trade / kind word ("ABC Plumbing" / "ABC Plumbing & Heating") is only a hint; only legal
+        // suffixes (LLC, Inc, Co ...) and glue may differ for a match a machine acts on
+        const full = (raw) => new Set(nameTokens(raw).filter((t) => !LEGAL_SUFFIXES.has(t) && t !== 'and' && t !== 'of' && t !== 'the'));
+        const fa = full(a); const fb = full(b);
+        return fa.size === fb.size && [...fa].every((t) => fb.has(t)) ? 'subset' : 'partial';
+      }
     }
     return 'no-match';
   }
@@ -456,9 +466,16 @@ export function compareNamesStrict(a, b) {
   const tb = nb.split(' ').filter(Boolean);
   const setA = new Set(ta);
   const setB = new Set(tb);
+  // ENTITY SAFETY (owner rule 2026-10-19: similar names must always be told apart): a generation suffix (Jr / Sr / II / III / IV) and a middle initial are
+  // part of WHO someone is. A father and his son, or "John A. Smith" and "John B. Smith", are never the same customer; "John Smith" next to
+  // "John A. Smith" may be, so that is only a hint ('initial'), never a match a machine acts on.
+  const genA = ta.filter((t) => GENERATION_TOKENS.has(t)).join(','); const genB = tb.filter((t) => GENERATION_TOKENS.has(t)).join(',');
+  if (genA !== genB) return 'no-match';
+  const iniA = ta.filter((t) => t.length === 1); const iniB = tb.filter((t) => t.length === 1);
+  if (iniA.length && iniB.length && iniA.join(',') !== iniB.join(',')) return 'no-match';
   if (setA.size === setB.size && [...setA].every((t) => setB.has(t))) return 'equal';
-  if (ta.length < tb.length && ta.every((t) => setB.has(t))) return 'subset';
-  if (tb.length < ta.length && tb.every((t) => setA.has(t))) return 'subset';
+  if (ta.length < tb.length && ta.every((t) => setB.has(t))) return tb.filter((t) => !setA.has(t)).every((t) => t.length === 1) ? 'initial' : 'subset';
+  if (tb.length < ta.length && tb.every((t) => setA.has(t))) return ta.filter((t) => !setB.has(t)).every((t) => t.length === 1) ? 'initial' : 'subset';
   const sa = normalizeSurname(a);
   const sb = normalizeSurname(b);
   if (sa && sb && sa === sb) return 'surname';
@@ -588,6 +605,8 @@ function describeMatch({ addrMatch, nameRel, evidence }) {
   else if (nameRel === 'subset') bits.push('one name is part of the other');
   else if (nameRel === 'surname') bits.push('same surname, different first name');
   else if (nameRel === 'surname-fuzzy') bits.push('surname is a likely misspelling of the other');
+  else if (nameRel === 'initial') bits.push('one name has a middle initial the other lacks');
+  else if (nameRel === 'partial') bits.push('one name adds words the other lacks');
   let base = bits.join(' and ') || (addrMatch ? 'same address' : 'possible match');
   base = base.charAt(0).toUpperCase() + base.slice(1);
   const missingBits = evidence.missing.map((k) => `${k} missing on one record`);
@@ -725,13 +744,18 @@ export function evaluateCustomerMatch(a, b, ctx) {
   const addrMatch = evidence.matches.includes('street');
   const nameRel = compareNamesStrict(a?.name, b?.name);
   const nameIsFull = nameRel === 'equal' || nameRel === 'subset';
-  const nameIsWeakHint = nameRel === 'surname' || nameRel === 'surname-fuzzy' || nameRel === 'unknown';
+  const nameIsWeakHint = nameRel === 'surname' || nameRel === 'surname-fuzzy' || nameRel === 'unknown' || nameRel === 'initial' || nameRel === 'partial';
 
   let score;
   if (addrMatch) score = nameIsFull ? 0.97 : nameIsWeakHint ? 0.6 : 0.3;
   else score = nameIsFull ? 0.55 : 0;
 
-  const tier = addrMatch && nameIsFull && contactConfirmed(a, b, evidence) ? 'auto' : 'suggest';
+  // ENTITY SAFETY: the same street line with a unit (or a city) on ONE side only is not the same place - "100 Main St Apt 2" vs "100 Main St", or the
+  // same street in a city on one side and no city on the other. Never an automatic match; a human may still be shown it as a suggestion.
+  const incompleteAddress = addrMatch && (evidence.missing.includes('unit') || evidence.missing.includes('city'));
+  if (incompleteAddress) score = Math.min(score, 0.85);
+
+  const tier = addrMatch && nameIsFull && !incompleteAddress && contactConfirmed(a, b, evidence) ? 'auto' : 'suggest';
   return { score, tier, evidence, reason: describeMatch({ addrMatch, nameRel, evidence }) };
 }
 
@@ -1192,7 +1216,22 @@ export function customerConflicts(a, b) {
   if (pa && pb && pa !== pb) out.push('phone');
   const ea = normalizeEmailKey(a?.email); const eb = normalizeEmailKey(b?.email);
   if (ea && eb && ea !== eb) out.push('email');
-  if (!isBusinessName(a?.name) && !isBusinessName(b?.name)) {
+  // ENTITY SAFETY: a different street, unit or city is a different customer - for a person AND for a business with the same name (two "Sun Valley Auto" in two cities).
+  // A unit or city on ONE side only is not proof of the same place either.
+  // Exception: one BUSINESS that shares its own email or phone is one company with several sites (the human still confirms the merge).
+  const sharedContact = (pa && pa === pb) || (ea && ea === eb);
+  if (sharedContact && isBusinessName(a?.name) && isBusinessName(b?.name) && !out.length) return out;
+  const sa = normalizeAddressKey(a?.address); const sb = normalizeAddressKey(b?.address);
+  if (sa && sb && sa !== sb) out.push('street');
+  if (sa && sb && sa === sb) {
+    if (normalizeUnitKey(a?.address) !== normalizeUnitKey(b?.address)) out.push('unit');
+    const ca = cityOfAddress(a?.address); const cb = cityOfAddress(b?.address);
+    if (ca !== cb && (ca || cb)) out.push('city');
+  } else if (!(sa && sb)) {
+    // no street on one side: only an explicit city disagreement counts
+    const ca = cityOfAddress(a?.address); const cb = cityOfAddress(b?.address);
+    if (ca && cb && ca !== cb) out.push('city');
+  } else {
     const ca = cityOfAddress(a?.address); const cb = cityOfAddress(b?.address);
     if (ca && cb && ca !== cb) out.push('city');
   }
@@ -1354,7 +1393,8 @@ export function findExistingCustomerForCreate(candidate, existing, { ownNames = 
     if (!e?.id || !e.name) continue;
     const sameName = customerNameKey(e.name) === key;
     const sameContact = (ce && ce === normalizeEmailKey(e.email)) || (cp && cp === phoneKeyOf(e.phone));
-    if (!sameName && !(sameContact && compareNamesStrict(cand.name, e.name) !== 'no-match' && compareNamesStrict(cand.name, e.name) !== 'unknown')) continue;
+    const rel = sameName ? 'equal' : compareNamesStrict(cand.name, e.name);
+    if (!sameName && !(sameContact && (rel === 'equal' || rel === 'subset'))) continue; // ENTITY SAFETY: a shared phone never makes "Jon" and "John", or Jr and Sr, one customer
     if (customerConflicts(cand, e).length) continue;
     hits.push({ e, basis: sameName ? (sameContact ? 'name-and-contact' : 'name') : 'contact' });
   }

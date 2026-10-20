@@ -32,10 +32,29 @@ export function SamplePromptChips({ prompts, onPick }: { prompts: SamplePrompt[]
  *  tenant's own vocabulary, or the same question with a real customer/address added. */
 export function DidYouMeanChips({ chips, onPick }: { chips: DidYouMeanChip[]; onPick: (q: string) => void }) {
   if (!chips.length) return null;
+  const rich = chips.some((c) => c.label);
   return (
     <div className="space-y-2">
       <h3 className="dw-label">{chips[0]?.heading ?? 'Did you mean'}</h3>
-      <ChipRow items={chips.map((c) => c.text)} onPick={onPick} />
+      {rich ? (
+        <ul className="flex flex-wrap gap-2" data-testid="entity-choices">
+          {chips.map((c) => (
+            <li key={c.text}>
+              <button
+                type="button"
+                onClick={() => onPick(c.text)}
+                data-tap-target="true"
+                className="min-h-11 px-3.5 py-2 text-left font-normal rounded-xl border border-line-2 bg-surface text-body text-ink-2 hover:text-ink hover:bg-surface-2 transition-colors duration-quick"
+              >
+                <span className="block font-medium text-ink">{c.label ?? c.text}</span>
+                {c.detail && <span className="block text-caption text-ink-3">{c.detail}</span>}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <ChipRow items={chips.map((c) => c.text)} onPick={onPick} />
+      )}
     </div>
   );
 }

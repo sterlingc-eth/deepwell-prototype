@@ -1185,7 +1185,7 @@ export function selectCustomerMatch(candidates, incoming) {
   if (!address) {
     // No address to disambiguate with. Only a single same-named candidate is
     // safe, and even that is a judgement call — see the header note.
-    return candidates.length === 1 ? candidates[0] : (sameCustomerTwin(candidates, { name, phone, email }) ?? null);
+    return candidates.length === 1 ? candidates[0] : (sameCustomerTwin(candidates, { name, phone, email, address }) ?? null);
   }
 
   // The incoming document HAS an address, so require a positive match on it.
@@ -1220,7 +1220,8 @@ export function selectCustomerMatch(candidates, incoming) {
       const candidateName = normalizeCustomerNameText(c.data?.customer_name);
       if (!name || !candidateName) return true;
       const rel = compareNamesStrict(name, candidateName);
-      return rel === 'equal' || rel === 'subset' || rel === 'surname';
+      // ENTITY SAFETY: same surname alone (Ray / Linda Castillo, John / James Smith) is no longer enough to put a document on someone's file
+      return rel === 'equal' || rel === 'subset';
     }
     // Fuzzy path (2026-09-20, bug A): the same household under a differently
     // worded name/address — "Castillo" @ "1519 W Juniper" and "Ray & Linda
@@ -1241,7 +1242,7 @@ export function selectCustomerMatch(candidates, incoming) {
     return false;
   });
   if (eligible.length === 1) return eligible[0];
-  return sameCustomerTwin(candidates, { name, phone, email });
+  return sameCustomerTwin(candidates, { name, phone, email, address });
 }
 
 /**
@@ -1253,10 +1254,10 @@ export function selectCustomerMatch(candidates, incoming) {
  * (the privacy rule above), and a phone/email that disagrees always blocks.
  * Several equal candidates -> the lowest customer number (the main record).
  */
-export function sameCustomerTwin(candidates, { name = '', phone = '', email = '' } = {}) {
+export function sameCustomerTwin(candidates, { name = '', phone = '', email = '', address = '' } = {}) {
   if (!name || !candidates?.length) return null;
   const found = findExistingCustomerForCreate(
-    { name, phone, email },
+    { name, phone, email, address },
     candidates.map((c) => ({
       id: c.id, name: c.data?.customer_name, address: c.data?.service_address,
       phone: c.data?.phone, email: c.data?.email, customerNumber: c.customer_number,

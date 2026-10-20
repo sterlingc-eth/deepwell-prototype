@@ -86,7 +86,8 @@ const rec = (n: number, name: string, extra: Record<string, unknown> = {}) => ({
   check('create: same name with Inc/LLC/Co/case differences finds the existing record', f({ name: 'BRIGHTWATER PAINTING, LLC' })?.match?.id === 'e1');
   check('create: the same name but a different phone is not the same customer', f({ name: 'Brightwater Painting', phone: '(480) 555-0999' }) === null);
   check('create: same name and same phone is confirmed by contact', f({ name: 'Brightwater Painting', phone: '480-555-0100' })?.basis === 'name-and-contact');
-  check('create: a different spelling needs the same email or phone', f({ name: 'D. Whitfield', email: 'DANA@example.com' })?.match?.id === 'e2' && f({ name: 'D. Whitfield' }) === null);
+  // ENTITY SAFETY (owner policy): an initial is not the same person as a full first name, even with a shared email - a human decides
+  check('create: a different spelling needs the same email or phone', f({ name: 'Dana  Whitfield', email: 'DANA@example.com' })?.match?.id === 'e2' && f({ name: 'D. Whitfield', email: 'DANA@example.com' }) === null && f({ name: 'D. Whitfield' }) === null);
   check('create: the company\'s own name is refused as a customer', f({ name: 'Acme Co' }, { ownNames: ['Acme Company'] })?.kind === 'self');
   check('create: a brand-new name finds nothing', f({ name: 'Totally New Customer' }) === null);
 }
@@ -101,8 +102,8 @@ const RS: any = await import('../api/_lib/recordsStore.js');
   const people = [{ id: 'p1', customer_number: 'C-00001', data: { customer_name: 'Alex Rivera', service_address: '1 A St, Mesa, AZ 85201' } }];
   check('document match: two people of one name at different addresses stay separate (privacy rule kept)',
     RS.selectCustomerMatch(people, { name: 'Alex Rivera', address: '9 Z Ave, Tucson, AZ 85701' }) === null);
-  check('document match: the same person with the same email is matched even at a new address',
-    RS.selectCustomerMatch([{ id: 'p1', customer_number: 'C-00001', data: { customer_name: 'Alex Rivera', service_address: '1 A St, Mesa, AZ 85201', email: 'alex@example.com' } }], { name: 'Alex Rivera', address: '9 Z Ave, Tucson, AZ 85701', email: 'alex@example.com' })?.id === 'p1');
+  check('document match: the same person with the same email at a NEW address is NOT auto-matched (address is identity; a human merges)',
+    RS.selectCustomerMatch([{ id: 'p1', customer_number: 'C-00001', data: { customer_name: 'Alex Rivera', service_address: '1 A St, Mesa, AZ 85201', email: 'alex@example.com' } }], { name: 'Alex Rivera', address: '9 Z Ave, Tucson, AZ 85701', email: 'alex@example.com' }) === null);
 }
 
 /* ================================================================== database */
@@ -284,9 +285,10 @@ const beforeLinks = (await lite.query('SELECT count(*)::int AS n FROM document_e
   // document-driven: the same business named again with another site lands on the existing record
   const r1 = await withTenant(ctxA, (db: any) => db.findOrCreateCustomer({ customer_name: 'Verde Logistics Inc.', service_address: '1 New Dock Rd, Chandler, AZ 85224' }));
   const r2 = await withTenant(ctxA, (db: any) => db.findOrCreateCustomer({ customer_name: 'Verde Logistics Inc.', service_address: '2 Other Dock Rd, Tempe, AZ 85281' }));
-  check('document: a business named again with a new site is the same customer (no new record)', r1.created === false && r2.created === false && r1.id === r2.id, { r1, r2 });
+  // ENTITY SAFETY (owner policy): a new city/street with no shared phone or email is a separate record, never silently merged
+  check('document: a business named again at a different city with no shared contact is kept as its own record (human merges)', r1.created === false && r2.created === true && r1.id !== r2.id, { r1, r2 });
   const kept = (await lite.query('SELECT data FROM entities WHERE id = $1', [r1.id])).rows[0].data;
-  check('document: the first site is the address and the later site is kept as another address', /New Dock/.test(kept.service_address) && (kept.other_addresses ?? []).length === 1 && /Other Dock/.test(kept.other_addresses[0]), kept);
+  check('document: the first record keeps its own address and gains no foreign address', /New Dock/.test(kept.service_address) && !(kept.other_addresses ?? []).length, kept);
 }
 
 /* ---------- This is us ---------- */

@@ -141,9 +141,14 @@ export function nameRelation(aRaw, bRaw) {
   const b = parseNameTokens(bRaw);
   if (!a.tokens.length || !b.tokens.length) return { relation: 'unknown', hardNegative: false };
 
+  // ENTITY SAFETY: different generation suffix (or one-sided) = different person, however the rest of the name compares
+  if ((a.generation || b.generation) && a.generation !== b.generation) {
+    return { relation: sameTokenSet(a.tokens, b.tokens) ? 'equal' : 'no-match', hardNegative: true };
+  }
   const sameCore = sameTokenSet(a.tokens, b.tokens);
   if (sameCore) {
-    if (a.generation && b.generation && a.generation !== b.generation) {
+    // ENTITY SAFETY: Jr vs Sr, or a suffix on ONE side only ("John Smith" / "John Smith Jr."), is a different person (father and son)
+    if ((a.generation || b.generation) && a.generation !== b.generation) {
       return { relation: 'equal', hardNegative: true };
     }
     return { relation: 'equal', hardNegative: false };

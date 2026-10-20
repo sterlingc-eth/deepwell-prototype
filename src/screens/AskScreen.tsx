@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { ArrowRight, Camera, Clock, Loader2, X } from 'lucide-react';
+import { normalizeSpoken } from '../core/voiceNormalize';
 import { AppShell } from '../components/AppShell';
 import { DonovanMark } from '../components/DonovanMark';
 import { AnswerCard } from '../components/AnswerCard';
@@ -11,7 +12,7 @@ import type { Answer, AnswerRecord, SourceRef } from '../core/types';
 import { recordTarget } from '../core/citations';
 import { useGraph } from '../core/entityGraph';
 import { buildSuggestions, nearMissRetryChips, useDidYouMean, useSamplePrompts, useTypeahead } from '../core/suggestions';
-import { PreflightPill, SamplePromptChips, SamplePromptsPlaceholder, DidYouMeanChips, TypeaheadDropdown, turnFrom, type ThreadTurn } from '../components/ask';
+import { PreflightPill, SamplePromptChips, SamplePromptsPlaceholder, DidYouMeanChips, TypeaheadDropdown, turnFrom, useVoiceInput, VoiceMicButton, VoiceStatus, type ThreadTurn, type VoiceInput } from '../components/ask';
 import { ask, AskApiError } from '../services/answerService';
 import { friendlyErrorMessage } from '../services/httpError';
 import { useAppStore } from '../store/appStore';
@@ -89,7 +90,9 @@ export function AskScreen() {
   const serverDidYouMean = useDidYouMean(answer?.kind === 'no-answer' ? asked : null);
   // A near-miss customer name ("Did you mean Sandra Wyckoff?") becomes a one-tap corrected re-ask.
   const nearMiss = useMemo(() => nearMissRetryChips(asked, answer?.text), [asked, answer?.text]);
-  const didYouMean = nearMiss.length ? nearMiss : serverDidYouMean;
+  // Entity safety: "Did you mean..." customers (name, address, last 4 of phone, last job) or "Not this customer?" after a closest-match answer; a tap re-asks for that customer.
+  const entityChips = useMemo(() => (answer?.entityChoices ? answer.entityChoices.chips.map((c) => ({ ...c, heading: answer.entityChoices!.heading })) : []), [answer]);
+  const didYouMean = entityChips.length ? entityChips : nearMiss.length ? nearMiss : serverDidYouMean;
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const showDropdown = dropdownOpen && completions.length > 0;
@@ -111,11 +114,15 @@ export function AskScreen() {
     else openEntity(id);
   }, [entities, openCustomer, openEntity]);
   const requestId = useRef(0);
+  const askedVoice = useRef(false);
 
   const submit = useCallback(
-    async (question: string, opts: { record?: boolean } = {}) => {
+    async (question: string, opts: { record?: boolean; voice?: boolean } = {}) => {
       const q = question.trim();
       if (!q) return;
+      // Dictated: the transcript stays visible as typed/heard; spoken numbers ("twenty twenty five") are tidied only in what is sent.
+      const sent = opts.voice ? normalizeSpoken(q).text : q;
+      askedVoice.current = !!opts.voice;
       const id = ++requestId.current;
       setAsked(q);
       // Cleared, not repopulated: the asked question stays visible above the
@@ -131,8 +138,9 @@ export function AskScreen() {
       // Captured before this turn is added — the prior turns only, per composeFollowup's contract.
       const priorTurns = opts.record !== false ? thread : [];
       try {
-        const a = await ask(q, {
+        const a = await ask(sent, {
           includeUnverified,
+          ...(opts.voice ? { inputMode: 'voice' as const } : {}),
           conversationContext: { turns: priorTurns },
           onStep: (step) => {
             if (id === requestId.current) setSteps((prev) => [...prev, step.message]);
@@ -140,7 +148,7 @@ export function AskScreen() {
         });
         if (id === requestId.current) {
           setAnswer(a);
-          if (opts.record !== false) setThread((t) => [...t, turnFrom(q, a)].slice(-MAX_CONTEXT_TURNS));
+          if (opts.record !== false) setThread((t) => [...t, turnFrom(sent, a)].slice(-MAX_CONTEXT_TURNS));
         }
       } catch (e) {
         if (id === requestId.current) {
@@ -181,7 +189,7 @@ export function AskScreen() {
 
   // Toggling verified-only, or the records changing, re-asks the same question silently
   useEffect(() => {
-    if (asked) void submit(asked, { record: false });
+    if (asked) void submit(asked, { record: false, voice: askedVoice.current });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [includeUnverified, graphVersion]);
 
@@ -198,12 +206,27 @@ export function AskScreen() {
     el.style.height = `${el.scrollHeight}px`;
   }, [input]);
 
+  const entityList = useMemo(() => Object.values(entities), [entities]);
+  const voice: VoiceInput = useVoiceInput({
+    value: input,
+    setValue: setInput,
+    entities: entityList,
+    send: (text) => { voice.markSent(); void submit(text, { voice: true }); },
+  });
+  // One path for every "send what is in the box": a still-unedited dictated question goes as inputMode "voice".
+  const sendTyped = () => {
+    const isVoice = voice.dictated;
+    voice.markSent();
+    void submit(input, isVoice ? { voice: true } : {});
+  };
+
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
-    void submit(input);
+    void sendTyped();
   };
 
   const clear = () => {
+    voice.noteManualEdit();
     setInput('');
     setAsked(null);
     setAnswer(null);
@@ -246,6 +269,7 @@ export function AskScreen() {
               id="ask-input"
               value={input}
               onChange={(e) => {
+                voice.noteManualEdit();
                 setInput(e.target.value);
                 setDropdownOpen(true);
                 setActiveIndex(-1);
@@ -275,11 +299,13 @@ export function AskScreen() {
                   if (showDropdown && activeIndex >= 0 && completions[activeIndex]) {
                     selectCompletion(completions[activeIndex].text);
                   } else {
-                    void submit(input);
+                    sendTyped();
                   }
                 } else if (e.key === 'Escape') {
                   e.preventDefault();
-                  if (showDropdown) {
+                  if (voice.listening) {
+                    voice.toggle();
+                  } else if (showDropdown) {
                     setDropdownOpen(false);
                     setActiveIndex(-1);
                   } else if (input) {
@@ -287,12 +313,12 @@ export function AskScreen() {
                   }
                 }
               }}
-              placeholder="Ask Donovan anything — an address, a serial, a name, a question…"
+              placeholder={voice.listening ? 'Listening…' : 'Ask Donovan anything — an address, a serial, a name, a question…'}
               autoComplete="off"
               spellCheck={false}
               rows={1}
               enterKeyHint="search"
-              className="dw-input pr-[7.5rem] text-body-lg field:text-body-xl sm:text-[18px] sm:leading-7 sm:py-4 resize-none overflow-y-auto max-h-48"
+              className={`dw-input ${voice.enabled ? 'pr-[10.5rem]' : 'pr-[7.5rem]'} text-body-lg field:text-body-xl sm:text-[18px] sm:leading-7 sm:py-4 resize-none overflow-y-auto max-h-48`}
               style={{ minHeight: fieldMode ? 60 : 56 }}
             />
             {showDropdown && (
@@ -306,6 +332,7 @@ export function AskScreen() {
                   <X className="w-5 h-5" aria-hidden="true" />
                 </button>
               )}
+              <VoiceMicButton voice={voice} />
               <button type="button" onClick={() => setCapture(true)} aria-label="Enter a serial from a photo" title="Serial from photo" className="min-w-touch min-h-touch grid place-items-center text-ink-3 hover:text-ink rounded-md">
                 <Camera className="w-5 h-5" aria-hidden="true" />
               </button>
@@ -320,6 +347,7 @@ export function AskScreen() {
               : <><kbd className="dw-kbd">Enter</kbd> to ask · <kbd className="dw-kbd">Esc</kbd> to clear</>}
             {!loading && <PreflightPill hint={hint} />}
           </p>
+          <VoiceStatus voice={voice} />
           {loading && steps.length > 1 && (
             <ul className="space-y-1 pl-1" aria-hidden="true">
               {steps.slice(0, -1).map((s, i) => (
@@ -365,7 +393,7 @@ export function AskScreen() {
               onAsk={(q) => void submit(q)}
             />}
             {answer.helpHint && answer.kind === 'no-answer' && <HelpHint />}
-            {(answer.kind === 'no-answer' || nearMiss.length > 0) && didYouMean.length > 0 && (
+            {(answer.kind === 'no-answer' || nearMiss.length > 0 || entityChips.length > 0) && didYouMean.length > 0 && (
               <DidYouMeanChips chips={didYouMean} onPick={(q) => void submit(q)} />
             )}
           </>

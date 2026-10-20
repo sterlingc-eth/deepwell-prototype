@@ -117,6 +117,8 @@ export function createClaudeProvider(snapshot: () => GraphSnapshot, endpoint = '
           question,
           today: localYmd(opts?.now ?? new Date()),
           ...(wantStream ? { stream: true } : {}),
+          // Dictated question (src/core/dictation.ts): lets the server's entity gate offer "Did you mean...?" instead of guessing a misheard name. Absent for typed questions.
+          ...(opts?.inputMode === 'voice' ? { inputMode: 'voice' } : {}),
           // TEAM T2: only sent when the thread actually has a prior turn — see
           // api/_lib/conversation.js. Omitted entirely for a first/"New question" ask.
           // Sent on a streaming request exactly the same as a non-streaming one.
@@ -187,6 +189,11 @@ function normalizeAnswer(a: Partial<Answer>, g: GraphSnapshot): Answer {
   if (a.entityId && g.entities[a.entityId]) out.entityId = a.entityId;
   if (a.interpretation) out.interpretation = a.interpretation;
   if (a.helpHint === true && !facts.length) out.helpHint = true;
+  const ec = (a as { entityChoices?: Answer['entityChoices'] }).entityChoices;
+  if (ec && Array.isArray(ec.chips)) {
+    const chips = ec.chips.filter((c) => c && typeof c.text === 'string' && typeof c.label === 'string').slice(0, 6).map((c) => ({ text: c.text, label: c.label, detail: String(c.detail ?? '') }));
+    if (chips.length) out.entityChoices = { heading: String(ec.heading ?? 'Did you mean'), chips, ...(ec.match ? { match: ec.match } : {}) };
+  }
   if (a.help && typeof a.help.title === 'string' && typeof a.help.article === 'string') out.help = { article: a.help.article, title: a.help.title, entry: String(a.help.entry ?? '') };
   // Citation contract: the rows behind the answer + one sentence on how it was computed.
   const cite = normalizeCitations(a);

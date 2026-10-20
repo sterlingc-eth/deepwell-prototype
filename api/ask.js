@@ -40,7 +40,7 @@ import { isInstallDateExtremeQuestion } from "./_lib/analytics/detPlan.js";
 // to just call these functions directly, so a non-money question never touches it.
 // (isFinancialQuestion itself is now only called from classifyAll.js — see the router import below.)
 // TEAM C (citations everywhere): one citation contract for every answer kind (records / recordsTotal / basis).
-import { attachCitations, finalizeCitations, unitRecord, documentRecord } from "./_lib/citations/records.js";
+import { attachCitations, finalizeCitations, unitRecord, documentRecord, customerRecord } from "./_lib/citations/records.js";
 // Round 22 (S2, privacy): a fuzzy-typo correction pair (below) is a fragment of whatever a
 // technician actually typed — a customer surname, a street name — so it is hashed before it ever
 // reaches a route log, never printed raw. See api/_lib/privacy/redact.js's own module doc.
@@ -125,6 +125,7 @@ import { tryPropertyPack, isResidentTenantsQuestion } from "./_lib/lookups/prope
 import { parseCustomerCount, runCustomerCount } from "./_lib/lookups/namedCompare.js";
 import { buildClarifyAnswer, clarifyEnabled, ADDRESS_RE } from "./_lib/lookups/clarify.js";
 import { answerAddressConflict, softConflictNote } from "./_lib/addressConflict.js";
+import { entityGateEnabled, loadRoster, loadLastJobDates, analyzeQuestion, buildEntityClarifyAnswer, buildMatchNote, buildMatchChoices, decideEntityResponse, rewriteAddressForMatch, buildIdentityNote, buildModelEntityNote, setEntityHint, verifyAnswer, describeCustomer } from "./_lib/entities/entityGate.js"; // ENTITY SAFETY: similar names / addresses are always told apart
 import { releaseEscalationEnabled, isFinalDecline, isEscalatableRelease, releaseCause, markFinal, stripReleaseMarker } from "./_lib/router/releaseGate.js"; // HANDOFF: a release always goes to the Claude path unless the decline is verified-final
 import { readerV2Wanted, readerV2LiveOn, readerV2ShadowOn, readerV2Hook } from "./_lib/dql/reader-v2/gate.js"; // Donovan Reader V2: DONOVAN_READER_V2 / DONOVAN_READER_V2_SHADOW, both OFF unless set
 import { capInlineNameList } from "./_lib/router/brevity.js";
@@ -911,10 +912,47 @@ export default async function handler(req, res) {
   // (agent / retrieval+model), unless the decline is FINAL (verified absent from this company's records, or a policy / privacy refusal). The decline is only the fallback.
   let releaseEscalate = null;      // set below, once tryAgent / retrievalAndModel exist
   const release = { tried: false, active: false, delivered: false, held: null, pendingClarify: null, modelTouched: false };
+  // ENTITY SAFETY (api/_lib/entities/entityGate.js): what the question names, from THIS organization's own customer roster. Every answer that goes out is checked against it.
+  let entityGate = null; // { analysis, roster, question, tenantCtx }
+  let entityNoteMemo = null;
+  const entityNoteForModel = async () => {
+    const g = entityGate; if (!g) return "";
+    if (entityNoteMemo != null) return entityNoteMemo;
+    const a = g.analysis; const ids = [...a.singles, ...(a.ambiguous?.targets ?? []), ...a.lookAlikes].slice(0, 12).map((c) => c.id);
+    let lastJobs = new Map(); try { lastJobs = await withTenant(g.tenantCtx, (db) => loadLastJobDates(db, ids)); } catch { /* names and addresses are enough */ }
+    entityNoteMemo = buildModelEntityNote(a, lastJobs);
+    return entityNoteMemo;
+  };
+  const entityGateCheck = async (b) => {
+    const g = entityGate; const d = b?.data;
+    if (!g || !d || typeof d !== "object" || d.kind !== "answer" || d.clarify || !g.analysis.singles.length) return b;
+    const v = verifyAnswer(d, g.analysis, g.roster);
+    if (!v.ok) {
+      const cands = [...g.analysis.singles, ...v.conflicts];
+      console.log(JSON.stringify({ route: "ask", entity_gate: { conflict: true, targets: g.analysis.singles.length, lookalikes: v.conflicts.length } }));
+      let lastJobs = new Map(); try { lastJobs = await withTenant(g.tenantCtx, (db) => loadLastJobDates(db, cands.map((c) => c.id))); } catch { /* names and addresses are enough */ }
+      const m = g.analysis.mentions.find((x) => x.status === "single") ?? { text: g.analysis.singles[0].name };
+      const clar = buildEntityClarifyAnswer(g.question, m, cands, lastJobs);
+      // not final: the Claude path gets the question (releaseGate); this "which one?" with details is the fallback
+      return { ...b, data: { ...clar, kind: "no-answer", clarifyReason: "entity-conflict" } };
+    }
+    if (g.match && !d.entityChoices) {
+      // one visible statement of the match: this one (name + address + what was typed) replaces the plain "Showing results for X (you typed ...)" of the typo lane
+      d.text = `${buildMatchNote(g.match)} ${String(d.text ?? "").replace(/^Showing results for .+? \(you typed "[^"]+"\)\.\s*/, "")}`.trim();
+      d.entityChoices = buildMatchChoices(g.match.origQuestion ?? g.question, g.match, g.matchLastJobs ?? new Map());
+    }
+    if (g.analysis.confusable.size && !/\n\nThat is /.test(String(d.text ?? ""))) {
+      const neighbors = [...g.analysis.confusable].map((id) => g.roster.byId.get(id)).filter(Boolean);
+      let lastJobs = new Map(); try { lastJobs = await withTenant(g.tenantCtx, (db) => loadLastJobDates(db, [...g.analysis.singles, ...neighbors.slice(0, 4)].map((c) => c.id))); } catch { /* no date */ }
+      d.text = `${d.text ?? ""}${buildIdentityNote(g.analysis.singles, neighbors, lastJobs)}`;
+    }
+    return b;
+  };
   const releaseOn = () => releaseEscalationEnabled() && (!scorecardCall || scorecardCall.releaseEscalation === true);
   const send = async (status, body) => {
     // while the escalation runs, an ANSWER is delivered at once; a decline is held (the original decline, or the chips, is the fallback)
     if (release.active && status === 200) {
+      if (body?.data && body.data.kind !== "no-answer" && entityGate) { const chk = await entityGateCheck(body); if (chk !== body || chk.data?.kind === "no-answer") { release.held = chk; return undefined; } }
       if (body?.data && body.data.kind !== "no-answer") { release.delivered = true; release.active = false; stripReleaseMarker(body.data); return sendBase(status, body); }
       release.held = body; return undefined;
     }
@@ -925,6 +963,7 @@ export default async function handler(req, res) {
       if (readerV2LiveOn() && b?.data?.kind === "no-answer" && !isFinalDecline(b.data)) b = await readerV2Hook(readerV2Ctx, b);
       else if (readerV2ShadowOn()) v2ShadowLater = true;
     }
+    if (status === 200 && entityGate) b = await entityGateCheck(b);
     if (status === 200 && releaseEscalate && !release.tried && releaseOn() && isEscalatableRelease(b?.data, { touched: release.modelTouched })) {
       release.tried = true; release.active = true; release.delivered = false; release.held = null;
       const cause = releaseCause(b.data);
@@ -981,6 +1020,8 @@ export default async function handler(req, res) {
 
   try {
     let { question, today, conversationContext } = req.body ?? {};
+    // VOICE: "voice" when the question was dictated (spoken names are often misspelled), else "typed". Only these two values pass.
+    const inputMode = req.body?.inputMode === "voice" ? "voice" : "typed";
     if (typeof question !== "string" || !question.trim()) {
       return res.status(400).json({ error: "Missing question" });
     }
@@ -1075,6 +1116,37 @@ export default async function handler(req, res) {
     }
 
     const ctxArg = { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId };
+    // ENTITY SAFETY: which customer(s) does the question name? Several fit -> "which one?" with address / phone / last job of each, never a guess.
+    setEntityHint(null);
+    if (entityGateEnabled()) {
+      try {
+        const roster = await timer.time("entity_roster", () => withTenant(ctxArg, (db) => loadRoster(db, auth.tenantId)));
+        const analysis = analyzeQuestion(question, roster);
+        if (analysis.mentions.length || analysis.address) { entityGate = { analysis, roster, question, tenantCtx: ctxArg, inputMode }; setEntityHint(analysis, auth.tenantId); }
+        // "which one?" (several fit) / "Did you mean...?" (close names, a dictated or mistyped name, a near address) / "no customer by that name" + closest names.
+        // A dictated question prefers a suggestion to answering on any match that is not the name as stored.
+        const decision = decideEntityResponse(analysis, roster, { inputMode });
+        if (decision.action === "clarify") {
+          const m = decision.mention;
+          const cands = decision.cands;
+          const lastJobs = await withTenant(ctxArg, (db) => loadLastJobDates(db, cands.slice(0, 6).map((c) => c.id))).catch(() => new Map());
+          console.log(JSON.stringify({ route: "ask", entity_gate: { ambiguous: decision.variant, candidates: cands.length, input: inputMode } }));
+          return send(200, { success: true, data: attachCitations(buildEntityClarifyAnswer(question, m, cands, lastJobs, decision.variant), { records: cands.slice(0, 6).map((c) => customerRecord({ id: c.id, customer_name: c.name, service_address: c.address, customer_number: c.number })), total: cands.length, claimedCount: cands.length, basis: `${decision.variant === "nomatch" || decision.variant === "address-near" || decision.variant === "confirm" ? "Nothing matched exactly; these are the closest customers on file. " : "Several customers fit what you typed; pick one. "}Nothing was answered until you do.` }) });
+        }
+        if (decision.action === "note") {
+          // ONE clear match that is not the name as stored: answer for that customer and say so on the answer (entityGateCheck adds the note + "Not this customer?")
+          const match = { ...decision.match, origQuestion: question };
+          if (match.kind === "address") {
+            question = rewriteAddressForMatch(question, match); // the lanes below see the exact stored address, not the mistyped street
+            const a2 = analyzeQuestion(question, roster);
+            entityGate = { analysis: a2, roster, question, tenantCtx: ctxArg, inputMode }; setEntityHint(a2, auth.tenantId);
+          }
+          if (entityGate) entityGate.match = match;
+          if (entityGate) entityGate.matchLastJobs = await withTenant(ctxArg, (db) => loadLastJobDates(db, [match.target, ...(match.others ?? [])].map((c) => c.id))).catch(() => new Map());
+          console.log(JSON.stringify({ route: "ask", entity_gate: { closest_match: match.kind, others: (match.others ?? []).length } }));
+        }
+      } catch (err) { console.error("entity gate failed, continuing without it:", err?.message); entityGate = null; }
+    }
     const meta0 = classifyMetaQuestion(question);
     const meta = meta0 && meta0.kind === 'count' && amountMentioned(question) ? null : meta0; // R40: a count of ALL invoices is never the answer to a question that named an amount
     if (!meta && earlyDeclineEnabled()) {
@@ -1468,12 +1540,12 @@ export default async function handler(req, res) {
         if (!result) {
           const deadlineAt = Math.min(requestStartedAt + budgetMs, scorecardCall?.deadlineAt ?? Infinity);
           result = researchV2Enabled
-            ? await timer.time("agent", () => researchAgentModule.runResearchAgent({ withTenant, ctxArg, question, today: todayResolved, overlay, deadlineAt, onEvent }))
-            : await timer.time("agent", () => agentModule.runDonovanAgent({ withTenant, ctxArg, question, today: todayResolved, overlay, deadlineAt, escalate: scorecardCall?.escalate === true }));
+            ? await timer.time("agent", async () => researchAgentModule.runResearchAgent({ withTenant, ctxArg, question: question + (await entityNoteForModel()), today: todayResolved, overlay, deadlineAt, onEvent }))
+            : await timer.time("agent", async () => agentModule.runDonovanAgent({ withTenant, ctxArg, question: question + (await entityNoteForModel()), today: todayResolved, overlay, deadlineAt, escalate: scorecardCall?.escalate === true }));
           // HANDOFF: the research agent's own daily cap (DONOVAN_RESEARCH_DAILY_USD) is spent: the cheaper Haiku agent still reads the records, instead of the question having no agent at all today
           if (researchV2Enabled && !result?.handled && String(result?.reason ?? "").startsWith("budget:")) {
             console.log(JSON.stringify({ route: "ask", research_cap_fallback: "haiku-agent" }));
-            result = await timer.time("agent", () => agentModule.runDonovanAgent({ withTenant, ctxArg, question, today: todayResolved, overlay, deadlineAt, escalate: false }));
+            result = await timer.time("agent", async () => agentModule.runDonovanAgent({ withTenant, ctxArg, question: question + (await entityNoteForModel()), today: todayResolved, overlay, deadlineAt, escalate: false }));
           }
         }
       } catch (err) {
@@ -1695,6 +1767,7 @@ export default async function handler(req, res) {
     const questionText = buildQuestionBlock({
       question,
       today: todayResolved,
+      entityNote: await entityNoteForModel(), // ENTITY SAFETY: who is meant + the look-alikes (empty when the question names no customer)
     });
 
     const { tools: cachedTools, system: cachedSystem, messageBlocks: cachedContent } = planCacheBreakpoints(

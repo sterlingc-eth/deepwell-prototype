@@ -25,6 +25,8 @@ export function extractAddressPhrase(question) {
   const q = String(question ?? "");
   const m = ADDRESS_RE.exec(q);
   if (!m || !CUE_RE.test(q)) return null;
+  // a year after a written date ("from august 18, 2022 take place") is not a house number
+  if (/^(?:19|20)\d\d\b/.test(m[0]) && /(?:\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+\d{1,2}(?:st|nd|rd|th)?,?\s*|\b\d{1,2}[/-]\d{1,2}[/-]\s*|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?,?\s+(?:of\s+)?)$/i.test(q.slice(0, m.index))) return null;
   const phrase = m[0].replace(/\.$/, "").trim();
   const words = phrase.split(/\s+/);
   const number = words[0];

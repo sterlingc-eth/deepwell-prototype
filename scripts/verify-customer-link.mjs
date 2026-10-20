@@ -112,7 +112,8 @@ eq(
 {
   const castillo = { id: 'castillo-1', customer_number: 'C-00003', data: { customer_name: 'Castillo', service_address: '1519 W Juniper' } };
   const got = selectCustomerMatch([castillo], { name: 'Ray & Linda Castillo', address: '1519 W Juniper Ave, Mesa AZ 85202' });
-  check('fuzzy: differently-worded name/address for the same household matches', got === castillo, `got ${JSON.stringify(got)}`);
+  // ENTITY SAFETY: a bare surname with a city-less address is a suggestion for a human, never an automatic link
+  check('fuzzy: differently-worded name/address for the same household is NOT auto-linked', got === null, `got ${JSON.stringify(got)}`);
 }
 {
   const castillo = { id: 'castillo-1', data: { customer_name: 'Castillo', service_address: '1519 W Juniper' } };

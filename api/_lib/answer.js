@@ -367,10 +367,10 @@ export function selectPassagesForContext(passages, maxTokens = CONTEXT_TOKEN_BUD
   return kept;
 }
 
-export function buildQuestionBlock({ question, today }) {
+export function buildQuestionBlock({ question, today, entityNote = "" }) {
   return `Today's date: ${today}
 
-QUESTION: ${question}`;
+QUESTION: ${question}${entityNote ?? ""}`;
 }
 
 export function buildPrompt({ question, today, passages, extractions }) {

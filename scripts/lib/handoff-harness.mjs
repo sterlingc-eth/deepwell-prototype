@@ -34,9 +34,9 @@ export async function boot({ v2 = true, release = true, extraEnv = {} } = {}) {
   console.log = (...a) => { if (typeof a[0] === "string" && (a[0].startsWith('{"route"') || a[0].startsWith('{"event"'))) { sink?.push(a[0]); return; } realLog(...a); };
   console.warn = () => {}; if (!process.env.HANDOFF_DEBUG) console.error = () => {};
   // same as scorecard/askCall.js, but waits for the response to be WRITTEN: ask.js can return before an async send (the V2 hook) has ended the response
-  async function askInProcess(auth, question, today, rel) {
+  async function askInProcess(auth, question, today, rel, inputMode) {
     const res = { statusCode: 200, headers: {}, headersSent: false, body: undefined, setHeader(k, v) { res.headers[String(k).toLowerCase()] = v; return res; }, getHeader(k) { return res.headers[String(k).toLowerCase()]; }, status(c) { res.statusCode = c; return res; }, json(b) { res.body = b; res.headersSent = true; return res; }, end() { res.headersSent = true; return res; } };
-    const req = { method: "POST", headers: {}, query: {}, body: { question, today, debug: true }, [SCORECARD_CALL]: { auth, escalate: false, releaseEscalation: rel ?? release } };
+    const req = { method: "POST", headers: {}, query: {}, body: { question, today, debug: true, ...(inputMode ? { inputMode } : {}) }, [SCORECARD_CALL]: { auth, escalate: false, releaseEscalation: rel ?? release } };
     const meter = createUsageMeter(); let thrown = null;
     try { await runWithUsageMeter(meter, () => handler(req, res)); } catch (err) { thrown = String(err?.name ?? "error") + ":" + String(err?.message ?? "").slice(0, 80); }
     for (let i = 0; i < 400 && res.body === undefined; i++) await new Promise((r) => setTimeout(r, 25));
@@ -54,7 +54,7 @@ export async function boot({ v2 = true, release = true, extraEnv = {} } = {}) {
     const t = tenants.get(key);
     const lines = []; sink = lines; mock.calls = 0; blocked.n = 0;
     let r;
-    try { r = await askInProcess(t.auth, question, today, opts.release); } finally { sink = null; }
+    try { r = await askInProcess(t.auth, question, today, opts.release, opts.inputMode); } finally { sink = null; }
     const logs = lines.map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
     const d = r.data;
     const v2 = logs.find((l) => l.readerV2)?.readerV2 ?? null;
