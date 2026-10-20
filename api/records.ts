@@ -109,7 +109,7 @@ export function cleanCreateDocumentPayload(p: any): { ok: true; value: Record<st
   // Office build: the same allow-list /api/upload-url applies (extension + declared type + per-kind size cap). A refused file
   // is a 4xx here, before anything is inserted, and the stored type is the canonical one for the extension.
   const verdict = checkUploadFile({ filename, contentType: normalizeContentType(p?.content_type), sizeBytes: size });
-  if (!verdict.ok) return { ok: false, error: verdict.message, status: verdict.status };
+  if (verdict.ok === false) { const v = verdict as { ok: false; status: number; message: string }; return { ok: false, error: v.message, status: v.status }; }
   const dt = typeof p?.document_type === 'string' ? p.document_type.trim().toLowerCase().replace(/[\s_]+/g, '-') : null;
   return {
     ok: true,
@@ -246,7 +246,7 @@ export async function processRecords(req: VercelRequest, res: VercelResponse, au
     delete payload.storage_key;
     delete payload.stage;
     const cleaned = cleanCreateDocumentPayload(payload);
-    if (!cleaned.ok) return handleCors(res, req).status(cleaned.status ?? 400).json({ error: cleaned.error });
+    if (cleaned.ok === false) { const c = cleaned as { ok: false; error: string; status?: number }; return handleCors(res, req).status(c.status ?? 400).json({ error: c.error }); }
     for (const k of Object.keys(payload)) delete payload[k];
     Object.assign(payload, cleaned.value);
     payload.clerk_user_id = auth.userId;

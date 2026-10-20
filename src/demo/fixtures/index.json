@@ -1,0 +1,45 @@
+{
+ "schema": 1,
+ "industries": [
+  {
+   "slug": "realty",
+   "label": "Real estate",
+   "family": "property_hospitality",
+   "familyLabel": "Property & hospitality",
+   "company": "Pinecone Hollow Home Team",
+   "core": true
+  },
+  {
+   "slug": "property-management",
+   "label": "Property management",
+   "family": "property_hospitality",
+   "familyLabel": "Property & hospitality",
+   "company": "Willowmere Rentals",
+   "core": true
+  },
+  {
+   "slug": "plumbing-hvac",
+   "label": "Plumbing & HVAC",
+   "family": "trades_field_service",
+   "familyLabel": "Trades & field service",
+   "company": "Pebbleworth Climate Control",
+   "core": true
+  },
+  {
+   "slug": "electrical",
+   "label": "Electrical",
+   "family": "trades_field_service",
+   "familyLabel": "Trades & field service",
+   "company": "Zephyr Crossing Electrical Contractors",
+   "core": true
+  },
+  {
+   "slug": "general-contractor",
+   "label": "General contractor",
+   "family": "trades_field_service",
+   "familyLabel": "Trades & field service",
+   "company": "Moonpenny Builders",
+   "core": true
+  }
+ ]
+}
