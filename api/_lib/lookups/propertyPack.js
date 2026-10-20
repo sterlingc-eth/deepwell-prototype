@@ -92,7 +92,7 @@ function unknownPersonName(rawQuestion, names, intro) {
 const NOT_ON_FILE = [
   [/\b(?:parking|garage|carport)\b/i, "parking"], [/\bcredit\s+(?:score|check|rating)\b/i, "credit score"], [/\bsmok(?:er|e|es|ing)\b/i, "smoking status"],
   [/\b(?:pets?|dogs?|cats?)\b/i, "pet information"], [/\brenewal\s+option\b/i, "renewal option"],
-  [/\b(?:paid|pay)\s+(?:this month|yet|on time)|\blate\s+(?:fees?|rent|payments?)|\brent\s+(?:paid|payments?)\b|\bpayment\s+history\b|\boverdue\s+rent\b/i, "rent payment"],
+  [/\b(?:late|behind)\s+on\s+(?:the\s+)?rent\b|\b(?:paid|pay)\s+(?:this month|yet|on time)|\blate\s+(?:fees?|rent|payments?)|\brent\s+(?:paid|payments?)\b|\bpayment\s+history\b|\boverdue\s+rent\b/i, "rent payment"],
 ];
 
 /** A field the lease documents never carry (parking, credit score, pets, payments...) for a tenant who IS on file: say so, never guess. */
@@ -408,6 +408,56 @@ async function vendorLane(db, raw, q) {
   return ok(`0 work orders on file for ${cand}: I don't have a vendor by that name. The vendors I do have work orders from are ${vendors.sort().join(", ")}.`, [{ label: `Work orders for ${cand}`, value: "0", sources: [] }], [], `Searched the vendor on every work order for ${cand}; none matched.`);
 }
 
+/* ------------------------------------------------------------------ R40: vendor trade / unpaid bills, tenant count, vacancy, rent-payment honesty */
+
+const dlv = (a, b) => dl(norm(a).trim(), norm(b).trim());
+async function vendorMatch(db, phrase) {
+  const r = await db.raw(`SELECT id, data->>'name' AS name, data->>'trade' AS trade FROM entities WHERE entity_type = 'technician' AND merged_into IS NULL AND data->>'name' IS NOT NULL`);
+  const k = norm(phrase).trim();
+  if (!k) return null;
+  let best = null;
+  for (const v of r.rows) { const d = dlv(v.name, phrase); if (d <= 2 && (!best || d < best.d)) best = { ...v, d }; }
+  return best;
+}
+const VENDOR_PHRASE = "((?:[A-Z][A-Za-z&'.-]+)(?:\\s+[A-Z][A-Za-z&'.-]+){0,3})";
+async function vendorTradeLane(db, raw, q) {
+  const m = new RegExp(`^(?:what does|what do|what kind of work does|what trade is|what type of vendor is|whats|what's) ${VENDOR_PHRASE}(?: do| do for us)?$`).exec(raw.trim().replace(/[\s?.!]+$/, "").replace(/^(?:hey|ok|so)[ ,]+/i, ""));
+  if (!m) return null;
+  const v = await vendorMatch(db, m[1]);
+  if (!v) return null;
+  if (!v.trade) return noAnswer(`${v.name} is on file as a vendor, but no trade is recorded for them.`, `Read the vendor record for ${v.name}.`);
+  return ok(`${v.name} is a ${v.trade} vendor.`, [{ label: "Vendor trade", value: v.trade, sources: [] }], [makeRecord({ type: "customer", id: v.id, label: v.name })].filter(Boolean), `Read the trade on the vendor record for ${v.name}.`);
+}
+async function vendorUnpaidLane(db, raw, q) {
+  const l = q.toLowerCase();
+  if (!/\b(?:unpaid|open|outstanding)\b/.test(l) || !/\b(?:bills?|invoices?)\b/.test(l) || YEAR_OR_PERIOD.test(l)) return null;
+  const m = new RegExp(`(?:\\bfrom|\\bby|\\bfor|\\bunpaid bills|\\bunpaid invoices|\\bopen bills|\\bopen invoices|\\boutstanding bills|\\boutstanding invoices)\\s+${VENDOR_PHRASE}`).exec(raw);
+  if (!m) return null;
+  const v = await vendorMatch(db, m[1]);
+  if (!v) return null;
+  const r = await db.raw(`SELECT DISTINCT d.id FROM documents d JOIN extractions a ON a.document_id = d.id AND a.field_key = 'vendor' AND lower(a.value) = lower($1) JOIN extractions s ON s.document_id = d.id AND s.field_key = 'status' AND lower(s.value) = 'unpaid' WHERE d.document_type = 'invoice' AND ${notPrivateSql("d")}`, [v.name]);
+  const inv = [...(await loadFields(db, r.rows.map((x) => x.id))).values()];
+  const total = inv.reduce((a, o) => a + (Number(String(o.f.cost ?? "").replace(/[$,]/g, "")) || 0), 0);
+  const f = [{ label: `Unpaid invoices from ${v.name}`, value: String(inv.length), sources: inv.slice(0, 20).map(srcFor).flat() }];
+  return ok(`${inv.length} unpaid invoice${inv.length === 1 ? "" : "s"} from ${v.name}${inv.length && total ? `, totaling ${money(total)}` : ""}.`, f, inv.slice(0, 20).map((o) => recFor(o, "Vendor invoice")), `Counted the invoice documents whose vendor is ${v.name} and whose status is unpaid.`);
+}
+async function tenantCountLane(db, q) {
+  if (!/^how many (?:(?:different|distinct|unique|total) )?(?:tenants|residents|renters)(?: (?:do we have|have we had|are there|have we had in total|on file|we have|in total|total|ever))?$/i.test(q.trim())) return null;
+  const names = await tenantNames(db);
+  if (!names.length) return null;
+  const distinct = [...new Set(names.map((n) => n.toLowerCase()))].length;
+  const leases = [...(await docsByType(db, "lease-agreement")).values()];
+  return ok(`${distinct} different tenant${distinct === 1 ? " has" : "s have"} a name recorded on the lease and inspection documents on file (${leases.length} lease agreement${leases.length === 1 ? "" : "s"}). The building owners are separate and are not counted here.`, [{ label: "Different tenants", value: String(distinct), sources: leases.slice(0, 20).map(srcFor).flat() }], leases.slice(0, 20).map((o) => recFor(o, "Lease agreement")), "Counted the distinct tenant names on the tenant's own lease, move-in and move-out documents.");
+}
+async function vacancyLane(q) {
+  if (!/^(?:which|what|how many|list|show)\b[^?]*\b(?:vacan(?:t|cy|cies)|empty units?|unoccupied)\b/i.test(q) || /\b(?:lease|certificate|limit)\b/i.test(q)) return null;
+  return noAnswer("Whether a unit is occupied or vacant isn't recorded in the documents on file. I can show lease start and end dates for a unit or a tenant if you give me the name or address.", "Looked for an occupancy/vacancy field; none exists on the unit or lease records.");
+}
+async function payStatusLane(db, raw, q) {
+  if (!/\b(?:late|behind)\s+on\s+(?:the\s+)?rent\b|\b(?:did|has|have)\b[^?]*\bpaid\b[^?]*\b(?:rent|this month)\b|\bpaid\s+(?:this month|yet|on time)\b/i.test(q)) return null;
+  return noAnswer("Rent payment status isn't recorded in the documents on file. The lease documents carry only the unit, address, lease dates, rent amount and security deposit.", "Looked for rent-payment or ledger fields; none exist on the lease documents.");
+}
+
 /** "how many leases are month to month": leases with no end date recorded (read from the tenant's own lease extractions). */
 async function monthToMonthLane(db, q) {
   if (!/^how many (?:of (?:our|the) )?(?:leases|tenants|units) (?:are|is) (?:on (?:a )?)?(?:month[\s-]*to[\s-]*month|mtm)$/i.test(q.trim())) return null;
@@ -420,7 +470,7 @@ async function monthToMonthLane(db, q) {
 
 /** "how many units does <owner> own": property entities whose owner (customer_name) is that exact owner. Unknown owner -> not on file. */
 async function ownerUnitsLane(db, raw, q) {
-  const m = /^how many (?:rental )?(?:units|properties|doors) (?:does|do|did) ([A-Za-z][A-Za-z .'&-]{2,50}?) (?:own|have|hold|manage)$/i.exec(q.trim());
+  const m = /^how many (?:rental )?(?:units|properties|doors) (?:does|do|did) ([A-Za-z][A-Za-z .'&-]{2,50}?) (?:own|have|hold|manage)(?: (?:with us|under management|in (?:our|the) portfolio|from us))?$/i.exec(q.trim());
   if (!m || YEAR_OR_PERIOD.test(q)) return null;
   const name = m[1].trim();
   if (/^(?:we|you|they|the|our)$/i.test(name) || name.split(/\s+/).length < 2) return null;
@@ -485,7 +535,7 @@ export async function tryPropertyPack(db, question, { today } = {}) {
   if (!q || q.length > 300) return null;
   const t = /^\d{4}-\d{2}-\d{2}$/.test(String(today ?? "")) ? today : new Date().toISOString().slice(0, 10);
   try {
-    return (await countLane(db, raw)) ?? (await unitLane(db, q, raw, t)) ?? (await vendorLane(db, raw, q)) ?? (await monthToMonthLane(db, q)) ?? (await ownerUnitsLane(db, raw, q)) ?? (await rentStatsLane(db, raw, q)) ?? (await noBuildingLane(db, q)) ?? (await notOnFileLane(db, q)) ?? (await personLane(db, q, raw, t));
+    return (await countLane(db, raw)) ?? (await unitLane(db, q, raw, t)) ?? (await vendorLane(db, raw, q)) ?? (await payStatusLane(db, raw, q)) ?? (await vacancyLane(q)) ?? (await tenantCountLane(db, q)) ?? (await vendorTradeLane(db, raw, q)) ?? (await vendorUnpaidLane(db, raw, q)) ?? (await monthToMonthLane(db, q)) ?? (await ownerUnitsLane(db, raw, q)) ?? (await rentStatsLane(db, raw, q)) ?? (await noBuildingLane(db, q)) ?? (await notOnFileLane(db, q)) ?? (await personLane(db, q, raw, t));
   } catch (err) {
     console.error("propertyPack lane failed, falling through:", err?.message);
     return null;

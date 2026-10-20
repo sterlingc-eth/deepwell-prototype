@@ -138,15 +138,34 @@ ok(Object.values({ a: dictationErrorMessage('not-allowed'), b: dictationErrorMes
   const none = applyHints(rec, h, {});
   eq(none, { phrases: false, grammar: false }, 'hints: unsupported API is skipped quietly');
   const added: string[] = [];
-  const used = applyHints(rec, h, {
+  const hintWin = {
     SpeechGrammarList: class { addFromString(s: string) { added.push(s); } },
     SpeechRecognitionPhrase: class { constructor(public p: string, public b?: number) {} },
-  });
-  eq(used, { phrases: true, grammar: true }, 'hints: both hooks used when present');
+  };
+  const used = applyHints(rec, h, hintWin);
+  eq(used, { phrases: false, grammar: true }, 'hints: phrases are NOT applied by default (Chrome ends the session with phrases-not-supported)');
+  ok(rec.phrases === undefined, 'hints: rec.phrases untouched by default');
   ok(added[0]?.includes('Plaza Dental | Mesa Bakery'), 'hints: grammar lists the names');
-  ok(Array.isArray(rec.phrases) && rec.phrases.length === h.length, 'hints: phrases set');
+  const rec2 = new MockRec();
+  eq(applyHints(rec2, h, hintWin, true), { phrases: true, grammar: true }, 'hints: allowPhrases=true opts in to both hooks');
+  ok(Array.isArray(rec2.phrases) && rec2.phrases.length === h.length, 'hints: phrases set when allowed');
   const c = clock(); createDictation({ Ctor, timers: c, hints: h, win: { SpeechRecognitionPhrase: class {} as never } }).start();
-  ok(Array.isArray(MockRec.last.phrases), 'hints: reach the engine through start()');
+  ok(MockRec.last.phrases === undefined, 'hints: start() does not set phrases');
+  for (const code of ['phrases-not-supported', 'language-not-supported']) {
+    const c2 = clock(); const errs: string[] = [];
+    createDictation({ Ctor, timers: c2, onError: (k, m) => errs.push(`${k}|${m}`) }).start();
+    MockRec.last.onerror?.({ error: code });
+    ok(errs.length === 1 && errs[0].startsWith('other|') && /try again/i.test(errs[0]), `error: ${code} maps to a friendly retry message`);
+  }
+  { // start() twice never creates a second engine
+    const c3 = clock(); const d2 = createDictation({ Ctor, timers: c3 }); d2.start(); const first = MockRec.last; d2.start();
+    ok(MockRec.last === first && first.started === 1, 'start twice: second call is ignored');
+  }
+  { // vercel.json must let the site use the microphone
+    const vj = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url), 'utf8')) as { headers?: Array<{ headers?: Array<{ key: string; value: string }> }> };
+    const vals = (vj.headers ?? []).flatMap((x) => x.headers ?? []).filter((x) => x.key === 'Permissions-Policy').map((x) => x.value);
+    ok(vals.length > 0 && vals.every((v) => /microphone=\(self\)/.test(v) && !/microphone=\(\)/.test(v)), 'vercel.json: Permissions-Policy allows microphone=(self)');
+  }
   eq(buildHints(Array.from({ length: 400 }, (_, i) => ({ type: 'customer', fields: { name: `Customer Number ${i}` } }))).length, 150, 'hints: capped');
 }
 

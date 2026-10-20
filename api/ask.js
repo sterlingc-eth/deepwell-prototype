@@ -121,6 +121,7 @@ import { classifyAll } from "./_lib/router/classifyAll.js";
 import { rewriteInvoiceTotal } from "./_lib/lookups/countQualifiers.js";
 import { buildAddressMissAnswer } from "./_lib/lookups/addressMiss.js";
 import { buildUnknownNameDecline } from "./_lib/lookups/unknownName.js";
+import { tryCatalogLane } from "./_lib/lookups/tenantCatalogLane.js"; // R40: plumbing/property tenant-catalog lane (vocab from the tenant's own rows)
 import { tryPropertyPack, isResidentTenantsQuestion } from "./_lib/lookups/propertyPack.js"; // R41N E2: property-pack resident/lease/unit lane
 import { parseCustomerCount, runCustomerCount } from "./_lib/lookups/namedCompare.js";
 import { buildClarifyAnswer, clarifyEnabled, ADDRESS_RE } from "./_lib/lookups/clarify.js";
@@ -1301,9 +1302,9 @@ export default async function handler(req, res) {
     }
 
     // R41N E2: property organizations only - resident / lease / unit questions answered from the tenant's own lease, inspection and work-order extractions.
-    if (pack?.id === "property" && !conversationContext) {
+    if ((pack?.id === "property" || pack?.id === "plumbing") && !conversationContext) {
       try {
-        const pp = await withTenant(ctxArg, (db) => tryPropertyPack(db, question, { today: resolveToday(today) }));
+        const pp = await withTenant(ctxArg, async (db) => (pack.id === "property" ? await tryPropertyPack(db, question, { today: resolveToday(today) }) : null) ?? (await tryCatalogLane(db, question)));
         if (pp) return send(200, { success: true, data: pp });
       } catch (err) { console.error("property pack lane failed:", err?.message); }
     }

@@ -1,0 +1,961 @@
+{
+ "version": "r40-plumb-r40",
+ "category": "blind-r40-plumbing",
+ "source": "scripts/gen-blind-r40.mjs seed 40040 (written before r40 code changes)",
+ "questions": [
+  {
+   "id": "plumb2-001",
+   "text": "phone # Anthony Valdez",
+   "category": "blind-r40-plumbing",
+   "shape": "phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "Anthony Valdez"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-002",
+   "text": "Ashley Quintero's cell?",
+   "category": "blind-r40-plumbing",
+   "shape": "phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "Ashley Quintero"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-003",
+   "text": "phone # Sandra Soto",
+   "category": "blind-r40-plumbing",
+   "shape": "phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "Sandra Soto"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-004",
+   "text": "phone # Sarah Gutierrez",
+   "category": "blind-r40-plumbing",
+   "shape": "phone",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'phone' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "Sarah Gutierrez"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-005",
+   "text": "what email do we have for Mark Dawson",
+   "category": "blind-r40-plumbing",
+   "shape": "email",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'email' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "Mark Dawson"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-006",
+   "text": "email for Steven Lindgren",
+   "category": "blind-r40-plumbing",
+   "shape": "email",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'email' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "Steven Lindgren"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-007",
+   "text": "email for Jennifer Erikesn",
+   "category": "blind-r40-plumbing",
+   "shape": "email",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'email' AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "Jennifer Eriksen"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-008",
+   "text": "what's Matthew Hammodn's customer number",
+   "category": "blind-r40-plumbing",
+   "shape": "customer_number",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT customer_number AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "Matthew Hammond"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-009",
+   "text": "what's John Tanaka's custmoer number",
+   "category": "blind-r40-plumbing",
+   "shape": "customer_number",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT customer_number AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "John Tanaka"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-010",
+   "text": "what's Joseph Alvarez's customer number",
+   "category": "blind-r40-plumbing",
+   "shape": "customer_number",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT customer_number AS v FROM entities WHERE entity_type='customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "Joseph Alvarez"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-011",
+   "text": "what model is Jessica Estrada's unit",
+   "category": "blind-r40-plumbing",
+   "shape": "model",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1",
+    "params": [
+     "Jessica Estrada"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-012",
+   "text": "what model is Sandra Figueroa's unit",
+   "category": "blind-r40-plumbing",
+   "shape": "model",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1",
+    "params": [
+     "Sandra Figueroa"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-013",
+   "text": "model nubmer on Betty Estrada's heater",
+   "category": "blind-r40-plumbing",
+   "shape": "model",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1",
+    "params": [
+     "Betty Estrada"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-014",
+   "text": "model number on Elizabeth Estrada's heater",
+   "category": "blind-r40-plumbing",
+   "shape": "model",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1",
+    "params": [
+     "Elizabeth Estrada"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-015",
+   "text": "model number on Andrew Okafor's heater",
+   "category": "blind-r40-plumbing",
+   "shape": "model",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'model' AS v FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1",
+    "params": [
+     "Andrew Okafor"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-016",
+   "text": "what kind of equipment does Paul Valdez have",
+   "category": "blind-r40-plumbing",
+   "shape": "equip_type",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'equipment_type' AS v FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1",
+    "params": [
+     "Paul Valdez"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-017",
+   "text": "what do we have installed at Daniel Tanaka's",
+   "category": "blind-r40-plumbing",
+   "shape": "equip_type",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'equipment_type' AS v FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1",
+    "params": [
+     "Daniel Tanaka"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-018",
+   "text": "what kind of equipment does Brabara Figueroa have",
+   "category": "blind-r40-plumbing",
+   "shape": "equip_type",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'equipment_type' AS v FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1",
+    "params": [
+     "Barbara Figueroa"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-019",
+   "text": "what kind of equipment does Andrew Cardenas have",
+   "category": "blind-r40-plumbing",
+   "shape": "equip_type",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT e.data->>'equipment_type' AS v FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1",
+    "params": [
+     "Andrew Cardenas"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-020",
+   "text": "who has a sump pump",
+   "category": "blind-r40-plumbing",
+   "shape": "list_type",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS item FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'equipment_type'=$1",
+    "params": [
+     "sump pump"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-021",
+   "text": "how many sump pumps do we have",
+   "category": "blind-r40-plumbing",
+   "shape": "count_type",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'equipment_type'=$1",
+    "params": [
+     "sump pump"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-022",
+   "text": "who has a water softener",
+   "category": "blind-r40-plumbing",
+   "shape": "list_type",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS item FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'equipment_type'=$1",
+    "params": [
+     "water softener"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-023",
+   "text": "how many water softeners do we have",
+   "category": "blind-r40-plumbing",
+   "shape": "count_type",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'equipment_type'=$1",
+    "params": [
+     "water softener"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-024",
+   "text": "which cutsomers have a backflow preventer",
+   "category": "blind-r40-plumbing",
+   "shape": "list_type",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS item FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'equipment_type'=$1",
+    "params": [
+     "backflow preventer"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-025",
+   "text": "how many backflow preventers do we have",
+   "category": "blind-r40-plumbing",
+   "shape": "count_type",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'equipment_type'=$1",
+    "params": [
+     "backflow preventer"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-026",
+   "text": "which customers have a tankless water heater",
+   "category": "blind-r40-plumbing",
+   "shape": "list_type",
+   "cmp": "set",
+   "oracle": {
+    "sql": "SELECT DISTINCT c.data->>'customer_name' AS item FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'equipment_type'=$1",
+    "params": [
+     "water heater (tankless)"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-027",
+   "text": "how many tankless water heaters do we have",
+   "category": "blind-r40-plumbing",
+   "shape": "count_type",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'equipment_type'=$1",
+    "params": [
+     "water heater (tankless)"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-028",
+   "text": "does Kimberly Fischer have a tankless",
+   "category": "blind-r40-plumbing",
+   "shape": "yesno_tankless",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1 AND e.data->>'equipment_type'='water heater (tankless)') AS v",
+    "params": [
+     "Kimberly Fischer"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-029",
+   "text": "is Linda Dawson's heater tankless",
+   "category": "blind-r40-plumbing",
+   "shape": "yesno_tankless",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1 AND e.data->>'equipment_type'='water heater (tankless)') AS v",
+    "params": [
+     "Linda Dawson"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-030",
+   "text": "does Joseph Gutierrez have a tankless",
+   "category": "blind-r40-plumbing",
+   "shape": "yesno_tankless",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1 AND e.data->>'equipment_type'='water heater (tankless)') AS v",
+    "params": [
+     "Joseph Gutierrez"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-031",
+   "text": "does Thomas Maldonado have a tankless",
+   "category": "blind-r40-plumbing",
+   "shape": "yesno_tankless",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1 AND e.data->>'equipment_type'='water heater (tankless)') AS v",
+    "params": [
+     "Thomas Maldonado"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-032",
+   "text": "is Richard Maldonado's heater tankless",
+   "category": "blind-r40-plumbing",
+   "shape": "yesno_tankless",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1 AND e.data->>'equipment_type'='water heater (tankless)') AS v",
+    "params": [
+     "Richard Maldonado"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-033",
+   "text": "does John Tanaka have a tankless",
+   "category": "blind-r40-plumbing",
+   "shape": "yesno_tankless",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM entities e JOIN entities c ON c.id=e.customer_id WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND c.data->>'customer_name' ILIKE $1 AND e.data->>'equipment_type'='water heater (tankless)') AS v",
+    "params": [
+     "John Tanaka"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-034",
+   "text": "how many Naviens have we put in",
+   "category": "blind-r40-plumbing",
+   "shape": "count_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1",
+    "params": [
+     "Navien"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-035",
+   "text": "number of Rinnai units",
+   "category": "blind-r40-plumbing",
+   "shape": "count_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1",
+    "params": [
+     "Rinnai"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-036",
+   "text": "how many Rheems have we put in",
+   "category": "blind-r40-plumbing",
+   "shape": "count_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1",
+    "params": [
+     "Rheem"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-037",
+   "text": "how many Bradford Whites have we put in",
+   "category": "blind-r40-plumbing",
+   "shape": "count_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1",
+    "params": [
+     "Bradford White"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-038",
+   "text": "number of A.O. Smith units",
+   "category": "blind-r40-plumbing",
+   "shape": "count_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1",
+    "params": [
+     "A.O. Smith"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-039",
+   "text": "how many Wattss have we put in",
+   "category": "blind-r40-plumbing",
+   "shape": "count_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1",
+    "params": [
+     "Watts"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-040",
+   "text": "any Carrier equipment on file?",
+   "category": "blind-r40-plumbing",
+   "shape": "unk_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-041",
+   "text": "any Trane equipment on file?",
+   "category": "blind-r40-plumbing",
+   "shape": "unk_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-042",
+   "text": "any Lennox equipment on file?",
+   "category": "blind-r40-plumbing",
+   "shape": "unk_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-043",
+   "text": "how many Kohler units do we have",
+   "category": "blind-r40-plumbing",
+   "shape": "unk_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-044",
+   "text": "any Moen equipment on file?",
+   "category": "blind-r40-plumbing",
+   "shape": "unk_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-045",
+   "text": "how many customres have a Grundfos",
+   "category": "blind-r40-plumbing",
+   "shape": "unk_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-046",
+   "text": "any customers in Falgstaff?",
+   "category": "blind-r40-plumbing",
+   "shape": "unk_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-047",
+   "text": "how many cutsomers do we have in Mesa",
+   "category": "blind-r40-plumbing",
+   "shape": "unk_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-048",
+   "text": "any customers in Scottsdale?",
+   "category": "blind-r40-plumbing",
+   "shape": "unk_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-049",
+   "text": "how many cutsomers do we have in Yuma",
+   "category": "blind-r40-plumbing",
+   "shape": "unk_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-050",
+   "text": "what's Marcus Delacroix's phone number",
+   "category": "blind-r40-plumbing",
+   "shape": "unk_person_phone",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   },
+   "citationRequired": false,
+   "nc": true
+  },
+  {
+   "id": "plumb2-051",
+   "text": "when did we install Marcus Delacroix's unit",
+   "category": "blind-r40-plumbing",
+   "shape": "unk_person_equip",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   },
+   "citationRequired": false,
+   "nc": true
+  },
+  {
+   "id": "plumb2-052",
+   "text": "what's Penelope Vandersloot's phone number",
+   "category": "blind-r40-plumbing",
+   "shape": "unk_person_phone",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   },
+   "citationRequired": false,
+   "nc": true
+  },
+  {
+   "id": "plumb2-053",
+   "text": "what water heater does Penelope Vandersloot have",
+   "category": "blind-r40-plumbing",
+   "shape": "unk_person_equip",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   },
+   "citationRequired": false,
+   "nc": true
+  },
+  {
+   "id": "plumb2-054",
+   "text": "what's Guntehr Abernathy-Ruiz's phone number",
+   "category": "blind-r40-plumbing",
+   "shape": "unk_person_phone",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   },
+   "citationRequired": false,
+   "nc": true
+  },
+  {
+   "id": "plumb2-055",
+   "text": "what water heater does Gunther Abernathy-Ruiz have",
+   "category": "blind-r40-plumbing",
+   "shape": "unk_person_equip",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   },
+   "citationRequired": false,
+   "nc": true
+  },
+  {
+   "id": "plumb2-056",
+   "text": "what's Tabitha Okonkwo's phone nubmer",
+   "category": "blind-r40-plumbing",
+   "shape": "unk_person_phone",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   },
+   "citationRequired": false,
+   "nc": true
+  },
+  {
+   "id": "plumb2-057",
+   "text": "what water heater does Tabitha Okonkwo have",
+   "category": "blind-r40-plumbing",
+   "shape": "unk_person_equip",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   },
+   "citationRequired": false,
+   "nc": true
+  },
+  {
+   "id": "plumb2-058",
+   "text": "how many invoices did Hector Quintanilla do",
+   "category": "blind-r40-plumbing",
+   "shape": "unk_tech",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-059",
+   "text": "how many invoiecs did Brianna Foxworth do",
+   "category": "blind-r40-plumbing",
+   "shape": "unk_tech",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT 0 AS n",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-060",
+   "text": "how many invoices in 2019",
+   "category": "blind-r40-plumbing",
+   "shape": "unk_year",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x WHERE x.field_key='invoice_date' AND x.value LIKE '2019-%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-061",
+   "text": "how many invoices in 2031",
+   "category": "blind-r40-plumbing",
+   "shape": "unk_year",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x WHERE x.field_key='invoice_date' AND x.value LIKE '2031-%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-062",
+   "text": "is Susan Ibarra behind on payments",
+   "category": "blind-r40-plumbing",
+   "shape": "honest",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key ~ '(balance|owed|payment_status)'",
+    "params": []
+   },
+   "citationRequired": false,
+   "nc": true
+  },
+  {
+   "id": "plumb2-063",
+   "text": "is Steven Cardenas behind on payments",
+   "category": "blind-r40-plumbing",
+   "shape": "honest",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key ~ '(balance|owed|payment_status)'",
+    "params": []
+   },
+   "citationRequired": false,
+   "nc": true
+  },
+  {
+   "id": "plumb2-064",
+   "text": "what's the water hardness at Patricia Fischer's house",
+   "category": "blind-r40-plumbing",
+   "shape": "honest",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key ~ 'hardness'",
+    "params": []
+   },
+   "citationRequired": false,
+   "nc": true
+  },
+  {
+   "id": "plumb2-065",
+   "text": "what's the water hardness at Joseph Soto's house",
+   "category": "blind-r40-plumbing",
+   "shape": "honest",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key ~ 'hardness'",
+    "params": []
+   },
+   "citationRequired": false,
+   "nc": true
+  },
+  {
+   "id": "plumb2-066",
+   "text": "how many service tickets do we have",
+   "category": "blind-r40-plumbing",
+   "shape": "count_big",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM documents WHERE document_type='service-ticket'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-067",
+   "text": "total number of invoices on file",
+   "category": "blind-r40-plumbing",
+   "shape": "count_big",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM documents WHERE document_type='invoice'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-068",
+   "text": "how many documents do we have in total",
+   "category": "blind-r40-plumbing",
+   "shape": "count_big",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM documents",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-069",
+   "text": "how many customers total",
+   "category": "blind-r40-plumbing",
+   "shape": "count_big",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type='customer' AND merged_into IS NULL",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-070",
+   "text": "how many pieces of equipment are we tracking",
+   "category": "blind-r40-plumbing",
+   "shape": "count_big",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type='equipment' AND e.merged_into IS NULL",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-071",
+   "text": "how many warranty registrations are on file",
+   "category": "blind-r40-plumbing",
+   "shape": "count_big",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM documents WHERE document_type='warranty-registration'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "plumb2-072",
+   "text": "how many proposals have we sent",
+   "category": "blind-r40-plumbing",
+   "shape": "count_big",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM documents WHERE document_type='proposal-quote'",
+    "params": []
+   },
+   "citationRequired": true
+  }
+ ]
+}

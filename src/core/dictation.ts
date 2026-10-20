@@ -54,6 +54,7 @@ export function dictationErrorMessage(code: DictationErrorCode): string {
 }
 function mapError(code: string): DictationErrorCode | null {
   if (code === 'aborted') return null; // we stopped it ourselves
+  if (code === 'phrases-not-supported' || code === 'language-not-supported') return 'other';
   if (code === 'not-allowed' || code === 'service-not-allowed') return 'not-allowed';
   if (code === 'no-speech') return 'no-speech';
   if (code === 'network') return 'network';
@@ -98,11 +99,13 @@ export function buildHints(entities: ReadonlyArray<{ type: string; fields: Recor
 }
 
 /** Offers the hints to the engine wherever it has a hook: `phrases` (Chrome contextual biasing) and the older grammar list. Never throws. */
-export function applyHints(rec: RecognitionLike, hints: readonly string[], win: WinLike | undefined = typeof window === 'undefined' ? undefined : (window as unknown as WinLike)): { phrases: boolean; grammar: boolean } {
+export function applyHints(rec: RecognitionLike, hints: readonly string[], win: WinLike | undefined = typeof window === 'undefined' ? undefined : (window as unknown as WinLike), allowPhrases = false): { phrases: boolean; grammar: boolean } {
   const used = { phrases: false, grammar: false };
   if (!hints.length || !win) return used;
   try {
-    if (win.SpeechRecognitionPhrase) {
+    // Chrome's contextual biasing (phrases) only works with on-device recognition and otherwise ends the
+    // session with 'phrases-not-supported', so it stays off unless explicitly enabled.
+    if (allowPhrases && win.SpeechRecognitionPhrase) {
       rec.phrases = hints.map((h) => new win.SpeechRecognitionPhrase!(h, 5));
       used.phrases = true;
     }
