@@ -4,6 +4,7 @@ import { requireAuthOrKey, assertScope } from "../apiKeyAuth.js";
 import { limit as rateLimit } from "../rateLimit.js";
 import { withTenant, normalizeMatchText } from "../recordsStore.js";
 import { alertTier, daysBetween, isPlausibleToday } from "../warrantyRules.js";
+import { orgNameTypo } from "../entities/similarity.js";
 import {
   findDuplicateCustomerPairs, crowdedAddressKeys, dedupePairs, normalizeAddressKey, compareNamesStrict, pickKeepDrop,
   possibleDuplicatePairKey, normalizeSurname, damerauLevenshteinDistance,
@@ -211,6 +212,24 @@ export function planPossibleDuplicates(customers, { keepSeparatePairs } = {}) {
         dropId: drop.id,
         reason: nameRel === "surname-fuzzy" ? "likely typo" : "same address, different name",
       });
+    }
+  }
+  // Inbox round (2026-10-21): an organisation name misread by one word ("Harboright" / "Harborlight Neighbors Alliance"), at
+  // the same address or with an address on at most one side. Shown for a person to merge; never merged automatically.
+  const seen = new Set(out.map((p) => possibleDuplicatePairKey(p.aId, p.bId)));
+  for (let i = 0; i < list.length; i++) {
+    for (let j = i + 1; j < list.length; j++) {
+      const a = list[i];
+      const b = list[j];
+      if (!a?.id || !b?.id || a.id === b.id) continue;
+      const ka = normalizeAddressKey(a.address); const kb = normalizeAddressKey(b.address);
+      if (ka && kb && ka !== kb) continue;
+      if (!orgNameTypo(a.name, b.name)) continue;
+      const key = possibleDuplicatePairKey(a.id, b.id);
+      if (skip.has(key) || seen.has(key)) continue;
+      seen.add(key);
+      const [keep, drop] = pickKeepDrop(a, b);
+      out.push({ aId: a.id, bId: b.id, keepId: keep.id, dropId: drop.id, reason: "likely typo" });
     }
   }
   return out;

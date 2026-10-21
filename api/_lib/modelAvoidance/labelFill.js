@@ -21,10 +21,12 @@
  */
 import { scanLabeledValues } from "./textExtract.js";
 import { normalizeFields, isUnconfirmedKey, baseKeyOf } from "../extractFields.js";
-import { completenessFor, REQUIRED_FIELDS, normalizeDocumentType } from "../documentTypes.js";
+import { completenessFor, REQUIRED_FIELDS, normalizeDocumentType, isLabelValue } from "../documentTypes.js";
 import { isOwnName, nameKey } from "./ownCompany.js";
 
-export const LABEL_FILL_VERSION = 1;
+// Inbox round (2026-10-21): 2 = new date / address labels ("Issued", "Date Reported", "Premises") and the file-name address;
+// the bump lets the nightly sweep and "Re-check all missing fields" look at every open paper once more.
+export const LABEL_FILL_VERSION = 2;
 
 /** Date fields the planner also restores when absent even though the type does not REQUIRE them — a labelled install
  * date on an invoice is what the warranty clock runs on. Explicit labels only (never a bare "Date:"). */
@@ -58,7 +60,24 @@ function presentKeys(fields) {
  * @returns {{add: object[], ambiguous: {key:string, values:string[]}[], targets: string[], missingBefore: string[]}}
  *   `add` is normalizeFields output (field_key/value/confidence/page_no/verbatim/flags/method) ready to write.
  */
-export function planLabelFill({ type, fields, pages, today, method = "label-fill", pageCount, optionalDates = true, ownNames = [], allKeys = false, pack = null }) {
+/**
+ * Inbox round (2026-10-21): a street address in the FILE NAME ("Permit PLB26-72783 - 7442 W Palo Dr.pdf", "WO-4402 8254 Bluebonnet
+ * Ct.pdf") that the page text also prints (same house number and the same first street word) is a service address read by two
+ * independent sources. Returns the address as written in the file name, or null. Pure.
+ */
+const FILE_ADDR_RE = /(?:^|[\s_-])(\d{2,6})\s+((?:[NSEW]\.?\s+)?[A-Za-z][A-Za-z']+(?:\s+[A-Za-z][A-Za-z']+){0,3}?\s+(?:St|Street|Ave|Avenue|Rd|Road|Dr|Drive|Ln|Lane|Blvd|Boulevard|Way|Ct|Court|Pl|Place|Cir|Circle|Pkwy|Parkway|Hwy|Highway|Row|Trl|Trail|Ter|Terrace|Loop)\b\.?(?:\s+(?:Unit|Apt|Suite|Ste)\.?\s*[A-Za-z0-9-]+)?)/i;
+export function addressFromFilename(filename, pages) {
+  const base = String(filename ?? "").replace(/\.[A-Za-z0-9]{2,5}$/, "").replace(/_/g, " ");
+  const m = FILE_ADDR_RE.exec(base);
+  if (!m) return null;
+  const house = m[1];
+  const firstWord = m[2].replace(/^[NSEW]\.?\s+/i, "").split(/\s+/)[0].toLowerCase();
+  const text = (pages ?? []).map((p) => String(p?.text ?? "")).join("\n").toLowerCase();
+  if (!new RegExp(`(?:^|[^0-9])${house}\\s+(?:[nsew]\\.?\\s+)?${firstWord.replace(/[^a-z']/g, "")}\\b`).test(text)) return null;
+  return `${house} ${m[2]}`.replace(/\s+/g, " ").trim();
+}
+
+export function planLabelFill({ type, fields, pages, today, method = "label-fill", pageCount, optionalDates = true, ownNames = [], allKeys = false, pack = null, filename = null }) {
   const docType = normalizeDocumentType(type);
   const completeness = completenessFor(docType, (fields ?? []).map((f) => ({ field_key: f.field_key ?? f.key, value: f.corrected_value ?? f.value, confidence: f.confidence ?? 1 })));
   const have = presentKeys(fields);
@@ -83,6 +102,8 @@ export function planLabelFill({ type, fields, pages, today, method = "label-fill
   for (const key of targets) {
     if (have.has(key)) continue;
     let list = candidates[key] ?? [];
+    // Inbox round: a label read as a name ("DELIVERED TO" beside "BILL TO") is never a party.
+    if (key === "customer_name" || key === "vendor") list = list.filter((c) => !isLabelValue(c.value));
     if (!required.has(key) && !allKeys) list = list.filter((c) => c.strength === "explicit" || (key === "vendor" && c.strength === "letterhead"));
     if (key === "installation_date" && serials.size > 1) continue;
     if (!list.length) continue;
@@ -104,13 +125,21 @@ export function planLabelFill({ type, fields, pages, today, method = "label-fill
     raw.push({ key, value: c.value, page_no: c.page_no, verbatim: c.verbatim, confidence: c.conf ?? FILL_CONFIDENCE[c.strength], method });
     satisfied.add(key);
   }
+  // Inbox round: the service address printed in the file name AND on the page, when the labels gave none.
+  if (filename && targets.includes("service_address") && !have.has("service_address") && !satisfied.has("service_address") && !ambiguous.some((a) => a.key === "service_address")) {
+    const addr = addressFromFilename(filename, pages);
+    if (addr) { raw.push({ key: "service_address", value: addr, page_no: 1, verbatim: addr, confidence: FILL_CONFIDENCE.explicit, method }); satisfied.add("service_address"); }
+  }
   // Only keep an alternative fill when its requirement is still open (the first alternative found wins).
   const keep = [];
   const doneReq = new Set();
   for (const f of raw) {
     const req = completeness.missing.find((r) => r.split("|").includes(f.key));
     if (req && req.includes("|")) {
-      if (doneReq.has(req) && f.key !== "work_performed") continue;
+      // Inbox round: a full stored-text read (allKeys) keeps both halves of a "date or number" requirement (the number is
+      // a fact of its own); every other alternative keeps only the first one found, as before.
+      const keepAll = allKeys && ALL_SCAN_KEYS.includes(f.key) && req.split("|").includes("invoice_number");
+      if (doneReq.has(req) && f.key !== "work_performed" && !keepAll) continue;
       doneReq.add(req);
     }
     keep.push(f);

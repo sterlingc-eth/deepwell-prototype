@@ -26,7 +26,40 @@
 import {
   normalizePhoneKey, normalizeEmailKey, normalizeSurname, compareNamesStrict,
   damerauLevenshteinDistance, SURNAME_FUZZY_MIN_LENGTH, SURNAME_FUZZY_MAX_DISTANCE,
+  isBusinessName, BUSINESS_SUFFIXES,
 } from '../integrity.js';
+
+/**
+ * Inbox round (2026-10-21): an ORGANISATION name read twice with one OCR slip ("Harboright Neighbors Alliance" next to
+ * "Harborlight Neighbors Alliance"). Person names are never compared this way ("Maria Lopez" / "Mario Lopez" are two
+ * people). Rule: both names are organisations (a business word, or an organisation word below), the same number of words,
+ * every word identical except ONE, that word is not itself a business / organisation word ("Desert Ridge Dental" vs
+ * "Desert Ridge Rental" is two businesses) and is at most 2 edits away (1 for a 5-letter word; never under 5 letters).
+ * The result is only ever a SUGGESTION a person confirms; nothing merges on it.
+ */
+const ORG_WORDS = new Set(['alliance', 'neighbors', 'neighbours', 'foundation', 'ministries', 'ministry', 'center', 'centre', 'coalition', 'council',
+  'society', 'club', 'collaborative', 'fund', 'network', 'community', 'project', 'institute', 'academy', 'mercantile', 'studio', 'store',
+  'market', 'pantry', 'shelter', 'charity', 'league', 'union', 'cooperative', 'coop', 'agency', 'office', 'firm', 'apartments', 'homes',
+  'villas', 'estates', 'condominiums', 'condos', 'fellowship', 'parish', 'temple', 'mosque', 'synagogue', 'museum', 'library', 'partnership']);
+const orgTokens = (raw) => String(raw ?? '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter(Boolean);
+const isOrgName = (raw) => isBusinessName(raw) || orgTokens(raw).some((t) => ORG_WORDS.has(t));
+export function orgNameTypo(aRaw, bRaw) {
+  if (!isOrgName(aRaw) || !isOrgName(bRaw)) return false;
+  const a = orgTokens(aRaw); const b = orgTokens(bRaw);
+  if (a.length < 2 || a.length !== b.length) return false;
+  let diff = -1;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] === b[i]) continue;
+    if (diff !== -1) return false;
+    diff = i;
+  }
+  if (diff === -1) return false;
+  const x = a[diff]; const y = b[diff];
+  if (/\d/.test(x) || /\d/.test(y) || ORG_WORDS.has(x) || ORG_WORDS.has(y) || BUSINESS_SUFFIXES.has(x) || BUSINESS_SUFFIXES.has(y)) return false;
+  const shortest = Math.min(x.length, y.length);
+  if (shortest < 5) return false;
+  return damerauLevenshteinDistance(x, y) <= (shortest >= 6 ? 2 : 1);
+}
 import { jobKeyParts } from '../financials/jobKey.js';
 
 // ------------------------------------------------------------------- names
@@ -278,6 +311,8 @@ export const WEIGHTS = {
   nameInitials: 0.4,
   nameTypo: 0.35,
   nameSurnameOnly: 0.1,
+  // Inbox round: reaches ENTITY_SUGGEST_THRESHOLD on its own, so a person is ASKED; never an automatic merge.
+  nameOrgTypo: 0.55,
   address: 0.4,
   phone: 0.45,
   email: 0.45,
@@ -339,6 +374,7 @@ export function evaluatePair(a, b) {
   if (nr.relation === 'equal') { score += WEIGHTS.nameEqual; reasons.push('same name'); evidenceFields.push('name'); }
   else if (nr.relation === 'initials') { score += WEIGHTS.nameInitials; reasons.push('name matches allowing for an initial'); evidenceFields.push('name'); }
   else if (nr.relation === 'typo') { score += WEIGHTS.nameTypo; reasons.push('name is a likely misspelling of the other'); evidenceFields.push('name'); }
+  else if (orgNameTypo(a?.name, b?.name)) { score += WEIGHTS.nameOrgTypo; reasons.push('organisation name differs by one misread word'); evidenceFields.push('name'); }
   else if (nr.relation === 'surname-only') { score += WEIGHTS.nameSurnameOnly; reasons.push('same last name, different first name'); }
 
   if (addrMatch) { score += WEIGHTS.address; reasons.push('same address (including unit and city)'); evidenceFields.push('address'); }

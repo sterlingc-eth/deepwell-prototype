@@ -37,6 +37,7 @@ export const DOCUMENT_TYPES: DocumentTypeDef[] = [
   { id: 'statement', label: 'Statement' },
   { id: 'insurance-certificate', label: 'Insurance certificate' },
   { id: 'hr-letter', label: 'HR / employment letter' },
+  { id: 'license-certification', label: 'License / certification' },
   { id: 'other', label: 'Other' },
 ];
 
@@ -49,9 +50,9 @@ export const DOCUMENT_TYPE_IDS = new Set(DOCUMENT_TYPES.map((t) => t.id));
  */
 export const REQUIRED_FIELDS: Record<string, string[]> = {
   // Address is required only where work happened at a place (work order, service ticket, inspection, permit).
-  'work-order': ['service_address', 'service_date'],
+  'work-order': ['service_address', 'service_date|invoice_number'],
   // A fleet or shop-owned unit is identified by its serial number, and a ticket can name a part instead of describing the work.
-  'service-ticket': ['service_address|serial_number', 'service_date', 'work_performed|part_number'],
+  'service-ticket': ['service_address|serial_number', 'service_date|invoice_number', 'work_performed|part_number'],
   invoice: ['customer_name|vendor', 'service_date', 'cost'],
   'warranty-registration': ['serial_number', 'model', 'warranty_expires|warranty_term'],
   'startup-sheet': ['serial_number', 'service_date'],
@@ -60,32 +61,34 @@ export const REQUIRED_FIELDS: Record<string, string[]> = {
   'maintenance-agreement': ['customer_name', 'warranty_term|agreement_term'],
   'dispatch-note': ['customer_name|service_address|vendor', 'service_date'],
   'proposal-quote': ['customer_name|service_address', 'cost'],
-  'inspection-report': ['service_address', 'service_date'],
+  'inspection-report': ['service_address', 'service_date|invoice_number|permit_number'],
   'purchase-order': ['vendor|customer_name', 'cost'],
   'equipment-record': ['serial_number|model'],
   correspondence: [],
   internal: [],
-  receipt: ['vendor|customer_name', 'service_date', 'cost'],
+  // Inbox round (2026-10-21): walk-in receipts name no customer; agreements need only who they are with.
+  receipt: ['service_date|invoice_number', 'cost'],
   agreement: ['customer_name|vendor', 'agreement_term|service_date'],
-  'delivery-ticket': ['customer_name|vendor', 'service_date'],
+  'delivery-ticket': ['customer_name|vendor|invoice_number', 'service_date|invoice_number'],
   schedule: [],
   'price-list': [],
   // Company paperwork: page text is what makes these readable, so no party is demanded of them.
   statement: [],
   'insurance-certificate': [],
   'hr-letter': [],
+  'license-certification': [],
   other: [],
 };
 
 /** Company paperwork (never "Not linked"; leaves Needs you once its own required fields are present).
  *  Mirrors api/_lib/documentTypes.js; verify:ui checks parity. */
 export const COMPANY_RECORD_TYPES = new Set([
-  'purchase-order', 'internal', 'schedule', 'price-list', 'statement', 'insurance-certificate', 'hr-letter',
+  'purchase-order', 'internal', 'schedule', 'price-list', 'statement', 'insurance-certificate', 'hr-letter', 'license-certification',
 ]);
 /** Company paperwork only while no customer is named on it. */
 export const COMPANY_RECORD_IF_NO_CUSTOMER_TYPES = new Set(['agreement']);
 /** Types that need no link when they carry no service address. */
-export const LINK_OPTIONAL_TYPES = new Set(['invoice', 'receipt', 'delivery-ticket', 'correspondence']);
+export const LINK_OPTIONAL_TYPES = new Set(['invoice', 'receipt', 'delivery-ticket', 'correspondence', 'agreement']);
 /** Company paperwork only while NO customer and NO address is named on it. */
 export const COMPANY_RECORD_IF_NO_CUSTOMER_OR_ADDRESS_TYPES = new Set(['other']);
 
@@ -202,14 +205,15 @@ export interface Completeness {
 }
 
 /** Required-field completeness for one document. Mirrors api/_lib/documentTypes.js's completenessFor exactly. */
-export function completenessFor(typeId: string, fields: CompletenessField[]): Completeness {
+export function completenessFor(typeId: string, fields: CompletenessField[], opts: { filename?: string | null; title?: string | null } = {}): Completeness {
   const type = normalizeDocumentType(typeId);
-  const required = REQUIRED_FIELDS[type] ?? [];
+  const required = requiredFieldsFor(type, opts.filename ?? null, opts.title ?? null);
 
   const byKey = new Map<string, { field_key: string; confidence: number }>();
   for (const f of Array.isArray(fields) ? fields : []) {
     if (!f || typeof f.field_key !== 'string' || f.field_key.startsWith('_')) continue;
     if (f.value == null || String(f.value).trim() === '') continue;
+    if ((f.field_key === 'customer_name' || f.field_key === 'vendor') && isLabelValue(f.value)) continue;
     const confidence = Number(f.confidence);
     const entry = { field_key: f.field_key, confidence: Number.isFinite(confidence) ? confidence : 0 };
     const prev = byKey.get(f.field_key);
@@ -230,6 +234,9 @@ export function completenessFor(typeId: string, fields: CompletenessField[]): Co
       .map((k) => byKey.get(k))
       .filter((x): x is { field_key: string; confidence: number } => !!x)
       .reduce<{ field_key: string; confidence: number } | null>((b, h) => (!b || h.confidence > b.confidence ? h : b), null);
+    // Inbox round: an unconfirmed printed date is never bypassed by the "or number" alternative. Mirrors the server.
+    const waiting = alts.filter((k) => byKey.has(`${k}_unconfirmed`) && !byKey.has(k));
+    if (waiting.length) { unconfirmed.push(waiting.join('|')); continue; }
     if (hit) {
       present.push(hit.field_key);
       satisfiedConfidences.push(hit.confidence);
@@ -247,4 +254,59 @@ export function completenessFor(typeId: string, fields: CompletenessField[]): Co
       : 1;
 
   return { type, required, present, missing, unconfirmed, minConfidence, complete: missing.length === 0 && unconfirmed.length === 0 };
+}
+
+/* ------------------------------------------------------------------ document kinds (inbox round, 2026-10-21) */
+/** Hand-mirrored from api/_lib/documentTypes.js DOCUMENT_KINDS (verify:ui checks parity). A kind is derived from the file
+ *  name / title line and never stored: it only changes the label shown and the facts the paper must carry. */
+export interface DocumentKindDef { id: string; type: string; label: string; re: RegExp; requires?: string[] }
+export const DOCUMENT_KINDS: DocumentKindDef[] = [
+  { id: 'pay-application', type: 'invoice', label: 'Pay application', re: /pay[-_ ]?app(?:lication)?\b|application[-_ ]for[-_ ]payment|progress[-_ ]billing|\bg70[23]\b/, requires: ['customer_name|vendor', 'cost'] },
+  { id: 'credit-memo', type: 'invoice', label: 'Credit memo', re: /credit[-_ ]?(?:memo|note)|(?:^|[^a-z0-9])cm[-_ ]\d/, requires: ['customer_name|vendor', 'cost'] },
+  { id: 'return-slip', type: 'receipt', label: 'Return slip', re: /return[-_ ]?(?:slip|receipt)|refund[-_ ]?(?:slip|receipt)/, requires: ['cost|invoice_number'] },
+  { id: 'retainer-receipt', type: 'receipt', label: 'Retainer receipt', re: /retainer/, requires: ['cost'] },
+  { id: 'in-kind-receipt', type: 'receipt', label: 'In-kind gift receipt', re: /in[-_ ]?kind/, requires: [] },
+  { id: 'filing-receipt', type: 'receipt', label: 'Filing receipt', re: /filing[-_ ]?(?:receipt|fee)/, requires: ['cost|invoice_number|service_date'] },
+  { id: 'pickup-ticket', type: 'delivery-ticket', label: 'Pickup / rental ticket', re: /pick[-_ ]?up|rental[-_ ]?(?:ticket|out|return)|will[-_ ]?call|(?:^|[^a-z0-9])pt[-_ ]?\d/ },
+  { id: 'packing-slip', type: 'delivery-ticket', label: 'Packing slip', re: /packing[-_ ]?(?:slip|list)|pack[-_ ]?list|(?:^|[^a-z0-9])ps[-_ ]?\d/ },
+  { id: 'grant-agreement', type: 'agreement', label: 'Grant agreement / award', re: /grant|award[-_ ]letter|notice[-_ ]of[-_ ]award|(?:^|[^a-z0-9])(?:gr|aw|cg)[-_ ]\d/, requires: [] },
+  { id: 'mou', type: 'agreement', label: 'Memorandum of understanding', re: /\bmou\b|memorandum[-_ ]of[-_ ]understanding/, requires: [] },
+  { id: 'volunteer-agreement', type: 'agreement', label: 'Volunteer agreement', re: /volunteer/, requires: [] },
+  { id: 'pledge', type: 'agreement', label: 'Pledge form', re: /pledge/, requires: [] },
+  { id: 'engagement-letter', type: 'agreement', label: 'Engagement letter', re: /engagement|letter[-_ ]of[-_ ]engagement/, requires: [] },
+  { id: 'nda', type: 'agreement', label: 'Non-disclosure agreement', re: /\bnda\b|non[-_ ]?disclosure|confidentiality[-_ ]agreement/, requires: [] },
+  { id: 'subcontract', type: 'agreement', label: 'Subcontract', re: /sub[-_ ]?contract|(?:^|[^a-z0-9])sc[-_ ]\d/, requires: [] },
+  { id: 'amendment', type: 'agreement', label: 'Amendment / addendum', re: /amendment|addendum/, requires: [] },
+  { id: 'change-order', type: 'proposal-quote', label: 'Change order', re: /change[-_ ]?order|(?:^|[^a-z0-9])co[-_ ]\d/, requires: ['cost|work_performed'] },
+  { id: 'consignor-statement', type: 'statement', label: 'Consignor statement', re: /consign/ },
+  { id: 'inventory-count', type: 'internal', label: 'Inventory count', re: /inventory|stock[-_ ]?count|cycle[-_ ]?count/ },
+  { id: 'backflow-test', type: 'inspection-report', label: 'Backflow test', re: /backflow|(?:^|[^a-z0-9])bf[-_ ]?\d/, requires: ['service_address|serial_number|customer_name'] },
+  { id: 'insurance-policy', type: 'insurance-certificate', label: 'Insurance policy / declarations', re: /declarations?|\bpolicy\b|floater|inland[-_ ]marine/ },
+];
+
+export function documentKindFor(typeId: string | null | undefined, filename?: string | null, title?: string | null): DocumentKindDef | null {
+  const t = normalizeDocumentType(typeId);
+  const hay = `${String(filename ?? '')} ${String(title ?? '')}`.toLowerCase();
+  if (!hay.trim()) return null;
+  return DOCUMENT_KINDS.find((k) => k.type === t && k.re.test(hay)) ?? null;
+}
+
+/** Required facts for one paper: its kind's list when a kind matches and sets one, else the type's own list. */
+export function requiredFieldsFor(typeId: string | null | undefined, filename?: string | null, title?: string | null): string[] {
+  const t = normalizeDocumentType(typeId);
+  const kind = documentKindFor(t, filename, title);
+  return kind && Array.isArray(kind.requires) ? kind.requires : (REQUIRED_FIELDS[t] ?? []);
+}
+
+const VOID_NAME_RE = /(?:^|[^a-z])void(?:ed)?(?:[^a-z]|$)/i;
+/** A VOID paper (file name or title says VOID / VOIDED): kept on file, never counted, never asks a person. Mirrors the server. */
+export function isVoidMarked(filename?: string | null, title?: string | null): boolean {
+  return VOID_NAME_RE.test(String(filename ?? '').replace(/\.[A-Za-z0-9]{2,5}$/, '')) || VOID_NAME_RE.test(String(title ?? ''));
+}
+
+const LABEL_AS_VALUE_RE = /^(?:(?:delivered|deliver|ship(?:ped)?|sold|bill(?:ed)?|remit|invoice[ds]?|paid|received|issued|sent|prepared|attn|attention)(?:\s+(?:to|from|by|for))?|customer(?:\s+name)?|client(?:\s+name)?|vendor(?:\s+name)?|name|payee|payer|tenant|owner|n\/?a|none|tbd|unknown|see\s+above|walk[-\s]?in(?:\s+customer)?|cash(?:\s+(?:sale|customer))?)\s*[:#.-]*$/i;
+/** A label read as a value ("DELIVERED TO", "N/A", "Walk-in") is never a party. Mirrors the server. */
+export function isLabelValue(value: unknown): boolean {
+  const v = String(value ?? '').replace(/\s+/g, ' ').trim();
+  return !v || LABEL_AS_VALUE_RE.test(v);
 }

@@ -153,3 +153,33 @@ export function counterpartyFromParties(line, ownNames) {
   const own = names.filter((n) => isOwnName(n, ownNames));
   return own.length === 1 ? names.find((n) => !isOwnName(n, ownNames)) : null;
 }
+
+/* ------------------------------------------------------------------ issuer is never the customer (inbox round, 2026-10-21) */
+/**
+ * The business printed at the top of a paper (its letterhead) ISSUED it: a store's own receipts, a law firm's own invoices.
+ * When the reader filed that same business as the customer ("Juniper Lane Mercantile" as the customer on Juniper Lane's own
+ * sales slips), the name moves to `vendor` (when no vendor was read) or is dropped. Only an exact name match after
+ * normalising counts (isOwnName's rule with the letterhead as "us"), so a real customer is never hidden. Pure.
+ * @returns {{fields: object[], moved: {from:string, to:string|null, value:string}[]}}
+ */
+const ISSUER_STOP_RE = /^(?:bill(?:ed)?|sold|ship(?:ped)?|deliver(?:ed)?|remit|invoice)\s+to\b|^(?:customer|client|account|homeowner|tenant|resident)(?:\s+name)?\s*[:#]?\s*$|^(?:customer|client)\s*:/i;
+const ISSUER_ORG_RE = /\b(?:alliance|coalition|council|network|neighbors|neighbours|ministry|partnership|cooperative|collective|institute|league|union|firm)\b/i;
+export function issuerNotCustomer(fields, pages, ownNames = []) {
+  const rows = Array.isArray(fields) ? fields : [];
+  const cust = rows.find((f) => f?.field_key === "customer_name" && String(f.value ?? "").trim());
+  if (!cust) return { fields: rows, moved: [] };
+  const first = (pages ?? []).find((p) => String(p?.text ?? "").trim());
+  if (!first) return { fields: rows, moved: [] };
+  const lines = String(first.text).split(/\r?\n/).map((l) => l.replace(/\s{2,}.*$/, "").trim()).filter(Boolean);
+  // Verify round (2026-10-21): stop at a "Bill to / Sold to / Customer" block (that is the customer, not the issuer), and
+  // only a BUSINESS letterhead counts (a person's name and address heading a page is the customer's own block).
+  const head = detectLetterhead(lines, { ownNames, isLabelLine: (t) => ISSUER_STOP_RE.test(t) });
+  if (!head || !(BIZ_WORDS.test(head.name) || ISSUER_ORG_RE.test(head.name)) || nameKey(head.name).length < 4 || !isOwnName(cust.value, [head.name])) return { fields: rows, moved: [] };
+  const hasVendor = rows.some((f) => f?.field_key === "vendor" && String(f.value ?? "").trim());
+  const out = [];
+  for (const f of rows) {
+    if (f !== cust) { out.push(f); continue; }
+    if (!hasVendor) out.push({ ...f, field_key: "vendor" });
+  }
+  return { fields: out, moved: [{ from: "customer_name", to: hasVendor ? null : "vendor", value: String(cust.value) }] };
+}

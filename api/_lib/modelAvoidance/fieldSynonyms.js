@@ -51,7 +51,9 @@ export const FIELD_SYNONYMS = {
     "inspection date", "date of inspection", "inspected on", "start-up date", "startup date", "commissioning date", "commissioned on",
   ],
   /** The date the DOCUMENT is about when no service date is printed (a receipt, invoice, statement ...). */
-  invoiceDate: ["invoice date", "billing date", "bill date", "date issued", "issue date", "date of issue", "credit date", "credit memo date"],
+  invoiceDate: ["invoice date", "billing date", "bill date", "date issued", "issue date", "date of issue", "credit date", "credit memo date", "issued", "issued on", "date of invoice", "invoiced on"],
+  /** Inbox round (2026-10-21): the date a work order / request was opened, which is that paper's own date. */
+  workOrderDate: ["date reported", "reported on", "date requested", "request date", "requested on", "date opened", "opened on", "scheduled date", "date scheduled", "scheduled for"],
   receiptDate: [
     "receipt date", "transaction date", "date of transaction", "purchase date", "date of purchase", "payment date",
     "date of payment", "date paid", "paid on", "paid date", "sale date", "date of sale", "date received", "received on",

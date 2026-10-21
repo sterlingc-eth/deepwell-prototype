@@ -35,6 +35,8 @@ export const DOCUMENT_TYPES = [
   { id: 'statement', label: 'Statement' },
   { id: 'insurance-certificate', label: 'Insurance certificate' },
   { id: 'hr-letter', label: 'HR / employment letter' },
+  // Inbox round (2026-10-21): trade / business / professional licences were filed as "Warranty registration".
+  { id: 'license-certification', label: 'License / certification' },
   { id: 'other', label: 'Other' },
 ];
 
@@ -120,6 +122,7 @@ export const DOCUMENT_TYPE_DEFINITIONS = {
   'statement': 'A summary of an account over a period: a bank, card, fuel, consignor or rent ledger statement.',
   'insurance-certificate': 'A certificate of insurance or insurance policy document.',
   'hr-letter': 'An employment, offer, award or other HR letter about a person who works for the company.',
+  'license-certification': 'A trade, business or professional license or certification held by the company or a staff member: license number, holder and expiry. Never a manufacturer warranty.',
   'other': 'Does not clearly fit any type above.',
 };
 
@@ -130,9 +133,10 @@ export const DOCUMENT_TYPE_DEFINITIONS = {
  */
 export const REQUIRED_FIELDS = {
   // Address is required only where work happened at a place (work order, service ticket, inspection, permit).
-  'work-order': ['service_address', 'service_date'],
+  // Inbox round (2026-10-21): a printed ticket / order number identifies the paper when no date was read.
+  'work-order': ['service_address', 'service_date|invoice_number'],
   // A fleet or shop-owned unit is identified by its serial number, and a ticket can name a part instead of describing the work.
-  'service-ticket': ['service_address|serial_number', 'service_date', 'work_performed|part_number'],
+  'service-ticket': ['service_address|serial_number', 'service_date|invoice_number', 'work_performed|part_number'],
   'invoice': ['customer_name|vendor', 'service_date', 'cost'],
   'warranty-registration': ['serial_number', 'model', 'warranty_expires|warranty_term'],
   'startup-sheet': ['serial_number', 'service_date'],
@@ -141,20 +145,24 @@ export const REQUIRED_FIELDS = {
   'maintenance-agreement': ['customer_name', 'warranty_term|agreement_term'],
   'dispatch-note': ['customer_name|service_address|vendor', 'service_date'],
   'proposal-quote': ['customer_name|service_address', 'cost'],
-  'inspection-report': ['service_address', 'service_date'],
+  'inspection-report': ['service_address', 'service_date|invoice_number|permit_number'],
   'purchase-order': ['vendor|customer_name', 'cost'],
   'equipment-record': ['serial_number|model'],
   'correspondence': [],
   'internal': [],
-  'receipt': ['vendor|customer_name', 'service_date', 'cost'],
+  // Inbox round (2026-10-21): a walk-in receipt names no customer and the issuer is the store itself, so no party is
+  // demanded; the receipt date (or its number) and the amount are what make it usable.
+  'receipt': ['service_date|invoice_number', 'cost'],
+  // An NDA, MOU, award letter, pledge or engagement letter prints no term: see DOCUMENT_KINDS (requires nothing more).
   'agreement': ['customer_name|vendor', 'agreement_term|service_date'],
-  'delivery-ticket': ['customer_name|vendor', 'service_date'],
+  'delivery-ticket': ['customer_name|vendor|invoice_number', 'service_date|invoice_number'],
   'schedule': [],
   'price-list': [],
   // Company paperwork: page text is what makes these readable, so no party is demanded of them.
   'statement': [],
   'insurance-certificate': [],
   'hr-letter': [],
+  'license-certification': [],
   'other': [],
 };
 
@@ -164,16 +172,100 @@ export const REQUIRED_FIELDS = {
  * src/domains/hvac/documentTypes.ts, parity checked by verify:ui).
  */
 export const COMPANY_RECORD_TYPES = new Set([
-  'purchase-order', 'internal', 'schedule', 'price-list', 'statement', 'insurance-certificate', 'hr-letter',
+  'purchase-order', 'internal', 'schedule', 'price-list', 'statement', 'insurance-certificate', 'hr-letter', 'license-certification',
 ]);
 /** Company paperwork only while no customer is named on it (an NDA/MOU/lease with the company's own counterparty). */
 export const COMPANY_RECORD_IF_NO_CUSTOMER_TYPES = new Set(['agreement']);
 /** Types that need no customer/equipment link when they also carry no service address (an address means a job at a
  *  place, which should link). */
-export const LINK_OPTIONAL_TYPES = new Set(['invoice', 'receipt', 'delivery-ticket', 'correspondence']);
+export const LINK_OPTIONAL_TYPES = new Set(['invoice', 'receipt', 'delivery-ticket', 'correspondence', 'agreement']);
 /** Company paperwork only while NO customer and NO address is named on it ("other": filed as company paper, needs no
  *  link; with a customer or an address it is a customer document and still needs one). */
 export const COMPANY_RECORD_IF_NO_CUSTOMER_OR_ADDRESS_TYPES = new Set(['other']);
+
+
+/* ------------------------------------------------------------------ document kinds (inbox round, 2026-10-21) */
+/**
+ * DOCUMENT KINDS: a finer name for a paper inside one stored type, read from its file name or title line, e.g. an invoice
+ * that is a pay application, a receipt that is a return slip, an agreement that is an NDA or a grant award. A kind is
+ * DERIVED every time (never stored): document_type stays the family id, so every search, answer and filter that knows
+ * "agreement" or "invoice" keeps finding these papers. A kind only changes two things:
+ *   - its label (shown next to the type), and
+ *   - which facts it must carry before it is checked automatically (`requires`; omitted = the type's own list).
+ * Rows are data, drawn from the 44 industry packs (donovan-training/v2loop/patches_ready/packs: licences, COIs,
+ * declarations, grants, pledges and volunteer forms carry no amount; retainers and pay apps always do). The browser keeps
+ * a hand-mirrored copy in src/domains/hvac/documentTypes.ts (verify:ui checks parity).
+ * `re` is tested against the file name and the title line, lower-case. First matching row wins.
+ */
+export const DOCUMENT_KINDS = [
+  { id: 'pay-application', type: 'invoice', label: 'Pay application', re: /pay[-_ ]?app(?:lication)?\b|application[-_ ]for[-_ ]payment|progress[-_ ]billing|\bg70[23]\b/, requires: ['customer_name|vendor', 'cost'] },
+  { id: 'credit-memo', type: 'invoice', label: 'Credit memo', re: /credit[-_ ]?(?:memo|note)|(?:^|[^a-z0-9])cm[-_ ]\d/, requires: ['customer_name|vendor', 'cost'] },
+  { id: 'return-slip', type: 'receipt', label: 'Return slip', re: /return[-_ ]?(?:slip|receipt)|refund[-_ ]?(?:slip|receipt)/, requires: ['cost|invoice_number'] },
+  { id: 'retainer-receipt', type: 'receipt', label: 'Retainer receipt', re: /retainer/, requires: ['cost'] },
+  { id: 'in-kind-receipt', type: 'receipt', label: 'In-kind gift receipt', re: /in[-_ ]?kind/, requires: [] },
+  { id: 'filing-receipt', type: 'receipt', label: 'Filing receipt', re: /filing[-_ ]?(?:receipt|fee)/, requires: ['cost|invoice_number|service_date'] },
+  { id: 'pickup-ticket', type: 'delivery-ticket', label: 'Pickup / rental ticket', re: /pick[-_ ]?up|rental[-_ ]?(?:ticket|out|return)|will[-_ ]?call|(?:^|[^a-z0-9])pt[-_ ]?\d/ },
+  { id: 'packing-slip', type: 'delivery-ticket', label: 'Packing slip', re: /packing[-_ ]?(?:slip|list)|pack[-_ ]?list|(?:^|[^a-z0-9])ps[-_ ]?\d/ },
+  { id: 'grant-agreement', type: 'agreement', label: 'Grant agreement / award', re: /grant|award[-_ ]letter|notice[-_ ]of[-_ ]award|(?:^|[^a-z0-9])(?:gr|aw|cg)[-_ ]\d/, requires: [] },
+  { id: 'mou', type: 'agreement', label: 'Memorandum of understanding', re: /\bmou\b|memorandum[-_ ]of[-_ ]understanding/, requires: [] },
+  { id: 'volunteer-agreement', type: 'agreement', label: 'Volunteer agreement', re: /volunteer/, requires: [] },
+  { id: 'pledge', type: 'agreement', label: 'Pledge form', re: /pledge/, requires: [] },
+  { id: 'engagement-letter', type: 'agreement', label: 'Engagement letter', re: /engagement|letter[-_ ]of[-_ ]engagement/, requires: [] },
+  { id: 'nda', type: 'agreement', label: 'Non-disclosure agreement', re: /\bnda\b|non[-_ ]?disclosure|confidentiality[-_ ]agreement/, requires: [] },
+  { id: 'subcontract', type: 'agreement', label: 'Subcontract', re: /sub[-_ ]?contract|(?:^|[^a-z0-9])sc[-_ ]\d/, requires: [] },
+  { id: 'amendment', type: 'agreement', label: 'Amendment / addendum', re: /amendment|addendum/, requires: [] },
+  { id: 'change-order', type: 'proposal-quote', label: 'Change order', re: /change[-_ ]?order|(?:^|[^a-z0-9])co[-_ ]\d/, requires: ['cost|work_performed'] },
+  { id: 'consignor-statement', type: 'statement', label: 'Consignor statement', re: /consign/ },
+  { id: 'inventory-count', type: 'internal', label: 'Inventory count', re: /inventory|stock[-_ ]?count|cycle[-_ ]?count/ },
+  { id: 'backflow-test', type: 'inspection-report', label: 'Backflow test', re: /backflow|(?:^|[^a-z0-9])bf[-_ ]?\d/, requires: ['service_address|serial_number|customer_name'] },
+  { id: 'insurance-policy', type: 'insurance-certificate', label: 'Insurance policy / declarations', re: /declarations?|\bpolicy\b|floater|inland[-_ ]marine/ },
+];
+
+/** The kind a paper of stored type `typeId` is, from its file name / title line; null when no row matches. Pure. */
+export function documentKindFor(typeId, filename = null, title = null) {
+  const t = canonicalTypeId(typeId);
+  const hay = `${String(filename ?? '')} ${String(title ?? '')}`.toLowerCase();
+  if (!hay.trim()) return null;
+  return DOCUMENT_KINDS.find((k) => k.type === t && k.re.test(hay)) ?? null;
+}
+
+/** Required facts for one paper: its kind's list when a kind matches and sets one, else the type's own list. */
+export function requiredFieldsFor(typeId, { filename = null, title = null, pack = null } = {}) {
+  const t = normalizeDocumentType(typeId, {}, pack);
+  if (pack && pack.id !== 'hvac') return pack.documentTypes?.find((x) => x.id === t)?.requires ?? [];
+  const kind = documentKindFor(t, filename, title);
+  return kind && Array.isArray(kind.requires) ? kind.requires : (REQUIRED_FIELDS[t] ?? []);
+}
+
+/** "Invoice · Pay application": the type label plus the kind label when one matches. */
+export function documentTypeDisplayLabel(typeId, { filename = null, title = null, pack = null } = {}) {
+  const base = documentTypeLabel(typeId, pack);
+  const kind = pack && pack.id !== 'hvac' ? null : documentKindFor(typeId, filename, title);
+  return kind ? `${base} · ${kind.label}` : base;
+}
+
+/**
+ * VOID papers: a cancelled invoice / receipt / check is kept on file but is never counted and never needs a person.
+ * Signals: the word VOID / VOIDED in the file name or title, or a page line that is only that word ("VOID", "*** VOIDED ***",
+ * "THIS INVOICE IS VOID"). A watermark printed letter by letter is not readable text, so the file name carries most cases.
+ */
+const VOID_NAME_RE = /(?:^|[^a-z])void(?:ed)?(?:[^a-z]|$)/i;
+const VOID_LINE_RE = /^[\s*#=_-]*(?:void(?:ed)?|this\s+(?:invoice|receipt|check|cheque|document|ticket|order)\s+(?:is|has\s+been)\s+void(?:ed)?|cancell?ed\s*[-:–]\s*void)[\s*#=_.!-]*$/i;
+export function isVoidMarked({ filename = null, title = null, text = null } = {}) {
+  if (VOID_NAME_RE.test(String(filename ?? '').replace(/\.[A-Za-z0-9]{2,5}$/, '')) || VOID_NAME_RE.test(String(title ?? ''))) return true;
+  if (!text) return false;
+  return String(text).split(/\r?\n/).slice(0, 80).some((l) => VOID_LINE_RE.test(l.trim()) && l.trim().length <= 60);
+}
+
+/**
+ * A label read as a value: "DELIVERED TO", "Bill To", "Customer:", "N/A", "Walk-in". Such a "name" is not a party and must
+ * never create a customer or satisfy a requirement. Pure, used at ingest (extractDocument.js) and by every completeness check.
+ */
+const LABEL_AS_VALUE_RE = /^(?:(?:delivered|deliver|ship(?:ped)?|sold|bill(?:ed)?|remit|invoice[ds]?|paid|received|issued|sent|prepared|attn|attention)(?:\s+(?:to|from|by|for))?|customer(?:\s+name)?|client(?:\s+name)?|vendor(?:\s+name)?|name|payee|payer|tenant|owner|n\/?a|none|tbd|unknown|see\s+above|walk[-\s]?in(?:\s+customer)?|cash(?:\s+(?:sale|customer))?)\s*[:#.-]*$/i;
+export function isLabelValue(value) {
+  const v = String(value ?? '').replace(/\s+/g, ' ').trim();
+  return !v || LABEL_AS_VALUE_RE.test(v);
+}
 
 const hasKey = (present, k) => (present instanceof Set ? present.has(k) : !!present?.[k]);
 
@@ -204,6 +296,7 @@ function realFacts(fields) {
   for (const f of Array.isArray(fields) ? fields : []) {
     if (!f || typeof f.field_key !== 'string' || isSyntheticKey(f.field_key)) continue;
     if (f.value == null || String(f.value).trim() === '') continue;
+    if (NAME_KEYS.includes(f.field_key) && isLabelValue(f.value)) continue;
     const c = Number(f.confidence);
     out.push({ key: f.field_key, conf: Number.isFinite(c) ? c : 0, corroborated: f.corroborated === true });
   }
@@ -251,12 +344,14 @@ export function nameSupportsType(typeId, filename, title) {
  *           low-confidence | amount-not-confirmed | likely-copy
  */
 export function autoCheckDecision(typeId, fields, opts = {}) {
-  const { hasText = false, hasLink = false, pack = null, filename = null, title = null } = opts;
+  const { hasText = false, hasLink = false, pack = null, filename = null, title = null, text = null } = opts;
   const t = canonicalTypeId(typeId);
   const facts = realFacts(fields);
   const present = new Set(facts.map((f) => f.key));
   const fail = (reason, detail) => ({ ok: false, allowUnlinked: false, reason, ...(detail ? { detail } : {}) });
   if (!facts.length && !hasText) return fail('unreadable');
+  // Inbox round: a VOID paper is kept on file, never checked and never counted (the Inbox sets it aside on its own).
+  if (isVoidMarked({ filename, title, text })) return fail('void');
   // A likely copy ("(copy)", " (2)", "copy of", "v2") is never checked automatically: a person decides which one stays.
   if (isLikelyCopyName(filename) || isLikelyCopyName(title)) return fail('likely-copy');
   // Page text alone is not enough to check a paper that has no facts: its file name or title must also say it is this type.
@@ -274,14 +369,17 @@ export function autoCheckDecision(typeId, fields, opts = {}) {
     return { ok: true, allowUnlinked: true, reason: null };
   }
 
-  const c = completenessFor(t, facts.map((f) => ({ field_key: f.key, value: 'x', confidence: f.conf })), pack);
+  const c = completenessFor(t, facts.map((f) => ({ field_key: f.key, value: 'x', confidence: f.conf })), pack, { filename, title });
   if (!c.complete) return fail(c.unconfirmed?.length && !c.missing.length ? 'date-unconfirmed' : 'missing-required', c.missing.join(', '));
-  // Judge the required facts (best alternative each) plus the name fact.
-  const required = pack && pack.id !== 'hvac' ? (pack.documentTypes?.find((x) => x.id === t)?.requires ?? []) : (REQUIRED_FIELDS[t] ?? []);
+  // Judge the required facts (best alternative each) plus the customer name (it decides which customer the paper joins).
+  // Inbox round: a vendor that the paper's type does not require (the store on a walk-in receipt, read from its
+  // letterhead) is no longer judged: a slightly unsure issuer name never decides whether a receipt is usable.
+  const required = c.required;
   const judged = [];
   for (const req of required) { const h = bestOf(facts, req.split('|')); if (h) judged.push(h); }
-  const name = bestOf(facts, NAME_KEYS);
-  if (name) judged.push(name);
+  const vendorRequired = required.some((r) => r.split('|').includes('vendor'));
+  const name = bestOf(facts, vendorRequired ? NAME_KEYS : ['customer_name']);
+  if (name && !judged.includes(name)) judged.push(name);
   const weak = judged.find((f) => f.conf < AI_VERIFY_MIN_CONFIDENCE);
   if (weak) return fail('low-confidence', weak.key);
 
@@ -655,6 +753,8 @@ const FILENAME_PATTERNS = [
   [code('cm'), 'invoice'],
   [/receipt|return[-_ ]?slip|sales[-_ ]slip/i, 'receipt'],
   [code('rc|rcpt|r'), 'receipt'],
+  // Inbox round: trade / business / professional licences (checked after receipts so "Licence fee receipt" stays a receipt).
+  [/\blicen[cs]e\b|\blicensure\b|\bcertification\b|certificate[-_ ]of[-_ ](?:completion|competency|registration)/i, 'license-certification'],
   [/price[-_ ]?list|rate[-_ ]?(?:card|sheet)|catalog(?:ue)?|fee[-_ ]schedule/i, 'price-list'],
   [/schedule|roster|timesheet/i, 'schedule'],
   [/inventory|stock[-_ ]?count|parts[-_ ]?count|gift[-_ ]?card|daily[-_ ]log/i, 'internal'],
@@ -662,6 +762,8 @@ const FILENAME_PATTERNS = [
   [/service[-_ ]?ticket/i, 'service-ticket'],
   [/dispatch/i, 'dispatch-note'],
   [/work[-_ ]?order/i, 'work-order'],
+  // Inbox round: "WO 7314 - Pearson", "WO-4402 8254 Bluebonnet Ct" (a work-order code, never inside a word).
+  [code('wo'), 'work-order'],
   [/(maintenance|service)[-_ ](?:agreement|contract|plan)|\bmsa\b/i, 'maintenance-agreement'],
   [/award[-_ ]letter|grant[-_ ]award|rental[-_ ]agreement|consign\w*[-_ ]agreement|grant[-_ ]agreement|non[-_ ]?disclosure|memorandum[-_ ]of|sub[-_ ]?contract|agreement|contract/i, 'agreement'],
   [code('ra|ca|sc'), 'agreement'],
@@ -684,14 +786,23 @@ export const GENERIC_TITLE_PATTERNS = [
   ['price-list', /^(?:price\s+list|rate\s+(?:card|sheet)|fee\s+schedule|product\s+catalog(?:ue)?)$/],
   ['statement', /^(?:account\s+|monthly\s+|consignor\s+|card\s+)?statement(?:\s+of\s+account)?$|^rent\s+ledger$|^(?:tenant|resident)\s+ledger$|^rent\s+roll$|^owner(?:'s)?\s+statement$|^explanation\s+of\s+benefits$|^superbill$/],
   ['insurance-certificate', /^(?:acord\s+25\s+)?certificate\s+of\s+(?:liability\s+)?insurance$|^insurance\s+(?:certificate|policy)$|^acord\s+25(?:\s*[-:(].*)?$|^proof\s+of\s+insurance$/],
+  ['license-certification', /^(?:(?:contractor|business|trade|plumbing|plumber|electrical|electrician|journeyman|master|professional|state)\s+){0,2}licen[cs]e(?:\s+certificate)?$|^certificate\s+of\s+(?:licensure|registration|competency)$/],
   ['hr-letter', /^(?:offer|employment|termination)\s+letter$|^employment\s+(?:agreement|offer)$|^(?:form\s+)?w-?4(?:\s*[-:(].*)?$|^(?:form\s+)?i-?9(?:\s*[-:(].*)?$|^employee'?s?\s+withholding\s+certificate$/],
 ];
 
 /** Types a one-time re-sort may move a document INTO when the rule is confident (a name or title says so). */
-export const RESORT_TARGET_TYPES = new Set(['receipt', 'agreement', 'delivery-ticket', 'schedule', 'price-list', 'statement', 'insurance-certificate', 'hr-letter', 'purchase-order', 'internal']);
+export const RESORT_TARGET_TYPES = new Set(['receipt', 'agreement', 'delivery-ticket', 'schedule', 'price-list', 'statement', 'insurance-certificate', 'hr-letter', 'purchase-order', 'internal', 'license-certification']);
 /** Types a re-sort may move a document OUT of (the catch-alls the old rules over-used, plus the types things get
  *  misfiled into: a COI or licence read as a warranty registration, a memo typed internal, an award letter typed HR). */
-export const RESORT_SOURCE_TYPES = new Set(['invoice', 'other', 'correspondence', 'dispatch-note', 'warranty-registration', 'internal', 'schedule']);
+export const RESORT_SOURCE_TYPES = new Set(['invoice', 'other', 'correspondence', 'dispatch-note', 'warranty-registration', 'internal', 'schedule', 'insurance-certificate']);
+/** Names that say plainly the paper is NOT a manufacturer warranty, even when equipment serials are printed on it (an equipment
+ *  floater lists the insured units; a subcontract lists the gear it installs). A name that also says "warranty" never counts. */
+const NOT_WARRANTY_BY_NAME = new Set(['insurance-certificate', 'license-certification', 'agreement']);
+const PLAIN_NOT_WARRANTY_RE = /certificate[-_ ]of[-_ ]insurance|insurance|declarations?|floater|inland[-_ ]marine|\bpolicy\b|licen[cs]e|sub[-_ ]?contract/i;
+/** Verify round: a file name that says invoice. */
+const INVOICE_NAME_RE = /invoice|\binv\b|(?:^|[^a-z])inv[-_ ]?\d/i;
+/** A backflow / cross-connection test is an inspection paper, whatever it was first filed as. */
+const BACKFLOW_RE = /backflow|cross[-_ ]connection|(?:^|[^a-z0-9])bf[-_ ]?\d/i;
 /** HR papers are never moved out of People and HR, with one exception: a grant or contract "award letter" typed HR. */
 const AWARD_LETTER_RE = /award[-_ ]letter/i;
 /** A licence or permit-to-practise filed as a warranty registration has no better type than company paper. */
@@ -710,13 +821,26 @@ export function resortDecision({ currentType, filename, titleType = null, titleT
     return AWARD_LETTER_RE.test(String(filename ?? '')) || AWARD_LETTER_RE.test(String(titleText ?? '')) ? 'agreement' : null;
   }
   if (!RESORT_SOURCE_TYPES.has(cur)) return null;
-  if (cur === 'warranty-registration' && hasEquipmentFacts) return null;
+  // Verify round (2026-10-21): an invoice whose own file name says "invoice" (or whose page title says it is an invoice)
+  // is confirmed, never moved to a type that needs no amount (licence, COI, inspection, work order ...).
+  if (cur === 'invoice' && (INVOICE_NAME_RE.test(String(filename ?? '')) || canonicalTypeId(titleType) === 'invoice')) return null;
   const nameType = inferTypeFromFilename(filename);
   const t1 = titleType && RESORT_TARGET_TYPES.has(titleType) ? titleType : null;
   const t2 = nameType && RESORT_TARGET_TYPES.has(nameType) ? nameType : null;
   if (t1 && t2 && t1 !== t2) return null; // the title and the name disagree: not confident
   let next = t1 || t2;
-  if (!next && cur === 'warranty-registration' && LICENCE_RE.test(String(filename ?? ''))) next = 'other';
+  if (cur === 'warranty-registration' && hasEquipmentFacts) {
+    const saysWarranty = /warrant/i.test(String(filename ?? '')) || /warrant/i.test(String(titleText ?? ''));
+    // Only a plainly worded name outweighs serials on file (a bare "COI" acronym does not).
+    const plainlyNot = PLAIN_NOT_WARRANTY_RE.test(String(filename ?? '')) || PLAIN_NOT_WARRANTY_RE.test(String(titleText ?? ''));
+    if (saysWarranty || !plainlyNot || !next || !NOT_WARRANTY_BY_NAME.has(next)) return null;
+  }
+  // An insurance certificate moves only to a paper the name plainly calls something else (a return slip read as a COI).
+  if (cur === 'insurance-certificate' && next !== 'receipt' && next !== 'license-certification') return null;
+  if (!next && cur === 'warranty-registration' && LICENCE_RE.test(String(filename ?? ''))) next = 'license-certification';
+  if (!next && ['invoice', 'other', 'correspondence', 'warranty-registration'].includes(cur) && BACKFLOW_RE.test(String(filename ?? ''))) next = 'inspection-report';
+  // A work-order code name ("WO 7314 - Pearson") read as an invoice, when the name never says invoice.
+  if (!next && cur === 'invoice' && nameType === 'work-order' && !/invoice|\binv\b|(?:^|[^a-z])inv[-_ ]?\d/i.test(String(filename ?? ''))) next = 'work-order';
   return next && next !== cur ? next : null;
 }
 
@@ -790,6 +914,16 @@ export function resolveDocumentType(toolInput, facts, filename, pack = null) {
   if (typeof raw === 'string' && raw.trim()) {
     const normalized = normalizeDocumentType(raw, facts, pack);
     if (validIds.has(normalized) && normalized !== 'other') {
+      // Inbox round: the same confident file-name rule the re-sort uses corrects the classic misfiles at ingest (a licence or a
+      // COI read as a warranty registration, a pickup ticket read as an invoice, a return slip read as a COI).
+      if (!pack || pack.id === 'hvac') {
+        const f = facts ?? {};
+        const better = resortDecision({ currentType: normalized, filename, hasEquipmentFacts: !!(f.serial_number || f.model) });
+        // Verify round: the model read a money paper AND an amount; a file name alone does not turn it into a paper that needs
+        // no amount (a licence-fee invoice named "Plumbing License - Alvarez.pdf"). "Sort my documents" can still move it later.
+        const moneyRead = (normalized === 'invoice' || normalized === 'receipt') && f.cost != null && String(f.cost).trim() !== '';
+        if (better && validIds.has(better) && !moneyRead) return { documentType: better, confidence, source: 'model+name' };
+      }
       return { documentType: normalized, confidence, source: 'model' };
     }
   }
@@ -828,16 +962,16 @@ export function toCompletenessFields(rows) {
  * @returns {{type: string, required: string[], present: string[],
  *            missing: string[], minConfidence: number, complete: boolean}}
  */
-export function completenessFor(typeId, fields, pack = null) {
+export function completenessFor(typeId, fields, pack = null, opts = {}) {
   const type = normalizeDocumentType(typeId, {}, pack);
-  const required = pack && pack.id !== 'hvac'
-    ? (pack.documentTypes.find((t) => t.id === type)?.requires ?? [])
-    : (REQUIRED_FIELDS[type] ?? []);
+  // Inbox round: a matching document kind (pay application, NDA, return slip ...) brings its own list; see DOCUMENT_KINDS.
+  const required = requiredFieldsFor(type, { filename: opts?.filename ?? null, title: opts?.title ?? null, pack });
 
   const byKey = new Map();
   for (const f of Array.isArray(fields) ? fields : []) {
     if (!f || typeof f.field_key !== 'string' || isSyntheticKey(f.field_key)) continue;
     if (f.value == null || String(f.value).trim() === '') continue;
+    if (NAME_KEYS.includes(f.field_key) && isLabelValue(f.value)) continue;
     const confidence = Number(f.confidence);
     const entry = { field_key: f.field_key, confidence: Number.isFinite(confidence) ? confidence : 0 };
     const prev = byKey.get(f.field_key);
@@ -857,6 +991,9 @@ export function completenessFor(typeId, fields, pack = null) {
     const alts = requirement.split('|');
     // The alternative the document reads best wins (not the first one listed).
     const hit = alts.map((k) => byKey.get(k)).filter(Boolean).reduce((b, h) => (!b || h.confidence > b.confidence ? h : b), null);
+    // Inbox round: a printed date nobody has confirmed (far future) is never bypassed by the "or number" alternative.
+    const waiting = alts.filter((k) => byKey.has(`${k}${UNCONFIRMED_SUFFIX}`) && !byKey.has(k));
+    if (waiting.length) { unconfirmed.push(waiting.join('|')); continue; }
     if (hit) {
       present.push(hit.field_key);
       satisfiedConfidences.push(hit.confidence);

@@ -14,6 +14,8 @@ export interface NeedInfo {
   /** Section the row belongs to when sections are by "what is needed". */
   groupKey: string;
   groupLabel: string;
+  /** Inbox round: one plain-language line under the section header saying why these papers are here. */
+  hint?: string;
 }
 
 /** Approved wording (also COMPANY_FILE_REASON_LABEL). */
@@ -22,12 +24,28 @@ const COPY_LABEL = COMPANY_FILE_REASON_LABEL.copy;
 /** PROPOSED wording, awaiting owner approval: the reason on an "Other" document with nothing read. */
 export const CHOOSE_TYPE_LABEL = 'Choose a document type';
 
+/** Inbox round (2026-10-21) - PROPOSED wording, awaiting owner approval (INBOX_TEAM_REPORT.md lists every string). */
+export const VOID_LABEL = 'Marked VOID - kept on file, not counted';
+export const GROUP_HINTS: Record<string, string> = {
+  'choose-type': 'We could not tell what kind of paper these are. Pick a type and the rest is filed for you.',
+  'nothing-read': 'The page could not be read clearly. Open one to check it, or upload a clearer copy.',
+  unlinked: 'These name a place or a job but match no customer yet. Choose the customer once and similar papers follow.',
+  conflict: 'Two papers disagree about the same fact. Pick the one that is right.',
+  duplicate: 'These look like the same paper uploaded twice.',
+};
+/** One line saying what is missing and why it matters, for a "Needs: ..." section. */
+export function missingHint(firstLabel: string): string {
+  return `The page did not show the ${firstLabel}. Look again on the page, or type it in once and the paper is checked.`;
+}
+
 const lowerFirst = (s: string) => (s ? s.charAt(0).toLowerCase() + s.slice(1) : s);
 
 /** Plain-words reason a document is in the queue. `requiredFields` is the document type's requirement list. */
 export function needInfo(doc: Doc, requiredFields: readonly string[]): NeedInfo {
+  // Set aside on their own (shown under Duplicates, never under Needs a person).
+  if (doc.stage !== 'verified' && doc.issues.some((i) => i.kind === 'void')) return { text: VOID_LABEL, groupKey: 'set-aside:void', groupLabel: VOID_LABEL };
   // "Other" with nothing read: linking is not the next step, a person picking the type is.
-  if (needsTypeChoice(doc)) return { text: CHOOSE_TYPE_LABEL, groupKey: 'choose-type', groupLabel: CHOOSE_TYPE_LABEL };
+  if (needsTypeChoice(doc)) return { text: CHOOSE_TYPE_LABEL, groupKey: 'choose-type', groupLabel: CHOOSE_TYPE_LABEL, hint: GROUP_HINTS['choose-type'] };
   // A company file is filed for you: its row says only the real reason (short approved labels), never "Needs: ...".
   const reasons = companyFileReasons(doc, hvacSchema);
   if (reasons.length > 0) {
@@ -35,18 +53,18 @@ export function needInfo(doc: Doc, requiredFields: readonly string[]): NeedInfo 
     return { text: reasons.map((r) => COMPANY_FILE_REASON_LABEL[r]).join(', '), groupKey: reasons[0] === 'hard-to-read' ? 'nothing-read' : `company:${reasons[0]}`, groupLabel: first };
   }
   // Nothing read from the paper: one shared group, whatever else it also lacks.
-  if (doc.issues.some((i) => i.kind === 'nothing-read')) return { text: HARD_TO_READ_LABEL, groupKey: 'nothing-read', groupLabel: HARD_TO_READ_LABEL };
+  if (doc.issues.some((i) => i.kind === 'nothing-read')) return { text: HARD_TO_READ_LABEL, groupKey: 'nothing-read', groupLabel: HARD_TO_READ_LABEL, hint: GROUP_HINTS['nothing-read'] };
   if (doc.issues.some((i) => i.kind === 'possible-copy')) return { text: COPY_LABEL, groupKey: 'possible-copy', groupLabel: COPY_LABEL };
   const present = new Set(doc.extracted.filter((f) => (f.correctedValue ?? f.value).trim()).map((f) => f.name));
   const missing = requiredFields.filter((r) => !isRequirementMet(present, r));
   if (missing.length > 0) {
     const labels = missing.map((r) => r.split('|').map((k) => lowerFirst(fieldLabel(k))).join(' or '));
-    return { text: `Needs: ${labels.join(', ')}`, groupKey: `missing:${labels[0]}`, groupLabel: `Needs: ${labels[0]}` };
+    return { text: `Needs: ${labels.join(', ')}`, groupKey: `missing:${labels[0]}`, groupLabel: `Needs: ${labels[0]}`, hint: missingHint(labels[0]!) };
   }
-  if (doc.issues.some((i) => i.kind === 'duplicate')) return { text: 'Duplicate', groupKey: 'duplicate', groupLabel: 'Duplicate' };
-  if (doc.issues.some((i) => i.kind === 'conflict')) return { text: 'Conflict', groupKey: 'conflict', groupLabel: 'Conflict' };
+  if (doc.issues.some((i) => i.kind === 'duplicate')) return { text: 'Duplicate', groupKey: 'duplicate', groupLabel: 'Duplicate', hint: GROUP_HINTS.duplicate };
+  if (doc.issues.some((i) => i.kind === 'conflict')) return { text: 'Conflict', groupKey: 'conflict', groupLabel: 'Conflict', hint: GROUP_HINTS.conflict };
   if (doc.issues.some((i) => i.kind === 'unlinked' || i.kind === 'ambiguous-name-link')) {
-    return { text: 'Needs linking', groupKey: 'unlinked', groupLabel: 'Needs linking' };
+    return { text: 'Needs linking', groupKey: 'unlinked', groupLabel: 'Needs linking', hint: GROUP_HINTS.unlinked };
   }
   if (!doc.typeId) return { text: 'Unclassified', groupKey: 'unclassified', groupLabel: 'Unclassified' };
   return { text: null, groupKey: 'other', groupLabel: 'Other' };
@@ -55,7 +73,7 @@ export function needInfo(doc: Doc, requiredFields: readonly string[]): NeedInfo 
 /** Filters whose sections are by "what is needed"; the rest are sectioned by document type. */
 const BY_NEED: ReadonlySet<Filter> = new Set<Filter>(['attention', 'gaps']);
 
-export interface Section<T> { key: string; label: string; items: T[] }
+export interface Section<T> { key: string; label: string; items: T[]; hint?: string }
 
 /**
  * Splits an already-sorted queue into sections (largest first, "Other" last).
@@ -68,7 +86,7 @@ export function sectionsFor<T extends { doc: Doc; need: NeedInfo; typeLabel: str
     const key = byNeed ? r.need.groupKey : `type:${r.typeLabel}`;
     const label = byNeed ? r.need.groupLabel : r.typeLabel;
     let s = map.get(key);
-    if (!s) { s = { key, label, items: [] }; map.set(key, s); }
+    if (!s) { s = { key, label, items: [], ...(byNeed && r.need.hint ? { hint: r.need.hint } : {}) }; map.set(key, s); }
     s.items.push(r);
   }
   const rank = (s: Section<T>) => (s.key === 'other' ? 1 : 0);

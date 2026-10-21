@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { Check, AlertTriangle, ArrowLeft, Bell, Link2, GitMerge, Copy, Loader2, Plus, Search, Sparkles, Trash2, UserCog } from 'lucide-react';
 import { StagePill, stageLabel } from '../components/StagePill';
 import { DocumentPreview } from '../components/DocumentPreview';
+import { requiredFieldsForDoc, isSetAside } from '../core/entityGraph';
+import { documentKindFor } from '../domains/hvac/documentTypes';
 import { conflictDocs, entitiesOfType, companyFileNeedsLook, gapDocs, isCompanyFileDoc, isNothingRead, isRequirementMet, maxStageFor, unlinkedDocs, useGraph, type GraphSnapshot } from '../core/entityGraph';
 import type { Conflict, Doc, Entity, SourceRef } from '../core/types';
 import { targetFor } from '../domains/hvac/intake';
@@ -69,6 +71,11 @@ function safeSetHideShopRecords(v: boolean) {
 // reasoning).
 const REVIEW_IS_DEMO_ONLY = import.meta.env?.VITE_DEMO_MODE === 'true';
 
+// Inbox round (2026-10-21) - PROPOSED wording, awaiting owner approval (listed in INBOX_TEAM_REPORT.md).
+const SET_ASIDE_NOTE = (n: number) => `${n} ${n === 1 ? 'paper was' : 'papers were'} set aside on their own: VOID papers and copies of papers already on file. They stay on file and are not counted in totals.`;
+const SET_ASIDE_LINK = 'See them';
+const LOOK_AGAIN_LABEL = (n: number) => `Look again on the page for ${n === 1 ? 'this one' : `all ${n}`}`;
+
 // Filter/FILTERS live in reviewFilters.ts (round 17, InboxScreen.tsx merge —
 // pure data, split out so neither this file nor InboxScreen.tsx mixes a
 // component export with a plain data export — a value re-export from here
@@ -81,6 +88,8 @@ export type { Filter };
  *  person" always means the exact same set of documents everywhere it's
  *  offered — never a second, slightly different definition. */
 export function isAttention(doc: Doc): boolean {
+  // Inbox round (2026-10-21): a VOID paper or a copy of a paper already on file is set aside on its own (kept out of totals).
+  if (isSetAside(doc)) return false;
   // A company file needs a person only for a real reason (unreadable, no total, a copy, unsure folder).
   if (isCompanyFileDoc(doc, hvacSchema)) return doc.stage !== 'verified' && companyFileNeedsLook(doc, hvacSchema);
   return doc.stage !== 'verified' && (doc.issues.length > 0 || doc.stage === 'received');
@@ -107,7 +116,7 @@ function matches(doc: Doc, f: Filter, sets: QueueSets): boolean {
     case 'gaps': return sets.gaps.has(doc.id);
     case 'unlinked': return sets.unlinked.has(doc.id);
     case 'conflicts': return sets.conflicts.has(doc.id);
-    case 'duplicates': return doc.issues.some((i) => i.kind === 'duplicate' || i.kind === 'possible-copy');
+    case 'duplicates': return doc.issues.some((i) => i.kind === 'duplicate' || i.kind === 'possible-copy' || i.kind === 'void');
     // Only substantive documents are listed (something was read), and there is no verify-all: each one is checked by a person.
     case 'ready': return doc.stage === 'linked' && doc.issues.length === 0 && !isNothingRead(doc);
     case 'shop-records': return doc.stage !== 'verified' && companyFileNeedsLook(doc, hvacSchema);
@@ -590,14 +599,15 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
   const missingQueueIds = useMemo(() => queue.filter((d) => d.issues.some((i) => i.kind === 'missing-field')).map((d) => d.id), [queue]);
   const [recheckAllBusy, setRecheckAllBusy] = useState(false);
   const [recheckAllMsg, setRecheckAllMsg] = useState<string | null>(null);
-  const runRecheckAll = async () => {
-    if (!missingQueueIds.length) return;
+  const runRecheckAll = async (onlyIds?: string[]) => {
+    const targetIds = onlyIds && onlyIds.length ? onlyIds : missingQueueIds;
+    if (!targetIds.length) return;
     setRecheckAllBusy(true);
     setRecheckAllMsg(null);
     try {
       let checked = 0, fixedDocs = 0, fields = 0;
-      for (let i = 0; i < missingQueueIds.length; i += 100) {
-        const r = await reviewClient.recheckMissing(missingQueueIds.slice(i, i + 100), 100);
+      for (let i = 0; i < targetIds.length; i += 100) {
+        const r = await reviewClient.recheckMissing(targetIds.slice(i, i + 100), 100);
         checked += r.rechecked; fixedDocs += r.filled; fields += r.fields;
       }
       try { await loadGraphFromServer(); } catch { /* keep last-good data */ }
@@ -683,18 +693,22 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
   };
 
   const doc = selectedDocumentId ? graph.docs[selectedDocumentId] : undefined;
+  // Inbox round: papers set aside on their own (VOID, or a copy of one on file), shown as one quiet line, never as work.
+  const setAsideCount = useMemo(() => Object.values(graph.docs).filter(isSetAside).length, [graph.docs]);
 
   // ---- Rows, sections and the render cap (400-3,000 documents must stay cheap) ----
   const rows = useMemo<QueueRowData[]>(() => {
     const typeById = new Map(graph.schema.documentTypes.map((t) => [t.id, t]));
     return queue.map((d) => {
       const t = d.typeId ? typeById.get(d.typeId) : undefined;
+      const kind = d.typeId ? documentKindFor(d.typeId, d.filename, d.displayName ?? null) : null;
+      const typeText = t ? (kind ? `${t.label} · ${kind.label}` : t.label) : 'Unclassified';
       return {
         doc: d,
         name: documentName(d),
-        sub: [t?.label ?? 'Unclassified', hasFriendlyName(d) ? d.filename : null].filter(Boolean).join(' · '),
+        sub: [typeText, hasFriendlyName(d) ? d.filename : null].filter(Boolean).join(' · '),
         typeLabel: t?.label ?? 'Unclassified',
-        need: needInfo(d, t?.requiredFields ?? []),
+        need: needInfo(d, requiredFieldsForDoc(d, t)),
         // Owner defect report (2026-09-22): visible in both "My work" and "Everyone".
         assignee: work.hasShop ? (d.uploadedBy && work.nameByUserId.get(d.uploadedBy)) || 'Teammate' : null,
         hasReminder: d.extracted.some((f) => f.name === 'reminder_text' && (f.correctedValue ?? f.value).trim()),
@@ -971,6 +985,12 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
               {!canAdmin && <AskAdminNote />}
             </div>
           )}
+          {filter === 'attention' && setAsideCount > 0 && (
+            <p className="text-caption text-ink-3">
+              {SET_ASIDE_NOTE(setAsideCount)}{' '}
+              <button type="button" className="underline text-accent min-h-[44px] px-1" onClick={() => setFilter('duplicates')}>{SET_ASIDE_LINK}</button>
+            </p>
+          )}
           <span className="hidden lg:inline text-caption text-ink-3 lg:ml-auto">Tip: j / k to move, Enter to open</span>
         </div>
         {recheckAllMsg && <p className="text-caption text-ink-3">{recheckAllMsg}</p>}
@@ -1110,6 +1130,7 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
               </div>
             ) : (
               <NeedsYouList
+                sectionAction={(filter === 'gaps' || filter === 'attention') && canAdmin && !REVIEW_IS_DEMO_ONLY ? (sec) => (sec.key.startsWith('missing:') ? { label: LOOK_AGAIN_LABEL(sec.items.length), busy: recheckAllBusy, run: () => void runRecheckAll(sec.items.map((r) => r.doc.id)) } : null) : undefined}
                 sections={sections}
                 cap={cap}
                 total={rows.length}
@@ -1227,7 +1248,8 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
   const present = new Set(doc.extracted.filter((f) => (f.correctedValue ?? f.value).trim()).map((f) => f.name));
   // Required fields may be `a|b` alternatives (either satisfies) — see the
   // team brief's CANONICAL REQUIRED FIELDS and core/entityGraph.ts.
-  const missing = (type?.requiredFields ?? []).filter((r) => !isRequirementMet(present, r));
+  const docRequired = requiredFieldsForDoc(doc, type);
+  const missing = docRequired.filter((r) => !isRequirementMet(present, r));
   const unlinked = doc.issues.find((i) => i.kind === 'unlinked');
   const duplicate = doc.issues.find((i) => i.kind === 'duplicate');
   const companyFile = isCompanyFileDoc(doc, graph.schema);
@@ -1384,7 +1406,7 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
                 basis for the verification instead of taking it on faith. */}
             {type && (
               <ul className="text-caption text-ok-ink dark:text-ok-bg divide-y divide-ok/20">
-                {type.requiredFields.map((requirement) => {
+                {docRequired.map((requirement) => {
                   const keys = requirement.split('|');
                   const f = doc.extracted.find((x) => keys.includes(x.name) && (x.correctedValue ?? x.value).trim());
                   return (
@@ -1445,7 +1467,7 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
               </button>
             ))}
           </div>
-          {type && type.requiredFields.length > 0 && <p className="text-caption text-ink-3">Requires: {type.requiredFields.map(requirementLabel).join(', ')}</p>}
+          {type && docRequired.length > 0 && <p className="text-caption text-ink-3">Requires: {docRequired.map(requirementLabel).join(', ')}</p>}
         </section>
       )}
 

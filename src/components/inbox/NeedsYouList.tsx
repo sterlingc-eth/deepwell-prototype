@@ -70,10 +70,12 @@ interface ListProps {
   onSelect: (id: string) => void;
   onShowMore: () => void;
   step: number;
+  /** Inbox round: an optional one-click action for a whole section ("Look again on the page for all 12"); null = none. */
+  sectionAction?: (section: Section<QueueRowData>) => { label: string; busy?: boolean; run: () => void } | null;
 }
 
 /** Sectioned, capped list. Sections carry small sticky headers with their full counts. */
-export function NeedsYouList({ sections, cap, total, activeId, fallbackFocusId, onSelect, onShowMore, step }: ListProps) {
+export function NeedsYouList({ sections, cap, total, activeId, fallbackFocusId, onSelect, onShowMore, step, sectionAction }: ListProps) {
   let left = cap;
   const shown: { section: Section<QueueRowData>; rows: QueueRowData[] }[] = [];
   for (const s of sections) {
@@ -92,6 +94,15 @@ export function NeedsYouList({ sections, cap, total, activeId, fallbackFocusId, 
               <span className="truncate text-body font-semibold text-ink">{section.label}</span>
               <span className="font-mono text-caption text-ink-3 shrink-0">{section.items.length}</span>
             </h3>
+            {(section.hint || sectionAction?.(section)) && (
+              <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-1.5 bg-surface-2 border-b border-line">
+                {section.hint && <p className="text-caption text-ink-3 min-w-0">{section.hint}</p>}
+                {(() => {
+                  const a = sectionAction?.(section);
+                  return a ? <button type="button" className="dw-btn-tertiary !min-h-[44px] !py-1 shrink-0" disabled={a.busy} onClick={a.run}>{a.label}</button> : null;
+                })()}
+              </div>
+            )}
             <ul className="divide-y divide-line">
               {rows.map((r) => (
                 <QueueRow key={r.doc.id} row={r} active={r.doc.id === activeId} focusable={activeId ? r.doc.id === activeId : r.doc.id === fallbackFocusId} onSelect={onSelect} />

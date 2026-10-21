@@ -139,6 +139,8 @@ export type DocumentIssue =
   // Filename-and-number look-alike of another document ("(copy)", "(2)", "v2" plus the same document number or cost).
   // A hint, not a certainty: shown as "Might be a copy" and never hides the document from answers.
   | { kind: 'possible-copy'; of: DocumentId }
+  // Inbox round (2026-10-21): the paper says VOID (file name or title). Kept on file, set aside on its own, never counted.
+  | { kind: 'void' }
   // Limit-test defect D (2026-09-20): this document was linked to its
   // customer by name alone (no address to disambiguate), and that surname
   // now matches 2+ other non-merged customers — order-dependent at the time

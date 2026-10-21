@@ -167,7 +167,7 @@ const LABELS = [
   L("agreement_term", "(?:agreement\\s+(?:period|term)|contract\\s+(?:period|term)|coverage\\s+period)"),
   L("DATE", "(?:date|dated)", "date"),
   L("customer_name", "(?:bill(?:ed)?\\s+to|sold\\s+to|customer(?:\\s+name)?|client(?:\\s+name)?|account(?:\\s+name)?|homeowner(?:\\s+name)?|property\\s+owner)"),
-  L("service_address", "(?:service\\s+(?:address|location)|job\\s+(?:address|site|location)|site\\s+address|property\\s+address|install(?:ation)?\\s+address)", "address"),
+  L("service_address", "(?:service\\s+(?:address|location)|job\\s+(?:address|site|location)|site\\s+address|property\\s+address|install(?:ation)?\\s+address|premises|rental\\s+premises|unit\\s+address)", "address"),
   L("PHONE", "(?:customer\\s+phone|contact\\s+phone|homeowner\\s+phone|phone(?:\\s*(?:#|no\\.?|number))?|ph|tel(?:ephone)?|cell|mobile)", "phone"),
   L("EMAIL", "(?:customer\\s+email|homeowner\\s+email|contact\\s+email|e-?mail(?:\\s+address)?)", "email"),
   L("EQUIPMENT", "(?:equipment|unit\\s+installed|system)"),
@@ -749,7 +749,7 @@ const SCAN_EXTRA = [
 const SCAN_REPLACED = new Set(["IGNORE", "customer_name", "cost", "invoice_number", "agreement_term"]);
 const SCAN_SYNONYM_LABELS = [
   L("customer_name", `(?:${labelSrc("customer")})`),
-  L("DOCDATE", `(?:${labelSrc("invoiceDate", "receiptDate", "statementDate", "deliveryDate", "agreementDate", "quoteDate", "letterDate", "certificateDate")})`, "docdate"),
+  L("DOCDATE", `(?:${labelSrc("invoiceDate", "receiptDate", "statementDate", "deliveryDate", "agreementDate", "quoteDate", "letterDate", "certificateDate", "workOrderDate")})`, "docdate"),
   L("cost", `(?:${labelSrc("cost", "costPaid")})`, "money"),
   L("invoice_number", `(?:${labelSrc("documentNumber")}|(?:invoice|work\\s+order|ticket|wo|inv)${NUMTAG})`),
   // an agreement / lease / policy period and where it ends. The bare word "term" is NOT here ("Term: Net 30" is payment terms).

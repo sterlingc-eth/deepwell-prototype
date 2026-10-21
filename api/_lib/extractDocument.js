@@ -18,6 +18,8 @@ import { updateDossierForDocument } from "./search/dossier.js";
 import {
   normalizeDocumentType,
   resolveDocumentType,
+  isLabelValue,
+  isVoidMarked,
   isLegacyOrUnknownType,
   completenessFor,
   isShopInternalDocument,
@@ -35,7 +37,7 @@ import { extractFromText } from "./modelAvoidance/textExtract.js";
 import { isDeterministicExtractEnabled, isGenericExtractEnabled } from "./modelAvoidance/switches.js";
 // R33: a REQUIRED field the extraction left empty is looked up on the page by its printed label — see labelFill.js.
 import { planLabelFill, corroborateFields } from "./modelAvoidance/labelFill.js";
-import { loadOwnNames, applyOwnCompanyGuard, isOwnName } from "./modelAvoidance/ownCompany.js";
+import { loadOwnNames, applyOwnCompanyGuard, isOwnName, issuerNotCustomer } from "./modelAvoidance/ownCompany.js";
 import { planStoredTextRead, NOTHING_READ_ACTION, readableChars, setNothingReadMarker, clearNothingReadMarker } from "./modelAvoidance/storedTextReread.js";
 export { reextractFromStoredText, NOTHING_READ_ACTION } from "./modelAvoidance/storedTextReread.js";
 
@@ -232,6 +234,10 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
   // A customer_name that is only a business suffix ("Management", "Inc.",
   // "Group") is a parse fragment, not a name: never store it as an identity.
   fields = fields.filter((f) => !(f.field_key === 'customer_name' && isFragmentName(f.value)));
+  // Inbox round (2026-10-21): a label read as a name ("DELIVERED TO", "Bill To", "N/A", "Walk-in") is never a party.
+  fields = fields.filter((f) => !((f.field_key === 'customer_name' || f.field_key === 'vendor') && isLabelValue(f.value)));
+  // Inbox round: the business on the letterhead issued the paper; it is never also its customer.
+  try { fields = issuerNotCustomer(fields, selected, ownNames).fields; } catch (err) { console.error("issuer check skipped:", err?.message); }
 
   // F1: our own company is never the customer (a bill addressed TO us used to create us as a customer) and never the vendor.
   const ownGuard = applyOwnCompanyGuard(fields, ownNames);
@@ -302,7 +308,7 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
   let corroborated = [];
   if (!pack || pack.id === 'hvac') {
     try {
-      const plan = planLabelFill({ type: resolvedType, fields, pages: selected, method: 'label-fill', pageCount: highestPage, ownNames });
+      const plan = planLabelFill({ type: resolvedType, fields, pages: selected, method: 'label-fill', pageCount: highestPage, ownNames, filename: doc.original_filename ?? null });
       labelFillAmbiguous = plan.ambiguous;
       if (plan.add.length) {
         labelFilled = plan.add;
@@ -534,7 +540,7 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
     // AI_VERIFY_MIN_CONFIDENCE or better, and the document is actually linked
     // to a record. verifyByAi (recordsStore.js) re-checks the link itself in
     // SQL, forward-only — this is a cheap pre-check, not the source of truth.
-    const completeness = completenessFor(resolvedType, fields, pack);
+    const completeness = completenessFor(resolvedType, fields, pack, { filename: doc.original_filename ?? null });
     let aiVerified = false;
     // F1: a document that had NO fields and was typed only by a re-read of its own page text is not auto-verified as an untyped
     // ("other") document: nothing about it was ever required, so "complete" proves nothing.
@@ -542,7 +548,9 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
     // Money guard (documentTypes.js moneyAmountsConfident): an amount below the bar that the page does not corroborate
     // blocks the automatic check on the linked path too, not only on the unlinked one.
     const pageHasText = pages.some((p) => String(p.text ?? '').trim() !== '');
-    if (!untypedReread && completeness.complete && completeness.minConfidence >= AI_VERIFY_MIN_CONFIDENCE && moneyAmountsConfident(fields)) {
+    // Inbox round: a VOID paper is kept on file and never checked (so never counted).
+    const voidPaper = isVoidMarked({ filename: doc.original_filename, text: pages.map((p) => String(p.text ?? '')).join('\n').slice(0, 20000) });
+    if (!untypedReread && !voidPaper && completeness.complete && completeness.minConfidence >= AI_VERIFY_MIN_CONFIDENCE && moneyAmountsConfident(fields)) {
       aiVerified = (await db.verifyByAi(documentId, { allowUnlinked: mayVerifyWithoutLink(resolvedType, fields, { hasText: pageHasText, filename: doc.original_filename }) })) > 0;
     }
 

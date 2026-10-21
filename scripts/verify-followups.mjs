@@ -69,7 +69,8 @@ eq(
   'missingFieldsForDocument reuses documentTypes.js completenessFor: work-order missing everything',
   missingFieldsForDocument({ document_type: 'work-order', extractions: [] }),
   // Document-rules round (2026-10-09): a work order no longer requires a technician (owner decision).
-  ['service_address', 'service_date']
+  // Inbox round (2026-10-21): a printed work-order number identifies the paper when no date was read.
+  ['service_address', 'service_date|invoice_number']
 );
 eq(
   'missingFieldsForDocument: a satisfied requirement drops out',
@@ -79,7 +80,7 @@ eq(
       { field_key: 'service_address', value: '123 Main St', confidence: 0.9 },
     ],
   }),
-  ['service_date']
+  ['service_date|invoice_number']
 );
 eq('missingFieldsForDocument: a fully satisfied document has nothing missing', missingFieldsForDocument({
   document_type: 'nameplate-photo',

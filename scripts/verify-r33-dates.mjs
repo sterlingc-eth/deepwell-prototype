@@ -401,7 +401,7 @@ if (PGlite) {
   // -- "Re-check this document" on the Sonoran ticket
   const r1 = await RC.recheckDocument(ctxA, sonoran, { actorClerkId: 'user_owner', source: 'inbox', today: TODAY });
   eq('re-check (Sonoran ticket): restores the printed date as service_date_unconfirmed, flagged far_future, provenance recheck', r1.filled.map((f) => [f.field_key, f.value, f.method, f.flags]), [['service_date_unconfirmed', '2028-10-19', 'recheck', ['future', 'far_future']]]);
-  eq('...the document is no longer "missing" anything; the date waits for a confirm; not auto-verified', [r1.missingBefore, r1.completeness.missing, r1.completeness.unconfirmed, r1.aiVerified], [['service_date'], [], ['service_date'], false]);
+  eq('...the document is no longer "missing" anything; the date waits for a confirm; not auto-verified', [r1.missingBefore, r1.completeness.missing, r1.completeness.unconfirmed, r1.aiVerified], [['service_date|invoice_number'], [], ['service_date'], false]); // inbox round: date-or-number requirement
   const rows1 = await rowsOf(tenA, sonoran);
   check('...written as facet + extraction under segment field-recheck (the provenance marker)', rows1.some((r) => r.field_key === 'service_date_unconfirmed' && r.value === '2028-10-19' && r.segment_id === 'field-recheck'));
   const audit = (await lite.query(`SELECT changes FROM audit_log WHERE tenant_id = $1 AND resource_id = $2 AND action = 'document.fields_rechecked'`, [tenA, sonoran])).rows;

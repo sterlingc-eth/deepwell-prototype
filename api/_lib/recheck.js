@@ -64,6 +64,7 @@ export async function recheckDocumentTx(db, documentId, { actorClerkId = null, s
     ownNames,
     type, fields: rows.map((r) => ({ field_key: r.field_key, value: r.value, corrected_value: r.corrected_value, confidence: Number(r.confidence ?? 0) })),
     pages: pages.map((p) => ({ page_no: p.page_no, text: p.text ?? "" })), today, method: "recheck", pageCount: highestPage,
+    filename: doc.original_filename ?? null,
   });
 
   const entityId = rows.find((r) => r.entity_id)?.entity_id ?? null;
@@ -112,7 +113,8 @@ export async function recheckDocumentTx(db, documentId, { actorClerkId = null, s
   {
     const hasText = pages.some((p) => String(p.text ?? '').trim() !== '');
     const link = await db.raw(`SELECT ${HAS_LINK_SQL} AS linked, d.original_filename AS filename FROM documents d WHERE d.id = $1::uuid`, [documentId]);
-    const verdict = autoCheckDecision(type, fieldsAfter, { hasText, hasLink: !!link.rows?.[0]?.linked, filename: link.rows?.[0]?.filename ?? null });
+    const pageText = pages.map((p) => String(p.text ?? "")).join("\n").slice(0, 20000);
+    const verdict = autoCheckDecision(type, fieldsAfter, { hasText, hasLink: !!link.rows?.[0]?.linked, filename: link.rows?.[0]?.filename ?? null, text: pageText });
     checkReason = verdict.reason;
     if (verdict.ok) aiVerified = (await db.verifyByAi(documentId, { allowUnlinked: verdict.allowUnlinked })) > 0;
   }

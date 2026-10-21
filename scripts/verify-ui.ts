@@ -433,7 +433,8 @@ const eq = (name: string, got: unknown, want: unknown): void =>
   eq('DOCUMENT_TYPES ids match the backend exactly', hvacDocTypes.DOCUMENT_TYPES.map((t) => t.id), backendDocTypes.DOCUMENT_TYPES.map((t: { id: string }) => t.id));
   eq('DOCUMENT_TYPES labels match the backend exactly', hvacDocTypes.DOCUMENT_TYPES.map((t) => t.label), backendDocTypes.DOCUMENT_TYPES.map((t: { label: string }) => t.label));
   // 16 before the document-rules round; +8 generic business types (receipt, agreement, delivery-ticket, schedule, price-list, statement, insurance-certificate, hr-letter).
-  eq('there are exactly the 24 canonical types (16 HVAC-era + 8 generic business types)', hvacDocTypes.DOCUMENT_TYPES.length, 24);
+  // Inbox round (2026-10-21): + license-certification.
+  eq('there are exactly the 25 canonical types (16 HVAC-era + 8 generic business types + licence)', hvacDocTypes.DOCUMENT_TYPES.length, 25);
   eq('COMPANY_RECORD_TYPES matches the backend exactly', [...hvacDocTypes.COMPANY_RECORD_TYPES].sort(), [...backendDocTypes.COMPANY_RECORD_TYPES].sort());
   eq('COMPANY_RECORD_IF_NO_CUSTOMER_TYPES matches the backend exactly', [...hvacDocTypes.COMPANY_RECORD_IF_NO_CUSTOMER_TYPES].sort(), [...backendDocTypes.COMPANY_RECORD_IF_NO_CUSTOMER_TYPES].sort());
   eq('LINK_OPTIONAL_TYPES matches the backend exactly', [...hvacDocTypes.LINK_OPTIONAL_TYPES].sort(), [...backendDocTypes.LINK_OPTIONAL_TYPES].sort());

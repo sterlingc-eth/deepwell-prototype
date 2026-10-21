@@ -103,7 +103,7 @@ export const ALWAYS_CUSTOMER_TYPES: Set<string> = new Set([
 ]);
 /** Types that are always the company's own paper: a vendor or bill-to name never pulls them to a customer. */
 export const ALWAYS_COMPANY_TYPES: Set<string> = new Set([
-  'receipt', 'purchase-order', 'schedule', 'price-list', 'hr-letter', 'insurance-certificate',
+  'receipt', 'purchase-order', 'schedule', 'price-list', 'hr-letter', 'insurance-certificate', 'license-certification',
 ]);
 
 const BANK_RE = /\b(bank|credit union|visa|mastercard|master card|amex|american express|discover|card services|fuel|fleet|wex|fleetcor|chase|wells fargo|capital one|citi|paypal|stripe|square|loan)\b/i;
@@ -169,7 +169,8 @@ export function companyFolderInfo(doc: CompanyDoc, opts: FolderOpts = {}): Folde
   let confident = true;
   switch (t) {
     case 'hr-letter': folder = 'people-hr'; break;
-    case 'insurance-certificate': folder = evPlace ? null : 'insurance-legal'; break;
+    case 'insurance-certificate':
+    case 'license-certification': folder = evPlace ? null : 'insurance-legal'; break;
     case 'schedule': folder = evPlace ? null : 'schedules-operations'; break;
     case 'price-list': folder = evPlace ? null : 'suppliers-vendors'; break;
     case 'purchase-order': folder = evPlace ? null : 'purchasing'; break;

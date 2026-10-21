@@ -83,7 +83,8 @@ const f = (field_key: string, confidence = 0.95, value = 'x') => ({ field_key, v
   eq('title and name disagree -> leave', R({ currentType: 'invoice', filename: 'Receipt 1.pdf', titleType: 'agreement' }), null);
   eq('COI filed as warranty registration -> insurance certificate', R({ currentType: 'warranty-registration', filename: 'COI - Palo 2025.pdf' }), 'insurance-certificate');
   eq('floater filed as warranty registration -> insurance certificate', R({ currentType: 'warranty-registration', filename: 'Equipment Floater Declarations 2026-2027.pdf' }), 'insurance-certificate');
-  eq('licence filed as warranty registration -> other (company paper)', R({ currentType: 'warranty-registration', filename: 'Plumbing License - Chloe Alvarez.pdf' }), 'other');
+  // Inbox round (2026-10-21): licences now have their own company-paper type (was 'other').
+  eq('licence filed as warranty registration -> license-certification (company paper)', R({ currentType: 'warranty-registration', filename: 'Plumbing License - Chloe Alvarez.pdf' }), 'license-certification');
   eq('subcontract filed as warranty registration -> agreement', R({ currentType: 'warranty-registration', filename: 'Subcontract SC-133 - Meridian.pdf' }), 'agreement');
   eq('a real warranty card (serial on file) is not moved', R({ currentType: 'warranty-registration', filename: 'COI copy.pdf', hasEquipmentFacts: true }), null);
   eq('internal -> schedule by name', R({ currentType: 'internal', filename: 'Schedule Week of 2026-06-08.pdf' }), 'schedule');

@@ -24,6 +24,7 @@ import { loadOwnNames, applyOwnCompanyGuard } from "./ownCompany.js";
 import {
   completenessFor, toCompletenessFields, normalizeDocumentType, mayVerifyWithoutLink, AI_VERIFY_MIN_CONFIDENCE,
   isLegacyOrUnknownType, inferTypeFromFilename, isSyntheticKey,
+  isVoidMarked,
 } from "../documentTypes.js";
 
 export const NOTHING_READ_ACTION = "document.nothing_read";
@@ -73,7 +74,7 @@ export function planStoredTextRead({ documentType, storedType, filename, pages, 
   const chars = readableChars(pages);
   if (chars < MIN_READABLE_CHARS) return { type, add: [], ambiguous: [], readable: false, chars };
   const plan = planLabelFill({
-    type, fields: [], pages, method: "text-reread", pageCount, today, ownNames, allKeys: true,
+    type, fields: [], pages, method: "text-reread", pageCount, today, ownNames, allKeys: true, filename,
     pack: pack && pack.id !== "hvac" ? pack : null,
   });
   const { fields } = applyOwnCompanyGuard(plan.add, ownNames);
@@ -177,8 +178,9 @@ export async function reextractFromStoredText(ctx, documentId, { actorClerkId = 
 
     // 4) verify when the document is now complete at the bar and linked (same rule as ingest); an untyped document is never auto-verified off a re-read.
     let aiVerified = false;
-    const completeness = completenessFor(docType, toCompletenessFields(after.map((f) => ({ field_key: f.field_key, value: f.value, confidence: f.confidence }))));
-    if ((filled.length || corroborated.length) && docType !== "other" && completeness.complete && completeness.minConfidence >= AI_VERIFY_MIN_CONFIDENCE) {
+    const completeness = completenessFor(docType, toCompletenessFields(after.map((f) => ({ field_key: f.field_key, value: f.value, confidence: f.confidence }))), null, { filename: doc.original_filename ?? null });
+    const voidPaper = isVoidMarked({ filename: doc.original_filename, text: (pagesIn ?? []).map((p) => String(p?.text ?? "")).join("\n").slice(0, 20000) });
+    if ((filled.length || corroborated.length) && docType !== "other" && !voidPaper && completeness.complete && completeness.minConfidence >= AI_VERIFY_MIN_CONFIDENCE) {
       aiVerified = (await db.verifyByAi(documentId, { allowUnlinked: mayVerifyWithoutLink(docType, after, { hasText: true, filename: doc.original_filename }) })) > 0;
     }
 

@@ -90,6 +90,8 @@ const CASES: Case[] = [
   { name: 'hr-letter', type: 'hr-letter', fields: { customer_name: 'J Smith' }, want: 'people-hr' },
   { name: 'hr-letter stays in People and HR even with an address', type: 'hr-letter', fields: { service_address: '9 Home Ave' }, linked: true, want: 'people-hr' },
   { name: 'insurance-certificate', type: 'insurance-certificate', fields: { vendor: 'Acme Insurance' }, want: 'insurance-legal' },
+  // Inbox round (2026-10-21): a trade licence is company paper, filed with insurance and legal.
+  { name: 'license-certification', type: 'license-certification', fields: { customer_name: 'Grace Walsh' }, want: 'insurance-legal' },
   { name: 'schedule', type: 'schedule', fields: { notes: 'Mon Ana' }, want: 'schedules-operations' },
   // correspondence: by customer found
   { name: 'correspondence naming a customer', type: 'correspondence', fields: { customer_name: 'Pat Lee' }, want: null },

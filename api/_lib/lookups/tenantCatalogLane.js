@@ -35,8 +35,11 @@ function typesFor(types, phrase) {
   if (!p) return [];
   const exact = types.filter((x) => x.t === p || (x.qual && `${x.qual} ${x.base}` === p));
   if (exact.length) return exact;
-  return types.filter((x) => x.base === p);
+  const base = types.filter((x) => x.base === p);
+  if (base.length || p.length < 6) return base;
+  return types.filter((x) => x.base.length >= 6 && lev(x.base, p) <= 2); // typo tolerance, vocabulary still the tenant's own types
 }
+function lev(a, b) { const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]); for (let j = 1; j <= b.length; j++) d[0][j] = j; for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[a.length][b.length]; }
 const label = (x) => (x.qual ? `${x.qual} ${x.base}` : x.base);
 const typeText = (ts) => (ts.length === 1 ? label(ts[0]) : ts[0].base);
 
@@ -57,10 +60,57 @@ async function equipCountLane(db, q) {
   if (!m) return null;
   const types = await equipTypes(db);
   const ts = typesFor(types, m[1]);
-  if (!ts.length) return null;
+  if (!ts.length) return await absentTypeCount(db, m[1], types);
   const r = await db.raw(`SELECT e.id, e.customer_id, e.data->>'manufacturer' AS manufacturer, e.data->>'equipment_type' AS equipment_type, e.data->>'model' AS model, e.data->>'serial_number' AS serial_number FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND lower(e.data->>'equipment_type') = ANY($1::text[])`, [ts.map((x) => x.t)]);
   const n = r.rows.length; const nm = typeText(ts);
   return ok(`${n} ${nm}${n === 1 ? "" : "s"} on file (by the equipment type on each unit record).`, [{ label: `Units: ${nm}`, value: String(n), sources: [] }], r.rows.slice(0, 20).map(unitRec).filter(Boolean), `Counted the equipment records whose type is ${ts.map((x) => x.t).join(" or ")}.`);
+}
+
+/** R41: "how many washers" when the tenant has no such equipment type: honest 0 + the types it does have (never the total, never a generic no-answer).
+ *  Only fires for a short plain noun that appears nowhere in this tenant's data and is not a generic collective word. */
+const GENERIC = /^(?:appliance|equipment|unit|thing|item|system|machine|piece|asset|record|row|entry|one|device|fixture|property|building|door|lease|document|file|page|question|dollar)s?$/;
+const EQUIP_NOUN = /^(?:washers?|dryers?|furnaces?|boilers?|heaters?|pumps?|softeners?|refrigerators?|fridges?|dishwashers?|ranges?|ovens?|stoves?|microwaves?|freezers?|disposals?|faucets?|toilets?|valves?|tanks?|filters?|thermostats?|compressors?|humidifiers?|dehumidifiers?|conditioners?|ices?makers?|hoods?|sinks?|showers?|tubs?|meters?|preventers?|osmosis|purifiers?)$/;
+async function absentTypeCount(db, phrase, types) {
+  const words = phrase.toLowerCase().replace(/[^a-z ]/g, " ").split(/\s+/).filter(Boolean);
+  if (!words.length || words.length > 2 || words.some((w) => GENERIC.test(w) || w.length < 4)) return null;
+  if (!EQUIP_NOUN.test(words[words.length - 1])) return null; // only recognise "this is asking about an equipment type" - the answer itself comes from the tenant's rows
+  const stem = (w) => { const x = sing(w); return x.length > 5 ? x.slice(0, -1) : x; }; // tolerate one trailing typo letter
+  const needle = words.map(stem).join(" ");
+  const seen = await db.raw(`SELECT 1 FROM entities WHERE data::text ~* $1 UNION ALL SELECT 1 FROM extractions WHERE value ~* $1 LIMIT 1`, [`\\m${needle.replace(/[^a-z ]/g, "")}`]);
+  if (seen.rows.length) return null;
+  const known = [...new Set(types.map((x) => x.base))].sort();
+  if (!known.length) return null;
+  return ok(`0 ${singPhrase(phrase)}s on file: that equipment type isn't in your records. The types I do have are ${known.join(", ")}.`, [], [], `Searched every equipment type and record for "${needle}"; none matched.`);
+}
+
+/** R41: "how many open work orders" - a status word qualifies a document type; count by the tenant's own status values, honest 0 when none matches. */
+const STATUS_GROUPS = { completed: ["completed", "complete", "done", "finished", "closed"], open: ["open", "pending", "in progress", "scheduled", "active", "unfinished", "outstanding", "new"], cancelled: ["cancelled", "canceled", "void", "voided"], paid: ["paid"], unpaid: ["unpaid", "overdue", "past due", "outstanding", "open"] };
+async function statusDocCountLane(db, q) {
+  const m = /^how many (open|pending|completed|complete|closed|scheduled|in progress|cancell?ed|finished|done|active|outstanding|overdue|past due|unfinished|unpaid|paid) (.+?)(?:\s+(?:do we have|are there|are open|on file|we have|right now|currently|so far))?$/i.exec(q);
+  if (!m) return null;
+  const mod = m[1].toLowerCase();
+  const words = m[2].toLowerCase().split(/\s+/).filter(Boolean).map(sing);
+  if (!words.length || words.length > 3) return null;
+  const dt = await db.raw(`SELECT d.document_type AS t FROM documents d WHERE ${notPrivateSql("d")} AND d.document_type IS NOT NULL GROUP BY 1`);
+  const hits = dt.rows.map((x) => ({ t: x.t, toks: new Set(String(x.t).toLowerCase().split(/[-_\s]+/).map(sing)) })).filter((x) => words.every((w) => x.toks.has(w)));
+  if (hits.length !== 1) return null;
+  const t = hits[0].t; const nm = t.replace(/[-_]/g, " ");
+  const st = await db.raw(`SELECT lower(x.value) AS v, count(DISTINCT d.id)::int AS n FROM documents d JOIN extractions x ON x.document_id = d.id AND x.field_key = 'status' WHERE ${notPrivateSql("d")} AND d.document_type = $1 GROUP BY 1`, [t]);
+  if (!st.rows.length) return null;
+  const grp = Object.values(STATUS_GROUPS).filter((g) => g.includes(mod.replace(/^cancelled$/, "cancelled")));
+  const want = new Set(grp.flat().concat(mod));
+  const matched = st.rows.filter((r) => want.has(r.v));
+  const total = st.rows.reduce((a, r) => a + r.n, 0);
+  const n = matched.reduce((a, r) => a + r.n, 0);
+  const have = st.rows.map((r) => `${r.v} (${r.n})`).join(", ");
+  const text = n ? `${n} ${mod} ${nm}${n === 1 ? "" : "s"} on file (by the status on each record).` : `0 ${mod} ${nm}s: none of the ${total} ${nm}s on file has a status that means ${mod}. Statuses on file: ${have}.`;
+  let recs = [];
+  if (n) {
+    const vals = matched.map((r) => r.v);
+    const docs = await db.raw(`SELECT d.id, d.original_filename FROM documents d JOIN extractions x ON x.document_id = d.id AND x.field_key = 'status' AND lower(x.value) = ANY($2) WHERE ${notPrivateSql("d")} AND d.document_type = $1 ORDER BY d.created_at DESC LIMIT 20`, [t, vals]);
+    recs = docs.rows.map((x) => documentRecord({ id: x.id, original_filename: x.original_filename }, { label: `${nm} · ${x.original_filename}` }));
+  }
+  return ok(text, [{ label: `${mod} ${nm}s`, value: String(n), sources: [] }], recs, `Counted ${nm} documents whose status extraction is one of: ${[...want].join(", ")}; statuses on file: ${have}.`);
 }
 
 async function equipListLane(db, q) {
@@ -141,7 +191,7 @@ export async function tryCatalogLane(db, question) {
   const q = clean(raw);
   if (!q || q.length > 220 || /[;:<>{}"`\\]/.test(q)) return null;
   try {
-    return (await customerNumberLane(db, raw, q)) ?? (await equipYesNoLane(db, raw, q)) ?? (await equipListLane(db, q)) ?? (await equipCountLane(db, q)) ?? (await docTypeCountLane(db, q)) ?? (await anyBrandLane(db, raw)) ?? null;
+    return (await customerNumberLane(db, raw, q)) ?? (await equipYesNoLane(db, raw, q)) ?? (await equipListLane(db, q)) ?? (await statusDocCountLane(db, q)) ?? (await equipCountLane(db, q)) ?? (await docTypeCountLane(db, q)) ?? (await anyBrandLane(db, raw)) ?? null;
   } catch (err) {
     console.error("tenantCatalogLane failed, falling through:", err?.message);
     return null;

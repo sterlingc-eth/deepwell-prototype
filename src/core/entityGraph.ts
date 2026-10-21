@@ -24,7 +24,7 @@ import { PIPELINE_STAGES } from './types';
 import { reviewClient, type Correction, type DocumentLink } from '../services/reviewClient';
 import { recordsStore } from '../services/recordsStoreClient';
 import { authHeader } from '../services/authToken';
-import { normalizeDocumentType } from '../domains/hvac/documentTypes';
+import { normalizeDocumentType, documentKindFor, isVoidMarked } from '../domains/hvac/documentTypes';
 import { isCompanyFile } from './companyFiles';
 
 /**
@@ -193,8 +193,25 @@ export function isRequirementMet(present: Set<string>, requirement: string): boo
   return splitAlternatives(requirement).some((k) => present.has(k) || present.has(`${k}${UNCONFIRMED_SUFFIX}`));
 }
 
+/**
+ * Inbox round (2026-10-21): the facts THIS paper must carry. A document kind read from its name or title (a pay application,
+ * an NDA, a return slip, a pickup ticket ...; see DOCUMENT_KINDS in domains/hvac/documentTypes.ts) brings its own list; every
+ * other paper uses its type's list. Mirrors the server's requiredFieldsFor.
+ */
+export function requiredFieldsForDoc(doc: Pick<Doc, 'typeId' | 'filename' | 'displayName'>, type: { requiredFields: string[] } | undefined): string[] {
+  const kind = doc.typeId ? documentKindFor(doc.typeId, doc.filename, doc.displayName ?? null) : null;
+  if (kind && Array.isArray(kind.requires)) return kind.requires;
+  return type?.requiredFields ?? [];
+}
+
+/** Papers the Inbox sets aside on its own: a VOID paper or a copy of a paper already on file. Never counted, never "needs you". */
+export function isSetAside(doc: Doc): boolean {
+  return doc.stage !== 'verified' && doc.issues.some((i) => i.kind === 'void' || i.kind === 'possible-copy');
+}
+
 export function isAnswerable(doc: Doc, includeUnverified: boolean): boolean {
   if (doc.issues.some((i) => i.kind === 'duplicate')) return false;
+  if (isSetAside(doc)) return false;
   return includeUnverified ? stageIndex(doc.stage) >= stageIndex('linked') : doc.stage === 'verified';
 }
 
@@ -262,7 +279,8 @@ export function companyFileReasons(doc: Doc, schema: DomainSchema): CompanyFileR
   const present = presentFieldNames(doc);
   if (doc.stage !== 'received' && doc.stage !== 'verified' && doc.issues.some((i) => i.kind === 'nothing-read')) out.push('hard-to-read');
   if (doc.typeId && MONEY_FILE_TYPES.has(doc.typeId) && !present.has('cost') && !present.has('total')) out.push('no-total');
-  if (doc.issues.some((i) => i.kind === 'duplicate' || i.kind === 'possible-copy')) out.push('copy');
+  // Inbox round: a likely copy (possible-copy) is set aside on its own (isSetAside); only an intake duplicate still asks.
+  if (doc.issues.some((i) => i.kind === 'duplicate')) out.push('copy');
   if (present.size > 0 && doc.completeness && Number.isFinite(doc.completeness.minConfidence) && doc.completeness.minConfidence < 0.5) out.push('unsure-folder');
   return out;
 }
@@ -286,7 +304,7 @@ export function maxStageFor(doc: Doc, schema: DomainSchema): PipelineStage {
   if (!doc.typeId) return 'received';
   const type = schema.documentTypes.find((t) => t.id === doc.typeId);
   const present = new Set(doc.extracted.filter((f) => (f.correctedValue ?? f.value).trim()).map((f) => f.name));
-  const missing = (type?.requiredFields ?? []).filter((r) => !isRequirementMet(present, r));
+  const missing = requiredFieldsForDoc(doc, type).filter((r) => !isRequirementMet(present, r));
   if (missing.length) return 'classified';
   if (doc.linkedEntityIds.length === 0 && !linkNotRequiredFor(doc, schema)) return 'extracted';
   if (doc.issues.some((i) => i.kind === 'conflict')) return 'linked';
@@ -307,14 +325,16 @@ export function recomputeIssues(doc: Doc, schema: DomainSchema): Doc {
   const type = schema.documentTypes.find((t) => t.id === doc.typeId);
   const present = new Set(doc.extracted.filter((f) => (f.correctedValue ?? f.value).trim()).map((f) => f.name));
   const noLinkNeeded = linkNotRequiredFor(doc, schema);
-  let kept = doc.issues.filter((i) => i.kind !== 'missing-field' && i.kind !== 'nothing-read' && !(i.kind === 'unlinked' && (doc.linkedEntityIds.length > 0 || noLinkNeeded)));
-  const missing = (type?.requiredFields ?? []).filter((r) => !isRequirementMet(present, r)).map((f) => ({ kind: 'missing-field' as const, field: f }));
+  let kept = doc.issues.filter((i) => i.kind !== 'missing-field' && i.kind !== 'nothing-read' && i.kind !== 'void' && !(i.kind === 'unlinked' && (doc.linkedEntityIds.length > 0 || noLinkNeeded)));
+  const missing = requiredFieldsForDoc(doc, type).filter((r) => !isRequirementMet(present, r)).map((f) => ({ kind: 'missing-field' as const, field: f }));
+  // Inbox round: a VOID paper is set aside (kept out of totals, never asks a person).
+  const voided = doc.stage !== 'verified' && isVoidMarked(doc.filename, doc.displayName ?? null) ? [{ kind: 'void' as const }] : [];
   if (doc.typeId && doc.linkedEntityIds.length === 0 && !kept.some((i) => i.kind === 'unlinked') && !linkNotRequiredFor(doc, schema)) {
     kept = [...kept, { kind: 'unlinked' as const, confidence: 0 }];
   }
   // Nothing read: a typed document with no real facts (or the reader's marker) needs a look, whatever else it lacks.
   const nothingRead = doc.typeId && doc.stage !== 'verified' && isNothingRead(doc) ? [{ kind: 'nothing-read' as const }] : [];
-  return { ...doc, issues: [...nothingRead, ...missing, ...kept] };
+  return { ...doc, issues: [...voided, ...nothingRead, ...missing, ...kept] };
 }
 
 // ---------------------------------------------------------------------------
@@ -349,6 +369,15 @@ const costOf = (d: Doc): number | null => {
   return raw && Number.isFinite(n) ? Math.round(n * 100) / 100 : null;
 };
 
+const partyKey = (d: Doc) => factValue(d, (n) => n === 'customer_name').toLowerCase().replace(/[^a-z0-9]/g, '') || factValue(d, (n) => n === 'vendor').toLowerCase().replace(/[^a-z0-9]/g, '');
+/** Verify round: the same party (or one side names none) and no two disjoint customer links. */
+function sameParty(a: Doc, b: Doc): boolean {
+  const pa = partyKey(a); const pb = partyKey(b);
+  if (pa && pb && pa !== pb) return false;
+  if (a.linkedEntityIds.length && b.linkedEntityIds.length && !a.linkedEntityIds.some((id) => b.linkedEntityIds.includes(id))) return false;
+  return true;
+}
+
 /**
  * Document ids that look like a copy of another document, mapped to that other document's id. A document is a likely
  * copy when its file name is another's plus "(copy)", "(2)" or "v2" AND they share a document number or a cost. Two
@@ -356,7 +385,8 @@ const costOf = (d: Doc): number | null => {
  */
 export function findPossibleCopies(docs: Iterable<Doc>): Map<DocumentId, DocumentId> {
   const groups = new Map<string, Doc[]>();
-  for (const d of docs) {
+  const all = [...docs];
+  for (const d of all) {
     const { stem } = copyStem(d.filename);
     const g = groups.get(stem);
     if (g) g.push(d); else groups.set(stem, [d]);
@@ -375,6 +405,28 @@ export function findPossibleCopies(docs: Iterable<Doc>): Map<DocumentId, Documen
         const on = docNumberOf(o);
         if ((num && num === on) || (cost !== null && cost === oc)) { out.set(d.id, o.id); break; }
       }
+    }
+  }
+  // Inbox round (2026-10-21): the same paper filed twice under different names (a PDF and a DOCX of one invoice): same type,
+  // same document number AND same amount. The later arrival is the copy; a checked paper is never flagged.
+  const byKey = new Map<string, Doc[]>();
+  for (const d of all) {
+    const num = docNumberOf(d);
+    const cost = costOf(d);
+    if (!d.typeId || !num || num.length < 3 || cost === null) continue;
+    const k = `${d.typeId}|${num}|${cost}`;
+    const g = byKey.get(k);
+    if (g) g.push(d); else byKey.set(k, [d]);
+  }
+  for (const members of byKey.values()) {
+    if (members.length < 2) continue;
+    const sorted = [...members].sort((a, b) => (a.stage === 'verified' ? -1 : 0) - (b.stage === 'verified' ? -1 : 0) || a.receivedAt.getTime() - b.receivedAt.getTime() || a.id.localeCompare(b.id));
+    const original = sorted[0]!;
+    for (const d of sorted.slice(1)) {
+      // Verify round (2026-10-21): two DIFFERENT parties (another store's receipt #1001, another customer's INV-500) sharing a
+      // number and an amount are two papers, never a copy: a copy must not name a different party or a different customer link.
+      if (!sameParty(original, d)) continue;
+      if (d.stage !== 'verified' && !out.has(d.id) && !out.has(original.id)) out.set(d.id, original.id);
     }
   }
   return out;
@@ -843,7 +895,7 @@ export function docCountsByStage(g: GraphSnapshot): Record<PipelineStage, number
 }
 
 /** Company files leave "Needs linking" and "Missing info" unless they have a real issue (companyFileReasons). Verified documents are never a problem. */
-const countsAsOpen = (d: Doc, g: GraphSnapshot) => d.stage !== 'verified' && (!isCompanyFileDoc(d, g.schema) || companyFileNeedsLook(d, g.schema));
+const countsAsOpen = (d: Doc, g: GraphSnapshot) => d.stage !== 'verified' && !isSetAside(d) && (!isCompanyFileDoc(d, g.schema) || companyFileNeedsLook(d, g.schema));
 /** "Other" with nothing read cannot be linked until a person picks a type, so it asks for a type instead (see needInfo). */
 export const needsTypeChoice = (d: Doc) => d.typeId === 'other' && substantiveFactNames(d).length === 0;
 export function unlinkedDocs(g: GraphSnapshot): Doc[] {
@@ -872,7 +924,7 @@ export function conflictDocs(g: GraphSnapshot): Doc[] {
   return Object.values(g.docs).filter((d) => ids.has(d.id));
 }
 export function duplicateDocs(g: GraphSnapshot): Doc[] {
-  return Object.values(g.docs).filter((d) => d.issues.some((i) => i.kind === 'duplicate' || i.kind === 'possible-copy'));
+  return Object.values(g.docs).filter((d) => d.issues.some((i) => i.kind === 'duplicate' || i.kind === 'possible-copy' || i.kind === 'void'));
 }
 
 // ---------------------------------------------------------------------------
