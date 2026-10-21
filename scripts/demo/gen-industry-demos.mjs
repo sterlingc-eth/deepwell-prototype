@@ -7,7 +7,7 @@
 // Every answer shown in the demo is the real Donovan reader's answer over these records (api/_lib/dql/reader-v2), checked against a gold
 // answer computed from the records. Synthetic data only: invented names, 555-01xx phones, example.com e-mail. Never written anywhere the training loop reads.
 import fs from 'node:fs'; import path from 'node:path'; import { fileURLToPath } from 'node:url';
-import { buildWorkspace, candidateQuestions, misspell, goldMatches, labelOf, hum, cap, pluralOf, DEMO_TODAY } from './demoData.mjs';
+import { buildWorkspace, candidateQuestions, misspell, goldMatches, labelOf, hum, cap, acro, polish, DEMO_TODAY } from './demoData.mjs';
 import { CORE, LABELS, FAMILY_LABELS } from './industries.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -21,16 +21,17 @@ const findPack = (id) => { for (const d of packDirs) { const p = path.join(d, id
 let specs = CORE.map((c) => ({ ...c }));
 if (ALL) { const ids = new Set(); for (const d of packDirs) for (const id of fs.readdirSync(d)) if (fs.existsSync(path.join(d, id, 'pack.json'))) ids.add(id);
   const coreIds = new Set(CORE.map((c) => c.pack));
-  for (const id of [...ids].sort()) if (!coreIds.has(id) && id !== 'clinicexample' && id !== 'realty') specs.push({ slug: id, pack: id }); }
+  for (const id of [...ids].sort()) if (!coreIds.has(id) && id !== 'clinicexample' && id !== 'realty' && id !== 'realtybroker') specs.push({ slug: id, pack: id }); }
 if (only) specs = specs.filter((s) => only.includes(s.slug));
+const SKIP_DONE = a.includes('--resume');
+const tried = path.join(OUT_REC, '.tried.json'); const triedSet = new Set(SKIP_DONE && fs.existsSync(tried) ? JSON.parse(fs.readFileSync(tried, 'utf8')) : []);
+const inIndex = new Set((fs.existsSync(path.join(OUT_UI, 'index.json')) ? JSON.parse(fs.readFileSync(path.join(OUT_UI, 'index.json'), 'utf8')).industries : []).map((x) => x.slug));
+if (SKIP_DONE) specs = specs.filter((s) => !inIndex.has(s.slug) && !triedSet.has(s.slug));
 
 const { loadReaderV2, buildIndex } = await import('../../api/_lib/dql/reader-v2/index.js');
 const { decide } = await import('../../api/_lib/dql/reader-v2/pipeline.js');
 const R = await loadReaderV2();
-const L = console.log; const ask = async (ix, q) => { console.log = () => {}; try { return await decide(ix, q, R.M); } catch (e) { return { answered: false, text: '', docs: [], reason: 'error' }; } finally { console.log = L; } };
-const ACRO = [['Hvac', 'HVAC'], ['hvac', 'HVAC'], ['Coi', 'COI'], [' coi', ' COI'], ['Hoa', 'HOA'], [' hoa', ' HOA'], ['Ev ', 'EV '], [' po ', ' PO '], ['Po ', 'PO ']];
-const acro = (t) => { for (const [a, b] of ACRO) t = t.split(a).join(b); return t; };
-const polish = (text, types) => { let t = String(text); for (const type of types) { const base = hum(type); const wrong = base + 's', right = pluralOf(base); if (wrong !== right) t = t.split(wrong).join(right).split(cap(wrong)).join(cap(right)); } return acro(t); };
+const L = console.log; const VERBOSE = a.includes('--verbose'); const MAX_TRIES = +arg('max-tries', '6'); const ask = async (ix, q) => { console.log = () => {}; const t0 = Date.now(); try { return await decide(ix, q, R.M); } catch (e) { return { answered: false, text: '', docs: [], reason: 'error' }; } finally { console.log = L; if (VERBOSE) L(`  ${Date.now() - t0}ms  ${q}`); } };
 const headlineOf = (t) => { const m = /^([^()]{1,80}?: [^()]+?) \(/.exec(t); return m ? m[1] : null; };
 
 fs.mkdirSync(OUT_UI, { recursive: true }); fs.mkdirSync(OUT_REC, { recursive: true });
@@ -46,7 +47,7 @@ for (const s of specs) {
     let kept = null;
     const taken = new Set(qs.map((q) => q.customer).filter(Boolean));
     const opts = [...c.options.filter((o) => !taken.has(o.customer)), ...c.options.filter((o) => taken.has(o.customer))];
-    outer: for (const o of opts) for (const q of o.phrasings) { const g = await ask(ix, q); if (g.answered && goldMatches(o.gold, g.text, g.docs)) { kept = { q, g, o }; break outer; } }
+    let tries = 0; outer: for (const o of opts) for (const q of o.phrasings) { if (++tries > MAX_TRIES) break outer; const g = await ask(ix, q); if (g.answered && goldMatches(o.gold, g.text, g.docs)) { kept = { q, g, o }; break outer; } }
     if (!kept) { misses.push(c.intent); continue; }
     c.gold = kept.o.gold; c.customer = kept.o.customer;
     const text = polish(kept.g.text, types);
@@ -57,7 +58,7 @@ for (const s of specs) {
   if (base) { const typo = misspell(base.customer); const tq = base.q.split(base.customer).join(typo); const g = await ask(ix, tq); dym = { q: tq, typed: typo, suggestion: base.customer, corrected: base.q, answerOf: base.id, readerAnsweredTypoDirectly: Boolean(g.answered && goldMatches(base.gold, g.text, g.docs)) }; }
   const ok = qs.length >= 4 && !!dym;
   report.push({ slug: s.slug, ok, questions: qs.length, misses, why: ok ? '' : `only ${qs.length} questions passed${dym ? '' : ', no near-name example'}` });
-  if (!ok) continue;
+  if (!ok) { L(`SKIP  ${s.slug}  ${report.at(-1).why}`); triedSet.add(s.slug); fs.writeFileSync(tried, JSON.stringify([...triedSet])); continue; }
   const fkLabel = (k) => cap(hum(k)).replace(/^Invoice number$/, 'Number').replace(/^Po number$/, 'PO number');
   const documents = ws.docs.map((d) => ({
     id: d.id, type: d.type, typeLabel: acro(cap(hum(d.type))), name: `${acro(cap(hum(d.type)))}${d.num ? ' ' + d.num : ''}${d.cust ? ' — ' + d.cust.name : d.ext.vendor_name ? ' — ' + d.ext.vendor_name : ''}`,
@@ -74,9 +75,14 @@ for (const s of specs) {
   fs.writeFileSync(path.join(OUT_REC, s.slug + '.records.json'), JSON.stringify(ws.records) + '\n');
   index.industries = index.industries.filter((x) => x.slug !== s.slug);
   index.industries.push({ slug: s.slug, label, family: fixture.family, familyLabel: fixture.familyLabel, company: ws.company, core: CORE.some((c) => c.slug === s.slug) });
+  saveIndex();   // after every industry, so a long run that stops part-way keeps what it made
+  L(`PASS  ${s.slug}`);
 }
-const coreOrder = CORE.map((c) => c.slug);
-index.industries.sort((x, y) => (coreOrder.includes(x.slug) ? coreOrder.indexOf(x.slug) : 99) - (coreOrder.includes(y.slug) ? coreOrder.indexOf(y.slug) : 99) || x.label.localeCompare(y.label));
-fs.writeFileSync(path.join(OUT_UI, 'index.json'), JSON.stringify(index, null, 1) + '\n');
+function saveIndex() {
+  const coreOrder = CORE.map((c) => c.slug);
+  index.industries.sort((x, y) => (coreOrder.includes(x.slug) ? coreOrder.indexOf(x.slug) : 99) - (coreOrder.includes(y.slug) ? coreOrder.indexOf(y.slug) : 99) || x.label.localeCompare(y.label));
+  fs.writeFileSync(path.join(OUT_UI, 'index.json'), JSON.stringify(index, null, 1) + '\n');
+}
+saveIndex();
 for (const x of report) L(`${x.ok ? 'PASS' : 'SKIP'}  ${x.slug}${x.ok ? `  (${x.questions} questions${x.misses.length ? '; dropped: ' + x.misses.join(', ') : ''})` : '  ' + x.why}`);
 L(`${report.filter((x) => x.ok).length} of ${report.length} industries written; index has ${index.industries.length}`);

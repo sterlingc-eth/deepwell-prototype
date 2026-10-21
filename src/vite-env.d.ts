@@ -12,4 +12,6 @@ interface ImportMetaEnv {
   readonly VITE_DEMO_MODE?: string;
   /** DEEPWELL_VOICE switch: the mic in the Ask box. Read as a string, compared with `=== 'true'`. Unset = off. */
   readonly VITE_DEEPWELL_VOICE?: string;
+  /** DEEPWELL_DEMO switch: the industry demo page at /demo/ (synthetic sample workspaces). Read as a string, compared with `=== 'true'`. Unset = not built. */
+  readonly VITE_DEEPWELL_DEMO?: string;
 }

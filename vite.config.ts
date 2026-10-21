@@ -1,5 +1,5 @@
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import { resolve } from 'node:path'
 import { readFileSync } from 'node:fs'
 import type { Plugin } from 'vite'
@@ -35,7 +35,9 @@ const appRelease = currentRelease(loadReleases(), 'app', 'app')
 // /patch-notes.html, the app at /app/, the lite field app
 // (installable PWA) at /m/, and the standalone founders' business-expense
 // site at /expenses/ (not linked from the app)
-export default defineConfig({
+// Demo mode (/demo/, industry demo workspaces with synthetic sample data) is built only when VITE_DEEPWELL_DEMO is "true".
+// Off (the default): the page is not in the build at all.
+export default defineConfig(({ mode }) => ({
   plugins: [react(), releaseNotesPlugin()],
   define: {
     __APP_VERSION__: JSON.stringify(appRelease ? appRelease.version : ''),
@@ -48,7 +50,10 @@ export default defineConfig({
         mobile: resolve(__dirname, 'm/index.html'),
         expenses: resolve(__dirname, 'expenses/index.html'),
         patchNotes: resolve(__dirname, 'patch-notes.html'),
+        ...((process.env.VITE_DEEPWELL_DEMO ?? loadEnv(mode, __dirname, 'VITE_').VITE_DEEPWELL_DEMO) === 'true'
+          ? { demo: resolve(__dirname, 'demo/index.html') }
+          : {}),
       },
     },
   },
-})
+}))

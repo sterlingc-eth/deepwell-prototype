@@ -40,6 +40,310 @@
    "familyLabel": "Trades & field service",
    "company": "Moonpenny Builders",
    "core": true
+  },
+  {
+   "slug": "auto",
+   "label": "Auto repair",
+   "family": "trades_field_service",
+   "familyLabel": "Trades & field service",
+   "company": "Pinecone Hollow Auto Repair",
+   "core": false
+  },
+  {
+   "slug": "bookkeeping",
+   "label": "Bookkeeping",
+   "family": "professional_office",
+   "familyLabel": "Professional & office",
+   "company": "Quillback Ledger Works",
+   "core": false
+  },
+  {
+   "slug": "brewery",
+   "label": "Brewery",
+   "family": "food_goods_logistics",
+   "familyLabel": "Food, goods & logistics",
+   "company": "Moonpenny Beer Works",
+   "core": false
+  },
+  {
+   "slug": "church",
+   "label": "Church",
+   "family": "nonprofit_public_sector",
+   "familyLabel": "Nonprofit & public sector",
+   "company": "Copperkettle Chapel",
+   "core": false
+  },
+  {
+   "slug": "cleaning",
+   "label": "Cleaning & janitorial",
+   "family": "trades_field_service",
+   "familyLabel": "Trades & field service",
+   "company": "Pebbleworth Cleaning Co",
+   "core": false
+  },
+  {
+   "slug": "daycarecenter",
+   "label": "Daycare center",
+   "family": "health_personal_care",
+   "familyLabel": "Health & personal care",
+   "company": "Sparrowgate Preschool and Daycare",
+   "core": false
+  },
+  {
+   "slug": "dentallabco",
+   "label": "Dental lab",
+   "family": "health_personal_care",
+   "familyLabel": "Health & personal care",
+   "company": "Kettleby Springs Dental Laboratory",
+   "core": false
+  },
+  {
+   "slug": "dentaloffice",
+   "label": "Dental office",
+   "family": "health_personal_care",
+   "familyLabel": "Health & personal care",
+   "company": "Moonpenny Dentistry",
+   "core": false
+  },
+  {
+   "slug": "eventvenue",
+   "label": "Event venue",
+   "family": "property_hospitality",
+   "familyLabel": "Property & hospitality",
+   "company": "Pebbleworth Event Center",
+   "core": false
+  },
+  {
+   "slug": "feedstore",
+   "label": "Feed & farm store",
+   "family": "food_goods_logistics",
+   "familyLabel": "Food, goods & logistics",
+   "company": "Starling Point Farm Supply",
+   "core": false
+  },
+  {
+   "slug": "filmprod",
+   "label": "Film production",
+   "family": "professional_office",
+   "familyLabel": "Professional & office",
+   "company": "Copperkettle Film Co",
+   "core": false
+  },
+  {
+   "slug": "foodtruck",
+   "label": "Food truck",
+   "family": "food_goods_logistics",
+   "familyLabel": "Food, goods & logistics",
+   "company": "Lantern Bay Smokehouse",
+   "core": false
+  },
+  {
+   "slug": "grantnp",
+   "label": "Grant-funded nonprofit",
+   "family": "nonprofit_public_sector",
+   "familyLabel": "Nonprofit & public sector",
+   "company": "Bramblewood Community Services",
+   "core": false
+  },
+  {
+   "slug": "gymfit",
+   "label": "Gym & fitness",
+   "family": "health_personal_care",
+   "familyLabel": "Health & personal care",
+   "company": "Zephyr Crossing Gym",
+   "core": false
+  },
+  {
+   "slug": "hotel",
+   "label": "Hotel",
+   "family": "property_hospitality",
+   "familyLabel": "Property & hospitality",
+   "company": "Moonpenny Hotel and Suites",
+   "core": false
+  },
+  {
+   "slug": "insagency",
+   "label": "Insurance agency",
+   "family": "professional_office",
+   "familyLabel": "Professional & office",
+   "company": "Honeycomb Hill Family Insurance",
+   "core": false
+  },
+  {
+   "slug": "msp",
+   "label": "IT services",
+   "family": "professional_office",
+   "familyLabel": "Professional & office",
+   "company": "Larkspur Vale Managed Technology",
+   "core": false
+  },
+  {
+   "slug": "landscaping",
+   "label": "Landscaping",
+   "family": "trades_field_service",
+   "familyLabel": "Trades & field service",
+   "company": "Thistle Creek Grounds Care",
+   "core": false
+  },
+  {
+   "slug": "legal",
+   "label": "Law office",
+   "family": "professional_office",
+   "familyLabel": "Professional & office",
+   "company": "Starling Point Attorneys at Law",
+   "core": false
+  },
+  {
+   "slug": "mfgqa",
+   "label": "Manufacturing",
+   "family": "food_goods_logistics",
+   "familyLabel": "Food, goods & logistics",
+   "company": "Juniper Glen Machine Works",
+   "core": false
+  },
+  {
+   "slug": "marina",
+   "label": "Marina",
+   "family": "property_hospitality",
+   "familyLabel": "Property & hospitality",
+   "company": "Fernsby Ridge Docks",
+   "core": false
+  },
+  {
+   "slug": "medbillingco",
+   "label": "Medical billing",
+   "family": "health_personal_care",
+   "familyLabel": "Health & personal care",
+   "company": "Copperkettle Medical Billing",
+   "core": false
+  },
+  {
+   "slug": "medicaloffice",
+   "label": "Medical office",
+   "family": "health_personal_care",
+   "familyLabel": "Health & personal care",
+   "company": "Willowmere Medical Group",
+   "core": false
+  },
+  {
+   "slug": "nonprofit",
+   "label": "Nonprofit",
+   "family": "nonprofit_public_sector",
+   "familyLabel": "Nonprofit & public sector",
+   "company": "Starling Point Food Bank",
+   "core": false
+  },
+  {
+   "slug": "pestcontrol",
+   "label": "Pest control",
+   "family": "trades_field_service",
+   "familyLabel": "Trades & field service",
+   "company": "Kettleby Springs Exterminating",
+   "core": false
+  },
+  {
+   "slug": "petgroomco",
+   "label": "Pet grooming",
+   "family": "health_personal_care",
+   "familyLabel": "Health & personal care",
+   "company": "Kettleby Springs Pet Grooming",
+   "core": false
+  },
+  {
+   "slug": "photostudio",
+   "label": "Photo studio",
+   "family": "professional_office",
+   "familyLabel": "Professional & office",
+   "company": "Juniper Glen Photo Co",
+   "core": false
+  },
+  {
+   "slug": "poolservice",
+   "label": "Pool service",
+   "family": "trades_field_service",
+   "familyLabel": "Trades & field service",
+   "company": "Pinecone Hollow Pools & Spas",
+   "core": false
+  },
+  {
+   "slug": "policerecords",
+   "label": "Records office",
+   "family": "nonprofit_public_sector",
+   "familyLabel": "Nonprofit & public sector",
+   "company": "Fernsby Ridge Police Services",
+   "core": false
+  },
+  {
+   "slug": "restaurant",
+   "label": "Restaurant",
+   "family": "food_goods_logistics",
+   "familyLabel": "Food, goods & logistics",
+   "company": "Copperkettle Steakhouse",
+   "core": false
+  },
+  {
+   "slug": "roofing",
+   "label": "Roofing",
+   "family": "trades_field_service",
+   "familyLabel": "Trades & field service",
+   "company": "Sparrowgate Roofing",
+   "core": false
+  },
+  {
+   "slug": "salonspa",
+   "label": "Salon & spa",
+   "family": "health_personal_care",
+   "familyLabel": "Health & personal care",
+   "company": "Nettlefield Cuts and Color",
+   "core": false
+  },
+  {
+   "slug": "storage",
+   "label": "Self storage",
+   "family": "property_hospitality",
+   "familyLabel": "Property & hospitality",
+   "company": "Starling Point Storage Solutions",
+   "core": false
+  },
+  {
+   "slug": "trucking",
+   "label": "Trucking",
+   "family": "food_goods_logistics",
+   "familyLabel": "Food, goods & logistics",
+   "company": "Marigold Flats Logistics",
+   "core": false
+  },
+  {
+   "slug": "tutoring",
+   "label": "Tutoring",
+   "family": "professional_office",
+   "familyLabel": "Professional & office",
+   "company": "Sparrowgate Learning Center",
+   "core": false
+  },
+  {
+   "slug": "vetclinic",
+   "label": "Veterinary clinic",
+   "family": "health_personal_care",
+   "familyLabel": "Health & personal care",
+   "company": "Marigold Flats Animal Hospital",
+   "core": false
+  },
+  {
+   "slug": "warehouse",
+   "label": "Warehouse",
+   "family": "food_goods_logistics",
+   "familyLabel": "Food, goods & logistics",
+   "company": "Nettlefield Storage",
+   "core": false
+  },
+  {
+   "slug": "weddingplan",
+   "label": "Wedding planning",
+   "family": "property_hospitality",
+   "familyLabel": "Property & hospitality",
+   "company": "Willowmere Planning Studio",
+   "core": false
   }
  ]
 }

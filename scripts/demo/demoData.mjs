@@ -148,7 +148,7 @@ export function candidateQuestions(ws) {
   // 1. total on a numbered paper (invoice first)
   add('total', 'Look up a total', [...finDocs.filter((d) => d.spec.fin?.[0] === 'invoice'), ...finDocs.filter((d) => d.spec.fin?.[0] !== 'invoice')].slice(0, 3).map((d) => ({ gold: { kind: 'money', value: d.total, docs: [d.id] }, phrasings: [`What's the total on ${d.num}?`, `How much is ${d.num}?`] })));
   // 2. a stored detail on a paper (pack field)
-  add('field', 'Find a detail', D.filter((d) => d.num).flatMap((d) => (d.t.fields ?? []).filter((x) => d.ext[x.k] !== undefined && x.t !== 'total' && x.t !== 'date+').map((x) => ({ gold: { kind: x.t === 'money' ? 'money' : 'text', value: x.t === 'money' ? Number(d.ext[x.k]) : d.ext[x.k], docs: [d.id] }, phrasings: [`What's the ${hum(x.k)} on ${d.num}?`, `what does ${d.num} list as the ${hum(x.k)}`] }))).slice(0, 4));
+  add('field', 'Find a detail', D.filter((d) => d.num).flatMap((d) => (d.t.fields ?? []).filter((x) => d.ext[x.k] !== undefined && x.t !== 'total' && x.t !== 'date+').map((x) => ({ gold: { kind: x.t === 'money' ? 'money' : 'text', value: x.t === 'money' ? Number(d.ext[x.k]) : d.ext[x.k], docs: [d.id] }, phrasings: [`${hum(x.k).split(' ').some((w) => /[^su]s$/.test(w)) ? 'What are' : 'What is'} the ${hum(x.k)} on ${d.num}?`, `What's the ${hum(x.k)} on ${d.num}?`, `what does ${d.num} list as the ${hum(x.k)}`] }))).slice(0, 4));
   // 3. sum across one customer's papers of one kind
   const byCT = new Map(); for (const d of finDocs) { if (!d.cust) continue; const k = d.cust.name + '|' + d.type; (byCT.get(k) ?? byCT.set(k, []).get(k)).push(d); }
   add('sum', 'Add up a customer', [...byCT.values()].filter((g) => g.length >= 2).sort((a, b) => b.length - a.length).slice(0, 3).map((g) => { const c = g[0].cust.name, p = pluralOf(lab(g[0])); return { customer: c, gold: { kind: 'money', value: g.reduce((s, d) => s + d.total, 0), docs: g.map((d) => d.id) }, phrasings: [`How much in total across ${c}'s ${p}?`, `What do ${c}'s ${p} come to in total?`] }; }));
@@ -177,3 +177,8 @@ export function goldMatches(gold, text, docs) {
   if (gold.kind === 'clause') return t.includes(gold.value) && docOk;
   return t.toLowerCase().includes(String(gold.value).toLowerCase()) && docOk;
 }
+
+/** Presentation of the reader's text (same as the app's reader hook: correct plurals) plus trade acronyms in capitals. */
+export const ACRO = [['Hvac', 'HVAC'], ['hvac', 'HVAC'], ['Coi', 'COI'], [' coi', ' COI'], ['Hoa', 'HOA'], [' hoa', ' HOA'], ['Ev ', 'EV '], [' po ', ' PO '], ['Po ', 'PO ']];
+export const acro = (t) => { for (const [a, b] of ACRO) t = t.split(a).join(b); return t; };
+export const polish = (text, types) => { let t = String(text); for (const type of types) { const base = hum(type); const wrong = base + 's', right = pluralOf(base); if (wrong !== right) t = t.split(wrong).join(right).split(cap(wrong)).join(cap(right)); } return acro(t); };
