@@ -25,6 +25,8 @@ export function cleanReading(r) {
 export async function recordHandoff(db, { question, vocab = null, answer, reading = null, env = process.env } = {}) {
   try {
     if (!handoffLearningEnabled(env)) return { ok: false, reason: 'off' };
+    // Industry demo companies never feed handoff learning (a prospect's questions stay out of every learning set).
+    try { const { rows } = await db.raw("SELECT plan, billing_status FROM tenants WHERE id = (current_setting('app.tenant_id', true))::uuid", []); if (rows?.[0]?.plan === 'demo' && rows?.[0]?.billing_status === 'demo') return { ok: false, reason: 'demo' }; } catch { /* fall through: unknown is not demo */ }
     const q = String(question ?? '').replace(/\s+/g, ' ').trim();
     if (!q || q.length > 240) return { ok: false, reason: 'question-shape' };
     const cited = (answer?.citedRecords ?? []).filter((r) => r && (r.id || r.documentId));

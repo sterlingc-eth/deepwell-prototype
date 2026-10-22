@@ -7,6 +7,9 @@ export const APP_ORIGINS = Object.freeze([
   "https://deepwellinc.vercel.app",
   "https://deepwelltechnology.com",
   "https://www.deepwelltechnology.com",
+  // Staging (industry demo build-out, 2026-10-22): the fixed staging address for the preview deployment that runs on the
+  // Neon staging branch. Same Clerk instance as production, so a session there is only ever a real signed-in user.
+  "https://staging.deepwelltechnology.com",
   "http://localhost:5173",
   "http://localhost:4173",
 ]);

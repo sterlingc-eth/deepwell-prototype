@@ -153,25 +153,40 @@ export async function candidates(ix, q, M, probs = null) {
   try { if (probs === null && TRP.enabled()) { rr = await TRP.rerun(ix, q, M, res, out, base); if (rr !== null && rr !== undefined) return [rr[0], rr[1], q2]; } } catch (e) { /* swallowed like the reference */ }
   return [res, out, q2];
 }
-/** the release rule of this version (precfix.passes): vetoes, direct releases, verifier score against the version threshold, strict rescues, plus the verbatim-grounding hard rule */
-export function passes(M, c, pv) {
-  const T = M.thr; const pf = T.precfix || {};
-  if (T.group_thr || pf.pmatch || pf.agree_hard) throw new Error('release options not supported by this port: ' + JSON.stringify({ group_thr: !!T.group_thr, pmatch: !!pf.pmatch, agree_hard: !!pf.agree_hard }));
+// ---- precision_match (lib/pmatch.py shift_thr, lib/precfix.py): ONE global logit shift of the release threshold; only v003+ bundles carry thresholds.precfix.pmatch (v002: null = unchanged behaviour)
+const logit = (p) => { p = Math.min(Math.max(Number(p), 1e-6), 1 - 1e-6); return Math.log(p / (1 - p)); };
+export function shiftThr(thr, d, cap = 0.99995) { if (!d) return Number(thr); return Math.min(cap, 1.0 / (1.0 + Math.exp(-(logit(thr) + Number(d))))); }
+/** precision_match anchor: would the INCUMBENT (its verifier + thresholds, shipped as pm_inc) release this candidate?  false when unknown (stricter) */
+function pmIncOk(M, c) {
+  try {
+    const inc = M.pmInc; const v = c._v;
+    if (!inc || v === undefined || v === null) return false;
+    const pf = { ...(inc.thr.precfix || {}) }; if (pf.pmatch) pf.pmatch = { ...pf.pmatch, anchor: false };
+    return !!passesT(M, { ...inc.thr, precfix: pf }, c, inc.verifier.score(v));
+  } catch (e) { return false; }
+}
+function passesT(M, T, c, pv) {
+  const pf = T.precfix || {};
+  if (T.group_thr || pf.agree_hard) throw new Error('release options not supported by this port: ' + JSON.stringify({ group_thr: !!T.group_thr, agree_hard: !!pf.agree_hard }));
   if (c._wp2_veto || c._wp_veto || c._mp_veto || c._mp2_veto || c._pv1_veto || c._mr2_veto || c._hv2 || c._hv3 || c._hv4 || c._sl1 || c._rp_veto) return false;
+  const pm = pf.pmatch || null;      // precision_match operating point of this version (null = incumbent behaviour)
   const gh = !!(pf.grounding_hard && c._ungrounded);
-  if (c._rk_direct && !gh) return true;      // rank_v2: exact computed rank answer
+  if (c._rk_direct && !gh && (pm === null || pv >= Number(pm.rk_floor ?? 0.0))) return true;      // rank_v2: exact computed rank answer
   if (c._hp_veto) return false;      // hard_v1: stricter-only veto
-  if (c._fx_direct && pv >= Math.max(Number(FX.cfg().floor ?? 0.0), 0.0) && !gh) return true;      // fields_v2: dual-extraction verified field
-  const thr = Number(T.thr);
+  if (c._fx_direct && pv >= Math.max(Number(FX.cfg().floor ?? 0.0), pm ? Number(pm.fx_floor ?? 0.0) : 0.0) && !gh) return true;      // fields_v2: dual-extraction verified field
+  const thr0 = Number(T.thr); let thr = thr0;
   if (pf.guard && c._v) throw new Error('guard not supported by this port');
-  if (pv < thr) {
-    if (CF2.rescue(pf, c)) return true;      // clause_free_v2: strict rescue of an unambiguous clause answer
+  if (pm && pm.d) thr = shiftThr(thr, Number(pm.d));
+  if (pv < thr && !(pm && pm.anchor && pv >= thr0 && pmIncOk(M, c))) {      // anchor: an answer the incumbent also releases keeps the base threshold; only NEW answers must clear the shifted one
+    if ((pm === null || pv >= Number(pm.cf2_floor ?? 0.0)) && CF2.rescue(pf, c)) return true;      // clause_free_v2: strict rescue of an unambiguous clause answer
     if (CA.rescue(pf, c, pv)) return true;      // cue_agree_v1: strict rescue of an unfiltered lowest/highest answer
     return false;
   }
   if (gh) return false;
   return true;
 }
+/** the release rule of this version (precfix.passes): vetoes, direct releases, verifier score against the (precision-matched) version threshold, strict rescues, plus the verbatim-grounding hard rule */
+export function passes(M, c, pv) { return passesT(M, M.thr, c, pv); }
 /** the answer decision: both readers' candidates -> verifier -> release rule -> answer, or release */
 export async function decide(ix, q, M) {
   const [res, out] = await candidates(ix, q, M);

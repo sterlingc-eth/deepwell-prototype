@@ -141,6 +141,7 @@ export function parsePeriod(q, today) {
 /* -------------------------------------------------------------------- intents */
 
 const TIME_STOP = new Set([
+  "never",
   // R32b: "how many invoices have we sent out last quarter / yr to date / in the last 6 weeks" must never read "out ..." as a customer
   'versus', 'vs', 'compared', 'compare', 'against', 'than', 'quoted', 'dated', 'invoiced', 'billed', 'charged', 'out', 'yr', 'yrs', 'weeks', 'years', 'quarters', 'lately', 'recently', 'over', 'since', 'during', 'ago', 'q1', 'q2', 'q3', 'q4', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'twelve',
   'for', 'at', 'about', 'did', 'do', 'does', 'have', 'has', 'had', 'is', 'are', 'was', 'what', 'how', 'who', 'which', 'whats', "what's", 'much', 'me', 'my',
@@ -218,6 +219,9 @@ export function extractSubjectPhrase(question) {
     // "<name> quote vs invoice", "was the bracken job over the quote"
     /\b([a-z][\w'.-]*(?:\s+[a-z][\w'.-]*)?)\s+(?:quote|estimate|proposal)\b/i,
     /\b(?:the\s+)?([a-z][\w'.-]*)\s+(?:job|install(?:ation)?|project|replacement)\b/i,
+    // Demo fix round 2: "how much did we spend at Desert Supply Co" / "what have we spent on receipts at Ferguson in September" - the supplier
+    // follows "at" after a spend verb (the same supplier reads fine after "with"/"from"). Only after spend/spent/spending, so no other question changes.
+    /\b(?:spend|spent|spending)\s+(?:[a-z][\w'.-]*\s+){0,3}?at\s+(?:the\s+)?(.+?)(?=['\u2019]s\b|\s+(?:last|latest|most|this|in|so|since|during|total|and|vs|versus|so far|over|under|job)\b|$)/i,
     // "for/to/from/of <name>" at the end or before a time word
     /\b(?:for|to|from|of|with)\s+(?:the\s+)?(.+?)(?=['’]s\b|\s+(?:last|latest|most|this|in|so|since|during|total|and|vs|versus|so far|over|under|job)\b|$)/i,
     // R32b: "how many unpaid invoices does Rebecca Montoya have" / "how much has Rebecca Montoya been invoiced" - the name sits between an auxiliary
@@ -266,11 +270,12 @@ const RE = {
   // no present-tense form, so this phrasing fell through to the generic total-invoiced handler.
   agreementFees: /\b(?:(?:maintenance|service)\s+(?:agreements?|contracts?|plans?)\b[^?]*\b(?:fees?|revenue|income|collected|worth|total|sales|bring(?:s)? in|brought in|pay|billed|invoiced|charged)\b|(?:fees?|revenue|income)\b[^?]*\b(?:maintenance|service)\s+(?:agreements?|contracts?|plans?)\b|agreement\s+(?:fees?|revenue))/i,
   quoteVsInvoice: /\b(?:over|under|above|below|more than|less than)\s+(?:the\s+)?(?:quote|quoted|estimate|estimated|proposal)\b|\b(?:quote|quoted|estimate|estimated|proposal)\b[^?]*\b(?:invoice|invoiced|billed|final|actual|came in|over|under)\b|\b(?:invoice|invoiced|billed)\b[^?]*\b(?:quote|quoted|estimate|estimated|proposal)\b/i,
-  payables: /\b(?:we owe|do we owe|our (?:open |unpaid )?(?:bills|payables)|payables?|vendor bills?|bills (?:we|to) (?:owe|pay)|unpaid bills|open bills|owe (?:our )?(?:vendors?|suppliers?)|owed to (?:our |the |all )?(?:vendors?|suppliers?))\b/i,
+  // Demo round (2026-10-22): "vendor invoices" / "supplier invoices" are the same bills as "vendor bills".
+  payables: /\b(?:we owe|do we owe|our (?:open |unpaid )?(?:bills|payables)|payables?|vendor bills?|(?:vendor|supplier) invoices?|bills (?:we|to) (?:owe|pay)|unpaid bills|open bills|owe (?:our )?(?:vendors?|suppliers?)|owed to (?:our |the |all )?(?:vendors?|suppliers?))\b/i,
   spend: /\b(?:how much (?:did|have) we (?:spend|spent|pay|paid)|(?:total )?(?:spend|spending)|spent (?:with|on|at))\b/i,
   aging: /\b(?:aging|ageing|aged|receivables? aging)\b|\baccounts? receivable\b/i,
   overdue: /\b(?:overdue|past due|late (?:invoices?|payments?))\b/i,
-  open: /\b(?:open|unpaid|outstanding|owe us|owes us|owed to us|owing|receivables?|haven'?t paid|hasn'?t paid|not paid|still owe|who owes|money owed|balance due)\b|\bare owed\b|\bowed\b/i,
+  open: /\b(?:open|unpaid|outstanding|owe us|owes us|owed to us|owing|receivables?|haven'?t paid|hasn'?t paid|not paid|still owe|who owes|money owed|balance due)\b|\bare owed\b|\bowed\b|\b(?:haven'?t|hasn'?t|have\s+not|has\s+not|not\s+yet|never)\s+(?:yet\s+)?(?:been\s+)?paid\b/i,
   byMonth: /\b(?:by month|monthly|per month|each month|month by month|month over month|by the month)\b/i,
   topCustomers: /\b(?:biggest|largest|top|best|highest)\b[^?]*\bcustomers?\b|\bcustomers?\b[^?]*\bby (?:revenue|sales|billing|spend)\b|\bwho(?:'s| is) our (?:biggest|best|top)\b/i,
   avg: /\baverage\s+(?:ticket|invoice|job|sale|bill|repair|quote|estimate|proposal)\b|\bavg\s+(?:ticket|invoice)\b|\bmedian\s+(?:invoice|quote|estimate|proposal)\b/i,
@@ -293,6 +298,9 @@ const COLLECTED_RE = /\bhow\s+much\s+(?:have|has|did)\s+(?:we|customers?)\s+coll
 const QUOTES_WAITING_RE = /\b(?:quotes?|proposals?|estimates?)\b[^?]*\bwaiting\b|\bwaiting\b[^?]*\b(?:quotes?|proposals?|estimates?)\b/i;
 const NEEDS_VERIFY_RE = /\binvoices?\b[^?]*\bverify\b|\bverify\b[^?]*\bthe\s+numbers\b|\bneed(?:s)?\s+(?:someone\s+)?to\s+verify\b|\bunverified\s+invoices?\b|\binvoices?\b[^?]*\bunverified\b/i;
 const PAID_STATUS_RE = /\binvoices?\b[^?]*\b(paid|partial(?:ly\s+paid)?)\b|\b(paid|partially\s+paid)\b[^?]*\binvoices?\b/i;
+/** Demo round (2026-10-22): "haven't been paid" / "not yet paid" is the OPPOSITE of paid. PAID_STATUS_RE used to match it and
+ *  answer with the count of PAID invoices. */
+const NOT_PAID_RE = /\b(?:haven'?t|hasn'?t|have\s+not|has\s+not|not\s+yet|not|never)\s+(?:yet\s+)?(?:been\s+)?paid\b/i;
 /** Document nouns a person uses for "a money document" and the document kinds each stands for. invoiceOnly = the long-standing invoice lane, unchanged. */
 const DOC_NOUN_KINDS = [
   { label: 'invoice', re: /\binvoices?\b/, kinds: ['invoice'] },
@@ -576,7 +584,7 @@ function parseMoneyIntentInner(question, { today }) {
   // steal an "unpaid"/"overdue" question from the branches below.
   // J1: "open POs", "unpaid quotes", "overdue work orders": a payment status next to another kind of paper is not an invoice question (those papers carry no payment status).
   if (namesOtherPaperOnly(q) && (PAID_STATUS_RE.test(q) || RE.aging.test(q) || RE.overdue.test(q) || RE.open.test(q))) return null;
-  if (PAID_STATUS_RE.test(q)) return mk('payment_status', { subject: null, statusTarget: /partial/i.test(q) ? 'partial' : 'paid' });
+  if (PAID_STATUS_RE.test(q) && !NOT_PAID_RE.test(q)) return mk('payment_status', { subject: null, statusTarget: /partial/i.test(q) ? 'partial' : 'paid' });
   if (RE.aging.test(q)) return mk('ar_aging', { subject: null });
   if (RE.overdue.test(q)) return mk('overdue', { subject, dayThreshold: (q.match(OVERDUE_DAYS_RE) || [])[1] ? Number(q.match(OVERDUE_DAYS_RE)[1]) : null });
   if (RE.open.test(q) && !RE.last.test(q) && !RE.topCustomers.test(q)) return mk('open_invoices', { subject });
@@ -1426,10 +1434,10 @@ async function spendTotal(db, intent, ctx) {
   const [a] = await q(db,
     `SELECT count(*) FILTER (WHERE f.total IS NOT NULL)::int AS n, COALESCE(sum(f.total) FILTER (WHERE f.total IS NOT NULL), 0) AS amount,
             count(*) FILTER (WHERE f.total IS NULL)::int AS n_no_total
-       FROM financials f WHERE f.direction = 'payable' AND f.doc_kind = 'invoice' AND f.currency = 'USD' AND ${inRange}
+       FROM financials f WHERE f.direction = 'payable' AND f.doc_kind IN ('invoice', 'receipt') AND f.currency = 'USD' AND ${inRange}
         AND ($4::text IS NULL OR f.vendor_name ILIKE '%' || $4::text || '%')`, [p?.from ?? null, p?.to ?? null, vendor], ctx.hu);
   const docs = await q(db,
-    `SELECT f.* FROM financials f WHERE f.direction = 'payable' AND f.doc_kind = 'invoice' AND f.currency = 'USD' AND f.total IS NOT NULL AND ${inRange}
+    `SELECT f.* FROM financials f WHERE f.direction = 'payable' AND f.doc_kind IN ('invoice', 'receipt') AND f.currency = 'USD' AND f.total IS NOT NULL AND ${inRange}
         AND ($4::text IS NULL OR f.vendor_name ILIKE '%' || $4::text || '%') ORDER BY f.doc_date DESC NULLS LAST LIMIT 200`, [p?.from ?? null, p?.to ?? null, vendor], ctx.hu);
   if (!a || a.n === 0) return baseAnswer(`No vendor bills${vendor ? ` from ${vendor}` : ''} with printed totals are on file yet.`, [], { confidence: 1, ...zeroCite(`Searched every vendor bill${vendor ? ` from ${vendor}` : ''}; none have a printed total.`) });
   const text = `Vendor bills${vendor ? ` from ${vendor}` : ''}${p ? ` in ${p.label}` : ''} total ${fmt(a.amount)} across ${plural(a.n, 'bill')}.${exclusionText({ noTotal: a.n_no_total, noun: 'bill' })}`;

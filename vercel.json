@@ -96,6 +96,10 @@
     {
       "path": "/api/account?action=backup",
       "schedule": "40 10-14 * * *"
+    },
+    {
+      "path": "/api/account?action=demo&op=reset-all",
+      "schedule": "5 10 * * *"
     }
   ],
   "headers": [

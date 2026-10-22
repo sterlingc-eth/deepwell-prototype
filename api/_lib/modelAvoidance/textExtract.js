@@ -30,7 +30,7 @@
 import { normalizeDate } from "../extractFields.js";
 import { BRAND_RULES } from "../warrantyRules.js";
 import { isFragmentName } from "../integrity.js";
-import { REQUIRED_FIELDS, DOCUMENT_TYPE_IDS, GENERIC_TITLE_PATTERNS } from "../documentTypes.js";
+import { REQUIRED_FIELDS, DOCUMENT_TYPE_IDS, GENERIC_TITLE_PATTERNS, isLabelValue } from "../documentTypes.js";
 import { extractLabelled } from "./labelledExtract.js";
 import { FIELD_SYNONYMS, LABEL_RANK, labelSrc } from "./fieldSynonyms.js";
 import { detectLetterhead, isOwnName, counterpartyFromParties } from "./ownCompany.js";
@@ -1006,6 +1006,8 @@ export function scanLabeledValues(pages, opts = {}) {
     // We are never the customer (a bill addressed to our own company) and never the vendor of that bill.
     for (const k of ["customer_name", "vendor"]) if (out[k]) { out[k] = out[k].filter((c) => !ownKey(c.value)); if (!out[k].length) delete out[k]; }
   }
+  // Docread round: a column title read as a name ("SERVICE LOCATION" beside "BILL TO") is never a party, and must not hide the letterhead below.
+  for (const k of ["customer_name", "vendor"]) if (out[k]) { out[k] = out[k].filter((c) => !isLabelValue(c.value)); if (!out[k].length) delete out[k]; }
   const wantKey = (k) => !want || want.has(k);
   if (ownNames.length && wantKey("vendor") && !out.vendor?.length && !["purchase-order", "dispatch-note", "internal", "correspondence"].includes(type ?? "")) {
     const rawLines = lines.map((l) => l.t);
@@ -1033,7 +1035,10 @@ export function scanLabeledValues(pages, opts = {}) {
     if (sUniq.length === 1 && eUniq.length === 1) {
       const sRaw = termStarts[0].raw, eRaw = termEnds[0].raw;
       const ln = lines.find((l) => l.t.includes(eRaw)) ?? lines[0];
-      (out.agreement_term ??= []).push({ value: `${sRaw} - ${eRaw}`, page_no: ln?.page ?? 1, verbatim: ln?.t.slice(0, 200) ?? "", label: "effective date / end date", strength: "explicit" });
+      // Docread round: the quote carries BOTH lines (start ... end) so the grounding check can find each date on the page.
+      const ls = lines.find((l) => l.t.includes(sRaw) && l.page === ln?.page);
+      const verbatim = ls && ls !== ln ? `${ls.t.trim().slice(0, 160)} … ${ln.t.trim().slice(0, 160)}` : (ln?.t.slice(0, 200) ?? "");
+      (out.agreement_term ??= []).push({ value: `${sRaw} - ${eRaw}`, page_no: ln?.page ?? 1, verbatim, label: "effective date / end date", strength: "explicit" });
     }
   }
 

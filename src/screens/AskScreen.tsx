@@ -12,6 +12,7 @@ import type { Answer, AnswerRecord, SourceRef } from '../core/types';
 import { recordTarget } from '../core/citations';
 import { useGraph } from '../core/entityGraph';
 import { buildSuggestions, nearMissRetryChips, useDidYouMean, useSamplePrompts, useTypeahead } from '../core/suggestions';
+import { useDemoAccount } from '../demoAccount/useDemoAccount';
 import { PreflightPill, SamplePromptChips, SamplePromptsPlaceholder, DidYouMeanChips, TypeaheadDropdown, turnFrom, useVoiceInput, VoiceMicButton, VoiceStatus, type ThreadTurn, type VoiceInput } from '../components/ask';
 import { ask, AskApiError } from '../services/answerService';
 import { friendlyErrorMessage } from '../services/httpError';
@@ -85,7 +86,12 @@ export function AskScreen() {
   // showed). Typeahead completions + the preflight hint for whatever is currently typed, and "Did you
   // mean…" chips once a question has actually come back with no answer.
   const askRole = fieldMode ? 'tech' : 'office';
-  const { prompts: samplePrompts, loading: samplesLoading } = useSamplePrompts(askRole, !asked, tenantKey);
+  const { prompts: serverSamplePrompts, loading: serverSamplesLoading } = useSamplePrompts(askRole, !asked, tenantKey);
+  // Industry demo company: the QA-checked starter questions for its industry come first (src/demoAccount).
+  const demoAccount = useDemoAccount();
+  const demoPrompts = demoAccount.isDemoOrg ? demoAccount.tryAsking.map((text, i) => ({ id: `demo-${i}`, text, category: 'client' as const })) : [];
+  const samplePrompts = demoPrompts.length ? demoPrompts : serverSamplePrompts;
+  const samplesLoading = demoPrompts.length ? false : serverSamplesLoading;
   const { completions, hint } = useTypeahead(input);
   const serverDidYouMean = useDidYouMean(answer?.kind === 'no-answer' ? asked : null);
   // A near-miss customer name ("Did you mean Sandra Wyckoff?") becomes a one-tap corrected re-ask.

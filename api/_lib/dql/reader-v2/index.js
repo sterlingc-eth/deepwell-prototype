@@ -36,6 +36,10 @@ import * as MP1 from './mentionparty.js';
 import * as TRP from './typorepair.js';
 import * as CA from './cueagree.js';
 import * as MPAIR1 from './mainpair1.js';
+import * as DA1 from './doctypealias1.js';
+import * as AD2 from './anydoc.js';
+import { configureStemFix } from './reader.js';
+import { U, RULES, configureUnified } from './unified1.js';
 const MODULES = [['agg_filter_v1', AF], ['label_clause_v1', LC], ['fields_v2', FX], ['realty_prec_v1', RP], ['rank_v2', RK], ['xdoc_v1', XD], ['hard_v1', HP], ['hard_v2', HV2], ['hard_v3', HV3], ['hard_v4', HV4],
   ['syn_lex_v1', SL1], ['main_prec_v1', MPR], ['main_prec_v2', MP2], ['watch6_veto', W6], ['wild_prec_v1', WPR], ['wild_prec_v2', WP2], ['mr_prec_v2', MR2], ['clause_free_v2', CF2], ['present_value_v1', PV1],
   ['clause_retrain_v2', CC], ['agree_v1', AG1], ['mention_party_v1', MP1], ['typo_repair_v1', TRP], ['cue_agree_v1', CA], ['mainpair_v1', MPAIR1]];
@@ -44,13 +48,27 @@ export function configureFromBundle(B) {
   const s = B.switches;
   DN.configure(s.date_value_norm); EM.configure(s.typo_match); RV.configure(s.retrieval_v2); AG.configure(s.agg_v2);
   for (const [k, m] of MODULES) m.configure(s[k]);
+  // unified rulebook (env DONOVAN_READER_V2_UNIFIED, default OFF): alias_compound_v1 + stem_fix_v1 + anydoc2_v1 + determinism_v1 canon; OFF = unchanged behaviour
+  const uni = configureUnified(); DA1.configure(uni ? RULES.alias_compound_v1 : null); configureStemFix(uni && RULES.stem_fix_v1 === true);
   if (s.clause_v3?.on || s.mainpair_v2?.on) throw new Error('switches not supported by this port are on in the bundle: clause_v3 / mainpair_v2');
   const off = [];
   if (!s.date_value_norm?.on) off.push('date_value_norm'); if (!s.typo_match?.on) off.push('typo_match'); if (!s.retrieval_v2?.on) off.push('retrieval_v2'); if (!s.doctype?.on) off.push('doctype_match');
   if (off.length) throw new Error('switches required by this port are off in the bundle: ' + off.join(', '));
 }
-export function buildIndex(records, key = 'company') { return new Index(new Co(key, records)); }
+/** opts.pack (or records.packWording): the company is an industry-pack company, the only kind anydoc2_v1 answers for (unified rulebook; never consulted while the switch is off) */
+export function buildIndex(records, key = 'company', opts = {}) {
+  const ix = new Index(new Co(key, records));
+  ix.pack = !!(opts.pack ?? records.packWording); ix.rawPages = records.pages;
+  return ix;
+}
 export async function loadReaderV2(dir = DATA_DIR) {
   const M = await loadModels(dir); configureFromBundle(M.bundle);
-  return { M, bundle: M.bundle, answer: (ix, q) => decide(ix, q, M) };
+  return {
+    M, bundle: M.bundle,
+    answer: async (ix, q) => {
+      const r = await decide(ix, q, M);
+      if (U.on && !r.answered && ix.pack) { const a = AD2.maybe(ix, ix.rawPages, q, r); if (a !== null) return a; }      // anydoc2_v1: second tier for a released question, industry-pack companies only
+      return r;
+    },
+  };
 }

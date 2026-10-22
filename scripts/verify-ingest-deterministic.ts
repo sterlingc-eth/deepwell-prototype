@@ -302,7 +302,10 @@ check('at least 85% of the positive fixtures skip the model', expectedAcceptHit 
   check('financials: law-firm invoice total, number and date', inv?.total?.value === '900.00' && inv.invoice_number === '24310' && inv.invoice_date === '2026-09-01', JSON.stringify(inv));
   check('financials: two different totals -> model', financialsInputFromText([{ page_no: 1, text: F.find((f) => f.name.includes('two different Totals'))!.text.replace('Receipt', 'INVOICE') }], 'invoice') == null);
   check('financials: ambiguous total on a PO -> model', financialsInputFromText([{ page_no: 1, text: po.text.replace('Total: $334.56', 'Total: $334.56\nTotal: $400.00') }], 'purchase-order') == null);
-  check('financials: a receipt is not a financial type here', financialsInputFromText([{ page_no: 1, text: F[0].text }], 'receipt') == null);
+  // Demo round (2026-10-22): a supplier receipt is now a money document (kind receipt, money we spent). F[0] ("Desert Supply Co"
+  // receipt, no "Sold To" line) reads as a receipt with its printed total; addressed to us it is payable.
+  { const rc = financialsInputFromText([{ page_no: 1, text: F[0].text }], 'receipt'); check('financials: a supplier receipt is read as a receipt with its printed total', rc?.kind === 'receipt' && rc?.total?.value === '43.84', JSON.stringify(rc)); }
+  { const rc = financialsInputFromText([{ page_no: 1, text: F[0].text.replace('Sold By: Desert Supply Co', 'Sold By: Desert Supply Co\nSold To: Acme HVAC') }], 'receipt', { ownNames: ['Acme HVAC'] }); check('financials: a receipt sold to us is money we spent (payable)', rc == null || rc.direction === 'payable', JSON.stringify(rc)); }
   check('financials: plumbing invoice with the plumbing pack', financialsInputFromText([{ page_no: 1, text: (F.find((f) => f.name.startsWith('plumbing invoice (plumbing')) as Fx).text }], 'invoice', { pack: plumbing })?.total?.value === '285.00');
   check('financials: stored type must equal the title type', financialsInputFromText(pages, 'invoice') == null);
 }

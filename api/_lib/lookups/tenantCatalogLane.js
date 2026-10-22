@@ -36,10 +36,10 @@ function typesFor(types, phrase) {
   const exact = types.filter((x) => x.t === p || (x.qual && `${x.qual} ${x.base}` === p));
   if (exact.length) return exact;
   const base = types.filter((x) => x.base === p);
-  if (base.length || p.length < 6) return base;
-  return types.filter((x) => x.base.length >= 6 && lev(x.base, p) <= 2); // typo tolerance, vocabulary still the tenant's own types
+  if (base.length || p.length < 4) return base;
+  return types.filter((x) => x.base.length >= 4 && lev(x.base, p) <= (p.length >= 6 ? 2 : 1)); // typo tolerance, vocabulary still the tenant's own types
 }
-function lev(a, b) { const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]); for (let j = 1; j <= b.length; j++) d[0][j] = j; for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[a.length][b.length]; }
+function lev(a, b) { const m = a.length, n = b.length; const d = Array.from({ length: m + 1 }, (_, x) => [x, ...Array(n).fill(0)]); for (let y = 1; y <= n; y++) d[0][y] = y; for (let x = 1; x <= m; x++) for (let y = 1; y <= n; y++) { d[x][y] = Math.min(d[x - 1][y] + 1, d[x][y - 1] + 1, d[x - 1][y - 1] + (a[x - 1] === b[y - 1] ? 0 : 1)); if (x > 1 && y > 1 && a[x - 1] === b[y - 2] && a[x - 2] === b[y - 1]) d[x][y] = Math.min(d[x][y], d[x - 2][y - 2] + 1); } return d[m][n]; }
 const label = (x) => (x.qual ? `${x.qual} ${x.base}` : x.base);
 const typeText = (ts) => (ts.length === 1 ? label(ts[0]) : ts[0].base);
 
@@ -49,16 +49,54 @@ async function customerByName(db, raw) {
     const r = await db.raw(`SELECT id, customer_number, data->>'customer_name' AS name FROM entities WHERE entity_type = 'customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1 LIMIT 3`, [esc(nm)]);
     if (r.rows.length === 1) return r.rows[0];
   }
+  for (const nm of m) { // one/two-typo tolerance against the tenant's own customer names (unique near match only)
+    if (nm.length < 8) continue;
+    const all = await db.raw(`SELECT id, customer_number, data->>'customer_name' AS name FROM entities WHERE entity_type = 'customer' AND merged_into IS NULL AND data->>'customer_name' IS NOT NULL`);
+    const near = all.rows.filter((x) => lev(String(x.name).toLowerCase(), nm.toLowerCase()) <= 2);
+    if (near.length === 1) return near[0];
+  }
   return null;
 }
 const custRec = (id, name) => makeRecord({ type: "customer", id, label: name });
 const unitRec = (e) => makeRecord({ type: "unit", id: e.id, label: `${e.manufacturer ?? ""} ${e.equipment_type ?? "unit"}`.trim(), sublabel: [e.model, e.serial_number].filter(Boolean).join(" · ") || undefined, customerId: e.customer_id });
 
 /* ---------------------------------------------------------------- lanes */
+
+/** R42: brand counts with a unit noun ("how many Haier appliances", "Whirplool units we manage", "how many Naivens have we put in"): manufacturer vocabulary is the tenant's own;
+ *  typo-tolerant to an existing brand; a brand that appears nowhere in the tenant's rows -> honest 0 + the brands on file (never the total). */
+const UNIT_NOUN = /^(.+?)\s+(?:units?|appliances?|equipment|euqipment|equipmnet|machines?|systems?|installs?|products?)$/i;
+async function brandCountLane(db, phrase, rawCase) {
+  const mm = UNIT_NOUN.exec(phrase.trim());
+  const cand = (mm ? mm[1] : phrase).trim();
+  if (!/^[A-Za-z][A-Za-z.&-]{2,24}(?: [A-Za-z.&-]+)?$/.test(cand) || cand.split(" ").length > 2) return null;
+  const types = await equipTypes(db);
+  if (typesFor(types, cand).length) return null;
+  const rows = await db.raw(`SELECT DISTINCT data->>'manufacturer' AS b FROM entities WHERE entity_type = 'equipment' AND merged_into IS NULL AND data->>'manufacturer' IS NOT NULL ORDER BY 1`);
+  const brands = rows.rows.map((x) => x.b);
+  if (!brands.length) return null;
+  const c = cand.toLowerCase().replace(/s$/, "");
+  const exact = brands.find((b) => b.toLowerCase() === cand.toLowerCase() || b.toLowerCase() === c);
+  const fuzzy = exact ?? brands.find((b) => b.length >= 5 && lev(b.toLowerCase(), c) <= 2 && lev(b.toLowerCase(), c) < Math.max(3, b.length - 3));
+  if (fuzzy) {
+    const r = await db.raw(`SELECT e.id, e.customer_id, e.data->>'manufacturer' AS manufacturer, e.data->>'equipment_type' AS equipment_type, e.data->>'model' AS model, e.data->>'serial_number' AS serial_number FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1`, [esc(fuzzy)]);
+    return ok(`${r.rows.length} ${fuzzy} unit${r.rows.length === 1 ? "" : "s"} on file${exact ? "" : ` (reading "${cand}" as ${fuzzy})`}.`, [{ label: `Units: ${fuzzy}`, value: String(r.rows.length), sources: [] }], r.rows.slice(0, 20).map(unitRec).filter(Boolean), `Counted equipment records whose manufacturer is ${fuzzy}.`);
+  }
+  if (!mm && !/^[A-Z]/.test(rawCase ?? cand)) return null; // bare unknown word without a unit noun: only a capitalised brand-looking name
+  if (EQUIP_NOUN.test(c) || GENERIC.test(c)) return null;
+  const anywhere = await db.raw(`SELECT 1 FROM entities WHERE data::text ILIKE $1 UNION ALL SELECT 1 FROM extractions WHERE value ILIKE $1 LIMIT 1`, [`%${esc(c)}%`]);
+  if (anywhere.rows.length) return null;
+  return ok(`0 ${cand} units on file: that brand isn't in your records. The brands I do have are ${brands.join(", ")}.`, [{ label: `Units: ${cand}`, value: "0", sources: [] }], [], `Searched every equipment manufacturer and every record for ${cand}; none matched.`);
+}
 async function equipCountLane(db, q) {
-  const m = /^how many (?:of )?(?:our |the )?(.+?)(?:\s+(?:do we (?:have|track|manage|own|got)|have we (?:installed|put in|got|done|set|sold|serviced)|are (?:there )?(?:on file|in (?:the |our )(?:portfolio|properties|system|units|buildings))|are we tracking|we have|on file|in (?:the |our )(?:portfolio|properties|system|units|buildings)|in total|total))?$/i.exec(q);
+  const m = /^how many (?:of )?(?:our |the )?(.+?)(?:\s+(?:do we (?:have|track|manage|own|got)|have we (?:installed|put in|got|done|set|sold|serviced)|do we (?:service|work on|maintain)|are (?:there )?(?:on file|in (?:the |our )(?:portfolio|properties|system|units|buildings))|are we tracking|we have|on file|in (?:the |our )(?:portfolio|properties|system|units|buildings)|in total|total))?$/i.exec(q);
   if (!m) return null;
   const types = await equipTypes(db);
+  if (/^(?:appliances|equipment|pieces of equipment|equipment items|appliance units)$/i.test(m[1].trim()) && types.length) {
+    const t = await db.raw(`SELECT e.id, e.customer_id, e.data->>'manufacturer' AS manufacturer, e.data->>'equipment_type' AS equipment_type, e.data->>'model' AS model, e.data->>'serial_number' AS serial_number FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL`);
+    return ok(`${t.rows.length} pieces of equipment on file (every appliance/equipment record).`, [{ label: "Equipment records", value: String(t.rows.length), sources: [] }], t.rows.slice(0, 20).map(unitRec).filter(Boolean), "Counted every equipment record.");
+  }
+  const bl = await brandCountLane(db, m[1], m[1]);
+  if (bl) return bl;
   const ts = typesFor(types, m[1]);
   if (!ts.length) return await absentTypeCount(db, m[1], types);
   const r = await db.raw(`SELECT e.id, e.customer_id, e.data->>'manufacturer' AS manufacturer, e.data->>'equipment_type' AS equipment_type, e.data->>'model' AS model, e.data->>'serial_number' AS serial_number FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND lower(e.data->>'equipment_type') = ANY($1::text[])`, [ts.map((x) => x.t)]);
@@ -135,7 +173,7 @@ async function equipYesNoLane(db, raw, q) {
   if (m) ts = typesFor(types, m[2]);
   if ((!ts || !ts.length) && m) { const w = singPhrase(m[2]); if (quals.has(w)) ts = types.filter((x) => x.qual === w); }
   if (!ts || !ts.length) {
-    m = /^(?:is|are) (.+?)'s (?:water heater|heater|unit|equipment|system|install|one|tank) (?:a |an )?([a-z]+)$/i.exec(q);
+    m = /^(?:is|are) (.+?)'s (?:water heater|heater|hetaer|unit|equipment|system|install|one|tank) (?:a |an )?([a-z]+)$/i.exec(q);
     if (m && quals.has(m[2].toLowerCase())) ts = types.filter((x) => x.qual === m[2].toLowerCase());
   }
   if (!m || !ts || !ts.length) return null;
@@ -166,7 +204,8 @@ async function docTypeCountLane(db, q) {
   if (!words.length || words.length > 4 || words.some((w) => /^(?:customer|owner|tenant|unit|vendor|technician|lease|equipment|document|page|file|question|dollar|invoice total)$/.test(w) && w !== "invoice")) return null;
   const r = await db.raw(`SELECT d.document_type AS t, count(*)::int AS n FROM documents d WHERE ${notPrivateSql("d")} AND d.document_type IS NOT NULL GROUP BY 1`);
   const toks = r.rows.map((x) => ({ ...x, toks: new Set(String(x.t).toLowerCase().split(/[-_\s]+/).map(sing)) }));
-  const hits = toks.filter((x) => words.every((w) => x.toks.has(w)));
+  let hits = toks.filter((x) => words.every((w) => x.toks.has(w)));
+  if (!hits.length) hits = toks.filter((x) => words.every((w) => x.toks.has(w) || (w.length >= 6 && [...x.toks].some((tk) => tk.length >= 6 && lev(tk, w) <= 1)))); // one-typo tolerance against the tenant's own document-type words
   if (hits.length !== 1) return null;
   const { t, n } = hits[0]; const nm = t.replace(/[-_]/g, " ");
   const docs = await db.raw(`SELECT d.id, d.original_filename FROM documents d WHERE ${notPrivateSql("d")} AND d.document_type = $1 ORDER BY d.created_at DESC LIMIT 20`, [t]);
@@ -174,7 +213,7 @@ async function docTypeCountLane(db, q) {
 }
 
 async function anyBrandLane(db, raw) {
-  const m = /^(?:do we have |are there |got |we got )?any ([A-Z][A-Za-z.&-]{2,24}(?: [A-Z][A-Za-z.&-]+)?)(?: (?:appliances?|units?|equipment|ones?|heaters?|products?))?(?: (?:in|at|on|across) (?:our |the )?(?:units?|portfolio|properties|buildings|file|system|installs?))?\??$/.exec(clean(raw));
+  const m = /^(?:do we have |are there |got |we got )?any ([A-Z][A-Za-z.&-]{2,24}(?: [A-Z][A-Za-z.&-]+)?)(?: (?:appliances?|units?|equipment|euqipment|equipmnet|ones?|heaters?|products?))?(?: (?:in|at|on|across) (?:our |the )?(?:units?|portfolio|properties|buildings|file|system|installs?))?(?: on file)?\??$/.exec(clean(raw));
   if (!m) return null;
   const brand = m[1].trim();
   if (/^(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|January|February|March|April|May|June|July|August|September|October|November|December|Day|Time|Way|One|Questions?|Customers?|Invoices?)\b/.test(brand)) return null;
@@ -186,12 +225,34 @@ async function anyBrandLane(db, raw) {
   return ok(`No ${brand} units on file (0). The brands I do have are ${brands.rows.map((x) => x.b).join(", ")}.`, [{ label: `Units: ${brand}`, value: "0", sources: [] }], [], `Searched every equipment manufacturer and every record for ${brand}; none matched.`);
 }
 
+async function brandStatementLane(db, q) {
+  const m = /^([A-Za-z][A-Za-z.&-]{2,24}(?: [A-Z][A-Za-z.&-]+)?) (?:units?|appliances?|equipment|euqipment|equipmnet) (?:we (?:manage|have|got|own|track|service)|on file|in (?:our |the )?(?:portfolio|system|properties|units))$/i.exec(q);
+  return m ? await brandCountLane(db, m[1] + " units", m[1]) : null;
+}
+
+/** R42: a person the question names who is not one of this organization's customers (and appears nowhere in its data) -> honest not-on-file for the fields a customer record carries. */
+async function unknownPersonLane(db, raw, q) {
+  if (!/\b(?:phone|cell|email|e-mail|water heater|heater|hetaer|install\w*|hardness)\b/i.test(q)) return null;
+  const caps = [...raw.matchAll(/\b([A-Z][a-z'-]+(?:\s+[A-Z][a-z'-]+)+)/g)].map((x) => x[1].replace(/['’]s?$/, "").trim()).filter((c) => !/^(?:How|Many|What|When|Which|Does|Is|Do)\b/.test(c));
+  if (caps.length !== 1) return null;
+  const nm = caps[0]; const nl = nm.toLowerCase();
+  const all = await db.raw(`SELECT data->>'customer_name' AS n FROM entities WHERE entity_type IN ('customer','technician') AND data->>'customer_name' IS NOT NULL`);
+  if (all.rows.some((x) => lev(String(x.n).toLowerCase(), nl) <= 2)) return null;
+  const mf = await db.raw(`SELECT DISTINCT lower(data->>'manufacturer') AS b FROM entities WHERE entity_type = 'equipment' AND data->>'manufacturer' IS NOT NULL`);
+  if (mf.rows.some((x) => nl.split(" ").some((w) => w.length >= 5 && lev(x.b.split(" ")[0], w) <= 2))) return null;
+  const tn = await db.raw(`SELECT DISTINCT lower(value) AS n FROM extractions WHERE field_key = 'tenant_name'`);
+  if (tn.rows.some((x) => lev(x.n, nl) <= 2)) return null;
+  const anywhere = await db.raw(`SELECT 1 FROM entities WHERE data::text ILIKE $1 UNION ALL SELECT 1 FROM extractions WHERE value ILIKE $1 LIMIT 1`, [`%${esc(nm)}%`]);
+  if (anywhere.rows.length) return null;
+  return noAnswer(`I don't have a customer named ${nm} on file, so there is nothing recorded about their phone, equipment or installs.`, `Searched every customer name and record for ${nm}; none matched.`);
+}
+
 export async function tryCatalogLane(db, question) {
   const raw = String(question ?? "");
   const q = clean(raw);
   if (!q || q.length > 220 || /[;:<>{}"`\\]/.test(q)) return null;
   try {
-    return (await customerNumberLane(db, raw, q)) ?? (await equipYesNoLane(db, raw, q)) ?? (await equipListLane(db, q)) ?? (await statusDocCountLane(db, q)) ?? (await equipCountLane(db, q)) ?? (await docTypeCountLane(db, q)) ?? (await anyBrandLane(db, raw)) ?? null;
+    return (await customerNumberLane(db, raw, q)) ?? (await equipYesNoLane(db, raw, q)) ?? (await equipListLane(db, q)) ?? (await statusDocCountLane(db, q)) ?? (await equipCountLane(db, q)) ?? (await docTypeCountLane(db, q)) ?? (await brandStatementLane(db, q)) ?? (await anyBrandLane(db, raw)) ?? (await unknownPersonLane(db, raw, q)) ?? null;
   } catch (err) {
     console.error("tenantCatalogLane failed, falling through:", err?.message);
     return null;

@@ -245,15 +245,16 @@ export function limitsFromTenantContext(tenantLimits, bucket, overrides) {
  */
 async function resolveTenantAndLimits(tenantKey, bucket, overrides) {
   const base = envLimits(bucket);
-  if (typeof tenantKey !== "string" || !tenantKey.trim()) return { tenantUuid: null, limits: base };
+  if (typeof tenantKey !== "string" || !tenantKey.trim()) return { tenantUuid: null, limits: base, demo: false };
   try {
     const ctx = await getTenantContext(tenantKey, tenantKey);
     // A blank id must never reach increment_*() as a uuid parameter.
-    if (typeof ctx?.id !== "string" || !ctx.id.trim()) return { tenantUuid: null, limits: base };
-    return { tenantUuid: ctx.id, limits: limitsFromTenantContext(ctx.limits, bucket, overrides) };
+    if (typeof ctx?.id !== "string" || !ctx.id.trim()) return { tenantUuid: null, limits: base, demo: false };
+    // Industry demo company (plan AND billing status 'demo', set only by M3-config/demo/D1): kept out of the usage REPORT below.
+    return { tenantUuid: ctx.id, limits: limitsFromTenantContext(ctx.limits, bucket, overrides), demo: ctx.plan === "demo" && ctx.billingStatus === "demo" };
   } catch (err) {
     console.error("rateLimit: could not resolve tenant/limits, using defaults:", err?.message);
-    return { tenantUuid: null, limits: base };
+    return { tenantUuid: null, limits: base, demo: false };
   }
 }
 
@@ -384,7 +385,7 @@ export async function limit(req, res, auth, bucket, overrides, cost) {
   const units = Number.isFinite(cost) && cost > 0 ? Math.trunc(cost) : 1;
   const stageStart = now;
 
-  const { tenantUuid, limits } = await resolveTenantAndLimits(tenantKey, bucket, overrides);
+  const { tenantUuid, limits, demo: isDemoTenant } = await resolveTenantAndLimits(tenantKey, bucket, overrides);
   logStage({ t: "ratelimit_resolve", bucket, ms: Date.now() - stageStart });
 
   // A tenant that could not be resolved (a transient DB error — resolve_tenant
@@ -485,10 +486,14 @@ export async function limit(req, res, auth, bucket, overrides, cost) {
       );
       return false;
     }
-    try {
-      await getAuxPool().query("SELECT * FROM increment_usage_counters($1, $2::date, $3, 0, 0, 0)", [tenantUuid, today, units]);
-    } catch (err) {
-      logOnce("usage_counters", err);
+    // Demo companies are left out of the usage report (usage_counters.requests is report-only; the burst and daily caps above are
+    // separate rate_limit_windows counters and still apply). model_calls (the daily AI spend ceiling) is NOT skipped - see usage.js.
+    if (!isDemoTenant) {
+      try {
+        await getAuxPool().query("SELECT * FROM increment_usage_counters($1, $2::date, $3, 0, 0, 0)", [tenantUuid, today, units]);
+      } catch (err) {
+        logOnce("usage_counters", err);
+      }
     }
     // Remember what this request was charged, so a later plan-gate refusal (402) can hand the unit back (refundPlanRefusal).
     if (req && typeof req === "object") {

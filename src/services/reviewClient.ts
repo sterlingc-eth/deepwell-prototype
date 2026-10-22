@@ -759,7 +759,7 @@ export const reviewClient = {
    *  extractions and promotes to verified (verified_by 'ai') if complete and
    *  confident enough. No-op (verified:false) otherwise — never an error. */
   aiVerify(documentId: string) {
-    return postJson<{ document: ReviewDocument; completeness: ReviewCompleteness; verified: boolean; unconfirmedDates?: { fieldKey: string; value: string }[]; recheck?: { filled: RecheckFilledField[] } | null }>({
+    return postJson<{ document: ReviewDocument; completeness: ReviewCompleteness; verified: boolean; unconfirmedDates?: { fieldKey: string; value: string }[]; recheck?: { filled: RecheckFilledField[]; retyped?: { from: string; to: string } | null } | null }>({
       action: 'aiVerify',
       documentId,
     });
@@ -777,7 +777,7 @@ export const reviewClient = {
   /** R33 (admin): "Re-check all missing fields" — a bounded batch (<=100) of this account's documents with a missing
    *  required field, optionally restricted to `documentIds`. Loop while `leftForNextRun` > 0. */
   recheckMissing(documentIds: string[] | null, limit = 50) {
-    return postJson<{ scanned: number; candidates: number; rechecked: number; filled: number; fields: number; verified: number; leftForNextRun: number; errors: number }>({
+    return postJson<{ scanned: number; candidates: number; rechecked: number; filled: number; fields: number; retyped?: number; verified: number; leftForNextRun: number; errors: number }>({
       action: 'recheckMissing',
       ...(documentIds ? { documentIds: documentIds.slice(0, 500) } : {}),
       limit,

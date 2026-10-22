@@ -529,13 +529,130 @@ export function isStrictTenantsAtAddress(question) {
 }
 export const isResidentTenantsQuestion = isStrictTenantsAtAddress; // safety-gate carve-out: a resident question, not a probe of other DeepWell tenants
 
+/* ------------------------------------------------------------------ R42: tenant rent / move-out phrasing, vendor COI, jobs-by, vendors by trade, COI year counts, owners by city
+ * Every vocabulary (tenant names, vendor names, trades, cities) is read from this organization's own rows. Unknown name/trade/city -> honest 0 / not on file, never a total. */
+const osa = (a, b) => { const m = a.length, n = b.length; const d = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]); for (let j = 1; j <= n; j++) d[0][j] = j; for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) { d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1); } return d[m][n]; };
+const tol = (s) => (s.length >= 9 ? 2 : s.length >= 5 ? 1 : 0);
+const INS_RE = /\b(?:ins\w{3,8}|coi|certificates? of insurance|cert)\b/i;
+const EXP_RE = /\b(?:expire|expires|expired|expiring|expiration|expiry|exprie|run out|runs out|lapse|lapsed|current|valid|good|up to date|active|covered)\b/i;
+
+/** Longest vendor name (tenant's own technician + work-order vendor values) the question names, typo-tolerant on the whole name. */
+async function vendorsAll(db) {
+  const r = await db.raw(`SELECT id, data->>'name' AS name, data->>'trade' AS trade FROM entities WHERE entity_type = 'technician' AND merged_into IS NULL AND data->>'name' IS NOT NULL`);
+  const have = new Map(r.rows.map((x) => [x.name.toLowerCase(), { id: x.id, name: x.name, trade: x.trade }]));
+  for (const v of await vendorNames(db)) if (!have.has(v.toLowerCase())) have.set(v.toLowerCase(), { name: v, trade: null });
+  return [...have.values()];
+}
+function vendorInQuestion(raw, vendors) {
+  const words = norm(raw).trim().split(" ").filter(Boolean);
+  let best = null;
+  for (const v of vendors) {
+    const k = norm(v.name).trim(); const kw = k.split(" ").length;
+    for (let w = Math.max(1, kw - 1); w <= kw + 1; w++) for (let i = 0; i + w <= words.length; i++) {
+      const seg = words.slice(i, i + w).join(" "); const d = osa(seg, k);
+      if (d <= Math.min(2, tol(k)) && (!best || d < best.d || (d === best.d && k.length > best.k.length))) best = { v, d, k };
+    }
+  }
+  return best?.v ?? null;
+}
+const CAND_RE = /([A-Z][A-Za-z&'.-]+(?:\s+[A-Z][A-Za-z&'.-]+){1,3})/g;
+async function unknownCandidate(db, raw, vendors) {
+  const caps = [...raw.replace(ADDRESS_RE, " ").matchAll(CAND_RE)].map((x) => x[1].replace(/['’]s?$/, "").trim()).filter((c) => !/^(?:How|Many|Work|Unit|Apt|Suite|The|Our|When|What|Which|Does|Is|Are|Do|Has|Have|Any|List)\b/.test(c));
+  if (caps.length !== 1) return null;
+  const c = caps[0]; const cl = c.toLowerCase();
+  if (vendors.some((v) => osa(v.name.toLowerCase(), cl) <= 2)) return null;
+  const anywhere = await db.raw(`SELECT 1 FROM entities WHERE data::text ILIKE $1 UNION ALL SELECT 1 FROM extractions WHERE value ILIKE $1 LIMIT 1`, [`%${esc(c)}%`]);
+  return anywhere.rows.length ? null : c;
+}
+
+async function extrasLane(db, raw, q, today) {
+  const l = q.toLowerCase();
+  /* tenant rent / move-out phrasing -> the existing person lane */
+  let m = /^(?:what|how much)\s+(?:does|is|do)\s+(.+?)\s+(?:pay|paying|owe)(?:\s+(?:in rent|a month|monthly|per month|each month))?$/i.exec(q);
+  if (m && !/\b(?:late|behind|owe)\b/i.test(q)) { const r = await personLane(db, `what is ${m[1]}'s rent`, `what is ${m[1]}'s rent`, today); if (r) return r; }
+  m = /^(?:has|have|did|is)\s+(.+?)\s+(?:moved|move|moving|left|vacated|gone)\s*(?:out|yet)?(?:\s+yet)?$/i.exec(q);
+  if (m) { const r = await personLane(db, `did ${m[1]} have a move out inspection`, `did ${m[1]} have a move out inspection`, today); if (r) return r; }
+
+  const vendors = await vendorsAll(db);
+  /* jobs done by V */
+  m = /^(?:jobs|work\s*orders?)\s+(?:done|handled|completed|performed)\s+by\s+(.+)$/i.exec(q) ?? /^(.+?)\s+(?:jobs|work\s*orders?)(?:\s+count)?$/i.exec(q);
+  if (m && (vendorInQuestion(m[1], vendors) || /^[A-Z]/.test(m[1]))) { const r = await vendorLane(db, `how many work orders did ${m[1]} do`, `how many work orders did ${m[1]} do`); if (r) return r; }
+
+  /* vendor insurance: when does V's insurance expire / is it current */
+  if (INS_RE.test(l) && EXP_RE.test(l) && !/\b(?:how many|which|list|who)\b/.test(l) && !YEAR_OR_PERIOD.test(l)) {
+    const v = vendorInQuestion(raw, vendors);
+    if (v) {
+      const cois = [...(await docsByType(db, "certificate-of-insurance")).values()].filter((o) => o.f.vendor && osa(o.f.vendor.toLowerCase(), v.name.toLowerCase()) <= 1);
+      if (!cois.length) return noAnswer(`${v.name} is on file as a vendor, but there is no certificate of insurance on file for them.`, `Looked for a certificate-of-insurance document naming ${v.name}; none exists.`);
+      const o = cois.sort((a, b) => String(b.f.coi_expires ?? "").localeCompare(String(a.f.coi_expires ?? "")))[0];
+      if (!o.f.coi_expires) return noAnswer(`The certificate of insurance on file for ${v.name} has no expiration date recorded.`, `Read the certificate of insurance for ${v.name}.`);
+      const exp = String(o.f.coi_expires); const cur = exp >= today;
+      return ok(`${v.name}'s insurance ${cur ? "runs until" : "expired on"} ${prettyDate(exp)}${/\b(?:current|valid|good|up to date|active|covered)\b/i.test(l) ? ` - ${cur ? "yes, it is current" : "no, it is not current"} as of today` : ""}.`, [{ label: `${v.name} insurance expires`, value: prettyDate(exp), sources: srcFor(o) }], [recFor(o, "Certificate of insurance")], `Read the expiration date on the certificate of insurance for ${v.name}.`);
+    }
+    const c = await unknownCandidate(db, raw, vendors);
+    if (c) return ok(`0 insurance certificates on file for ${c}: I don't have a vendor by that name. Vendors with certificates on file: ${[...new Set([...(await docsByType(db, "certificate-of-insurance")).values()].map((o) => o.f.vendor).filter(Boolean))].sort().join(", ") || "none"}.`, [{ label: `Insurance certificates for ${c}`, value: "0", sources: [] }], [], `Searched every vendor name and certificate for ${c}; none matched.`);
+  }
+
+  /* COI expiry counts by year */
+  m = /\b(20\d{2})\b/.exec(l);
+  if (m && INS_RE.test(l) && /\b(?:how many|number of|count)\b/.test(l) && /\bexp\w+|\brun out\b|\bend\b/.test(l)) {
+    const cois = [...(await docsByType(db, "certificate-of-insurance")).values()].filter((o) => o.f.coi_expires);
+    const hit = cois.filter((o) => String(o.f.coi_expires).startsWith(`${m[1]}-`));
+    const yrs = [...new Set(cois.map((o) => String(o.f.coi_expires).slice(0, 4)))].sort();
+    return ok(hit.length ? `${hit.length} vendor insurance certificate${hit.length === 1 ? "" : "s"} expire${hit.length === 1 ? "s" : ""} in ${m[1]}: ${hit.map((o) => `${o.f.vendor} (${prettyDate(o.f.coi_expires)})`).join("; ")}.` : `0 vendor insurance certificates expire in ${m[1]}. Expiration years on file: ${yrs.join(", ") || "none"}.`,
+      [{ label: `COIs expiring ${m[1]}`, value: String(hit.length), sources: hit.slice(0, 20).map(srcFor).flat() }], hit.slice(0, 20).map((o) => recFor(o, "Certificate of insurance")), `Counted certificate-of-insurance documents whose expiration date is in ${m[1]}.`);
+  }
+
+  /* vendors by trade: "how many hvac vendors", "list our pest vendors", "which plumbing vnedors do we use" */
+  m = /^(?:(how many|number of|count of)|which|list|what|who|show(?: me)?|name)\s+(?:of\s+)?(?:all\s+)?(?:our\s+|the\s+|my\s+)?([A-Za-z][A-Za-z -]{2,24}?)\s+(?:v\w{3,8}s|contractors|companies|subs)(?:\s+(?:do we (?:have|use|work with|got)|we (?:use|have)|are there|on file|do we got))?$/i.exec(q);
+  if (m) {
+    const word = m[2].toLowerCase().trim();
+    if (!/^(?:unpaid|paid|total|active|different|all|many|insured|uninsured|expired|current|new|old)$/.test(word) && vendors.some((v) => v.trade)) {
+      const trades = [...new Set(vendors.map((v) => v.trade).filter(Boolean).map((t) => t.toLowerCase()))].sort();
+      const hit = trades.find((t) => t === word || osa(t, word) <= tol(t) || word.startsWith(t));
+      const tv = hit ? vendors.filter((v) => (v.trade ?? "").toLowerCase() === hit).sort((a, b) => a.name.localeCompare(b.name)) : [];
+      if (hit) return ok(m[1] ? `${tv.length} ${hit} vendor${tv.length === 1 ? "" : "s"}: ${tv.map((v) => v.name).join(", ")}.` : `${tv.length} ${hit} vendor${tv.length === 1 ? "" : "s"} on file: ${tv.map((v) => v.name).join(", ")}.`, (m[1] ? [{ label: `${hit} vendors`, value: String(tv.length), sources: [] }] : tv.map((v) => ({ label: `${hit} vendor`, value: v.name, sources: [] }))), tv.map((v) => v.id && makeRecord({ type: "customer", id: v.id, label: v.name })).filter(Boolean), `Counted the vendor records whose trade is ${hit}.`);
+      if (word.split(" ").length === 1) return ok(`0 ${word} vendors on file. The trades I do have vendors for are ${trades.join(", ")}.`, [{ label: `${word} vendors`, value: "0", sources: [] }], [], `Checked the trade on every vendor record for ${word}; none matched.`);
+    }
+  }
+
+  /* vendor invoice counts (any status) and unknown vendor on unpaid/invoice counts */
+  m = /^how many\s+(paid\s+|unpaid\s+|open\s+)?(?:invoices|bills)\s+(?:from|by|for)\s+(.+)$/i.exec(q);
+  if (m && !YEAR_OR_PERIOD.test(l)) {
+    const v = vendorInQuestion(m[2], vendors);
+    if (v && !m[1]) {
+      const r = await db.raw(`SELECT DISTINCT d.id FROM documents d JOIN extractions a ON a.document_id = d.id AND a.field_key = 'vendor' AND lower(a.value) = lower($1) WHERE d.document_type = 'invoice' AND ${notPrivateSql("d")}`, [v.name]);
+      const inv = [...(await loadFields(db, r.rows.map((x) => x.id))).values()];
+      return ok(`${inv.length} invoice${inv.length === 1 ? "" : "s"} from ${v.name} on file.`, [{ label: `Invoices from ${v.name}`, value: String(inv.length), sources: inv.slice(0, 20).map(srcFor).flat() }], inv.slice(0, 20).map((o) => recFor(o, "Vendor invoice")), `Counted the invoice documents whose vendor is ${v.name}.`);
+    }
+    if (!v && /^[A-Z]/.test(m[2])) {
+      const c = await unknownCandidate(db, m[2], vendors);
+      if (c) return ok(`0 invoices from ${c}: I don't have a vendor by that name. The vendors I do have are ${vendors.map((x) => x.name).sort().join(", ")}.`, [{ label: `Invoices from ${c}`, value: "0", sources: [] }], [], `Searched the vendor on every invoice for ${c}; none matched.`);
+    }
+  }
+
+  /* owners by city (cities read from the owners' own addresses) */
+  m = /^how many\s+(owners|clients|landlords|customers)\s+(?:do we have|have we got|we have|do we got)?\s*(?:in|from|around|near)\s+([A-Z][A-Za-z.' -]{2,24})$/.exec(q);
+  if (m) {
+    const city = m[2].trim();
+    const r = await db.raw(`SELECT id, data->>'customer_name' AS name, data->>'service_address' AS addr FROM entities WHERE entity_type = 'customer' AND merged_into IS NULL`);
+    const cityOf = (a) => (/,\s*([^,]+),\s*[A-Z]{2}\b/.exec(a ?? "") ?? [])[1]?.trim();
+    const cities = [...new Set(r.rows.map((x) => cityOf(x.addr)).filter(Boolean))].sort();
+    const hit = cities.find((c) => c.toLowerCase() === city.toLowerCase());
+    if (hit) { const rows = r.rows.filter((x) => cityOf(x.addr) === hit); return ok(`${rows.length} ${m[1].toLowerCase()} in ${hit}.`, [{ label: `${m[1]} in ${hit}`, value: String(rows.length), sources: [] }], rows.slice(0, 20).map((x) => makeRecord({ type: "customer", id: x.id, label: x.name })).filter(Boolean), `Counted the owner records whose address city is ${hit}.`); }
+    if (!cities.some((c) => osa(c.toLowerCase(), city.toLowerCase()) <= 1)) return ok(`0 ${m[1].toLowerCase()} in ${city}: no owner address on file is in that city. The cities I do have are ${cities.join(", ")}.`, [{ label: `${m[1]} in ${city}`, value: "0", sources: [] }], [], `Read the city on every owner address; none is ${city}.`);
+  }
+  return null;
+}
+
 export async function tryPropertyPack(db, question, { today } = {}) {
   const raw = String(question ?? "");
   const q = cleanQ(raw);
   if (!q || q.length > 300) return null;
   const t = /^\d{4}-\d{2}-\d{2}$/.test(String(today ?? "")) ? today : new Date().toISOString().slice(0, 10);
   try {
-    return (await countLane(db, raw)) ?? (await unitLane(db, q, raw, t)) ?? (await vendorLane(db, raw, q)) ?? (await payStatusLane(db, raw, q)) ?? (await vacancyLane(q)) ?? (await tenantCountLane(db, q)) ?? (await vendorTradeLane(db, raw, q)) ?? (await vendorUnpaidLane(db, raw, q)) ?? (await monthToMonthLane(db, q)) ?? (await ownerUnitsLane(db, raw, q)) ?? (await rentStatsLane(db, raw, q)) ?? (await noBuildingLane(db, q)) ?? (await notOnFileLane(db, q)) ?? (await personLane(db, q, raw, t));
+    const base = (await countLane(db, raw)) ?? (await unitLane(db, q, raw, t)) ?? (await vendorLane(db, raw, q)) ?? (await payStatusLane(db, raw, q)) ?? (await vacancyLane(q)) ?? (await tenantCountLane(db, q)) ?? (await vendorTradeLane(db, raw, q)) ?? (await vendorUnpaidLane(db, raw, q)) ?? (await monthToMonthLane(db, q)) ?? (await ownerUnitsLane(db, raw, q)) ?? (await rentStatsLane(db, raw, q)) ?? (await noBuildingLane(db, q)) ?? (await notOnFileLane(db, q)) ?? (await personLane(db, q, raw, t));
+    return base ?? (await extrasLane(db, raw, q, t));
   } catch (err) {
     console.error("propertyPack lane failed, falling through:", err?.message);
     return null;

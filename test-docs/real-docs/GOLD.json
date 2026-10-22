@@ -1,0 +1,2824 @@
+{
+ "about": "Gold for npm run verify:real-docs (docs/QUALITY_GATE.md). Synthetic Sonoran test set (UPLOAD_THIS_FIRST_all_industries_100_each_1000_documents.zip); never Donovan training.",
+ "facts": [
+  {
+   "filename": "INV-70400 Young.pdf",
+   "key": "service_address",
+   "value": "4733 Arbor Dr",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Receipt R-3301 Harborview.pdf",
+   "key": "invoice_number",
+   "value": "R-3301",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Hawkins Invoice 84591.pdf",
+   "key": "invoice_number",
+   "value": "84591",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Rent Ledger - 7942 Barton Bend Apt 107 Anderson.xlsx",
+   "key": "cost",
+   "value": "539.00",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "INV-31207 Dixon.pdf",
+   "key": "service_date",
+   "value": "2026-09-09",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Service Agreement SA-341 - Cornerstone Dental Inc..pdf",
+   "key": "end_date",
+   "value": "2027-07-13",
+   "page": 2,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Pearson Invoice INV73836.pdf",
+   "key": "customer_name",
+   "value": "Cardinal Ridge Construction",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "neighbour": "Noah Tran",
+   "captured": true,
+   "neighbour_note": "the DELIVERED TO name printed beside it on the same line"
+  },
+  {
+   "filename": "Receipt R-8103 Vega.pdf",
+   "key": "invoice_number",
+   "value": "R-8103",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Estimate Q-1042 Fuentes v2.pdf",
+   "key": "cost",
+   "value": "3398.74",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Invoice 4117 - Bishop.xlsx",
+   "key": "customer_name",
+   "value": "Bishop Plumbing Group",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Grant Agreement GR-25-5397 - Valdez (signed).pdf",
+   "key": "agreement_term",
+   "value": "01/30/2025 - 07/29/2026",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Invoice 24323 - Evergreen.docx",
+   "key": "invoice_number",
+   "value": "24323",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Rhodes SI-62336.pdf",
+   "key": "cost",
+   "value": "47.75",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Anderson Invoice INV98205.pdf",
+   "key": "vendor",
+   "value": "ANDERSON PLUMBING SUPPLY COMPANY",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "WO 7320 - Yazzie.docx",
+   "key": "service_address",
+   "value": "1999 W Pinecrest Blvd",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Delivery Ticket DT-8816 RA-4031.pdf",
+   "key": "customer_name",
+   "value": "Jacobs Framing Company",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "WO 7318 - Beacon.pdf",
+   "key": "service_address",
+   "value": "8416 N Desert Blvd",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Ortega Invoice SI-98805.pdf",
+   "key": "vendor",
+   "value": "Ortega Plumbing Supply LLC",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Construction Contract CC-26-021 - Marcus Valdez (signed).pdf",
+   "key": "vendor",
+   "value": "Cardinal Ridge Construction",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Pay App 01 - Tran.pdf",
+   "key": "cost",
+   "value": "3897.00",
+   "page": 2,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "PA-7419 Pay App 4 Gutierrez.docx",
+   "key": "invoice_number",
+   "value": "PA-7419",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Punch List Gonzales.pdf",
+   "key": "service_address",
+   "value": "1748 E Mesquite Ave",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Dalton SI-50691.pdf",
+   "key": "service_date",
+   "value": "2025-04-11",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Maintenance Agreement MA-881 - Charles Zamora.pdf",
+   "key": "agreement_term",
+   "value": "2025-07-14 - 2026-07-13",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "INV-20406 Harborview.pdf",
+   "key": "service_address",
+   "value": "3532 S Canyon Ave",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Abbott Invoice 4293.docx",
+   "key": "service_date",
+   "value": "2026-05-07",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "In-Kind IK-2026-021 Hansen.xlsx",
+   "key": "customer_name",
+   "value": "Tomas Hansen",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Permit BLD25-23003 - 3629 S Ridge Way.pdf",
+   "key": "service_date",
+   "value": "2025-06-23",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Quote rev Roberts v2.pdf",
+   "key": "customer_name",
+   "value": "Nathan Roberts",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "NDA - Desert and Horizon.pdf",
+   "key": "start_date",
+   "value": "2025-02-17",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "East bill 2025-06.pdf",
+   "key": "cost",
+   "value": "297.10",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Invoice 24326 - Heritage.xlsx",
+   "key": "cost",
+   "value": "1718.00",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Retainer Receipt TR-5122 Saguaro.pdf",
+   "key": "service_date",
+   "value": "2025-08-18",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Beacon SI-77481.docx",
+   "key": "customer_name",
+   "value": "Juniper Lane Mercantile",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Receipt R-2025-1001 Cruz.pdf",
+   "key": "vendor",
+   "value": "HARBORLIGHT NEIGHBORS ALLIANCE",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "PA-7415 Pay App 2 Gutierrez.pdf",
+   "key": "vendor",
+   "value": "Summit Line Electric",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "PA-7413 Pay App 1 Gutierrez.pdf",
+   "key": "cost",
+   "value": "97138.84",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Inspection Sign-off Rough-in Lindgren.pdf",
+   "key": "permit_number",
+   "value": "ELC25-17675",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Service Agreement SA-347 - Landmark Apartments Group.pdf",
+   "key": "start_date",
+   "value": "2026-05-31",
+   "page": 2,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Estimate Q-1047 Jensen.pdf",
+   "key": "customer_name",
+   "value": "Alicia Jensen",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Lease - 8254 Bluebonnet Ct Unit D (Fischer).pdf",
+   "key": "end_date",
+   "value": "2027-11-02",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Move-In Inspection - 9088 Barton Bend 2025-06-10.pdf",
+   "key": "vendor",
+   "value": "CEDARLINE PROPERTY MANAGEMENT",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Water Heater Warranty Reg - Campos.pdf",
+   "key": "vendor",
+   "value": "TIDEWELL WATER PRODUCTS",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "WO 5507 - Brightwater.pdf",
+   "key": "service_address",
+   "value": "2517 S Cottonwood Ave",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Warranty Registration - Ironwood Fitness Company.docx",
+   "key": "installation_date",
+   "value": "2026-04-14",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Receipt R-20117.pdf",
+   "key": "vendor",
+   "value": "Juniper Lane Mercantile",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Maintenance Agreement MA-885 - Isaac Fuentes.pdf",
+   "key": "customer_name",
+   "value": "Isaac Fuentes",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Sunbelt Invoice INV59428.xlsx",
+   "key": "customer_name",
+   "value": "Sidewinder Equipment Rental",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Return Slip RC-0304.pdf",
+   "key": "service_date",
+   "value": "2026-04-12",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Lease - 4624 Bluebonnet Ct Suite 100 (Greer).pdf",
+   "key": "start_date",
+   "value": "2025-01-20",
+   "page": 1,
+   "source": "sample50 (hand-checked 2026-10-22)",
+   "captured": true
+  },
+  {
+   "filename": "Lease - Warehouse and Office (signed).pdf",
+   "key": "agreement_term",
+   "value": "60 months (02/10/2023 - 02/09/2028)",
+   "page": 1,
+   "source": "live screenshot 2026-10-22",
+   "captured": true
+  },
+  {
+   "filename": "Lease - Warehouse and Office (signed).pdf",
+   "key": "start_date",
+   "value": "2023-02-10",
+   "page": 1,
+   "source": "live screenshot 2026-10-22",
+   "captured": true
+  },
+  {
+   "filename": "Lease - Warehouse and Office (signed).pdf",
+   "key": "end_date",
+   "value": "2028-02-09",
+   "page": 1,
+   "source": "live screenshot 2026-10-22",
+   "captured": true
+  },
+  {
+   "filename": "Lease - Warehouse and Office (signed).pdf",
+   "key": "customer_name",
+   "value": "Harborlight Neighbors Alliance",
+   "page": 1,
+   "source": "live screenshot 2026-10-22",
+   "captured": true
+  },
+  {
+   "filename": "WO 7316 - Bridgeway.pdf",
+   "key": "vendor",
+   "value": "Bluff Creek Plumbing & Drain",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "WO 7316 - Bridgeway.pdf",
+   "key": "invoice_number",
+   "value": "7316",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "WO 7316 - Bridgeway.pdf",
+   "key": "customer_name",
+   "value": "Bridgeway Storage Co.",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "WO 7316 - Bridgeway.pdf",
+   "key": "service_address",
+   "value": "9455 N Willow Rd",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "HOA Assessment Notice - 7634 Prairie Wind Way.pdf",
+   "key": "vendor",
+   "value": "Pecan Hollow Community Association",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "HOA Assessment Notice - 7634 Prairie Wind Way.pdf",
+   "key": "service_address",
+   "value": "7634 Prairie Wind Way",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "HOA Assessment Notice - 7634 Prairie Wind Way.pdf",
+   "key": "customer_name",
+   "value": "Dennis Nash",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": false
+  },
+  {
+   "filename": "COI - Hendrix 2025.pdf",
+   "key": "start_date",
+   "value": "2025-12-13",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "COI - Hendrix 2025.pdf",
+   "key": "end_date",
+   "value": "2026-12-13",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Intake Checklist - Trailhead.xlsx",
+   "key": "customer_name",
+   "value": "Trailhead Consulting Inc.",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Intake Checklist - Trailhead.xlsx",
+   "key": "vendor",
+   "value": "Larkspur Ledger Bookkeeping & Tax, LLC",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": false
+  },
+  {
+   "filename": "MOU - Beacon (Youth).pdf",
+   "key": "start_date",
+   "value": "2026-01-27",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "MOU - Beacon (Youth).pdf",
+   "key": "end_date",
+   "value": "2028-01-26",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "MOU - Beacon (Youth).pdf",
+   "key": "agreement_term",
+   "value": "27 Jan 2026 - 26 Jan 2028",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Pay App 02 - Tran.pdf",
+   "key": "customer_name",
+   "value": "Noah Tran",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Pay App 02 - Tran.pdf",
+   "key": "vendor",
+   "value": "Cardinal Ridge Construction",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Credit Memo CM-4500 Patel.pdf",
+   "key": "invoice_number",
+   "value": "CM-4500",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Credit Memo CM-4500 Patel.pdf",
+   "key": "service_date",
+   "value": "2025-11-21",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Credit Memo CM-4500 Patel.pdf",
+   "key": "customer_name",
+   "value": "Juniper Lane Mercantile",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Credit Memo CM-4500 Patel.pdf",
+   "key": "vendor",
+   "value": "Patel Paper & Press Group",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Credit Memo CM-4500 Patel.pdf",
+   "key": "cost",
+   "value": "1.65",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Ortega Invoice A86698.pdf",
+   "key": "invoice_number",
+   "value": "A86698",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Ortega Invoice A86698.pdf",
+   "key": "service_date",
+   "value": "2026-04-27",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Ortega Invoice A86698.pdf",
+   "key": "customer_name",
+   "value": "Bluff Creek Plumbing & Drain",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Ortega Invoice A86698.pdf",
+   "key": "vendor",
+   "value": "Ortega Plumbing Supply LLC",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Ortega Invoice A86698.pdf",
+   "key": "cost",
+   "value": "1579.59",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Pay App 03 - Bennett.xlsx",
+   "key": "customer_name",
+   "value": "Zachary Bennett",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": false
+  },
+  {
+   "filename": "Pay App 03 - Bennett.xlsx",
+   "key": "vendor",
+   "value": "Cardinal Ridge Construction",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": false
+  },
+  {
+   "filename": "Engagement Letter - Heritage (2026-0107).pdf",
+   "key": "customer_name",
+   "value": "Heritage Brewing Inc.",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Engagement Letter - Heritage (2026-0107).pdf",
+   "key": "vendor",
+   "value": "Whitfield Marsh Law Group, PLLC",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": false
+  },
+  {
+   "filename": "Engagement Letter - Heritage (2026-0107).pdf",
+   "key": "service_date",
+   "value": "2026-01-16",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": false
+  },
+  {
+   "filename": "Insurance Policy NPP-2486143 Declarations.pdf",
+   "key": "policy_number",
+   "value": "NPP-2486143",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Jacobs INV-21004.pdf",
+   "key": "invoice_number",
+   "value": "INV-21004",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Jacobs INV-21004.pdf",
+   "key": "service_date",
+   "value": "2025-12-21",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Jacobs INV-21004.pdf",
+   "key": "customer_name",
+   "value": "Larkspur Ledger Bookkeeping & Tax, LLC",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Jacobs INV-21004.pdf",
+   "key": "cost",
+   "value": "127.00",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Daily Log 2025-06-16 P-2503.pdf",
+   "key": "vendor",
+   "value": "Cardinal Ridge Construction",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": false
+  },
+  {
+   "filename": "Receipt R-2026-1028 Mercer.pdf",
+   "key": "invoice_number",
+   "value": "R-2026-1028",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Receipt R-2026-1028 Mercer.pdf",
+   "key": "service_date",
+   "value": "2026-03-03",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Receipt R-2026-1028 Mercer.pdf",
+   "key": "customer_name",
+   "value": "Lucia Mercer",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Receipt R-2026-1028 Mercer.pdf",
+   "key": "vendor",
+   "value": "Harborlight Neighbors Alliance",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Receipt R-2026-1028 Mercer.pdf",
+   "key": "cost",
+   "value": "250.00",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Engagement Letter EN-2026-103 - Trailhead.pdf",
+   "key": "customer_name",
+   "value": "Trailhead Consulting Inc.",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Engagement Letter EN-2026-103 - Trailhead.pdf",
+   "key": "vendor",
+   "value": "Larkspur Ledger Bookkeeping & Tax, LLC",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": false
+  },
+  {
+   "filename": "Engagement Letter EN-2026-103 - Trailhead.pdf",
+   "key": "service_date",
+   "value": "2026-02-13",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": false
+  },
+  {
+   "filename": "Board Minutes 2025-09-23.pdf",
+   "key": "vendor",
+   "value": "Harborlight Neighbors Alliance",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Receipt R-5606 Pearson.docx",
+   "key": "invoice_number",
+   "value": "R-5606",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Receipt R-5606 Pearson.docx",
+   "key": "service_date",
+   "value": "2025-04-14",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Receipt R-5606 Pearson.docx",
+   "key": "customer_name",
+   "value": "Trevor Pearson",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Receipt R-5606 Pearson.docx",
+   "key": "vendor",
+   "value": "Bluff Creek Plumbing & Drain",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Receipt R-5606 Pearson.docx",
+   "key": "cost",
+   "value": "119.00",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Offer Letter - Claudia Keller.pdf",
+   "key": "vendor",
+   "value": "Summit Line Electric",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Maintenance Agreement MA-883 - Kevin Acosta.docx",
+   "key": "customer_name",
+   "value": "Kevin Acosta",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Maintenance Agreement MA-883 - Kevin Acosta.docx",
+   "key": "agreement_term",
+   "value": "2026-06-09 - 2027-06-08",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Maintenance Agreement MA-883 - Kevin Acosta.docx",
+   "key": "start_date",
+   "value": "2026-06-09",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Maintenance Agreement MA-883 - Kevin Acosta.docx",
+   "key": "end_date",
+   "value": "2027-06-08",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Engagement Letter - Bridgeway (2026-0102).pdf",
+   "key": "customer_name",
+   "value": "Bridgeway Brewing Inc.",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Engagement Letter - Bridgeway (2026-0102).pdf",
+   "key": "service_date",
+   "value": "2026-05-06",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": false
+  },
+  {
+   "filename": "Rent Ledger - 9088 Barton Bend Cardenas.pdf",
+   "key": "customer_name",
+   "value": "Laura Cardenas",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Rent Ledger - 9088 Barton Bend Cardenas.pdf",
+   "key": "service_address",
+   "value": "9088 Barton Bend",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": false
+  },
+  {
+   "filename": "Consignment Agreement - Little Kiln Studio II.pdf",
+   "key": "agreement_term",
+   "value": "11/18/25 - 11/17/26",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Consignment Agreement - Little Kiln Studio II.pdf",
+   "key": "start_date",
+   "value": "2025-11-18",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Consignment Agreement - Little Kiln Studio II.pdf",
+   "key": "end_date",
+   "value": "2026-11-17",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Packing Slip PS-48434 Desert.pdf",
+   "key": "invoice_number",
+   "value": "PS-48434",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Packing Slip PS-48434 Desert.pdf",
+   "key": "service_date",
+   "value": "2025-05-17",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Receipt R-3305 Brightwater (copy).pdf",
+   "key": "invoice_number",
+   "value": "R-3305",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Receipt R-3305 Brightwater (copy).pdf",
+   "key": "service_date",
+   "value": "2025-08-28",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Receipt R-3305 Brightwater (copy).pdf",
+   "key": "customer_name",
+   "value": "Brightwater Properties LLC",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Receipt R-3305 Brightwater (copy).pdf",
+   "key": "cost",
+   "value": "449.25",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Warranty - Security camera system.pdf",
+   "key": "model",
+   "value": "SC-113X",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Warranty - Security camera system.pdf",
+   "key": "serial_number",
+   "value": "60612445",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Warranty - Security camera system.pdf",
+   "key": "warranty_expires",
+   "value": "2030-04-22",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Warranty - Security camera system.pdf",
+   "key": "customer_name",
+   "value": "Juniper Lane Mercantile",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": false
+  },
+  {
+   "filename": "Lease - Suite 300 (signed).pdf",
+   "key": "agreement_term",
+   "value": "60 months (2024-05-13 - 2029-05-12)",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Lease - Suite 300 (signed).pdf",
+   "key": "start_date",
+   "value": "2024-05-13",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Lease - Suite 300 (signed).pdf",
+   "key": "end_date",
+   "value": "2029-05-12",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Lease - Suite 300 (signed).pdf",
+   "key": "vendor",
+   "value": "Escobar Realty Partners LLC",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Lease - Suite 300 (signed).pdf",
+   "key": "customer_name",
+   "value": "Whitfield Marsh Law Group, PLLC",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "PO-4106 Cardinal.pdf",
+   "key": "service_date",
+   "value": "2025-07-23",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "PO-4106 Cardinal.pdf",
+   "key": "vendor",
+   "value": "Cardinal Electrical Supply Group",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Receipt R-20131.pdf",
+   "key": "invoice_number",
+   "value": "R-20131",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Receipt R-20131.pdf",
+   "key": "service_date",
+   "value": "2025-10-11",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Receipt R-20131.pdf",
+   "key": "customer_name",
+   "value": "Lamar Nguyen",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": false
+  },
+  {
+   "filename": "Receipt R-20131.pdf",
+   "key": "cost",
+   "value": "42.44",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Receipt R-20131.pdf",
+   "key": "vendor",
+   "value": "Juniper Lane Mercantile",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Inspection Sign-off Underground Graves.pdf",
+   "key": "permit_number",
+   "value": "ELC26-16469",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": true
+  },
+  {
+   "filename": "Inspection Sign-off Underground Graves.pdf",
+   "key": "service_address",
+   "value": "5697 W Cactus Cir",
+   "page": null,
+   "source": "independent30 (hand-read)",
+   "captured": false
+  },
+  {
+   "filename": "Certificate of Insurance - Pena Car Wash Company.pdf",
+   "key": "start_date",
+   "value": "2025-12-03",
+   "page": 1,
+   "source": "verifier round 2026-10-22 (policy period, hand-checked)",
+   "captured": true
+  },
+  {
+   "filename": "Certificate of Insurance - Pena Car Wash Company.pdf",
+   "key": "end_date",
+   "value": "2026-12-03",
+   "page": 1,
+   "source": "verifier round 2026-10-22 (policy period, hand-checked)",
+   "captured": true
+  },
+  {
+   "filename": "COI - Harborview Low Voltage Cabling Group for Summit Line Electric.pdf",
+   "key": "start_date",
+   "value": "2025-07-03",
+   "page": 1,
+   "source": "verifier round 2026-10-22 (policy period, hand-checked)",
+   "captured": true
+  },
+  {
+   "filename": "COI - Harborview Low Voltage Cabling Group for Summit Line Electric.pdf",
+   "key": "end_date",
+   "value": "2026-07-03",
+   "page": 1,
+   "source": "verifier round 2026-10-22 (policy period, hand-checked)",
+   "captured": true
+  }
+ ],
+ "forbidden": [
+  {
+   "filename": "Bid BID-2401 Lindgren v2.pdf",
+   "key": "warranty_expires",
+   "value": "2025-09-25",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Bid BID-2404 Fischer.pdf",
+   "key": "warranty_expires",
+   "value": "2025-05-17",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Bid BID-2417 Pearson.pdf",
+   "key": "warranty_expires",
+   "value": "2025-10-28",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Bid BID-2420 Heritage.pdf",
+   "key": "warranty_expires",
+   "value": "2026-03-27",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Bid BID-2425 Greer.pdf",
+   "key": "warranty_expires",
+   "value": "2025-10-16",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Bid BID-2427 Redwood.docx",
+   "key": "warranty_expires",
+   "value": "2025-03-26",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Bid BID-2428 Evergreen.pdf",
+   "key": "warranty_expires",
+   "value": "2025-07-04",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Bid Proposal B-2501 Valdez.docx",
+   "key": "warranty_expires",
+   "value": "2025-06-10",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Bid Proposal B-2513 Palo (copy).pdf",
+   "key": "warranty_expires",
+   "value": "2025-08-13",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Bid Proposal B-2513 Palo.pdf",
+   "key": "warranty_expires",
+   "value": "2025-08-13",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "CO-02 Dunn v2.pdf",
+   "key": "vendor",
+   "value": "Construction",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "CamScanner 2025-03-28.jpg",
+   "key": "warranty_expires",
+   "value": "2027-08-03",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "CamScanner 2025-04-06.jpg",
+   "key": "customer_name",
+   "value": "Credit card",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "CamScanner 2025-07-05.jpg",
+   "key": "warranty_expires",
+   "value": "2025-07-19",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "CamScanner 2025-10-02.jpg",
+   "key": "customer_name",
+   "value": "PROJECT LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "CamScanner 2025-10-02.jpg",
+   "key": "cost",
+   "value": "0.00",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "CamScanner 2026-02-11.jpg",
+   "key": "customer_name",
+   "value": "Lucas Harper",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "CamScanner 2026-06-09.jpg",
+   "key": "warranty_expires",
+   "value": "2026-12-06",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Clearview Invoice INV-8080.pdf",
+   "key": "customer_name",
+   "value": "PROJECT LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Consignment Agreement - Hollow Oak Pottery.pdf",
+   "key": "vendor",
+   "value": "SHOP CONSIGNOR",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Consignment Agreement - Little Kiln Studio (2).pdf",
+   "key": "vendor",
+   "value": "SHOP CONSIGNOR",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Consignment Agreement - Little Kiln Studio II.pdf",
+   "key": "vendor",
+   "value": "SHOP CONSIGNOR",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Consignment Agreement - Little Kiln Studio.pdf",
+   "key": "vendor",
+   "value": "SHOP CONSIGNOR",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Consignment Agreement - Rowan Woodworks.pdf",
+   "key": "vendor",
+   "value": "SHOP CONSIGNOR",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Construction Contract CC-26-021 - Marcus Valdez (signed).pdf",
+   "key": "vendor",
+   "value": "OWNER CONTRACTOR PROJECT SITE",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Delivery Ticket DT-8801 RA-4021.pdf",
+   "key": "vendor",
+   "value": "Rentals - Sales - Service",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Delivery Ticket DT-8808 RA-4025.pdf",
+   "key": "vendor",
+   "value": "Rentals - Sales - Service",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Deposit Disposition - Coleman.pdf",
+   "key": "vendor",
+   "value": "Management",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "East bill 2025-09.pdf",
+   "key": "cost",
+   "value": "526.00",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "East bill 2025-09.pdf",
+   "key": "vendor",
+   "value": "Number",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Electrician License - Grace Walsh.jpg",
+   "key": "warranty_expires",
+   "value": "2028-03-16",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Electrician License - Julian Delgado.pdf",
+   "key": "warranty_expires",
+   "value": "2028-10-09",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Engagement Letter - Bridgeway (2025-0111).pdf",
+   "key": "vendor",
+   "value": "Priya Anand",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Engagement Letter - Bridgeway (2026-0102).pdf",
+   "key": "vendor",
+   "value": "Eleanor Whitfield",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Engagement Letter - Escobar (2025-0103).pdf",
+   "key": "vendor",
+   "value": "Priya Anand",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Engagement Letter - Evergreen (2025-0106).pdf",
+   "key": "vendor",
+   "value": "Tobias Reeves",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Engagement Letter - Gomez (2025-0112).pdf",
+   "key": "vendor",
+   "value": "Priya Anand",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Engagement Letter - Heritage (2026-0107).pdf",
+   "key": "vendor",
+   "value": "Marcus Marsh",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Engagement Letter - Ibarra (2026-0110).pdf",
+   "key": "vendor",
+   "value": "Priya Anand",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Engagement Letter - Ibarra (2026-0114).pdf",
+   "key": "vendor",
+   "value": "Priya Anand",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Engagement Letter - Landmark (2025-0113).pdf",
+   "key": "vendor",
+   "value": "Marcus Marsh",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Engagement Letter - Mata (2026-0108).pdf",
+   "key": "vendor",
+   "value": "Tobias Reeves",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Engagement Letter - Perkins (2025-0109).pdf",
+   "key": "vendor",
+   "value": "Marcus Marsh",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Engagement Letter - Saguaro (2025-0105).pdf",
+   "key": "vendor",
+   "value": "Tobias Reeves",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Engagement Letter - Saguaro (2026-0104).pdf",
+   "key": "vendor",
+   "value": "Priya Anand",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Engagement Letter EN-2025-111 - Verde.pdf",
+   "key": "vendor",
+   "value": "Rosalind Larkspur",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Engagement Letter EN-2025-113 - Copperline.pdf",
+   "key": "vendor",
+   "value": "Camila Ibarra",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Engagement Letter EN-2025-114 - Ridgeline.pdf",
+   "key": "vendor",
+   "value": "Dennis Pike",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Engagement Letter EN-2025-124 - Escobar.pdf",
+   "key": "vendor",
+   "value": "Dennis Pike",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Engagement Letter EN-2025-125 - Salazar.pdf",
+   "key": "vendor",
+   "value": "Camila Ibarra",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Engagement Letter EN-2025-126 - Schmidt.pdf",
+   "key": "vendor",
+   "value": "Camila Ibarra",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Engagement Letter EN-2026-103 - Trailhead.pdf",
+   "key": "vendor",
+   "value": "Camila Ibarra",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Engagement Letter EN-2026-131 - Calloway (copy).pdf",
+   "key": "vendor",
+   "value": "Dennis Pike",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Engagement Letter EN-2026-131 - Calloway.pdf",
+   "key": "vendor",
+   "value": "Dennis Pike",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Engagement Letter EN-2026-134 - Thornton.pdf",
+   "key": "vendor",
+   "value": "Rosalind Larkspur",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Engagement Renewal EN-2025-102 - Sunbelt.pdf",
+   "key": "vendor",
+   "value": "Rosalind Larkspur",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Engagement Renewal EN-2025-111 - Verde (2).pdf",
+   "key": "vendor",
+   "value": "Rosalind Larkspur",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Engagement Renewal EN-2025-111 - Verde.pdf",
+   "key": "vendor",
+   "value": "Rosalind Larkspur",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Engagement Renewal EN-2025-129 - Pacheco.pdf",
+   "key": "vendor",
+   "value": "Rosalind Larkspur",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Estimate E-4102 Patel.pdf",
+   "key": "warranty_expires",
+   "value": "2026-04-26",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Estimate E-4103 Dixon.pdf",
+   "key": "warranty_expires",
+   "value": "2026-09-27",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Estimate E-4103 Dixon.pdf",
+   "key": "vendor",
+   "value": "Bluff Creek Plumbing &",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Estimate E-4112 Rowe.pdf",
+   "key": "warranty_expires",
+   "value": "2026-09-05",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Estimate E-4118 Campos v2.pdf",
+   "key": "warranty_expires",
+   "value": "2026-04-08",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Estimate E-4118 Campos.pdf",
+   "key": "warranty_expires",
+   "value": "2026-04-08",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Estimate Q-1042 Fuentes v2.pdf",
+   "key": "warranty_expires",
+   "value": "2025-03-26",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Estimate Q-1043 Harborview.pdf",
+   "key": "warranty_expires",
+   "value": "2026-10-20",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Estimate Q-1047 Jensen v2.pdf",
+   "key": "warranty_expires",
+   "value": "2026-05-15",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Estimate Q-1047 Jensen.pdf",
+   "key": "warranty_expires",
+   "value": "2026-05-15",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Estimate Q-1049 Gonzales v2.pdf",
+   "key": "warranty_expires",
+   "value": "2026-08-11",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Estimate Q-1050 Campos.pdf",
+   "key": "warranty_expires",
+   "value": "2025-04-25",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Event Contract - Community Fun Run Check-in Tent (Redwood).pdf",
+   "key": "vendor",
+   "value": "VENUE / CATERER CLIENT",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Filing Receipt R2025-298002.pdf",
+   "key": "customer_name",
+   "value": "Credit card",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Filing Receipt R2026-703712.pdf",
+   "key": "customer_name",
+   "value": "Credit card",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Granite Invoice 1558.pdf",
+   "key": "customer_name",
+   "value": "PROJECT LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Grant Agreement AW-25-1797 - Silverleaf (signed).pdf",
+   "key": "vendor",
+   "value": "FUNDER GRANTEE",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Grant Agreement GR-24-1008 - Copperline (signed).pdf",
+   "key": "vendor",
+   "value": "FUNDER GRANTEE",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Hendrix Invoice 1427.jpg",
+   "key": "customer_name",
+   "value": "PROJECT LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Herrera Invoice 34952.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Herrera Invoice INV-60838.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Herrera Invoice S57646.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "IMG_3395.jpg",
+   "key": "customer_name",
+   "value": "Trevor Burke",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "INV-20400 Harborview.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "INV-20402 Schmidt.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "INV-20403 Fuentes.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "INV-20406 Harborview.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "INV-20409 Pacheco.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "INV-20410 Brightwater.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "INV-20416 Jensen.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "INV-20417 Duarte.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "INV-20420 Gonzales.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "INV-31200 Campos.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "INV-31206 Patel.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "INV-31207 Dixon.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "INV-31207 Dixon.pdf",
+   "key": "vendor",
+   "value": "Drain",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "INV-31210 Dixon.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "INV-31214 Ibarra.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "INV-31216 Westfield.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "INV-31218 Winters.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "INV-31219 Molina VOID.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "INV-31220 Molina.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "INV-31225 Bridgeway VOID.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "INV-31226 Bridgeway.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "INV-31228 Beacon.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "INV-31230 Pearson.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "INV-31233 Yazzie.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "INV-31234 Campos VOID.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "INV-70400 Young.pdf",
+   "key": "customer_name",
+   "value": "JOB SITE",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "INV-70406 Keller.pdf",
+   "key": "customer_name",
+   "value": "JOB SITE",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "INV-70408 Jensen.pdf",
+   "key": "customer_name",
+   "value": "JOB SITE",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "INV-70408 Jensen.pdf",
+   "key": "vendor",
+   "value": "Rentals - Sales - Service",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "INV-70410 Canyon.pdf",
+   "key": "customer_name",
+   "value": "JOB SITE",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "INV-70412 Cooper.pdf",
+   "key": "customer_name",
+   "value": "JOB SITE",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "INV-70416 Leal.pdf",
+   "key": "customer_name",
+   "value": "JOB SITE",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "INV-70416 Leal.pdf",
+   "key": "vendor",
+   "value": "Rentals - Sales - Service",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "INV-70420 Jacobs.pdf",
+   "key": "customer_name",
+   "value": "JOB SITE",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "In-Kind IK-2025-023 Lopez.pdf",
+   "key": "vendor",
+   "value": "Alliance",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Invoice 24330 - Mata.pdf",
+   "key": "cost",
+   "value": "2610.00",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Invoice 24337 - Bridgeway.pdf",
+   "key": "cost",
+   "value": "1545.00",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Invoice 24345 - Landmark.pdf",
+   "key": "cost",
+   "value": "2309.50",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Ironwood INV-38423.pdf",
+   "key": "vendor",
+   "value": "Ironwood Legal",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Keystone Invoice 9217.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Keystone Invoice INV-48418.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Keystone Invoice INV-53059.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Keystone Invoice INV-56533.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Lease - 113 Live Oak Ln Apt 105 (Rowe).pdf",
+   "key": "vendor",
+   "value": "Gloria Mendoza",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Lease - 4361 Limestone Dr Apt 101 (Rhodes) FINAL.pdf",
+   "key": "vendor",
+   "value": "Gloria Mendoza",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Lease - 4361 Limestone Dr Apt 106 (Vance) FINAL.pdf",
+   "key": "vendor",
+   "value": "Gloria Mendoza",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Lease - 4361 Limestone Dr Apt 107 (Harper) FINAL.pdf",
+   "key": "vendor",
+   "value": "Gloria Mendoza",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Lease - 4361 Limestone Dr Apt 107 (Harper).pdf",
+   "key": "vendor",
+   "value": "Gloria Mendoza",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Lease - 4624 Bluebonnet Ct Suite 100 (Greer).pdf",
+   "key": "vendor",
+   "value": "Gloria Mendoza",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Lease - 4624 Bluebonnet Ct Suite 120 (Lindgren) signed.pdf",
+   "key": "vendor",
+   "value": "Gloria Mendoza",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Lease - 7942 Barton Bend Apt 101 (Robles).pdf",
+   "key": "vendor",
+   "value": "Gloria Mendoza",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Lease - 8254 Bluebonnet Ct Unit B (Pacheco) FINAL.pdf",
+   "key": "vendor",
+   "value": "Gloria Mendoza",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Lease - 8254 Bluebonnet Ct Unit D (Fischer).pdf",
+   "key": "vendor",
+   "value": "Gloria Mendoza",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Lease Renewal Offer - 113 Live Oak Ln Apt 108.pdf",
+   "key": "vendor",
+   "value": "Management",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "MOU - Beacon (Senior).pdf",
+   "key": "vendor",
+   "value": "PARTNER ALLIANCE",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "MOU - Beacon (Youth) (2).pdf",
+   "key": "vendor",
+   "value": "PARTNER ALLIANCE",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "MOU - Beacon (Youth).pdf",
+   "key": "vendor",
+   "value": "PARTNER ALLIANCE",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "MOU - Saguaro (Senior).pdf",
+   "key": "vendor",
+   "value": "Alliance",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Owner Statement 2025-11 Gutierrez.pdf",
+   "key": "vendor",
+   "value": "Management",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "PA-7400 Pay App 1 Fischer.pdf",
+   "key": "customer_name",
+   "value": "PROJECT",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "PA-7403 Pay App 2 Fischer.pdf",
+   "key": "customer_name",
+   "value": "PROJECT",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "PA-7405 Pay App 3 Fischer.pdf",
+   "key": "customer_name",
+   "value": "PROJECT",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "PA-7411 Pay App 2 Lakeshore.pdf",
+   "key": "customer_name",
+   "value": "PROJECT",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "PA-7413 Pay App 1 Gutierrez.pdf",
+   "key": "customer_name",
+   "value": "PROJECT",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "PA-7415 Pay App 2 Gutierrez.pdf",
+   "key": "customer_name",
+   "value": "PROJECT",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "PA-7416 Pay App 3 Gutierrez.pdf",
+   "key": "customer_name",
+   "value": "PROJECT",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "PA-7421 Pay App 1 Saguaro VOID.pdf",
+   "key": "customer_name",
+   "value": "PROJECT",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "PA-7422 Pay App 1 Saguaro.pdf",
+   "key": "customer_name",
+   "value": "PROJECT",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "PA-7424 Pay App 2 Saguaro.pdf",
+   "key": "customer_name",
+   "value": "PROJECT",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "PA-7425 Pay App 1 Redwood.pdf",
+   "key": "customer_name",
+   "value": "PROJECT",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "PA-7426 Pay App 2 Redwood.pdf",
+   "key": "customer_name",
+   "value": "PROJECT",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "PA-7429 Pay App 3 Redwood.pdf",
+   "key": "customer_name",
+   "value": "PROJECT",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "PA-7432 Pay App 1 Evergreen.pdf",
+   "key": "customer_name",
+   "value": "PROJECT",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "PO-6202 Bautista.jpg",
+   "key": "customer_name",
+   "value": "Nicole Valdez",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "PO-6204 Bautista.pdf",
+   "key": "customer_name",
+   "value": "Nicole Valdez",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "PO-6205 Cardinal.jpg",
+   "key": "customer_name",
+   "value": "Nicole Valdez",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Palo Invoice 34408.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Palo Invoice 5603.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Palo Invoice 9331.pdf",
+   "key": "customer_name",
+   "value": "PROJECT LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Palo Invoice 9331.pdf",
+   "key": "cost",
+   "value": "0.00",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Palo Invoice INV-7302.pdf",
+   "key": "customer_name",
+   "value": "PROJECT LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Palo Invoice INV-7302.pdf",
+   "key": "cost",
+   "value": "0.00",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Palo Invoice S67275.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Pay App 02 - Tran.pdf",
+   "key": "vendor",
+   "value": "Construction",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Permit BLD25-23003 - 3629 S Ridge Way.pdf",
+   "key": "warranty_expires",
+   "value": "2025-12-20",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Permit BLD25-62508 - 4031 E Vista Pkwy.pdf",
+   "key": "warranty_expires",
+   "value": "2025-07-02",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Permit ELC25-13691 - 3117 W Sycamore Ave.pdf",
+   "key": "warranty_expires",
+   "value": "2025-08-27",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Permit ELC25-65990 - 6924 Vista Pkwy.pdf",
+   "key": "warranty_expires",
+   "value": "2026-07-02",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Permit MEC25-40968 - 8967 N Pinecrest Ave.pdf",
+   "key": "warranty_expires",
+   "value": "2025-12-09",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Permit MEC25-49485 - 8836 Lakeview St.pdf",
+   "key": "warranty_expires",
+   "value": "2025-10-25",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Permit MEC26-19801 - 3532 S Canyon Ave.pdf",
+   "key": "warranty_expires",
+   "value": "2027-01-22",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Permit MEC26-19801 - 3532 S Canyon Ave.pdf",
+   "key": "vendor",
+   "value": "City of Scottsdale Building",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Permit MEC26-88485 - 963 S Sycamore Ave.pdf",
+   "key": "warranty_expires",
+   "value": "2027-03-01",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Permit PLB25-20885 - 3428 N Ridge Pkwy.pdf",
+   "key": "warranty_expires",
+   "value": "2025-12-13",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Permit PLB25-35301 - 9649 Sunset St.pdf",
+   "key": "warranty_expires",
+   "value": "2025-08-29",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Permit PLB25-67056 - 6011 E Canyon Way.pdf",
+   "key": "warranty_expires",
+   "value": "2025-08-27",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Permit PLB26-72783 - 7442 W Palo Dr.pdf",
+   "key": "warranty_expires",
+   "value": "2026-10-02",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Pickup Ticket PT-8803 RA-4022.pdf",
+   "key": "vendor",
+   "value": "Rentals - Sales - Service",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Pickup Ticket PT-8810 RA-4026.pdf",
+   "key": "vendor",
+   "value": "Rentals - Sales - Service",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Pledge Form PL-2025-018 Nguyen.pdf",
+   "key": "vendor",
+   "value": "Alliance",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Plumbing License - Chloe Alvarez.pdf",
+   "key": "warranty_expires",
+   "value": "2027-08-30",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Plumbing License - Jorge Mata.pdf",
+   "key": "warranty_expires",
+   "value": "2026-11-10",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Quintero Invoice 20476.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Quote Q-2210 Young.pdf",
+   "key": "warranty_expires",
+   "value": "2026-05-31",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Quote Q-2211 Keller.pdf",
+   "key": "warranty_expires",
+   "value": "2025-08-14",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Quote Q-2211 Keller.pdf",
+   "key": "vendor",
+   "value": "Sidewinder Equipment",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Quote Q-2212 Keller.pdf",
+   "key": "warranty_expires",
+   "value": "2025-07-05",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Quote Q-2213 Canyon.pdf",
+   "key": "warranty_expires",
+   "value": "2025-06-09",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Quote Q-2213 Canyon.pdf",
+   "key": "vendor",
+   "value": "Rentals - Sales - Service",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Quote Q-2215 Roberts.pdf",
+   "key": "vendor",
+   "value": "Rentals - Sales - Service",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Quote Q-2216 Jacobs.pdf",
+   "key": "warranty_expires",
+   "value": "2025-07-06",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Quote rev Brightwater v2.pdf",
+   "key": "warranty_expires",
+   "value": "2025-07-22",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Quote rev Brightwater v2.pdf",
+   "key": "vendor",
+   "value": "Rentals - Sales - Service",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Quote rev Canyon v2.pdf",
+   "key": "warranty_expires",
+   "value": "2025-06-10",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Receipt R-20144.pdf",
+   "key": "customer_name",
+   "value": "Debit card",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Receipt R-2026-1002 Pacheco.jpg",
+   "key": "customer_name",
+   "value": "ACH",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Receipt R-2026-1003 Ellis.pdf",
+   "key": "vendor",
+   "value": "Alliance",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Receipt R-2026-1012 Sparks.pdf",
+   "key": "vendor",
+   "value": "Harborlight Neighbors",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Receipt R-3305 Brightwater (copy).pdf",
+   "key": "customer_name",
+   "value": "Credit card",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Receipt R-8103 Vega.pdf",
+   "key": "vendor",
+   "value": "Cardinal Ridge",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Receipt RC-2206 - Jacobs.pdf",
+   "key": "customer_name",
+   "value": "Credit card",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Redwood Invoice 1238.pdf",
+   "key": "customer_name",
+   "value": "PROJECT LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Redwood Invoice INV-9156.pdf",
+   "key": "customer_name",
+   "value": "PROJECT LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Redwood Invoice INV-9156.pdf",
+   "key": "cost",
+   "value": "0.00",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Rent Ledger - 4361 Limestone Dr Apt 101 Rhodes.pdf",
+   "key": "vendor",
+   "value": "Cedarline Property",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Rent Ledger - 9088 Barton Bend Cardenas.pdf",
+   "key": "vendor",
+   "value": "Management",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Rental Agreement RA-4028 Brightwater.pdf",
+   "key": "vendor",
+   "value": "Rentals - Sales - Service",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Safety Training Record - Helen Jensen.pdf",
+   "key": "vendor",
+   "value": "Course",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Salazar Invoice 35500.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Salazar Invoice INV-76653.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Scan 154.jpg",
+   "key": "customer_name",
+   "value": "Nicole Valdez",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Scan 46.jpg",
+   "key": "warranty_expires",
+   "value": "2025-10-31",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Service Agreement SA-350 - Bridgeway Storage Co..pdf",
+   "key": "vendor",
+   "value": "Bluff Creek Plumbing &",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Service Ticket ST-3302 EQ-116.pdf",
+   "key": "vendor",
+   "value": "Sidewinder Equipment",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Special Order SO-1401 Gonzales.pdf",
+   "key": "cost",
+   "value": "0.24",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Subcontract SC-130 - Ridgeline Solar Racking Company.docx",
+   "key": "service_date",
+   "value": "2025-07-06",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Subcontract SC-132 - Navarro Concrete Cutting & Coring Group.docx",
+   "key": "service_date",
+   "value": "2026-01-22",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Subcontract SC-133 - Meridian Fire Alarm Systems Co..pdf",
+   "key": "service_date",
+   "value": "2025-10-02",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Subcontract SC-2510-05 Horizon.pdf",
+   "key": "vendor",
+   "value": "CONTRACTOR SUBCONTRACTOR PROJECT SITE",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Thank You Letter - Cruz.pdf",
+   "key": "vendor",
+   "value": "Alliance",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Verde Invoice INV-91058.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Verde Invoice S57350.pdf",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Warranty - Rooftop heating and cooling unit.pdf",
+   "key": "vendor",
+   "value": "Authorized reseller",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "photo_0314.jpg",
+   "key": "warranty_expires",
+   "value": "2025-09-06",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "scan0212.jpg",
+   "key": "vendor",
+   "value": "LLC",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "scan0329.jpg",
+   "key": "customer_name",
+   "value": "SERVICE LOCATION",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "scan0392.jpg",
+   "key": "cost",
+   "value": "0.00",
+   "why": "read before the docread round; wrong (reviewed)"
+  },
+  {
+   "filename": "Certificate of Insurance - Pena Car Wash Company.pdf",
+   "key": "agreement_term",
+   "value": "2026-01-25 - 2026-12-03",
+   "why": "term built from the Certificate Date (or an amended period); found by the independent verifier round"
+  },
+  {
+   "filename": "COI - Harborview Low Voltage Cabling Group for Summit Line Electric.pdf",
+   "key": "agreement_term",
+   "value": "2025-07-04 - 2026-07-03",
+   "why": "term built from the Certificate Date (or an amended period); found by the independent verifier round"
+  },
+  {
+   "filename": "COI - Abbott 2025.pdf",
+   "key": "agreement_term",
+   "value": "07/03/2025 - 07/17/2026",
+   "why": "term built from the Certificate Date (or an amended period); found by the independent verifier round"
+  },
+  {
+   "filename": "COI - Hendrix 2025.pdf",
+   "key": "agreement_term",
+   "value": "December 8, 2025 - December 13, 2026",
+   "why": "term built from the Certificate Date (or an amended period); found by the independent verifier round"
+  },
+  {
+   "filename": "COI - Palo 2025.pdf",
+   "key": "agreement_term",
+   "value": "June 14, 2025 - June 23, 2026",
+   "why": "term built from the Certificate Date (or an amended period); found by the independent verifier round"
+  }
+ ],
+ "recheck_cases": [
+  {
+   "filename": "Lease - Warehouse and Office (signed).pdf",
+   "storedType": "agreement",
+   "expectType": "agreement",
+   "expectKeys": [
+    "agreement_term",
+    "start_date",
+    "end_date"
+   ]
+  },
+  {
+   "filename": "COI - Palo 2025.pdf",
+   "storedType": "warranty-registration",
+   "expectType": "insurance-certificate"
+  },
+  {
+   "filename": "COI - Meridian 2025 (2).pdf",
+   "storedType": "warranty-registration",
+   "expectType": "insurance-certificate"
+  },
+  {
+   "filename": "COI - Landmark 2025.pdf",
+   "storedType": "warranty-registration",
+   "expectType": "insurance-certificate"
+  },
+  {
+   "filename": "Plumbing License - Chloe Alvarez.pdf",
+   "storedType": "warranty-registration",
+   "expectType": "license-certification",
+   "expectKeys": [
+    "license_number",
+    "end_date"
+   ]
+  },
+  {
+   "filename": "Plumbing License - Jorge Mata.pdf",
+   "storedType": "warranty-registration",
+   "expectType": "license-certification",
+   "expectKeys": [
+    "license_number",
+    "end_date"
+   ]
+  }
+ ],
+ "degraded": {
+  "max_wrong": 4,
+  "min_correct": 34,
+  "known_wrong": [
+   "Jacobs INV-21004 [photo].jpg customer_name",
+   "Jacobs INV-21004 [photo].jpg vendor",
+   "COI - Hendrix 2025 [lowres].jpg vendor",
+   "WO 7316 - Bridgeway [lowres].jpg vendor"
+  ],
+  "note": "The 4 known wrong facts are tesseract misreads of degraded images (stand-in for the paid vision transcription). Any NEW wrong fact on a degraded copy fails the gate."
+ },
+ "needs_person": {
+  "Amendment 1 - Grant CG-25-2623.pdf": "needs-type",
+  "Backflow Test BF-2200 Brightwater.xlsx": "missing-required: service_address|serial_number|customer_name",
+  "Backflow Test BF-2201 Yazzie.xlsx": "missing-required: service_address|serial_number|customer_name",
+  "Board Minutes 2025-10-21.pdf": "needs-type",
+  "Board Minutes 2025-10-28.pdf": "needs-type",
+  "Board Minutes 2026-01-06.pdf": "needs-type",
+  "Bridgeway Invoice INV67420.jpg": "missing-required: service_date",
+  "Budget FY2026 - Neighborhood Food Pantry.xlsx": "needs-type",
+  "Budget FY2026 - Youth Tutoring Collaborative.xlsx": "needs-type",
+  "CamScanner 2025-03-28.jpg": "needs-type",
+  "CamScanner 2025-05-13.jpg": "missing-required: service_date",
+  "CamScanner 2025-05-28.jpg": "missing-required: customer_name|vendor, cost",
+  "CamScanner 2025-08-09.jpg": "missing-required: service_date",
+  "CamScanner 2025-08-20.jpg": "missing-required: service_date",
+  "CamScanner 2025-08-31.jpg": "missing-required: service_date|invoice_number, cost",
+  "CamScanner 2026-02-11.jpg": "missing-required: vendor|customer_name, cost",
+  "CamScanner 2026-04-08.jpg": "needs-type",
+  "CamScanner 2026-06-02.jpg": "needs-type",
+  "CamScanner 2026-06-09.jpg": "missing-required: service_address",
+  "CamScanner 2026-07-04.jpg": "missing-required: cost",
+  "Camera Inspection CAM-910 Dixon.pdf": "missing-required: service_address",
+  "Camera Inspection CAM-911 Ibarra.pdf": "missing-required: service_address",
+  "Camera Inspection CAM-912 Lambert.pdf": "missing-required: service_address",
+  "Cardinal Invoice SI-42500.pdf": "missing-required: cost",
+  "Change Order CO-1 25124 Lambert.pdf": "needs-type",
+  "Change Order CO-1 25127 Redwood.docx": "missing-required: service_address",
+  "Client List 2026-08-18.csv": "barely-readable",
+  "Client List 2026-09-09.csv": "barely-readable",
+  "Credit Application - Sandoval Framing LLC.pdf": "missing-required: service_address",
+  "Dalton INV-52857.jpg": "missing-required: service_date, cost",
+  "Damage Report DR-117 EQ-116.pdf": "missing-required: cost",
+  "Document Request - Calloway.pdf": "needs-type",
+  "Document Request - Copperline.pdf": "needs-type",
+  "Document Request - Dunn.docx": "needs-type",
+  "Document Request - Escobar.pdf": "needs-type",
+  "Document Request - Greer.pdf": "needs-type",
+  "Document Request - Ibarra.jpg": "needs-type",
+  "Document Request - Reyes.pdf": "needs-type",
+  "Document Request - Schmidt.pdf": "needs-type",
+  "Document Request - Verde.pdf": "needs-type",
+  "Document Request - Wagner.pdf": "needs-type",
+  "East bill 2025-06.pdf": "missing-required: customer_name|vendor",
+  "East bill 2025-09.pdf": "missing-required: customer_name|vendor",
+  "Equipment List 2025-06-30.xlsx": "missing-required: service_address",
+  "Estimate E-4109 Winters.jpg": "missing-required: customer_name|service_address",
+  "Estimate E-4110 Molina.jpg": "missing-required: customer_name|service_address",
+  "Estimate E-4115 Beacon.jpg": "missing-required: customer_name|service_address",
+  "Fleet - Unit 1 MFJ 8969.docx": "needs-type",
+  "Fleet - Unit 4 DFP 6934.xlsx": "needs-type",
+  "Hawkins Invoice INV49641.xlsx": "missing-required: customer_name|vendor",
+  "IMG_3039.jpg": "missing-required: customer_name|service_address",
+  "IMG_3155.jpg": "needs-type",
+  "IMG_3156.jpg": "missing-required: service_date",
+  "IMG_3161.jpg": "missing-required: vendor|customer_name",
+  "IMG_3200.jpg": "missing-required: customer_name|vendor, service_date, cost",
+  "IMG_3206.jpg": "missing-required: service_date, cost",
+  "IMG_3287.jpg": "missing-required: service_date, cost",
+  "IMG_3316.jpg": "missing-required: service_date|invoice_number",
+  "IMG_3363.jpg": "missing-required: cost",
+  "IMG_3395.jpg": "needs-type",
+  "IMG_3396.jpg": "missing-required: service_date|invoice_number",
+  "IMG_3419.jpg": "missing-required: cost",
+  "IMG_3435.jpg": "missing-required: service_address",
+  "INV-31203 Dixon.jpg": "missing-required: service_date, cost",
+  "INV-31222 Pearson.jpg": "missing-required: service_date, cost",
+  "In-Kind IK-2025-022 Gallegos.docx": "missing-required: service_address",
+  "In-Kind IK-2025-023 Lopez.pdf": "missing-required: service_address",
+  "In-Kind IK-2025-024 Gallegos.docx": "missing-required: service_address",
+  "In-Kind IK-2025-025 Gallegos.xlsx": "missing-required: service_address",
+  "In-Kind IK-2025-026 Cardenas.pdf": "missing-required: service_address",
+  "In-Kind IK-2026-020 Mercer.xlsx": "missing-required: service_address",
+  "In-Kind IK-2026-021 Hansen.xlsx": "missing-required: service_address",
+  "Inspection Cert - EQ-118 2025.docx": "missing-required: service_address",
+  "Inspection Cert - EQ-120 2026.pdf": "missing-required: service_address",
+  "Inspection Cert - EQ-127 2026.docx": "missing-required: service_address",
+  "Inspection Sign-off Underground Graves.pdf": "missing-required: service_address",
+  "Intake Checklist - Calloway.pdf": "missing-required: service_address",
+  "Intake Checklist - Ridgeline.pdf": "missing-required: service_address",
+  "Intake Checklist - Schmidt.pdf": "missing-required: service_address",
+  "Intake Checklist - Thornton.pdf": "missing-required: service_address",
+  "Invoice 24315 - Escobar.xlsx": "missing-required: service_date",
+  "Invoice 24316 - Saguaro.xlsx": "missing-required: service_date",
+  "Invoice 24317 - Saguaro.xlsx": "missing-required: service_date",
+  "Invoice 24326 - Heritage.xlsx": "missing-required: service_date",
+  "Invoice 24335 - Ibarra.xlsx": "missing-required: service_date",
+  "Jacobs INV-61493.jpg": "missing-required: customer_name|vendor, service_date",
+  "Lease Renewal Offer - 113 Live Oak Ln Apt 108.pdf": "missing-required: customer_name|vendor",
+  "Lien Waiver - Palo 2025-08 (cond).pdf": "missing-required: service_address",
+  "Lien Waiver Final - Brightwater.pdf": "missing-required: service_date",
+  "Maintenance History EQ-114.xlsx": "needs-type",
+  "Monthly Report 2025-03 Pacheco.xlsx": "needs-type",
+  "Monthly Report 2026-08 Ibarra.xlsx": "needs-type",
+  "PA-7416 Pay App 3 Gutierrez.pdf": "missing-required: cost",
+  "PA-7425 Pay App 1 Redwood.pdf": "missing-required: cost",
+  "PA-7432 Pay App 1 Evergreen.pdf": "missing-required: cost",
+  "PO-4100 Prairie.xlsx": "missing-required: vendor|customer_name",
+  "PO-6100 Ramos.xlsx": "missing-required: vendor|customer_name",
+  "PO-6202 Bautista.jpg": "missing-required: vendor|customer_name, cost",
+  "PO-6205 Cardinal.jpg": "missing-required: vendor|customer_name, cost",
+  "PO-7100 Fuentes.xlsx": "missing-required: vendor|customer_name",
+  "PO-8801 Ortega.xlsx": "missing-required: vendor|customer_name",
+  "PO-8803 Prairie.xlsx": "missing-required: vendor|customer_name",
+  "Palo Invoice 9331.pdf": "missing-required: cost",
+  "Palo Invoice INV-7302.pdf": "missing-required: cost",
+  "Pay App 01 - Summit.xlsx": "missing-required: customer_name|vendor",
+  "Pay App 02 - Vega.pdf": "missing-required: cost",
+  "Pay App 03 - Bennett.xlsx": "missing-required: customer_name|vendor",
+  "Payroll Summary Bishop 2026-06-01.csv": "needs-type",
+  "Payroll Summary Sunbelt 2026-02-16.csv": "needs-type",
+  "Pearson Invoice 41341.pdf": "missing-required: cost",
+  "Personnel Record - Priya Anand.xlsx": "needs-type",
+  "Personnel Record - Tobias Reeves.xlsx": "needs-type",
+  "Receipt R-20114.jpg": "missing-required: cost",
+  "Receipt R-2026-1002 Pacheco.jpg": "missing-required: service_date|invoice_number, cost",
+  "Receipt R-3302 Pacheco.jpg": "missing-required: cost",
+  "Receipt R-8102 Garner.jpg": "missing-required: cost",
+  "Receipt R-8806 Redwood.jpg": "missing-required: service_date|invoice_number",
+  "Redwood Invoice 1238.pdf": "missing-required: cost",
+  "Redwood Invoice INV-9156.pdf": "missing-required: cost",
+  "Registration - EQ-118 2026.jpg": "missing-required: service_address",
+  "Reimbursement RR-2001 Flores.pdf": "needs-type",
+  "Reimbursement RR-2004 Quintero.xlsx": "needs-type",
+  "Retainer Receipt TR-5123 Evergreen.jpg": "missing-required: cost",
+  "Saguaro B-41030.jpg": "needs-type",
+  "Sales Tax Summary 2026-01.xlsx": "needs-type",
+  "Sales Tax Summary 2026-06.xlsx": "needs-type",
+  "Scan 132.jpg": "missing-required: service_address",
+  "Scan 138.jpg": "missing-required: service_date",
+  "Scan 150.jpg": "needs-type",
+  "Scan 151.jpg": "missing-required: cost",
+  "Scan 154.jpg": "missing-required: vendor|customer_name",
+  "Scan 162.jpg": "missing-required: service_address",
+  "Scan 177.jpg": "missing-required: service_date|invoice_number",
+  "Scan 276.jpg": "missing-required: service_date",
+  "Scan 293.jpg": "missing-required: service_date",
+  "Scan 335.jpg": "missing-required: service_date|invoice_number",
+  "Scan 358.jpg": "missing-required: vendor|customer_name",
+  "Scan 371.jpg": "missing-required: service_date",
+  "Scan 46.jpg": "missing-required: customer_name|service_address",
+  "Service Agreement SA-30 - Palo Landscaping Inc..docx": "missing-required: customer_name",
+  "Service Agreement SA-31 - Salazar Cleaning Services Co..pdf": "missing-required: customer_name",
+  "Service Ticket ST-3300 EQ-124.pdf": "missing-required: work_performed|part_number",
+  "Service Ticket ST-3301 EQ-127.pdf": "missing-required: work_performed|part_number",
+  "Service Ticket ST-3302 EQ-116.pdf": "missing-required: work_performed|part_number",
+  "Sunbelt Invoice A82518.jpg": "missing-required: service_date, cost",
+  "Title - EQ-125 JDL.pdf": "missing-required: service_address",
+  "WO 7302 - Patel.docx": "missing-required: work_performed|part_number",
+  "WO 7304 - Dixon.pdf": "missing-required: work_performed|part_number",
+  "WO 7313 - Molina.docx": "missing-required: work_performed|part_number",
+  "WO 7314 - Pearson.docx": "missing-required: work_performed|part_number",
+  "WO 7316 - Bridgeway.pdf": "missing-required: work_performed|part_number",
+  "WO 7317 - Copperline.pdf": "missing-required: work_performed|part_number",
+  "WO 7318 - Beacon.pdf": "missing-required: work_performed|part_number",
+  "WO 7320 - Yazzie.docx": "missing-required: work_performed|part_number",
+  "WO 7322 - Campos.pdf": "missing-required: work_performed|part_number",
+  "Warranty - Distribution panelboard Dalton.pdf": "needs-link",
+  "Warranty - Distribution panelboard Pearson.pdf": "needs-link",
+  "Warranty - Security camera system.pdf": "needs-link",
+  "Warranty - Switchgear lineup Keller.pdf": "needs-link",
+  "Warranty - Switchgear lineup Pearson.pdf": "needs-link",
+  "Warranty Letter - Clearview.pdf": "missing-required: serial_number, model, warranty_expires|warranty_term",
+  "Warranty Letter - Delgado.pdf": "missing-required: serial_number, model, warranty_expires|warranty_term",
+  "Warranty Letter - Valdez.pdf": "missing-required: serial_number, model, warranty_expires|warranty_term",
+  "Warranty Registration - Brightwater Properties LLC.pdf": "needs-link",
+  "Warranty Registration - Gutierrez Church LLC.pdf": "needs-link",
+  "Warranty Registration - Ironwood Fitness Company.docx": "needs-link",
+  "Warranty Registration - Kevin Acosta.pdf": "needs-link",
+  "Water Heater Warranty Reg - Campos.pdf": "needs-link",
+  "Water Heater Warranty Reg - Rowe.pdf": "needs-link",
+  "Water Heater Warranty Reg - Winters.pdf": "needs-link",
+  "photo_0059.jpg": "missing-required: customer_name|service_address, cost",
+  "photo_0146.jpg": "missing-required: service_date|invoice_number",
+  "photo_0199.jpg": "needs-type",
+  "photo_0213.jpg": "missing-required: cost",
+  "photo_0233.jpg": "missing-required: customer_name|vendor",
+  "photo_0314.jpg": "missing-required: customer_name|service_address, cost",
+  "photo_0403.jpg": "missing-required: service_date",
+  "scan0065.jpg": "missing-required: service_address",
+  "scan0066.jpg": "needs-type",
+  "scan0072.jpg": "missing-required: service_date",
+  "scan0155.jpg": "missing-required: cost",
+  "scan0164.jpg": "missing-required: service_address",
+  "scan0170 (retail store).jpg": "missing-required: customer_name|vendor",
+  "scan0212.jpg": "missing-required: cost",
+  "scan0221.jpg": "needs-type",
+  "scan0228.jpg": "missing-required: cost",
+  "scan0234.jpg": "needs-type",
+  "scan0320.jpg": "missing-required: service_date|invoice_number, cost",
+  "scan0328.jpg": "missing-required: cost",
+  "scan0329.jpg": "missing-required: service_date",
+  "scan0380.jpg": "missing-required: service_address",
+  "scan0392.jpg": "missing-required: service_date, cost"
+ },
+ "captured_facts_min": 3177
+}

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useAuth, useOrganization } from '@clerk/clerk-react';
 import { AlertTriangle, CheckCircle2, Info, X } from 'lucide-react';
 import { authHeader, setAuthTokenProvider } from './services/authToken';
@@ -23,6 +23,10 @@ import { AskScreen } from './screens/AskScreen';
 import { LoginScreen } from './screens/LoginScreen';
 import { OnboardingScreen } from './screens/OnboardingScreen';
 import { isAdminRole } from './services/teamClient';
+import { useDemoAccount } from './demoAccount/useDemoAccount';
+import { demoPicked, subscribeDemoPicked } from './demoAccount/industries';
+
+const DemoPicker = lazy(() => import('./demoAccount/DemoPicker').then((m) => ({ default: m.DemoPicker })));
 import './index.css';
 
 const BillingScreen = lazy(() => import('./screens/BillingScreen').then((m) => ({ default: m.BillingScreen })));
@@ -55,6 +59,9 @@ function App() {
   }, [getToken]);
   const currentScreen = useAppStore((s) => s.currentScreen);
   const setCurrentScreen = useAppStore((s) => s.setCurrentScreen);
+  // Industry demo account: the picker comes first, and the demo never merges or onboards (src/demoAccount).
+  const demo = useDemoAccount();
+  const picked = useSyncExternalStore(subscribeDemoPicked, demoPicked, () => false);
 
   // Fires once, the moment a signed-in user goes from having no active
   // Clerk organization to having one — creating a shop, accepting an invite,
@@ -90,6 +97,8 @@ function App() {
     const had = prevOrgId.current;
     prevOrgId.current = orgId;
     if (!isSignedIn || had || !orgId || !isAdminRole(orgRole ?? null)) return;
+    // The demo login never folds anything into a demo company.
+    if (demo.isDemoLogin) return;
 
     // Once this browser has already run (or tried) the merge for this org, it
     // must never ask again — without this, `had` is `null` on every fresh
@@ -135,7 +144,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [isSignedIn, orgId, orgRole]);
+  }, [isSignedIn, orgId, orgRole, demo.isDemoLogin]);
 
   // Only fetches while signed in, and never in demo mode. Runs unconditionally
   // (rules of hooks) — the `enabled` flag is what actually gates the fetch, so
@@ -166,12 +175,12 @@ function App() {
   const hadDeepLinkOnLoad = useRef(typeof window !== 'undefined' && window.location.search.length > 0);
   const firstRunRedirectedRef = useRef(false);
   useEffect(() => {
-    if (DEMO_MODE || firstRunRedirectedRef.current || hadDeepLinkOnLoad.current) return;
+    if (DEMO_MODE || demo.isDemoOrg || firstRunRedirectedRef.current || hadDeepLinkOnLoad.current) return;
     if (sync.status !== 'ready' || !sync.isEmpty) return;
     if (currentScreen !== 'ask') return; // the app default — anything else was a deliberate navigation
     firstRunRedirectedRef.current = true;
     setCurrentScreen('ingest');
-  }, [sync.status, sync.isEmpty, currentScreen, setCurrentScreen]);
+  }, [sync.status, sync.isEmpty, currentScreen, setCurrentScreen, demo.isDemoOrg]);
 
   // ?entity= / ?doc= / ?screen= / ?plan= in the URL open the right record (or
   // Billing) once the graph is loaded. Unconditional for the rules of hooks;
@@ -329,6 +338,15 @@ function App() {
     return <LoginScreen />;
   }
 
+  // Industry demo: after the demo login, and after "Switch industry", the industry picker is the whole screen.
+  if (!DEMO_MODE && demo.isDemoLogin && (!orgId || !demo.isDemoOrg || !picked)) {
+    return (
+      <Suspense fallback={<div className="min-h-screen bg-bg" aria-busy="true" />}>
+        <DemoPicker />
+      </Suspense>
+    );
+  }
+
   // A signed-in user with no active shop is mid-onboarding, not mid-loading —
   // show the gate instead of a blank app whose every screen would report an
   // empty, unshared account. Skipped in demo mode: the fixture bootstrap in
@@ -372,6 +390,7 @@ function App() {
     if (billingGateActive) {
       return currentScreen === 'team' ? <TeamScreen /> : <BillingScreen />;
     }
+    if (demo.isDemoOrg && (currentScreen === 'billing' || currentScreen === 'team')) return <AskScreen />;
     switch (currentScreen) {
       case 'ask':
         return <AskScreen />;

@@ -102,6 +102,18 @@ export class Index {
   cite(x) { return `${cap(hum(x.type))} ${x.num ? x.num + ' ' : ''}(${x.cust ? this.name(x.cust) + ', ' : ''}${x.date})`; }
 }
 export const DOCNO = () => new RegExp(DOCNO_SRC, 'g');
+/** stem_fix_v1 (recipe 'stem_fix_v1': true): document-type-name stem so that singular 'lease' and plural 'leases' meet (lib/reader.py stem_t); off = stem unchanged */
+let STEMFIX = false;
+export const configureStemFix = (on) => { STEMFIX = !!on; };
+const SFX_S = ['ases', 'nses', 'rses', 'lses', 'auses', 'ouses'];
+export function stemT(w) {
+  if (!STEMFIX) return stem(w);
+  if (w === 'pos' || w === 'pms' || w === 'djs') return w.slice(0, -1);
+  if (w.endsWith('ss') && w.length > 4) return w;
+  if (['ches', 'shes', 'xes', 'zes'].some((s) => w.endsWith(s)) && w.length > 5) return w.slice(0, -2);
+  if (SFX_S.some((s) => w.endsWith(s)) && w !== 'gases' && w.length > 5) return w.slice(0, -1);
+  return stem(w);
+}
 const spaces = (n) => ' '.repeat(n);
 export function ground(ix, q) {
   const ql = q.toLowerCase().replace(/’/g, "'");
@@ -147,10 +159,10 @@ export function ground(ix, q) {
   for (const m of ql.matchAll(DOCNO())) sp.push([m.index, m.index + m[0].length, 'DOCNO']);
   for (const [[a, b]] of g.dates) sp.push([a, b, 'DATE']);
   g.spans = sp;
-  const wq = words(mask), sq = wq.map(stem); let best = [];
+  const wq = words(mask), sq = wq.map(stemT); let best = [];
   const tl = [...ix.tphr.keys()].concat([...ix.restricted]);
   for (const t of tl) {
-    const pw = words(hum(t)), spw = pw.map(stem), L = spw.length;
+    const pw = words(hum(t)), spw = pw.map(stemT), L = spw.length;
     for (let i = 0; i <= sq.length - L; i++) { let eq = true; for (let j = 0; j < L; j++) if (sq[i + j] !== spw[j]) { eq = false; break; } if (eq) { best.push([L, t, wq[i + L - 1] !== pw[pw.length - 1]]); break; } }
   }
   best = sortedBy(best, (x) => x, true);

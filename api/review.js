@@ -24,6 +24,7 @@
 import { shareScore, getSharing as getPerfSharing, setSharing as setPerfSharing, loadScores as loadPerfScores } from './_lib/learning/perfShare.js';
 import { armResponseDeadline } from './_lib/util/deadline.js';
 import { requireAuth, denyAuth, hasShop, requireRole, AuthError } from './_lib/auth.js';
+import { isDemoAuth, sendDemoRestricted, demoReviewAllowed } from './_lib/demo/index.js';
 import * as reviewStore from './_lib/reviewStore.js';
 import { deleteDocuments } from './_lib/routes/document-delete.js';
 import { integrityScan, integrityFix } from './_lib/routes/integrity.js';
@@ -271,6 +272,12 @@ export default async (req, res) => {
     return res.status(403).json({ error: 'This action is restricted to DeepWell platform operators.' });
   }
 
+  // Industry demo: reads and the automatic link repair a fresh scan uses; corrections, merges, deletes and learning
+  // actions are turned off (nothing a prospect does may change the sample facts or reach Donovan's learning).
+  if (!demoReviewAllowed(action, payload) && (await isDemoAuth(auth, { failClosed: true }))) {
+    return sendDemoRestricted(res, req);
+  }
+
   if (INTEGRITY_RATE_LIMIT_ACTIONS.has(action)) {
     if (!(await limit(req, res, auth, 'write'))) return; // 429 already written
   }
@@ -353,14 +360,14 @@ export default async (req, res) => {
           // Chunked loop behind the admin button: 100 documents per pass until nothing is left or the time budget is
           // spent (the caller can press again; what is done stays done, and a finished document is not picked twice).
           const stopAt = Date.now() + 200_000;
-          const total = { scanned: 0, candidates: 0, rechecked: 0, filled: 0, fields: 0, verified: 0, leftForNextRun: 0, errors: 0, passes: 0 };
+          const total = { scanned: 0, candidates: 0, rechecked: 0, filled: 0, fields: 0, retyped: 0, verified: 0, leftForNextRun: 0, errors: 0, passes: 0 };
           let prevLeft = Infinity;
           for (;;) {
             const r = await recheckTenantMissing(ctx, { ...baseOpts, limit: 100, deadlineAt: stopAt });
             total.passes++;
             const stalled = !r.filled && !r.verified && (r.leftForNextRun ?? 0) >= prevLeft;
             prevLeft = r.leftForNextRun ?? 0;
-            for (const k of ['scanned', 'rechecked', 'filled', 'fields', 'verified', 'errors']) total[k] += r[k] ?? 0;
+            for (const k of ['scanned', 'rechecked', 'filled', 'fields', 'retyped', 'verified', 'errors']) total[k] += r[k] ?? 0;
             total.candidates = Math.max(total.candidates, r.candidates ?? 0);
             total.leftForNextRun = r.leftForNextRun ?? 0;
             if (stalled || !r.scanned || !total.leftForNextRun || Date.now() >= stopAt || total.passes >= 30) break;

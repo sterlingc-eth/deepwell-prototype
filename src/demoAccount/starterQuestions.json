@@ -1,0 +1,170 @@
+{
+ "realestate": {
+  "label": "Real Estate",
+  "company": "Quailbrush Realty Group",
+  "orgName": "Demo · Real Estate — Quailbrush Realty Group",
+  "tryAsking": [
+   "What did 5532 E Pinon Grove Ln sell for?",
+   "How much earnest money did the Lindqvists deposit?",
+   "When does the Larkspur listing expire?",
+   "Which vendor invoices haven't been paid?"
+  ],
+  "all": [
+   "What did 5532 E Pinon Grove Ln sell for?",
+   "When did escrow close on 5532 E Pinon Grove Ln?",
+   "How much earnest money did the Lindqvists deposit?",
+   "What did the home inspection find at 5532 E Pinon Grove Ln?",
+   "What was the total commission on the Pinon Grove sale?",
+   "How much is the seller credit in the Pinon Grove contract?",
+   "When does the Larkspur listing expire?",
+   "What is the list price for 3906 E Larkspur Dr?",
+   "When does Saoirse Delacroix's buyer agreement expire?",
+   "What's the lockbox code at 1218 W Nopal Ave?",
+   "What was Saoirse's concern about 1218 W Nopal Ave?",
+   "Which vendor invoices haven't been paid?",
+   "How much are the HOA dues at 3906 E Larkspur Dr?",
+   "When does our errors and omissions insurance expire?",
+   "What did 5532 E Pinon Grove Ln sell for in 2019?"
+  ]
+ },
+ "propmgmt": {
+  "label": "Property Management",
+  "company": "Tallgrass Mesa Property Management",
+  "orgName": "Demo · Property Management — Tallgrass Mesa Property Management",
+  "tryAsking": [
+   "When does Danica Ferreira's lease end?",
+   "How much does Rafferty Osei owe?",
+   "Which vendor invoices are unpaid?",
+   "When does Greenreach Landscape's insurance certificate expire?"
+  ],
+  "all": [
+   "When does Danica Ferreira's lease end?",
+   "What is the monthly rent at 412 N Saddleback Rd Unit 3?",
+   "How much is Danica Ferreira's security deposit?",
+   "How much does Rafferty Osei owe?",
+   "Which vendor invoices are unpaid?",
+   "Who fixed the dishwasher at 412 N Saddleback Rd?",
+   "How much was paid to Celestine Abernathy-Ruiz for September 2026?",
+   "When does Greenreach Landscape's insurance certificate expire?",
+   "When does the Dunmore Pool Care insurance certificate expire?",
+   "What is the pet policy in the Kittredge lease?",
+   "What's wrong in Unit 7 at 1580 E Brown Rd, and when can we go in?",
+   "How much of Bartholomew Nkemelu's deposit was refunded?",
+   "What is the management fee in the Duchesne management agreement?",
+   "When does Noriko Iwasaki's lease end?",
+   "Who is Rafferty Osei's employer?"
+  ]
+ },
+ "hvac": {
+  "label": "HVAC",
+  "company": "Coppervane Heating & Air",
+  "orgName": "Demo · HVAC — Coppervane Heating & Air",
+  "tryAsking": [
+   "When does Harlan Whitcombe's maintenance agreement expire?",
+   "What is the serial number of the heat pump at 1847 E Ocotillo Dr?",
+   "Who was the technician on invoice CV-24117?",
+   "Which invoices are unpaid?"
+  ],
+  "all": [
+   "When does Harlan Whitcombe's maintenance agreement expire?",
+   "What is the serial number of the heat pump at 1847 E Ocotillo Dr?",
+   "When does the warranty on Harlan Whitcombe's heat pump expire?",
+   "Who was the technician on invoice CV-24117?",
+   "How much does Maribel Okafor still owe?",
+   "Which invoices are unpaid?",
+   "What is the permit number for the job at 9 W Kiowa Cir?",
+   "How much did we quote Maribel Okafor for the new system?",
+   "What's the gate code at the Okafor house?",
+   "How much did we spend at Valley Comfort Supply in March 2026?",
+   "When does the Saltbush Self Storage maintenance agreement expire?",
+   "What did the inspection find at Corinne Achterberg's house?",
+   "What was the total on invoice CV-21408?",
+   "Who was the technician at 1120 N Lindsay Rd on September 15, 2026?",
+   "What is Harlan Whitcombe's email address?"
+  ]
+ },
+ "plumbing": {
+  "label": "Plumbing",
+  "company": "Bluegill Plumbing Co.",
+  "orgName": "Demo · Plumbing — Bluegill Plumbing Co.",
+  "tryAsking": [
+   "When does the tank warranty on Ottilie Brannagh's water heater expire?",
+   "How much did we quote Ottilie Brannagh for the repipe?",
+   "Which invoices are unpaid?",
+   "Who was the technician on invoice BP-3402?"
+  ],
+  "all": [
+   "When was the water heater at 77 S Cholla St installed?",
+   "What is the serial number of Ottilie Brannagh's water heater?",
+   "When does the tank warranty on Ottilie Brannagh's water heater expire?",
+   "How much did we quote Ottilie Brannagh for the repipe?",
+   "Which invoices are unpaid?",
+   "How much does Rosalind Achebe-Kurtz owe us?",
+   "Who was the technician on invoice BP-3402?",
+   "When is the next backflow test due at Fernhollow Apartments?",
+   "What did the sewer camera inspection find at 1903 E Fairview St?",
+   "What is the permit number for the sewer repair at 1903 E Fairview St?",
+   "Where is the main water shutoff at the Hendricks house?",
+   "How much did we spend at Saguaro Pipe & Supply on August 20, 2026?",
+   "What was the total on invoice BP-3166?",
+   "When does the Fernhollow Apartments service agreement expire?",
+   "When does our liability insurance policy expire?"
+  ]
+ },
+ "electrical": {
+  "label": "Electrical",
+  "company": "Kestrel Line Electric",
+  "orgName": "Demo · Electrical — Kestrel Line Electric",
+  "tryAsking": [
+   "How much was the panel upgrade at 2788 E Merrill Ave?",
+   "What correction did the inspector ask for at the Strand house?",
+   "Which invoices are unpaid?",
+   "What is the serial number of Imogen Castellanos' generator?"
+  ],
+  "all": [
+   "How much was the panel upgrade at 2788 E Merrill Ave?",
+   "What is the permit number for Philippa Strand's panel upgrade?",
+   "What correction did the inspector ask for at the Strand house?",
+   "Which invoices are unpaid?",
+   "How much does Dashiell Moreau owe?",
+   "Who installed the EV charger at 4419 S Ranger Trl?",
+   "What is the serial number of Imogen Castellanos' generator?",
+   "When does the warranty on the Castellanos generator expire?",
+   "When does the Harrow & Finch Furniture service agreement expire?",
+   "How much was the LED retrofit at Harrow & Finch Furniture?",
+   "Where is the electrical panel at the Strand house?",
+   "How much did we spend at Arcwell Electrical Supply on June 17, 2026?",
+   "When was the generator at 905 W Elliot Rd last serviced?",
+   "What is on purchase order PO-4402?",
+   "What is Philippa Strand's email address?"
+  ]
+ },
+ "contractors": {
+  "label": "General Contractors",
+  "company": "Stonefield & Pike Builders",
+  "orgName": "Demo · General Contractors — Stonefield & Pike Builders",
+  "tryAsking": [
+   "What is the contract amount for the Ocampo remodel?",
+   "What was change order CO-3 on the Ocampo job for, and how much?",
+   "How much is due on pay application PA-5 for the Ocampo job?",
+   "Which invoices are unpaid?"
+  ],
+  "all": [
+   "What is the contract amount for the Ocampo remodel?",
+   "What was change order CO-3 on the Ocampo job for, and how much?",
+   "What is the contract sum for the Ocampo job after change orders?",
+   "How much retainage does the Ocampo contract hold?",
+   "What is the building permit number for 3127 S Los Feliz Dr?",
+   "When was the Ocampo addition supposed to be substantially complete?",
+   "How much is due on pay application PA-5 for the Ocampo job?",
+   "Which invoices are unpaid?",
+   "How much do we owe Haverline Lumber & Truss?",
+   "When does Arclight Tradeworks' insurance certificate expire?",
+   "When does Desert Drywall Partners' insurance certificate expire?",
+   "Who is the framing subcontractor on the Ocampo job, and what is their subcontract amount?",
+   "How deep does Lucia Ocampo want the pantry shelves?",
+   "When is the coffee roaster being delivered to Canyon Fold?",
+   "Who is the Ocampos' mortgage lender?"
+  ]
+ }
+}

@@ -27,6 +27,9 @@ export const FINANCIAL_KINDS_BY_TYPE = Object.freeze({
   'proposal-quote': ['estimate', 'change_order'],
   'purchase-order': ['po'],
   'maintenance-agreement': ['agreement'],
+  // Demo round (2026-10-22): a supplier's receipt is money we SPENT (always paid). Without this, "how much did we spend at
+  // <supplier>" answered "no vendor bills on file" for a company that keeps its supply-house receipts.
+  receipt: ['receipt'],
 });
 
 /** The document types that get a financial extraction (and backfill). */

@@ -180,6 +180,23 @@ export async function listTenantKeysWithSource() {
   }
 }
 
+/**
+ * Keys (Clerk org ids) of the industry demo companies, from list_demo_tenants() (M3-config/73; security definer, identifiers only).
+ * The nightly sweep leaves these out: their paperwork is the fixed sample set, their stuck-document retries and catch-up model
+ * work would only spend money, and the demo reset puts everything back anyway. Empty set when the function is not installed.
+ */
+export async function listDemoTenantKeys() {
+  const client = serializeClient(await getPool().connect());
+  try {
+    const { rows } = await client.query('SELECT tenant_key FROM list_demo_tenants()');
+    return new Set(rows.map((r) => r.tenant_key).filter(Boolean));
+  } catch {
+    return new Set();
+  } finally {
+    client.release();
+  }
+}
+
 export async function listTenantKeys() {
   return (await listTenantKeysWithSource()).tenants;
 }

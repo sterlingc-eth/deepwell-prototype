@@ -23,6 +23,7 @@
  * points where nothing else is being awaited yet either. Either way a slow or
  * failed miss write never delays, and never fails, the customer's answer.
  */
+import { isDemoCtx } from './demo/index.js';
 import { withTenant } from './recordsStore.js';
 import { getProviderOutage } from './claude.js';
 import { shareMissFromDb } from './learning/perfShare.js';
@@ -173,6 +174,9 @@ export async function insertAskMiss(db, { question, questionNormalized, outcome,
  */
 export async function recordAskMiss(ctxArg, opts) {
   try {
+    // Industry demo: a prospect's questions are never logged as misses (they must not reach Donovan's learning,
+    // the miss digest or any training set).
+    if (await isDemoCtx(ctxArg)) return;
     await withTenant(ctxArg, (db) => insertAskMiss(db, opts));
   } catch (err) {
     // withTenant itself failing (pool exhausted, bad ctxArg) is exactly as

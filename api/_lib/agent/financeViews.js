@@ -32,8 +32,31 @@ export const FINANCE_VIEW_NAMES = Object.freeze(["financials", "invoice_lines"])
 export const FINANCE_REAL_TABLES = Object.freeze(["document_financials", "document_financial_lines"]);
 
 /** Effective (corrected-over-original) value of one column, as text -> cast. */
-function eff(col, cast) {
-  return `(CASE WHEN f.corrections ? '${col}' THEN NULLIF(f.corrections->>'${col}', '') ELSE f.${col}::text END)::${cast}`;
+function eff(col, cast, alias = "f") {
+  return `(CASE WHEN ${alias}.corrections ? '${col}' THEN NULLIF(${alias}.corrections->>'${col}', '') ELSE ${alias}.${col}::text END)::${cast}`;
+}
+
+const SQL_ALNUM_UPPER = (expr) => `upper(regexp_replace(COALESCE(${expr}, ''), '[^A-Za-z0-9]', '', 'g'))`;
+
+/**
+ * Demo fix round 2 (2026-10-22): the SAME receipt scanned twice (two files, one receipt number and amount) must not be counted
+ * twice. Same rule the Inbox uses to set a likely copy aside (src/core/entityGraph.ts findPossibleCopies, 2nd pass): same document
+ * type, same document number (3+ letters/digits after stripping punctuation) AND same amount, from the same vendor (or one side
+ * names none); the ORIGINAL is the checked (verified) one, else the earliest arrival (created_at, then id); only the later
+ * arrival is left out. Two different stores' "Receipt #1001 $20.00" are two papers (different vendors), never a copy.
+ * Receipts only (an invoice number can legitimately repeat across customers). Not applied to a per-document lookup
+ * (`docIdsSql`), so opening the later copy in Records still shows its own figures. `f` = the document_financials row, `d` = its document.
+ */
+export function duplicateReceiptSql() {
+  return `NOT (f.doc_kind = 'receipt' AND length(${SQL_ALNUM_UPPER("f.invoice_number")}) >= 3 AND ${eff("total", "numeric")} IS NOT NULL AND EXISTS (
+           SELECT 1 FROM document_financials o
+             JOIN documents od ON od.id = o.document_id AND ${notPrivateSql("od")} AND ${t("od")}
+            WHERE ${t("o")} AND o.doc_kind = 'receipt' AND o.direction = f.direction AND o.document_id <> f.document_id
+              AND ${SQL_ALNUM_UPPER("o.invoice_number")} = ${SQL_ALNUM_UPPER("f.invoice_number")}
+              AND ${eff("total", "numeric", "o")} = ${eff("total", "numeric")}
+              AND (o.vendor_name IS NULL OR f.vendor_name IS NULL OR ${SQL_ALNUM_UPPER("o.vendor_name")} = ${SQL_ALNUM_UPPER("f.vendor_name")})
+              AND ((od.stage = 'verified' AND d.stage <> 'verified')
+                   OR ((od.stage = 'verified') = (d.stage = 'verified') AND (o.created_at, o.document_id) < (f.created_at, f.document_id)))))`;
 }
 
 /**
@@ -113,7 +136,8 @@ financials AS (
     FROM document_financials f
     JOIN documents d ON d.id = f.document_id AND ${notPrivateSql("d")} AND ${t("d")}
     LEFT JOIN fin_doc_customer dc ON dc.document_id = f.document_id
-   WHERE ${t("f")}
+   WHERE ${t("f")}${docIdsSql ? "" : `
+     AND ${duplicateReceiptSql()}`}
 ),
 invoice_lines AS (
   SELECT l.document_id, l.line_no, l.description, l.qty, l.unit_price, l.amount, l.category_guess, l.page_no,

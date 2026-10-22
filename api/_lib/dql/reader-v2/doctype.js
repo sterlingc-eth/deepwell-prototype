@@ -2,6 +2,9 @@
 import { words, stem, hum } from './text.js';
 import { osa, SYN_STOP } from './ext.js';
 import { reEscape } from './pyc.js';
+import * as DA1 from './doctypealias1.js';
+import { osaFull } from './v3util.js';
+import { U } from './unified1.js';
 
 const CLASSES = [
   'bid estimate quote quotation proposal', 'bill invoice inv billing', 'contract agreement agmt pact', 'order purchase po requisition',
@@ -63,6 +66,11 @@ function tokCanon(w, vocabSorted, vocab) {
   const c = CLS.get(w); if (c) return c;
   if (w.length >= 5 && !vocab.has(w)) {
     const k = w.length < 9 ? 1 : 2;
+    if (U.on) {      // determinism_v1 (canon 'best', unified rulebook): the vocab word with the smallest exact OSA distance wins, ties by sorted order (the banded osa under-counts, so several words can match)
+      let bv = null, bd = 1e9;
+      for (const v of vocabSorted) if (Math.abs(v.length - w.length) <= k && osa(w, v, k) <= k) { const d = osaFull(w, v); if (d < bd) { bd = d; bv = v; } }
+      return bv !== null ? (CLS.get(bv) || bv) : w;
+    }
     for (const v of vocabSorted) if (Math.abs(v.length - w.length) <= k && osa(w, v, k) <= k) return CLS.get(v) || v;
   }
   return w;
@@ -146,6 +154,11 @@ export async function match(ix, g, M, cfg, learned) {
     const top = sc[o[0]][0]; const sec = o.length > 1 ? sc[o[1]][0] : 0.0;
     const key = [(top - sec >= cfg.margin && top >= cfg.thr), top, p.length];
     if (best === null || (+key[0] > +best[0][0]) || ((+key[0] === +best[0][0]) && (key[1] > best[0][1] || (key[1] === best[0][1] && key[2] > best[0][2])))) best = [key, p, ti.ts[o[0]], top - sec, sc[o[0]][1]];
+  }
+  if (U.on && best !== null && !best[0][0]) {
+    try {     // alias_compound_v1 (H078, unified rulebook): rescue-only resolution when the old scoring resolved no type
+      if (DA1.enabled()) { const r_ = DA1.rescue(ix, g, M, cfg, learned, ph, ti, ctx, PE, { CLS, stem, dot }); if (r_ !== null) { best = r_; g.dt_rescue = 1; } }
+    } catch (e) { /* swallowed like the reference */ }
   }
   if (best === null) return;
   const [key, p, t, mg, kind] = best;

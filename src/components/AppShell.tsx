@@ -14,6 +14,8 @@ import { CommandPalette } from './command/CommandPalette';
 import { SupportWidget } from './support/SupportWidget';
 import { NAV } from './nav';
 import { APP_VERSION } from '../core/version';
+import { useDemoAccount } from '../demoAccount/useDemoAccount';
+import { DemoBadge, DemoControls } from '../demoAccount/DemoBar';
 
 // Lazy — same reasoning as App.tsx's WarrantyExportScreen/OutreachScreen:
 // this is an admin-only destination most sessions never open, and it pulls
@@ -39,7 +41,10 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
   const { signOut, user } = useClerk();
   const { orgRole } = useAuth();
   const prefillQuestion = useAppStore((s) => s.prefillQuestion);
-  const isAdmin = isAdminRole(orgRole ?? null);
+  const demo = useDemoAccount();
+  // Industry demo company: billing, team, settings and the organization menu are turned off (the server refuses them
+  // too); the header shows a Demo badge, "Switch industry" and "Clear my scans" instead.
+  const isAdmin = isAdminRole(orgRole ?? null) && !demo.isDemoOrg;
   const [donovanOpen, setDonovanOpen] = useState(false);
   // The Donovan screen is DeepWell-operator-only (customers get nothing to review, approve or teach). The server says who
   // is an operator; any failure means "not an operator", so a customer never sees the button.
@@ -98,6 +103,7 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
           >
             <Wordmark />
           </button>
+          {demo.isDemoOrg && <DemoBadge industry={demo.industry} />}
 
           {!billingGateActive && ingestProgress && (
             <button
@@ -138,8 +144,10 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
                     ) : (
                       <Icon className="w-[18px] h-[18px]" />
                     )}
-                    <span className="hidden lg:inline">{label}</span>
-                    <span className="sr-only lg:hidden">{label}</span>
+                    {/* Demo header carries two extra controls (Switch industry, Clear my scans): its nav labels start at xl so an
+                        iPad's 1024px header stays on one line. */}
+                    <span className={demo.isDemoOrg ? 'hidden xl:inline' : 'hidden lg:inline'}>{label}</span>
+                    <span className={demo.isDemoOrg ? 'sr-only xl:hidden' : 'sr-only lg:hidden'}>{label}</span>
                     {screen === 'ingest' && inboxBadge > 0 && (
                       <span
                         className={[
@@ -165,13 +173,14 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
           {/* Bell, next to Billing — see NotificationsPanel.tsx. Hidden while
               gated: notifications reference records a paywalled tenant has
               no access to. */}
-          {!billingGateActive && <NotificationsPanel />}
+          {!billingGateActive && !demo.isDemoOrg && <NotificationsPanel />}
 
           {/* Billing lives in the account area, not the primary nav — it's
               not one of the four destinations NAV enumerates above.
               Pushed to the far right with ml-auto when the primary nav
               above it is hidden (gated), same as it would sit after NAV
               otherwise. */}
+          {!demo.isDemoOrg && (
           <button
             aria-label="Billing"
             title="Billing"
@@ -186,6 +195,8 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
             <CreditCard className="w-5 h-5" aria-hidden="true" />
             <span className="hidden 2xl:inline text-body whitespace-nowrap">Billing</span>
           </button>
+          )}
+          {demo.isDemoOrg && <DemoControls onSwitch={() => setCurrentScreen('ask')} />}
 
           {/* Team (invite/manage members) — admin-only in the UI. A member
               still has read-only access if they navigate here directly (see
@@ -243,6 +254,7 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
               signing into a different account would. hidePersonal: DeepWell
               has no "personal" tenant concept in the UI — a user with no
               company sees OnboardingScreen instead of ever reaching this menu. */}
+          {!demo.isDemoOrg && (
           <OrganizationSwitcher
             hidePersonal
             afterSelectOrganizationUrl="/app/"
@@ -255,6 +267,7 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
               },
             }}
           />
+          )}
 
           <button
             type="button"

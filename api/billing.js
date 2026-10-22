@@ -1,4 +1,5 @@
 import { requireAuth, denyAuth, hasShop, requireRole } from "./_lib/auth.js";
+import { isDemoAuth, sendDemoRestricted, DEMO_ALLOWED_BILLING_ACTIONS } from "./_lib/demo/index.js";
 import { handleCors, handleError, sendPrivateCacheableJson } from "./_lib/claude.js";
 import { withTenant, getPool, bustTenantCache } from "./_lib/recordsStore.js";
 import {
@@ -384,6 +385,9 @@ export default async function handler(req, res) {
   } catch (err) {
     return denyAuth(res, err);
   }
+
+  // Industry demo: never billed, no plan changes, no seats or invites. Status still answers (it reports the demo plan).
+  if (!DEMO_ALLOWED_BILLING_ACTIONS.has(action) && (await isDemoAuth(auth, { failClosed: true }))) return sendDemoRestricted(handleCors(res, req), req);
 
   try {
     if (action === "checkout" && req.method === "POST") return await handleCheckout(req, res, auth);

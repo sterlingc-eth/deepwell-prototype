@@ -1,0 +1,975 @@
+{
+ "version": "r38-prop-1",
+ "category": "blind-r38-property",
+ "source": "scripts/gen-property-tenant.mjs (seeded; written before any property-pack code change)",
+ "questions": [
+  {
+   "id": "prop-001",
+   "text": "Rosa Lopez lease expiration?",
+   "category": "blind-r38-property",
+   "shape": "lease_end",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT x.value AS v FROM extractions x JOIN extractions t ON t.document_id = x.document_id AND t.field_key = 'tenant_name' WHERE x.field_key = 'lease_end_date' AND t.value ILIKE $1",
+    "params": [
+     "Rosa Lopez"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-002",
+   "text": "Kevin Trujillo lease expiration?",
+   "category": "blind-r38-property",
+   "shape": "lease_end",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT x.value AS v FROM extractions x JOIN extractions t ON t.document_id = x.document_id AND t.field_key = 'tenant_name' WHERE x.field_key = 'lease_end_date' AND t.value ILIKE $1",
+    "params": [
+     "Kevin Trujillo"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-003",
+   "text": "Paula Vargas lease expiration?",
+   "category": "blind-r38-property",
+   "shape": "lease_end",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT x.value AS v FROM extractions x JOIN extractions t ON t.document_id = x.document_id AND t.field_key = 'tenant_name' WHERE x.field_key = 'lease_end_date' AND t.value ILIKE $1",
+    "params": [
+     "Paula Vargas"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-004",
+   "text": "when does Ethan Holloway's lease end",
+   "category": "blind-r38-property",
+   "shape": "lease_end",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT x.value AS v FROM extractions x JOIN extractions t ON t.document_id = x.document_id AND t.field_key = 'tenant_name' WHERE x.field_key = 'lease_end_date' AND t.value ILIKE $1",
+    "params": [
+     "Ethan Holloway"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-005",
+   "text": "when does Paula Ortega's lease end",
+   "category": "blind-r38-property",
+   "shape": "lease_end",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT x.value AS v FROM extractions x JOIN extractions t ON t.document_id = x.document_id AND t.field_key = 'tenant_name' WHERE x.field_key = 'lease_end_date' AND t.value ILIKE $1",
+    "params": [
+     "Paula Ortega"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-006",
+   "text": "when is Carlos Holloway up for renewal",
+   "category": "blind-r38-property",
+   "shape": "lease_end",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT x.value AS v FROM extractions x JOIN extractions t ON t.document_id = x.document_id AND t.field_key = 'tenant_name' WHERE x.field_key = 'lease_end_date' AND t.value ILIKE $1",
+    "params": [
+     "Carlos Holloway"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-007",
+   "text": "what's Gabriel Barrera's rent",
+   "category": "blind-r38-property",
+   "shape": "rent",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT x.value AS v FROM extractions x JOIN extractions t ON t.document_id = x.document_id AND t.field_key = 'tenant_name' WHERE x.field_key = 'rent_amount' AND t.value ILIKE $1",
+    "params": [
+     "Gabriel Barrera"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-008",
+   "text": "how much is Ethan Mendoza paying in rent",
+   "category": "blind-r38-property",
+   "shape": "rent",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT x.value AS v FROM extractions x JOIN extractions t ON t.document_id = x.document_id AND t.field_key = 'tenant_name' WHERE x.field_key = 'rent_amount' AND t.value ILIKE $1",
+    "params": [
+     "Ethan Mendoza"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-009",
+   "text": "monthly rent for Miguel Lopez",
+   "category": "blind-r38-property",
+   "shape": "rent",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT x.value AS v FROM extractions x JOIN extractions t ON t.document_id = x.document_id AND t.field_key = 'tenant_name' WHERE x.field_key = 'rent_amount' AND t.value ILIKE $1",
+    "params": [
+     "Miguel Lopez"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-010",
+   "text": "monthly rent for Gabriel Salazar",
+   "category": "blind-r38-property",
+   "shape": "rent",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT x.value AS v FROM extractions x JOIN extractions t ON t.document_id = x.document_id AND t.field_key = 'tenant_name' WHERE x.field_key = 'rent_amount' AND t.value ILIKE $1",
+    "params": [
+     "Gabriel Salazar"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-011",
+   "text": "monthly rent for Isaiah Coleman",
+   "category": "blind-r38-property",
+   "shape": "rent",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT x.value AS v FROM extractions x JOIN extractions t ON t.document_id = x.document_id AND t.field_key = 'tenant_name' WHERE x.field_key = 'rent_amount' AND t.value ILIKE $1",
+    "params": [
+     "Isaiah Coleman"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-012",
+   "text": "how much is Wendy Abbott paying in rent",
+   "category": "blind-r38-property",
+   "shape": "rent",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT x.value AS v FROM extractions x JOIN extractions t ON t.document_id = x.document_id AND t.field_key = 'tenant_name' WHERE x.field_key = 'rent_amount' AND t.value ILIKE $1",
+    "params": [
+     "Wendy Abbott"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-013",
+   "text": "what's the security deposit for Samuel Barrera",
+   "category": "blind-r38-property",
+   "shape": "deposit",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT x.value AS v FROM extractions x JOIN extractions t ON t.document_id = x.document_id AND t.field_key = 'tenant_name' WHERE x.field_key = 'security_deposit' AND t.value ILIKE $1",
+    "params": [
+     "Samuel Barrera"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-014",
+   "text": "how much deposit does Victor Holloway have on file",
+   "category": "blind-r38-property",
+   "shape": "deposit",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT x.value AS v FROM extractions x JOIN extractions t ON t.document_id = x.document_id AND t.field_key = 'tenant_name' WHERE x.field_key = 'security_deposit' AND t.value ILIKE $1",
+    "params": [
+     "Victor Holloway"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-015",
+   "text": "how much deposit does Yolanda Lopez have on file",
+   "category": "blind-r38-property",
+   "shape": "deposit",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT x.value AS v FROM extractions x JOIN extractions t ON t.document_id = x.document_id AND t.field_key = 'tenant_name' WHERE x.field_key = 'security_deposit' AND t.value ILIKE $1",
+    "params": [
+     "Yolanda Lopez"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-016",
+   "text": "what's the security deposit for Diana Jimenez",
+   "category": "blind-r38-property",
+   "shape": "deposit",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT x.value AS v FROM extractions x JOIN extractions t ON t.document_id = x.document_id AND t.field_key = 'tenant_name' WHERE x.field_key = 'security_deposit' AND t.value ILIKE $1",
+    "params": [
+     "Diana Jimenez"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-017",
+   "text": "when did Nora Duarte move in",
+   "category": "blind-r38-property",
+   "shape": "lease_start",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT x.value AS v FROM extractions x JOIN extractions t ON t.document_id = x.document_id AND t.field_key = 'tenant_name' WHERE x.field_key = 'lease_start_date' AND t.value ILIKE $1",
+    "params": [
+     "Nora Duarte"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-018",
+   "text": "when did Hannah Ramirez move in",
+   "category": "blind-r38-property",
+   "shape": "lease_start",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT x.value AS v FROM extractions x JOIN extractions t ON t.document_id = x.document_id AND t.field_key = 'tenant_name' WHERE x.field_key = 'lease_start_date' AND t.value ILIKE $1",
+    "params": [
+     "Hannah Ramirez"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-019",
+   "text": "Victor Salazar lease start date",
+   "category": "blind-r38-property",
+   "shape": "lease_start",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT x.value AS v FROM extractions x JOIN extractions t ON t.document_id = x.document_id AND t.field_key = 'tenant_name' WHERE x.field_key = 'lease_start_date' AND t.value ILIKE $1",
+    "params": [
+     "Victor Salazar"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-020",
+   "text": "Paula Keller lease start date",
+   "category": "blind-r38-property",
+   "shape": "lease_start",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT x.value AS v FROM extractions x JOIN extractions t ON t.document_id = x.document_id AND t.field_key = 'tenant_name' WHERE x.field_key = 'lease_start_date' AND t.value ILIKE $1",
+    "params": [
+     "Paula Keller"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-021",
+   "text": "who lives in unit 1B at 7808 E Speedway Blvd",
+   "category": "blind-r38-property",
+   "shape": "who_lives",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions u JOIN extractions a ON a.document_id = u.document_id AND a.field_key = 'service_address' JOIN extractions t ON t.document_id = u.document_id AND t.field_key = 'tenant_name' JOIN documents d ON d.id = u.document_id WHERE u.field_key = 'unit_number' AND u.value ILIKE $1 AND a.value ILIKE $2 AND d.document_type = 'lease-agreement'",
+    "params": [
+     "1B",
+     "7808 E Speedway Blvd%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-022",
+   "text": "who's the tenant in 2C at 7272 N Oracle Rd",
+   "category": "blind-r38-property",
+   "shape": "who_lives",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions u JOIN extractions a ON a.document_id = u.document_id AND a.field_key = 'service_address' JOIN extractions t ON t.document_id = u.document_id AND t.field_key = 'tenant_name' JOIN documents d ON d.id = u.document_id WHERE u.field_key = 'unit_number' AND u.value ILIKE $1 AND a.value ILIKE $2 AND d.document_type = 'lease-agreement'",
+    "params": [
+     "2C",
+     "7272 N Oracle Rd%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-023",
+   "text": "who lives in unit 2D at 2604 E Speedway Blvd",
+   "category": "blind-r38-property",
+   "shape": "who_lives",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions u JOIN extractions a ON a.document_id = u.document_id AND a.field_key = 'service_address' JOIN extractions t ON t.document_id = u.document_id AND t.field_key = 'tenant_name' JOIN documents d ON d.id = u.document_id WHERE u.field_key = 'unit_number' AND u.value ILIKE $1 AND a.value ILIKE $2 AND d.document_type = 'lease-agreement'",
+    "params": [
+     "2D",
+     "2604 E Speedway Blvd%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-024",
+   "text": "who's the tenant in 2A4 at 6385 N Campbell Ave",
+   "category": "blind-r38-property",
+   "shape": "who_lives",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions u JOIN extractions a ON a.document_id = u.document_id AND a.field_key = 'service_address' JOIN extractions t ON t.document_id = u.document_id AND t.field_key = 'tenant_name' JOIN documents d ON d.id = u.document_id WHERE u.field_key = 'unit_number' AND u.value ILIKE $1 AND a.value ILIKE $2 AND d.document_type = 'lease-agreement'",
+    "params": [
+     "2A4",
+     "6385 N Campbell Ave%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-025",
+   "text": "who's the tenant in 1C at 1159 N Swan Rd",
+   "category": "blind-r38-property",
+   "shape": "who_lives",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions u JOIN extractions a ON a.document_id = u.document_id AND a.field_key = 'service_address' JOIN extractions t ON t.document_id = u.document_id AND t.field_key = 'tenant_name' JOIN documents d ON d.id = u.document_id WHERE u.field_key = 'unit_number' AND u.value ILIKE $1 AND a.value ILIKE $2 AND d.document_type = 'lease-agreement'",
+    "params": [
+     "1C",
+     "1159 N Swan Rd%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-026",
+   "text": "who lives in unit 3A at 6965 W Ina Rd",
+   "category": "blind-r38-property",
+   "shape": "who_lives",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT t.value AS v FROM extractions u JOIN extractions a ON a.document_id = u.document_id AND a.field_key = 'service_address' JOIN extractions t ON t.document_id = u.document_id AND t.field_key = 'tenant_name' JOIN documents d ON d.id = u.document_id WHERE u.field_key = 'unit_number' AND u.value ILIKE $1 AND a.value ILIKE $2 AND d.document_type = 'lease-agreement'",
+    "params": [
+     "3A",
+     "6965 W Ina Rd%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-027",
+   "text": "how many leases end in 2026",
+   "category": "blind-r38-property",
+   "shape": "count_leases_end_year",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x WHERE x.field_key = 'lease_end_date' AND x.value LIKE $1",
+    "params": [
+     "2026-%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-028",
+   "text": "how many leases expire in 2027",
+   "category": "blind-r38-property",
+   "shape": "count_leases_end_year",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x WHERE x.field_key = 'lease_end_date' AND x.value LIKE $1",
+    "params": [
+     "2027-%"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-029",
+   "text": "how many leases do we have on file",
+   "category": "blind-r38-property",
+   "shape": "count_leases",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM documents WHERE document_type = 'lease-agreement'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-030",
+   "text": "how many leases are month to month",
+   "category": "blind-r38-property",
+   "shape": "count_mtm",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM documents d WHERE d.document_type = 'lease-agreement' AND NOT EXISTS (SELECT 1 FROM extractions x WHERE x.document_id = d.id AND x.field_key = 'lease_end_date')",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-031",
+   "text": "how many move-out inspections do we have",
+   "category": "blind-r38-property",
+   "shape": "count_moveouts",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM documents WHERE document_type = 'move-out-inspection'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-032",
+   "text": "how many move-ins have we done",
+   "category": "blind-r38-property",
+   "shape": "count_movein",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM documents WHERE document_type = 'move-in-inspection'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-033",
+   "text": "how many work orders are on file",
+   "category": "blind-r38-property",
+   "shape": "count_work_orders",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM documents WHERE document_type = 'work-order'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-034",
+   "text": "how many vendors do we use",
+   "category": "blind-r38-property",
+   "shape": "count_vendors",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type = 'technician' AND merged_into IS NULL",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-035",
+   "text": "how many owners do we manage for",
+   "category": "blind-r38-property",
+   "shape": "count_owners",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type = 'customer' AND merged_into IS NULL",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-036",
+   "text": "how many units do we manage",
+   "category": "blind-r38-property",
+   "shape": "count_units",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type = 'property' AND merged_into IS NULL",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-037",
+   "text": "how many jobs has Desert Air Mechanical done for us",
+   "category": "blind-r38-property",
+   "shape": "count_vendor_wo",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(DISTINCT x.document_id) AS n FROM extractions x JOIN documents d ON d.id = x.document_id WHERE x.field_key = 'vendor' AND d.document_type = 'work-order' AND x.value ILIKE $1",
+    "params": [
+     "Desert Air Mechanical"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-038",
+   "text": "how many jobs has Rivera Plumbing done for us",
+   "category": "blind-r38-property",
+   "shape": "count_vendor_wo",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(DISTINCT x.document_id) AS n FROM extractions x JOIN documents d ON d.id = x.document_id WHERE x.field_key = 'vendor' AND d.document_type = 'work-order' AND x.value ILIKE $1",
+    "params": [
+     "Rivera Plumbing"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-039",
+   "text": "how many jobs has GreenEdge Landscaping done for us",
+   "category": "blind-r38-property",
+   "shape": "count_vendor_wo",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(DISTINCT x.document_id) AS n FROM extractions x JOIN documents d ON d.id = x.document_id WHERE x.field_key = 'vendor' AND d.document_type = 'work-order' AND x.value ILIKE $1",
+    "params": [
+     "GreenEdge Landscaping"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-040",
+   "text": "how many work orders did Clearview Glass do",
+   "category": "blind-r38-property",
+   "shape": "count_vendor_wo",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(DISTINCT x.document_id) AS n FROM extractions x JOIN documents d ON d.id = x.document_id WHERE x.field_key = 'vendor' AND d.document_type = 'work-order' AND x.value ILIKE $1",
+    "params": [
+     "Clearview Glass"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-041",
+   "text": "how many owners do we have in Oro Valley",
+   "category": "blind-r38-property",
+   "shape": "count_owners_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type = 'customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "%, Oro Valley, %"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-042",
+   "text": "how many owners do we have in Marana",
+   "category": "blind-r38-property",
+   "shape": "count_owners_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type = 'customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "%, Marana, %"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-043",
+   "text": "how many owners do we have in Sahuarita",
+   "category": "blind-r38-property",
+   "shape": "count_owners_city",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities WHERE entity_type = 'customer' AND merged_into IS NULL AND data->>'service_address' ILIKE $1",
+    "params": [
+     "%, Sahuarita, %"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-044",
+   "text": "how many Whirlpool units are in our properties",
+   "category": "blind-r38-property",
+   "shape": "count_appl_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1",
+    "params": [
+     "Whirlpool"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-045",
+   "text": "how many Samsung units are in our properties",
+   "category": "blind-r38-property",
+   "shape": "count_appl_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1",
+    "params": [
+     "Samsung"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-046",
+   "text": "how many Bosch appliances do we have",
+   "category": "blind-r38-property",
+   "shape": "count_appl_brand",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.data->>'manufacturer' ILIKE $1",
+    "params": [
+     "Bosch"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-047",
+   "text": "how many refrigerators do we have",
+   "category": "blind-r38-property",
+   "shape": "count_refrigerators",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities e WHERE e.entity_type = 'equipment' AND e.merged_into IS NULL AND e.data->>'equipment_type' = 'refrigerator'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-048",
+   "text": "how many vendor insurance certificates expire in 2027",
+   "category": "blind-r38-property",
+   "shape": "coi_expiring_year",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions x WHERE x.field_key = 'coi_expires' AND x.value LIKE '2027-%'",
+    "params": []
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-049",
+   "text": "when does GreenEdge Landscaping's insurance expire",
+   "category": "blind-r38-property",
+   "shape": "coi_vendor",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT x.value AS v FROM extractions x JOIN extractions t ON t.document_id = x.document_id AND t.field_key = 'vendor' WHERE x.field_key = 'coi_expires' AND t.value ILIKE $1",
+    "params": [
+     "GreenEdge Landscaping"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-050",
+   "text": "Rivera Plumbing certificate of insurance expiration",
+   "category": "blind-r38-property",
+   "shape": "coi_vendor",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT x.value AS v FROM extractions x JOIN extractions t ON t.document_id = x.document_id AND t.field_key = 'vendor' WHERE x.field_key = 'coi_expires' AND t.value ILIKE $1",
+    "params": [
+     "Rivera Plumbing"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-051",
+   "text": "Clearview Glass certificate of insurance expiration",
+   "category": "blind-r38-property",
+   "shape": "coi_vendor",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT x.value AS v FROM extractions x JOIN extractions t ON t.document_id = x.document_id AND t.field_key = 'vendor' WHERE x.field_key = 'coi_expires' AND t.value ILIKE $1",
+    "params": [
+     "Clearview Glass"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-052",
+   "text": "Bright Spark Electric certificate of insurance expiration",
+   "category": "blind-r38-property",
+   "shape": "coi_vendor",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT x.value AS v FROM extractions x JOIN extractions t ON t.document_id = x.document_id AND t.field_key = 'vendor' WHERE x.field_key = 'coi_expires' AND t.value ILIKE $1",
+    "params": [
+     "Bright Spark Electric"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-053",
+   "text": "how many invoices has Handy Hands Maintenance sent us",
+   "category": "blind-r38-property",
+   "shape": "vendor_invoice_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(DISTINCT x.document_id) AS n FROM extractions x JOIN documents d ON d.id = x.document_id WHERE x.field_key = 'vendor' AND d.document_type = 'invoice' AND x.value ILIKE $1",
+    "params": [
+     "Handy Hands Maintenance"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-054",
+   "text": "how many invoices has Rivera Plumbing sent us",
+   "category": "blind-r38-property",
+   "shape": "vendor_invoice_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(DISTINCT x.document_id) AS n FROM extractions x JOIN documents d ON d.id = x.document_id WHERE x.field_key = 'vendor' AND d.document_type = 'invoice' AND x.value ILIKE $1",
+    "params": [
+     "Rivera Plumbing"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-055",
+   "text": "how many invoices has Desert Air Mechanical sent us",
+   "category": "blind-r38-property",
+   "shape": "vendor_invoice_count",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(DISTINCT x.document_id) AS n FROM extractions x JOIN documents d ON d.id = x.document_id WHERE x.field_key = 'vendor' AND d.document_type = 'invoice' AND x.value ILIKE $1",
+    "params": [
+     "Desert Air Mechanical"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-056",
+   "text": "how many units do we manage for Diana Coleman",
+   "category": "blind-r38-property",
+   "shape": "owner_units",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities p WHERE p.entity_type = 'property' AND p.merged_into IS NULL AND p.data->>'customer_name' ILIKE $1",
+    "params": [
+     "Diana Coleman"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-057",
+   "text": "how many units does Kevin Ramirez own",
+   "category": "blind-r38-property",
+   "shape": "owner_units",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities p WHERE p.entity_type = 'property' AND p.merged_into IS NULL AND p.data->>'customer_name' ILIKE $1",
+    "params": [
+     "Kevin Ramirez"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-058",
+   "text": "how many units does Aaron Navarro own",
+   "category": "blind-r38-property",
+   "shape": "owner_units",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities p WHERE p.entity_type = 'property' AND p.merged_into IS NULL AND p.data->>'customer_name' ILIKE $1",
+    "params": [
+     "Aaron Navarro"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-059",
+   "text": "how many units does Gabriel Keller own",
+   "category": "blind-r38-property",
+   "shape": "owner_units",
+   "cmp": "number",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM entities p WHERE p.entity_type = 'property' AND p.merged_into IS NULL AND p.data->>'customer_name' ILIKE $1",
+    "params": [
+     "Gabriel Keller"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-060",
+   "text": "what's the address of Miguel Duarte's property",
+   "category": "blind-r38-property",
+   "shape": "owner_address",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type = 'customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "Miguel Duarte"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-061",
+   "text": "what's the address of Nora Perez's property",
+   "category": "blind-r38-property",
+   "shape": "owner_address",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type = 'customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "Nora Perez"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-062",
+   "text": "what's the address of Tessa Perez's property",
+   "category": "blind-r38-property",
+   "shape": "owner_address",
+   "cmp": "value",
+   "oracle": {
+    "sql": "SELECT data->>'service_address' AS v FROM entities WHERE entity_type = 'customer' AND merged_into IS NULL AND data->>'customer_name' ILIKE $1",
+    "params": [
+     "Tessa Perez"
+    ]
+   },
+   "citationRequired": true
+  },
+  {
+   "id": "prop-063",
+   "text": "does Julia Lopez have a lease on file",
+   "category": "blind-r38-property",
+   "shape": "yesno_leased",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions t JOIN documents d ON d.id = t.document_id WHERE t.field_key = 'tenant_name' AND t.value ILIKE $1 AND d.document_type = 'lease-agreement') AS v",
+    "params": [
+     "Julia Lopez"
+    ]
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "prop-064",
+   "text": "does Paula Perez have a lease on file",
+   "category": "blind-r38-property",
+   "shape": "yesno_leased",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions t JOIN documents d ON d.id = t.document_id WHERE t.field_key = 'tenant_name' AND t.value ILIKE $1 AND d.document_type = 'lease-agreement') AS v",
+    "params": [
+     "Paula Perez"
+    ]
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "prop-065",
+   "text": "does Diana Jimenez have a lease on file",
+   "category": "blind-r38-property",
+   "shape": "yesno_leased",
+   "cmp": "yesno",
+   "oracle": {
+    "sql": "SELECT EXISTS (SELECT 1 FROM extractions t JOIN documents d ON d.id = t.document_id WHERE t.field_key = 'tenant_name' AND t.value ILIKE $1 AND d.document_type = 'lease-agreement') AS v",
+    "params": [
+     "Diana Jimenez"
+    ]
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "prop-066",
+   "text": "has Julia Vargas paid this month",
+   "category": "blind-r38-property",
+   "shape": "honest_late",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key ~ '(rent_paid|payment|late_fee)'",
+    "params": []
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "prop-067",
+   "text": "has Kevin Duarte paid this month",
+   "category": "blind-r38-property",
+   "shape": "honest_late",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key ~ '(rent_paid|payment|late_fee)'",
+    "params": []
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "prop-068",
+   "text": "what's our vacancy rate",
+   "category": "blind-r38-property",
+   "shape": "honest_vacancy",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key ~ 'vacan'",
+    "params": []
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "prop-069",
+   "text": "what's the weather in Tucson today",
+   "category": "blind-r38-property",
+   "shape": "honest_other",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key ~ 'weather'",
+    "params": []
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "prop-070",
+   "text": "does Bianca Lopez have a dog",
+   "category": "blind-r38-property",
+   "shape": "honest_pets",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key ~ '(pet|dog)'",
+    "params": []
+   },
+   "citationRequired": false
+  },
+  {
+   "id": "prop-071",
+   "text": "does Carlos Griffin have a dog",
+   "category": "blind-r38-property",
+   "shape": "honest_pets",
+   "cmp": "honest-zero",
+   "oracle": {
+    "sql": "SELECT count(*) AS n FROM extractions WHERE field_key ~ '(pet|dog)'",
+    "params": []
+   },
+   "citationRequired": false
+  }
+ ]
+}

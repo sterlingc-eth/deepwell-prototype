@@ -64,6 +64,12 @@ export const FIELD_SPECS = [
   // R33: a purchase order's required "vendor|customer_name" could never be met from "Vendor: Baker Distributing" —
   // there was no field to put it in, so every PO with no customer line showed "missing" forever.
   { key: 'vendor',           kind: 'text', desc: 'The business that ISSUED the document or was paid / supplied the goods or services, exactly as printed: a purchase order\'s supplier, the store or company whose name is the letterhead at the top of a receipt or bill, the seller, the payee, the landlord, the law firm, the insured on a certificate of insurance. Never our own company and never the customer.', example: 'Printed "Vendor: Baker Distributing" -> value "Baker Distributing". A receipt headed "Mesa Hardware Co." with its address under it, when that is not our own company -> value "Mesa Hardware Co.".' },
+  // Docread round (2026-10-22): the period a lease, contract, insurance policy or licence runs, and its number. Forward-looking
+  // dates (never flagged as "future"); read from labels or sentences, always with the quote they came from.
+  { key: 'start_date',       kind: 'date', desc: 'The date an agreement, lease, insurance policy or licence period BEGINS (commences, is effective, was issued).', example: 'Printed "for a term of 60 months beginning 02/10/2023" -> value "2023-02-10". Printed "Policy Effective: June 23, 2025" -> value "2025-06-23".' },
+  { key: 'end_date',         kind: 'date', desc: 'The date an agreement, lease, insurance policy or licence period ENDS or EXPIRES.', example: 'Printed "... and ending 02/09/2028" -> value "2028-02-09". Printed "Expires 2027-08-30" on a licence -> value "2027-08-30".' },
+  { key: 'license_number',   kind: 'text', desc: 'A professional, trade or business licence / certification number, exactly as printed.', example: 'Printed "License No. JP-860244" -> value "JP-860244".' },
+  { key: 'policy_number',    kind: 'text', desc: 'An insurance policy number, exactly as printed, when one policy number is labelled on its own.', example: 'Printed "Policy #: GL-1488527" -> value "GL-1488527".' },
   { key: 'permit_number',    kind: 'text', desc: 'A government or utility permit number referenced on the document.', example: 'Printed "Permit No: BP-2024-08841" -> value "BP-2024-08841".' },
   // CUSTOMER REMINDERS (2026-09-22): an internal memo, dispatch note or piece
   // of correspondence sometimes carries a forward-looking instruction for

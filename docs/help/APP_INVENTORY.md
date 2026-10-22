@@ -104,7 +104,7 @@ Surfaces: Desktop app = `deepwelltechnology.com/app`. Phone app = `deepwelltechn
 - **A-CONFLICT** "Two documents disagree on <field>": click the value that is right.
 - **A-DUP-DOC** Duplicate document: **Merge into original** (keeps the original, drops this copy).
 - **A-DUP-CUSTOMER** Duplicate customers: **Duplicate customers** panel in Inbox → Needs you (Merge into <name>, Keep separate) and Records → Customers (banner: Merge into <name>, **Not the same**, **Merge all**; whole-company **Duplicate customers** scan for admins with Undo). Merging is admin.
-- **A-AI-VERIFY** **Verify with AI** on a document not yet checked: "Verified by AI." or "Not confident enough yet — this still needs a person." Verified-by-AI shows as "AI verified".
+- **A-AI-VERIFY** **Read page & check** (formerly "Verify with AI"; it calls no AI model) on a document not yet checked: reads the page again (labels and sentences), corrects the type when the page proves it, then checks it: "Checked: the page shows everything this document needs." or "Read the page again. It does not show: {facts}. It still needs a person." Checked documents show as "AI verified".
 - **A-OPEN-ORIGINAL** **Open original** (review panel) / **Download <filename>** (preview dialog). Phone: **Open original** in the document sheet. One file at a time.
 - **A-DELETE-DOC** Delete one document: open it (Inbox → Needs you → the document), **Delete document**, then **Confirm delete** ("Delete this document? This can't be undone."). Admin only; the button is hidden from members.
 - **A-MONEY-FIX** Money on this document (invoice number, dates, Subtotal, Tax, Total, Paid, Balance due, Status): **Correct <field>**.

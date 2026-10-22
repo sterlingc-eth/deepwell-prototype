@@ -36,7 +36,9 @@ import { classifyDocumentAudience } from "./audience/store.js";
 import { extractFromText } from "./modelAvoidance/textExtract.js";
 import { isDeterministicExtractEnabled, isGenericExtractEnabled } from "./modelAvoidance/switches.js";
 // R33: a REQUIRED field the extraction left empty is looked up on the page by its printed label — see labelFill.js.
-import { planLabelFill, corroborateFields } from "./modelAvoidance/labelFill.js";
+import { planLabelFill, corroborateFields, crossCheckFields } from "./modelAvoidance/labelFill.js";
+import { verifyGrounded } from "./modelAvoidance/groundedFacts.js";
+import { retypeDecision } from "./modelAvoidance/retype.js";
 import { loadOwnNames, applyOwnCompanyGuard, isOwnName, issuerNotCustomer } from "./modelAvoidance/ownCompany.js";
 import { planStoredTextRead, NOTHING_READ_ACTION, readableChars, setNothingReadMarker, clearNothingReadMarker } from "./modelAvoidance/storedTextReread.js";
 export { reextractFromStoredText, NOTHING_READ_ACTION } from "./modelAvoidance/storedTextReread.js";
@@ -231,6 +233,19 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
   const highestPage = pages.reduce((n, p) => Math.max(n, Number(p.page_no) || 0), 0);
   let { fields, dropped } = normalizeFields(toolUse?.input?.fields, { pageCount: highestPage, pack });
 
+  // Docread round (grounding): a value the MODEL gave is trusted only when the quote it returned is on its page and the value comes
+  // from that quote. Otherwise it is kept (a person sees it) but quarantined below the automatic-check bar (confidence <= 0.6,
+  // flag 'ungrounded'), so it can never check a paper or feed an answer as a confident fact on its own.
+  let ungroundedCount = 0;
+  if (extractMethod === "model") {
+    fields = fields.map((f) => {
+      const g = verifyGrounded({ field_key: f.field_key, value: f.value, verbatim: f.verbatim, page_no: f.page_no }, selected);
+      if (g.ok) return f;
+      ungroundedCount++;
+      return { ...f, confidence: Math.min(Number(f.confidence) || 0, 0.6), flags: [...(f.flags ?? []), "ungrounded"] };
+    });
+  }
+
   // A customer_name that is only a business suffix ("Management", "Inc.",
   // "Group") is a parse fragment, not a name: never store it as an identity.
   fields = fields.filter((f) => !(f.field_key === 'customer_name' && isFragmentName(f.value)));
@@ -295,7 +310,15 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
   // override that decision.
   const existingIsDecided = classification.source !== 'explicit'
     && doc.document_type && !isLegacyOrUnknownType(doc.document_type);
-  const resolvedType = existingIsDecided ? doc.document_type : classification.documentType;
+  let resolvedType = existingIsDecided ? doc.document_type : classification.documentType;
+  // Docread round: page anchors ("CERTIFICATE OF LIABILITY INSURANCE", a licence number under a licensing board) correct the
+  // classic misfiles at upload too. Never over a decided type or an explicit override.
+  if (!existingIsDecided && classification.source !== 'explicit' && (!pack || pack.id === 'hvac')) {
+    try {
+      const rt = retypeDecision({ currentType: resolvedType, filename: doc.original_filename ?? null, pages: selected, fields });
+      if (rt) resolvedType = rt.to;
+    } catch (err) { console.error("retype at upload skipped:", err?.message); }
+  }
 
   // R33 (Sonoran Comfort Air, 2026-09-30): "Date of Service: 10/19/2028" printed on the page, "Missing information —
   // Service date" in the Inbox. Whatever the extractor (model or text) left EMPTY for a field this type requires is
@@ -328,6 +351,15 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
     if (corroborated.length) facts = Object.fromEntries(fields.map((f) => [f.field_key, f.value]));
   } catch (err) {
     console.error("corroboration failed (extraction kept as is):", err?.message);
+  }
+  // Docread verify round: the fast extractors' cost and period are checked against the totals / period readers before storing.
+  let crossChecked = [];
+  try {
+    const cc = crossCheckFields({ fields, pages: selected });
+    fields = cc.fields;
+    crossChecked = cc.removed;
+  } catch (err) {
+    console.error("cross-check failed (extraction kept as is):", err?.message);
   }
   fields = applyOwnCompanyGuard(fields, ownNames).fields;
   facts = Object.fromEntries(fields.map((f) => [f.field_key, f.value]));
@@ -563,6 +595,8 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
         fields: counts.extractions,
         replaced: counts.replaced,
         dropped: dropped.length,
+        ungrounded: ungroundedCount,
+        cross_checked: crossChecked.slice(0, 10),
         truncated,
         model: extractModelLabel,
         method: extractMethod,

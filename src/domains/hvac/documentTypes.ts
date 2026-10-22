@@ -136,6 +136,10 @@ export const FIELD_LABELS: Record<string, string> = {
   status: 'Status',
   notes: 'Notes',
   permit_number: 'Permit number',
+  start_date: 'Start / effective date',
+  end_date: 'End / expiry date',
+  license_number: 'License number',
+  policy_number: 'Policy number',
   agreement_term: 'Agreement term',
   vendor: 'Vendor',
   reminder_text: 'Reminder',
@@ -304,9 +308,13 @@ export function isVoidMarked(filename?: string | null, title?: string | null): b
   return VOID_NAME_RE.test(String(filename ?? '').replace(/\.[A-Za-z0-9]{2,5}$/, '')) || VOID_NAME_RE.test(String(title ?? ''));
 }
 
-const LABEL_AS_VALUE_RE = /^(?:(?:delivered|deliver|ship(?:ped)?|sold|bill(?:ed)?|remit|invoice[ds]?|paid|received|issued|sent|prepared|attn|attention)(?:\s+(?:to|from|by|for))?|customer(?:\s+name)?|client(?:\s+name)?|vendor(?:\s+name)?|name|payee|payer|tenant|owner|n\/?a|none|tbd|unknown|see\s+above|walk[-\s]?in(?:\s+customer)?|cash(?:\s+(?:sale|customer))?)\s*[:#.-]*$/i;
+const LABEL_AS_VALUE_RE = /^(?:(?:delivered|deliver|ship(?:ped)?|sold|bill(?:ed)?|remit|invoice[ds]?|paid|received|issued|sent|prepared|attn|attention)(?:\s+(?:to|from|by|for))?|customer(?:\s+name)?|client(?:\s+name)?|vendor(?:\s+name)?|name|payee|payer|tenant|owner|(?:service|project|job|pickup|return|delivery|drop[-\s]?off|billing|mailing|shipping|work)\s+(?:location|address|site)|project|job\s*site|premises|property|certificate\s+holder|insured|n\/?a|none|tbd|unknown|see\s+above|walk[-\s]?in(?:\s+customer)?|cash(?:\s+(?:sale|customer))?)\s*[:#.-]*$/i;
 /** A label read as a value ("DELIVERED TO", "N/A", "Walk-in") is never a party. Mirrors the server. */
+/** Docread round: a value made only of party-role words ("FUNDER GRANTEE", "OWNER MANAGER" - two column titles read as one
+ *  name) or a payment method ("Credit card" under "Paid By") is never a party either. */
+const ROLE_WORDS_ONLY_RE = /^(?:(?:funder|grantor|grantee|landlord|tenant|lessor|lessee|shop|store|consignor|consignee|owner|manager|agent|insured|certificate|holder|contractor|subcontractor|client|customer|vendor|supplier|buyer|seller|purchaser|licensee|licensor|provider|recipient|member|company|party|parties|project|site|location|address|service|job|premises|claimant|partner|alliance|firm|attorney|bill|ship|remit|sold|to|from|and|&)\s*)+$/i;
+const PAYMENT_METHOD_RE = /^(?:credit\s+card|debit\s+card|card|cash|check|cheque|money\s+order|ach(?:\s+transfer)?|wire(?:\s+transfer)?|bank\s+transfer|online(?:\s+(?:payment|gift|transfer))?|visa|mastercard|amex|american\s+express|discover|paypal|venmo|zelle|eft|in[-\s]kind)(?:\s*[#x*]+\s*\d{0,4})?$/i;
 export function isLabelValue(value: unknown): boolean {
   const v = String(value ?? '').replace(/\s+/g, ' ').trim();
-  return !v || LABEL_AS_VALUE_RE.test(v);
+  return !v || LABEL_AS_VALUE_RE.test(v) || ROLE_WORDS_ONLY_RE.test(v) || PAYMENT_METHOD_RE.test(v);
 }

@@ -42,7 +42,15 @@ export const PLAN_LIMITS = Object.freeze({
   shop:  Object.freeze({ logins: 5,    documentsStored: 100_000, pagesPerMonth: 2_000 }),
   crew:  Object.freeze({ logins: 10,   documentsStored: 500_000, pagesPerMonth: 5_000 }),
   fleet: Object.freeze({ logins: null, documentsStored: null,    pagesPerMonth: 10_000 }),
+  // Industry demo (M3-config/73 + demo/D1): free, never billed, never sold. Its own small fixed caps only stop a demo
+  // login being used as free storage; the presenter's scans are wiped by "Clear my scans" and the nightly reset.
+  demo:  Object.freeze({ logins: 2,    documentsStored: 400,     pagesPerMonth: 1_500 }),
 });
+
+/** Industry demo company (plan 'demo' AND billing_status 'demo', set only by M3-config/demo/D1 from the SQL editor). */
+export function isDemoTenantRow(tenantRow) {
+  return tenantRow?.plan === 'demo' && tenantRow?.billing_status === 'demo';
+}
 
 /** Login cap (people besides the owner) for a plan: a number, `null` for
  * Fleet (no DeepWell cap), or `undefined` when the plan is unknown/absent
@@ -170,6 +178,9 @@ export function planStateFor(tenantRow, now = new Date()) {
     return 'trialing';
   }
   if (status === 'active') return 'active';
+  // Industry demo: reads, asks and the presenter's live scans work exactly like an active plan; it is never billed and
+  // 'demo' is not in any billing_status IN ('active','trialing') listing, so digests, outreach and autopilot skip it.
+  if (status === 'demo' && tenantRow?.plan === 'demo') return 'active';
   if (status === 'past_due') return 'past_due';
   if (status === 'canceled') return 'canceled';
   return 'none';

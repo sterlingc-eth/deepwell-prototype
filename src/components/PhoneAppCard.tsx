@@ -27,7 +27,7 @@ export function PhoneAppCard() {
         alt="QR code that opens DeepWell Mobile on a phone"
         width={112}
         height={112}
-        className="w-28 h-28 rounded-md bg-white p-1 border border-line shrink-0"
+        className="hidden sm:block w-28 h-28 rounded-md bg-white p-1 border border-line shrink-0"
       />
       <div className="flex-1 min-w-[220px] space-y-2">
         <h2 id="phone-app-title" className="text-body font-medium text-ink flex items-center gap-2">

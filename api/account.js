@@ -20,6 +20,9 @@ import askSuggest from "./_lib/routes/ask-suggest.js";
 import unitAddress from "./_lib/routes/unit-address-backfill.js";
 import insights from "./_lib/routes/insights.js";
 import audience from "./_lib/audience/route.js";
+import demo from "./_lib/demo/route.js";
+import { requireAuthOrKey } from "./_lib/apiKeyAuth.js";
+import { isDemoAuth, demoAccountAllowed, sendDemoRestricted } from "./_lib/demo/index.js";
 
 /**
  * Account-level operations, behind one function — see api/v1.js for why.
@@ -53,6 +56,10 @@ import audience from "./_lib/audience/route.js";
  *                                                      document's audience, one-tap override — any
  *                                                      member — round 18, owner ask (a))
  *
+ *   GET/POST demo             -> ?action=demo      (industry demo account: status, "Clear my scans", nightly reset (cron) -
+ *                                                      see _lib/demo/route.js). Every other action below that a demo company
+ *                                                      must not use (export, delete, outreach, edits ...) answers 403 for it.
+ *
  *   GET/POST backup           -> ?action=backup    (nightly encrypted data backup + status; OFF unless DEEPWELL_BACKUP=1;
  *                                                      cron secret or platform operator only; lazy-imported)
  *   GET/POST google-sync      -> ?action=google-sync (Connected sources: Google Drive + Gmail attachments; OFF unless
@@ -71,7 +78,7 @@ import audience from "./_lib/audience/route.js";
  */
 export const config = { api: { bodyParser: { sizeLimit: "64kb" } }, maxDuration: 300 };
 
-const ACTIONS = { keys, export: tenantExport, "export-files": accountExport, delete: tenantDelete, sweep: cronSweep, merge: mergeTenant, notifications, outreach, followups, expenses, financials, graph, "entity-merge": entityMerge, naming, intake, grid, "ask-suggest": askSuggest, "unit-address": unitAddress, insights, audience, support: (q, s) => import("./_lib/support/route.js").then((m) => m.default(q, s)),
+const ACTIONS = { keys, export: tenantExport, "export-files": accountExport, delete: tenantDelete, sweep: cronSweep, merge: mergeTenant, notifications, outreach, followups, expenses, financials, graph, "entity-merge": entityMerge, naming, intake, grid, "ask-suggest": askSuggest, "unit-address": unitAddress, insights, audience, demo, support: (q, s) => import("./_lib/support/route.js").then((m) => m.default(q, s)),
   // Google Drive / Gmail sync: ships OFF. With DEEPWELL_GOOGLE_SYNC unset nothing from googleSync/ is even imported.
   // Data backup (nightly encrypted copy to a separate bucket): ships OFF. With DEEPWELL_BACKUP unset the handler answers
   // 404 / {enabled:false} and nothing else in backup/ is loaded. Cron-secret or platform operator only.
@@ -86,8 +93,16 @@ export default async function handler(req, res) {
   if (action === "health") return healthHandler(req, res);
   const target = Object.prototype.hasOwnProperty.call(ACTIONS, action) ? ACTIONS[action] : null;
   if (!target) return res.status(404).json({ error: "Unknown action", actions: Object.keys(ACTIONS) });
+  // Industry demo (ALLOW-LIST): a demo company may only call the actions named in DEMO_ACCOUNT_ALLOW (_lib/demo/index.js);
+  // everything else - including any action added later - is refused here, before the handler runs. Only for authenticated
+  // callers that are demo companies; real companies, the cron secret and the public support widget are unaffected.
+  if (!demoAccountAllowed(action, req.body?.op ?? req.query?.op, req.body)) {
+    let auth = null;
+    try { auth = await requireAuthOrKey(req); } catch { auth = null; }
+    if (auth && (await isDemoAuth(auth, { failClosed: true }))) return sendDemoRestricted(res, req);
+  }
   // maxDuration is 300s. The nightly sweep manages its own deadline and returns a partial summary, so it is excluded.
   // Export streams its own body with its own 240s budget + resume token; a 504 appended mid-stream would corrupt the file.
-  if (action !== "sweep" && action !== "export") armResponseDeadline(res, 290_000);
+  if (action !== "sweep" && action !== "export" && action !== "demo") armResponseDeadline(res, 290_000);
   return target(req, res);
 }

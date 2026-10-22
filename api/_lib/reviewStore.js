@@ -79,6 +79,7 @@
  *                       already-canonical value.
  */
 import { loadOwnNames, isOwnName } from './modelAvoidance/ownCompany.js';
+import { skipDemoAuditNoise } from './demo/auditPolicy.js';
 import { serializeClient, assertTenantUuid } from './util/pgClient.js';
 import Anthropic from '@anthropic-ai/sdk';
 import {
@@ -105,6 +106,7 @@ import {
   DOCUMENT_TYPE_DEFINITIONS,
   DOCUMENT_TYPE_IDS,
 } from './documentTypes.js';
+import { retypeDecision } from './modelAvoidance/retype.js';
 import { classifyFromText } from './modelAvoidance/textExtract.js';
 import { isDeterministicClassifyEnabled } from './modelAvoidance/switches.js';
 import { listOpenReminders, REMINDER_ELIGIBLE_DOCUMENT_TYPES } from './reminders.js';
@@ -223,6 +225,8 @@ async function withTenant(ctx, fn) {
  * subtly different shapes would be worse than one file owning the schema.
  */
 async function logAction(client, tenantId, { clerkUserId, action, resourceType, resourceId, changes }) {
+  // Industry demo companies: routine rows are not written; security entries always are (demo/auditPolicy.js).
+  if (await skipDemoAuditNoise(async (sql, params) => (await client.query(sql, params)).rows, tenantId, action)) return;
   let userId = null;
   if (clerkUserId) {
     const { rows } = await client.query(`SELECT id FROM users WHERE clerk_user_id = $1 AND ${TENANT}`, [clerkUserId]);
@@ -828,12 +832,12 @@ export async function aiVerifyDocument(ctx, { documentId }, actorClerkId) {
     // field ($0, no model — recheck.js). The Sonoran Comfort Air ticket printed "Date of Service: 10/19/2028" and this
     // button answered "Not confident enough yet"; now it finds the date, parks it as unconfirmed (far future) and
     // says exactly that. Only runs when something required is missing, so a complete document is unaffected.
+    // Docread round (2026-10-22): this button calls NO model (it never did; it was named "Verify with AI"). It is now "Read page &
+    // check": it always re-reads the page (labels, sentences, column blocks; grounded), re-judges the type from the page, then
+    // applies the automatic check. A checked document is left alone.
     let recheck = null;
-    {
-      const pre = completenessFor(normalizeDocumentType(doc.document_type), toCompletenessFields(await db.listExtractionsByDocument(documentId)));
-      if (pre.missing.length && doc.stage !== 'verified') {
-        recheck = await recheckDocumentTx(db, documentId, { actorClerkId, source: 'ai-verify' });
-      }
+    if (doc.stage !== 'verified') {
+      recheck = await recheckDocumentTx(db, documentId, { actorClerkId, source: 'ai-verify' });
     }
 
     const rows = await db.listExtractionsByDocument(documentId); // SELECT * includes corrected_value
@@ -866,8 +870,10 @@ export async function aiVerifyDocument(ctx, { documentId }, actorClerkId) {
       }
     }
 
-    const type = normalizeDocumentType(doc.document_type);
-    const completeness = completenessFor(type, completenessFields);
+    // The re-check above may have corrected the type: judge the paper as it is now.
+    const current = (await db.getDocument(documentId)) ?? doc;
+    const type = normalizeDocumentType(current.document_type);
+    const completeness = completenessFor(type, completenessFields, null, { filename: doc.original_filename ?? null });
 
     // Judged under today's rules (documentTypes.js autoCheckDecision): required facts plus the name fact, company
     // paperwork readable on page text alone, an undecided "other" with no customer or address checked on one
@@ -901,7 +907,7 @@ export async function aiVerifyDocument(ctx, { documentId }, actorClerkId) {
     const unconfirmedDates = rows
       .filter((r) => typeof r.field_key === 'string' && r.field_key.endsWith(UNCONFIRMED_SUFFIX) && (r.corrected_value ?? r.value))
       .map((r) => ({ fieldKey: r.field_key.slice(0, -UNCONFIRMED_SUFFIX.length), value: r.corrected_value ?? r.value }));
-    return { document, completeness, verified: verified || !!recheck?.aiVerified, unconfirmedDates, recheck: recheck ? { filled: recheck.filled, ambiguous: recheck.ambiguous ?? [] } : null };
+    return { document, completeness, verified: verified || !!recheck?.aiVerified, unconfirmedDates, recheck: recheck ? { filled: recheck.filled, ambiguous: recheck.ambiguous ?? [], retyped: recheck.retyped ? { from: recheck.retyped.from, to: recheck.retyped.to } : null } : null };
   });
 }
 
@@ -1203,7 +1209,9 @@ export async function resortDocuments(ctx, { afterId = null, limit = 100, dryRun
           const rows = await db.listExtractionsByDocument(d.id);
           const keys = new Set(toCompletenessFields(rows).filter((f) => f.value != null && String(f.value).trim() !== '').map((f) => f.field_key));
           const args = { currentType: type, filename: doc.original_filename, titleType: hit?.type ?? null, titleText: hit?.evidence ?? null, hrOverride, hasEquipmentFacts: keys.has('serial_number') || keys.has('model') };
-          const next = resortDecision({ ...args, humanChosen });
+          // Docread round: page anchors (COI title, licence number under a board) first, then the file-name / title rule.
+          const pagesIn = pages.map((p) => ({ page_no: p.page_no, text: p.text ?? '' }));
+          const next = retypeDecision({ currentType: type, filename: doc.original_filename, pages: pagesIn, fields: rows, humanChosen, hrOverride })?.to ?? null;
           if (next) {
             await db.updateDocument(d.id, { document_type: next });
             await db.logAction({
@@ -1303,7 +1311,9 @@ async function resortDryRun(ctx, { afterId = null, limit = 100 } = {}) {
         const hit = classifyFromText((await db.listPages(id)).map((p) => ({ page_no: p.page_no, text: p.text ?? '' })));
         const fields0 = toCompletenessFields(rows);
         const keys = new Set(fields0.filter((f) => f.value != null && String(f.value).trim() !== '').map((f) => f.field_key));
-        to = resortDecision({ currentType: type, filename: doc.original_filename, titleType: hit?.type ?? null, titleText: hit?.evidence ?? null, humanChosen, hrOverride, hasEquipmentFacts: keys.has('serial_number') || keys.has('model') });
+        void hit; void keys;
+        const pagesIn = (await db.listPages(id)).map((p) => ({ page_no: p.page_no, text: p.text ?? '' }));
+        to = retypeDecision({ currentType: type, filename: doc.original_filename, pages: pagesIn, fields: rows, humanChosen, hrOverride })?.to ?? null;
         if (!to && humanChosen) skip('type-chosen-by-person');
       }
       if (to) { out.wouldMove++; out.moves.push({ documentId: id, filename: doc.original_filename ?? null, from: type, to }); type = to; }

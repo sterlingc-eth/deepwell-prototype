@@ -604,14 +604,17 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
     if (!targetIds.length) return;
     setRecheckAllBusy(true);
     setRecheckAllMsg(null);
-    let checked = 0, fixedDocs = 0, fields = 0;
+    let checked = 0, fixedDocs = 0, fields = 0, retyped = 0, verified = 0;
     try {
       for (let i = 0; i < targetIds.length; i += 100) {
         const r = await reviewClient.recheckMissing(targetIds.slice(i, i + 100), 100);
-        checked += r.rechecked; fixedDocs += r.filled; fields += r.fields;
+        checked += r.rechecked; fixedDocs += r.filled; fields += r.fields; retyped += r.retyped ?? 0; verified += r.verified;
       }
       try { await loadGraphFromServer(); } catch { /* keep last-good data */ }
-      setRecheckAllMsg(`Re-checked ${checked} document${checked === 1 ? '' : 's'}: restored ${fields} field${fields === 1 ? '' : 's'} on ${fixedDocs}. ${Math.max(0, checked - fixedDocs)} still need a person.`);
+      // Docread round: count what actually changed (facts read, types corrected, papers now checked); "still need a person" is
+      // every re-checked paper that is not checked yet, not "re-checked minus filled".
+      const typed = retyped ? ` Corrected the type of ${retyped}.` : '';
+      setRecheckAllMsg(`Re-checked ${checked} document${checked === 1 ? '' : 's'}: read ${fields} fact${fields === 1 ? '' : 's'} from the page on ${fixedDocs}.${typed} ${verified} now complete. ${Math.max(0, checked - verified)} still need a person.`);
     } catch (e) {
       // Never show a bare "Internal server error": say what was saved and that pressing again continues.
       const raw = e instanceof Error ? e.message : '';
@@ -1294,12 +1297,16 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
     // generic "still needs a person" for a document whose only open item is "check the year".
     const fresh = useGraph.getState().docs[doc.id] ?? doc;
     const pending = unconfirmedDates(fresh);
+    // Docread round: say what the page did NOT show, instead of a generic verdict (this button reads the page; it calls no model).
+    const stillMissing = fresh.issues.flatMap((i) => (i.kind === 'missing-field' ? [requirementLabel(i.field)] : []));
     setAiMsg(
       verified
-        ? 'Verified by AI.'
+        ? 'Checked: the page shows everything this document needs.'
         : pending.length
           ? `${pending.map((p) => p.note).join('; ')}. Confirm it (or fix the year) and this document can be verified.`
-          : 'Not confident enough yet — this still needs a person.'
+          : stillMissing.length
+            ? `Read the page again. It does not show: ${stillMissing.join(', ')}. It still needs a person.`
+            : 'Read the page again. It still needs a person to confirm it.'
     );
   };
 
@@ -1432,7 +1439,7 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
           <button type="button" className="dw-btn-secondary !min-h-[40px] !py-1.5" onClick={onPreview}>Open original</button>
           {doc.stage !== 'verified' && !duplicate && (
             <button type="button" className="dw-btn-secondary !min-h-[40px] !py-1.5" onClick={() => void runAiVerify()} disabled={aiBusy}>
-              <Sparkles className="w-4 h-4" aria-hidden="true" /> {aiBusy ? 'Checking…' : 'Verify with AI'}
+              <Sparkles className="w-4 h-4" aria-hidden="true" /> {aiBusy ? 'Reading…' : 'Read page & check'}
             </button>
           )}
           {!canAdmin ? null : confirmingDelete ? (

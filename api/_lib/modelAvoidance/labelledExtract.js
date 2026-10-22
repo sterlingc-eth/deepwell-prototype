@@ -463,11 +463,17 @@ export function extractLabelled(ctx) {
   }
   if (!cand.has("agreement_term") && termEnds.length && (type === "agreement" || type === "insurance-certificate")) {
     // "Effective Date: X" + "End Date / Expiration Date: Y" = the period X - Y
-    const sD = (cand.get("service_date") ?? []).filter((c) => c.rank >= 2);
+    // Docread round (verifier, 2026-10-22): only a date printed under a PERIOD-START label starts the period. A certificate,
+    // issue or statement date beside it is the paper's own date (a COI's "Certificate Date" is not when the policy begins).
+    const TERM_START_RE = new RegExp(`(?:^|\\s)(?:${labelSrc("termStart")})\\s*[:#.-]*\\s*$`, "i");
+    const DATE_IN_LINE = /(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}|\d{4}-\d{2}-\d{2}|[A-Za-z]{3,9}\.? \d{1,2},? \d{4})/g;
+    const startLabelled = (c) => [...String(c.line?.t ?? "").matchAll(DATE_IN_LINE)].some((m) => parseDate(m[1]) === c.value
+      && TERM_START_RE.test(String(c.line.t).slice(0, m.index).split(/\s{2,}|\t|\s*\|\s*/).pop() ?? ""));
+    const sD = (cand.get("service_date") ?? []).filter((c) => c.rank >= 2 && startLabelled(c));
     const eU = [...new Set(termEnds.map((x) => x.iso))];
     if (sD.length && new Set(sD.map((c) => c.value)).size === 1 && eU.length === 1) {
       const sLine = sD[0].line, eLine = termEnds[0].line;
-      const sRaw = (sLine.t.match(/(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}|\d{4}-\d{2}-\d{2}|[A-Za-z]{3,9}\.? \d{1,2},? \d{4})/) ?? [])[1];
+      const sRaw = ([...String(sLine.t).matchAll(DATE_IN_LINE)].find((m) => parseDate(m[1]) === sD[0].value) ?? [])[1];
       const eRaw = termEnds[0].raw;
       if (sRaw) cand.set("agreement_term", [{ value: `${sRaw} - ${eRaw}`, conf: 0.9, line: eLine }]);
     }

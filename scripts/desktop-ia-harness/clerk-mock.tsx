@@ -38,6 +38,10 @@ export function useOrganization(_opts?: any) {
   } as any;
 }
 
+export function useUser() {
+  return { isLoaded: true, isSignedIn: true, user: { id: 'user_demo', primaryEmailAddress: { emailAddress: 'pat@sunrisehvac.com' }, firstName: 'Pat' } } as any;
+}
+
 export function useClerk() {
   return { signOut: async () => {} } as any;
 }

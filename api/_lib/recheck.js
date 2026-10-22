@@ -31,6 +31,12 @@ import { deriveWarranty } from "./warrantyRules.js";
 import { packForTenant } from "./industry/index.js";
 import { loadOwnNames } from "./modelAvoidance/ownCompany.js";
 import { clearNothingReadMarker } from "./modelAvoidance/storedTextReread.js";
+import { retypeDecision } from "./modelAvoidance/retype.js";
+import { COMPANY_FOLDER_FIELD_KEY, HR_FOLDER_ID } from "./companyFiles.js";
+
+/** Docread round: the audit action Sort already writes for a re-type; Re-check writes the same one (source 'recheck'), so every
+ *  move is listed with its from / to and can be put back. */
+export const RETYPE_ACTION = "review.document_resorted";
 
 export const RECHECK_VERSION = LABEL_FILL_VERSION;
 export const RECHECK_ACTION = "document.fields_rechecked";
@@ -56,9 +62,34 @@ export async function recheckDocumentTx(db, documentId, { actorClerkId = null, s
   if (pack && pack.id && pack.id !== "hvac") return { documentId, status: "pack-not-supported", filled: [] };
 
   const [pages, rows] = await Promise.all([db.listPages(documentId), db.listExtractionsByDocument(documentId)]);
-  const type = normalizeDocumentType(doc.document_type);
+  let type = normalizeDocumentType(doc.document_type);
+  // Docread round: re-judge the TYPE from the page first (a COI or licence stored as "Warranty registration" before the inbox
+  // round). Never a type a person chose (any review.document_classified row for this paper), never an HR-filed paper.
+  let retyped = null;
+  try {
+    // Verify round: a failed audit-log read counts as "a person may have chosen this type" (safe side: no re-type).
+    const classified = await db.getAuditLog({ action: "review.document_classified", resource_type: "document", resource_id: documentId }).catch(() => null);
+    const hrOverride = rows.some((r) => r.field_key === COMPANY_FOLDER_FIELD_KEY && r.value === HR_FOLDER_ID);
+    const decision = retypeDecision({
+      currentType: type, filename: doc.original_filename ?? null, humanChosen: classified === null || classified.length > 0, hrOverride,
+      pages: pages.map((p) => ({ page_no: p.page_no, text: p.text ?? "" })),
+      fields: rows.map((r) => ({ field_key: r.field_key, value: r.value, corrected_value: r.corrected_value })),
+    });
+    if (decision) {
+      await db.updateDocument(documentId, { document_type: decision.to });
+      await db.logAction({
+        clerk_user_id: actorClerkId, action: RETYPE_ACTION, resource_type: "document", resource_id: documentId,
+        changes: { from: decision.from, to: decision.to, source: `recheck:${decision.source}`, evidence: String(decision.evidence ?? "").slice(0, 200), model_calls: 0, had_fields: rows.length > 0 },
+      });
+      retyped = decision;
+      type = decision.to;
+    }
+  } catch (err) {
+    console.error(`recheck: retype skipped for ${documentId}: ${err?.message}`);
+  }
+  const filenameOpt = { filename: doc.original_filename ?? null };
   const fieldsBefore = toCompletenessFields(rows);
-  const before = completenessFor(type, fieldsBefore);
+  const before = completenessFor(type, fieldsBefore, null, filenameOpt);
   const highestPage = pages.reduce((n, p) => Math.max(n, Number(p.page_no) || 0), 0);
   const ownNames = await loadOwnNames(db, {}).catch(() => []);
   const plan = planLabelFill({
@@ -92,7 +123,7 @@ export async function recheckDocumentTx(db, documentId, { actorClerkId = null, s
 
   if (written.length) await clearNothingReadMarker(db, documentId);
   const fieldsAfter = [...fieldsBefore, ...written.map((w) => ({ field_key: w.field_key, value: w.value, confidence: plan.add.find((a) => a.field_key === w.field_key)?.confidence ?? 0.9 }))];
-  const after = completenessFor(type, fieldsAfter);
+  const after = completenessFor(type, fieldsAfter, null, filenameOpt);
 
   // A restored canonical install date is what the warranty clock runs on: same fill-only merge + derive as ingest.
   let warrantyRederived = false;
@@ -132,6 +163,8 @@ export async function recheckDocumentTx(db, documentId, { actorClerkId = null, s
       filled: written,
       ambiguous: plan.ambiguous.slice(0, 10),
       completeness_missing_before: before.missing,
+      retyped: retyped ? { from: retyped.from, to: retyped.to, source: retyped.source } : null,
+      ungrounded: (plan.ungrounded ?? []).slice(0, 10),
       completeness_missing: after.missing,
       unconfirmed: after.unconfirmed ?? [],
       warranty_rederived: warrantyRederived,
@@ -142,7 +175,8 @@ export async function recheckDocumentTx(db, documentId, { actorClerkId = null, s
 
   return {
     documentId,
-    status: written.length ? "filled" : "nothing-to-fill",
+    status: written.length ? "filled" : retyped ? "retyped" : "nothing-to-fill",
+    retyped,
     filled: written,
     ambiguous: plan.ambiguous,
     missingBefore: before.missing,
@@ -211,7 +245,7 @@ export async function recheckTenantMissing(ctx, { limit = 40, today, deadlineAt 
     return docs.filter((d) => {
       const fields = toCompletenessFields(byDoc.get(d.id) ?? []);
       const type = normalizeDocumentType(d.document_type);
-      const c = completenessFor(type, fields);
+      const c = completenessFor(type, fields, null, { filename: d.original_filename });
       // Would the automatic check pass today? Always worth a pass (it writes nothing but the verified stamp).
       if (autoCheckDecision(type, fields, { hasText: d.has_text, hasLink: d.has_link, filename: d.original_filename }).ok) return true;
       if (!force && d.already_rechecked) return false;
@@ -223,7 +257,7 @@ export async function recheckTenantMissing(ctx, { limit = 40, today, deadlineAt 
     });
   });
 
-  const summary = { scanned: 0, candidates: candidates.length, rechecked: 0, filled: 0, fields: 0, verified: 0, leftForNextRun: 0, errors: 0 };
+  const summary = { scanned: 0, candidates: candidates.length, rechecked: 0, filled: 0, fields: 0, retyped: 0, verified: 0, leftForNextRun: 0, errors: 0 };
   for (const d of candidates.slice(0, cap)) {
     if (Date.now() >= deadlineAt) { summary.leftForNextRun++; continue; }
     summary.scanned++;
@@ -231,6 +265,7 @@ export async function recheckTenantMissing(ctx, { limit = 40, today, deadlineAt 
       const r = await withTenant(ctx, (db) => recheckDocumentTx(db, d.id, { actorClerkId, source, today }));
       summary.rechecked++;
       if (r.filled.length) { summary.filled++; summary.fields += r.filled.length; }
+      if (r.retyped) summary.retyped++;
       if (r.aiVerified) summary.verified++;
     } catch (err) {
       summary.errors++;

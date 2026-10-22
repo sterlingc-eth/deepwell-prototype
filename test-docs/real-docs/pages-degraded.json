@@ -1,0 +1,875 @@
+{
+ "about": "Degraded copies of real Sonoran test documents and handwriting-style notes; page text from tesseract (stand-in for the vision transcription). gold = the facts the page states.",
+ "docs": [
+  {
+   "filename": "Ortega Invoice A86698 [photo].jpg",
+   "source": "Ortega Invoice A86698.pdf",
+   "variant": "photo",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "Invoice # A86698\n\nDate Issued\nDue 5/27/26\n\nPayment\nTerms\nAccount # 5682-73\n\nBILL To\n\nREMIT To\nBluff Creek Plumbing \u00a2 Drain Ortega Plumbin,\nAttn: Zachary Molina 673 Timber ct\n6007 E Heritage Rd Queen Creek\nGilbert, az 85280\n\n3 Supply Lic\n\n\u00bb AZ 85115\nItem # Item\n\nct Unit Price\nOR-3744 Kitchen faucet, Single handle\n\nOR-2706 pry 3/4 in with gauge\nOR-3161\n\nHose bib frost-free 10 in\nOR-2763\n\nToilet flapper kit\n\nSub Tot\n\nTax (7.8%\n\u2014\u2014\u2014\u2014$_$___* {7.8%\nTotal Amount\n\nal\n\nQuestions? Cail 928.555.0167\n\n"
+    }
+   ],
+   "gold": {
+    "invoice_number": "A86698",
+    "service_date": "2026-04-27",
+    "customer_name": "Bluff Creek Plumbing & Drain",
+    "vendor": "Ortega Plumbing Supply LLC",
+    "cost": "1579.59"
+   },
+   "partyAnyOf": null
+  },
+  {
+   "filename": "Ortega Invoice A86698 [lowres].jpg",
+   "source": "Ortega Invoice A86698.pdf",
+   "variant": "lowres",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "Ortega Plunibing \u2018Supply: LLC *\n\nan ingeupe\nJoxanpie.cott\n\nHL * \u2018 INVOICE\nvinvoite.# 86698 Date Ieguea 4/21/26 |\nDue  BARTI26 \u2018Paytbent, Net \u201c40. i\n{ oan i ferns i\n|adcount # 3682:73, 3 i\naTLL 70 . \u201cee niet 10.\" aa\nBluf\u00e9 Creek Plumbing 's Drain ortega Plumbing sipply. Lic\netn: dachary Molina 673 Timber \u2018ct\n6007 .E Heritage Rd \u201c \u2018Queen 'Creak, AZ 85: .\nGitbert, Az 85280 : ,\nItem\u2019 # | Tem te Woof gt unit\u2019 price\u201c  \u2018potal\n@a-3744. Kitchen faucet, single\u2019 handle : 6 $113-00 $744.00\nOR+2706, \"PRV 3/4 in with \u2018gauge . 7, \u00a3 $9400\" \u201d'$85B,00\n\u201cOk-316] -\u201cHog\u00e9 bE frost-fre\u00e9 10 in . x. & $$26.50 .\u00b0 979.50\nOR:2763 oitet flapper kit)... 2 \u2018$6.90 |.\" $13.80\",\n\nshlg : Sub! tata $hiaes.j0\n- Sek Tax\u2019 (7.84) #ird.29\n\na8 Total Amount\u2019. *\u201d | $1,579.59 :\n\n"
+    }
+   ],
+   "gold": {
+    "invoice_number": "A86698",
+    "service_date": "2026-04-27",
+    "customer_name": "Bluff Creek Plumbing & Drain",
+    "vendor": "Ortega Plumbing Supply LLC",
+    "cost": "1579.59"
+   },
+   "partyAnyOf": null
+  },
+  {
+   "filename": "Ortega Invoice A86698 [skew].jpg",
+   "source": "Ortega Invoice A86698.pdf",
+   "variant": "skew",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": ""
+    }
+   ],
+   "gold": {
+    "invoice_number": "A86698",
+    "service_date": "2026-04-27",
+    "customer_name": "Bluff Creek Plumbing & Drain",
+    "vendor": "Ortega Plumbing Supply LLC",
+    "cost": "1579.59"
+   },
+   "partyAnyOf": null
+  },
+  {
+   "filename": "Jacobs INV-21004 [photo].jpg",
+   "source": "Jacobs INV-21004.pdf",
+   "variant": "photo",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "EEE\u201c\n\nJacobs Tax Research\nPublishing Company\n\nInvoice Number\n\nINV-21004 Date Issued Dec 21, 2025\n\nPayment Due Jan 20, 2026 Pay Terms Net 30\nAccount # 70748\n\nBILL To\n\nLarkspur Ledger Bookkeeping & Tax, Lic\n\nAttn: Samuel Graves\n\n3655 Ironwood Pkwy\n\nSuite 357\n\nTempe, AZ 85200\n\nlem / Description\n\nUpdate Service\n\nQuantity Unit Price Amount\n\n1 $29.00 $29.00\n1 $98.00 $98.00\n\nTax research library - Monthly\n\n$127.00\n\n"
+    }
+   ],
+   "gold": {
+    "invoice_number": "INV-21004",
+    "service_date": "2025-12-21",
+    "customer_name": "Larkspur Ledger Bookkeeping & Tax, LLC",
+    "cost": "127.00"
+   },
+   "partyAnyOf": [
+    "Larkspur Ledger Bookkeeping & Tax, LLC",
+    "Jacobs Tax Research Publishing Company"
+   ]
+  },
+  {
+   "filename": "Jacobs INV-21004 [lowres].jpg",
+   "source": "Jacobs INV-21004.pdf",
+   "variant": "lowres",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "Jacobs Tax Research ee gaan\n\n~Publishing:Company. a les ai\n\nINVOICE\n\n|tnvoles Number\" INV-2f008 an Bate Isstied Dec 2}, 205\nPayment Due san 20: 2026. Pay Terms \u2018Net 30 z\nAccount # Tora Q z a\n\nBue TS \"\n\nLarkspur Ledger Bookkeeping & Tax, LLC\natin: Samuel Graves\n\n3556 lrorwgod Pkwy\n\nSuite 357 q ~\n\n\u2018Tempe, AZ'85200 5 4\n\nItem Beseription Quantity Unit Price Amount\n\nUpdate wervice 1 $29.00.\" $29.00\n\nTax iwsearch lbfary : monthly : E 1 oe00 $88.90.\n* Total Amount $137.00\n"
+    }
+   ],
+   "gold": {
+    "invoice_number": "INV-21004",
+    "service_date": "2025-12-21",
+    "customer_name": "Larkspur Ledger Bookkeeping & Tax, LLC",
+    "cost": "127.00"
+   },
+   "partyAnyOf": [
+    "Larkspur Ledger Bookkeeping & Tax, LLC",
+    "Jacobs Tax Research Publishing Company"
+   ]
+  },
+  {
+   "filename": "Jacobs INV-21004 [skew].jpg",
+   "source": "Jacobs INV-21004.pdf",
+   "variant": "skew",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": ""
+    }
+   ],
+   "gold": {
+    "invoice_number": "INV-21004",
+    "service_date": "2025-12-21",
+    "customer_name": "Larkspur Ledger Bookkeeping & Tax, LLC",
+    "cost": "127.00"
+   },
+   "partyAnyOf": [
+    "Larkspur Ledger Bookkeeping & Tax, LLC",
+    "Jacobs Tax Research Publishing Company"
+   ]
+  },
+  {
+   "filename": "Receipt R-2026-1028 Mercer [photo].jpg",
+   "source": "Receipt R-2026-1028 Mercer.pdf",
+   "variant": "photo",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "Harborlight Neighbors Alliance\n\n7714 N Aspen Way\nSuite 363\nTacoma, WA 98483\narborlightneighborsallliance.example.com | www harbortightne ghbor\nA501(c)(3) pub\n\nServing Pierce County ta cr\nDONATION RECEIPT\nDate Received Mar 3, 2026\n\nReceipt # R-2026-1028\nMethod Online gift Designation Unrestricted - general operations\nPledge Ref. PL-2026-021\n\nsalliance.example\n\nTel (360) 555-0176 | office@h:\n\nRECEIVED FROM\nLucia Mercer\n\n3675 N Summit Way\nTacoma, WA 98425\n\nAmount Received USD 250.00 :\n\nNo goods or services were provided in exchange for this gift. Harborlight Neighbors Alliance is a tax-exempt\n\norganization under section\n\n501(c)(3). Please keep this receipt for your tax records.\n\n"
+    }
+   ],
+   "gold": {
+    "invoice_number": "R-2026-1028",
+    "service_date": "2026-03-03",
+    "customer_name": "Lucia Mercer",
+    "vendor": "Harborlight Neighbors Alliance",
+    "cost": "250.00"
+   },
+   "partyAnyOf": null
+  },
+  {
+   "filename": "Receipt R-2026-1028 Mercer [lowres].jpg",
+   "source": "Receipt R-2026-1028 Mercer.pdf",
+   "variant": "lowres",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "\" Harborlight Neighbors Alliance :\n4 Aen Way,\nuo 9,\nee\n\nDONATION RECEIPT.\n\nReceipt # R-2026.1028 .~ Date Received \u00abMar 9, 2028\n\n' Method \u201c: Onliie gift Designation\u2019 \u2018Unrestricted - general operations\u201d\nPledge Ret. PL-2026-021 \u201c \u2019\n\nR\u00e9ceveD From - %\n\nLucta Mercer. .\n\n9675 N Summit Way\nTacoma, WA 98425\n\nJ \u2018Amount Received USD 250.00\n\n* No goods'or services indie pidvided in exchange tor this gift. Harborlight Neighbors Alliance Is a tax-exerhpt\n\n\u2018rganization under section 501(c}(3). lease keep this'receipt {or your tax records:\n\nPraga\n"
+    }
+   ],
+   "gold": {
+    "invoice_number": "R-2026-1028",
+    "service_date": "2026-03-03",
+    "customer_name": "Lucia Mercer",
+    "vendor": "Harborlight Neighbors Alliance",
+    "cost": "250.00"
+   },
+   "partyAnyOf": null
+  },
+  {
+   "filename": "Receipt R-2026-1028 Mercer [skew].jpg",
+   "source": "Receipt R-2026-1028 Mercer.pdf",
+   "variant": "skew",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "Harborlight Neighbors Alliance\n\u201cecw 2089\nNA gga nnnct z\n\nat (e)(@) public char\nAON ey tation sce 1\n\nexample.com\n\n"
+    }
+   ],
+   "gold": {
+    "invoice_number": "R-2026-1028",
+    "service_date": "2026-03-03",
+    "customer_name": "Lucia Mercer",
+    "vendor": "Harborlight Neighbors Alliance",
+    "cost": "250.00"
+   },
+   "partyAnyOf": null
+  },
+  {
+   "filename": "Lease - Suite 300 (signed) [photo].jpg",
+   "source": "Lease - Suite 300 (signed).pdf",
+   "variant": "photo",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "OFFICE LEASE AGREEMENT\n\nSuite 300, 4305 N Laurel Dr, Unit 376, Raleigh, NC 27607\n\nLANDLORD TENANT\n\nEscobar Realty Partners LLC Whitfield Marsh Law Group, PLLC\nAttn: Marisol Herrera 4305 N Laurel Dr\n\n3558 Orchard Rd Unit 376\n\nRaleigh, NC 27685 Raleigh, NC 27607\n\n1. Premises and Term\nLandiord leases to Tenant Suite 300, containing approximately 3,028 rentable square feet, for a term of 60 months\nbeginning 2024-05-13 and ending 2029-05-12.\n\n2. Rent\n\nTenant shall pay monthly base rent of USD 8,313.00, payable in advance on the first day of each month, increasing 3%\neach year on the anniversary date. Tenant also pays its pro rata share of operating expenses and taxes above the\nbase year.\n\n3. Security Deposit\n\nTenant has deposited USD 16,626.00 as a security deposit, refundable within 30 days after the end of the term less\nlawtul deductions.\n\n4. Use and Parking\n\nTenant shall use the Premises solely as a law office. Tenant is allotted twelve unreserved parking spaces. Tenant shall\nmaintain client files and confidential materials in secure locations.\n\n5. Renewal\n\nTenant has one option to renew for 60 months at the then-prevailing market rate by written notice delivered at least 210\ndays before expiration of the term.\n\n6. Early Termination and Default\n\nTenant may terminate after month 36 on 90 days written notice with payment of unamortized leasing costs. Landlord\nmay terminate for uncured monetary default after ten days\u2019 notice.\n\n7. Insurance and Indemnity\n\nTenant shall carry commercial general liability insurance of not less than $1,000,000 per occurrence and shall\nindemnify Landlord against claims arising from Tenant's use of the Premises.\n\n8. Miscellaneous\n\nThis Lease is governed by North Carolina law and may be amended only in writing signed by both parties.\n\nTenant: Whitfield Marsh Law Group, PLLC Date:\n\n"
+    }
+   ],
+   "gold": {
+    "agreement_term": "60 months (2024-05-13 - 2029-05-12)",
+    "start_date": "2024-05-13",
+    "end_date": "2029-05-12",
+    "vendor": "Escobar Realty Partners LLC",
+    "customer_name": "Whitfield Marsh Law Group, PLLC"
+   },
+   "partyAnyOf": null
+  },
+  {
+   "filename": "Lease - Suite 300 (signed) [lowres].jpg",
+   "source": "Lease - Suite 300 (signed).pdf",
+   "variant": "lowres",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "OFFICE LEASE AGREEMENT Je\n\u2018Suite 800, 4308 N'Laure! Dr: Unit 376:-Raleigh, NC 27807 :\ntain.on vei :\n\nEscobar Realty Partners LLC \u2018Whitfigid Marsh Law Group, PLLC\nAttn: Marisol Herrera 4305 N.Laurel Dr ;\n\n\u2018 9888-Orchard Rd . : : Unit 376.\nRaleigh, NC 27685 Raleigh, NO.27607, \u2018\n\n1. Premises and Term. ;\nLandlord leases 1 Tenant Suite 300, ccataining approximately 3,028 rentable square feet, for-a term of 69-months\nbeginning 2024-05-13 and ending 2029-05-12.\n\n2.Rent\n\nTenant shall pay monthiy base rent of USD 8,31300, payable in advance\u2019on the first day of each\u2019month, incieasing 3%\n\u2018each year on the anniversary date. Tefant also:pays.its pro rata share of operaling experises and taxeb above ihe.\n; fade year. . :\n\n3:'S\u00e9eurrity. Deposit\n\n\u201cTena has deposited USD 16,628.00-as'a-securty deposi, \u2018refundable within 30 days after the eng of the term fess\nlawful d\u00e9ductions. :\n\n4; Use and Parking .\n\u201cTenant sha usestie Prefhises solely asa law bcd. Tenant is alloted tWeive Unreservad parking shaces. Tenant sal\nteihtaln client files and confidential rriaterials in-secure focaiions, .\n\n5. Renewat :\n\nTTenarit has one option t\u00e9 renew for 60 months at the then\u2018prevalling iparkst raie.hiy writen'n\u00e9tice delivered at feast 210\n\u2018gays betore expiration of the term. :\n\n6. Early Termination and Default\nTenant thay triinate alter moth a6 on 90.days witten notice with payment 6 unainonized easing costs, Larord\nmay terminate far uncur\u00e9d monetary default alter ten days\u2019 natica.,\n\n7 \\Wisurahee and iridemnity . :\n\u2018Tenant Shall. carry. commercial general liability insurance of not jess than $1,000;000 per docurience and shail \u00ab*\nInderity Landord against claims acing rom Tenants use of te Premises.\n\n8; Mis\u00e9ellaneous 2\nThig Lease is governed by North Cafdliria law and may-be. amended only in writing signed by both parties.\n\nLandjord: Escobar Reaty-Partners LLG: Dato:\n\n\u2018Tenant wri Marth Law Grip PLLC \u201cDato\n"
+    }
+   ],
+   "gold": {
+    "agreement_term": "60 months (2024-05-13 - 2029-05-12)",
+    "start_date": "2024-05-13",
+    "end_date": "2029-05-12",
+    "vendor": "Escobar Realty Partners LLC",
+    "customer_name": "Whitfield Marsh Law Group, PLLC"
+   },
+   "partyAnyOf": null
+  },
+  {
+   "filename": "Lease - Suite 300 (signed) [skew].jpg",
+   "source": "Lease - Suite 300 (signed).pdf",
+   "variant": "skew",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "OFFICE LEASE AGREEMENT\nSuite 300, 4305 N Laurel Dr. Unit 376, Raleigh, NC 27607\nLANDLORD\nEscobar Realty Partners LLC\nHerrera\n\n4, Premises and Term\n\n"
+    }
+   ],
+   "gold": {
+    "agreement_term": "60 months (2024-05-13 - 2029-05-12)",
+    "start_date": "2024-05-13",
+    "end_date": "2029-05-12",
+    "vendor": "Escobar Realty Partners LLC",
+    "customer_name": "Whitfield Marsh Law Group, PLLC"
+   },
+   "partyAnyOf": null
+  },
+  {
+   "filename": "MOU - Beacon (Youth) [photo].jpg",
+   "source": "MOU - Beacon (Youth).pdf",
+   "variant": "photo",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "MEMORANDUM OF UNDERSTANDING\nHarborlight Neighbors Alliance and Beacon Community Church\nPARTNER ALLIANCE\nBeacon Community Church Harborlight Neighbors Alliance\nAttn: Laura Burke 7714 N Aspen Way\n4706 S Sunrise Dr Suite 363\nTacoma, WA 98485 Tacoma, WA 98483\n\nThis Memorandum of Understanding (MOU) sets out how Beacon Community Church and the Alliance will work\ntogether on the Youth Tutoring Collaborative from 27 Jan 2026 through 26 Jan 2028. It is a statement of\ncooperation and does not create a binding obligation to pay money.\n\n1. Responsibilities of the Partner\n\nThe Partner will make its space available for the program for 10 hours per week, will designate one staff or\nvolunteer liaison, will help publicize the program to the families and residents it serves, and will keep the space\nclean and safe.\n\n2. Responsibilities of the Alliance\n\nThe Alliance will provide program staff and trained volunteers, food and supplies, and liability insurance for the\nprogram, will keep attendance records, and will share summary results with the Partner at the review meeting on\n27 Jul 2026.\n\n3. Privacy\nEach party will keep personal information about participants confidential and will share it only as needed to run\nthe program. Neither party will use participant information for fundraising without written permission.\n\n4. Term and Ending This MOU\nThis MOU begins 27 Jan 2026 and ends 26 Jan 2028 unless extended in writing. Either party may end it on 30\ndays written notice.\n\n5. Independent Parties\n\nThe parties are independent organizations. Neither is the agent or employee of the other, and each is responsible\nfor its own staff, volunteers and insurance. No money passes between the parties under this MOU; any in-kind\nsupport will be recorded separately.\n\nFor the Partner: Laura Burke Date: For the Alliance: Marguerite Hale Date:\n\n"
+    }
+   ],
+   "gold": {
+    "start_date": "2026-01-27",
+    "end_date": "2028-01-26",
+    "agreement_term": "27 Jan 2026 - 26 Jan 2028"
+   },
+   "partyAnyOf": [
+    "Beacon Community Church",
+    "Harborlight Neighbors Alliance"
+   ]
+  },
+  {
+   "filename": "MOU - Beacon (Youth) [lowres].jpg",
+   "source": "MOU - Beacon (Youth).pdf",
+   "variant": "lowres",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "MEMORANDUM OF UNDERSTANDING\nHarborlight Neighbors Alliance and Beacori.Gegimunlty Church\n\nPARTNER\u2019. \u2018ALLIANCE * ale\nBeacon Corhmuhity Church Harborlight Neighbors Ailian\n\n\u2018Aun: Laura Burke: 7714 N-Aspen Way\n\n4706 S \u2018Sunrise Dr Suite 963. -\n\nTacoma, WA 98485 Tacoma, WA 98483 :\n\nThis\u2019 Memorandum of Uriderstandiig (MOU}s\u00e9ts out hew Beacon Community. Church and the Alliance will work\u2019\ntogether oi the Youth Tutoring Collaborative from, 27-Jan 2026 through 26.Jan 2028. Itis a Statement of\n\u2018eaoperation and does not \u00a2reate\u2019a binding obligation to pay money. : :\n\n1. Responsibilities of the Partner.\n\n\u2018The Parthet will make its space available for the program for 10, hours'pier week will designate one staff or\nvolunteer liaison, will hei publicize the program to the families and residents it serv\u00e9s, anc will Keep the space\nclean and safe. -!\n\n2. Respansibilities of the Alliance : i\n\n\u2018The Alliance. will provide program staff and trained volunteers, food and \u2018supplies, and liability insurance for the\nprogram, wil keep atindarice records: and wil share Summary results with the Partnef at the review.m\u00e9eting on\n27 Jul 2026,\n\n3. Privacy \\\n\nEach panty will keep personal information about participants cantidential:anc.will shar\u00e9 it only as-neteded to.run.\nthe propre Nether Barty wil ue pericipantiforinaton for uncraling without watien permission.\n\n4. Term and Ending This MOU 2\nThis MOU begins 27 Jan 2026 and ends 26 Jan 2028 unless extended in thi, Ether party ay end it on 90\ndays writt\u00e9n fatice.\n\n\u201c5:Independent Parti\u00e9s\n\u201cThe parties are Independent organizations. Nether is theagent or employee of the other, and each is responsible\n\n* or its wn staff, volunteers and ingurarice. Na rhoney passes between the:parties under this MOU; any in-kind\nsuipport wil ie recorded Separately,\n\nFor the Partner: Caura Burke \u201cDate: , Forthe Allance: Matayerio\u2018Hale, Date: :\n"
+    }
+   ],
+   "gold": {
+    "start_date": "2026-01-27",
+    "end_date": "2028-01-26",
+    "agreement_term": "27 Jan 2026 - 26 Jan 2028"
+   },
+   "partyAnyOf": [
+    "Beacon Community Church",
+    "Harborlight Neighbors Alliance"
+   ]
+  },
+  {
+   "filename": "MOU - Beacon (Youth) [skew].jpg",
+   "source": "MOU - Beacon (Youth).pdf",
+   "variant": "skew",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "AND!\nacon Community Church\n\nMEMORANDUM oF U\nHarbortight Neighbors Alliance and Be:\n\nnt Alliance\n7714 N Aspen Way\nSuite 363\n\u201cTacoma, WA 98483\nAiance will work\n\nnrise OF\ncommunity Church and\nty Crs. his a statement \u00a9\n\nLaura Burke Date: For the Alliance\u2019 Margut\n\nFor the Partner:\n\n"
+    }
+   ],
+   "gold": {
+    "start_date": "2026-01-27",
+    "end_date": "2028-01-26",
+    "agreement_term": "27 Jan 2026 - 26 Jan 2028"
+   },
+   "partyAnyOf": [
+    "Beacon Community Church",
+    "Harborlight Neighbors Alliance"
+   ]
+  },
+  {
+   "filename": "Consignment Agreement - Little Kiln Studio II [photo].jpg",
+   "source": "Consignment Agreement - Little Kiln Studio II.pdf",
+   "variant": "photo",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "3. Pricing and Display\nThe Consignor sets the retail pri\n\n4. Commission and Payment\nWhen an item sells, the Consi\n\n6. Quality, Taxes and Legal Compliance\nThe Consignor represents that the\n\nby the laws of Tennessee\n\nSchedule of Consigned Items\nHand-thrown mugs\n\n$28.00\n\nFramed prints\n\n$85.00\n| Serving bowls |\n\n$38.00\n\n\u2014\u2014\n"
+    }
+   ],
+   "gold": {
+    "agreement_term": "11/18/25 - 11/17/26",
+    "start_date": "2025-11-18",
+    "end_date": "2026-11-17"
+   },
+   "partyAnyOf": [
+    "Juniper Lane Mercantile",
+    "Daniel Abbott",
+    "Little Kiln Studio II"
+   ]
+  },
+  {
+   "filename": "Consignment Agreement - Little Kiln Studio II [lowres].jpg",
+   "source": "Consignment Agreement - Little Kiln Studio II.pdf",
+   "variant": "lowres",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "CONSIGNME! Tr AGREEMENT\n\nCA2025.06\nsive coNsGNOR\nJuniper Lane Mercantile . Daniel Abbott\n5243 E Copper Ct 20 2M6Vita Phy\n\n1S Franklin, TN 37052: :\n_FrankliiFN.37040 iis) sss-o1is\n\ndaniel abbott @ekampla. com :\n\nAgreement No. -CA-2\nAbbot, dog Busin\u00e9ss-as Litde Kiln Studio I,the Contignes), The Consigiar wie the Shop jo dsplay\u2019an\ngoods listed on the Schedule of Consigned tems, ..\n\n5-06. The Cousigmient Agecemyot is made betwee Iiniper tne: Mercantile (ibe Shop) and Daniel\nd sell the Handmade,\n\n1,\u2019Rerm : : \u00a7\nTaig Agreement begins 11/18/25 and ends 11/17/26. It feneivs for Successive thr\u00e9e-micinth-periods ures either party Rives written\nnotice at Teast thirty dayd before ibe, end of the aben-carreni, peried. Either party muiy end this Agreement earligy On thtity days\n\u2018writen totige 3 .\n\n2, \u2018Title and Risk of Loss \u2014 \u2018\n\n\u201cThe ssi gos rata he eoperty oft Cans ung Po Shop Wil pay thei ity esculenta\nsales sen. The Shop a epofue a oks came BY fre Who msgs: bene, gods eros ok danse by\nemployer while nthe Shops nod, the Shop lt pe the Conic Oo he ret prc. The Conslnor shoul! sure tie\nrods othe Ceniptoun expos, : : :\n\n3. Pricing and Display\n\u2018The Consigior sats the reall price ofeach item, shown fn the Schedule. Price-changes.muit bE requested in write. The Shop tay\nmark items down by\u2019 up to twenty, per\u00e9ent dri Sore-wide promotions, said the Consignor\u2019 share is then \u00a2aleukited sn the actual\nSein price. The Sp deciles pisement ond hay rotatetems :\n\n4 Commission and Payment \")! 5\n\nWhen. stem-sci the Consignor feceves 655 telling price hefore gsi tax and the Shop keups 35%. The, Stop wil send i\nWritten statemnent of sales and pay the smomit due By the, 15th of eich ionth Yar sales in the prior month, by check: IF the amount;\n\u2018diieiv les than\u2019 $25, the Shop may cariy it forward to the next month, .\n\n5, Delivery; Inventory and Unsoid Goaids \u00a5\n\u2018he Connor wt ener igs clean, nisi, labeled and ready a ply! The\u2019 Stop wil gpa record of every Hem reels\nand wil give'the Consigioea'signed copy. lisms unsold athe end of ihe Ascent must be picked-up withip 30 daysafier the eid\n\u2018due; iter Yh the Shop may donate th\u00e9m io charity pr sisposg of ther.\n\n6: Quality, Tax\u00e9s and, Legal Compliance s\n\u201cTlie Consignpr repfesents thst the goods re the Consignor's own original work, donot infringe aayone\u2019 rights nd faget Alf safety\n\u2018and labling las, including labeling for'sqaps ant! Food: contact-goods. The\u2019 Shop collsets ad. remits sales tax on hetall sales\u201d The\n\u2018Consignor is an independent business and is responsible-for'its own ifcoms taxes,\n\n7..Generai\n\u2018TAs ip she cite\u2019 agregunvet abi the consigned gosds anil may Be chaiged only in writing signed by both\u2019 paris, tk i'gdyerbed\nby the fiw of Tichiessee,\n\n\u2018Setvedul\u00e9 of Cousigned! Items. a 5 Tea Price Each,\nHaind-throwee muss oo, 328.00 x\nFramed prints 7 $25.00\n\n\u2018Serving bowls & $38.00\n\n"
+    }
+   ],
+   "gold": {
+    "agreement_term": "11/18/25 - 11/17/26",
+    "start_date": "2025-11-18",
+    "end_date": "2026-11-17"
+   },
+   "partyAnyOf": [
+    "Juniper Lane Mercantile",
+    "Daniel Abbott",
+    "Little Kiln Studio II"
+   ]
+  },
+  {
+   "filename": "Consignment Agreement - Little Kiln Studio II [skew].jpg",
+   "source": "Consignment Agreement - Little Kiln Studio II.pdf",
+   "variant": "skew",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": ""
+    }
+   ],
+   "gold": {
+    "agreement_term": "11/18/25 - 11/17/26",
+    "start_date": "2025-11-18",
+    "end_date": "2026-11-17"
+   },
+   "partyAnyOf": [
+    "Juniper Lane Mercantile",
+    "Daniel Abbott",
+    "Little Kiln Studio II"
+   ]
+  },
+  {
+   "filename": "COI - Hendrix 2025 [photo].jpg",
+   "source": "COI - Hendrix 2025.pdf",
+   "variant": "photo",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "CANYON INSURANCE AGENCY COMPANY\n\nHarbor St, Unit 303, Tempe, AZ 85229 | Tel 602-555\n\nCERTIFICATE OF LIABILITY IN\n\nRANCE\n\nof inform:\nCertificate Date: December 8, 2025 Insurer: Palo Alto Desert Mutual\nPolicy Effective: December 13, 2025 Policy Expires: December 13, 2026\n\nCERTIFICATE HOLDER\n\nINSURED\nHendrix Drywall LLC Cardinal Ridge Construction\n2328 Summit St 3860 S Windmill St\nBldg 164 Suite 368\nGilbert, AZ 85269\n\nPhoenix, AZ 85090\n480-555-0120\n\nAmount\n\nEffective\n\nDecember 13,\n2025\n\nPolicy #\nGL-2316913\n\nCoverage\n\nEach occurrence $1,000,000.00\n\nCommercial General December 13,\n2026\n\nLiability\n\na\n$2,000,000.00 |\n\nGeneral aggregate\n\n$1,000,000.00\n\nCombined single\nlimit\n\nDecember 13,\n2026\n\nDecember 13,\n2025\n\nCA-3070482\n\nAutomobile Liability\n\nDecember 13, | Each accident $500,000.00\n\n2026\n\nDecember 13,\n2025\n\nWC-7076055\n\nWorkers Compensation\n\ng services on projects of the certificate holder. Additional insured status is not\n\nDrywall contractin;\n\nDescription of operations:\nshown on this certificate.\nShould any of the above policies be cancelled before the expiration date, notice will be delivered in accordance with the\n\npolicy provisions.\n\n"
+    }
+   ],
+   "gold": {
+    "start_date": "2025-12-13",
+    "end_date": "2026-12-13"
+   },
+   "partyAnyOf": [
+    "Canyon Insurance Agency Company",
+    "Palo Alto Desert Mutual",
+    "Hendrix Drywall LLC",
+    "Cardinal Ridge Construction"
+   ]
+  },
+  {
+   "filename": "COI - Hendrix 2025 [lowres].jpg",
+   "source": "COI - Hendrix 2025.pdf",
+   "variant": "lowres",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "\u2018iss catiyonincurahceageney company example-wontt\n\nCERTIVICATE OF LIABILITY INSURANCE\n\nied us a matter of informaiton only\n\nCerificate Date:\nPolicy Effective: December 13,\n\niber 8, 2025. Insurer: Pito\u2018Alto Desert Muti\nPolicy Expires: -Depemiber 13/2026\n\nANSURED, CERTIFICATE HOLDER\nHendrix Deywall LUC Catidinal Ridge Construction\n2328 Susiimit Si : 3860) $ Windmill St\nBldg 164 % Suite 368\nPhoenix, AZ 85096, Gilbert, AZ'85269\n480-555-0120\n\u2018Coverage -' *[Potiey'# | Ettective [Expires 5 \u2018Amount\n| Cimmereial General,\u201d :| GL-2316013 + | December 13;, | December 13, | Each osebirence $1,000,000.00\nLiability, 2 : 20s 2024 i\ni : General agistizace $2,000,000,00\nAutomobile Liability.\u201d | CA-3070482\u00b0 \"| December.19, |:Deceraber 13,\" | Cambined single '$1,000,000.00\nos 2 2026 lirit 2\naccident $500,000.00 -\n\n\u2018Workers Compensation .-|: WC-7076055: | December 13,\n: : 2025\n\nDescription of operations: Drywall gontriicting service\u2019 on projects of the certificate holder, Additional insured stats is not\nshowin on this certificate,\n\n\u2018Stioukd \u2018aij of the abave policies be\npolicy: provisions,\n\nyelled \u2018before the-expin\n\njee Will be delivered in aecordance with the:\n\n"
+    }
+   ],
+   "gold": {
+    "start_date": "2025-12-13",
+    "end_date": "2026-12-13"
+   },
+   "partyAnyOf": [
+    "Canyon Insurance Agency Company",
+    "Palo Alto Desert Mutual",
+    "Hendrix Drywall LLC",
+    "Cardinal Ridge Construction"
+   ]
+  },
+  {
+   "filename": "COI - Hendrix 2025 [skew].jpg",
+   "source": "COI - Hendrix 2025.pdf",
+   "variant": "skew",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "Tempe, AZ 8595\n\"cycompany.exan,\n\n9 | Tel 602\nnple.com\n\nCertificate Date;\nPolicy Effective:\n\nInsurer; Palo Alto Desert Mutual\nPolicy Expires; December 13, 2026\nINSURED CERTIFICATE HOLDER\nHendrix Drywall LLC Cardinal Ridge Construction\n2328 Summit 5; 3860 \u00a7 Windmit, St\nBldg 164\nPhoenix, AZ 85090\n480-555.0199\n\nDescription OF ope, Vices on Projects of the Certificate holder, Additiona} insured Slatus is noy\nShown on this cert}\nShould any Of the above Policies be cancelled bet\n\nPolicy PlOVisions,\n\nTations: Drywa\nficate,\n\naccordance With the\n"
+    }
+   ],
+   "gold": {
+    "start_date": "2025-12-13",
+    "end_date": "2026-12-13"
+   },
+   "partyAnyOf": [
+    "Canyon Insurance Agency Company",
+    "Palo Alto Desert Mutual",
+    "Hendrix Drywall LLC",
+    "Cardinal Ridge Construction"
+   ]
+  },
+  {
+   "filename": "Receipt R-20131 [photo].jpg",
+   "source": "Receipt R-20131.pdf",
+   "variant": "photo",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "Juniper Lane Mercantile\n\nSALES RECEIPT\n\nReceipt #: R-20131 Date Issued: 10/11/2025\n\nTime: 10:33 PM Cashier: Gabriel Ochoa\n\nRegister: Reg | Method: Debit card\n\nCUSTOMER\n\nLamar Nguyen\n\n(615) 555-0150\nItem # Item / Description Units Each Line Total\nFDS-1019 | Granola, 10 oz 2 $10.95 $21.90\n\n=|\nCND-1007 Soy candle, linen, 8 oz 1 $16.95 $16.95\n$38.85\n\nItems Total\n\n"
+    }
+   ],
+   "gold": {
+    "invoice_number": "R-20131",
+    "service_date": "2025-10-11",
+    "customer_name": "Lamar Nguyen",
+    "cost": "42.44",
+    "vendor": "Juniper Lane Mercantile"
+   },
+   "partyAnyOf": null
+  },
+  {
+   "filename": "Receipt R-20131 [lowres].jpg",
+   "source": "Receipt R-20131.pdf",
+   "variant": "lowres",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "Juniper Lane Mercantile\n\nSUL EpRO\nBars\nSea, TN\n\n2 a0 90 once epee eee)\n\u2018rv umipelgrcat Seamecmy\nCla Home - Hoc Maer\nR29131 : Dati tssveds ei 1/2035. ;\n10'33 PM Cashiee: Gabsiet Ocha\nReg + Methd: Debit cand fos\neustosten :\nEamniar Newyen\u2019 2\n(615) 535.0189 :\nitem *~ | ttewe/ Description. = 2 - 2 Wiaits [o> Each \u2018Line Totat |\nFDS-1019 | Granola, 1Go2 5 i 2 | - \u201csass 521,90\nEND-1007. Soy candle, tinen.* oz 1 $1695\nteas Total $38.88\n: = : TET O28) | $459\n\u2018Aniownt Bue ory\n"
+    }
+   ],
+   "gold": {
+    "invoice_number": "R-20131",
+    "service_date": "2025-10-11",
+    "customer_name": "Lamar Nguyen",
+    "cost": "42.44",
+    "vendor": "Juniper Lane Mercantile"
+   },
+   "partyAnyOf": null
+  },
+  {
+   "filename": "Receipt R-20131 [skew].jpg",
+   "source": "Receipt R-20131.pdf",
+   "variant": "skew",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": ""
+    }
+   ],
+   "gold": {
+    "invoice_number": "R-20131",
+    "service_date": "2025-10-11",
+    "customer_name": "Lamar Nguyen",
+    "cost": "42.44",
+    "vendor": "Juniper Lane Mercantile"
+   },
+   "partyAnyOf": null
+  },
+  {
+   "filename": "WO 7316 - Bridgeway [photo].jpg",
+   "source": "WO 7316 - Bridgeway.pdf",
+   "variant": "photo",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "Bluff Creek Plumbing & Drain\n\n|SL@MEE 6007 E Heritage Ra\nGilbert. AZ 85280\nTe 555 om | www biuticreekplumbingdrain example.com\n\nSERVICE TICKET\n\nPlumbing dispatch\n\nWork Order # 7316 Scheduled 2026-03-01\nPlumber Marcus Trujillo Priority Urgent\nStatus Completed\n\nCUSTOMER SERVICE ADDRESS\n\nBridgeway Storage Co. Bridgeway Storage Co.\n\nAttn: Esther Rhodes 9455 N Willow Rd\n\n9455 N Willow Rd Bidg 344\n\nBidg 344 Chandler, AZ 85206\n\nChandler, AZ 85206 602.555.0152\n\n602.555.0152\n\nbilling@bridgewaystorageco.example.com\n\nWork / Materials Used | Qty |\n\n| Hydrathane Tankless water heater 7 GPM [| 4]\n\nExpansion tank 2 gal\nc= E | +\n\n| Pan, drain line and seismic strap kit | 1]\n\nWater Shut Off Yes -fixture Arrival 7:30 AM Departure 2:00 PM\nonly\n\nPlumber Notes\n\nOld tank drained and removed. New heater set on pan, flex connectors and expansion tank installed, T&P discharge piped to\nexterior, Tested for leaks and set to 120 F\n\nature Bridgeway Storage Date Plumber: Marcus Trujilo Date\n\nPage 1\n"
+    }
+   ],
+   "gold": {
+    "vendor": "Bluff Creek Plumbing & Drain",
+    "invoice_number": "7316",
+    "customer_name": "Bridgeway Storage Co.",
+    "service_address": "9455 N Willow Rd"
+   },
+   "partyAnyOf": null
+  },
+  {
+   "filename": "WO 7316 - Bridgeway [lowres].jpg",
+   "source": "WO 7316 - Bridgeway.pdf",
+   "variant": "lowres",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "Be Blutt Creek Plumbing & Drain.\n\nSERVICE TICKET\n\n * \"2086-03-01\n\nWork Order# 7386\u201d e \u2018Scheduled\n\nPlumber\u2019, \u00b0\u00b0 \u2018Marcus Frio Priority\u201c \u00b0.. . Urnent\n\nStatus 2. Completde Ss Ca %\n\ncbsroicch +1) ssehence Appness\n\nBridgeway Storage Co. Bridgeway Storage'Co.\n\natin: Esther Rhodes i 9485 N-Willow'Ra\" ,\n\n\u20189455'N Wiiow Ad Bldg 944 :\n\nBlog 44 , Chandler, Az 88008 : :\n\n\u2018Chandler, AZ'88208 5 602.855.0182\n\n502.585.0182 :\n\nbiling@ridgeyraysioragjeco exarple coin . \u2018\n\nsett Tanks wate heater 7 GPM, : . . . 4\n\nExpansion tark2 das. : : 7\n\nan, drlin line anid seismic strap kt\u2019 \u201c 1\n\n\u201cWater Shat OW Yes tawure.Amival\u201ds- | * 730'AN\u201d.. \u201cDeparture, ; 200eM\neS only 1g i a a\n\nPlumber Notes : 5 .\n\n\u2018tank drained and rinovd. Now heater sot oh an Hox cofactors and expaison tink installa. TAP dlachage piped to\nexterior: Teste! or leaks a el to 120 F : j\n\n+ Sudha ignated Stelsge 09. Dat\n\nPrior. Marcin To, ata\n\nPaje\n"
+    }
+   ],
+   "gold": {
+    "vendor": "Bluff Creek Plumbing & Drain",
+    "invoice_number": "7316",
+    "customer_name": "Bridgeway Storage Co.",
+    "service_address": "9455 N Willow Rd"
+   },
+   "partyAnyOf": null
+  },
+  {
+   "filename": "WO 7316 - Bridgeway [skew].jpg",
+   "source": "WO 7316 - Bridgeway.pdf",
+   "variant": "skew",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": ""
+    }
+   ],
+   "gold": {
+    "vendor": "Bluff Creek Plumbing & Drain",
+    "invoice_number": "7316",
+    "customer_name": "Bridgeway Storage Co.",
+    "service_address": "9455 N Willow Rd"
+   },
+   "partyAnyOf": null
+  },
+  {
+   "filename": "Packing Slip PS-48434 Desert [photo].jpg",
+   "source": "Packing Slip PS-48434 Desert.pdf",
+   "variant": "photo",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "Desert Candle Works LLC saat\n\nFranklin, TN 37003\nTel 615.555.0179 | office@desertcandieworkslic.example.com |\nwww.desertcandieworksiic.example.com\n\nPACKING SLIP\n\nPacking Slip #: PS-48434 Ship Date: May 17, 2025\nYour Ref: PO-3106 Cartons: 2\nShip Via: Freight carrier\n\nSHIP TO\n\nJuniper Lane Mercantile\n5243 E Copper Ct\n\nSte 325\n\nFranklin, TN 37040\n\nItem # Description\nCND-1035 Votive set of 6\nCND-1000 Soy candle, cedar and sage, 8 oz\n\nCND-1007 Soy candle, linen, 8 oz\nCND-1014 Beeswax taper pair\nCND-1021 Wax melt 6-pack\nCND-1028 Brass candle snuffer\n\n"
+    }
+   ],
+   "gold": {
+    "invoice_number": "PS-48434",
+    "service_date": "2025-05-17"
+   },
+   "partyAnyOf": [
+    "Desert Candle Works LLC",
+    "Juniper Lane Mercantile"
+   ]
+  },
+  {
+   "filename": "Packing Slip PS-48434 Desert [lowres].jpg",
+   "source": "Packing Slip PS-48434 Desert.pdf",
+   "variant": "lowres",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "- Desert Candle Works LLC\n\nTol. 618.555 0173 oitce@aseericandteworksic exam\n\u2018ww defertcanieworkal example com\n\nPacking Slip #: |\u201c PS-48434 \u2018Ship Date: May 17, 2026:\nYour Ret: PO:3106 Cartohs: 2\nShip.Vi *_Efeight cartier :\n\n_SHIP TO\n\n\u2018Juniper Lane Mercantile.\n\n5243 E Copper Ct\n\nSte 325\n\nFranklin, TN 97040)\n\ntte Description Ordered: Shipped, Backordered\nTOND-1035, Velive set of 6 = i 24 124 0\nCND-1000 ,\u201d Soy candi\u00e9, cedat arid sage: Boz 48 48 0\nCND-1007 -Soy candle, linen, 8.02 ny rs) 19 0\nCND-1014 | Beeswax taper pair bu Ss 60 Ca 0\nND-1021 Wax melt 6-pack 8 6 0\n\nGND-1028 ~ Brass candle \u00e9nufier a8. 48 8\n"
+    }
+   ],
+   "gold": {
+    "invoice_number": "PS-48434",
+    "service_date": "2025-05-17"
+   },
+   "partyAnyOf": [
+    "Desert Candle Works LLC",
+    "Juniper Lane Mercantile"
+   ]
+  },
+  {
+   "filename": "Packing Slip PS-48434 Desert [skew].jpg",
+   "source": "Packing Slip PS-48434 Desert.pdf",
+   "variant": "skew",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "g1o6 S Saguaro PSY\n37003\ncom |\n\nworks LLC\nTel 615.555.0179 oticeadeseteanen\ncea detegertcandlewowsie example co\n\n"
+    }
+   ],
+   "gold": {
+    "invoice_number": "PS-48434",
+    "service_date": "2025-05-17"
+   },
+   "partyAnyOf": [
+    "Desert Candle Works LLC",
+    "Juniper Lane Mercantile"
+   ]
+  },
+  {
+   "filename": "Inspection Sign-off Underground Graves [photo].jpg",
+   "source": "Inspection Sign-off Underground Graves.pdf",
+   "variant": "photo",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "6394 N Saguaro Ave\nLittleton, CO 80153\n\nCity of Littleton Eleton, <2 0153\nBuilding Division\nELECTRICAL INSPECTION RECORD\n\nUnderground / slab\n\nPermit No.:  ELC26-16469 Inspection:\nInspected: July 27, 2026 Inspector: Esther Ortega\nResult: Approved site 5697 W Cactus Cir,\nAddress: Littleton, CO 80131\nContractor: Summit Line Electric\nproceed\n\nWork inspected and found to comply at the time of inspection. Approved to\n\nto the next stage.\n\nas\n\nInspect ega Date:\n\n"
+    }
+   ],
+   "gold": {
+    "permit_number": "ELC26-16469",
+    "service_address": "5697 W Cactus Cir"
+   },
+   "partyAnyOf": [
+    "City of Littleton",
+    "Summit Line Electric"
+   ]
+  },
+  {
+   "filename": "Inspection Sign-off Underground Graves [lowres].jpg",
+   "source": "Inspection Sign-off Underground Graves.pdf",
+   "variant": "lowres",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "City of Littleton : a\nBuilding Division :\n\n: . ELECTRICAL INSPECTION: RECORD\n\nPermit Wo. BLC26-T6i6s Ingpection?.. : Undezgrdund\u2019/ shal)\n\nImapected? \"guy 27,\u00b02626 Inspector: ..' Esther oitesa\nResult: Approved\u201d site 5697 'W Cactug. Cir,\n\n* \u2018 Address? LittYeton, co 80131.\ncontractor:.\". \u201csumiit Line \u2018gle\u00e9tric\n\nWork inspected\u2019 afd found to\u201ccomply atthe \u2018time. bf-inspection. approved to, proceed\nbe the next stage:\n\n"
+    }
+   ],
+   "gold": {
+    "permit_number": "ELC26-16469",
+    "service_address": "5697 W Cactus Cir"
+   },
+   "partyAnyOf": [
+    "City of Littleton",
+    "Summit Line Electric"
+   ]
+  },
+  {
+   "filename": "Inspection Sign-off Underground Graves [skew].jpg",
+   "source": "Inspection Sign-off Underground Graves.pdf",
+   "variant": "skew",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "pates \u2014\u2014_\n\ne: Eather orted?\n\ninspect?\n\n"
+    }
+   ],
+   "gold": {
+    "permit_number": "ELC26-16469",
+    "service_address": "5697 W Cactus Cir"
+   },
+   "partyAnyOf": [
+    "City of Littleton",
+    "Summit Line Electric"
+   ]
+  },
+  {
+   "filename": "Credit Memo CM-4500 Patel [photo].jpg",
+   "source": "Credit Memo CM-4500 Patel.pdf",
+   "variant": "photo",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "Patel Paper & Press Group\n\nUnit 151\nMurtreesboro, TN 37188\n\nTel 629.555.0101 | otfice@patelpaperpressgroup.example.com | \u2018www patelpaperpressgroup example.com\nCREDIT MEMO\nCredit Memo # CM-4500 Issued 21 Nov 2025\nApplies To Invoice INV-96101 Reason Damaged in transit\nCREDIT TO\nJuniper Lane Mercantile\nAttn: Sofia Calloway\n5243 E Copper Ct\nSte 325\nFranklin, TN 37040\nSTA-1030 Sticker sheet assortment 1 $1.65\na To\n$1.65\n\nTotal Credit\n\n"
+    }
+   ],
+   "gold": {
+    "invoice_number": "CM-4500",
+    "service_date": "2025-11-21",
+    "customer_name": "Juniper Lane Mercantile",
+    "vendor": "Patel Paper & Press Group",
+    "cost": "1.65"
+   },
+   "partyAnyOf": null
+  },
+  {
+   "filename": "Credit Memo CM-4500 Patel [lowres].jpg",
+   "source": "Credit Memo CM-4500 Patel.pdf",
+   "variant": "lowres",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "Patel. Paper & Press Group\n\n: . ~ <. CREDIT MEMO\nCr\u00e9dit, Memo (CM-4500, a lesued \u00a9 21 Now 2025:\n\nApplies To Invoitie - ihiv-96101 Damaged in transit\nneon te\n\nJuniper Larie Mercantile\n\nAitn: Sofia Calloway\n\n5243 E Copper Ct\n\nSte 325\n\nFrank; TN37049,\n\ntern # Deseription Qty Credit\n\n\u2018BTA-1090 , Sticker sheet assortment Ys! $165\n\nToto) Credit 365\n"
+    }
+   ],
+   "gold": {
+    "invoice_number": "CM-4500",
+    "service_date": "2025-11-21",
+    "customer_name": "Juniper Lane Mercantile",
+    "vendor": "Patel Paper & Press Group",
+    "cost": "1.65"
+   },
+   "partyAnyOf": null
+  },
+  {
+   "filename": "Credit Memo CM-4500 Patel [skew].jpg",
+   "source": "Credit Memo CM-4500 Patel.pdf",
+   "variant": "skew",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "Description\n\nSTA-1039 me\n\n"
+    }
+   ],
+   "gold": {
+    "invoice_number": "CM-4500",
+    "service_date": "2025-11-21",
+    "customer_name": "Juniper Lane Mercantile",
+    "vendor": "Patel Paper & Press Group",
+    "cost": "1.65"
+   },
+   "partyAnyOf": null
+  },
+  {
+   "filename": "Lease - Warehouse and Office (signed) [photo].jpg",
+   "source": "Lease - Warehouse and Office (signed).pdf",
+   "variant": "photo",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "COMMERCIAL LEASE AGREEMENT\n\nFood distribution warehouse and Offices, 7714 N Aspen Way, Suite 363, Tacoma, WA 98483\nTENANT\n\nZamora Property Holdings Company Harborlight Neighbors Alliance\nAttn: Hannah Quintero 7714 N Aspen Way\nSuite 363\n\nTacoma, WA 98483\nronprotcapenace between Zamora Property Holdings Company (Landlord) and Harboright Neighbors Allance (Tenant), a\nNonprofit corporation exempt from federal income tax.\n1. Premises and Term\n\napproximately 5,967 rentable square feet of warehouse and office space at the address shown\ndock ond the caveat. fra term of 60 months begining 02/10/2023 and ending 0209/2028. Tenant may use the oedng\ndock and the paved parking area adjacent to the Premises.\n\n2. Rent\nTenant shall pay monthly base rent of $4,800.00, due in advance on the first\n\neach anniversary of the start date. Rent not received within 5 days after its\noverdue amount.\n\nday of each month. Base rent increases 3% on\ndue date carries a late charge of 5% of the\n\nlente eae sebosied $8,600.00 as a security deposit. Landlord wil etum R within tity days alte the end ofthe erm, ess\nlawtul deductions for unpaid rent and damage beyond normal wear.\n\n6. Maintenance and Repairs\n\nLandlord is responsible for the roof, structure, and exterior and electrical systems. Tenant is responsible for interior\nMananance Kt bub, andthe wakin cover an rtigeratonequpmam alee erent Tene ea eee\nneeded repair promptly.\n\n"
+    }
+   ],
+   "gold": {
+    "agreement_term": "60 months (02/10/2023 - 02/09/2028)",
+    "start_date": "2023-02-10",
+    "end_date": "2028-02-09",
+    "vendor": "Zamora Property Holdings Company",
+    "customer_name": "Harborlight Neighbors Alliance"
+   },
+   "partyAnyOf": null
+  },
+  {
+   "filename": "Lease - Warehouse and Office (signed) [lowres].jpg",
+   "source": "Lease - Warehouse and Office (signed).pdf",
+   "variant": "lowres",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "COMMERCIAL LEASE. AGREEMENT -\n\n: Fob distsbution warehouse and offites: 7744.N Aspen Way, Site 363, Tacoma, WA 98483\n\ni \u2018LANQLORD i \u2018TENANT\nZamora Property Holdings Gompany Harbortight Neightors Alliance ,\n\u2018Attn: Hanriah Quintero FINAN Asper'Way :\n9409 E Sunrise-Ct Suite3s3 5. 4\n\nTacoma, WA 98467 \u201ccTacema, WA 98433.\n\n\u2018This Lease is made between Zariora Rraperty Holdings, Company (Lendird) arid Harborlignt Neighbors Alliance (Tenant), a\n\u2018\u00e9npratit corporation exempt trot: federal income ta.\n\n4. Premises and Term\u201d,\nLandlord eases Tenant appronitiatly 6 867 rertabl\u00e9 square leet wartiouse and bles space al he address sicwin\n\u2018above (the Premises), for a term of 60 months beginning 02/10;2023 and ending'02/08/2028. T\u00e9narit may\u2019 uss the loading\n\u201cdock and the paved parking area adjgicent tothe Premises: i\n\nJ ?-Reat . 5 2\n\u201cTenant shall pay monthly base refit'ct $4,800.00, due in advance.on the first day of ea\u00e9h month, Base fenit increases 3% on\n\u2018each anniversary of the start date. lent net received within 5.days after is-quie date cartied a late charge of 5% of the.\noverdue airount:\n\n3. Operating Expenses\n\nIn adaition t8 bass rent Tenant pays its share of common ar\u00e9a mainteriarce, \u00e9stimated at $1,133.79 per month, and ts share\n1 * ol property taxes and landior's insufance, Landlord will reconcile estimates against actual costs once a year and refund or *\n\u201cinvoice any ditfererice within sity days. . :\n\n4. S\u00e9ourity Depasit -\nTenant has' deposited $9,600.00 as a'securty deposit. Landlord wil retum it within thity days alter ine end.of the term, oss\nJawiul deductions Yor unpaid fent and.damage beyond normal wear\n\n5. Use of Premis\u00e9s,\n\n\" Tenint shal se the Premises Gry or storing, packing and dlstbutig food ahd noysetold gdods eciutarng and meal,\nPrograms; and for administrative-otices. Tenant stial Keep fodd stofaige area\u2019 tlean and pest-re\u00e9 and shall comply with\nealth codes, NO hazardous rhateiale may be stored on the Premise othe than oinary cleahing supplies.\n\n6, Mairitenance ani\u00e9-Repairs\nLandlord |s fespoinste for the ror, stfucture, and exterior plumbing and clectrical systems. Tenant is responsible fo\u2019 interior\nmaint\u00e9nance, fight bulbs, and the walk-in cooler and refrigeration equipmentinstalied by Tenant. Teint shall eport any,\u00bb \u00b0\nneeded repair promptly.\n\n7, Alterations:\nTenant may'not. make stricturat alt\u00e9rations without Landlord's writterr Gonsent, which shall noi be'unr\u00e9asonably withhaid:\nShelving, racking and r\u00e9trigeration:equipment installed by Tenant r\u00e9snain Tenant's property dhd may be remtoved af the end\u2019oi\nthe term if Tenant repairs any damage,\n\n:B. Insurance and Indemnity ;\nTenant shall carry.commercial general liability insurance ot at\u2019 least Br 000,000 per ocourrence naming Landlord asan. \u201c> *\nadditional insured arid shall insure its iersonal properly. Each party waives clairis against the other for josses covered by\nproperty insurance. Tenant shall indemnity Laridlord against third-party claims arising from Tehait's operation\u2019, except those\u2019\ncaused by Landlord's negligence. c\n\n9, Renewal .\n\nTenant has\u2018one option to reneiw for 36 months at a reft agreed by the parties; orf hey cannot agree, at ninety-five percent of\nmarket rent, by written notice given atleast 180 days before the end of ttie term: a\n\npagel\n"
+    }
+   ],
+   "gold": {
+    "agreement_term": "60 months (02/10/2023 - 02/09/2028)",
+    "start_date": "2023-02-10",
+    "end_date": "2028-02-09",
+    "vendor": "Zamora Property Holdings Company",
+    "customer_name": "Harborlight Neighbors Alliance"
+   },
+   "partyAnyOf": null
+  },
+  {
+   "filename": "Lease - Warehouse and Office (signed) [skew].jpg",
+   "source": "Lease - Warehouse and Office (signed).pdf",
+   "variant": "skew",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "may eS\u00b02bIY withhelg\n\nFemoved at the end of\n\n"
+    }
+   ],
+   "gold": {
+    "agreement_term": "60 months (02/10/2023 - 02/09/2028)",
+    "start_date": "2023-02-10",
+    "end_date": "2028-02-09",
+    "vendor": "Zamora Property Holdings Company",
+    "customer_name": "Harborlight Neighbors Alliance"
+   },
+   "partyAnyOf": null
+  },
+  {
+   "filename": "Handwritten service note 1 [handwriting].jpg",
+   "source": null,
+   "variant": "handwriting",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "SERVICE TICKET\nCustomer: Rosa Delgado\nService Agoress - 4127 \u00a3 Juniper Ave\nDate of Se\u2019vice: 40/8/2026\n\nWork: replaced run Capacitor, Cleaned Coil\nTotak $579.50\n\n"
+    }
+   ],
+   "gold": {
+    "customer_name": "Rosa Delgado",
+    "service_address": "4127 E Juniper Ave",
+    "service_date": "2026-12-08",
+    "cost": "579.50"
+   }
+  },
+  {
+   "filename": "Handwritten service note 2 [handwriting].jpg",
+   "source": null,
+   "variant": "handwriting",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "_ SERVCE TICKET\n\nCustomer: Martin Okafor\n\n__ Service Addyess\u2019 885 N Chol Dr\n\n__ Date of Service: 9/1 7/2026\n\n_ Work: replaced un capactto,, Cleane? coj/\nTotal: $312.00\n"
+    }
+   ],
+   "gold": {
+    "customer_name": "Martin Okafor",
+    "service_address": "885 N Cholla Dr",
+    "service_date": "2026-03-11",
+    "cost": "312.00"
+   }
+  },
+  {
+   "filename": "Handwritten service note 3 [handwriting].jpg",
+   "source": null,
+   "variant": "handwriting",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "SE.\n\nRVUcE TICKET\nCustomer- Helen Brand\nService Address. 2290 w Mesauite st\nD#te of Service. 8/24/2026\nWork: replaced ryn C2D acitor\nToRI: $284. 50\n\n\u00bb Cape coj/\n\n"
+    }
+   ],
+   "gold": {
+    "customer_name": "Helen Brandt",
+    "service_address": "2290 W Mesquite St",
+    "service_date": "2026-03-24",
+    "cost": "284.50"
+   }
+  },
+  {
+   "filename": "Handwritten service note 4 [handwriting].jpg",
+   "source": null,
+   "variant": "handwriting",
+   "route": "ocr-standin",
+   "pages": [
+    {
+     "page_no": 1,
+     "text": "SERVICE TICKET\n~ Customer: Victor Sal@s\n\u201cService Adafegss: 7716 \u00a7 Ocagtillo L\u201d\n\" Date of Service: 3/13/2026\nWork: replaced tun capact\u2019, cPaned coil\n_ Fotal: $326-00\n\n"
+    }
+   ],
+   "gold": {
+    "customer_name": "Victor Salas",
+    "service_address": "7716 S Ocotillo Ln",
+    "service_date": "2026-03-13",
+    "cost": "326.00"
+   }
+  }
+ ]
+}

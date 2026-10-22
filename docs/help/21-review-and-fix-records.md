@@ -53,10 +53,10 @@ Open **Inbox → Needs you → Duplicates**, open the copy and press **Merge int
 !covers:A-DUP-CUSTOMER
 Admins can merge; a member sees the merge buttons disabled with "Ask an admin" beside them, and the whole-company scan is hidden. In **Records → Customers**, a banner lists likely pairs: **Merge into <name>** (tick which one to keep), **Not the same**, or **Merge all**. Admins also get a whole-company **Duplicate customers** scan there, with Undo after a merge. The same suggestions appear in Inbox → Needs you. A different name at the same address is never merged automatically.
 
-### What does Verify with AI do?
-~ verify with ai, ai verify, ai verified, let ai check, verified by ai, ai check, auto verify, what is ai verified, automatic verification, use ai to verify
+### What does Read page & check do? (it used to be called Verify with AI)
+~ verify with ai, ai verify, ai verified, let ai check, verified by ai, ai check, auto verify, what is ai verified, automatic verification, use ai to verify, read page and check, read page & check
 !covers:A-AI-VERIFY
-On a document that isn't checked yet, **Verify with AI** has DeepWell re-check it. You'll see "Verified by AI." or "Not confident enough yet — this still needs a person." AI-verified documents show an **AI verified** badge.
+On a document that isn't checked yet, **Read page & check** has DeepWell read the page again (labelled fields and facts written in sentences, such as "a term of 60 months beginning 02/10/2023"), correct the document type when the page proves it (for example a certificate of insurance or a licence), and then check it. It does not send the document to an AI model. You'll see "Checked: the page shows everything this document needs." or which facts the page does not show. Checked documents show an **AI verified** badge.
 
 ### How do I open the original file?
 ~ open original, see the original, original document, original scan, view the pdf, view the original, download the original, download a document, look at the file, see the photo, show me the paper, open the source, open the document, download file, look at the original scan, how do i look at the original scan, source file, open the source file, open the source file for a document

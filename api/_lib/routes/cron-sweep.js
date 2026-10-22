@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { ingestDocument, recordIngestFailure } from "../readDocument.js";
 import { extractDocumentFields } from "../extractDocument.js";
 import { withTenant } from "../recordsStore.js";
-import { listStuckDocuments, listBudgetDeferredDocuments, listTenantKeysWithSource } from "../opsStore.js";
+import { listStuckDocuments, listBudgetDeferredDocuments, listTenantKeysWithSource, listDemoTenantKeys } from "../opsStore.js";
 import { DAILY_BUDGET_EXCEEDED_MESSAGE, isQueueEnabled, enqueueDocument } from "../queue.js";
 import { getDailyModelBudgetStatus } from "../rateLimit.js";
 import { assertActiveBilling } from "../plan.js";
@@ -155,8 +155,21 @@ export default async function handler(req, res) {
     tenantSource = "body";
   }
 
+  // Industry demo companies are left out of the sweep (fixed sample paperwork; no stuck-document retries or catch-up model work
+  // is worth paying for there). Their nightly reset is its own cron (?action=demo&op=reset-all).
+  let demoSkipped = 0;
+  {
+    const demoKeys = await listDemoTenantKeys();
+    if (demoKeys.size) {
+      const before = tenants.length;
+      tenants = tenants.filter((t) => !demoKeys.has(t.tenant_key));
+      demoSkipped = before - tenants.length;
+    }
+  }
+
   const summary = {
     tenantsChecked: tenants.length,
+    demoTenantsSkipped: demoSkipped,
     tenantSource,
     stuckFound: 0,
     recovered: 0,

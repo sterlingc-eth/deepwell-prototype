@@ -23,6 +23,7 @@ import { serializeClient, assertTenantUuid, isNonBlankId, explicitPgSsl } from '
 import pg from 'pg';
 import { loadOwnNames, isOwnName } from './modelAvoidance/ownCompany.js';
 import { keyBelongsToTenant } from './r2.js';
+import { skipDemoAuditNoise } from './demo/auditPolicy.js';
 import { DOCX_CONTENT_TYPE, XLSX_CONTENT_TYPE } from './uploadTypes.js';
 import {
   ESTIMATE_DOCX_FIXED_BYTES, ESTIMATE_DOCX_BYTES_PER_PAGE, ESTIMATE_XLSX_FIXED_BYTES, ESTIMATE_XLSX_BYTES_PER_PAGE, ESTIMATE_CSV_BYTES_PER_PAGE, ESTIMATE_DOCX_MAX_PAGES, ESTIMATE_SHEET_MAX_PAGES,
@@ -2533,6 +2534,8 @@ function makeStore(db, tenantId) {
 
     // ---- audit ----
     logAction: async (a) => {
+      // Industry demo companies: routine rows (questions asked, link repairs ...) are not written; security entries always are.
+      if (await skipDemoAuditNoise(async (sql, params) => (await db.query(sql, params)).rows, tenantId, a.action)) return;
       // audit_log.user_id is a uuid FK into `users`; the caller only has a
       // Clerk user id (a string like "user_2ab..."). Resolve it, and fall back
       // to NULL rather than failing the write — an audit row with an unknown

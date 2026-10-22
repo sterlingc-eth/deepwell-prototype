@@ -27,6 +27,7 @@ import { normalizeContentType, sanitizeUploadFilename } from './_lib/r2.js';
 import { checkUploadFile } from './_lib/uploadTypes.js';
 import { DOCUMENT_TYPE_IDS } from './_lib/documentTypes.js';
 import { hrGateSql } from './_lib/companyFilesStore.js';
+import { isDemoAuth, sendDemoRestricted } from './_lib/demo/index.js';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '1mb' } },
@@ -236,6 +237,12 @@ export async function processRecords(req: VercelRequest, res: VercelResponse, au
   }
   if (access === 'forbidden') {
     return handleCors(res, req).status(403).json({ error: "This action requires the 'admin' role in your company." });
+  }
+
+  // Industry demo: reads and the upload's own createDocument only; every other write (edits, links, merges, deletes)
+  // is turned off, so a demo day can only ADD documents and the reset can always put the seed back.
+  if (!RECORDS_READ_ACTIONS.has(String(action)) && action !== 'createDocument' && (await isDemoAuth(auth, { failClosed: true }))) {
+    return sendDemoRestricted(handleCors(res, req), req);
   }
 
   if (action === 'createDocument') {

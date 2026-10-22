@@ -20,13 +20,29 @@
  * Pure. No clock (the caller passes `today`), no I/O.
  */
 import { scanLabeledValues } from "./textExtract.js";
-import { normalizeFields, isUnconfirmedKey, baseKeyOf } from "../extractFields.js";
+import { normalizeFields, isUnconfirmedKey, baseKeyOf, normalizeDate } from "../extractFields.js";
 import { completenessFor, REQUIRED_FIELDS, normalizeDocumentType, isLabelValue } from "../documentTypes.js";
 import { isOwnName, nameKey } from "./ownCompany.js";
+import { scanProseFacts } from "./proseFacts.js";
+import { verifyGrounded } from "./groundedFacts.js";
+import { detectDateOrder } from "./textExtract.js";
+const normalizeDateLoose = (v) => normalizeDate(String(v ?? "").trim(), { order: "mdy" });
 
 // Inbox round (2026-10-21): 2 = new date / address labels ("Issued", "Date Reported", "Premises") and the file-name address;
 // the bump lets the nightly sweep and "Re-check all missing fields" look at every open paper once more.
-export const LABEL_FILL_VERSION = 2;
+// Docread round (2026-10-22): 3 = facts stated in sentences / column blocks (proseFacts.js), period and licence facts, and every
+// fill grounded (quote on the page, value from the quote) before it is written. The bump re-scans every open paper once.
+export const LABEL_FILL_VERSION = 3;
+
+/** Facts restored when absent on papers of these types although nothing requires them: the period a lease, policy or licence
+ *  runs, its number. Read from labels or sentences only, grounded like everything else. */
+export const PERIOD_KEYS_BY_TYPE = {
+  "agreement": ["start_date", "end_date"],
+  "maintenance-agreement": ["start_date", "end_date"],
+  "insurance-certificate": ["policy_number", "start_date", "end_date"],
+  "license-certification": ["license_number", "start_date", "end_date"],
+  "permit": ["end_date"],
+};
 
 /** Date fields the planner also restores when absent even though the type does not REQUIRE them — a labelled install
  * date on an invoice is what the warranty clock runs on. Explicit labels only (never a bare "Date:"). */
@@ -36,6 +52,25 @@ const FILL_CONFIDENCE = { explicit: 0.9, bare: 0.86, letterhead: 0.8 };
 
 /** Fields a stored-text read may supply on a document that has NONE (the "nothing read" repair). */
 export const ALL_SCAN_KEYS = ["customer_name", "vendor", "service_date", "cost", "invoice_number", "service_address", "agreement_term", "customer_phone", "customer_email"];
+/** Docread round: OCR noise in a name - a token like "oF" (lower then upper), a dot glued between letters, or a trailing lone letter. */
+export function letterheadTruncated(name, pages) {
+  const slug = String(name ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (slug.length < 4) return false;
+  const top = String((pages ?? [])[0]?.text ?? "").split(/\r?\n/).slice(0, 12).join(" ").toLowerCase();
+  const doms = [...top.matchAll(/(?:www\.|@)([a-z0-9-]{4,})\./g)].map((m) => m[1].replace(/-/g, "").replace(/(?:example)?(?:com|net|org)?$/, ""));
+  return doms.some((d) => d.startsWith(slug) && d.length - slug.length >= 5);
+}
+export function isHeaderRow(verbatim) {
+  const segs = String(verbatim ?? "").split(/\s{2,}|\t|\s*\|\s*/).map((x) => x.trim()).filter(Boolean);
+  return segs.length >= 3 && segs.every((x) => !/\d/.test(x) && x.split(/\s+/).length <= 3 && !/[,.]$/.test(x) && !/\b(?:llc|inc|co|company|group|corp)\b/i.test(x));
+}
+export function looksGarbledName(v) {
+  const toks = String(v ?? "").trim().split(/\s+/);
+  if (toks.some((t) => /^[a-z][A-Z]/.test(t) || /[a-z]\.[A-Za-z]{2,}/.test(t) || /^[^A-Za-z0-9&]+$/.test(t))) return true;
+  return toks.length > 1 && /^[A-Z]$/.test(toks[toks.length - 1]) && !/^[A-Z]\.?$/.test(toks[toks.length - 2] ?? "x");
+}
+const NO_EQUIPMENT_DATE_TYPES = new Set(["permit", "license-certification", "insurance-certificate", "hr-letter", "statement", "agreement", "receipt", "schedule", "price-list"]);
+const PROSE_KEYS = new Set(["service_address", "serial_number", "model", "warranty_term", "service_date", "invoice_number", "permit_number", "customer_name", "vendor", "cost", "agreement_term", "start_date", "end_date", "license_number", "policy_number"]);
 /** Fields restored when absent even though the type does not require them (explicit labels, or a non-own letterhead). */
 export const OPTIONAL_PARTY_KEYS = ["vendor"];
 
@@ -83,14 +118,24 @@ export function planLabelFill({ type, fields, pages, today, method = "label-fill
   const have = presentKeys(fields);
   const targets = [];
   for (const requirement of completeness.missing) for (const k of requirement.split("|")) if (!targets.includes(k)) targets.push(k);
-  if (optionalDates) for (const k of OPTIONAL_DATE_KEYS) if (!have.has(k) && !targets.includes(k)) targets.push(k);
+  // Docread round: equipment dates (install, warranty registered / expires) are never read off company paper that has no equipment:
+  // a licence's "Expires" is the licence period (end_date), not a warranty.
+  const noEquipmentDates = NO_EQUIPMENT_DATE_TYPES.has(docType);
+  if (optionalDates) for (const k of OPTIONAL_DATE_KEYS) if (!(noEquipmentDates && k !== "service_date") && !have.has(k) && !targets.includes(k)) targets.push(k);
   if (ownNames?.length) for (const k of OPTIONAL_PARTY_KEYS) if (!have.has(k) && !targets.includes(k)) targets.push(k);
   if (allKeys) for (const k of ALL_SCAN_KEYS) if (!have.has(k) && !targets.includes(k)) targets.push(k);
+  for (const k of PERIOD_KEYS_BY_TYPE[docType] ?? []) if (!have.has(k) && !targets.includes(k)) targets.push(k);
   if (!targets.length || !(pages ?? []).some((p) => String(p?.text ?? "").trim())) {
     return { add: [], ambiguous: [], targets, missingBefore: completeness.missing };
   }
 
   const { candidates } = scanLabeledValues(pages, { type: docType, keys: targets, ownNames });
+  // Docread round: the second reader, for facts stated in sentences or column blocks. Used only where the labels gave nothing.
+  let prose = { candidates: {}, ambiguous: [] };
+  try {
+    const order = detectDateOrder((pages ?? []).map((p) => String(p?.text ?? "")).join("\n"));
+    prose = scanProseFacts(pages, { keys: targets.filter((k) => PROSE_KEYS.has(k)), type: docType, order: order === "dmy" ? "dmy" : "mdy" });
+  } catch { prose = { candidates: {}, ambiguous: [] }; }
   const required = new Set((REQUIRED_FIELDS[docType] ?? []).flatMap((r) => r.split("|")));
   // A unit-scoped date on a document naming several units belongs to ONE of them — not ours to pick.
   const serials = new Set((fields ?? []).filter((f) => (f.field_key ?? f.key) === "serial_number").map((f) => String(f.corrected_value ?? f.value ?? "").trim().toLowerCase()).filter(Boolean));
@@ -102,10 +147,53 @@ export function planLabelFill({ type, fields, pages, today, method = "label-fill
   for (const key of targets) {
     if (have.has(key)) continue;
     let list = candidates[key] ?? [];
-    // Inbox round: a label read as a name ("DELIVERED TO" beside "BILL TO") is never a party.
-    if (key === "customer_name" || key === "vendor") list = list.filter((c) => !isLabelValue(c.value));
+    // Docread round: the same precision filters apply to every reader's candidates (labels and sentences / columns).
+    const keepOnly = (input) => {
+      let list = input;
+      // Inbox round: a label read as a name ("DELIVERED TO" beside "BILL TO") is never a party.
+      if (key === "customer_name" || key === "vendor") list = list.filter((c) => !isLabelValue(c.value));
+      // Docread round: on a purchase order the "Buyer" / "Ordered by" is the issuer's own employee, never the customer.
+      if (key === "customer_name" && docType === "purchase-order") list = list.filter((c) => !/buyer|ordered\s+by|requested\s+by|purchaser|placed\s+by/i.test(String(c.label ?? "")));
+      // A negative amount ("Payment Received -526.00", "(655.00)") is a payment or credit line, never the paper's own total -
+      // except on a credit or refund line itself.
+      if (key === "cost") list = list.filter((c) => !/^\s*(?:-|\(|USD\s*-|\$\s*-)/i.test(String(c.value)) || /credit|refund/i.test(String(c.label ?? "")));
+      // A name on a signature line ("Attorney: Marcus Marsh Date: ______") is the person signing, never the issuing business.
+      if (key === "vendor") list = list.filter((c) => !/_{4,}|date:\s*_{2,}/i.test(String(c.verbatim ?? "")));
+      // A one-word letterhead with no business word is a fragment of a name wrapped across lines ("Drain" of "... Plumbing & Drain").
+      // Docread round: any one-word issuer name is too thin to trust on its own (a column title "Course", a wrapped "Drain").
+      if (key === "vendor") list = list.filter((c) => /\s/.test(String(c.value).trim()));
+      // A name read off a table's header row ("Unit | Tenant | Rent Charged | Collected") is a column title, not a party.
+      if (key === "customer_name" || key === "vendor") list = list.filter((c) => !isHeaderRow(c.verbatim));
+      // A letterhead cut off by the line wrap ("City of Scottsdale Building" / ... / "Safety Division") ends on a dangling word.
+      if (key === "vendor") list = list.filter((c) => c.strength !== "letterhead" || !/\b(?:building|safety|of|and|&|the)$/i.test(String(c.value).trim()));
+      // A letterhead whose own web / email domain carries more words than the name was cut off by the line wrap
+      // ("Ironwood Legal" with www.ironwoodlegalresearchservice...).
+      if (key === "vendor") list = list.filter((c) => c.strength !== "letterhead" || !letterheadTruncated(c.value, pages));
+      // A name that reads like OCR noise ("MEMORANDUM oF U", "Beacori.Gegimunlty") is left for a person.
+      if (key === "customer_name" || key === "vendor") list = list.filter((c) => !looksGarbledName(c.value));
+      // A bare "Expires" is a warranty expiry only on a warranty paper (a quote, permit or licence "Expires" is not a warranty).
+      if (key === "warranty_expires" && docType !== "warranty-registration") list = list.filter((c) => /warrant|coverage/i.test(String(c.label ?? "")));
+      // On an agreement or a quote, a completion / due / expiry date is not the date the paper is about.
+      if (key === "service_date" && ["agreement", "maintenance-agreement", "proposal-quote"].includes(docType)) list = list.filter((c) => !/complet|due|expir|valid|through|until|end/i.test(String(c.label ?? "")));
+      // A zero amount (a paid-off balance) is not the paper's amount.
+      if (key === "cost") list = list.filter((c) => Number(String(c.value).replace(/[^0-9.]/g, "")) !== 0);
+      return list;
+    };
+    list = keepOnly(list);
+    // Docread round: the document total is read by the totals reader (exact total labels, tiers, subtotal + tax check) when it
+    // finds one; when it finds two different totals the amount is left for a person, whatever the labelled scan picked.
+    if (key === "cost" && PROSE_KEYS.has(key)) {
+      if (prose.ambiguous.some((a) => a.key === "cost")) { const pa = prose.ambiguous.find((a) => a.key === "cost"); ambiguous.push({ key, values: pa.values ?? [], reason: pa.reason }); continue; }
+      const pc = keepOnly(prose.candidates.cost ?? []);
+      if (pc.length === 1) list = pc;
+    }
     if (!required.has(key) && !allKeys) list = list.filter((c) => c.strength === "explicit" || (key === "vendor" && c.strength === "letterhead"));
     if (key === "installation_date" && serials.size > 1) continue;
+    if (!list.length && PROSE_KEYS.has(key)) {
+      const pa = prose.ambiguous.find((a) => a.key === key);
+      if (pa) { ambiguous.push({ key, values: pa.values ?? [], reason: pa.reason }); continue; }
+      list = keepOnly((prose.candidates[key] ?? []).filter((c) => !((key === "customer_name" || key === "vendor") && isOwnName(c.value, ownNames))));
+    }
     if (!list.length) continue;
     if (key === "work_performed") {
       const seen = new Set();
@@ -119,7 +207,14 @@ export function planLabelFill({ type, fields, pages, today, method = "label-fill
       continue;
     }
     const distinct = [...new Set(list.map((c) => c.value.trim().toLowerCase()))];
-    if (distinct.length !== 1) { ambiguous.push({ key, values: [...new Set(list.map((c) => c.value))] }); continue; }
+    if (distinct.length !== 1) {
+      // Docread round: two labelled readings disagree, but the second reader (sentences / totals / columns) reads exactly one of
+      // them: two independent readers agree on that value, so it is used (with the second reader's quote).
+      const p1 = PROSE_KEYS.has(key) && !prose.ambiguous.some((a) => a.key === key) ? (prose.candidates[key] ?? []) : [];
+      const agreed = p1.length === 1 && list.some((c) => sameValue(key, c.value, p1[0].value)) ? p1[0] : null;
+      if (!agreed) { ambiguous.push({ key, values: [...new Set(list.map((c) => c.value))] }); continue; }
+      list = [agreed];
+    }
     // Alternatives ("customer_name|service_address") are satisfied by the first one found.
     const c = list[0];
     raw.push({ key, value: c.value, page_no: c.page_no, verbatim: c.verbatim, confidence: c.conf ?? FILL_CONFIDENCE[c.strength], method });
@@ -128,7 +223,7 @@ export function planLabelFill({ type, fields, pages, today, method = "label-fill
   // Inbox round: the service address printed in the file name AND on the page, when the labels gave none.
   if (filename && targets.includes("service_address") && !have.has("service_address") && !satisfied.has("service_address") && !ambiguous.some((a) => a.key === "service_address")) {
     const addr = addressFromFilename(filename, pages);
-    if (addr) { raw.push({ key: "service_address", value: addr, page_no: 1, verbatim: addr, confidence: FILL_CONFIDENCE.explicit, method }); satisfied.add("service_address"); }
+    if (addr) { raw.push({ key: "service_address", value: addr, page_no: 1, verbatim: addr, confidence: FILL_CONFIDENCE.explicit, method, fromFilename: true }); satisfied.add("service_address"); }
   }
   // Only keep an alternative fill when its requirement is still open (the first alternative found wins).
   const keep = [];
@@ -138,14 +233,23 @@ export function planLabelFill({ type, fields, pages, today, method = "label-fill
     if (req && req.includes("|")) {
       // Inbox round: a full stored-text read (allKeys) keeps both halves of a "date or number" requirement (the number is
       // a fact of its own); every other alternative keeps only the first one found, as before.
-      const keepAll = allKeys && ALL_SCAN_KEYS.includes(f.key) && req.split("|").includes("invoice_number");
+      // Docread round: a permit number printed beside the inspection date is a fact of its own too.
+      const keepAll = allKeys && (ALL_SCAN_KEYS.includes(f.key) || f.key === "permit_number") && req.split("|").some((k) => k === "invoice_number" || k === "permit_number");
       if (doneReq.has(req) && f.key !== "work_performed" && !keepAll) continue;
       doneReq.add(req);
     }
     keep.push(f);
   }
-  const { fields: add } = normalizeFields(keep, { pageCount, today, ...(pack ? { pack } : {}) });
-  return { add, ambiguous, targets, missingBefore: completeness.missing };
+  // Docread round: nothing is written unless its quote is on its page and the value comes from that quote.
+  const ungrounded = [];
+  const grounded = keep.filter((f) => {
+    if (f.fromFilename) return true; // the file-name address: checked against the page by addressFromFilename itself
+    const g = verifyGrounded({ field_key: f.key, value: f.value, verbatim: f.verbatim, page_no: f.page_no }, pages);
+    if (!g.ok) ungrounded.push({ key: f.key, value: f.value, reason: g.reason });
+    return g.ok;
+  }).map(({ fromFilename, ...f }) => f);
+  const { fields: add } = normalizeFields(grounded, { pageCount, today, ...(pack ? { pack } : {}) });
+  return { add, ambiguous, targets, missingBefore: completeness.missing, ungrounded };
 }
 
 
@@ -198,4 +302,42 @@ export function corroborateFields({ type, fields, pages, ownNames = [] }) {
     return { ...f, confidence: CORROBORATED_CONFIDENCE, corroborated: true };
   });
   return { fields: out, corroborated };
+}
+
+/* ------------------------------------------------------------------ cross-check (docread verify round, 2026-10-22) */
+/**
+ * The fast extractors (template / labelled, extractDocument's deterministic path) write facts without the totals reader's or
+ * the period reader's checks. This runs those checks on what they wrote, before anything is stored:
+ *   - cost: when the page's totals are inconsistent (subtotal + tax != total, two different totals, total vs amount due with
+ *     nothing between them) or the totals reader reads a different amount, the cost is removed - a person decides;
+ *   - agreement_term: when the page states the period's start / end under period labels or in a sentence and the term's dates
+ *     are not those dates (a COI's Certificate Date taken as the policy start), the term is removed.
+ * Pure. Returns the kept fields and what was removed (with the reason).
+ */
+export function crossCheckFields({ fields, pages }) {
+  const rows = Array.isArray(fields) ? fields : [];
+  if (!rows.length || !(pages ?? []).some((p) => String(p?.text ?? "").trim())) return { fields: rows, removed: [] };
+  let pf;
+  try {
+    const order = detectDateOrder((pages ?? []).map((p) => String(p?.text ?? "")).join("\n"));
+    pf = scanProseFacts(pages, { keys: ["cost", "start_date", "end_date"], order: order === "dmy" ? "dmy" : "mdy" });
+  } catch { return { fields: rows, removed: [] }; }
+  const removed = [];
+  const out = rows.filter((f) => {
+    if (f?.field_key === "cost" && f.corrected_value == null) {
+      const amb = pf.ambiguous.find((a) => a.key === "cost" && a.reason !== "zero amount");
+      if (amb) { removed.push({ field_key: "cost", value: f.value, reason: amb.reason }); return false; }
+      const one = pf.candidates.cost?.[0];
+      if (one && !sameValue("cost", f.value, one.value)) { removed.push({ field_key: "cost", value: f.value, reason: `the page's total is ${one.value}` }); return false; }
+    }
+    if (f?.field_key === "agreement_term" && f.corrected_value == null) {
+      const iso = (v) => normalizeDateLoose(v);
+      const dates = [...String(f.value).matchAll(/\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}|[A-Za-z]{3,9}\.? \d{1,2},? \d{4}|\d{1,2} [A-Za-z]{3,9}\.? \d{4}/g)].map((m) => iso(m[0])).filter(Boolean);
+      const s = pf.candidates.start_date?.[0] ? iso(pf.candidates.start_date[0].value) : null;
+      const e = pf.candidates.end_date?.[0] ? iso(pf.candidates.end_date[0].value) : null;
+      if (dates.length && ((s && !dates.includes(s)) || (e && !dates.includes(e)))) { removed.push({ field_key: "agreement_term", value: f.value, reason: `the page states the period ${s ?? "?"} - ${e ?? "?"}` }); return false; }
+    }
+    return true;
+  });
+  return { fields: out, removed };
 }
