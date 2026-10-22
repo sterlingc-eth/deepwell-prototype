@@ -19,8 +19,11 @@ export interface Release {
   public: boolean
   /** Two or three plain customer-facing sentences, one per entry. */
   notes: string[]
-  /** Never shown to customers and removed from every built file. */
-  internal: { sha: string }
+  /** Never shown to customers and removed from every built file.
+   *  ownerApproved (YYYY-MM-DD): the owner signed off this exact wording, so the entry may carry up to six
+   *  notes of a few sentences each (each still under 600 characters, ending in a full stop). allowWords lists
+   *  the only otherwise-blocked words that wording may use. */
+  internal: { sha: string; ownerApproved?: string; allowWords?: string[] }
 }
 
 export interface ReleaseFile {
@@ -97,16 +100,28 @@ export function validateReleases(data: unknown): string[] {
     if (!internal || typeof internal.sha !== 'string' || !/^[0-9a-f]{7,40}$/.test(internal.sha)) {
       bad('"internal.sha" must be a git commit id (7 to 40 letters and digits).')
     }
-    if (!Array.isArray(r.notes) || r.notes.length < 2 || r.notes.length > 3) {
-      bad('"notes" must be a list of two or three sentences.')
+    const approved = !!internal && typeof internal.ownerApproved === 'string' && validDate(internal.ownerApproved)
+    if (internal && internal.ownerApproved !== undefined && !approved) bad('"internal.ownerApproved" must be the sign-off day written YYYY-MM-DD.')
+    const allow = new Set(
+      approved && Array.isArray(internal!.allowWords) ? (internal!.allowWords as unknown[]).map((w) => String(w).toLowerCase()) : [],
+    )
+    const maxNotes = approved ? 6 : 3
+    const maxLen = approved ? 600 : 260
+    if (!Array.isArray(r.notes) || r.notes.length < 2 || r.notes.length > maxNotes) {
+      bad(approved ? '"notes" must be a list of two to six notes.' : '"notes" must be a list of two or three sentences.')
     } else {
       r.notes.forEach((n: unknown, j: number) => {
         if (typeof n !== 'string' || n.trim() === '') return bad(`note ${j + 1} is empty.`)
-        if (n.length > 260) bad(`note ${j + 1} is too long (keep each sentence under 260 characters).`)
-        if (!/[.]$/.test(n.trim())) bad(`note ${j + 1} must be one sentence ending in a full stop.`)
-        if (/[.!?]\s+[A-Z]/.test(n)) bad(`note ${j + 1} looks like more than one sentence; use one sentence per note.`)
-        const hit = FORBIDDEN_RE.exec(n)
-        if (hit) bad(`note ${j + 1} uses the word "${hit[0]}", which is not allowed in customer wording.`)
+        if (n.length > maxLen) bad(`note ${j + 1} is too long (keep each note under ${maxLen} characters).`)
+        if (!/[.]$/.test(n.trim())) bad(`note ${j + 1} must end in a full stop.`)
+        if (!approved && /[.!?]\s+[A-Z]/.test(n)) bad(`note ${j + 1} looks like more than one sentence; use one sentence per note.`)
+        const re = new RegExp(FORBIDDEN_RE.source, 'gi')
+        let hit: RegExpExecArray | null
+        while ((hit = re.exec(n))) {
+          if (allow.has(hit[0].toLowerCase())) continue
+          bad(`note ${j + 1} uses the word "${hit[0]}", which is not allowed in customer wording.`)
+          break
+        }
       })
     }
     if (!ok) return

@@ -59,6 +59,9 @@ check('rejects a version that does not go up', mutate((d) => { d.releases.push({
 check('rejects a Patch that raises the middle number', mutate((d) => { d.releases.push({ ...d.releases[0], version: '1.1.0', type: 'patch' }) }))
 check('rejects an Update that only raises the last number', mutate((d) => { d.releases.push({ ...d.releases[0], version: '1.0.1', type: 'update' }) }))
 check('rejects defect or internal wording', mutate((d) => { d.releases[0].notes[0] = 'We fixed a bug in uploads.' }) && mutate((d) => { d.releases[0].notes[0] = 'Sentinel checked this.' }))
+check('owner-approved wording: longer notes and listed words pass', !mutate((d) => { d.releases[0].internal.ownerApproved = '2026-10-21'; d.releases[0].internal.allowWords = ['fixed']; d.releases[0].notes = ['Voice. Input is fixed in Chrome.', 'B two.', 'C three.', 'D four.', 'E five.'] }))
+check('owner-approved wording: unlisted blocked words and seven notes still fail', mutate((d) => { d.releases[0].internal.ownerApproved = '2026-10-21'; d.releases[0].notes[0] = 'We fixed a bug.' }) && mutate((d) => { d.releases[0].internal.ownerApproved = '2026-10-21'; d.releases[0].notes = ['A.', 'B.', 'C.', 'D.', 'E.', 'F.', 'G.'] }))
+check('owner-approved wording needs a real sign-off day', mutate((d) => { d.releases[0].internal.ownerApproved = 'yes' }))
 check('rejects a track with nothing released', mutate((d) => { d.releases[1].released = false }))
 check('accepts a correct Hotfix after 1.0.0', !mutate((d) => { d.releases.push({ ...d.releases[0], version: '1.0.1', type: 'hotfix', date: '2026-10-09' }) }))
 

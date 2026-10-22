@@ -157,6 +157,28 @@
    "internal": {
     "sha": "55d1b2b"
    }
+  },
+ {
+  "track": "app",
+  "version": "1.3.0",
+  "date": "2026-10-21",
+  "type": "update",
+  "released": true,
+  "public": true,
+  "notes": [
+   "Try DeepWell for your industry. A new live demo lets you pick your industry (real estate, property management, plumbing and HVAC, electrical, contracting and more) and watch your kind of paperwork get uploaded, organized and answered from start to finish.",
+   "A smarter Inbox. DeepWell now recognizes more kinds of paperwork, including licenses, insurance certificates, grants, MOUs, NDAs, subcontracts, change orders, pay applications, pickup tickets and return slips. It only asks for details each kind of document actually has. Copies and voided documents are set aside automatically and kept out of your totals. What’s left in “Needs you” is grouped with a plain reason and a one-click “Look again.” “Sort my documents” previews every change before you confirm, and it can be undone.",
+   "Cleaner customer records. When two customer names look like a typo of each other, DeepWell suggests merging them, and never merges on its own.",
+   "Talk to Donovan. Voice input is fixed in Chrome. Tap the mic and ask your question out loud.",
+   "Donovan keeps getting better. He reads more kinds of documents and answers more questions directly, always with the source."
+  ],
+  "internal": {
+   "sha": "c397348",
+   "ownerApproved": "2026-10-21",
+   "allowWords": [
+    "fixed"
+   ]
   }
+ }
  ]
 }

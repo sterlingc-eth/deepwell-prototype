@@ -1,4 +1,4 @@
-import { forwardRef, memo, startTransition, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
+import { forwardRef, lazy, memo, Suspense, startTransition, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { ArrowUp, LogIn, RotateCcw, X } from 'lucide-react'
 import { ask, AskApiError } from '../services/answerService'
 import { friendlyErrorMessage } from '../services/httpError'
@@ -9,9 +9,12 @@ import { PreflightPill, TypeaheadDropdown, useVoiceInput, VoiceMicButton, VoiceS
 import { useGraph } from '../core/entityGraph'
 import { DonovanMark } from '../components/DonovanMark'
 import type { Answer } from '../core/types'
-import { MobileAnswer } from './MobileAnswer'
+import { loadMobileAnswer } from './sheetLoader'
 import { HelpAnswerCard, HelpHint } from '../components/HelpAnswerCard'
 import { InsightsCard } from '../components/insights/InsightsCard'
+
+// Mobile entry budget (2026-10-21): the answer card is only needed after the first answer; prefetched at idle.
+const MobileAnswer = lazy(() => loadMobileAnswer().then((m) => ({ default: m.MobileAnswer })))
 import { canPromptInstall, isIos, isStandalone, onInstallAvailabilityChange, promptInstall } from './pwa'
 
 // TEAM T2 / Round 18 P2: same cap as AskScreen's own (api/_lib/conversation.js's MAX_CONTEXT_TURNS —
@@ -248,7 +251,7 @@ const TurnView = memo(function TurnView({
   return (
     <div className="grid grid-cols-1 gap-2 min-w-0 scroll-mt-3" data-turn={turn.id}>
       <div className="justify-self-end max-w-[85%] px-4 py-2.5 rounded-2xl rounded-br-md bg-forest-600 text-stone-0 text-body-lg break-words">{turn.question}</div>
-      {turn.answer && (turn.answer.help ? <HelpAnswerCard answer={turn.answer} variant="mobile" /> : <MobileAnswer question={turn.question} answer={turn.answer} onOpenDoc={onOpenDoc} onOpenCustomer={onOpenCustomer} onAsk={onAsk} />)}
+      {turn.answer && (turn.answer.help ? <HelpAnswerCard answer={turn.answer} variant="mobile" /> : <Suspense fallback={<div className="min-h-24" aria-busy="true" />}><MobileAnswer question={turn.question} answer={turn.answer} onOpenDoc={onOpenDoc} onOpenCustomer={onOpenCustomer} onAsk={onAsk} /></Suspense>)}
       {turn.answer?.helpHint && turn.answer.kind === 'no-answer' && <HelpHint variant="mobile" />}
       {(turn.answer?.kind === 'no-answer' || nearMiss.length > 0 || entityChips.length > 0) && didYouMean.length > 0 && <DidYouMeanChips chips={didYouMean} onPick={onAsk} />}
       {turn.error && (

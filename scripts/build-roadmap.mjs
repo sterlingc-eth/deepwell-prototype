@@ -38,12 +38,14 @@ for (const g of GROUPS) {
 if (problems.length) { console.error(problems.map((p) => `build-roadmap: ${p}`).join('\n')); process.exit(1); }
 
 /* ------------------------------------------------------------ (a) website section */
-const CHECK_SVG = '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+// Layout: "Live now" is a full-width deep-green panel; "In progress" and "Coming next" sit side by side under it
+// (stacked on phones). Styles live in index.html <style id="dw-roadmap">.
+const CHECK_SVG = '<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 function stage(cls, heading, sub, items) {
-  const lis = items.map((it) => `<li><b>${esc(it.title)}</b><span>${esc(it.text)}</span></li>`).join('\n          ');
-  return `      <li class="rm-stage ${cls} dw-observe dw-once">
-        <div class="rm-top"><span class="rm-node" aria-hidden="true">${cls === 'rm-live' ? CHECK_SVG : ''}</span><div><h3>${esc(heading)}</h3><small>${esc(sub)}</small></div></div>
-        <ul class="rm-items">
+  const lis = items.map((it) => `<li>${cls === 'rmx-live' ? `<i class="rmx-ic" aria-hidden="true">${CHECK_SVG}</i>` : '<i class="rmx-ic" aria-hidden="true"></i>'}<div><b>${esc(it.title)}</b><span>${esc(it.text)}</span></div></li>`).join('\n          ');
+  return `      <li class="rmx-col ${cls} dw-observe dw-once" aria-labelledby="${cls}-h">
+        <div class="rmx-head"><span class="rmx-dot" aria-hidden="true"></span><h3 id="${cls}-h">${esc(heading)}</h3><span class="rmx-count">${items.length} ${esc(sub)}</span></div>
+        <ul class="rmx-list">
           ${lis}
         </ul>
       </li>`;
@@ -56,12 +58,12 @@ const sectionHtml = `${START}
         <div class="eyebrow">Roadmap</div>
         <h2 id="roadmap-h">What we're building</h2>
       </div>
-      <p class="lede">What works today, what's being built now, and what comes after. No dates. We'd rather ship it than promise it.</p>
+      <p class="lede">What works today, what we're building right now, and what comes after. No dates. We'd rather ship it than promise it.</p>
     </div>
-    <ol class="rm-stages" id="rm-stages" data-snap aria-label="Roadmap: live now, building next, later">
-${stage('rm-live', 'Live now', 'Working today', road.live)}
-${stage('rm-next', 'Building next', 'Coming soon', road.next)}
-${stage('rm-later', 'Later', 'Planned', road.later)}
+    <ol class="rmx" id="rm-stages" aria-label="Roadmap: live now, in progress, coming next">
+${stage('rmx-live', 'Live now', road.live.length === 1 ? 'feature' : 'features', road.live)}
+${stage('rmx-next', 'In progress', 'being built', road.next)}
+${stage('rmx-later', 'Coming next', 'planned', road.later)}
     </ol>
     <div class="rm-foot">
       <button type="button" class="rm-toggle" id="rm-toggle" aria-expanded="false" aria-controls="rm-stages">Show details</button>
@@ -71,7 +73,10 @@ ${stage('rm-later', 'Later', 'Planned', road.later)}
 </section>
 ${END}`;
 
-const html = fs.readFileSync(HTML_PATH, 'utf8');
+// keep each file's own line endings (the Windows checkout has CRLF), compare and splice in LF
+const eolOf = (t) => (t.includes('\r\n') ? '\r\n' : '\n');
+const htmlRaw = fs.readFileSync(HTML_PATH, 'utf8');
+const html = htmlRaw.replace(/\r\n/g, '\n');
 const si = html.indexOf(START);
 const ei = html.indexOf(END);
 let newHtml;
@@ -89,11 +94,12 @@ if (si >= 0 && ei > si) {
 const list = (items) => items.map((i) => i.title.toLowerCase()).join(', ');
 const answer = [
   `Nothing here has a date, and I can't promise one. Live today: ${list(road.live)}.`,
-  `Marked **coming soon** on the site, being built next: ${list(road.next)}.`,
-  `Later, not available today: ${list(road.later)}.`,
+  `In progress, being built now: ${list(road.next)}.`,
+  `Coming next, not available today (marked **coming soon** on the site): ${list(road.later)}.`,
 ].join(' ');
 
-const help = fs.readFileSync(HELP_PATH, 'utf8');
+const helpRaw = fs.readFileSync(HELP_PATH, 'utf8');
+const help = helpRaw.replace(/\r\n/g, '\n');
 const qi = help.indexOf(HELP_Q);
 if (qi < 0) { console.error(`build-roadmap: help 18 has no "${HELP_Q}" entry`); process.exit(1); }
 const lines = help.split('\n');
@@ -129,12 +135,12 @@ if (CHECK) {
     if (!hit) fail(`index.html "Coming soon" pill after "…${lead.trim()}" has no matching item in roadmap.json next/later`);
   }
   if (!n) fail('verify: found no "Coming soon" pills on index.html — the scan is broken');
-  // industries pages marked coming soon must be in "later"
+  // industries pages marked coming soon must be covered by an "In progress" or "Coming next" item
   for (const f of fs.readdirSync(INDUSTRIES_DIR).filter((x) => x.endsWith('.html'))) {
     const page = fs.readFileSync(path.join(INDUSTRIES_DIR, f), 'utf8');
     if (!/status-pill soon/.test(page)) continue;
     const slug = f.replace(/\.html$/, '').replace(/-/g, ' ');
-    if (!road.later.some((it) => it.match.some((k) => k.toLowerCase() === slug))) fail(`public/industries/${f} is marked Coming soon but roadmap.json "later" has no item matching "${slug}"`);
+    if (!covered.some((it) => it.match.some((k) => k.toLowerCase() === slug))) fail(`public/industries/${f} is marked Coming soon but roadmap.json next/later has no item matching "${slug}"`);
   }
   // fleet / equipment rental must stay on the roadmap
   if (!road.later.some((it) => it.id === 'fleet-equipment-rental')) fail('roadmap.json "later" lost Fleet and equipment rental');
@@ -143,7 +149,7 @@ if (CHECK) {
   if (problems.length) { console.error(problems.map((p) => `build-roadmap --check: ${p}`).join('\n')); process.exit(1); }
   console.log(`build-roadmap --check: ok (${road.live.length} live, ${road.next.length} next, ${road.later.length} later; ${n} site pills covered)`);
 } else {
-  if (newHtml !== html) fs.writeFileSync(HTML_PATH, newHtml);
-  if (newHelp !== help) fs.writeFileSync(HELP_PATH, newHelp);
+  if (newHtml !== html) fs.writeFileSync(HTML_PATH, newHtml.replace(/\n/g, eolOf(htmlRaw)));
+  if (newHelp !== help) fs.writeFileSync(HELP_PATH, newHelp.replace(/\n/g, eolOf(helpRaw)));
   console.log(`build-roadmap: index.html ${newHtml !== html ? 'updated' : 'unchanged'}, help 18 ${newHelp !== help ? 'updated' : 'unchanged'}`);
 }

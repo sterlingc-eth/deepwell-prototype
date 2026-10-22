@@ -10,6 +10,8 @@ let docChunk = false
 let customerChunk = false
 export const loadDocSheet = () => import('./DocSheet').then((m) => ((docChunk = true), m))
 export const loadCustomerSheet = () => import('./CustomerSheet').then((m) => ((customerChunk = true), m))
+export const loadDocsTab = () => import('./DocsTab')
+export const loadMobileAnswer = () => import('./MobileAnswer')
 export const loadAccountSheet = () => import('./AccountSheet')
 
 /**
@@ -26,7 +28,7 @@ export function openSheet(kind: 'doc' | 'customer', update: () => void) {
 /** Prefetch the sheet chunks one idle slot apart (each fires as soon as the main thread is idle; the timeout is only
  *  the latest it may wait). `onDone` runs once every chunk has loaded. Returns a canceller. */
 export function schedulePrefetch(onDone?: () => void): () => void {
-  const steps = [loadDocSheet, loadCustomerSheet, loadAccountSheet]
+  const steps = [loadMobileAnswer, loadDocsTab, loadDocSheet, loadCustomerSheet, loadAccountSheet]
   let cancelled = false
   let cancelIdle: () => void = () => {}
   const next = (i: number) => {

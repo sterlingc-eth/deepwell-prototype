@@ -1,26 +1,37 @@
 {
-  "_note": "Single source of truth for the website roadmap section (index.html, between the roadmap markers) and the 'What features are coming soon?' help answer (docs/help/18). Edit here, then run: npm run build:roadmap && npm run build:support-kb. No dates, ever. 'match' lists lowercase phrases used by verify:roadmap to tie each 'Coming soon' pill on the site to an item here.",
+  "_note": "Single source of truth for the website roadmap section (index.html, between the roadmap markers) and the 'What features are coming soon?' help answer (docs/help/18). Groups: live = Live now, next = In progress, later = Coming next. Edit here, then run: npm run build:roadmap && npm run build:support-kb. No dates, ever. 'match' lists lowercase phrases used by verify:roadmap to tie each 'Coming soon' pill on the site (and each industries page marked Coming soon) to an item here.",
   "live": [
-    { "id": "ask-donovan", "title": "Ask Donovan", "text": "Ask a plain-English question and get an answer with the original page attached as the source." },
-    { "id": "phone-scanning", "title": "Phone app scanning", "text": "Scan paperwork on your phone, even with no signal; pages upload when it returns." },
+    { "id": "upload", "title": "Upload and bulk import", "text": "Add PDFs, photos, Word, Excel and CSV files one at a time, or drop in a whole folder or a .zip." },
+    { "id": "auto-sort", "title": "Automatic sorting and field reading", "text": "Every page is read, sorted by kind and filed, with names, dates, amounts and serial numbers pulled out for you." },
+    { "id": "inbox", "title": "Inbox with \"Needs you\"", "text": "Anything DeepWell could not settle on its own waits in one short list, with a plain reason." },
+    { "id": "smarter-inbox", "title": "Smarter Inbox", "text": "More kinds of paperwork recognized, copies and voided documents set aside, and every sort previewed before you confirm. New in 1.3." },
+    { "id": "records", "title": "Records and customer profiles", "text": "Browse by document or by customer and see every visit, invoice and warranty for one customer in one place." },
+    { "id": "ask-donovan", "title": "Ask Donovan, with sources", "text": "Ask a plain-English question and get an answer with the original page attached as the source." },
+    { "id": "did-you-mean", "title": "\"Did you mean\" for names and addresses", "text": "Misspell a customer name or an address and Donovan offers the closest match instead of coming up empty." },
+    { "id": "voice", "title": "Voice questions", "text": "Tap the mic and ask Donovan your question out loud." },
+    { "id": "phone-app", "title": "Phone app", "text": "Scan paperwork on your phone, even with no signal; pages upload when it returns." },
+    { "id": "office-view", "title": "Office and field views", "text": "A calm dark view for the office, or switch to light, larger type for working outdoors." },
     { "id": "warranty", "title": "Warranty tracking and export", "text": "See which coverage is expiring across every unit and export warranty records any time." },
-    { "id": "bulk-upload", "title": "Bulk upload", "text": "Drag in a whole folder or a .zip and every file is read, sorted and filed." },
-    { "id": "records-search", "title": "Records search", "text": "Find a customer, address, serial number or date across every document you have sent in." },
-    { "id": "status-page", "title": "Public status page", "text": "See whether DeepWell is up right now, and the history of past incidents, at status.deepwelltechnology.com." },
-    { "id": "help-chat", "title": "Help chat", "text": "Ask the help chat how DeepWell works, any time, with answers drawn from our public help articles." }
+    { "id": "team", "title": "Team accounts", "text": "Invite your team, each with their own login." },
+    { "id": "billing", "title": "Plans and billing", "text": "Pick a plan, change it and manage billing from inside DeepWell." },
+    { "id": "api", "title": "API access", "text": "Connect your own systems to DeepWell on the Fleet plan." },
+    { "id": "industry-demo", "title": "Industry demo", "text": "Pick from 43 industries and watch your kind of paperwork get uploaded, organized and answered." },
+    { "id": "help-chat", "title": "Help chat", "text": "Ask the help chat how DeepWell works, any time, with answers drawn from our public help articles." },
+    { "id": "status-page", "title": "Public status page", "text": "See whether DeepWell is up right now, and past incidents, at status.deepwelltechnology.com." }
   ],
   "next": [
-    { "id": "email-folder-upload", "title": "Email and folder upload", "text": "Forward a vendor invoice or drop files in a folder and they file themselves.", "match": ["email", "folder upload"] },
-    { "id": "google-drive-sync", "title": "Google Drive sync", "text": "Connect a Drive folder so new files come in on their own.", "match": ["drive sync"] },
-    { "id": "branch-scoping", "title": "Branch scoping", "text": "Limit each person to the records of their own branch or location.", "match": ["branch scoping"] },
-    { "id": "callback-analytics", "title": "Callback analytics", "text": "See which technicians and equipment brands generate the most repeat visits.", "match": ["callback analytics"] },
-    { "id": "backups-restore", "title": "Backups and per-company restore", "text": "Scheduled off-site backups, with the option to restore a single company.", "match": ["backup", "per-company restore"] },
-    { "id": "uptime-sla", "title": "Uptime SLA", "text": "An uptime commitment with service credits.", "match": ["uptime sla"] }
+    { "id": "donovan-every-industry", "title": "Donovan answers more, in every industry", "text": "More of your questions answered directly from your records, whatever your line of work, always with the source.", "match": ["donovan answers more"] },
+    { "id": "backups", "title": "Automatic encrypted backups", "text": "Your customer files copied on a schedule, encrypted, to a separate location.", "match": ["backup"] },
+    { "id": "google-drive-import", "title": "Google Drive import", "text": "Choose files and folders in your Google Drive and DeepWell brings them in and reads them.", "match": ["google drive import"] }
   ],
   "later": [
-    { "id": "electrical", "title": "Electrical", "text": "Panel schedules, permits and inspections for electrical contractors.", "match": ["electrical"] },
-    { "id": "plumbing", "title": "Plumbing", "text": "Backflow testing, water heater warranties and permits for plumbing contractors.", "match": ["plumbing"] },
-    { "id": "property-management", "title": "Property management", "text": "Leases, unit turns, vendor compliance and appliance warranties for property managers.", "match": ["property management"] },
-    { "id": "fleet-equipment-rental", "title": "Fleet and equipment rental", "text": "Service history and paperwork for rented equipment and vehicle fleets.", "match": ["fleet and equipment rental", "equipment rental"] }
+    { "id": "donovan-dashboard", "title": "Donovan for every industry on the dashboard", "text": "Ask Donovan right from your dashboard, tuned to your industry.", "match": ["donovan for every industry"] },
+    { "id": "drive-sync", "title": "Deeper Google Drive sync", "text": "Connect a Drive folder once and new files come in on their own.", "match": ["drive sync"] },
+    { "id": "restore", "title": "One-click restore", "text": "Bring back a company's files from a backup in one click.", "match": ["per-company restore", "restore"] },
+    { "id": "email-folder-upload", "title": "Email and folder upload", "text": "Forward a vendor invoice or drop files in a folder and they file themselves.", "match": ["email", "folder upload"] },
+    { "id": "branch-scoping", "title": "Branch scoping", "text": "Limit each person to the records of their own branch or location.", "match": ["branch scoping"] },
+    { "id": "callback-analytics", "title": "Callback analytics", "text": "See which technicians and equipment brands generate the most repeat visits.", "match": ["callback analytics"] },
+    { "id": "uptime-sla", "title": "Uptime SLA", "text": "An uptime commitment with service credits.", "match": ["uptime sla"] },
+    { "id": "fleet-equipment-rental", "title": "Fleet and equipment rental", "text": "Service history and paperwork for rented equipment and vehicle fleets.", "match": ["fleet and equipment rental", "fleet equipment rental", "equipment rental"] }
   ]
 }

@@ -1,6 +1,6 @@
 import { Component, lazy, Suspense, type ComponentProps, type ReactNode } from 'react'
 import { Sheet } from './Sheet'
-import { loadCustomerSheet, loadDocSheet } from './sheetLoader'
+import { loadCustomerSheet, loadDocSheet, loadDocsTab } from './sheetLoader'
 import { forcedOpen, wasDismissed } from './installGuideState'
 import { installPath } from './pwa'
 
@@ -59,6 +59,38 @@ export function LazyCustomerSheet(props: ComponentProps<typeof CustomerSheetLazy
       </Suspense>
     </SheetBoundary>
   )
+}
+
+const DocsTabLazy = lazy(() => loadDocsTab().then((m) => ({ default: m.DocsTab })))
+
+/** Mobile entry budget (2026-10-21): the Docs tab is hidden on first paint, so its code is its own chunk, prefetched
+ *  at idle. The placeholder fills the tab so nothing jumps; a chunk that can't load says so inline. */
+export function LazyDocsTab(props: ComponentProps<typeof DocsTabLazy>) {
+  return (
+    <TabBoundary>
+      <Suspense fallback={<div className="h-full" aria-busy="true" />}>
+        <DocsTabLazy {...props} />
+      </Suspense>
+    </TabBoundary>
+  )
+}
+
+class TabBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  override state = { failed: false }
+  static getDerivedStateFromError() {
+    return { failed: true }
+  }
+  override render() {
+    if (!this.state.failed) return this.props.children
+    return (
+      <div className="p-4 flex flex-col gap-3">
+        <p className="m-0 text-body text-ink-2">Couldn't load this tab. Check your connection, then reload.</p>
+        <button type="button" onClick={() => window.location.reload()} className="min-h-touch rounded-xl bg-accent text-forest-950 font-semibold">
+          Reload
+        </button>
+      </div>
+    )
+  }
 }
 
 const InstallGuideLazy = lazy(() => import('./InstallGuide').then((m) => ({ default: m.InstallGuide })))

@@ -34,6 +34,7 @@ import { clearNothingReadMarker } from "./modelAvoidance/storedTextReread.js";
 
 export const RECHECK_VERSION = LABEL_FILL_VERSION;
 export const RECHECK_ACTION = "document.fields_rechecked";
+const RECHECK_EXTRACTION_CHUNK = 200; // ids per extraction lookup (stays under its 500-id / 8000-row caps)
 const TENANT = "tenant_id = (current_setting('app.tenant_id', true))::uuid";
 const REPEATABLE = new Set(["work_performed", "part_number"]);
 /** True when the document already has a customer or unit link (the same test verifyByAi applies in SQL). */
@@ -189,13 +190,22 @@ export async function recheckTenantMissing(ctx, { limit = 40, today, deadlineAt 
                          AND COALESCE((a.changes->>'recheck_version')::int, 0) >= $1) AS already_rechecked
          FROM documents d
         WHERE d.${TENANT} AND d.stage IN ('read', 'mapped', 'linked') AND d.document_type IS NOT NULL
-          ${ids ? "AND d.id = ANY($3::uuid[])" : ""}
+          ${ids ? "AND d.id = ANY($2::uuid[])" : ""}
         ORDER BY d.created_at DESC
         LIMIT 3000`,
-      ids ? [RECHECK_VERSION, !!force, ids] : [RECHECK_VERSION, !!force]
+      // 2026-10-22 fix: every bound parameter MUST appear in the SQL. `force` used to be sent as an unreferenced $2
+      // (ids as $3); Postgres/Neon cannot type an unused parameter and rejects the whole query (42P18 "could not
+      // determine data type of parameter $2"), so the Inbox's "Re-check all missing fields" and the nightly sweep's
+      // re-check both failed. `force` is applied in JS below, never in SQL.
+      ids ? [RECHECK_VERSION, ids] : [RECHECK_VERSION]
     );
     if (!docs.length) return [];
-    const ex = await db.listExtractionsByDocuments(docs.map((d) => d.id));
+    // listExtractionsByDocuments caps at 500 ids / 8000 rows; a large account (~1,200+ documents) would otherwise
+    // see every document past the cap as "missing everything". Fetch in chunks.
+    const ex = [];
+    for (let i = 0; i < docs.length; i += RECHECK_EXTRACTION_CHUNK) {
+      ex.push(...(await db.listExtractionsByDocuments(docs.slice(i, i + RECHECK_EXTRACTION_CHUNK).map((d) => d.id))));
+    }
     const byDoc = new Map();
     for (const e of ex) { if (!byDoc.has(e.document_id)) byDoc.set(e.document_id, []); byDoc.get(e.document_id).push(e); }
     return docs.filter((d) => {

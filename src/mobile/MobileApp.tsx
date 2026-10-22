@@ -9,8 +9,7 @@ import { useAppStore } from '../store/appStore'
 import { Wordmark } from '../components/Wordmark'
 import { AskTab } from './AskTab'
 import { ScanTab } from './ScanTab'
-import { DocsTab } from './DocsTab'
-import { LazyCustomerSheet, LazyDocSheet, LazyInstallGuide } from './lazySheets'
+import { LazyCustomerSheet, LazyDocsTab, LazyDocSheet, LazyInstallGuide } from './lazySheets'
 import { openSheet, schedulePrefetch } from './sheetLoader'
 import { whenIdle } from './idle'
 import { useKeyboardOpen } from './useKeyboardOpen'
@@ -305,7 +304,7 @@ export function MobileApp() {
           />
         </div>
         <div className={tab === 'docs' ? 'h-full' : 'hidden'}>
-          <DocsTab active={tab === 'docs'} syncStatus={sync.status} onOpenDoc={openDoc} onRefresh={refreshSync} />
+          <LazyDocsTab active={tab === 'docs'} syncStatus={sync.status} onOpenDoc={openDoc} onRefresh={refreshSync} />
         </div>
       </main>
 

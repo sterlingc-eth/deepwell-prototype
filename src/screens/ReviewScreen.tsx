@@ -604,8 +604,8 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
     if (!targetIds.length) return;
     setRecheckAllBusy(true);
     setRecheckAllMsg(null);
+    let checked = 0, fixedDocs = 0, fields = 0;
     try {
-      let checked = 0, fixedDocs = 0, fields = 0;
       for (let i = 0; i < targetIds.length; i += 100) {
         const r = await reviewClient.recheckMissing(targetIds.slice(i, i + 100), 100);
         checked += r.rechecked; fixedDocs += r.filled; fields += r.fields;
@@ -613,7 +613,14 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
       try { await loadGraphFromServer(); } catch { /* keep last-good data */ }
       setRecheckAllMsg(`Re-checked ${checked} document${checked === 1 ? '' : 's'}: restored ${fields} field${fields === 1 ? '' : 's'} on ${fixedDocs}. ${Math.max(0, checked - fixedDocs)} still need a person.`);
     } catch (e) {
-      setRecheckAllMsg(e instanceof Error ? e.message : 'Could not re-check these documents.');
+      // Never show a bare "Internal server error": say what was saved and that pressing again continues.
+      const raw = e instanceof Error ? e.message : '';
+      const friendly = !raw || /internal server error|^5\d\d\b|failed to fetch|networkerror/i.test(raw)
+        ? 'We couldn\'t finish re-checking just now. Press "Re-check all missing fields" again in a minute to continue.'
+        : raw;
+      const soFar = checked ? ` (${checked} document${checked === 1 ? '' : 's'} re-checked and saved before it stopped; ${fields} field${fields === 1 ? '' : 's'} restored.)` : '';
+      if (checked) { try { await loadGraphFromServer(); } catch { /* keep last-good data */ } }
+      setRecheckAllMsg(friendly + soFar);
     } finally {
       setRecheckAllBusy(false);
     }

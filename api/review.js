@@ -339,32 +339,41 @@ export default async (req, res) => {
       // (<=100 per call; the caller loops on `leftForNextRun`), idempotent, $0.
       case 'recheckMissing': {
         requireAdmin(auth);
-        const baseOpts = {
-          documentIds: Array.isArray(payload.documentIds) ? payload.documentIds : null,
-          force: payload.force === true,
-          actorClerkId: auth.userId,
-          source: 'inbox-bulk',
-        };
-        if (payload.all !== true || baseOpts.force) {
-          result = await recheckTenantMissing(ctx, { ...baseOpts, limit: Math.min(300, Number(payload.limit) || 50), deadlineAt: Date.now() + 240_000 });
-          break;
+        try {
+          const baseOpts = {
+            documentIds: Array.isArray(payload.documentIds) ? payload.documentIds : null,
+            force: payload.force === true,
+            actorClerkId: auth.userId,
+            source: 'inbox-bulk',
+          };
+          if (payload.all !== true || baseOpts.force) {
+            result = await recheckTenantMissing(ctx, { ...baseOpts, limit: Math.min(300, Number(payload.limit) || 50), deadlineAt: Date.now() + 240_000 });
+            break;
+          }
+          // Chunked loop behind the admin button: 100 documents per pass until nothing is left or the time budget is
+          // spent (the caller can press again; what is done stays done, and a finished document is not picked twice).
+          const stopAt = Date.now() + 200_000;
+          const total = { scanned: 0, candidates: 0, rechecked: 0, filled: 0, fields: 0, verified: 0, leftForNextRun: 0, errors: 0, passes: 0 };
+          let prevLeft = Infinity;
+          for (;;) {
+            const r = await recheckTenantMissing(ctx, { ...baseOpts, limit: 100, deadlineAt: stopAt });
+            total.passes++;
+            const stalled = !r.filled && !r.verified && (r.leftForNextRun ?? 0) >= prevLeft;
+            prevLeft = r.leftForNextRun ?? 0;
+            for (const k of ['scanned', 'rechecked', 'filled', 'fields', 'verified', 'errors']) total[k] += r[k] ?? 0;
+            total.candidates = Math.max(total.candidates, r.candidates ?? 0);
+            total.leftForNextRun = r.leftForNextRun ?? 0;
+            if (stalled || !r.scanned || !total.leftForNextRun || Date.now() >= stopAt || total.passes >= 30) break;
+          }
+          result = total;
+        } catch (err) {
+          // A failure here must never reach the owner as a bare "Internal server error". Log the detail (no customer
+          // data: the pg error carries code/message only), answer in plain words. Documents already re-checked stay
+          // done (each is its own transaction), so pressing the button again simply continues.
+          if (err instanceof reviewStore.ReviewError || err instanceof AuthError) throw err;
+          console.error('review API error (recheckMissing):', err);
+          throw new reviewStore.ReviewError("We couldn't finish re-checking these documents just now. Anything already re-checked is saved, so press \"Re-check all missing fields\" again in a minute to continue. If it keeps happening, contact support.", 503);
         }
-        // Chunked loop behind the admin button: 100 documents per pass until nothing is left or the time budget is
-        // spent (the caller can press again; what is done stays done, and a finished document is not picked twice).
-        const stopAt = Date.now() + 200_000;
-        const total = { scanned: 0, candidates: 0, rechecked: 0, filled: 0, fields: 0, verified: 0, leftForNextRun: 0, errors: 0, passes: 0 };
-        let prevLeft = Infinity;
-        for (;;) {
-          const r = await recheckTenantMissing(ctx, { ...baseOpts, limit: 100, deadlineAt: stopAt });
-          total.passes++;
-          const stalled = !r.filled && !r.verified && (r.leftForNextRun ?? 0) >= prevLeft;
-          prevLeft = r.leftForNextRun ?? 0;
-          for (const k of ['scanned', 'rechecked', 'filled', 'fields', 'verified', 'errors']) total[k] += r[k] ?? 0;
-          total.candidates = Math.max(total.candidates, r.candidates ?? 0);
-          total.leftForNextRun = r.leftForNextRun ?? 0;
-          if (stalled || !r.scanned || !total.leftForNextRun || Date.now() >= stopAt || total.passes >= 30) break;
-        }
-        result = total;
         break;
       }
       case 'resortDocuments':

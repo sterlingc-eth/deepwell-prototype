@@ -24,7 +24,12 @@ export function formatDate(iso: string): string {
 
 function entry(r: Release, index: number): string {
   const label = TYPE_LABEL[r.type]
-  const bullets = r.notes.map((n) => `<li>${esc(n)}</li>`).join('')
+  // Owner-approved notes are a short headline sentence then detail: show the headline in bold.
+  const lead = (n: string) => {
+    const m = r.internal?.ownerApproved ? /^([^.!?]+[.!?])\s+(.+)$/s.exec(n) : null
+    return m ? `<strong>${esc(m[1] ?? "")}</strong> ${esc(m[2] ?? "")}` : esc(n)
+  }
+  const bullets = r.notes.map((n) => `<li>${lead(n)}</li>`).join('')
   return (
     `<li class="pn-rel" data-type="${r.type}" style="--i:${index}">` +
     `<span class="pn-node" aria-hidden="true"></span>` +

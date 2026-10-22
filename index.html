@@ -258,49 +258,11 @@ section{padding-block:clamp(36px,5vw,64px);border-top:1px solid var(--line)}
 .plan .math{min-height:5.2em}
 .trial-badge{white-space:nowrap;padding:3px 10px;border-radius:999px;background:var(--well);color:#fff;font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.08em;text-transform:uppercase}
 .pill-soon{display:inline-flex;align-items:center;padding:2px 9px;border-radius:999px;border:1px dashed var(--line-strong);color:var(--faint);background:transparent;font-family:"IBM Plex Mono",monospace;font-size:.64rem;letter-spacing:.07em;text-transform:uppercase;white-space:nowrap}
-/* roadmap section (generated markup: scripts/build-roadmap.mjs from docs/roadmap.json) */
-#roadmap{padding-block:clamp(36px,5vw,64px);--rm-gap:clamp(18px,2.6vw,36px);--rm-node:34px}
-#roadmap .sec-head{align-items:end;margin-bottom:clamp(20px,3vw,32px)}
-.rm-stages{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--rm-gap)}
-.rm-stage{position:relative;min-width:0;display:flex;flex-direction:column}
-.rm-stage:not(:last-child)::before{content:"";position:absolute;top:calc(var(--rm-node)/2 - 1px);left:calc(var(--rm-node) + 10px);right:calc(-1*var(--rm-gap) + 10px);height:2px;background:var(--well);opacity:.55}
-.rm-next::before{background:repeating-linear-gradient(90deg,var(--brass) 0 8px,transparent 8px 14px)!important;opacity:.8!important}
-.rm-top{display:flex;flex-direction:column;align-items:flex-start;gap:12px;margin-bottom:16px}
-.rm-node{position:relative;flex:none;width:var(--rm-node);height:var(--rm-node);border-radius:50%;display:grid;place-items:center}
-.rm-live .rm-node{background:var(--well);color:#fff}
-.rm-next .rm-node{border:2px solid var(--brass);background:var(--ground)}
-.rm-next .rm-node::before{content:"";width:12px;height:12px;border-radius:50%;background:var(--brass)}
-.rm-next .rm-node::after{content:"";position:absolute;inset:-2px;border-radius:50%;border:2px solid var(--brass);animation:rmPulse 2.4s ease-out infinite}
-.rm-later .rm-node{border:2px dashed var(--line-strong);background:var(--ground)}
-@keyframes rmPulse{0%{transform:scale(1);opacity:.7}100%{transform:scale(1.9);opacity:0}}
-@media (prefers-reduced-motion:reduce){.rm-next .rm-node::after{animation:none;opacity:0}}
-.rm-top h3{margin:0;font-size:1.15rem;line-height:1.2}
-.rm-top small{display:block;font:500 .7rem/1.3 var(--mono,ui-monospace,monospace);letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-top:3px}
-.rm-next .rm-top small{color:var(--brass-text)}
-.rm-items{list-style:none;margin:0;padding:16px 18px;display:grid;align-content:start;gap:14px;flex:1;background:var(--surface);border:1px solid var(--line);border-radius:8px}
-.rm-next .rm-items{border-color:rgba(185,138,78,.55);box-shadow:0 18px 40px -30px rgba(185,138,78,.9)}
-.rm-later .rm-items{background:transparent;border-style:dashed}
-.rm-items li{position:relative;padding-left:22px;font-size:.86rem;line-height:1.4;color:var(--muted)}
-.rm-items li b{display:block;font-size:.95rem;font-weight:600;color:var(--text);margin-bottom:1px}
-.rm-items li span{display:block}
-.rm-items li::before{content:"";position:absolute;left:0;top:.38em;width:9px;height:9px;border-radius:50%}
-.rm-live .rm-items li::before{width:12px;height:7px;border-radius:0;border-left:2px solid var(--well);border-bottom:2px solid var(--well);transform:rotate(-45deg);top:.3em;left:1px}
-.rm-next .rm-items li::before{background:var(--brass)}
-.rm-later .rm-items li::before{border:1.5px solid var(--line-strong)}
 .rm-ask{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px 14px;margin:clamp(20px,3vw,32px) 0 0;font-size:.95rem;color:var(--muted);text-align:center}
 .rm-ask a{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:10px 18px;border:1px solid var(--line-strong);border-radius:4px;color:var(--text);font-weight:600;text-decoration:none;transition:background .2s ease,transform .2s ease}
 .rm-ask a:hover{background:var(--surface);transform:translateY(-1px)}
-:root[data-theme="dark"] .rm-live .rm-items li::before{border-color:#9DC4B2}
-:root[data-theme="dark"] .rm-live .rm-node{background:#2F6B52}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .rm-live .rm-items li::before{border-color:#9DC4B2}:root:not([data-theme="light"]) .rm-live .rm-node{background:#2F6B52}}
 @media (max-width:860px){
-  .rm-stages{grid-template-columns:1fr;gap:28px}
-  .rm-stage{padding-left:calc(var(--rm-node) + 14px)}
-  .rm-top{flex-direction:row;align-items:center;margin-left:calc(-1*(var(--rm-node) + 14px));margin-bottom:12px}
-  .rm-stage:not(:last-child)::before{top:calc(var(--rm-node) + 8px);bottom:-20px;left:calc(var(--rm-node)/2 - 1px);right:auto;width:2px;height:auto}
-  .rm-next::before{background:repeating-linear-gradient(180deg,var(--brass) 0 8px,transparent 8px 14px)!important}
 }
-@media (max-width:600px){.rm-items{gap:10px;padding:14px 16px}.rm-items li span{display:none}.rm-items li b{margin:0}}
 @media (max-width:1100px){.plans-4{grid-template-columns:repeat(2,1fr)}}
 @media (max-width:860px){.plans,.plans-4{grid-template-columns:1fr}}
 /* cost-of-missing-this: interactive calculator + tightened registration note */
@@ -583,7 +545,7 @@ footer a{color:var(--muted);text-decoration:none}
    the pre-existing .cost-card, which uses the same JS-only mechanism):
    without JS these would otherwise stay invisible forever. */
 .sec-head,.person,.founder,.plan,.principle,.cost-card,.cost-calc{opacity:1!important;transform:none!important}
-#roadmap .rm-items li span{display:block!important}.rm-toggle{display:none}
+#roadmap .rmx-list span{display:block!important}.rm-toggle{display:none}
 </style></noscript>
 <style id="dw-tighten">
 /* ==== Density pass: fewer, tighter sections (r28) ==== */
@@ -1004,12 +966,6 @@ h2{font-size:clamp(1.5rem,2.4vw,1.9rem)}
   .principle h4,.principle p{display:block;margin:0}
   .principle h4::after{content:none}
   .principle p{grid-column:1 / -1;margin-top:2px}
-  .rm-stages{margin-top:2px}
-  .rm-stages>.rm-stage{flex-basis:min(80%,300px);padding-left:0;display:flex;flex-direction:column}
-  .rm-stage:not(:last-child)::before{top:calc(var(--rm-node)/2 - 1px);bottom:auto;left:calc(var(--rm-node) + 10px);right:-10px;width:auto;height:2px;background:var(--well)}
-  .rm-next::before{background:repeating-linear-gradient(90deg,var(--brass) 0 8px,transparent 8px 14px)!important}
-  .rm-top{flex-direction:column;align-items:flex-start;margin-left:0}
-  .rm-top h3{font-size:1.05rem}
 }
 [data-snap]:focus-visible{outline:2px solid var(--brass);outline-offset:-2px}
 
@@ -1047,18 +1003,6 @@ h2{font-size:clamp(1.5rem,2.4vw,1.9rem)}
   .people>.person{flex-basis:min(86%,330px)}
 }
 
-/* roadmap: titles by default, one toggle for the one-liners */
-#roadmap .rm-items li span{display:none}
-#roadmap.rm-open .rm-items li span{display:block}
-#roadmap{padding-block:clamp(14px,1.6vw,22px)}
-#roadmap .sec-head{margin-bottom:12px}
-.rm-top{margin-bottom:10px;gap:8px}
-.rm-items{gap:9px;padding:13px 16px}
-.rm-items li b{margin:0;line-height:1.35}
-.rm-items li::before{top:.5em}
-.rm-live .rm-items li::before{top:.4em}
-#roadmap.rm-open .rm-items{gap:12px}
-#roadmap.rm-open .rm-items li b{margin-bottom:1px}
 .rm-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:4px 20px;margin-top:12px}
 .rm-foot .rm-ask{margin:0}
 .rm-toggle{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:10px 18px;border:1px solid var(--line-strong);border-radius:4px;background:transparent;color:var(--text);font:inherit;font-weight:600;font-size:.95rem;cursor:pointer;transition:background .2s ease}
@@ -1067,7 +1011,6 @@ h2{font-size:clamp(1.5rem,2.4vw,1.9rem)}
 .rm-toggle[aria-expanded="true"]::after{transform:translateY(2px) rotate(-135deg)}
 @media (min-width:701px) and (max-width:860px){.rm-stages{gap:16px}.rm-stage:not(:last-child)::before{bottom:-12px}.rm-top{margin-bottom:8px}}
 @media (max-width:860px){.rm-foot{margin-top:6px}}
-@media (max-width:600px){.rm-items{gap:8px;padding:11px 14px}.rm-foot{flex-direction:column;gap:0}}
 
 /* plans */
 .plans-every{margin-bottom:10px}
@@ -1334,16 +1277,6 @@ html.dwm .q[aria-pressed="true"]{box-shadow:none}
   /* chips: the brass marker glides to the chosen question */
   html.dwm .mo-ind{transition:transform .35s var(--mo-travel),opacity .15s}
   html.dwm .mo-ind.mo-jump{transition:none}
-  /* roadmap: node lights, rail draws to the next stop, items follow in order */
-  @media (min-width:861px){.rm-stage:nth-child(2){--rm-d:.6s}.rm-stage:nth-child(3){--rm-d:1.2s}}
-  html.dwm .rm-stage .rm-node{transition:transform .5s var(--mo-settle) var(--rm-d,0s),opacity .3s ease var(--rm-d,0s)}
-  html.dwm .rm-stage:not(.in-view) .rm-node{transform:scale(.6);opacity:0}
-  html.dwm .rm-stage:not(:last-child)::before{transform-origin:left top;transition:transform .6s var(--mo-travel) calc(var(--rm-d,0s) + .3s)}
-  html.dwm .rm-stage:not(:last-child):not(.in-view)::before{transform:scaleX(0)}
-  html.dwm .rm-items li{transition:opacity .4s ease,transform .4s var(--mo-settle);transition-delay:calc(var(--rm-d,0s) + .3s + var(--i,0)*70ms)}
-  @media (min-width:701px){html.dwm .rm-stage:not(.in-view) .rm-items li{opacity:0;transform:translateY(6px)}}
-  html.dwm .rm-next .rm-node::after{animation-iteration-count:3}
-  @media (min-width:701px) and (max-width:860px){html.dwm .rm-stage:not(:last-child):not(.in-view)::before{transform:scaleY(0)}}
   /* quiet reveals for a few blocks that had none */
   html.dwm [data-mo]{transition:opacity .6s var(--mo-settle) var(--mo-d,0s),transform .6s var(--mo-settle) var(--mo-d,0s)}
   html.dwm [data-mo]:not(.mo-in){opacity:0;transform:translateY(var(--mo-y,14px))}
@@ -1353,6 +1286,59 @@ html.dwm .q[aria-pressed="true"]{box-shadow:none}
   /* closing rules: each icon is drawn in */
   html.dwm .principle svg>*{stroke-dasharray:1 2;stroke-dashoffset:0;transition:stroke-dashoffset .8s var(--mo-travel) calc(.3s + var(--pd,0s))}
   html.dwm .principle:not(.in-view) svg>*{stroke-dashoffset:1}
+}
+</style>
+<style id="dw-roadmap">
+/* roadmap (markup generated by scripts/build-roadmap.mjs from docs/roadmap.json): Live now panel, then In progress + Coming next */
+#roadmap{padding-block:clamp(28px,4vw,56px)}
+#roadmap .sec-head{margin-bottom:clamp(16px,2.4vw,26px)}
+.rmx{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:clamp(14px,2vw,22px)}
+.rmx-col{position:relative;min-width:0;border-radius:14px;padding:clamp(18px,2.4vw,28px)}
+.rmx-live{grid-column:1/-1;color:#F2F5F1;background:radial-gradient(700px 260px at 100% 0%,rgba(216,174,110,.16),transparent 60%),linear-gradient(160deg,#1B4834 0%,#163C2C 45%,#10301F 100%);border:1px solid rgba(216,174,110,.32);box-shadow:0 24px 60px -36px rgba(11,22,19,.8)}
+.rmx-next{background:var(--surface);border:1px solid rgba(185,138,78,.5);box-shadow:inset 0 3px 0 var(--brass),0 18px 44px -34px rgba(185,138,78,.9)}
+.rmx-later{background:transparent;border:1.5px dashed var(--line-strong)}
+.rmx-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.rmx-head h3{font-size:clamp(1.25rem,2vw,1.5rem);line-height:1.15}
+.rmx-live .rmx-head h3{color:#fff}
+.rmx-count{margin-left:auto;padding:3px 10px;border-radius:999px;font:500 .66rem/1.4 "IBM Plex Mono",ui-monospace,monospace;letter-spacing:.09em;text-transform:uppercase;white-space:nowrap}
+.rmx-live .rmx-count{background:rgba(227,194,143,.14);color:#E9CD9E;border:1px solid rgba(227,194,143,.35)}
+.rmx-next .rmx-count{color:var(--brass-text);border:1px solid rgba(185,138,78,.55)}
+.rmx-later .rmx-count{color:var(--muted);border:1px dashed var(--line-strong)}
+.rmx-dot{position:relative;flex:none;width:12px;height:12px;border-radius:50%}
+.rmx-live .rmx-dot{background:#8FD3AE;box-shadow:0 0 0 4px rgba(143,211,174,.18)}
+.rmx-next .rmx-dot{background:var(--brass)}
+.rmx-next .rmx-dot::after{content:"";position:absolute;inset:-4px;border-radius:50%;border:2px solid var(--brass);animation:rmxPulse 2.4s ease-out 3}
+.rmx-later .rmx-dot{border:2px dashed var(--line-strong)}
+@keyframes rmxPulse{0%{transform:scale(.8);opacity:.8}100%{transform:scale(1.8);opacity:0}}
+@media (prefers-reduced-motion:reduce){.rmx-next .rmx-dot::after{animation:none;opacity:0}}
+.rmx-list{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.rmx-live .rmx-list{grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px 28px}
+.rmx-list li{display:flex;align-items:flex-start;gap:11px;min-width:0}
+.rmx-list li>div{min-width:0}
+.rmx-list b{display:block;font-size:.95rem;font-weight:600;line-height:1.35;color:var(--text)}
+.rmx-list span{display:block;margin-top:2px;font-size:.85rem;line-height:1.45;color:var(--muted)}
+.rmx-live .rmx-list b{color:#fff}
+.rmx-live .rmx-list span{color:rgba(242,245,241,.8)}
+.rmx-ic{flex:none;display:grid;place-items:center;width:22px;height:22px;margin-top:-1px;border-radius:50%}
+.rmx-live .rmx-ic{background:rgba(227,194,143,.16);color:#E9CD9E;border:1px solid rgba(227,194,143,.4)}
+.rmx-next .rmx-ic{border:2px solid var(--brass);background:conic-gradient(var(--brass) 0 50%,transparent 50% 100%);background-clip:content-box;padding:2px;width:20px;height:20px;margin-top:0}
+.rmx-later .rmx-ic{width:18px;height:18px;margin:2px 2px 0;border:2px dashed var(--line-strong)}
+/* titles only for the long Live list until "Show details"; In progress and Coming next always say what they are */
+#roadmap:not(.rm-open) .rmx-live .rmx-list span{display:none}
+#roadmap:not(.rm-open) .rmx-live .rmx-list{gap:10px 28px}
+.rm-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px 20px;margin-top:clamp(14px,2vw,20px)}
+.rm-foot .rm-ask{margin:0}
+:root[data-theme="dark"] .rmx-live{border-color:rgba(157,196,178,.28)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .rmx-live{border-color:rgba(157,196,178,.28)}}
+@media (max-width:760px){
+  .rmx{grid-template-columns:1fr}
+  .rmx-live .rmx-list{grid-template-columns:1fr}
+  .rmx-count{margin-left:0}
+  .rmx-head{gap:8px 10px}
+}
+@media (prefers-reduced-motion:no-preference){
+  html.dwm .rmx-list li{transition:opacity .4s ease,transform .4s ease;transition-delay:calc(var(--i,0)*45ms)}
+  html.dwm .rmx-col:not(.in-view) .rmx-list li{opacity:0;transform:translateY(6px)}
 }
 </style>
 </head>
@@ -2117,34 +2103,50 @@ html.dwm .q[aria-pressed="true"]{box-shadow:none}
         <div class="eyebrow">Roadmap</div>
         <h2 id="roadmap-h">What we're building</h2>
       </div>
-      <p class="lede">What works today and what's being built now. No dates. We'd rather ship it than promise it.</p>
+      <p class="lede">What works today, what we're building right now, and what comes after. No dates. We'd rather ship it than promise it.</p>
     </div>
-    <ol class="rm-stages" id="rm-stages" data-snap aria-label="Roadmap: live now, building next, later">
-      <li class="rm-stage rm-live dw-observe dw-once">
-        <div class="rm-top"><span class="rm-node" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div><h3>Live now</h3><small>Working today</small></div></div>
-        <ul class="rm-items">
-          <li><b>Ask Donovan</b><span>Ask a plain-English question and get an answer with the original page attached as the source.</span></li>
-          <li><b>Phone app scanning</b><span>Scan paperwork on your phone, even with no signal; pages upload when it returns.</span></li>
-          <li><b>Warranty tracking and export</b><span>See which coverage is expiring across every unit and export warranty records any time.</span></li>
-          <li><b>Bulk upload</b><span>Drag in a whole folder or a .zip and every file is read, sorted and filed.</span></li>
-          <li><b>Records search</b><span>Find a customer, address, serial number or date across every document you have sent in.</span></li>
-          <li><b>Public status page</b><span>See whether DeepWell is up right now, and the history of past incidents, at status.deepwelltechnology.com.</span></li>
-          <li><b>Help chat</b><span>Ask the help chat how DeepWell works, any time, with answers drawn from our public help articles.</span></li>
+    <ol class="rmx" id="rm-stages" aria-label="Roadmap: live now, in progress, coming next">
+      <li class="rmx-col rmx-live dw-observe dw-once" aria-labelledby="rmx-live-h">
+        <div class="rmx-head"><span class="rmx-dot" aria-hidden="true"></span><h3 id="rmx-live-h">Live now</h3><span class="rmx-count">17 features</span></div>
+        <ul class="rmx-list">
+          <li><i class="rmx-ic" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></i><div><b>Upload and bulk import</b><span>Add PDFs, photos, Word, Excel and CSV files one at a time, or drop in a whole folder or a .zip.</span></div></li>
+          <li><i class="rmx-ic" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></i><div><b>Automatic sorting and field reading</b><span>Every page is read, sorted by kind and filed, with names, dates, amounts and serial numbers pulled out for you.</span></div></li>
+          <li><i class="rmx-ic" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></i><div><b>Inbox with &quot;Needs you&quot;</b><span>Anything DeepWell could not settle on its own waits in one short list, with a plain reason.</span></div></li>
+          <li><i class="rmx-ic" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></i><div><b>Smarter Inbox</b><span>More kinds of paperwork recognized, copies and voided documents set aside, and every sort previewed before you confirm. New in 1.3.</span></div></li>
+          <li><i class="rmx-ic" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></i><div><b>Records and customer profiles</b><span>Browse by document or by customer and see every visit, invoice and warranty for one customer in one place.</span></div></li>
+          <li><i class="rmx-ic" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></i><div><b>Ask Donovan, with sources</b><span>Ask a plain-English question and get an answer with the original page attached as the source.</span></div></li>
+          <li><i class="rmx-ic" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></i><div><b>&quot;Did you mean&quot; for names and addresses</b><span>Misspell a customer name or an address and Donovan offers the closest match instead of coming up empty.</span></div></li>
+          <li><i class="rmx-ic" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></i><div><b>Voice questions</b><span>Tap the mic and ask Donovan your question out loud.</span></div></li>
+          <li><i class="rmx-ic" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></i><div><b>Phone app</b><span>Scan paperwork on your phone, even with no signal; pages upload when it returns.</span></div></li>
+          <li><i class="rmx-ic" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></i><div><b>Office and field views</b><span>A calm dark view for the office, or switch to light, larger type for working outdoors.</span></div></li>
+          <li><i class="rmx-ic" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></i><div><b>Warranty tracking and export</b><span>See which coverage is expiring across every unit and export warranty records any time.</span></div></li>
+          <li><i class="rmx-ic" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></i><div><b>Team accounts</b><span>Invite your team, each with their own login.</span></div></li>
+          <li><i class="rmx-ic" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></i><div><b>Plans and billing</b><span>Pick a plan, change it and manage billing from inside DeepWell.</span></div></li>
+          <li><i class="rmx-ic" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></i><div><b>API access</b><span>Connect your own systems to DeepWell on the Fleet plan.</span></div></li>
+          <li><i class="rmx-ic" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></i><div><b>Industry demo</b><span>Pick from 43 industries and watch your kind of paperwork get uploaded, organized and answered.</span></div></li>
+          <li><i class="rmx-ic" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></i><div><b>Help chat</b><span>Ask the help chat how DeepWell works, any time, with answers drawn from our public help articles.</span></div></li>
+          <li><i class="rmx-ic" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></i><div><b>Public status page</b><span>See whether DeepWell is up right now, and past incidents, at status.deepwelltechnology.com.</span></div></li>
         </ul>
       </li>
-      <li class="rm-stage rm-next dw-observe dw-once">
-        <div class="rm-top"><span class="rm-node" aria-hidden="true"></span><div><h3>Building next</h3><small>Coming soon</small></div></div>
-        <ul class="rm-items">
-          <li><b>Email and folder upload</b><span>Forward a vendor invoice or drop files in a folder and they file themselves.</span></li>
-          <li><b>Google Drive sync</b><span>Connect a Drive folder so new files come in on their own.</span></li>
-          <li><b>Branch scoping</b><span>Limit each person to the records of their own branch or location.</span></li>
-          <li><b>Callback analytics</b><span>See which technicians and equipment brands generate the most repeat visits.</span></li>
-          <li><b>Backups and per-company restore</b><span>Scheduled off-site backups, with the option to restore a single company.</span></li>
-          <li><b>Uptime SLA</b><span>An uptime commitment with service credits.</span></li>
-          <li><b>Electrical</b><span>Panel schedules, permits and inspections for electrical contractors.</span></li>
-          <li><b>Plumbing</b><span>Backflow testing, water heater warranties and permits for plumbing contractors.</span></li>
-          <li><b>Property management</b><span>Leases, unit turns, vendor compliance and appliance warranties for property managers.</span></li>
-          <li><b>Fleet and equipment rental</b><span>Service history and paperwork for rented equipment and vehicle fleets.</span></li>
+      <li class="rmx-col rmx-next dw-observe dw-once" aria-labelledby="rmx-next-h">
+        <div class="rmx-head"><span class="rmx-dot" aria-hidden="true"></span><h3 id="rmx-next-h">In progress</h3><span class="rmx-count">3 being built</span></div>
+        <ul class="rmx-list">
+          <li><i class="rmx-ic" aria-hidden="true"></i><div><b>Donovan answers more, in every industry</b><span>More of your questions answered directly from your records, whatever your line of work, always with the source.</span></div></li>
+          <li><i class="rmx-ic" aria-hidden="true"></i><div><b>Automatic encrypted backups</b><span>Your customer files copied on a schedule, encrypted, to a separate location.</span></div></li>
+          <li><i class="rmx-ic" aria-hidden="true"></i><div><b>Google Drive import</b><span>Choose files and folders in your Google Drive and DeepWell brings them in and reads them.</span></div></li>
+        </ul>
+      </li>
+      <li class="rmx-col rmx-later dw-observe dw-once" aria-labelledby="rmx-later-h">
+        <div class="rmx-head"><span class="rmx-dot" aria-hidden="true"></span><h3 id="rmx-later-h">Coming next</h3><span class="rmx-count">8 planned</span></div>
+        <ul class="rmx-list">
+          <li><i class="rmx-ic" aria-hidden="true"></i><div><b>Donovan for every industry on the dashboard</b><span>Ask Donovan right from your dashboard, tuned to your industry.</span></div></li>
+          <li><i class="rmx-ic" aria-hidden="true"></i><div><b>Deeper Google Drive sync</b><span>Connect a Drive folder once and new files come in on their own.</span></div></li>
+          <li><i class="rmx-ic" aria-hidden="true"></i><div><b>One-click restore</b><span>Bring back a company's files from a backup in one click.</span></div></li>
+          <li><i class="rmx-ic" aria-hidden="true"></i><div><b>Email and folder upload</b><span>Forward a vendor invoice or drop files in a folder and they file themselves.</span></div></li>
+          <li><i class="rmx-ic" aria-hidden="true"></i><div><b>Branch scoping</b><span>Limit each person to the records of their own branch or location.</span></div></li>
+          <li><i class="rmx-ic" aria-hidden="true"></i><div><b>Callback analytics</b><span>See which technicians and equipment brands generate the most repeat visits.</span></div></li>
+          <li><i class="rmx-ic" aria-hidden="true"></i><div><b>Uptime SLA</b><span>An uptime commitment with service credits.</span></div></li>
+          <li><i class="rmx-ic" aria-hidden="true"></i><div><b>Fleet and equipment rental</b><span>Service history and paperwork for rented equipment and vehicle fleets.</span></div></li>
         </ul>
       </li>
     </ol>
@@ -3399,7 +3401,7 @@ sync(true);if(mq.addEventListener)mq.addEventListener('change',function(){sync(f
   $('.cta-card,.plans-every').forEach(function(el){el.setAttribute('data-mo','');io.observe(el)});
   $('.what-ask li').forEach(function(el,i){el.setAttribute('data-mo','');el.style.setProperty('--mo-y','6px');el.style.setProperty('--mo-d',(i*70)+'ms');io.observe(el)});
   /* roadmap items: order index */
-  $('.rm-items').forEach(function(ul){[].slice.call(ul.children).forEach(function(li,i){li.style.setProperty('--i',i)})});
+  $('.rmx-list').forEach(function(ul){[].slice.call(ul.children).forEach(function(li,i){li.style.setProperty('--i',i)})});
   /* closing icons: draw-in needs a normalised path length */
   $('.principle svg').forEach(function(s){[].slice.call(s.children).forEach(function(n,i){n.setAttribute('pathLength','1');n.style.setProperty('--pd',(i*.12)+'s')})});
   /* sliding marker under/beside the chosen question */
