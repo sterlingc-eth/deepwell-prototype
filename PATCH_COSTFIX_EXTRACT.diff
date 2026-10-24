@@ -1,0 +1,34 @@
+--- a/api/_lib/extractDocument.js	2026-10-22 05:44:50.227957500 +0000
++++ b/api/_lib/extractDocument.js	2026-10-23 17:18:01.496725877 +0000
+@@ -35,6 +35,8 @@
+ // R32 (model avoidance): a plain labelled form is a lookup, not reasoning — see modelAvoidance/textExtract.js.
+ import { extractFromText } from "./modelAvoidance/textExtract.js";
+ import { isDeterministicExtractEnabled, isGenericExtractEnabled } from "./modelAvoidance/switches.js";
++// Cost-fix: the paid extraction model runs only when the free reader leaves a required field empty or a cross-check fails.
++import { freeReadCompletes, isFreeFirstExtractEnabled } from "./modelAvoidance/freeFirst.js";
+ // R33: a REQUIRED field the extraction left empty is looked up on the page by its printed label — see labelFill.js.
+ import { planLabelFill, corroborateFields, crossCheckFields } from "./modelAvoidance/labelFill.js";
+ import { verifyGrounded } from "./modelAvoidance/groundedFacts.js";
+@@ -157,11 +159,22 @@
+   let extractMethod = "model";
+   let extractModelLabel = EXTRACT_MODEL;
+   let toolUse;
++  // Cost-fix (free-first): when the free readers (stored-text read, type, label fill, corroboration, cross-check) already
++  // complete the document and the automatic check would accept it, the model is not called. Same functions, same order as
++  // the code below the model call, so the stored result is what the model path would have kept from the free readers.
++  const freeFirst = !det?.accepted && !documentType && !truncated && isFreeFirstExtractEnabled() && (!pack || pack.id === "hvac")
++    ? freeReadCompletes({ pages: selected, filename: doc.original_filename ?? null, ownNames, pack, highestPage: pages.reduce((n, p) => Math.max(n, Number(p.page_no) || 0), 0) })
++    : null;
+   if (det?.accepted) {
+     extractMethod = "text";
+     extractModelLabel = "deterministic-text";
+     toolUse = { type: "tool_use", input: det.toolInput };
+     console.log(JSON.stringify({ route: "extract", method: "text", type: det.type, fields: det.toolInput.fields.length }));
++  } else if (freeFirst?.skip) {
++    extractMethod = "text";
++    extractModelLabel = "deterministic-free";
++    toolUse = { type: "tool_use", input: { fields: [], document_type: freeFirst.titleType ?? null } };
++    console.log(JSON.stringify({ route: "extract", method: "free-first", type: freeFirst.type }));
+   } else {
+   await assertModelBudget(ctx);
+   const client = new Anthropic({ apiKey: getApiKey(), timeout: MODEL_TIMEOUT_MS, maxRetries: 0 });

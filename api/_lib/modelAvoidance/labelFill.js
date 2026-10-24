@@ -24,6 +24,7 @@ import { normalizeFields, isUnconfirmedKey, baseKeyOf, normalizeDate } from "../
 import { completenessFor, REQUIRED_FIELDS, normalizeDocumentType, isLabelValue } from "../documentTypes.js";
 import { isOwnName, nameKey } from "./ownCompany.js";
 import { scanProseFacts } from "./proseFacts.js";
+import { signerOnlyByValue } from "./signerGuard.js";
 import { verifyGrounded } from "./groundedFacts.js";
 import { detectDateOrder } from "./textExtract.js";
 const normalizeDateLoose = (v) => normalizeDate(String(v ?? "").trim(), { order: "mdy" });
@@ -157,6 +158,8 @@ export function planLabelFill({ type, fields, pages, today, method = "label-fill
       // A negative amount ("Payment Received -526.00", "(655.00)") is a payment or credit line, never the paper's own total -
       // except on a credit or refund line itself.
       if (key === "cost") list = list.filter((c) => !/^\s*(?:-|\(|USD\s*-|\$\s*-)/i.test(String(c.value)) || /credit|refund/i.test(String(c.label ?? "")));
+      // Docread2: a name printed only in a signature block is the signer, never a party (any reader's candidate).
+      if (key === "customer_name" || key === "vendor") list = list.filter((c) => !signerOnlyByValue(c.value, pages).signer);
       // A name on a signature line ("Attorney: Marcus Marsh Date: ______") is the person signing, never the issuing business.
       if (key === "vendor") list = list.filter((c) => !/_{4,}|date:\s*_{2,}/i.test(String(c.verbatim ?? "")));
       // A one-word letterhead with no business word is a fragment of a name wrapped across lines ("Drain" of "... Plumbing & Drain").
@@ -329,6 +332,11 @@ export function crossCheckFields({ fields, pages }) {
       if (amb) { removed.push({ field_key: "cost", value: f.value, reason: amb.reason }); return false; }
       const one = pf.candidates.cost?.[0];
       if (one && !sameValue("cost", f.value, one.value)) { removed.push({ field_key: "cost", value: f.value, reason: `the page's total is ${one.value}` }); return false; }
+    }
+    // Docread2: a party name printed only in a signature block is the signer, not the party.
+    if ((f?.field_key === "customer_name" || f?.field_key === "vendor") && f.corrected_value == null && String(f.method ?? "") !== "human") {
+      const sg = signerOnlyByValue(f.value, pages);
+      if (sg.signer) { removed.push({ field_key: f.field_key, value: f.value, reason: "printed only in a signature block" }); return false; }
     }
     if (f?.field_key === "agreement_term" && f.corrected_value == null) {
       const iso = (v) => normalizeDateLoose(v);

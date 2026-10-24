@@ -165,6 +165,40 @@ function entityLabel(e: Entity): string {
 // customer yet" here while Browse showed the right name for the same row
 // (handoffs/LINKING_ROOT_CAUSE_2026-09-20.md).
 
+/** Docread2 round (2026-10-23): "Please check this value" - the read-only audit found a stored value that disagrees with its page.
+ *  Shows the evidence (quote + page). The person corrects the value in the field list below, or says it is fine. Nothing is changed for them. */
+function SuspectValueNotice({ doc }: { doc: Doc }) {
+  const flags = doc.issues.filter((i): i is Extract<typeof i, { kind: 'suspect-value' }> => i.kind === 'suspect-value');
+  const [busy, setBusy] = useState<string | null>(null);
+  if (!flags.length) return null;
+  const dismiss = async (f: (typeof flags)[number]) => {
+    setBusy(f.field);
+    try {
+      await reviewClient.dismissSuspect(doc.id, f.field, f.value);
+      useGraph.setState((s) => {
+        const cur = s.docs[doc.id];
+        return cur ? { docs: { ...s.docs, [doc.id]: { ...cur, issues: cur.issues.filter((i) => !(i.kind === 'suspect-value' && i.field === f.field && i.value === f.value)) } } } : s;
+      });
+    } catch { /* stays flagged; the person can try again */ } finally { setBusy(null); }
+  };
+  return (
+    <section aria-label="Please check this value" className="rounded-lg border border-line bg-surface-2 p-3 space-y-2">
+      {flags.map((f) => (
+        <div key={`${f.field}|${f.value}`} className="space-y-1">
+          <p role="alert" className="flex items-start gap-1 text-body text-warn-ink dark:text-brass-200">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
+            <span><strong>Please check this value:</strong> {fieldLabel(f.field)} is saved as “{f.value}”. {f.reason}</span>
+          </p>
+          {f.quote && <p className="text-caption text-ink-2">Page {f.page ?? 1} says: “{f.quote}”</p>}
+          <button type="button" className="dw-btn-tertiary !min-h-[40px]" disabled={busy === f.field} onClick={() => void dismiss(f)}>
+            {busy === f.field ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Check className="w-4 h-4" aria-hidden="true" />} This value is fine
+          </button>
+        </div>
+      ))}
+    </section>
+  );
+}
+
 /**
  * "Linked to" for a customer replaces the old equipment-only "Record to
  * link" for serial-less documents (invoices, warranty cards without a
@@ -1569,6 +1603,9 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
           </section>
         );
       })}
+
+      {/* Docread2: a stored value that looks wrong against its page - evidence first, never changed for you. */}
+      <SuspectValueNotice doc={doc} />
 
       {/* Customer link — search/create, independent of the equipment/property
           link below (a document can name a customer with no serial at all). */}

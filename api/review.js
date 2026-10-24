@@ -30,6 +30,7 @@ import { deleteDocuments } from './_lib/routes/document-delete.js';
 import { integrityScan, integrityFix } from './_lib/routes/integrity.js';
 import { limit } from './_lib/rateLimit.js';
 import { recheckDocument, recheckTenantMissing } from './_lib/recheck.js';
+import { auditStoredTenant, listStoredFlags, dismissStoredFlag, flagsVisible } from './_lib/storedAuditStore.js';
 import { assertActiveBilling } from './_lib/plan.js';
 // Miss loop (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md): owner/admin-only
 // read of the ask_misses table missStore.js writes from api/ask.js.
@@ -93,7 +94,7 @@ import { notifyStaffOfGrant } from './_lib/support/accessHelp.js';
 // (list_autopilot_summary_window / a live gap-report rebuild can scan list_ask_misses_window and
 // list_scorecard_failures_window) an operator's dashboard could otherwise poll without limit — same
 // reasoning as missDigest above, even though neither makes a billed model call.
-const INTEGRITY_RATE_LIMIT_ACTIONS = new Set(['recheckDocument', 'recheckMissing', 'resortDocuments', 'undoResort', 'integrityScan', 'integrityFix', 'missDigest', 'learningRunNow', 'learningReplay', 'learningRejectAllGaps', 'askFeedback', 'scorecardRun', 'scorecardBaseline', 'semanticBackfill', 'dossierBackfill', 'learningAutopilotStatus', 'learningGapReport']);
+const INTEGRITY_RATE_LIMIT_ACTIONS = new Set(['auditStoredFacts', 'recheckDocument', 'recheckMissing', 'resortDocuments', 'undoResort', 'integrityScan', 'integrityFix', 'missDigest', 'learningRunNow', 'learningReplay', 'learningRejectAllGaps', 'askFeedback', 'scorecardRun', 'scorecardBaseline', 'semanticBackfill', 'dossierBackfill', 'learningAutopilotStatus', 'learningGapReport']);
 const OPERATOR_ACTIONS = new Set(['missDigest', 'learningList', 'learningDecide', 'learningDeactivate', 'learningRunNow', 'learningExport', 'learningReplay', 'learningRejectAllGaps', 'scorecardRun', 'scorecardStatus', 'scorecardBaseline', 'learningAutopilotStatus', 'learningGapReport', 'examPromote', 'examList', 'examExport', 'donovanScores']);
 
 // HARD GATE (Reviewer NO-GO, 2026-09-21): which of this route's actions
@@ -234,6 +235,10 @@ const ACTIONS = new Set([
   'supportAccessRevoke',
   'supportAccessStatus',
   'supportAccessLog',
+  // Docread2: read-only audit of values already stored (api/_lib/storedAuditStore.js).
+  'auditStoredFacts',
+  'suspectFlags',
+  'dismissSuspect',
 ]);
 
 export default async (req, res) => {
@@ -383,6 +388,25 @@ export default async (req, res) => {
         }
         break;
       }
+      // Docread2: the READ-ONLY audit of values already stored. Admin. Never changes a value. A DRY RUN (counts per rule, nothing
+      // flagged, nothing shown) unless the owner has set STORED_FACT_FLAGS=1 in the environment AND the call passes commit: true.
+      case 'auditStoredFacts':
+        requireAdmin(auth);
+        result = { ...(await auditStoredTenant(ctx, { limit: Math.min(300, Number(payload.limit) || 100), afterId: typeof payload.afterId === 'string' ? payload.afterId : null, commit: payload.commit === true, deadlineAt: Date.now() + 200_000, actorClerkId: auth.userId, source: 'admin' })), flagsVisible: flagsVisible() };
+        break;
+      // The Inbox's "Please check this value" rows (empty while the owner switch is off).
+      case 'suspectFlags':
+        result = await listStoredFlags(ctx);
+        break;
+      // "This value is fine": stored as an audit row so it is not flagged again.
+      case 'dismissSuspect':
+        try {
+          result = await dismissStoredFlag(ctx, { documentId: payload.documentId, field: payload.field, value: payload.value }, auth.userId);
+        } catch (err) {
+          if (err?.status === 400) throw new reviewStore.ReviewError(err.message, 400);
+          throw err;
+        }
+        break;
       case 'resortDocuments':
         requireAdmin(auth);
         result = await reviewStore.resortDocuments(ctx, { afterId: payload.afterId ?? null, limit: Math.min(200, Number(payload.limit) || 100), dryRun: payload.dryRun === true, runId: payload.runId ?? null }, auth.userId);

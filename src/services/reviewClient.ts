@@ -765,6 +765,21 @@ export const reviewClient = {
     });
   },
 
+  /** Docread2: the "Please check this value" rows - stored values the read-only audit found wrong. Empty until the owner turns flags on. */
+  suspectFlags() {
+    return postJson<{ visible: boolean; flags: { documentId: string; field: string; value: string; rule: string; reason: string; quote: string | null; page: number | null; expected: string | null }[] }>({ action: 'suspectFlags' });
+  },
+
+  /** Docread2: "This value is fine" - stored as an audit row, changes no value. */
+  dismissSuspect(documentId: string, field: string, value: string) {
+    return postJson<{ documentId: string; field: string; dismissed: boolean }>({ action: 'dismissSuspect', documentId, field, value });
+  },
+
+  /** Docread2 (admin): the audit as a dry run (counts per rule) - or flags when the owner switch is on and commit is true. */
+  auditStoredFacts(opts: { limit?: number; afterId?: string | null; commit?: boolean } = {}) {
+    return postJson<{ scanned: number; flagged: number; documentsFlagged: number; byRule: Record<string, number>; written: number; dryRun: boolean; nextAfter: string | null; done: boolean; flagsVisible: boolean }>({ action: 'auditStoredFacts', ...opts });
+  },
+
   /** R33: re-read this document's own stored page text for a missing required field ($0, no model; fill-only —
    *  api/_lib/recheck.js). A far-future printed date comes back as `<key>_unconfirmed` with flags. */
   recheckDocument(documentId: string) {

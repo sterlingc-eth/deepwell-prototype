@@ -32,6 +32,7 @@ import { packForTenant } from "./industry/index.js";
 import { loadOwnNames } from "./modelAvoidance/ownCompany.js";
 import { clearNothingReadMarker } from "./modelAvoidance/storedTextReread.js";
 import { retypeDecision } from "./modelAvoidance/retype.js";
+import { auditDocumentTx, auditEnabled } from "./storedAuditStore.js";
 import { COMPANY_FOLDER_FIELD_KEY, HR_FOLDER_ID } from "./companyFiles.js";
 
 /** Docread round: the audit action Sort already writes for a re-type; Re-check writes the same one (source 'recheck'), so every
@@ -173,8 +174,28 @@ export async function recheckDocumentTx(db, documentId, { actorClerkId = null, s
     },
   });
 
+  // Docread2: Re-check is insert-only, so a wrong value an older reader stored stays. Judge the STORED values with the same new
+  // cross-checks (read-only: never overwrites; flags are written, and shown, only when the owner switch STORED_FACT_FLAGS=1 is on).
+  let suspect = [];
+  // It runs inside a SAVEPOINT: a database error in the audit rolls back to the savepoint only, so it can never undo the fill above.
+  if (auditEnabled()) {
+    let sp = false;
+    try {
+      await db.raw("SAVEPOINT stored_audit", []);
+      sp = true;
+      const a = await auditDocumentTx(db, documentId, { commit: true, actorClerkId, source: `recheck:${source}` });
+      suspect = a.flags.map((f) => ({ field_key: f.field_key, value: f.value, rule: f.rule, reason: f.reason, quote: f.quote, page: f.page }));
+      await db.raw("RELEASE SAVEPOINT stored_audit", []);
+    } catch (err) {
+      console.error(`recheck: stored-value audit skipped for ${documentId}: ${err?.message}`);
+      suspect = [];
+      if (sp) { try { await db.raw("ROLLBACK TO SAVEPOINT stored_audit", []); } catch { /* the fill is already written; nothing more to do */ } }
+    }
+  }
+
   return {
     documentId,
+    suspect,
     status: written.length ? "filled" : retyped ? "retyped" : "nothing-to-fill",
     retyped,
     filled: written,

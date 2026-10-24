@@ -1162,6 +1162,56 @@
    "page": 1,
    "source": "verifier round 2026-10-22 (policy period, hand-checked)",
    "captured": true
+  },
+  {
+   "filename": "Event Contract - Community Fun Run Check-in Tent (Redwood).pdf",
+   "key": "customer_name",
+   "value": "Harborlight Neighbors Alliance",
+   "page": 1,
+   "source": "docread2 (hand-checked 2026-10-23: \"between the Venue and Harborlight Neighbors Alliance (the Client)\")",
+   "neighbour": "Colin Dunn",
+   "captured": true,
+   "neighbour_note": "the signer printed on the signature line (\"Client: Colin Dunn Date: ____\")"
+  },
+  {
+   "filename": "Event Contract - Holiday Food Drive Kickoff (Westfield).docx",
+   "key": "customer_name",
+   "value": "Harborlight Neighbors Alliance",
+   "page": 1,
+   "source": "docread2 (hand-checked 2026-10-23: \"between the Venue and Harborlight Neighbors Alliance (the Client)\")",
+   "neighbour": "Colin Dunn",
+   "captured": true,
+   "neighbour_note": "the signer printed on the signature line (\"Client: Colin Dunn Date: ____\")"
+  },
+  {
+   "filename": "Event Contract - Spring Benefit Luncheon (Ridgeline).pdf",
+   "key": "customer_name",
+   "value": "Harborlight Neighbors Alliance",
+   "page": 1,
+   "source": "docread2 (hand-checked 2026-10-23: \"between the Venue and Harborlight Neighbors Alliance (the Client)\")",
+   "neighbour": "Colin Dunn",
+   "captured": true,
+   "neighbour_note": "the signer printed on the signature line (\"Client: Colin Dunn Date: ____\")"
+  },
+  {
+   "filename": "Event Contract - Volunteer Appreciation Dinner (Ridgeline) (2).pdf",
+   "key": "customer_name",
+   "value": "Harborlight Neighbors Alliance",
+   "page": 1,
+   "source": "docread2 (hand-checked 2026-10-23: \"between the Venue and Harborlight Neighbors Alliance (the Client)\")",
+   "neighbour": "Colin Dunn",
+   "captured": true,
+   "neighbour_note": "the signer printed on the signature line (\"Client: Colin Dunn Date: ____\")"
+  },
+  {
+   "filename": "Event Contract - Volunteer Appreciation Dinner (Ridgeline).pdf",
+   "key": "customer_name",
+   "value": "Harborlight Neighbors Alliance",
+   "page": 1,
+   "source": "docread2 (hand-checked 2026-10-23: \"between the Venue and Harborlight Neighbors Alliance (the Client)\")",
+   "neighbour": "Colin Dunn",
+   "captured": true,
+   "neighbour_note": "the signer printed on the signature line (\"Client: Colin Dunn Date: ____\")"
   }
  ],
  "forbidden": [
@@ -2568,6 +2618,66 @@
    "key": "agreement_term",
    "value": "June 14, 2025 - June 23, 2026",
    "why": "term built from the Certificate Date (or an amended period); found by the independent verifier round"
+  },
+  {
+   "filename": "Engagement Renewal EN-2025-111 - Verde.docx",
+   "key": "vendor",
+   "value": "Rosalind Larkspur",
+   "why": "docread2: a signer (name printed only in a signature block), not the party (reviewed)"
+  },
+  {
+   "filename": "Event Contract - Community Fun Run Check-in Tent (Redwood).pdf",
+   "key": "customer_name",
+   "value": "Colin Dunn",
+   "why": "docread2: a signer (name printed only in a signature block), not the party (reviewed)"
+  },
+  {
+   "filename": "Event Contract - Holiday Food Drive Kickoff (Westfield).docx",
+   "key": "customer_name",
+   "value": "Colin Dunn",
+   "why": "docread2: a signer (name printed only in a signature block), not the party (reviewed)"
+  },
+  {
+   "filename": "Event Contract - Spring Benefit Luncheon (Ridgeline).pdf",
+   "key": "customer_name",
+   "value": "Colin Dunn",
+   "why": "docread2: a signer (name printed only in a signature block), not the party (reviewed)"
+  },
+  {
+   "filename": "Event Contract - Volunteer Appreciation Dinner (Ridgeline) (2).pdf",
+   "key": "customer_name",
+   "value": "Colin Dunn",
+   "why": "docread2: a signer (name printed only in a signature block), not the party (reviewed)"
+  },
+  {
+   "filename": "Event Contract - Volunteer Appreciation Dinner (Ridgeline).pdf",
+   "key": "customer_name",
+   "value": "Colin Dunn",
+   "why": "docread2: a signer (name printed only in a signature block), not the party (reviewed)"
+  },
+  {
+   "filename": "Lease - 4361 Limestone Dr Apt 108 (Coleman) signed.docx",
+   "key": "vendor",
+   "value": "Gloria Mendoza",
+   "why": "docread2: a signer (name printed only in a signature block), not the party (reviewed)"
+  },
+  {
+   "filename": "Lease - 4624 Bluebonnet Ct Suite 100 (Greer) signed.docx",
+   "key": "vendor",
+   "value": "Gloria Mendoza",
+   "why": "docread2: a signer (name printed only in a signature block), not the party (reviewed)"
+  },
+  {
+   "filename": "Lease - 7942 Barton Bend Apt 108 (Hayes) FINAL.docx",
+   "key": "vendor",
+   "value": "Gloria Mendoza",
+   "why": "docread2: a signer (name printed only in a signature block), not the party (reviewed)"
+  },
+  {
+   "filename": "Lease - 9758 Mesquite Row Unit A (Lawson).docx",
+   "key": "vendor",
+   "value": "Gloria Mendoza",
+   "why": "docread2: a signer (name printed only in a signature block), not the party (reviewed)"
   }
  ],
  "recheck_cases": [
@@ -2658,6 +2768,7 @@
   "Credit Application - Sandoval Framing LLC.pdf": "missing-required: service_address",
   "Dalton INV-52857.jpg": "missing-required: service_date, cost",
   "Damage Report DR-117 EQ-116.pdf": "missing-required: cost",
+  "Damage Report DR-118 EQ-127.pdf": "missing-required: cost",
   "Document Request - Calloway.pdf": "needs-type",
   "Document Request - Copperline.pdf": "needs-type",
   "Document Request - Dunn.docx": "needs-type",
@@ -2782,7 +2893,7 @@
   "WO 7318 - Beacon.pdf": "missing-required: work_performed|part_number",
   "WO 7320 - Yazzie.docx": "missing-required: work_performed|part_number",
   "WO 7322 - Campos.pdf": "missing-required: work_performed|part_number",
-  "Warranty - Distribution panelboard Dalton.pdf": "needs-link",
+  "Warranty - Distribution panelboard Dalton.pdf": "missing-required: serial_number",
   "Warranty - Distribution panelboard Pearson.pdf": "needs-link",
   "Warranty - Security camera system.pdf": "needs-link",
   "Warranty - Switchgear lineup Keller.pdf": "needs-link",
@@ -2820,5 +2931,5 @@
   "scan0380.jpg": "missing-required: service_address",
   "scan0392.jpg": "missing-required: service_date, cost"
  },
- "captured_facts_min": 3177
+ "captured_facts_min": 3187
 }

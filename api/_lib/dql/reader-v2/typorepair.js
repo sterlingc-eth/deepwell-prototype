@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { DATA_DIR } from './models.js';
+import { dataPath } from './unified1.js';
 import { norm } from './reader2.js';
 
 const DEF = { on: false, min_len: 5, max_changes: 3, skip_clause: true, intents: null, collect: false, agree: true, max_parts: 1 };
@@ -23,7 +24,7 @@ function d1(a, b) {
 }
 let STATIC = null;
 function staticWords() {
-  if (!STATIC) STATIC = new Set(JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'typo_static.json'), 'utf8')));
+  if (!STATIC) STATIC = new Set(JSON.parse(fs.readFileSync(dataPath(DATA_DIR, 'typo_static.json'), 'utf8')));
   return STATIC;
 }
 const words = (s) => (String(s).toLowerCase().match(W) || []);

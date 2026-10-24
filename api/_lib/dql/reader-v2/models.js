@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { WordPiece } from './tokenizer.js';
 import { Booster } from './lgb.js';
 import * as DT from './doctype.js';
+import { dataPath } from './unified1.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const DATA_DIR = path.join(HERE, 'data');
@@ -94,22 +95,22 @@ export class Models {
 const f32 = (buf, off, n) => { const a = new Float32Array(n); const dv = new DataView(buf.buffer, buf.byteOffset + off, n * 4); for (let i = 0; i < n; i++) a[i] = dv.getFloat32(i * 4, true); return a; };
 const readJson = (f) => JSON.parse(fs.readFileSync(f, 'utf8'));
 export async function loadModels(dir = DATA_DIR) {
-  const B = readJson(path.join(dir, 'bundle.json')); const wts = fs.readFileSync(path.join(dir, 'weights.bin'));
+  const B = readJson(dataPath(dir, 'bundle.json')); const wts = fs.readFileSync(dataPath(dir, 'weights.bin'));
   const T = (k) => { const t = B.tensors[k]; return f32(wts, t.offset, t.shape.reduce((a, b) => a * b, 1)); };
-  const wp = new WordPiece(fs.readFileSync(path.join(dir, 'vocab.txt'), 'utf8'));
+  const wp = new WordPiece(fs.readFileSync(dataPath(dir, 'vocab.txt'), 'utf8'));
   const M = new Models(); M.bundle = B;
-  M.emb = new Emb(await makeSession(path.join(dir, B.models.enc_base.file)), wp, 48);
-  M.intent_emb = new Emb(await makeSession(path.join(dir, B.models.intent_enc.file)), wp, 48);
+  M.emb = new Emb(await makeSession(dataPath(dir, B.models.enc_base.file)), wp, 48);
+  M.intent_emb = new Emb(await makeSession(dataPath(dir, B.models.intent_enc.file)), wp, 48);
   M.intent_clf = new MLPHead(B.classes, [{ W: T('intent.W0'), b: T('intent.b0'), nin: B.tensors['intent.W0'].shape[0], nout: B.tensors['intent.W0'].shape[1] }, { W: T('intent.W1'), b: T('intent.b1'), nin: B.tensors['intent.W1'].shape[0], nout: B.tensors['intent.W1'].shape[1] }]);
   M.pair = new Pair(T('pair.W1'), T('pair.b1'), T('pair.W2'), T('pair.b2'));
-  M.ranker = new Booster(readJson(path.join(dir, B.models.ranker.file))); M.verifier = new Booster(readJson(path.join(dir, B.models.verifier.file)));
+  M.ranker = new Booster(readJson(dataPath(dir, B.models.ranker.file))); M.verifier = new Booster(readJson(dataPath(dir, B.models.verifier.file)));
   M.syn = B.switches.syn || {};
   const dcfg = B.switches.doctype; M.doctype = [DT.makeCfg(dcfg), new DT.Learned(dcfg)];
   M.thr = B.thresholds; M.switches = B.switches;
-  if (B.models.cf2_lex) { const CF2 = await import('./clausefree2.js'); CF2.setData(readJson(path.join(dir, B.models.cf2_lex.file)), readJson(path.join(dir, B.models.cf2_meta.file))); }
-  if (B.models.pv1_w) { const PV1 = await import('./pv1.js'); PV1.setData(f32(fs.readFileSync(path.join(dir, B.models.pv1_w.file)), 0, 1 << 18), B.models.pv1_w.b); }
-  if (B.models.pm_inc_verifier) M.pmInc = { verifier: new Booster(readJson(path.join(dir, B.models.pm_inc_verifier.file))), thr: B.thresholds.pm_inc };      // precision_match anchor: the incumbent's verifier + thresholds (v003 bundles)
+  if (B.models.cf2_lex) { const CF2 = await import('./clausefree2.js'); CF2.setData(readJson(dataPath(dir, B.models.cf2_lex.file)), readJson(dataPath(dir, B.models.cf2_meta.file))); }
+  if (B.models.pv1_w) { const PV1 = await import('./pv1.js'); PV1.setData(f32(fs.readFileSync(dataPath(dir, B.models.pv1_w.file)), 0, 1 << 18), B.models.pv1_w.b); }
+  if (B.models.pm_inc_verifier) M.pmInc = { verifier: new Booster(readJson(dataPath(dir, B.models.pm_inc_verifier.file))), thr: B.thresholds.pm_inc };      // precision_match anchor: the incumbent's verifier + thresholds (v003 bundles)
   const cc = B.switches.clause;
-  if (cc && cc.on) { const CL = await import('./clause.js'); M.clause = new CL.Reader2(new PairEnc(await makeSession(path.join(dir, B.models.clause_ce.file)), wp, 96), cc); }
+  if (cc && cc.on) { const CL = await import('./clause.js'); M.clause = new CL.Reader2(new PairEnc(await makeSession(dataPath(dir, B.models.clause_ce.file)), wp, 96), cc); }
   return M;
 }

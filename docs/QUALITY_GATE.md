@@ -40,7 +40,18 @@ result with `test-docs/real-docs/GOLD.json`.
 7. **Live screenshot regressions, as Re-check sees stored documents.**
    - The warehouse lease must get its term.
    - COIs and plumbing licenses stored as "Warranty registration" must be re-typed, with nothing left missing.
-8. **Degraded copies.** Any wrong fact other than the 4 known tesseract misreads, or fewer correct facts than the gold count.
+8. **Signer taken as a party (docread2).** A name printed only in a signature block ("By:", "Signature", "Authorized
+   representative", "Name / Title", a line under a signature rule, "Client: X Date: ____") is a signer, not the customer or
+   vendor, unless the party clause or a party block names the same person as the party. Spec cases P8 (signer refused, the
+   party clause's name read instead), P9 (named in the party clause: kept) and P10 (By / Name-Title lines refused) run in the
+   gate, and the 5 Ridgeline / Redwood / Westfield event contracts are gold facts with "Colin Dunn" forbidden.
+9. **Stored-value audit (docread2).** `api/_lib/modelAvoidance/storedAudit.js` re-runs the cross-checks over values ALREADY
+   STORED (period vs the page, start + term = end, subtotal + tax = total, a label as a name, a signer as a party). Over this
+   tree's own values it must flag nothing (no false alarms on the 1,000 documents); 11 planted cases (7 wrong stored values, 4
+   correct controls including a person-corrected value) must each be flagged or left alone as expected. With `--tree <older
+   checkout>` it reports what it finds in the values that older reader stored. `npm run verify:stored-audit` covers the database
+   half on PGlite: dry run by default, nothing is ever overwritten, flags only with the owner switch.
+10. **Degraded copies.** Any wrong fact other than the 4 known tesseract misreads, or fewer correct facts than the gold count.
 
 ## Updating the gold
 - When a change makes documents complete that the gold lists as needing a person, the gate prints a note.

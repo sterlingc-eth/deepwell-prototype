@@ -186,7 +186,7 @@ let fullCost = 0;
   const sonnet = scripted([() => [tu("read_document", { documentId: docId })], () => [answerToolUse()]], { input_tokens: 2500, output_tokens: 200, cache_read_input_tokens: 7000 });
   const rs = await run(SIMPLE_Q, sonnet);
   fullCost = rs.costUsd;
-  check("tier ON: the same run costs about a third on Haiku ($1/$5 vs $3/$15 per MTok)", cheapCost > 0 && Math.abs(fullCost / cheapCost - 3) < 0.2, `${cheapCost} vs ${fullCost}`);
+  check("tier ON: the same run costs about half on Haiku ($1/$5 vs Sonnet 5.5 $2/$10 per MTok)", cheapCost > 0 && Math.abs(fullCost / cheapCost - 2) < 0.2, `${cheapCost} vs ${fullCost}`);
 }
 {
   // Haiku gives up honestly -> re-run on Sonnet, cost of BOTH is counted, escalation recorded.
@@ -201,7 +201,7 @@ let fullCost = 0;
   check("escalation: a Haiku miss re-runs the question on Sonnet and answers", r.handled === true && per.haiku >= 1 && per.sonnet >= 2, JSON.stringify(per));
   check("escalation: the result names both models and why", Array.isArray(r.models) && /haiku/i.test(r.models[0]) && /sonnet/i.test(r.models[1]) && typeof r.escalation?.why === "string", JSON.stringify({ models: r.models, esc: r.escalation }));
   const haikuUsd = estimateModelCostUsd("claude-haiku-4-5", { inputTokens: 2500, outputTokens: 100 }) * per.haiku;
-  const sonnetUsd = estimateModelCostUsd("claude-sonnet-4-5", { inputTokens: 2500, outputTokens: 100 }) * (per.sonnet - 1) + estimateModelCostUsd("claude-sonnet-4-5", { inputTokens: 2500, outputTokens: 200 });
+  const sonnetUsd = estimateModelCostUsd("claude-sonnet-5-5", { inputTokens: 2500, outputTokens: 100 }) * (per.sonnet - 1) + estimateModelCostUsd("claude-sonnet-5-5", { inputTokens: 2500, outputTokens: 200 });
   check("escalation: total cost is the SUM of the Haiku attempt and the Sonnet run", Math.abs(r.costUsd - (haikuUsd + sonnetUsd)) < 1e-5, `${r.costUsd} vs ${haikuUsd + sonnetUsd}`);
   check("escalation: modelCalls / tokens are summed too", r.modelCalls === per.haiku + per.sonnet && r.outputTokens === 100 * per.haiku + 100 * (per.sonnet - 1) + 200, JSON.stringify({ mc: r.modelCalls, out: r.outputTokens, per }));
 }

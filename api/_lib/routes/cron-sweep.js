@@ -18,6 +18,7 @@ import { runAutopilotSweepStep } from "../learning/autopilot.js";
 import { runDossierCatchup } from "../search/dossier.js";
 import { runKnowledgeReportSweepStep } from "../search/mapReduce.js";
 import { recheckTenantMissing } from "../recheck.js";
+import { auditStoredTenant, flagsVisible } from "../storedAuditStore.js";
 
 /**
  * GET /api/cron-sweep
@@ -212,6 +213,12 @@ export default async function handler(req, res) {
     recheckVerified: 0,
     recheckLeftForNextRun: 0,
     recheckSkippedTenants: 0,
+    // Docread2 (2026-10-23): read-only audit of already-stored values. Counts per rule; flags are written only when STORED_FACT_FLAGS=1.
+    storedAuditScanned: 0,
+    storedAuditFlagged: 0,
+    storedAuditDistinctPapers: 0,
+    storedAuditByRule: {},
+    storedAuditWritten: 0,
     billingGatedTenants: 0,
     // R35: documents handed to the queue by this sweep, abandoned uploads (PUT never happened), read-but-never-extracted
     // documents found, and tenants whose model budget was still spent today.
@@ -449,6 +456,22 @@ export default async function handler(req, res) {
       summary.recheckSkippedTenants += 1;
     }
 
+    // Docread2: read-only audit of already-stored values (never overwrites). Bounded (60 documents per tenant per night, resumable);
+    // a dry run that only counts per rule unless the owner has set STORED_FACT_FLAGS=1.
+    if (Date.now() < deadlineAt) {
+      try {
+        const au = await auditStoredTenant(ctx, { limit: 60, commit: true, deadlineAt, source: "cron" });
+        summary.storedAuditScanned += au.scanned;
+        summary.storedAuditFlagged += au.newFlags ?? 0;
+        summary.storedAuditDistinctPapers += au.distinctFlaggedPapers ?? 0;
+        summary.storedAuditWritten += au.written;
+        for (const [k, v] of Object.entries(au.byRule)) summary.storedAuditByRule[k] = (summary.storedAuditByRule[k] ?? 0) + v;
+      } catch (err) {
+        summary.errors.push({ tenant: t.tenant_key, phase: "stored-audit", message: err?.message });
+        await captureException(err, { route: "/api/cron-sweep", tenant: t.tenant_key, stage: "stored-audit" });
+      }
+    }
+
     // TEAM T2 (2026-09-25): dossier catch-up for THIS tenant — small, bounded slice (a few seconds,
     // a few dozen entities) so one tenant's backlog never crowds out the rest of the sweep. Never throws.
     if (Date.now() < deadlineAt) {
@@ -599,6 +622,7 @@ export default async function handler(req, res) {
       `${summary.integritySplitUnitsHealed} split unit(s) healed, ${summary.integrityContactsFilled} customer contact(s) filled, ` +
       `${summary.integrityNamesRelinkable} mismatched name link(s) relinkable (dry-run, needs an admin), ` +
       `${summary.integritySkippedTenants} tenant(s) skipped (deadline); ` +
+      `stored-value audit (${flagsVisible() ? "flags on" : "dry run"}): ${summary.storedAuditScanned} scanned, ${summary.storedAuditFlagged} new flag(s) tonight, ${summary.storedAuditDistinctPapers} distinct paper(s) flagged so far ${JSON.stringify(summary.storedAuditByRule)}, ${summary.storedAuditWritten} flagged; ` +
       `recheck: ${summary.recheckScanned} document(s) re-checked, ${summary.recheckFilledFields} field(s) restored on ${summary.recheckFilledDocuments} document(s), ${summary.recheckVerified} verified, ${summary.recheckLeftForNextRun} left for next run; ` +
       `${summary.queuedForRecovery} queued for recovery, ${summary.abandonedUploads} abandoned upload(s), ${summary.unextractedFound} read-but-unextracted found; ` +
       `${summary.billingGatedTenants} tenant(s) billing-gated (no active subscription, retries skipped); ` +

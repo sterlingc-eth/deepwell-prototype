@@ -107,7 +107,17 @@ if (ground && prose) {
   const amd = runDoc(P, { filename: 'Lease - Unit 9 amended.pdf', pages: [{ page_no: 1, text: 'LEASE AGREEMENT\nfor a term of 12 months beginning 01/01/2025 and ending 12/31/2025.' }, { page_no: 2, text: 'AMENDMENT NO. 1\nThe parties hereby amend the Lease: the term is extended to 24 months, ending 12/31/2026.' }] }).fields;
   const p7 = !val(amd, 'agreement_term').some((v) => /^12 months/.test(v));
   if (!p7) fail('spec', `P7: an amendment page means the original term is not the current one (got ${val(amd, 'agreement_term')})`);
-  console.log(`  spec cases: T2 ${ok ? 'ok' : 'FAIL'}, P1 ${p1.ok ? 'FAIL' : 'refused'}, P2 ${p2.ok ? 'FAIL' : 'refused'}, P3 ${p3.candidates.end_date ? 'FAIL' : 'refused'}, P4 ${p4 ? 'refused' : 'FAIL'}, P5 ${p5 ? 'refused' : 'FAIL'}, P6 ${p6 ? 'ok' : 'FAIL'}, P7 ${p7 ? 'refused' : 'FAIL'}`);
+  // Docread2 round (2026-10-23): a name in a signature block is a signer, not a party - unless the party clause names that person.
+  const evt = run1('EVENT AGREEMENT\nCommunity Fun Run\n\nVENUE / CATERER   CLIENT\nRedwood Event Hall LLC   Harborlight Neighbors Alliance\nAttn: Cecilia Reeves   Attn: Gordon Patel\n\nThis Agreement is made 03/13/2026 between the Venue and Harborlight Neighbors Alliance (the Client) for the event described above.\n\n__________________________________   __________________________________\nVenue: Cecilia Reeves Date: ________   Client: Colin Dunn Date: ________', 'Event Contract - Fun Run (Redwood).pdf');
+  const p8 = !val(evt, 'customer_name').some((v) => /colin dunn/i.test(v)) && val(evt, 'customer_name').includes('Harborlight Neighbors Alliance');
+  if (!p8) fail('spec', `P8: a signer ("Client: Colin Dunn Date: ____" under a signature rule) must not be the customer; the party clause names Harborlight (got ${val(evt, 'customer_name')})`);
+  const own = run1('SERVICE AGREEMENT\nThis Agreement is made 01/05/2026 between Mesa Holdings LLC (Landlord) and Colin Dunn (Tenant). The term begins 03/01/2026 and ends 02/28/2027.\n\n__________________________________   __________________________________\nLandlord: Ana Ruiz Date: ________   Tenant: Colin Dunn Date: ________', 'Lease - Dunn.pdf');
+  const p9 = val(own, 'customer_name').includes('Colin Dunn');
+  if (!p9) fail('spec', `P9: when the party clause names the signer as the party ("... and Colin Dunn (Tenant)"), the signer IS the customer (got ${val(own, 'customer_name')})`);
+  const sigOnly = run1('ENGAGEMENT LETTER\nPlease sign below and return one copy.\n\n__________________________________   __________________________________\nBy: Priya Anand   Authorized Representative   Name/Title: Priya Anand, Partner', 'Letter - Anand.pdf');
+  const p10 = !val(sigOnly, 'vendor').some((v) => /priya anand/i.test(v)) && !val(sigOnly, 'customer_name').some((v) => /priya anand/i.test(v));
+  if (!p10) fail('spec', `P10: "By:" / "Authorized Representative" / "Name/Title" lines are signers, never a party (got vendor ${val(sigOnly, 'vendor')}, customer ${val(sigOnly, 'customer_name')})`);
+  console.log(`  spec cases: T2 ${ok ? 'ok' : 'FAIL'}, P1 ${p1.ok ? 'FAIL' : 'refused'}, P2 ${p2.ok ? 'FAIL' : 'refused'}, P3 ${p3.candidates.end_date ? 'FAIL' : 'refused'}, P4 ${p4 ? 'refused' : 'FAIL'}, P5 ${p5 ? 'refused' : 'FAIL'}, P6 ${p6 ? 'ok' : 'FAIL'}, P8 ${p8 ? 'refused' : 'FAIL'}, P9 ${p9 ? 'ok' : 'FAIL'}, P10 ${p10 ? 'refused' : 'FAIL'}, P7 ${p7 ? 'refused' : 'FAIL'}`);
 } else fail('spec', 'groundedFacts.js / proseFacts.js missing in this tree (no grounding, no prose reader)');
 
 // ---------------------------------------------------------------- 2. the pipeline over every document
@@ -195,6 +205,52 @@ if (fs.existsSync(DEG_PATH) && GOLD.degraded) {
   if (deg.correct < GOLD.degraded.min_correct) fail('degraded', `only ${deg.correct} facts correct on degraded copies (gold ${GOLD.degraded.min_correct})`);
 }
 
+// ---------------------------------------------------------------- 5. stored-value audit (read-only; docread2 round)
+// The audit re-runs the cross-checks over values ALREADY STORED. (a) over this tree's own stored values it must raise nothing
+// (no false alarms on the 1,000 documents); with `--tree <older checkout>` it reports what it finds in the values that older reader
+// stored. (b) Planted stored-wrong values must each be flagged, planted-right controls must not.
+let audit = null;
+try {
+  const A = await import(pathToFileURL(path.join(ROOT, 'api/_lib/modelAvoidance/storedAudit.js')).href);
+  audit = { byRule: {}, docs: 0, flags: 0 };
+  for (const d of PAGES.docs) {
+    const r = runDoc(P, d);
+    const fl = A.auditStoredFacts({ pages: d.pages, fields: r.fields });
+    if (fl.length) audit.docs++;
+    for (const f of fl) { audit.flags++; audit.byRule[f.rule] = (audit.byRule[f.rule] ?? 0) + 1; if (TREE === ROOT && audit.flags <= 10) fail('audit false alarm', `${d.filename} ${f.field_key}="${f.value}" (${f.rule}): ${f.reason}`); }
+  }
+  const pg = (text) => [{ page_no: 1, text }];
+  const stored = (pairs) => pairs.map(([k, v, extra]) => ({ field_key: k, value: v, corrected_value: null, ...(extra ?? {}) }));
+  const COI = 'CERTIFICATE OF LIABILITY INSURANCE\nCertificate Date: 2026-01-25   Insurer:   Ironwood Casualty Mutual\nGeneral Liability GL-1   Policy Effective: 2025-12-03\nPolicy Expires:   2026-12-03\nINSURED   CERTIFICATE HOLDER\nAcme Plumbing LLC   Desert Car Wash Co';
+  const INV = 'INVOICE\nInvoice #: 4411   Date: 03/02/2026\nBill To: Desert Car Wash Co\nService call   1   $100.00\nSubtotal $100.00\nTax $8.00\nTotal $108.00';
+  const BADINV = 'INVOICE\nInvoice #: 4412   Date: 03/02/2026\nBill To: Desert Car Wash Co\nService call   1   $100.00\nSubtotal $100.00\nTax $8.00\nTotal $180.00';
+  const LEASE = 'LEASE AGREEMENT\nThis Lease is made between Mesa Holdings LLC (Landlord) and Desert Car Wash Co (Tenant) for a term of 60 months beginning 02/10/2023 and ending 02/09/2028.';
+  const EVT = 'EVENT AGREEMENT\nThis Agreement is made 03/13/2026 between the Venue and Harborlight Neighbors Alliance (the Client).\n\n__________________________________   __________________________________\nVenue: Cecilia Reeves Date: ________   Client: Colin Dunn Date: ________';
+  const CASES = [
+    // [label, pages, stored fields, expected rule or null (= must not be flagged)]
+    ['COI start stored as the certificate date', COI, stored([['start_date', '2026-01-25'], ['end_date', '2026-12-03']]), 'period'],
+    ['COI period stored correctly (control)', COI, stored([['start_date', '2025-12-03'], ['end_date', '2026-12-03']]), null],
+    ['lease term whose end is 12 months short', LEASE, stored([['agreement_term', '60 months (02/10/2023 - 02/09/2027)'], ['start_date', '2023-02-10'], ['end_date', '2027-02-09']]), 'term'],
+    ['lease term correct (control)', LEASE, stored([['agreement_term', '60 months (02/10/2023 - 02/09/2028)'], ['start_date', '2023-02-10'], ['end_date', '2028-02-09']]), null],
+    ['invoice amount stored as the subtotal', INV, stored([['cost', '100.00']]), 'total'],
+    ['invoice amount correct (control)', INV, stored([['cost', '108.00']]), null],
+    ['page whose subtotal + tax is not its total', BADINV, stored([['cost', '180.00']]), 'total'],
+    ['column title stored as the customer', INV, stored([['customer_name', 'SERVICE LOCATION']]), 'label'],
+    ['signer stored as the customer', EVT, stored([['customer_name', 'Colin Dunn']]), 'signer'],
+    ['party stored as the customer (control)', EVT, stored([['customer_name', 'Harborlight Neighbors Alliance']]), null],
+    ['a person-corrected value is never flagged (control)', EVT, [{ field_key: 'customer_name', value: 'Colin Dunn', corrected_value: 'Colin Dunn' }], null],
+  ];
+  let planted = 0, plantedOk = 0;
+  for (const [label, text, fields, want] of CASES) {
+    const got = A.auditStoredFacts({ pages: pg(text), fields }).map((f) => f.rule);
+    const ok = want ? got.includes(want) : got.length === 0;
+    planted++; if (ok) plantedOk++;
+    console.log(`  stored-value audit: ${label} -> ${got.length ? got.join(',') : 'no flag'} ${ok ? '(as expected)' : '(WRONG)'}`);
+    if (!ok) fail('audit', `${label}: expected ${want ?? 'no flag'}, got ${got.join(',') || 'no flag'}`);
+  }
+  audit.planted = `${plantedOk}/${planted}`;
+} catch (err) { audit = null; fail('audit', `storedAudit.js missing or broken in this checkout: ${err?.message}`); }
+
 // ---------------------------------------------------------------- report
 const reasons = {};
 for (const r of needs) { const k = `${r.reason}${r.detail ? ': ' + r.detail : ''}`; reasons[k] = (reasons[k] ?? 0) + 1; }
@@ -204,6 +260,7 @@ console.log(`\nverify:real-docs  tree=${path.relative(process.cwd(), TREE) || '.
 console.log(`  documents ${results.length}; need a person ${needs.length}; set aside (VOID / copies) ${results.filter((r) => r.setAside).length}; facts captured ${capturedTotal}`);
 console.log(`  by reader: ${JSON.stringify(byRoute)}`);
 console.log(`  gold facts ${GOLD.facts.length}: correct ${goldOk}, WRONG ${wrongN}, no longer captured ${missedN}; forbidden values back ${forbiddenN}`);
+if (audit) console.log(`  stored-value audit over the values this tree stores: ${audit.flags} flags on ${audit.docs} documents ${JSON.stringify(audit.byRule)}; planted cases ${audit.planted}`);
 console.log(`  quotes checked on the page ${checkedQuotes}, not grounded ${badQuotes}`);
 console.log(`  needs a person: ${needs.length} (gold allows ${Object.keys(allowed).length}); unexpected ${unexpected.length}; resolved since gold ${resolved.length}`);
 if (deg) { console.log(`  degraded copies ${deg.docs}: facts correct ${deg.correct}, wrong ${deg.wrong.length}, not read ${deg.missed}; ${JSON.stringify(deg.byVariant)}`); for (const w of deg.wrong) console.log('    known OCR misread: ' + w); }

@@ -610,6 +610,27 @@ function* tokens(str) {
   }
 }
 
+/** Pure. Is the text starting at (x0, y0) and ending at x1 sitting on a dark filled rectangle? The last rectangle painted over the
+ *  start and over the end decides, and it must be dark and be the same one. */
+/** Pure. Visible area of a form XObject: its /BBox (device space) narrowed by the clip already in force. */
+function formClip(xo, doc, m, outer) {
+  const bb = doc.arr(xo.BBox)?.map((x) => doc.num(x));
+  if (!bb || bb.length !== 4) return outer;
+  const pts = [[bb[0], bb[1]], [bb[2], bb[1]], [bb[0], bb[3]], [bb[2], bb[3]]].map(([px, py]) => [m[0] * px + m[2] * py + m[4], m[1] * px + m[3] * py + m[5]]);
+  const q = [Math.min(...pts.map((a) => a[0])), Math.min(...pts.map((a) => a[1])), Math.max(...pts.map((a) => a[0])), Math.max(...pts.map((a) => a[1]))];
+  return outer ? [Math.max(outer[0], q[0]), Math.max(outer[1], q[1]), Math.min(outer[2], q[2]), Math.min(outer[3], q[3])] : q;
+}
+function darkBehind(rects, x0, x1, y0, size) {
+  const at = (x, y) => { for (let i = rects.length - 1; i >= 0; i--) { const q = rects[i].r; if (x >= q[0] - 1 && x <= q[2] + 1 && y >= q[1] - 1 && y <= q[3] + 1) return rects[i]; } return null; };
+  // The SAME dark shape must sit under both ends of the text at three heights (baseline, middle, cap height): a thin rule or
+  // a sliver drawn through the middle of white text does not make it readable.
+  const xa = Math.min(x0, x1) + 0.5, xb = Math.max(x0, x1) - 0.5;
+  const first = at(xa, y0 + size * 0.05);
+  if (!first || first.lum >= 0.6) return false;
+  for (const x of [xa, xb]) for (const f of [0.05, 0.4, 0.65]) if (at(x, y0 + size * f) !== first) return false;
+  return true;
+}
+
 function interpret(doc, content, resources, state, depth) {
   const { runs, stats, fontCache, images } = state;
   const res = doc.dict(resources) ?? {};
@@ -619,6 +640,10 @@ function interpret(doc, content, resources, state, depth) {
   const stack = [];
   let tm = IDENT.slice(), tlm = IDENT.slice();
   let font = null, fsize = 0, tc = 0, tw = 0, th = 1, tl = 0, trise = 0, tr = 0;
+  let fillLum = 0; // 0 black .. 1 white: luminance of the current non-stroking colour (cost-fix: white text on a dark banner is visible)
+  let pathRects = [];
+  let clipped = false, translucent = false, clipBox = state.clipBox ?? null, pathPolyUsed = false; // cost-fix: a clipped or see-through dark shape is not proof that white text is readable
+  let pathPoly = null;
   let whiteFill = false; // R34: current non-stroking colour is (near) white — see the hidden-text note in readPdfTextLayer
   const operands = [];
   const showString = (str) => {
@@ -639,8 +664,12 @@ function interpret(doc, content, resources, state, depth) {
     const x1 = x0 + adv * Math.hypot(trm[0], trm[1]) * Math.sign(trm[0] || 1);
     const box = state.box;
     const offPage = box && (x0 < box[0] - 2 || x0 > box[2] + 2 || y0 < box[1] - 2 || y0 > box[3] + 2);
+    // cost-fix: white text is only hidden when nothing dark was painted under it. White header text on a dark table banner or
+    // title bar is how many born-digital invoices are laid out, and it is plainly visible; the LAST filled rectangle painted
+    // under both ends of the text decides (a later light rectangle painted over a dark one hides the text again).
+    const onDark = whiteFill && size >= 3.5 && !offPage && state.rects && darkBehind(state.rects, x0, x1, y0, size);
     if (tr === 3 || tr === 7) { stats.invisible++; }
-    else if (whiteFill || size < 3.5 || offPage) { stats.hidden++; }
+    else if ((whiteFill && !onDark) || size < 3.5 || offPage) { stats.hidden++; }
     else if (rotated) { stats.rotated++; }
     else if (text.trim()) runs.push({ x: Math.min(x0, x1), x2: Math.max(x0, x1), y: y0, size: Math.max(1, size), text });
     // advance text matrix
@@ -654,19 +683,65 @@ function interpret(doc, content, resources, state, depth) {
       const op = t.op;
       const o = operands;
       switch (op) {
-        case "q": stack.push({ ctm: ctm.slice(), whiteFill }); break;
-        case "Q": if (stack.length) { const top = stack.pop(); ctm = top.ctm; whiteFill = top.whiteFill; } break;
-        case "g": if (o.length >= 1) whiteFill = Number(o[o.length - 1]) >= 0.97; break;
-        case "rg": if (o.length >= 3) whiteFill = o.slice(-3).every((v) => Number(v) >= 0.97); break;
-        case "k": if (o.length >= 4) whiteFill = o.slice(-4).every((v) => Number(v) <= 0.03); break;
+        case "q": stack.push({ ctm: ctm.slice(), whiteFill, fillLum, clipped, translucent, clipBox }); break;
+        case "Q": if (stack.length) { const top = stack.pop(); ctm = top.ctm; whiteFill = top.whiteFill; fillLum = top.fillLum; clipped = top.clipped; translucent = top.translucent; clipBox = top.clipBox; } break;
+        case "g": if (o.length >= 1) { whiteFill = Number(o[o.length - 1]) >= 0.97; fillLum = Number(o[o.length - 1]); } break;
+        case "rg": if (o.length >= 3) { const c = o.slice(-3).map(Number); whiteFill = c.every((v) => v >= 0.97); fillLum = 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2]; } break;
+        case "k": if (o.length >= 4) { const c = o.slice(-4).map(Number); whiteFill = c.every((v) => v <= 0.03); fillLum = (1 - Math.min(1, c[3])) * (1 - 0.3 * c[0] - 0.59 * c[1] - 0.11 * c[2]); } break;
         case "sc": case "scn": {
           const nums = o.filter((v) => typeof v === "number");
-          if (nums.length === 1) whiteFill = nums[0] >= 0.97;
-          else if (nums.length === 3) whiteFill = nums.every((v) => v >= 0.97);
-          else if (nums.length === 4) whiteFill = nums.every((v) => v <= 0.03);
-          else whiteFill = false;
+          if (nums.length === 1) { whiteFill = nums[0] >= 0.97; fillLum = nums[0]; }
+          else if (nums.length === 3) { whiteFill = nums.every((v) => v >= 0.97); fillLum = 0.3 * nums[0] + 0.59 * nums[1] + 0.11 * nums[2]; }
+          else if (nums.length === 4) { whiteFill = nums.every((v) => v <= 0.03); fillLum = (1 - Math.min(1, nums[3])) * (1 - 0.3 * nums[0] - 0.59 * nums[1] - 0.11 * nums[2]); }
+          else { whiteFill = false; fillLum = 0; }
           break;
         }
+        case "re": if (o.length >= 4) {
+          const [rx, ry, rw, rh] = o.slice(-4).map(Number);
+          const pts = [[rx, ry], [rx + rw, ry], [rx, ry + rh], [rx + rw, ry + rh]].map(([px, py]) => [ctm[0] * px + ctm[2] * py + ctm[4], ctm[1] * px + ctm[3] * py + ctm[5]]);
+          pathRects.push([Math.min(...pts.map((q) => q[0])), Math.min(...pts.map((q) => q[1])), Math.max(...pts.map((q) => q[0])), Math.max(...pts.map((q) => q[1]))]);
+          if (pathRects.length > 64) pathRects.shift();
+        } break;
+        case "m": case "l": case "c": case "v": case "y": {
+          // cost-fix: a filled diamond / circle logo mark is drawn with line and curve segments, not "re"; its bounding box stands in.
+          const nums = o.filter((v) => typeof v === "number");
+          pathPolyUsed = true;
+          if (nums.length >= 2) {
+            for (let k = nums.length - 2; k >= Math.max(0, nums.length - 6); k -= 2) {
+              const px = nums[k], py = nums[k + 1];
+              const dx = ctm[0] * px + ctm[2] * py + ctm[4], dy = ctm[1] * px + ctm[3] * py + ctm[5];
+              if (op === "m" || !pathPoly) { pathPoly = [dx, dy, dx, dy]; pathRects.push(pathPoly); if (pathRects.length > 64) pathRects.shift(); }
+              else { pathPoly[0] = Math.min(pathPoly[0], dx); pathPoly[1] = Math.min(pathPoly[1], dy); pathPoly[2] = Math.max(pathPoly[2], dx); pathPoly[3] = Math.max(pathPoly[3], dy); }
+            }
+          }
+        } break;
+        case "W": case "W*":
+          // A rectangular clip narrows the visible part of every later shape (Skia/Chrome start each page with one); any other
+          // clip shape makes later shapes untrusted as proof of a dark background.
+          if (!pathPolyUsed && pathRects.length === 1) {
+            const q = pathRects[0];
+            clipBox = clipBox ? [Math.max(clipBox[0], q[0]), Math.max(clipBox[1], q[1]), Math.min(clipBox[2], q[2]), Math.min(clipBox[3], q[3])] : q.slice();
+          } else clipped = true;
+          break;
+        case "gs": {
+          const gsd = doc.dict(doc.dict(res.ExtGState)?.[String(o[o.length - 1] ?? "").slice(1)]);
+          if (gsd) {
+            const ca = gsd.ca === undefined ? 1 : doc.num(gsd.ca);
+            const sm = gsd.SMask !== undefined && gsd.SMask !== "/None";
+            const bm = gsd.BM !== undefined && !/^\/(Normal|Compatible)$/.test(String(gsd.BM));
+            translucent = !(ca >= 0.95) || sm || bm;
+          } else translucent = true;
+          break;
+        }
+        case "f": case "F": case "f*": case "B": case "B*": case "b": case "b*":
+          if (state.rects) for (const r0 of pathRects) {
+            const r = clipBox ? [Math.max(r0[0], clipBox[0]), Math.max(r0[1], clipBox[1]), Math.min(r0[2], clipBox[2]), Math.min(r0[3], clipBox[3])] : r0;
+            if (r[2] < r[0] || r[3] < r[1]) continue; // wholly outside the clip: nothing is painted
+            state.rects.push({ r, lum: (clipped || translucent || state.taint) ? 1 : fillLum });
+            if (state.rects.length > 4000) state.rects.shift();
+          }
+          pathRects = []; pathPoly = null; pathPolyUsed = false; break;
+        case "n": case "S": case "s": pathRects = []; pathPoly = null; pathPolyUsed = false; break;
         case "cm": if (o.length >= 6) ctm = mul(o.slice(-6), ctm); break;
         case "BT": tm = IDENT.slice(); tlm = IDENT.slice(); break;
         case "ET": break;
@@ -715,11 +790,17 @@ function interpret(doc, content, resources, state, depth) {
             const w = doc.num(xo.Width), h = doc.num(xo.Height);
             const mask = xo.ImageMask === true || (xo.ImageMask?.k === "true");
             images.push({ area, w, h, mask });
+            // cost-fix: a picture painted over a dark shape covers it (and may itself be light), so it counts as a light cover.
+            if (state.rects) {
+              const pts = [[0, 0], [1, 0], [0, 1], [1, 1]].map(([px, py]) => [ctm[0] * px + ctm[2] * py + ctm[4], ctm[1] * px + ctm[3] * py + ctm[5]]);
+              state.rects.push({ r: [Math.min(...pts.map((q) => q[0])), Math.min(...pts.map((q) => q[1])), Math.max(...pts.map((q) => q[0])), Math.max(...pts.map((q) => q[1]))], lum: 1 });
+              if (state.rects.length > 4000) state.rects.shift();
+            }
           } else if (xo.Subtype === "/Form" && depth < MAX_XOBJECT_DEPTH) {
             const st = doc.stream(xref);
             if (!st.ok) { stats.badStream = true; break; }
             const mat = (doc.arr(xo.Matrix) ?? IDENT).map((x) => doc.num(x));
-            const sub = { ...state, ctm: mul(mat.length === 6 ? mat : IDENT, ctm) };
+            const sub = { ...state, ctm: mul(mat.length === 6 ? mat : IDENT, ctm), taint: !!(state.taint || clipped || translucent), clipBox: formClip(xo, doc, mul(mat.length === 6 ? mat : IDENT, ctm), clipBox) };
             interpret(doc, st.data.toString("latin1"), xo.Resources ?? resources, sub, depth + 1);
           }
           break;
@@ -831,7 +912,7 @@ export function readPdfTextLayer(bytes, opts = {}) {
       const runs = [];
       const images = [];
       const pstats = { ...stats, unmapped: 0, chars: 0, invisible: 0, rotated: 0, hidden: 0, unreadableFont: null };
-      const state = { runs, stats: pstats, fontCache, images, ctm: IDENT.slice(), box: [Math.min(mb[0], mb[2]), Math.min(mb[1], mb[3]), Math.max(mb[0], mb[2]), Math.max(mb[1], mb[3])] };
+      const state = { runs, stats: pstats, fontCache, images, rects: [], ctm: IDENT.slice(), box: [Math.min(mb[0], mb[2]), Math.min(mb[1], mb[3]), Math.max(mb[0], mb[2]), Math.max(mb[1], mb[3])] };
       interpret(doc, contentStr, inh.Resources, state, 0);
       if (pstats.timeout || Date.now() > deadline) return { ok: false, reason: "timeout", stats };
       if (doc.budget.over) return { ok: false, reason: "stream-budget", stats };

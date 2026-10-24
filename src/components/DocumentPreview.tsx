@@ -177,6 +177,7 @@ export function DocumentPreview({ documentId, location, excerpt, onClose }: Docu
                   {i.kind === 'conflict' && <span>Disagrees with another document — needs a decision</span>}
                   {i.kind === 'duplicate' && <span>Duplicate of a document already in the system</span>}
                   {i.kind === 'ambiguous-name-link' && <span>Two customers named {i.surname} — confirm which one</span>}
+                  {i.kind === 'suspect-value' && <span>Please check this value: {i.field.replace(/_/g, ' ')} “{i.value}”. {i.reason}{i.quote ? ` Page ${i.page ?? 1}: “${i.quote}”` : ''}</span>}
                 </li>
               ))}
             </ul>

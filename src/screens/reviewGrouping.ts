@@ -32,7 +32,10 @@ export const GROUP_HINTS: Record<string, string> = {
   unlinked: 'These name a place or a job but match no customer yet. Choose the customer once and similar papers follow.',
   conflict: 'Two papers disagree about the same fact. Pick the one that is right.',
   duplicate: 'These look like the same paper uploaded twice.',
+  'suspect-value': 'A value saved from one of these papers does not match what the page says. Open one, read the quote, then correct the value or tell us it is fine.',
 };
+/** Docread2 round (2026-10-23) - PROPOSED wording, awaiting owner approval. */
+export const SUSPECT_LABEL = 'Please check this value';
 /** One line saying what is missing and why it matters, for a "Needs: ..." section. */
 export function missingHint(firstLabel: string): string {
   return `The page did not show the ${firstLabel}. Look again on the page, or type it in once and the paper is checked.`;
@@ -55,6 +58,8 @@ export function needInfo(doc: Doc, requiredFields: readonly string[]): NeedInfo 
   // Nothing read from the paper: one shared group, whatever else it also lacks.
   if (doc.issues.some((i) => i.kind === 'nothing-read')) return { text: HARD_TO_READ_LABEL, groupKey: 'nothing-read', groupLabel: HARD_TO_READ_LABEL, hint: GROUP_HINTS['nothing-read'] };
   if (doc.issues.some((i) => i.kind === 'possible-copy')) return { text: COPY_LABEL, groupKey: 'possible-copy', groupLabel: COPY_LABEL };
+  // Docread2: a stored value that looks wrong against its page (read-only audit): a person looks at it, whatever else the paper has.
+  if (doc.stage !== 'verified' && doc.issues.some((i) => i.kind === 'suspect-value')) return { text: SUSPECT_LABEL, groupKey: 'suspect-value', groupLabel: SUSPECT_LABEL, hint: GROUP_HINTS['suspect-value'] };
   const present = new Set(doc.extracted.filter((f) => (f.correctedValue ?? f.value).trim()).map((f) => f.name));
   const missing = requiredFields.filter((r) => !isRequirementMet(present, r));
   if (missing.length > 0) {

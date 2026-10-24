@@ -15,6 +15,7 @@ import { getCorpusStamp } from '../../askCache.js';
 import { attachCitations, makeRecord } from '../../citations/records.js';
 import { isFinalDecline } from '../../router/releaseGate.js';
 import { fileURLToPath } from 'node:url';
+import { dataPath } from './unified1.js';
 const DATA_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'data');
 
 const truthy = (v) => /^(?:1|true|on|yes)$/i.test(String(v ?? '').trim());
@@ -33,7 +34,7 @@ export function _assumeParity(v) { stampOk = v === null ? null : Boolean(v); }
 export function paritySealed() {
   if (stampOk !== null) return stampOk;
   try {
-    const B = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'bundle.json'), 'utf8'));
+    const B = JSON.parse(fs.readFileSync(dataPath(DATA_DIR, 'bundle.json'), 'utf8'));
     stampOk = Boolean(B.parity && B.parity.mismatches === 0 && Number(B.parity.questions) >= 2000);
   } catch { stampOk = false; }
   if (!stampOk) log({ refused: 'parity stamp missing or not zero' });

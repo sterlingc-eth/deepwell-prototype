@@ -95,8 +95,15 @@ export const MODEL_PRICE_PER_MTOK = {
     output: Number(process.env.AI_COST_HAIKU_OUTPUT_PER_MTOK ?? 5),
   },
   sonnet: {
-    input: Number(process.env.AI_COST_SONNET_INPUT_PER_MTOK ?? 3),
-    output: Number(process.env.AI_COST_SONNET_OUTPUT_PER_MTOK ?? 15),
+    // 2026-10-23: Sonnet 5 / 5.5 (what this codebase calls: claude-sonnet-5-5) list at $2 in / $10 out per MTok
+    // (platform.claude.com/docs/en/about-claude/pricing). Sonnet 4.x ids still list at $3 / $15: see sonnet4 below.
+    input: Number(process.env.AI_COST_SONNET_INPUT_PER_MTOK ?? 2),
+    output: Number(process.env.AI_COST_SONNET_OUTPUT_PER_MTOK ?? 10),
+  },
+  // Sonnet 4 / 4.5 / 4.6 ids (older pins): $3 / $15.
+  sonnet4: {
+    input: Number(process.env.AI_COST_SONNET4_INPUT_PER_MTOK ?? 3),
+    output: Number(process.env.AI_COST_SONNET4_OUTPUT_PER_MTOK ?? 15),
   },
 };
 
@@ -105,7 +112,9 @@ export const MODEL_PRICE_PER_MTOK = {
  * Haiku, this codebase's default: the two families are the only ones it calls.
  */
 export function modelFamily(model) {
-  return /sonnet/i.test(String(model ?? "")) ? "sonnet" : "haiku";
+  const m = String(model ?? "");
+  if (/sonnet[-_.]?4/i.test(m)) return "sonnet4";
+  return /sonnet/i.test(m) ? "sonnet" : "haiku";
 }
 
 /**

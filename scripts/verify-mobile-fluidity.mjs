@@ -55,7 +55,7 @@ const DOC_ID = '44444444-4444-4444-8444-000000000001';
 const LONG_TASK_BUDGET_MS = 80;
 const CLS_BUDGET = 0.05;
 /** The mobile entry chunk alone, gzip. R23 baseline ~22.5 KB; R36: 21.2 KB; R39 (2026-10-13): 18.4 KB measured, tightened to 20 KB. */
-const MOBILE_ENTRY_BUDGET_GZIP = 18.5 * 1024; // 2026-10-21: 22.2 -> 17.6 KB (Docs tab + answer card lazy); was 19
+const MOBILE_ENTRY_BUDGET_GZIP = 16 * 1024; // 2026-10-23: measured 14.5 KB (real multi-entry build); was 18.5 (10-21), 19 before
 
 /** "Slow 4G" (Chrome DevTools' own preset: ~400 Kbps, 400ms RTT) applied as
  *  a per-response delay on every mocked API call below, rather than as a

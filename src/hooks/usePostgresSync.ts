@@ -499,6 +499,14 @@ async function hydrateRows(rows: DocumentRow[]): Promise<void> {
     }
   } catch { /* corrections are an enhancement, not a precondition */ }
   const docs = rows.map((r) => toDoc(r, byDoc.get(r.id) ?? [], linksByDoc.get(r.id) ?? [], correctionsByDoc.get(r.id) ?? []));
+  // Docread2: "Please check this value" - stored values the read-only audit found wrong (empty until the owner turns flags on).
+  try {
+    const { flags } = await reviewClient.suspectFlags();
+    if (flags.length) {
+      const byId = new Map(docs.map((d) => [d.id, d]));
+      for (const f of flags) byId.get(f.documentId)?.issues.push({ kind: 'suspect-value', field: f.field, value: f.value, rule: f.rule, reason: f.reason, quote: f.quote, page: f.page });
+    }
+  } catch { /* a flag is an enhancement, not a precondition */ }
 
   // The customers / units these documents point at may be older than the newest 500 entities the sync loaded.
   const have = useGraph.getState().entities;

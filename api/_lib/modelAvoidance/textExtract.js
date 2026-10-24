@@ -27,6 +27,7 @@
  *
  * Pure. No I/O, no clock. HVAC pack only (another industry's vocabulary is a different label table).
  */
+import { signatureLineFlags, isSignerOnly } from "./signerGuard.js";
 import { normalizeDate } from "../extractFields.js";
 import { BRAND_RULES } from "../warrantyRules.js";
 import { isFragmentName } from "../integrity.js";
@@ -806,8 +807,11 @@ export function scanLabeledValues(pages, opts = {}) {
   const out = {};
   const termStarts = [];
   const termEnds = [];
+  // Docread2: a name read off a signature-block line is the signer, not the party (see signerGuard.js).
+  const sigFlags = signatureLineFlags(lines);
   const push = (key, value, line, label, strength = "explicit") => {
     if (want && !want.has(key)) return;
+    if ((key === "customer_name" || key === "vendor") && isSignerOnly(value, line, lines, sigFlags)) return;
     (out[key] ??= []).push({ value, page_no: line.page, verbatim: line.t.slice(0, 200), label: String(label).toLowerCase(), strength });
   };
   // Letterhead addresses (the shop's own) are never a service address, even under a bare "Address:" label.

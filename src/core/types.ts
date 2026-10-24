@@ -148,7 +148,10 @@ export type DocumentIssue =
   // linked customer. Computed client-side in usePostgresSync.ts from each
   // link's `linked_by` (server value 'ai:name-only' or 'ai:name-mention') plus the already-synced
   // customer entities — no extra round trip.
-  | { kind: 'ambiguous-name-link'; surname: string; candidateIds: EntityId[] };
+  | { kind: 'ambiguous-name-link'; surname: string; candidateIds: EntityId[] }
+  // Docread2 round (2026-10-23): a value already stored looks wrong against the page (the read-only audit,
+  // api/_lib/storedAuditStore.js). Never changes the value; shows the evidence quote and page. Only exists once the owner switch is on.
+  | { kind: 'suspect-value'; field: string; value: string; rule: string; reason: string; quote: string | null; page: number | null };
 
 export interface Doc {
   id: DocumentId;

@@ -91,7 +91,7 @@ const segmentsOf = (t) => {
   return segs.flatMap((x) => { const m = /^([A-Za-z][A-Za-z ()%.#/&-]{1,40}?)\s+(\(?-?(?:USD\s*|US\$\s*)?\$\s*[\d,]+\.\d{2}\)?|\(?-?USD\s*[\d,]+\.\d{2}\)?)$/.exec(x); return m && !/:\s*$/.test(m[1]) ? [m[1], m[2]] : [x]; });
 };
 
-function monthsBetweenOk(startYmd, n, unit, endYmd) {
+export function monthsBetweenOk(startYmd, n, unit, endYmd) {
   const s = new Date(`${startYmd}T00:00:00Z`);
   const e = new Date(`${endYmd}T00:00:00Z`);
   if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return false;
@@ -195,6 +195,17 @@ export function scanProseFacts(pages, opts = {}) {
         if (VENDOR_ROLES.test(role)) push("vendor", { ...base, value: name, label: `parties sentence (${role.toLowerCase()})` });
         else if (CUSTOMER_ROLES.test(role)) push("customer_name", { ...base, value: name, label: `parties sentence (${role.toLowerCase()})` });
       }
+    }
+    // Docread2: "between the Venue and Harborlight Neighbors Alliance (the Client)" - one side is only a role word, the other
+    // names the party. The named side's role decides which party it is; a signer is never read here (signerGuard.js).
+    const oneSideRe = new RegExp(`\\bbetween\\s+(?:the\\s+)?[A-Za-z']{3,20}(?:\\s+[A-Za-z']{3,20})?\\s+and\\s+${NAME}\\s*,?\\s*${ROLE}`, "g");
+    for (const m of flat.matchAll(oneSideRe)) {
+      const name = cleanName(m[1]);
+      const role = collapse(m[2]);
+      if (name.split(/\s+/).length > 9 || name.length < 3 || /^(?:the\s+)?(?:parties|undersigned)$/i.test(name)) continue;
+      const base = { page_no: page, line: lineAt(m.index), verbatim: quote(m), label: `parties sentence (${role.toLowerCase()})`, value: name };
+      if (VENDOR_ROLES.test(role)) push("vendor", base);
+      else if (CUSTOMER_ROLES.test(role)) push("customer_name", base);
     }
   }
 

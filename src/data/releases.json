@@ -158,6 +158,21 @@
     "sha": "55d1b2b"
    }
   },
+  {
+   "track": "donovan",
+   "version": "1.5.0",
+   "date": "2026-10-23",
+   "type": "update",
+   "released": true,
+   "public": true,
+   "notes": [
+    "Donovan answers more of your questions directly, with the source shown.",
+    "Better at reading contracts and industry paperwork."
+   ],
+   "internal": {
+    "sha": "55d1b2b"
+   }
+  },
  {
   "track": "app",
   "version": "1.3.0",
