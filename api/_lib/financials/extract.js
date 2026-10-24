@@ -25,6 +25,7 @@ import { modelCallLogLine } from '../promptCache.js';
 import { selectPages } from '../extractFields.js';
 import { normalizeFinancials, FINANCIAL_DOCUMENT_TYPES, isFinancialDocumentType } from './normalize.js';
 import { financialsTableExists, upsertFinancials } from './store.js';
+import { withVerifiedRows } from '../modelAvoidance/tableRowsInput.js';
 
 export const FINANCIALS_MODEL = process.env.FINANCIALS_MODEL || process.env.EXTRACT_MODEL || 'claude-haiku-4-5';
 /** Page-text budget for one call: money documents are short; totals sit on the last page. */
@@ -184,6 +185,8 @@ export async function extractFinancialsForDocument(ctx, documentId, deps) {
     console.error('financials: model call failed:', err?.name ?? 'error');
     return { status: 'failed', reason: 'model_error', modelCalls: 1, costUsd: 0 };
   }
+  // Tables lane (2026-10-24): TABLE_ROWS_READER=1 (default OFF) - lines the page's own arithmetic proves replace the model's unproven ones.
+  if (out?.input) out = { ...out, input: withVerifiedRows(out.input, loaded.pages, { env: deps.env ?? process.env }).input };
   const costUsd = estimateFinancialsCost(out.usage);
   const highestPage = loaded.pages.reduce((n, p) => Math.max(n, Number(p.page_no) || 0), 0);
   const norm = normalizeFinancials(out.input, { documentType: loaded.type, pages: loaded.pages, pageCount: highestPage, today });

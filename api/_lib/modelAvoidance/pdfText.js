@@ -816,7 +816,16 @@ function interpret(doc, content, resources, state, depth) {
 
 /* ------------------------------------------------------------------ lines from runs */
 function buildLines(runs) {
-  if (!runs.length) return "";
+  return layoutLines(runs).map((l) => (l.blankBefore ? "\n" : "") + l.text).join("\n");
+}
+
+/**
+ * Tables lane (2026-10-24): the same lines buildLines() writes, but kept as structure: each line has its text, its cells
+ * (a cell = runs closer than 1.2 em; {t, x, x2} in page points) and its size. The text of a line is byte-for-byte what
+ * buildLines() wrote (buildLines is now built from this), so a quote taken from `text` is on the stored page.
+ */
+export function layoutLines(runs) {
+  if (!runs.length) return [];
   const sorted = runs.slice().sort((a, b) => b.y - a.y || a.x - b.x);
   const lines = [];
   for (const r of sorted) {
@@ -830,24 +839,34 @@ function buildLines(runs) {
     line.runs.sort((a, b) => a.x - b.x);
     let text = "";
     let last = null;
+    const cells = [];
+    let cell = null;
     for (const r of line.runs) {
+      let newCell = true;
       if (last) {
         const gap = r.x - last.x2;
         const em = Math.max(1, Math.min(last.size, r.size));
         const needsSpace = gap > 0.12 * em && !/\s$/.test(text) && !/^\s/.test(r.text);
         if (gap > 2.2 * em) text += "   ";
         else if (needsSpace) text += " ";
+        newCell = gap > 1.2 * em;
       }
+      if (newCell) { if (cell) cells.push(cell); cell = { start: text.length, x: r.x, x2: r.x2 }; }
       text += r.text;
+      cell.x2 = r.x2; cell.end = text.length;
       last = r;
     }
-    text = text.replace(/[ \t]+$/g, "");
-    if (!text) continue;
-    if (prev && prev.y - line.y > 1.75 * Math.max(prev.size, line.size) * 1.2) outLines.push("");
-    outLines.push(text);
+    if (cell) cells.push(cell);
+    const trimmed = text.replace(/[ \t]+$/g, "");
+    if (!trimmed) continue;
+    const blankBefore = !!(prev && prev.y - line.y > 1.75 * Math.max(prev.size, line.size) * 1.2);
+    outLines.push({
+      text: trimmed, size: line.size, y: line.y, blankBefore, cw: 0.5 * line.size,
+      cells: cells.map((c) => ({ t: trimmed.slice(c.start, c.end).trim(), x: c.x, x2: c.x2 })).filter((c) => c.t),
+    });
     prev = line;
   }
-  return outLines.join("\n");
+  return outLines;
 }
 
 /* ------------------------------------------------------------------ garble heuristics */
@@ -931,7 +950,7 @@ export function readPdfTextLayer(bytes, opts = {}) {
       if (bigImg.length) return { ok: false, reason: "page-image", stats };
       if (images.length && pageText.replace(/\s/g, "").length < 120 && images.some((im) => im.area / pageArea > 0.02)) return { ok: false, reason: "image-with-little-text", stats };
       if (looksGarbled(pageText)) return { ok: false, reason: "garbled-text", stats };
-      pages.push({ page_no: i + 1, text: pageText });
+      pages.push(opts.keepLines ? { page_no: i + 1, text: pageText, lines: layoutLines(runs) } : { page_no: i + 1, text: pageText });
     }
     stats.pages = pages.length;
     if (!pages.some((p) => p.text.trim())) return { ok: false, reason: "no-text", stats };

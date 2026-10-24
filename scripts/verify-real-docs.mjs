@@ -251,6 +251,103 @@ try {
   audit.planted = `${plantedOk}/${planted}`;
 } catch (err) { audit = null; fail('audit', `storedAudit.js missing or broken in this checkout: ${err?.message}`); }
 
+// ---------------------------------------------------------------- 6. line-item tables (tables lane, 2026-10-24)
+// The anchored-stream table reader (api/_lib/modelAvoidance/tableRows.js) over (a) the clean synthetic "Sample" line-item documents
+// (gold rows known: ENFORCED - a wrong row fact fails the gate), (b) the ORIGINAL 1,000 documents (no gold rows exist: a verified
+// table whose total contradicts the document's own cost fact fails), (c) the degraded copies of (a) (MEASURED, not enforced).
+// Three table-specific planted failures (a swapped column, an off-by-one row, a total from another page) must be rejected, first
+// by the oracle and then by the reader itself.
+let tbl = null;
+{
+  const TG_PATH = path.join(ROOT, 'test-docs/real-docs/tables/GOLD_TABLES.json');
+  let TR = null, E = null;
+  try { TR = await import(pathToFileURL(path.join(TREE, 'api/_lib/modelAvoidance/tableRows.js')).href); E = await import('./real-docs/tables-eval.mjs'); } catch { TR = null; }
+  const TDOCS = E?.loadTablesPages(ROOT);
+  if (!TR || !TDOCS || !fs.existsSync(TG_PATH)) { if (TREE === ROOT) fail('tables', 'tableRows.js / tables suite missing in this tree'); else console.log('  tables: reader absent in this tree (skipped)'); }
+  else {
+    const TG = JSON.parse(fs.readFileSync(TG_PATH, 'utf8'));
+    const rd = TR.readTables;
+    const clean = TDOCS.filter((d) => d.variant === 'clean-pdf');
+    tbl = { clean: {}, plants: [], degraded: {}, originals: {} };
+    // 6a. oracle self-test: planted table failures are rejected by the judge
+    const gdoc = clean.find((d) => d.filename.includes('invoice-B')) ?? clean[0];
+    const gold = gdoc.gold_rows;
+    const self = E.judgeRows(gold.map((g) => ({ ...g })), gold);
+    if (self.wrong.length || self.missed.length) fail('oracle', 'table gold does not match itself');
+    const i = gold.findIndex((g) => g.values[0] > 1);
+    const planted = [
+      ['swapped column (unit price <-> amount)', gold.map((g, k) => (k === i ? { ...g, values: [g.values[0], g.values[2], g.values[1]] } : g)), 'rows'],
+      ['off-by-one row (label of the next row)', gold.map((g, k) => (k === i ? { ...g, label: gold[i + 1].label } : g)), 'rows'],
+      ['total taken from another page', null, 'total'],
+    ];
+    for (const [label, rows, kind] of planted) {
+      let caught;
+      if (kind === 'rows') caught = E.judgeRows(rows, gold).wrong.length > 0;
+      else caught = E.judgeTotals({ totals: { total: { value: gdoc.gold_totals.total, page: 2 } } }, gdoc.gold_totals, 1).wrong.length > 0;
+      console.log(`  oracle self-test: ${label} -> ${caught ? 'REJECTED (good)' : 'NOT CAUGHT'}`);
+      tbl.plants.push([label, caught]);
+      if (!caught) fail('oracle', `planted table failure not rejected: ${label}`);
+    }
+    // 6b. the same three plants fed to the READER as damaged page text: a damaged row/total must never become a fact
+    {
+      const base = gdoc.pages.map((p) => ({ page_no: p.page_no, text: p.text }));
+      const lines = base[0].text.split('\n');
+      const rowIdx = lines.findIndex((l) => l.startsWith(gold[i].label.slice(0, 10)));
+      const run = (ls, other) => { const pg = [{ page_no: 1, text: ls.join('\n') }]; const r = rd(other ? [{ page_no: 1, text: ls.join('\n') }] : pg); return { r, j: E.judgeRows(r.rows, gold) }; };
+      const cellsOf = (l) => l.split(/ {2,}/);
+      const sw = lines.slice(); { const c = cellsOf(sw[rowIdx]); [c[c.length - 1], c[c.length - 2]] = [c[c.length - 2], c[c.length - 1]]; sw[rowIdx] = c.join('   '); }
+      const off = lines.slice(); off[rowIdx] = off[rowIdx].replace(/\$([\d,]+)\.(\d\d)$/, (m, a, b) => `$${(Number(a.replace(/,/g, '')) + 1).toLocaleString('en-US')}.${b}`);
+      const otherDoc = clean.find((d) => d !== gdoc && d.kind === 'invoice');
+      const otherTotal = otherDoc.pages[otherDoc.pages.length - 1].text.split('\n').find((l) => /^Total Due/.test(l.trim()));
+      const wt = lines.slice(); const ti = wt.findIndex((l) => /^\s*Total Due/.test(l)); wt[ti] = otherTotal;
+      const results6 = [
+        ['swapped column in the page text', run(sw), (x) => x.j.wrong.length === 0 && !x.r.rows.some((q) => q.quote === sw[rowIdx].trim())],
+        ['an amount one dollar off in the page text', run(off), (x) => x.j.wrong.length === 0 && !x.r.rows.some((q) => q.quote === off[rowIdx].trim())],
+        ["another document's total on the total line", run(wt), (x) => x.j.wrong.length === 0 && !x.r.totals?.total && !x.r.documentVerified],
+      ];
+      for (const [label, x, ok] of results6) { const good = ok(x); console.log(`  reader plant: ${label} -> ${good ? 'no wrong fact (good)' : 'GOT THROUGH'}`); tbl.plants.push([label, good]); if (!good) fail('tables', `planted failure got through the reader: ${label}`); }
+    }
+    // 6c. the clean suite: enforced
+    for (const mode of ['x', 'order']) {
+      const s = E.evalSuite(clean, { mode, readTables: rd });
+      tbl.clean[mode] = { docs: s.docs, goldRows: s.goldRows, captured: s.rowsCaptured, wrong: s.wrongRows.length, wrongTotals: s.wrongTotals.length, docsNeedPerson: s.docsNeedPerson, byKind: s.byKind };
+      for (const w of s.wrongRows.slice(0, 5)) fail('WRONG TABLE ROW', `${w.doc}: ${w.label} ${JSON.stringify(w.values)}`);
+      for (const w of s.wrongTotals.slice(0, 5)) fail('WRONG TABLE TOTAL', `${w.doc}: ${w.key} read ${w.read} (gold ${w.gold})`);
+      if (s.rowsCaptured < TG.clean_rows_min) fail('regression (table rows no longer captured)', `${mode}: ${s.rowsCaptured} < ${TG.clean_rows_min}`);
+    }
+    // 6d. the original documents: no gold rows exist; count what is verified and check each verified total against the document's own cost
+    {
+      let withTable = 0, withRows = 0, rows = 0, verified = 0, contra = 0, quarantinedDocs = 0;
+      const q = {};
+      for (const d of PAGES.docs) {
+        const r = rd(d.pages);
+        if (!r.tables.length) continue;
+        withTable++;
+        if (r.rows.length) { withRows++; rows += r.rows.length; } else { quarantinedDocs++; const k = r.reason ?? 'unknown'; q[k] = (q[k] ?? 0) + 1; }
+        if (r.documentVerified && r.totals?.total) {
+          verified++;
+          const cost = byName.get(d.filename)?.fields.find((f) => f.k === 'cost');
+          if (cost && canon('cost', cost.v) !== String(Math.round(r.totals.total.value * 100)) && Number(P.ef.normalizeNumber(String(cost.v), { money: true })) > 0) { contra++; fail('TABLE TOTAL CONTRADICTS the document cost', `${d.filename}: table total ${r.totals.total.value}, cost fact ${cost.v}`); }
+        }
+      }
+      tbl.originals = { withTable, withRows, rows, verifiedDocs: verified, quarantinedDocs, contradictions: contra, reasons: q };
+      if (rows < (TG.originals_rows_min ?? 0)) fail('regression (table rows no longer captured)', `originals: ${rows} < ${TG.originals_rows_min}`);
+      if (verified < (TG.originals_docs_verified_min ?? 0)) fail('regression (table documents no longer verified)', `originals: ${verified} < ${TG.originals_docs_verified_min}`);
+    }
+    // 6e. degraded copies of the same documents: MEASURED, NOT ENFORCED
+    for (const v of ['photo', 'lowres', 'rotated', 'stained', 'handwriting']) {
+      const s = E.evalSuite(TDOCS.filter((d) => d.variant === v), { mode: 'order', readTables: rd });
+      tbl.degraded[v] = { docs: s.docs, goldRows: s.goldRows, captured: s.rowsCaptured, wrong: s.wrongRows.length, wrongTotals: s.wrongTotals.length, docsNeedPerson: s.docsNeedPerson, wrongRows: s.wrongRows.slice(0, 5) };
+    }
+    if (process.argv.includes('--update-tables') && failures.length === 0) {
+      TG.clean_rows_min = Math.min(tbl.clean.x.captured, tbl.clean.order.captured);
+      TG.originals_rows_min = tbl.originals.rows; TG.originals_docs_verified_min = tbl.originals.verifiedDocs;
+      fs.writeFileSync(TG_PATH, JSON.stringify(TG, null, 2));
+      console.log('  GOLD_TABLES.json ratchets updated (review the diff).');
+    }
+  }
+}
+
 // ---------------------------------------------------------------- report
 const reasons = {};
 for (const r of needs) { const k = `${r.reason}${r.detail ? ': ' + r.detail : ''}`; reasons[k] = (reasons[k] ?? 0) + 1; }
@@ -264,6 +361,15 @@ if (audit) console.log(`  stored-value audit over the values this tree stores: $
 console.log(`  quotes checked on the page ${checkedQuotes}, not grounded ${badQuotes}`);
 console.log(`  needs a person: ${needs.length} (gold allows ${Object.keys(allowed).length}); unexpected ${unexpected.length}; resolved since gold ${resolved.length}`);
 if (deg) { console.log(`  degraded copies ${deg.docs}: facts correct ${deg.correct}, wrong ${deg.wrong.length}, not read ${deg.missed}; ${JSON.stringify(deg.byVariant)}`); for (const w of deg.wrong) console.log('    known OCR misread: ' + w); }
+if (tbl) {
+  const c = tbl.clean;
+  console.log(`  line-item tables, clean synthetic documents (${c.order.docs}; ${c.order.goldRows} gold rows): captured x-anchored ${c.x.captured}, text-only ${c.order.captured}; WRONG rows ${c.x.wrong + c.order.wrong}, wrong totals ${c.x.wrongTotals + c.order.wrongTotals}; documents needing a person ${c.x.docsNeedPerson}/${c.order.docsNeedPerson}`);
+  const o = tbl.originals;
+  console.log(`  line-item tables, the original documents: ${o.withTable} with a table; verified rows ${o.rows} in ${o.withRows} documents (${o.verifiedDocs} with a verified total); table not proven (quarantined) in ${o.quarantinedDocs}; total contradicting the cost fact ${o.contradictions}`);
+  const dg = Object.entries(tbl.degraded);
+  console.log(`  line-item tables, degraded copies (MEASURED, not enforced): ` + dg.map(([k, v]) => `${k} ${v.captured}/${v.goldRows} rows, wrong ${v.wrong}, need a person ${v.docsNeedPerson}/${v.docs}`).join('; '));
+  for (const [k, v] of dg) for (const w of v.wrongRows) console.log(`    degraded wrong row (${k}): ${w.doc} ${w.label} ${JSON.stringify(w.values)}`);
+}
 console.log('  by reason: ' + Object.entries(reasons).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${v} ${k}`).join('; '));
 if (arg('--json')) fs.writeFileSync(arg('--json'), JSON.stringify({ results, reasons, failures }, null, 1));
 if (process.argv.includes('--update-needs') && failures.every((f) => f.startsWith('regression (now needs a person)') || f.startsWith('regression (fewer facts captured)'))) {

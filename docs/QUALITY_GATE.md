@@ -52,6 +52,24 @@ result with `test-docs/real-docs/GOLD.json`.
    checkout>` it reports what it finds in the values that older reader stored. `npm run verify:stored-audit` covers the database
    half on PGlite: dry run by default, nothing is ever overwritten, flags only with the owner switch.
 10. **Degraded copies.** Any wrong fact other than the 4 known tesseract misreads, or fewer correct facts than the gold count.
+11. **Line-item tables (tables lane, 2026-10-24).** `api/_lib/modelAvoidance/tableRows.js` reads the printed rows of invoice /
+   receipt / work-order / rent-roll / pay-application tables. A row is a fact only if the page's own arithmetic proves it
+   (qty x unit = amount, rows = subtotal, rows + tax = total, per-column sums for rent rolls and pay applications); anything
+   else is quarantined. Gate section 6 (`test-docs/real-docs/tables/`, ratchets in `GOLD_TABLES.json`):
+   - **Oracle plants (must be rejected):** a swapped column (unit price and amount), an off-by-one row (the next row's label),
+     a total taken from another page. The same three are then fed to the reader as damaged page text.
+   - **Clean synthetic suite (14 "Sample" documents, 119 gold rows, enforced):** any wrong row or total, or fewer rows
+     captured than the ratchet, fails. Run twice: x-anchored (PDF word positions) and text-only (what the app stores).
+   - **Original 1,000 documents (no gold rows exist):** a verified table whose total contradicts the document's own cost
+     fact fails; the verified-row count is a ratchet.
+   - **Degraded copies of the 14 documents (phone photo, low-res scan, rotated scan, coffee stain + stamp, handwriting-style
+     fields; tesseract stand-in text): MEASURED, NOT ENFORCED yet.** The printed line shows rows captured, wrong rows (target 0)
+     and documents needing a person.
+   - `node scripts/real-docs/tables-fuzz.mjs [N]` corrupts the clean documents (digit, swapped cells, dropped / duplicated row,
+     changed total, letter for a digit ...) and counts verified rows that are not in the gold (target 0).
+   - `python3 scripts/real-docs/make-degraded-tables.py <work dir>` then `node scripts/real-docs/build-tables-pages.mjs <work dir>`
+     rebuild the suite (needs reportlab, Pillow, numpy, OpenCV, pdftoppm, tesseract; own script, no Augraphy).
+   - The reader is behind `TABLE_ROWS_READER=1` (default OFF) in the app (`financialsHook.js`, `financials/extract.js`).
 
 ## Updating the gold
 - When a change makes documents complete that the gold lists as needing a person, the gate prints a note.
@@ -70,4 +88,4 @@ result with `test-docs/real-docs/GOLD.json`.
 - `node scripts/verify-real-docs.mjs --tree <other checkout>`: runs another tree's reader against the same gold. Use this
   for the "before" numbers.
 
-The test documents are synthetic test data. Never use them for Donovan training.
+The test documents are synthetic test data (the table suite is marked "Sample" on every page). Never use them for Donovan training.

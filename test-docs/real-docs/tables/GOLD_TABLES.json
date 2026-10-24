@@ -1,0 +1,7 @@
+{
+  "about": "Ratchets for the line-item table reader (gate section 6). Synthetic 'Sample' documents only; never Donovan training. Update with: node scripts/verify-real-docs.mjs --update-tables (after reviewing).",
+  "clean_rows_min": 119,
+  "originals_rows_min": 547,
+  "originals_docs_verified_min": 126,
+  "degraded_note": "The degraded suite is MEASURED, not enforced (owner decision 2026-10-24: do not fail the gate on it yet)."
+}

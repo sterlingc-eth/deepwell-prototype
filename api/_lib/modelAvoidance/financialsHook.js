@@ -18,6 +18,7 @@ import { extractFinancialsForDocument } from "../financials/extract.js";
 import { isFinancialDocumentType } from "../financials/normalize.js";
 import { extractFromText } from "./textExtract.js";
 import { isDeterministicFinancialsEnabled, isGenericExtractEnabled } from "./switches.js";
+import { withVerifiedRows } from "./tableRowsInput.js";
 import { packForTenant } from "../industry/index.js";
 import { normalizeDate } from "../extractFields.js";
 import { canonicalTypeId } from "../documentTypes.js";
@@ -86,6 +87,8 @@ export function financialsInputFromText(pages, docType, opts = {}) {
     const due = printedDueDateFromText(pages);
     if (due) input.due_date = due;
   }
+  // Tables lane (2026-10-24): TABLE_ROWS_READER=1 (default OFF) replaces the empty line_items with the rows the page's arithmetic proves.
+  Object.assign(input, withVerifiedRows(input, pages, { env: opts.env ?? process.env }).input);
   const term = f("agreement_term");
   if (type === "maintenance-agreement" && term) {
     input.agreement_term = term.value;
