@@ -1,0 +1,81 @@
+{
+ "id": "newhire-34",
+ "arrival": "scan",
+ "kind": "newhire-handwritten",
+ "type": "hr-letter",
+ "acceptable_types": [
+  "hr-letter",
+  "internal",
+  "other"
+ ],
+ "person": "Nadia Whitlock",
+ "fields": {
+  "customer_name": "Nadia Whitlock",
+  "vendor": "Kestrel Ridge Plumbing",
+  "service_date": "2026-12-24",
+  "customer_phone": "(520) 555-0154",
+  "customer_email": "nadia.whitlock@example.com"
+ },
+ "extra": {
+  "manager": "Osvaldo Santibanez",
+  "position": "Line Cook",
+  "hourly_rate": "36.50",
+  "department": "Operations",
+  "emergency_contact": "Garrett Mondragon",
+  "emergency_phone": "(480) 555-0144",
+  "address": "609 W Palo Brea Ln",
+  "shirt_size": "XL"
+ },
+ "questions": [
+  {
+   "q": "Who is Nadia Whitlock's manager?",
+   "answer": "Osvaldo Santibanez",
+   "key": "manager",
+   "accept": [
+    "Osvaldo Santibanez"
+   ]
+  },
+  {
+   "q": "What is Nadia Whitlock's start date?",
+   "answer": "2026-12-24",
+   "key": "service_date",
+   "accept": [
+    "2026-12-24",
+    "12/24/2026",
+    "December 24, 2026",
+    "Dec 24, 2026",
+    "12/24/2026",
+    "24 Dec 2026",
+    "12/24/26",
+    "December 24, 2026"
+   ]
+  },
+  {
+   "q": "What position was Nadia Whitlock hired for?",
+   "answer": "Line Cook",
+   "key": "position",
+   "accept": [
+    "Line Cook"
+   ]
+  },
+  {
+   "q": "What is Nadia Whitlock's hourly rate?",
+   "answer": "$36.50",
+   "key": "hourly_rate",
+   "accept": [
+    "$36.50",
+    "36.50"
+   ]
+  },
+  {
+   "q": "Who is Nadia Whitlock's emergency contact?",
+   "answer": "Garrett Mondragon",
+   "key": "emergency_contact",
+   "accept": [
+    "Garrett Mondragon"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "newhire-34.pdf"
+}

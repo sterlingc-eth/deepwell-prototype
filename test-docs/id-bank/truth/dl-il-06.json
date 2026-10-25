@@ -1,0 +1,76 @@
+{
+ "id": "dl-il-06",
+ "arrival": "photo",
+ "kind": "driver-license",
+ "type": "license-certification",
+ "acceptable_types": [
+  "license-certification"
+ ],
+ "person": "Ignacio Jernigan",
+ "fields": {
+  "customer_name": "Ignacio Jernigan",
+  "license_number": "J124-9142-7726",
+  "end_date": "2028-08-28",
+  "start_date": "2020-08-28"
+ },
+ "extra": {
+  "dob": "1973-11-25",
+  "dl_class": "C",
+  "state": "IL",
+  "address": "5498 E Tumbleweed Pass",
+  "endorsements": "NONE"
+ },
+ "questions": [
+  {
+   "q": "When does Ignacio Jernigan's driver license expire?",
+   "answer": "2028-08-28",
+   "key": "end_date",
+   "accept": [
+    "2028-08-28",
+    "08/28/2028",
+    "August 28, 2028",
+    "Aug 28, 2028",
+    "8/28/2028",
+    "28 Aug 2028",
+    "08/28/28",
+    "August 28, 2028"
+   ]
+  },
+  {
+   "q": "What is Ignacio Jernigan's driver license number?",
+   "answer": "J124-9142-7726",
+   "key": "license_number",
+   "accept": [
+    "J124-9142-7726",
+    "J124-9142-7726",
+    "J12491427726"
+   ]
+  },
+  {
+   "q": "What is Ignacio Jernigan's date of birth?",
+   "answer": "1973-11-25",
+   "key": "dob",
+   "accept": [
+    "1973-11-25",
+    "11/25/1973",
+    "November 25, 1973",
+    "Nov 25, 1973",
+    "11/25/1973",
+    "25 Nov 1973",
+    "11/25/73",
+    "November 25, 1973"
+   ]
+  },
+  {
+   "q": "What class is Ignacio Jernigan's driver license?",
+   "answer": "Class C",
+   "key": "dl_class",
+   "accept": [
+    "Class C",
+    "class C"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "dl-il-06.jpg"
+}

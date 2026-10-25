@@ -15,18 +15,18 @@ export const TODAY = '2026-10-22';
 
 export async function loadPipeline(tree) {
   const lib = (p) => import(pathToFileURL(path.join(tree, 'api/_lib', p)).href);
-  const [te, ef, dt, lf, oc, sr] = await Promise.all([
+  const [te, ef, dt, lf, oc, sr, ps] = await Promise.all([
     lib('modelAvoidance/textExtract.js'), lib('extractFields.js'), lib('documentTypes.js'),
-    lib('modelAvoidance/labelFill.js'), lib('modelAvoidance/ownCompany.js'), lib('modelAvoidance/storedTextReread.js'),
+    lib('modelAvoidance/labelFill.js'), lib('modelAvoidance/ownCompany.js'), lib('modelAvoidance/storedTextReread.js'), lib('modelAvoidance/peopleShape.js').catch(() => null),
   ]);
   let rs = null;
   try { rs = await lib('modelAvoidance/retype.js'); } catch { rs = null; } // present after the docread round only
-  return { te, ef, dt, lf, oc, sr, rs };
+  return { te, ef, dt, lf, oc, sr, rs, ps };
 }
 
 /** One document through upload: text reader -> (stub model) -> stored-text read -> type -> label/prose fill -> auto-check. */
 export function runDoc(P, doc, { ownNames = [TENANT_NAME], today = TODAY } = {}) {
-  const { te, ef, dt, lf, oc, sr, rs } = P;
+  const { te, ef, dt, lf, oc, sr, rs, ps } = P;
   const pages = (doc.pages ?? []).map((p) => ({ page_no: p.page_no, text: p.text ?? '' }));
   const filename = doc.filename;
   const highestPage = pages.reduce((n, p) => Math.max(n, p.page_no || 0), 0) || 1;
@@ -61,6 +61,7 @@ export function runDoc(P, doc, { ownNames = [TENANT_NAME], today = TODAY } = {})
   fields = lf.corroborateFields({ type, fields, pages, ownNames }).fields;
   if (lf.crossCheckFields) fields = lf.crossCheckFields({ fields, pages }).fields; // docread verify round
   fields = oc.applyOwnCompanyGuard(fields, ownNames).fields;
+  if (ps?.dropPeopleIdFacts) fields = ps.dropPeopleIdFacts(type, fields).fields; // as ingest: an HR / person-ID paper has no customer_* / service_* facts
   const text = pages.map((p) => p.text).join('\n').slice(0, 20000);
   const keys = new Set(fields.map((f) => f.field_key));
   const hasLink = keys.has('customer_name') || keys.has('service_address');

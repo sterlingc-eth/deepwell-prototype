@@ -1,0 +1,76 @@
+{
+ "id": "dl-co-07",
+ "arrival": "scan",
+ "kind": "driver-license",
+ "type": "license-certification",
+ "acceptable_types": [
+  "license-certification"
+ ],
+ "person": "Kendrick Villanueva",
+ "fields": {
+  "customer_name": "Kendrick Villanueva",
+  "license_number": "41-210556",
+  "end_date": "2029-02-19",
+  "start_date": "2021-02-19"
+ },
+ "extra": {
+  "dob": "1973-05-16",
+  "dl_class": "C",
+  "state": "CO",
+  "address": "1554 E Saguaro Vista Dr",
+  "endorsements": "M"
+ },
+ "questions": [
+  {
+   "q": "When does Kendrick Villanueva's driver license expire?",
+   "answer": "2029-02-19",
+   "key": "end_date",
+   "accept": [
+    "2029-02-19",
+    "02/19/2029",
+    "February 19, 2029",
+    "Feb 19, 2029",
+    "2/19/2029",
+    "19 Feb 2029",
+    "02/19/29",
+    "February 19, 2029"
+   ]
+  },
+  {
+   "q": "What is Kendrick Villanueva's driver license number?",
+   "answer": "41-210556",
+   "key": "license_number",
+   "accept": [
+    "41-210556",
+    "41-210556",
+    "41210556"
+   ]
+  },
+  {
+   "q": "What is Kendrick Villanueva's date of birth?",
+   "answer": "1973-05-16",
+   "key": "dob",
+   "accept": [
+    "1973-05-16",
+    "05/16/1973",
+    "May 16, 1973",
+    "May 16, 1973",
+    "5/16/1973",
+    "16 May 1973",
+    "05/16/73",
+    "May 16, 1973"
+   ]
+  },
+  {
+   "q": "What class is Kendrick Villanueva's driver license?",
+   "answer": "Class C",
+   "key": "dl_class",
+   "accept": [
+    "Class C",
+    "class C"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "dl-co-07.pdf"
+}

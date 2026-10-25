@@ -1,0 +1,76 @@
+{
+ "id": "dl-ca-02",
+ "arrival": "photo",
+ "kind": "driver-license",
+ "type": "license-certification",
+ "acceptable_types": [
+  "license-certification"
+ ],
+ "person": "Zelda Wexford",
+ "fields": {
+  "customer_name": "Zelda Wexford",
+  "license_number": "I4406167",
+  "end_date": "2031-08-17",
+  "start_date": "2023-08-17"
+ },
+ "extra": {
+  "dob": "1969-08-12",
+  "dl_class": "C",
+  "state": "CA",
+  "address": "8025 S Mesquite Hollow Rd",
+  "endorsements": "NONE"
+ },
+ "questions": [
+  {
+   "q": "When does Zelda Wexford's driver license expire?",
+   "answer": "2031-08-17",
+   "key": "end_date",
+   "accept": [
+    "2031-08-17",
+    "08/17/2031",
+    "August 17, 2031",
+    "Aug 17, 2031",
+    "8/17/2031",
+    "17 Aug 2031",
+    "08/17/31",
+    "August 17, 2031"
+   ]
+  },
+  {
+   "q": "What is Zelda Wexford's driver license number?",
+   "answer": "I4406167",
+   "key": "license_number",
+   "accept": [
+    "I4406167",
+    "I4406167",
+    "I4406167"
+   ]
+  },
+  {
+   "q": "What is Zelda Wexford's date of birth?",
+   "answer": "1969-08-12",
+   "key": "dob",
+   "accept": [
+    "1969-08-12",
+    "08/12/1969",
+    "August 12, 1969",
+    "Aug 12, 1969",
+    "8/12/1969",
+    "12 Aug 1969",
+    "08/12/69",
+    "August 12, 1969"
+   ]
+  },
+  {
+   "q": "What class is Zelda Wexford's driver license?",
+   "answer": "Class C",
+   "key": "dl_class",
+   "accept": [
+    "Class C",
+    "class C"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "dl-ca-02.jpg"
+}

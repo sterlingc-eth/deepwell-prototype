@@ -266,9 +266,17 @@ const LABEL_AS_VALUE_RE = /^(?:(?:delivered|deliver|ship(?:ped)?|sold|bill(?:ed)
  *  name) or a payment method ("Credit card" under "Paid By") is never a party either. */
 const ROLE_WORDS_ONLY_RE = /^(?:(?:funder|grantor|grantee|landlord|tenant|lessor|lessee|shop|store|consignor|consignee|owner|manager|agent|insured|certificate|holder|contractor|subcontractor|client|customer|vendor|supplier|buyer|seller|purchaser|licensee|licensor|provider|recipient|member|company|party|parties|project|site|location|address|service|job|premises|claimant|partner|alliance|firm|attorney|bill|ship|remit|sold|to|from|and|&)\s*)+$/i;
 const PAYMENT_METHOD_RE = /^(?:credit\s+card|debit\s+card|card|cash|check|cheque|money\s+order|ach(?:\s+transfer)?|wire(?:\s+transfer)?|bank\s+transfer|online(?:\s+(?:payment|gift|transfer))?|visa|mastercard|amex|american\s+express|discover|paypal|venmo|zelle|eft|in[-\s]kind)(?:\s*[#x*]+\s*\d{0,4})?$/i;
+/** People-forms round: a ROW of printed form labels read as one value ("EMPLOYEE NAME SOCIAL SECURITY NUMBER", "ADDRESS DRIVER'S LICENSE NO. STATE"). */
+const FORM_LABEL_WORDS = new Set(['name', "driver's", 'drivers', 'license', 'licence', 'no', 'no.', 'state', 'address', 'date', 'birth', 'of', 'social', 'security', 'number', 'employee', "employee's", 'employer', 'plate', 'owner', 'phone', 'email', 'type', 'issued', 'expires', 'expiration', 'card', 'certificate', 'position', 'title', 'department', 'signature', 'course', 'instructor', 'account', 'bank', 'routing', 'applicant', 'full', 'home', 'city', 'town', 'zip', 'code', 'and', 'or', 'the', '/', 'first', 'last', 'middle', 'initial', 'hire', 'start', 'manager', 'rate', 'hourly', 'contact', 'telephone', 'examiner', "examiner's", 'medical', 'national', 'registry', 'policy', 'named', 'insured', 'effective', 'vin', 'make', 'model', 'year', 'body', 'fee', 'paid', 'insurance', 'vehicle', 'identification']);
+function isFormLabelRow(v) {
+  const letters = v.replace(/[^A-Za-z]/g, '');
+  if (letters.length < 6 || letters.replace(/[^A-Z]/g, '').length / letters.length < 0.85) return false;
+  const toks = v.toLowerCase().split(/\s+/).filter(Boolean);
+  return toks.length >= 2 && toks.filter((t) => FORM_LABEL_WORDS.has(t)).length / toks.length >= 0.75;
+}
 export function isLabelValue(value) {
   const v = String(value ?? '').replace(/\s+/g, ' ').trim();
-  return !v || LABEL_AS_VALUE_RE.test(v) || ROLE_WORDS_ONLY_RE.test(v) || PAYMENT_METHOD_RE.test(v);
+  return !v || LABEL_AS_VALUE_RE.test(v) || ROLE_WORDS_ONLY_RE.test(v) || PAYMENT_METHOD_RE.test(v) || isFormLabelRow(v);
 }
 
 const hasKey = (present, k) => (present instanceof Set ? present.has(k) : !!present?.[k]);
@@ -498,6 +506,16 @@ export const FIELD_LABELS = {
   end_date: 'End / expiry date',
   license_number: 'License number',
   policy_number: 'Policy number',
+  holder_name: 'Holder name',
+  license_class: 'License class',
+  issued_by: 'Issued by / examiner',
+  employee_name: 'Employee name',
+  employee_phone: 'Employee phone',
+  employee_email: 'Employee email',
+  signed_date: 'Date signed',
+  position: 'Position',
+  pay_rate: 'Pay rate',
+  manager: 'Manager',
   agreement_term: 'Agreement term',
   vendor: 'Vendor',
   reminder_text: 'Reminder',
@@ -752,7 +770,7 @@ const FILENAME_PATTERNS = [
   [word('coi|policy'), 'insurance-certificate'],
   [/acord[-_ ]?25|proof[-_ ]of[-_ ]insurance/i, 'insurance-certificate'],
   [/equipment[-_ ]floater|inland[-_ ]marine|\bfloater\b/i, 'insurance-certificate'],
-  [/offer[-_ ]letter|employment|termination[-_ ]letter|new[-_ ]hire|job[-_ ]offer|onboarding[-_ ]letter/i, 'hr-letter'],
+  [/offer[-_ ]letter|employment|termination[-_ ]letter|new[-_ ]hire|job[-_ ]offer|onboarding/i, 'hr-letter'],
   [word('w-?4|i-?9'), 'hr-letter'],
   [/statement|ledger|account[-_ ]summary|remittance|rent[-_ ]?roll|superbill|explanation[-_ ]of[-_ ]benefits/i, 'statement'],
   [word('eob'), 'statement'],
@@ -762,7 +780,7 @@ const FILENAME_PATTERNS = [
   [/receipt|return[-_ ]?slip|sales[-_ ]slip/i, 'receipt'],
   [code('rc|rcpt|r'), 'receipt'],
   // Inbox round: trade / business / professional licences (checked after receipts so "Licence fee receipt" stays a receipt).
-  [/\blicen[cs]e\b|\blicensure\b|\bcertification\b|certificate[-_ ]of[-_ ](?:completion|competency|registration)/i, 'license-certification'],
+  [/\blicen[cs]e\b|\blicensure\b|\bcertification\b|certificate[-_ ]of[-_ ](?:completion|competency|registration)|medical[-_ ]examiner|mcsa[-_ ]?5876|(?:^|[^a-z])cdl(?:[^a-z]|$)|dot[-_ ]med(?:ical)?[-_ ](?:card|cert)/i, 'license-certification'],
   [/price[-_ ]?list|rate[-_ ]?(?:card|sheet)|catalog(?:ue)?|fee[-_ ]schedule/i, 'price-list'],
   [/schedule|roster|timesheet/i, 'schedule'],
   [/inventory|stock[-_ ]?count|parts[-_ ]?count|gift[-_ ]?card|daily[-_ ]log/i, 'internal'],
@@ -796,8 +814,8 @@ export const GENERIC_TITLE_PATTERNS = [
   ['price-list', /^(?:price\s+list|rate\s+(?:card|sheet)|fee\s+schedule|product\s+catalog(?:ue)?)$/],
   ['statement', /^(?:account\s+|monthly\s+|consignor\s+|card\s+)?statement(?:\s+of\s+account)?$|^rent\s+ledger$|^(?:tenant|resident)\s+ledger$|^rent\s+roll$|^owner(?:'s)?\s+statement$|^explanation\s+of\s+benefits$|^superbill$/],
   ['insurance-certificate', /^(?:acord\s+25\s+)?certificate\s+of\s+(?:liability\s+)?insurance$|^insurance\s+(?:certificate|policy)$|^acord\s+25(?:\s*[-:(].*)?$|^proof\s+of\s+insurance$/],
-  ['license-certification', /^(?:(?:contractor|business|trade|plumbing|plumber|electrical|electrician|journeyman|master|professional|state)\s+){0,2}licen[cs]e(?:\s+certificate)?$|^certificate\s+of\s+(?:licensure|registration|competency)$/],
-  ['hr-letter', /^(?:offer|employment|termination)\s+letter$|^employment\s+(?:agreement|offer)$|^(?:form\s+)?w-?4(?:\s*[-:(].*)?$|^(?:form\s+)?i-?9(?:\s*[-:(].*)?$|^employee'?s?\s+withholding\s+certificate$/],
+  ['license-certification', /^(?:(?:contractor|business|trade|plumbing|plumber|electrical|electrician|journeyman|master|professional|state)\s+){0,2}licen[cs]e(?:\s+certificate)?$|^certificate\s+of\s+(?:licensure|registration|competency)$|^(?:[a-z]+\s+){0,2}(?:driver'?s?|operator'?s?|chauffeur'?s?)\s+licen[cs]e(?:\s+card)?$|^(?:commercial\s+)?driver\s+licen[cs]e$|^cdl$|^(?:u\.?s\.?\s+)?(?:dot\s+)?medical\s+examiner'?s?\s+certificate(?:\s*[-,(:]?\s*(?:form\s+)?(?:mcsa[-\s]?5876.*)?)?$|^medical\s+(?:examiner|examination)\s+(?:card|report|certificate)$|^(?:dot\s+)?medical\s+(?:card|certificate)$/],
+  ['hr-letter', /^(?:new[-\s]?hire|new\s+employee|employee|hiring)\s+(?:onboarding\s+)?(?:checklist|sheet|form|paperwork|packet|information(?:\s+sheet)?|worksheet)$|^(?:new[-\s]?hire|employee)\s+onboarding(?:\s+(?:checklist|sheet|form|packet))?$|^onboarding\s+(?:checklist|sheet|form|packet)$|^new[-\s]?hire$|^(?:offer|employment|termination)\s+letter$|^employment\s+(?:agreement|offer)$|^(?:form\s+)?w-?4(?:\s*[-:(].*)?$|^(?:form\s+)?i-?9(?:\s*[-:(].*)?$|^employee'?s?\s+withholding\s+certificate$/],
 ];
 
 /** Types a one-time re-sort may move a document INTO when the rule is confident (a name or title says so). */

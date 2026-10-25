@@ -1,0 +1,74 @@
+{
+ "id": "i9-23",
+ "arrival": "clean",
+ "kind": "i9",
+ "type": "hr-letter",
+ "acceptable_types": [
+  "hr-letter",
+  "internal",
+  "other"
+ ],
+ "person": "Joaquin Orteza",
+ "fields": {
+  "customer_name": "Joaquin Orteza",
+  "vendor": "Blue Agave Catering",
+  "service_date": "2026-10-14"
+ },
+ "extra": {
+  "dob": "1993-12-28",
+  "address": "5997 E Cholla Bend Ct",
+  "list_a_document": "Permanent Resident Card",
+  "list_a_number": "685357457",
+  "ssn": "987-65-8328"
+ },
+ "questions": [
+  {
+   "q": "When did Joaquin Orteza start work according to the I-9?",
+   "answer": "2026-10-14",
+   "key": "service_date",
+   "accept": [
+    "2026-10-14",
+    "10/14/2026",
+    "October 14, 2026",
+    "Oct 14, 2026",
+    "10/14/2026",
+    "14 Oct 2026",
+    "10/14/26",
+    "October 14, 2026"
+   ]
+  },
+  {
+   "q": "What employer is Joaquin Orteza's I-9 for?",
+   "answer": "Blue Agave Catering",
+   "key": "vendor",
+   "accept": [
+    "Blue Agave Catering"
+   ]
+  },
+  {
+   "q": "What identity document did Joaquin Orteza present for Form I-9?",
+   "answer": "Permanent Resident Card",
+   "key": "list_a_document",
+   "accept": [
+    "Permanent Resident Card"
+   ]
+  },
+  {
+   "q": "What is Joaquin Orteza's date of birth on the I-9?",
+   "answer": "1993-12-28",
+   "key": "dob",
+   "accept": [
+    "1993-12-28",
+    "12/28/1993",
+    "December 28, 1993",
+    "Dec 28, 1993",
+    "12/28/1993",
+    "28 Dec 1993",
+    "12/28/93",
+    "December 28, 1993"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "i9-23.pdf"
+}

@@ -1,0 +1,85 @@
+{
+ "id": "dl-txcdl-14",
+ "arrival": "scan",
+ "kind": "cdl",
+ "type": "license-certification",
+ "acceptable_types": [
+  "license-certification"
+ ],
+ "person": "Oluwaseun Ruzicka",
+ "fields": {
+  "customer_name": "Oluwaseun Ruzicka",
+  "license_number": "44077965",
+  "end_date": "2029-04-02",
+  "start_date": "2025-04-02"
+ },
+ "extra": {
+  "dob": "1992-10-27",
+  "dl_class": "B",
+  "state": "TX",
+  "address": "1357 E Cholla Bend Ct",
+  "endorsements": "N"
+ },
+ "questions": [
+  {
+   "q": "When does Oluwaseun Ruzicka's CDL expire?",
+   "answer": "2029-04-02",
+   "key": "end_date",
+   "accept": [
+    "2029-04-02",
+    "04/02/2029",
+    "April 2, 2029",
+    "Apr 2, 2029",
+    "4/2/2029",
+    "02 Apr 2029",
+    "04/02/29",
+    "April 2, 2029"
+   ]
+  },
+  {
+   "q": "What is Oluwaseun Ruzicka's CDL number?",
+   "answer": "44077965",
+   "key": "license_number",
+   "accept": [
+    "44077965",
+    "44077965",
+    "44077965"
+   ]
+  },
+  {
+   "q": "What is Oluwaseun Ruzicka's date of birth?",
+   "answer": "1992-10-27",
+   "key": "dob",
+   "accept": [
+    "1992-10-27",
+    "10/27/1992",
+    "October 27, 1992",
+    "Oct 27, 1992",
+    "10/27/1992",
+    "27 Oct 1992",
+    "10/27/92",
+    "October 27, 1992"
+   ]
+  },
+  {
+   "q": "What class is Oluwaseun Ruzicka's CDL?",
+   "answer": "Class B",
+   "key": "dl_class",
+   "accept": [
+    "Class B",
+    "class B"
+   ]
+  },
+  {
+   "q": "What endorsements does Oluwaseun Ruzicka's CDL carry?",
+   "answer": "N",
+   "key": "endorsements",
+   "accept": [
+    "N",
+    "N"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "dl-txcdl-14.pdf"
+}

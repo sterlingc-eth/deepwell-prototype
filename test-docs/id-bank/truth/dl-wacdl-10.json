@@ -1,0 +1,85 @@
+{
+ "id": "dl-wacdl-10",
+ "arrival": "scan",
+ "kind": "cdl",
+ "type": "license-certification",
+ "acceptable_types": [
+  "license-certification"
+ ],
+ "person": "Ilse Underhill",
+ "fields": {
+  "customer_name": "Ilse Underhill",
+  "license_number": "UNDEAJ286Z9",
+  "end_date": "2031-08-17",
+  "start_date": "2027-08-17"
+ },
+ "extra": {
+  "dob": "1979-10-14",
+  "dl_class": "A",
+  "state": "WA",
+  "address": "4234 E Tumbleweed Pass",
+  "endorsements": "T"
+ },
+ "questions": [
+  {
+   "q": "When does Ilse Underhill's CDL expire?",
+   "answer": "2031-08-17",
+   "key": "end_date",
+   "accept": [
+    "2031-08-17",
+    "08/17/2031",
+    "August 17, 2031",
+    "Aug 17, 2031",
+    "8/17/2031",
+    "17 Aug 2031",
+    "08/17/31",
+    "August 17, 2031"
+   ]
+  },
+  {
+   "q": "What is Ilse Underhill's CDL number?",
+   "answer": "UNDEAJ286Z9",
+   "key": "license_number",
+   "accept": [
+    "UNDEAJ286Z9",
+    "UNDEAJ286Z9",
+    "UNDEAJ286Z9"
+   ]
+  },
+  {
+   "q": "What is Ilse Underhill's date of birth?",
+   "answer": "1979-10-14",
+   "key": "dob",
+   "accept": [
+    "1979-10-14",
+    "10/14/1979",
+    "October 14, 1979",
+    "Oct 14, 1979",
+    "10/14/1979",
+    "14 Oct 1979",
+    "10/14/79",
+    "October 14, 1979"
+   ]
+  },
+  {
+   "q": "What class is Ilse Underhill's CDL?",
+   "answer": "Class A",
+   "key": "dl_class",
+   "accept": [
+    "Class A",
+    "class A"
+   ]
+  },
+  {
+   "q": "What endorsements does Ilse Underhill's CDL carry?",
+   "answer": "T",
+   "key": "endorsements",
+   "accept": [
+    "T",
+    "T"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "dl-wacdl-10.pdf"
+}

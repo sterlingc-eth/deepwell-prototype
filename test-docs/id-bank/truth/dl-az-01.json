@@ -1,0 +1,76 @@
+{
+ "id": "dl-az-01",
+ "arrival": "photo",
+ "kind": "driver-license",
+ "type": "license-certification",
+ "acceptable_types": [
+  "license-certification"
+ ],
+ "person": "Leona Mondragon",
+ "fields": {
+  "customer_name": "Leona Mondragon",
+  "license_number": "D84816037",
+  "end_date": "2029-07-12",
+  "start_date": "2021-07-12"
+ },
+ "extra": {
+  "dob": "1972-11-11",
+  "dl_class": "C",
+  "state": "AZ",
+  "address": "4876 S Mesquite Hollow Rd",
+  "endorsements": "M"
+ },
+ "questions": [
+  {
+   "q": "When does Leona Mondragon's driver license expire?",
+   "answer": "2029-07-12",
+   "key": "end_date",
+   "accept": [
+    "2029-07-12",
+    "07/12/2029",
+    "July 12, 2029",
+    "Jul 12, 2029",
+    "7/12/2029",
+    "12 Jul 2029",
+    "07/12/29",
+    "July 12, 2029"
+   ]
+  },
+  {
+   "q": "What is Leona Mondragon's driver license number?",
+   "answer": "D84816037",
+   "key": "license_number",
+   "accept": [
+    "D84816037",
+    "D84816037",
+    "D84816037"
+   ]
+  },
+  {
+   "q": "What is Leona Mondragon's date of birth?",
+   "answer": "1972-11-11",
+   "key": "dob",
+   "accept": [
+    "1972-11-11",
+    "11/11/1972",
+    "November 11, 1972",
+    "Nov 11, 1972",
+    "11/11/1972",
+    "11 Nov 1972",
+    "11/11/72",
+    "November 11, 1972"
+   ]
+  },
+  {
+   "q": "What class is Leona Mondragon's driver license?",
+   "answer": "Class C",
+   "key": "dl_class",
+   "accept": [
+    "Class C",
+    "class C"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "dl-az-01.jpg"
+}

@@ -1,0 +1,76 @@
+{
+ "id": "insurance-id-55",
+ "arrival": "clean",
+ "kind": "insurance-id-card",
+ "type": "insurance-certificate",
+ "acceptable_types": [
+  "insurance-certificate",
+  "license-certification",
+  "other"
+ ],
+ "person": "Yara Cordero",
+ "fields": {
+  "customer_name": "Yara Cordero",
+  "policy_number": "KV177212752",
+  "start_date": "2026-05-15",
+  "end_date": "2026-11-13",
+  "vendor": "Test Desert Insurance Co"
+ },
+ "extra": {
+  "vin": "8Y8788UUA7Y2F3CGP",
+  "year": "2018",
+  "make": "Subaru",
+  "model": "Outback",
+  "naic": "94853"
+ },
+ "questions": [
+  {
+   "q": "What is Yara Cordero's auto insurance policy number?",
+   "answer": "KV177212752",
+   "key": "policy_number",
+   "accept": [
+    "KV177212752"
+   ]
+  },
+  {
+   "q": "When does Yara Cordero's auto insurance expire?",
+   "answer": "2026-11-13",
+   "key": "end_date",
+   "accept": [
+    "2026-11-13",
+    "11/13/2026",
+    "November 13, 2026",
+    "Nov 13, 2026",
+    "11/13/2026",
+    "13 Nov 2026",
+    "11/13/26",
+    "November 13, 2026"
+   ]
+  },
+  {
+   "q": "Who insures Yara Cordero's vehicle?",
+   "answer": "Test Desert Insurance Co",
+   "key": "vendor",
+   "accept": [
+    "Test Desert Insurance Co"
+   ]
+  },
+  {
+   "q": "When does Yara Cordero's insurance coverage start?",
+   "answer": "2026-05-15",
+   "key": "start_date",
+   "accept": [
+    "2026-05-15",
+    "05/15/2026",
+    "May 15, 2026",
+    "May 15, 2026",
+    "5/15/2026",
+    "15 May 2026",
+    "05/15/26",
+    "May 15, 2026"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "insurance-id-55.pdf"
+}

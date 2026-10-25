@@ -1,0 +1,58 @@
+{
+ "id": "bgcheck-42",
+ "arrival": "scan",
+ "kind": "background-consent",
+ "type": "hr-letter",
+ "acceptable_types": [
+  "agreement",
+  "hr-letter",
+  "other"
+ ],
+ "person": "Osvaldo Galvan",
+ "fields": {
+  "customer_name": "Osvaldo Galvan",
+  "vendor": "Red Mesa Builders",
+  "service_date": "2026-01-20"
+ },
+ "extra": {
+  "agency": "Sample Verified Background LLC",
+  "dob": "1965-10-15",
+  "ssn": "987-65-5089",
+  "address": "6680 N Ocotillo Spur"
+ },
+ "questions": [
+  {
+   "q": "When did Osvaldo Galvan sign the background check consent?",
+   "answer": "2026-01-20",
+   "key": "service_date",
+   "accept": [
+    "2026-01-20",
+    "01/20/2026",
+    "January 20, 2026",
+    "Jan 20, 2026",
+    "1/20/2026",
+    "20 Jan 2026",
+    "01/20/26",
+    "January 20, 2026"
+   ]
+  },
+  {
+   "q": "Which company is requesting a background check on Osvaldo Galvan?",
+   "answer": "Red Mesa Builders",
+   "key": "vendor",
+   "accept": [
+    "Red Mesa Builders"
+   ]
+  },
+  {
+   "q": "Which screening agency will run Osvaldo Galvan's background check?",
+   "answer": "Sample Verified Background LLC",
+   "key": "agency",
+   "accept": [
+    "Sample Verified Background LLC"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "bgcheck-42.pdf"
+}

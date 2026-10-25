@@ -1,0 +1,85 @@
+{
+ "id": "dl-ohcdl-09",
+ "arrival": "photo",
+ "kind": "cdl",
+ "type": "license-certification",
+ "acceptable_types": [
+  "license-certification"
+ ],
+ "person": "Bettina Okonkwo-Reyes",
+ "fields": {
+  "customer_name": "Bettina Okonkwo-Reyes",
+  "license_number": "TG410109",
+  "end_date": "2027-09-10",
+  "start_date": "2023-09-10"
+ },
+ "extra": {
+  "dob": "1966-03-26",
+  "dl_class": "A",
+  "state": "OH",
+  "address": "5811 W Palo Brea Ln",
+  "endorsements": "T"
+ },
+ "questions": [
+  {
+   "q": "When does Bettina Okonkwo-Reyes's CDL expire?",
+   "answer": "2027-09-10",
+   "key": "end_date",
+   "accept": [
+    "2027-09-10",
+    "09/10/2027",
+    "September 10, 2027",
+    "Sep 10, 2027",
+    "9/10/2027",
+    "10 Sep 2027",
+    "09/10/27",
+    "September 10, 2027"
+   ]
+  },
+  {
+   "q": "What is Bettina Okonkwo-Reyes's CDL number?",
+   "answer": "TG410109",
+   "key": "license_number",
+   "accept": [
+    "TG410109",
+    "TG410109",
+    "TG410109"
+   ]
+  },
+  {
+   "q": "What is Bettina Okonkwo-Reyes's date of birth?",
+   "answer": "1966-03-26",
+   "key": "dob",
+   "accept": [
+    "1966-03-26",
+    "03/26/1966",
+    "March 26, 1966",
+    "Mar 26, 1966",
+    "3/26/1966",
+    "26 Mar 1966",
+    "03/26/66",
+    "March 26, 1966"
+   ]
+  },
+  {
+   "q": "What class is Bettina Okonkwo-Reyes's CDL?",
+   "answer": "Class A",
+   "key": "dl_class",
+   "accept": [
+    "Class A",
+    "class A"
+   ]
+  },
+  {
+   "q": "What endorsements does Bettina Okonkwo-Reyes's CDL carry?",
+   "answer": "T",
+   "key": "endorsements",
+   "accept": [
+    "T",
+    "T"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "dl-ohcdl-09.jpg"
+}

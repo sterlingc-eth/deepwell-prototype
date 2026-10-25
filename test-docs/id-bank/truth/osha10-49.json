@@ -1,0 +1,67 @@
+{
+ "id": "osha10-49",
+ "arrival": "photo",
+ "kind": "osha10-card",
+ "type": "license-certification",
+ "acceptable_types": [
+  "license-certification"
+ ],
+ "person": "Dwayne Nakagawa",
+ "fields": {
+  "customer_name": "Dwayne Nakagawa",
+  "license_number": "39-6667441",
+  "start_date": "2024-10-24",
+  "vendor": "Copperline Safety Academy"
+ },
+ "extra": {
+  "course": "OSHA 10-Hour Construction Outreach",
+  "issuer": "Copperline Safety Academy"
+ },
+ "questions": [
+  {
+   "q": "What is Dwayne Nakagawa's OSHA-10 card number?",
+   "answer": "39-6667441",
+   "key": "license_number",
+   "accept": [
+    "39-6667441"
+   ]
+  },
+  {
+   "q": "Who issued Dwayne Nakagawa's OSHA-10 card?",
+   "answer": "Copperline Safety Academy",
+   "key": "vendor",
+   "accept": [
+    "Copperline Safety Academy"
+   ]
+  },
+  {
+   "q": "When was Dwayne Nakagawa's OSHA-10 card issued?",
+   "answer": "2024-10-24",
+   "key": "start_date",
+   "accept": [
+    "2024-10-24",
+    "10/24/2024",
+    "October 24, 2024",
+    "Oct 24, 2024",
+    "10/24/2024",
+    "24 Oct 2024",
+    "10/24/24",
+    "October 24, 2024"
+   ]
+  },
+  {
+   "q": "Does Dwayne Nakagawa's OSHA-10 card expire?",
+   "answer": "No",
+   "key": "no_expiry",
+   "accept": [
+    "does not expire",
+    "no expiration",
+    "never expires",
+    "no expiry",
+    "not expire"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "osha10-49.jpg"
+}

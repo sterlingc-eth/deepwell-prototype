@@ -1,0 +1,72 @@
+{
+ "id": "volunteer-59",
+ "arrival": "scan",
+ "kind": "volunteer-application-typed",
+ "type": "hr-letter",
+ "acceptable_types": [
+  "agreement",
+  "hr-letter",
+  "internal",
+  "other"
+ ],
+ "person": "Bettina Zuniga",
+ "fields": {
+  "customer_name": "Bettina Zuniga",
+  "vendor": "Cottonwood Literacy Project",
+  "service_date": "2026-08-09",
+  "customer_phone": "(480) 555-0168",
+  "customer_email": "bettina.zuniga@example.com"
+ },
+ "extra": {
+  "role": "Youth mentor",
+  "availability": "Tuesday and Thursday afternoons",
+  "reference": "Priya Nystrom",
+  "skills": "Forklift certified",
+  "address": "3799 W Ironwood Terrace"
+ },
+ "questions": [
+  {
+   "q": "What volunteer role did Bettina Zuniga apply for?",
+   "answer": "Youth mentor",
+   "key": "role",
+   "accept": [
+    "Youth mentor"
+   ]
+  },
+  {
+   "q": "When is Bettina Zuniga available to volunteer?",
+   "answer": "Tuesday and Thursday afternoons",
+   "key": "availability",
+   "accept": [
+    "Tuesday and Thursday afternoons"
+   ]
+  },
+  {
+   "q": "Who is Bettina Zuniga's volunteer reference?",
+   "answer": "Priya Nystrom",
+   "key": "reference",
+   "accept": [
+    "Priya Nystrom"
+   ]
+  },
+  {
+   "q": "Which organization did Bettina Zuniga apply to volunteer with?",
+   "answer": "Cottonwood Literacy Project",
+   "key": "vendor",
+   "accept": [
+    "Cottonwood Literacy Project"
+   ]
+  },
+  {
+   "q": "What is Bettina Zuniga's phone number on the volunteer application?",
+   "answer": "(480) 555-0168",
+   "key": "customer_phone",
+   "accept": [
+    "(480) 555-0168",
+    "480-555-0168"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "volunteer-59.pdf"
+}

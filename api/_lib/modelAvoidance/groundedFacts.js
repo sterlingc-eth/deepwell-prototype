@@ -19,6 +19,7 @@ export const norm = (s) => String(s ?? "")
 const DATE_KEYS = /(?:_date|_expires|installation_date|warranty_registered_date)$/;
 const MONEY_KEYS = new Set(["cost"]);
 const NUMBER_KEYS = new Set(["labor_hours"]);
+const PERSON_KEYS = new Set(["holder_name", "employee_name", "manager", "issued_by"]);
 
 /** Every date in `text`, normalised, both readings when day/month could swap. */
 function datesIn(text, order) {
@@ -72,6 +73,13 @@ export function verifyGrounded(field, pages, { order = "mdy" } = {}) {
   }
   const v = norm(value).replace(/[.,]+$/, "");
   if (!v) return { ok: false, reason: "value-not-in-quote" };
+  // People-forms round: a person's name printed "Last, First M" or in separate first / last cells is read in natural order; every word of it must still be in the quote.
+  if (PERSON_KEYS.has(key)) {
+    const words = (t) => norm(t).replace(/[.,]/g, " ").split(/\s+/).filter(Boolean);
+    const qw = new Set(words(field.verbatim));
+    const vw = words(value);
+    if (vw.length && vw.every((w) => qw.has(w))) return { ok: true, reason: null };
+  }
   const q = quote.replace(/[.,]/g, "");
   return q.includes(v.replace(/[.,]/g, "")) || quote.includes(v) ? { ok: true, reason: null } : { ok: false, reason: "value-not-in-quote" };
 }

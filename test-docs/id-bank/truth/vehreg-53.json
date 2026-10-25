@@ -1,0 +1,69 @@
+{
+ "id": "vehreg-53",
+ "arrival": "photo",
+ "kind": "vehicle-registration",
+ "type": "license-certification",
+ "acceptable_types": [
+  "internal",
+  "license-certification",
+  "other"
+ ],
+ "person": "Zelda Pemberton",
+ "fields": {
+  "customer_name": "Zelda Pemberton",
+  "end_date": "2026-12-22",
+  "start_date": "2025-12-22"
+ },
+ "extra": {
+  "plate": "ABC3887",
+  "vin": "EWJ47F835CJYDDPLE",
+  "year": "2019",
+  "make": "Ford",
+  "model": "F-150",
+  "state": "FL"
+ },
+ "questions": [
+  {
+   "q": "When does Zelda Pemberton's vehicle registration expire?",
+   "answer": "2026-12-22",
+   "key": "end_date",
+   "accept": [
+    "2026-12-22",
+    "12/22/2026",
+    "December 22, 2026",
+    "Dec 22, 2026",
+    "12/22/2026",
+    "22 Dec 2026",
+    "12/22/26",
+    "December 22, 2026"
+   ]
+  },
+  {
+   "q": "What is the license plate on Zelda Pemberton's registration?",
+   "answer": "ABC3887",
+   "key": "plate",
+   "accept": [
+    "ABC3887"
+   ]
+  },
+  {
+   "q": "What is the VIN on Zelda Pemberton's vehicle registration?",
+   "answer": "EWJ47F835CJYDDPLE",
+   "key": "vin",
+   "accept": [
+    "EWJ47F835CJYDDPLE"
+   ]
+  },
+  {
+   "q": "What vehicle is registered to Zelda Pemberton?",
+   "answer": "2019 Ford F-150",
+   "key": "vehicle",
+   "accept": [
+    "Ford F-150",
+    "ford f-150"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "vehreg-53.jpg"
+}

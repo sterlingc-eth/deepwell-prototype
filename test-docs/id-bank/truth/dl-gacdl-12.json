@@ -1,0 +1,85 @@
+{
+ "id": "dl-gacdl-12",
+ "arrival": "scan",
+ "kind": "cdl",
+ "type": "license-certification",
+ "acceptable_types": [
+  "license-certification"
+ ],
+ "person": "Orlando Hartigan",
+ "fields": {
+  "customer_name": "Orlando Hartigan",
+  "license_number": "327928300",
+  "end_date": "2027-10-27",
+  "start_date": "2023-10-27"
+ },
+ "extra": {
+  "dob": "1977-03-04",
+  "dl_class": "B",
+  "state": "GA",
+  "address": "1653 W Sunrise Arroyo St",
+  "endorsements": "T"
+ },
+ "questions": [
+  {
+   "q": "When does Orlando Hartigan's CDL expire?",
+   "answer": "2027-10-27",
+   "key": "end_date",
+   "accept": [
+    "2027-10-27",
+    "10/27/2027",
+    "October 27, 2027",
+    "Oct 27, 2027",
+    "10/27/2027",
+    "27 Oct 2027",
+    "10/27/27",
+    "October 27, 2027"
+   ]
+  },
+  {
+   "q": "What is Orlando Hartigan's CDL number?",
+   "answer": "327928300",
+   "key": "license_number",
+   "accept": [
+    "327928300",
+    "327928300",
+    "327928300"
+   ]
+  },
+  {
+   "q": "What is Orlando Hartigan's date of birth?",
+   "answer": "1977-03-04",
+   "key": "dob",
+   "accept": [
+    "1977-03-04",
+    "03/04/1977",
+    "March 4, 1977",
+    "Mar 4, 1977",
+    "3/4/1977",
+    "04 Mar 1977",
+    "03/04/77",
+    "March 4, 1977"
+   ]
+  },
+  {
+   "q": "What class is Orlando Hartigan's CDL?",
+   "answer": "Class B",
+   "key": "dl_class",
+   "accept": [
+    "Class B",
+    "class B"
+   ]
+  },
+  {
+   "q": "What endorsements does Orlando Hartigan's CDL carry?",
+   "answer": "T",
+   "key": "endorsements",
+   "accept": [
+    "T",
+    "T"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "dl-gacdl-12.pdf"
+}

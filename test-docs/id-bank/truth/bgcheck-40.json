@@ -1,0 +1,58 @@
+{
+ "id": "bgcheck-40",
+ "arrival": "clean",
+ "kind": "background-consent",
+ "type": "hr-letter",
+ "acceptable_types": [
+  "agreement",
+  "hr-letter",
+  "other"
+ ],
+ "person": "Kestrel Nystrom",
+ "fields": {
+  "customer_name": "Kestrel Nystrom",
+  "vendor": "Ironwood Cold Storage",
+  "service_date": "2026-09-02"
+ },
+ "extra": {
+  "agency": "Example Screening Services",
+  "dob": "1998-05-11",
+  "ssn": "987-65-5938",
+  "address": "5833 N Chuparosa Way"
+ },
+ "questions": [
+  {
+   "q": "When did Kestrel Nystrom sign the background check consent?",
+   "answer": "2026-09-02",
+   "key": "service_date",
+   "accept": [
+    "2026-09-02",
+    "09/02/2026",
+    "September 2, 2026",
+    "Sep 2, 2026",
+    "9/2/2026",
+    "02 Sep 2026",
+    "09/02/26",
+    "September 2, 2026"
+   ]
+  },
+  {
+   "q": "Which company is requesting a background check on Kestrel Nystrom?",
+   "answer": "Ironwood Cold Storage",
+   "key": "vendor",
+   "accept": [
+    "Ironwood Cold Storage"
+   ]
+  },
+  {
+   "q": "Which screening agency will run Kestrel Nystrom's background check?",
+   "answer": "Example Screening Services",
+   "key": "agency",
+   "accept": [
+    "Example Screening Services"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "bgcheck-40.pdf"
+}

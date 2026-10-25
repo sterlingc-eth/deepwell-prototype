@@ -1,0 +1,72 @@
+{
+ "id": "volunteer-61",
+ "arrival": "scan",
+ "kind": "volunteer-application-handwritten",
+ "type": "hr-letter",
+ "acceptable_types": [
+  "agreement",
+  "hr-letter",
+  "internal",
+  "other"
+ ],
+ "person": "Yosef Eckhart",
+ "fields": {
+  "customer_name": "Yosef Eckhart",
+  "vendor": "Desert Bloom Animal Rescue",
+  "service_date": "2026-07-14",
+  "customer_phone": "(480) 555-0162",
+  "customer_email": "yosef.eckhart@example.com"
+ },
+ "extra": {
+  "role": "Kennel assistant",
+  "availability": "Weekday evenings",
+  "reference": "Anselm Ashgrove",
+  "skills": "Forklift certified",
+  "address": "9376 N Ocotillo Spur"
+ },
+ "questions": [
+  {
+   "q": "What volunteer role did Yosef Eckhart apply for?",
+   "answer": "Kennel assistant",
+   "key": "role",
+   "accept": [
+    "Kennel assistant"
+   ]
+  },
+  {
+   "q": "When is Yosef Eckhart available to volunteer?",
+   "answer": "Weekday evenings",
+   "key": "availability",
+   "accept": [
+    "Weekday evenings"
+   ]
+  },
+  {
+   "q": "Who is Yosef Eckhart's volunteer reference?",
+   "answer": "Anselm Ashgrove",
+   "key": "reference",
+   "accept": [
+    "Anselm Ashgrove"
+   ]
+  },
+  {
+   "q": "Which organization did Yosef Eckhart apply to volunteer with?",
+   "answer": "Desert Bloom Animal Rescue",
+   "key": "vendor",
+   "accept": [
+    "Desert Bloom Animal Rescue"
+   ]
+  },
+  {
+   "q": "What is Yosef Eckhart's phone number on the volunteer application?",
+   "answer": "(480) 555-0162",
+   "key": "customer_phone",
+   "accept": [
+    "(480) 555-0162",
+    "480-555-0162"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "volunteer-61.pdf"
+}

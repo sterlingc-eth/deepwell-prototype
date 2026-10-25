@@ -27,13 +27,16 @@ import { scanProseFacts } from "./proseFacts.js";
 import { signerOnlyByValue } from "./signerGuard.js";
 import { verifyGrounded } from "./groundedFacts.js";
 import { detectDateOrder } from "./textExtract.js";
+import { scanIdDocFacts, ID_KEYS_BY_TYPE } from "./idDocFields.js";
+import { stripFormControl, PEOPLE_ID_TYPES } from "./peopleShape.js";
 const normalizeDateLoose = (v) => normalizeDate(String(v ?? "").trim(), { order: "mdy" });
 
 // Inbox round (2026-10-21): 2 = new date / address labels ("Issued", "Date Reported", "Premises") and the file-name address;
 // the bump lets the nightly sweep and "Re-check all missing fields" look at every open paper once more.
 // Docread round (2026-10-22): 3 = facts stated in sentences / column blocks (proseFacts.js), period and licence facts, and every
 // fill grounded (quote on the page, value from the quote) before it is written. The bump re-scans every open paper once.
-export const LABEL_FILL_VERSION = 3;
+// ID-document round: 4 = driver licence / CDL, medical examiner's certificate and new-hire sheet fields (idDocFields.js); re-scans open papers of those types once.
+export const LABEL_FILL_VERSION = 4;
 
 /** Facts restored when absent on papers of these types although nothing requires them: the period a lease, policy or licence
  *  runs, its number. Read from labels or sentences only, grounded like everything else. */
@@ -115,6 +118,9 @@ export function addressFromFilename(filename, pages) {
 
 export function planLabelFill({ type, fields, pages, today, method = "label-fill", pageCount, optionalDates = true, ownNames = [], allKeys = false, pack = null, filename = null }) {
   const docType = normalizeDocumentType(type);
+  // a form's own control block (OMB number, form number, revision line, the "Expires" line that goes with them - also when it wraps over
+  // several lines) is not the document's date: those lines are not read by any reader below
+  pages = stripFormControl(pages, { ombOnly: !PEOPLE_ID_TYPES.has(docType) });
   const completeness = completenessFor(docType, (fields ?? []).map((f) => ({ field_key: f.field_key ?? f.key, value: f.corrected_value ?? f.value, confidence: f.confidence ?? 1 })));
   const have = presentKeys(fields);
   const targets = [];
@@ -126,11 +132,30 @@ export function planLabelFill({ type, fields, pages, today, method = "label-fill
   if (ownNames?.length) for (const k of OPTIONAL_PARTY_KEYS) if (!have.has(k) && !targets.includes(k)) targets.push(k);
   if (allKeys) for (const k of ALL_SCAN_KEYS) if (!have.has(k) && !targets.includes(k)) targets.push(k);
   for (const k of PERIOD_KEYS_BY_TYPE[docType] ?? []) if (!have.has(k) && !targets.includes(k)) targets.push(k);
+  // ID-document round: the holder, number, class, dates and issuer of a licence / certificate; the employee, start, position, pay
+  // and manager of a new-hire sheet. Read from labels (value beside or under the label) by idDocFields.js.
+  for (const k of ID_KEYS_BY_TYPE[docType] ?? []) if (!have.has(k) && !targets.includes(k)) targets.push(k);
+  // an HR or person-ID paper is about an employee / a holder: never a customer_* / service_* fact (peopleShape.dropPeopleIdFacts)
+  if (PEOPLE_ID_TYPES.has(docType)) for (let i = targets.length - 1; i >= 0; i--) if (/^(?:customer_|service_|shop_)/.test(targets[i])) targets.splice(i, 1);
   if (!targets.length || !(pages ?? []).some((p) => String(p?.text ?? "").trim())) {
     return { add: [], ambiguous: [], targets, missingBefore: completeness.missing };
   }
 
-  const { candidates } = scanLabeledValues(pages, { type: docType, keys: targets, ownNames });
+  const { candidates: labelCandidates } = scanLabeledValues(pages, { type: docType, keys: targets, ownNames });
+  // ID-document round: on these two types the id reader's candidates replace the generic scan's for the keys it finds.
+  const candidates = { ...labelCandidates };
+  let idAmbiguous = [];
+  if (ID_KEYS_BY_TYPE[docType]) {
+    try {
+      const idOrder = detectDateOrder((pages ?? []).map((p) => String(p?.text ?? "")).join("\n"));
+      const idc = scanIdDocFacts(pages, { type: docType, keys: targets, order: idOrder === "dmy" ? "dmy" : "mdy" });
+      // A new hire's "Start Date" is the start date, not a work-order service date (the generic scan's service_date goes).
+      if (docType === "hr-letter" && idc.candidates.start_date?.length) delete candidates.service_date;
+      for (const k of idc.blocked ?? []) delete candidates[k];
+      for (const [k, v] of Object.entries(idc.candidates)) candidates[k] = v;
+      idAmbiguous = idc.ambiguous;
+    } catch { /* the generic scan stands */ }
+  }
   // Docread round: the second reader, for facts stated in sentences or column blocks. Used only where the labels gave nothing.
   let prose = { candidates: {}, ambiguous: [] };
   try {

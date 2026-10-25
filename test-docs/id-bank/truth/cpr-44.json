@@ -1,0 +1,71 @@
+{
+ "id": "cpr-44",
+ "arrival": "clean",
+ "kind": "cpr-card",
+ "type": "license-certification",
+ "acceptable_types": [
+  "license-certification"
+ ],
+ "person": "Rosalba Jernigan",
+ "fields": {
+  "customer_name": "Rosalba Jernigan",
+  "license_number": "CPR-643340",
+  "start_date": "2024-06-17",
+  "vendor": "Arroyo Workforce Training",
+  "end_date": "2026-06-17"
+ },
+ "extra": {
+  "course": "Adult CPR and First Aid",
+  "issuer": "Arroyo Workforce Training"
+ },
+ "questions": [
+  {
+   "q": "When does Rosalba Jernigan's CPR card expire?",
+   "answer": "2026-06-17",
+   "key": "end_date",
+   "accept": [
+    "2026-06-17",
+    "06/17/2026",
+    "June 17, 2026",
+    "Jun 17, 2026",
+    "6/17/2026",
+    "17 Jun 2026",
+    "06/17/26",
+    "June 17, 2026"
+   ]
+  },
+  {
+   "q": "What is Rosalba Jernigan's CPR card number?",
+   "answer": "CPR-643340",
+   "key": "license_number",
+   "accept": [
+    "CPR-643340"
+   ]
+  },
+  {
+   "q": "Who issued Rosalba Jernigan's CPR card?",
+   "answer": "Arroyo Workforce Training",
+   "key": "vendor",
+   "accept": [
+    "Arroyo Workforce Training"
+   ]
+  },
+  {
+   "q": "When was Rosalba Jernigan's CPR card issued?",
+   "answer": "2024-06-17",
+   "key": "start_date",
+   "accept": [
+    "2024-06-17",
+    "06/17/2024",
+    "June 17, 2024",
+    "Jun 17, 2024",
+    "6/17/2024",
+    "17 Jun 2024",
+    "06/17/24",
+    "June 17, 2024"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "cpr-44.pdf"
+}

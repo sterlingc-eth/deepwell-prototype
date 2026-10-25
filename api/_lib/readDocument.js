@@ -11,6 +11,15 @@ import { FIELD_SPECS } from "./extractFields.js";
 import { embedDocumentPages } from "./search/store.js";
 // R32 (model avoidance): a born-digital PDF already contains its text — read it in-process instead of paying a vision model.
 import { readPdfTextLayer } from "./modelAvoidance/pdfText.js";
+// Vision lane: send the model only the pages it must read, and shrink a phone-photo page instead of refusing the file.
+// Loaded lazily (a literal specifier, so the bundler still ships it): a missing jpeg-js dependency must degrade to the old
+// behaviours (whole file / 413), never break every ingest at import time.
+async function loadPdfPages() {
+  try { return await import("./modelAvoidance/pdfPages.js"); } catch (err) {
+    console.warn(`readDocument: page-subset helper unavailable (${err?.message}); using whole-file behaviour`);
+    return null;
+  }
+}
 import { isTextLayerReadEnabled } from "./modelAvoidance/switches.js";
 // Word / Excel / CSV: read in-process (no model, no cost). decodeText lives with the readers so both share one copy.
 import { readOfficeFile, extOf, decodeText, REFUSED_OFFICE_EXT } from "./office/index.js";
@@ -34,6 +43,9 @@ export { decodeText };
  */
 
 export const MAX_PDF_BYTES = 24 * 1024 * 1024;
+// A PDF between MAX_PDF_BYTES and this (the upload cap) is no longer refused outright: its oversized page images are re-encoded to
+// ~2000 px JPEG first (pdfPages.js). Past this it is still a 413.
+export const MAX_PDF_SHRINK_BYTES = 100 * 1024 * 1024;
 // See callTranscribe's comment: a PDF page count varies, an image call is
 // always exactly one page.
 export const PDF_MAX_TOKENS = 8000;
@@ -474,6 +486,62 @@ export function shouldEscalate(pages, threshold = 0.75) {
 }
 
 /**
+ * Read a PDF or photo into pages (no database). Pure routing around the text-layer reader and the vision model:
+ *   - every page digital            -> the PDF's own text layer, no model (R32, unchanged)
+ *   - some digital, some scanned    -> text layer for the digital pages, the model for ONLY the others (a one-page-per-scan subset PDF)
+ *   - nothing digital               -> the model on the original bytes (unchanged) - or, past MAX_PDF_BYTES, on a copy whose
+ *                                      oversized images were re-encoded to ~2000 px JPEG instead of a 413
+ * Exported so the routing can be tested with a stubbed model (no DB, no network).
+ */
+export async function readPdfOrImage(bytes, contentType, ctx, startedAt) {
+  const isPdf = contentType === "application/pdf";
+  const oversize = bytes.length > MAX_PDF_BYTES;
+  if (oversize && (!isPdf || bytes.length > MAX_PDF_SHRINK_BYTES)) {
+    throw new IngestError("File is too large to extract in one pass", 413);
+  }
+  // R32: try the PDF's own text layer first (PDF_TEXT_LAYER=0 disables). Per page now: a page that is not clearly real, complete,
+  // readable text — a scan, an OCR overlay, a big image, garbled or unmappable fonts, rotated/invisible text — is handed to the
+  // model; a file where NO page qualifies goes to the model exactly as before.
+  // PDF_PER_PAGE=0 restores the all-or-nothing per-file text layer (kill switch for the mixed-PDF split).
+  const perPage = process.env.PDF_PER_PAGE !== "0";
+  const scan = {}; // the text-layer reader's parse, reused below so the file is scanned once
+  const layer = isPdf && isTextLayerReadEnabled() ? readPdfTextLayer(bytes, { perPage, out: scan, ...(oversize ? { budgetMs: 8_000 } : {}) }) : null;
+  const tooLarge = () => new IngestError("File is too large to extract in one pass", 413);
+
+  if (layer?.ok && !layer.mixed) {
+    return { pages: layer.pages.map((p) => ({ ...p, model: "pdf-text-layer", confidence: 1 })), method: "text", readSource: "pdf-text-layer" };
+  }
+
+  if (layer?.ok && layer.mixed) {
+    const need = layer.skipped.map((x) => x.page_no);
+    const digital = layer.pages.map((p) => ({ ...p, model: "pdf-text-layer", confidence: 1 }));
+    const lib = await loadPdfPages();
+    const sub = lib ? lib.buildPdfSubset(lib.openPdf(bytes, { budgetMs: 8_000, parsed: scan.parsed }), need, { shrink: oversize }) : { ok: false };
+    let visionPages;
+    if (sub.ok) {
+      visionPages = await extractWithClaude(sub.bytes, contentType, ctx, startedAt, { pageMap: sub.pageMap });
+    } else if (!oversize) {
+      // could not cut the file apart: send it whole but ask for only the scanned pages (still saves the output tokens)
+      visionPages = (await extractWithClaude(bytes, contentType, ctx, startedAt, { onlyPages: need })).filter((p) => need.includes(p.page_no));
+    } else throw tooLarge();
+    const pages = [...digital, ...visionPages].sort((a, b) => a.page_no - b.page_no);
+    return { pages, method: "model", readSource: `pdf-mixed:${digital.length}text+${need.length}model` };
+  }
+
+  let readSource = layer && !layer.ok ? `model:${String(layer.reason).slice(0, 40)}` : null;
+  if (!oversize) {
+    return { pages: await extractWithClaude(bytes, contentType, ctx, startedAt, { parsed: scan.parsed }), method: "model", readSource };
+  }
+  const lib = await loadPdfPages();
+  const pdf = lib ? lib.openPdf(bytes, { budgetMs: 8_000, parsed: scan.parsed }) : null;
+  const all = pdf ? pdf.pages.map((_, i) => i + 1) : [];
+  const sub = all.length ? lib.buildPdfSubset(pdf, all, { shrink: true }) : { ok: false };
+  if (!sub.ok) throw tooLarge();
+  const pages = await extractWithClaude(sub.bytes, contentType, ctx, startedAt, { pageMap: sub.pageMap });
+  return { pages, method: "model", readSource: `${readSource ?? "model"}+shrunk` };
+}
+
+/**
  * Read one stored document and write its page text into Postgres.
  *
  * Idempotent twice over. `upsertPages` is an upsert on (document_id,
@@ -616,30 +684,16 @@ export async function ingestDocument(ctx, documentId, { userId, force = false } 
     pages = chunkText(decoded);
     method = "text";
   } else if (contentType === "application/pdf" || VISION_IMAGE_TYPES.has(contentType)) {
-    if (bytes.length > MAX_PDF_BYTES) {
-      throw new IngestError("File is too large to extract in one pass", 413);
-    }
-    // R32: try the PDF's own text layer first (PDF_TEXT_LAYER=0 disables). readPdfTextLayer refuses (ok:false) anything
-    // that is not clearly real, complete, readable text — scans, OCR overlays, big images, garbled or unmappable fonts,
-    // rotated/invisible text — and those go to the model exactly as before.
-    const layer = contentType === "application/pdf" && isTextLayerReadEnabled() ? readPdfTextLayer(bytes) : null;
-    if (layer?.ok) {
-      pages = layer.pages.map((p) => ({ ...p, model: "pdf-text-layer", confidence: 1 }));
-      method = "text";
-      readSource = "pdf-text-layer";
-    } else {
-      try {
-        pages = await extractWithClaude(bytes, contentType, ctx, startedAt);
-      } catch (err) {
-        const rejection = classifyModelInputRejection(err);
-        if (!rejection) throw err;
-        // A 413 is recorded by the caller (read-document.js / the queue's recordIfFinal); a 415 is recorded here, like the
-        // other terminal "cannot read this file" outcomes above.
-        if (rejection.status === 415) await withTenant(ctx, (db) => db.markExtracted(documentId, { error: rejection.message }));
-        throw new IngestError(rejection.message, rejection.status);
-      }
-      method = "model";
-      if (layer && !layer.ok) readSource = `model:${String(layer.reason).slice(0, 40)}`;
+    try {
+      ({ pages, method, readSource } = await readPdfOrImage(bytes, contentType, ctx, startedAt));
+    } catch (err) {
+      if (err instanceof IngestError) throw err;
+      const rejection = classifyModelInputRejection(err);
+      if (!rejection) throw err;
+      // A 413 is recorded by the caller (read-document.js / the queue's recordIfFinal); a 415 is recorded here, like the
+      // other terminal "cannot read this file" outcomes above.
+      if (rejection.status === 415) await withTenant(ctx, (db) => db.markExtracted(documentId, { error: rejection.message }));
+      throw new IngestError(rejection.message, rejection.status);
     }
   } else {
     const message =
@@ -904,14 +958,21 @@ async function callTranscribe({ model, bytes, contentType, timeoutMs, pageFilter
  * that gets hard-killed by the platform partway through and records nothing
  * at all.
  */
-export async function extractWithClaude(bytes, contentType, ctx, startedAt) {
+export async function extractWithClaude(bytes, contentType, ctx, startedAt, opts = {}) {
   const { fast, strong, legacy } = resolveTranscribeModels();
+  // `pageMap` (optional): `bytes` is a subset PDF whose Nth page is page pageMap[N-1] of the real document. Everything inside this
+  // function works in the subset's own numbering ("local"); the pages it returns are renumbered to the real ones on the way out.
+  const pageMap = Array.isArray(opts.pageMap) ? opts.pageMap : null;
+  const toReal = (list) => (pageMap
+    ? list.filter((p) => pageMap[p.page_no - 1] !== undefined).map((p) => ({ ...p, page_no: pageMap[p.page_no - 1] }))
+    : list);
 
   const fastResult = await callTranscribe({
     model: fast,
     bytes,
     contentType,
     timeoutMs: MODEL_TIMEOUT_MS,
+    pageFilter: opts.onlyPages,
     strict: true,
   });
   await recordUsageSafely(ctx, fastResult.usage);
@@ -921,7 +982,7 @@ export async function extractWithClaude(bytes, contentType, ctx, startedAt) {
   if (legacy) {
     // TRANSCRIBE_MODEL forces a single model. No escalation, matching the
     // pre-existing behavior exactly.
-    return pages;
+    return toReal(pages);
   }
 
   const threshold = parseEscalateThreshold();
@@ -929,7 +990,7 @@ export async function extractWithClaude(bytes, contentType, ctx, startedAt) {
   const failingPageNos = decisions.filter((d) => d.escalate).map((d) => d.page_no);
 
   if (!failingPageNos.length) {
-    return pages;
+    return toReal(pages);
   }
 
   const remaining = remainingBudgetMs(startedAt);
@@ -940,19 +1001,34 @@ export async function extractWithClaude(bytes, contentType, ctx, startedAt) {
       `Flagged pages: model="${fast}" with their self-reported confidence, which a caller can treat as ` +
       `"needs a human look" until document_pages has a confidence column to query on directly.`
     );
-    return pages;
+    return toReal(pages);
   }
 
   const strongTimeoutMs = Math.max(1000, Math.min(MODEL_TIMEOUT_MS, remaining - ESCALATION_SAFETY_MARGIN_MS));
+
+  // Send ONLY the flagged pages: cut them out into a small PDF (page bytes copied verbatim, so the model sees exactly the same
+  // pixels) instead of re-sending the whole file and paying every page's image tokens again. If the file cannot be cut apart
+  // (not a PDF, odd structure) or every page is flagged anyway, fall back to the old whole-file + "only page N" instruction.
+  let sendBytes = bytes;
+  let sendFilter = failingPageNos;
+  let subMap = null;
+  if (contentType === "application/pdf") {
+    const lib = await loadPdfPages();
+    const pdf = lib ? lib.openPdf(bytes, opts.parsed ? { parsed: opts.parsed } : {}) : null;
+    if (pdf && pdf.pages.length > new Set(failingPageNos).size) {
+      const sub = lib.buildPdfSubset(pdf, failingPageNos, { shrink: false });
+      if (sub.ok) { sendBytes = sub.bytes; sendFilter = undefined; subMap = sub.pageMap; }
+    }
+  }
 
   let strongResult;
   try {
     strongResult = await callTranscribe({
       model: strong,
-      bytes,
+      bytes: sendBytes,
       contentType,
       timeoutMs: strongTimeoutMs,
-      pageFilter: failingPageNos,
+      pageFilter: sendFilter,
       strict: false,
     });
   } catch (err) {
@@ -961,17 +1037,20 @@ export async function extractWithClaude(bytes, contentType, ctx, startedAt) {
     // trimmed timeout expiring) should degrade to that result, not turn a
     // usable transcription into a hard ingestion failure.
     console.warn(`readDocument: escalation call failed, keeping fast result for page(s) ${failingPageNos.join(", ")}: ${err?.message}`);
-    return pages;
+    return toReal(pages);
   }
   await recordUsageSafely(ctx, strongResult.usage);
 
+  const strongPages = subMap
+    ? strongResult.pages.filter((p) => subMap[p.page_no - 1] !== undefined).map((p) => ({ ...p, page_no: subMap[p.page_no - 1] }))
+    : strongResult.pages;
   const byPageNo = new Map(pages.map((p) => [p.page_no, p]));
-  for (const sp of strongResult.pages) {
+  for (const sp of strongPages) {
     if (byPageNo.has(sp.page_no)) {
       byPageNo.set(sp.page_no, { ...sp, model: strong });
     }
   }
-  return Array.from(byPageNo.values()).sort((a, b) => a.page_no - b.page_no);
+  return toReal(Array.from(byPageNo.values()).sort((a, b) => a.page_no - b.page_no));
 }
 
 /** Pure (R34): why these bytes are not the PDF/photo they were declared to be, in words a person can act on. */

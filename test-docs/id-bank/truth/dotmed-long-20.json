@@ -1,0 +1,83 @@
+{
+ "id": "dotmed-long-20",
+ "arrival": "clean",
+ "kind": "dot-medical-long",
+ "type": "license-certification",
+ "acceptable_types": [
+  "hr-letter",
+  "license-certification"
+ ],
+ "person": "Joaquin Okonkwo-Reyes",
+ "fields": {
+  "customer_name": "Joaquin Okonkwo-Reyes",
+  "service_date": "2026-08-23",
+  "end_date": "2027-02-21",
+  "license_number": "D61364903"
+ },
+ "extra": {
+  "examiner": "Dr. Curtis Oyelaran",
+  "national_registry": "8716055317",
+  "examiner_license": "AZ-722662",
+  "certification_period": "6 months",
+  "dob": "1999-04-03"
+ },
+ "questions": [
+  {
+   "q": "When does Joaquin Okonkwo-Reyes's DOT medical card expire?",
+   "answer": "2027-02-21",
+   "key": "end_date",
+   "accept": [
+    "2027-02-21",
+    "02/21/2027",
+    "February 21, 2027",
+    "Feb 21, 2027",
+    "2/21/2027",
+    "21 Feb 2027",
+    "02/21/27",
+    "February 21, 2027"
+   ]
+  },
+  {
+   "q": "Who was Joaquin Okonkwo-Reyes's medical examiner?",
+   "answer": "Dr. Curtis Oyelaran",
+   "key": "examiner",
+   "accept": [
+    "Dr. Curtis Oyelaran",
+    "Curtis Oyelaran"
+   ]
+  },
+  {
+   "q": "When was Joaquin Okonkwo-Reyes's DOT physical?",
+   "answer": "2026-08-23",
+   "key": "service_date",
+   "accept": [
+    "2026-08-23",
+    "08/23/2026",
+    "August 23, 2026",
+    "Aug 23, 2026",
+    "8/23/2026",
+    "23 Aug 2026",
+    "08/23/26",
+    "August 23, 2026"
+   ]
+  },
+  {
+   "q": "What is the driver license number on Joaquin Okonkwo-Reyes's medical certificate?",
+   "answer": "D61364903",
+   "key": "license_number",
+   "accept": [
+    "D61364903"
+   ]
+  },
+  {
+   "q": "What is the examiner's national registry number on Joaquin Okonkwo-Reyes's DOT medical certificate?",
+   "answer": "8716055317",
+   "key": "national_registry",
+   "accept": [
+    "8716055317"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "dotmed-long-20.pdf"
+}

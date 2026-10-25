@@ -1,0 +1,74 @@
+{
+ "id": "i9-24",
+ "arrival": "scan",
+ "kind": "i9",
+ "type": "hr-letter",
+ "acceptable_types": [
+  "hr-letter",
+  "internal",
+  "other"
+ ],
+ "person": "Enrique Nystrom",
+ "fields": {
+  "customer_name": "Enrique Nystrom",
+  "vendor": "Kestrel Ridge Plumbing",
+  "service_date": "2026-10-24"
+ },
+ "extra": {
+  "dob": "1987-02-19",
+  "address": "5506 S Mesquite Hollow Rd",
+  "list_a_document": "U.S. Passport",
+  "list_a_number": "A25589891",
+  "ssn": "987-65-4251"
+ },
+ "questions": [
+  {
+   "q": "When did Enrique Nystrom start work according to the I-9?",
+   "answer": "2026-10-24",
+   "key": "service_date",
+   "accept": [
+    "2026-10-24",
+    "10/24/2026",
+    "October 24, 2026",
+    "Oct 24, 2026",
+    "10/24/2026",
+    "24 Oct 2026",
+    "10/24/26",
+    "October 24, 2026"
+   ]
+  },
+  {
+   "q": "What employer is Enrique Nystrom's I-9 for?",
+   "answer": "Kestrel Ridge Plumbing",
+   "key": "vendor",
+   "accept": [
+    "Kestrel Ridge Plumbing"
+   ]
+  },
+  {
+   "q": "What identity document did Enrique Nystrom present for Form I-9?",
+   "answer": "U.S. Passport",
+   "key": "list_a_document",
+   "accept": [
+    "U.S. Passport"
+   ]
+  },
+  {
+   "q": "What is Enrique Nystrom's date of birth on the I-9?",
+   "answer": "1987-02-19",
+   "key": "dob",
+   "accept": [
+    "1987-02-19",
+    "02/19/1987",
+    "February 19, 1987",
+    "Feb 19, 1987",
+    "2/19/1987",
+    "19 Feb 1987",
+    "02/19/87",
+    "February 19, 1987"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "i9-24.pdf"
+}

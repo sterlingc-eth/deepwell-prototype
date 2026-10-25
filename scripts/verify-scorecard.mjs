@@ -1057,43 +1057,51 @@ const fetchObject = async (key) => { if (!objects[key]) throw new Error('missing
     { id: 's', name: 'Sam Ortega', address: '21 Ridge Rd, Gilbert, AZ 85234' }, { id: 'ph', name: 'Customer at 12 Elm St', address: '12 Elm St, Mesa, AZ 85201', nameSource: 'address' },
   ];
   const pg = (text) => [{ page_no: 1, text }];
-  const v = (t) => findCustomersInBody(pg(t), cust);
-  eq('match (pure): a full name with a possessive is unique', [v("Reminder logged for David Prentiss's account: confirm filter size").status, v("Reminder logged for David Prentiss's account: confirm filter size").matches[0]?.customerId], ['unique', 'p']);
-  check('match (pure): case, punctuation and line breaks do not matter', v('re: DAVID\n prentiss, call back').status === 'unique');
-  eq('match (pure): a street address alone is unique (basis address)', [v('parts at 88 Whitmore Ave, Mesa').status, v('parts at 88 Whitmore Ave, Mesa').matches[0].basis], ['unique', 'address']);
-  eq('match (pure): the same full name on two customers is AMBIGUOUS', v('Call Ann Lee').status, 'ambiguous');
-  eq('match (pure): a name and an address of two different customers is AMBIGUOUS', v('Sam Ortega asked about 88 Whitmore Ave').status, 'ambiguous');
+  // A real memo has a dated header; a one-line string would be read as the issuer's letterhead and never scanned.
+  const v = (t) => findCustomersInBody(pg('Memo 2026-09-23\nNote to file.\nFilter job.\nNo charge.\nFollow up later.\n' + t), cust);
+  // R6.2 (2026-10-25): the 2026-09-23 memo case. A name inside free text ("Reminder logged for David Prentiss's account") is not strong evidence under the
+  // strong-evidence rule, so it is no longer linked automatically; it must at least reach a person as a one-click "Link to David Prentiss" suggestion.
+  const memo = v("Reminder logged for David Prentiss's account: confirm filter size");
+  eq('match (pure): a full name with a possessive in a memo is a one-click suggestion (weak partial naming the customer), never an auto-link', [memo.status, !!memo.weak, memo.matches.length, memo.candidates.map((c) => c.customerId)], ['partial', true, 0, ['p']]);
+  const memo2 = v('re: DAVID\n prentiss, call back');
+  check('match (pure): case, punctuation and line breaks do not matter (still found, as a suggestion)', memo2.status === 'partial' && memo2.candidates.map((c) => c.customerId).join() === 'p' && memo2.matches.length === 0);
+  // R6.2: under the strong-evidence rule a street alone, a bare name in free text, or a placeholder name is a suggestion for a person (weak partial), never an auto-link.
+  eq('match (pure): a street address alone is only a weak suggestion naming the customer, never an auto-link', [v('parts at 88 Whitmore Ave, Mesa').status, v('parts at 88 Whitmore Ave, Mesa').matches.length, v('parts at 88 Whitmore Ave, Mesa').candidates.map((c) => c.customerId)], ['partial', 0, ['w']]);
+  eq('match (pure): the same full name on two customers offers both for a person to pick, never links', [v('Call Ann Lee').status, v('Call Ann Lee').matches.length, v('Call Ann Lee').candidates.map((c) => c.customerId).sort()], ['partial', 0, ['l1', 'l2']]);
+  eq('match (pure): a name and an address of two different customers offers both, never links', [v('Sam Ortega asked about 88 Whitmore Ave').status, v('Sam Ortega asked about 88 Whitmore Ave').matches.length, v('Sam Ortega asked about 88 Whitmore Ave').candidates.map((c) => c.customerId).sort()], ['partial', 0, ['s', 'w']]);
   eq('match (pure): a surname alone is only PARTIAL (review), never unique', [v('Follow up with Prentiss').status, v('Follow up with Prentiss').candidates.map((c) => c.customerId)], ['partial', ['p']]);
   eq('match (pure): a first name alone, a different person, or no name is none', [v('David called').status, v('Davidson Prentice called').status, v('nothing here').status], ['none', 'none', 'none']);
-  eq('match (pure): a "Customer at <address>" placeholder is never matched by its made-up NAME, only by its real street address', [v('Customer at 12 Elm St').matches[0]?.basis, findCustomersInBody(pg('Customer at 99 Nowhere Rd'), cust).status], ['address', 'none']);
+  eq('match (pure): a "Customer at <address>" placeholder is never matched by its made-up NAME, only suggested by its real street address', [v('Customer at 12 Elm St').matches.length, v('Customer at 12 Elm St').candidates.map((c) => c.customerId), findCustomersInBody(pg('Customer at 99 Nowhere Rd'), cust).status], [0, ['ph'], 'none']);
   check('match (pure): a longer house number or street ("188 Whitmore Ave", "88 Whitmore Avenue Extension") is never an address match (at most a partial to review)', v('188 Whitmore Ave').status !== 'unique' && v('88 Whitmore Avenue Extension').status !== 'unique');
 
   const db = async (sql, p = []) => (await lite.query(sql, p)).rows;
   const links = async (n) => db(`SELECT l.entity_id, l.linked_by FROM document_entity_links l WHERE l.document_id = $1`, [uid('c', 'd', n)]);
   const custName = async (n) => (await db(`SELECT value FROM extractions WHERE document_id = $1 AND field_key = 'customer_name'`, [uid('c', 'd', n)])).map((r) => r.value);
 
+  // R6.2 (2026-10-25): under the strong-evidence rule (a labelled customer value, or name AND street) a name or street in free text no longer links by itself.
+    // The 2026-09-23 memo the owner reported still reaches a person: it is kept as a weak candidate and Re-check offers it as a one-click "Link to David Prentiss".
   const dry = await applyBodyNameLinks(ctxC, { dryRun: true });
-  eq('body-name (DB): a dry run previews the unique matches and writes nothing', [dry.linked.map((x) => x.documentId).sort(), (await links(1)).length, (await custName(1)).length], [[uid('c', 'd', 1), uid('c', 'd', 10), uid('c', 'd', 5), uid('c', 'd', 9)].sort(), 0, 0]);
+  eq('body-name (DB): a dry run links nothing from free text and writes nothing', [dry.linked.length, (await links(1)).length, (await custName(1)).length, dry.review.filter((r) => r.weak).map((r) => r.documentId).sort()], [0, 0, 0, [uid('c', 'd', 1), uid('c', 'd', 2)].sort()]);
   const scan = await integrity.integrityScan(ctxC);
-  check('body-name (DB): the integrity scan reports them (bodyNameLinks / bodyNameReview counts)', scan.counts.bodyNameLinks === 4 && scan.counts.bodyNameReview === 3, JSON.stringify(scan.counts));
+  check('body-name (DB): the integrity scan reports the free-text memos for review, not as links (bodyNameLinks 0 / bodyNameReview 3)', scan.counts.bodyNameLinks === 0 && scan.counts.bodyNameReview === 3, JSON.stringify(scan.counts));
 
   const res = await integrity.integrityFixTenant(ctxC, { apply: ['linkBodyNames'], dryRun: false });
-  eq('body-name (DB): the integrity fix links the 4 unambiguous memos', res.bodyNamesLinked.map((x) => x.documentId).sort(), [uid('c', 'd', 1), uid('c', 'd', 10), uid('c', 'd', 5), uid('c', 'd', 9)].sort());
-  eq('body-name (DB): "Reminder logged for David Prentiss\'s account" is linked to David Prentiss with linked_by name-in-body', await links(1), [{ entity_id: uid('c', 'c', 1), linked_by: 'name-in-body' }]);
-  eq('body-name (DB): the missing customer_name field is filled ("Missing required field: Customer" clears)', await custName(1), ['David Prentiss']);
-  eq('body-name (DB): a document that already had a customer_name extraction keeps it (not overwritten or duplicated) but is linked', [await custName(10), (await links(10)).map((l) => l.linked_by)], [['D. Prentiss (handwritten)'], ['name-in-body']]);
-  eq('body-name (DB): an address-only match links to that address\'s customer (Bill Whitmore)', (await links(5)).map((l) => l.entity_id), [uid('c', 'c', 5)]);
-  eq('body-name (DB): the ambiguous memos (two Ann Lees; a name and an address that disagree) are NOT linked - they go to review',
-    [(await links(2)).length, (await links(6)).length, res.bodyNamesForReview.filter((r) => r.kind === 'ambiguous').map((r) => r.documentId).sort()], [0, 0, [uid('c', 'd', 2), uid('c', 'd', 6)].sort()]);
+  eq('body-name (DB): the integrity fix links none of them (no free-text auto-link)', res.bodyNamesLinked.length, 0);
+  eq('body-name (DB): the 2026-09-23 memo "Reminder logged for David Prentiss\'s account" is NOT linked, and is kept as a weak candidate naming David Prentiss (the one-click suggestion)', [(await links(1)).length, res.bodyNamesForReview.find((r) => r.documentId === uid('c', 'd', 1))?.weak, res.bodyNamesForReview.find((r) => r.documentId === uid('c', 'd', 1))?.candidates.map((c) => c.name)], [0, true, ['David Prentiss']]);
+  eq('body-name (DB): nothing is written to the paper\'s facts by a suggestion (customer_name stays empty)', await custName(1), []);
+  eq('body-name (DB): a document that already had a customer_name keeps it (not overwritten or duplicated) and is not linked', [await custName(10), (await links(10)).length], [['D. Prentiss (handwritten)'], 0]);
+  eq('body-name (DB): an address-only memo never links (a street in the top lines reads as the issuer\'s own address)', (await links(5)).length, 0);
+  eq('body-name (DB): the ambiguous memos (two Ann Lees; a name and an address that disagree) are NOT linked; two Ann Lees go to review as weak candidates',
+    [(await links(2)).length, (await links(6)).length, res.bodyNamesForReview.filter((r) => r.kind === 'ambiguous' || r.weak).map((r) => r.documentId).sort()], [0, 0, [uid('c', 'd', 1), uid('c', 'd', 2)].sort()]);
   eq('body-name (DB): a surname-only memo is NOT linked - "Needs your review" (partial)', [(await links(3)).length, res.bodyNamesForReview.find((r) => r.documentId === uid('c', 'd', 3))?.kind], [0, 'partial']);
   eq('body-name (DB): a customer that exists only in ANOTHER tenant is never matched (Zed Competitor)', [(await links(4)).length, res.bodyNamesForReview.some((r) => r.documentId === uid('c', 'd', 4))], [0, false]);
   eq('body-name (DB): a document that already has a link is left alone', (await links(7)).map((l) => l.entity_id), [uid('c', 'c', 4)]);
   eq('body-name (DB): a document a person explicitly unlinked is left alone', (await links(8)).length, 0);
-  eq('body-name (DB): a memo naming only a street address links to that address\'s (placeholder) customer, by address', (await links(9)).map((l) => l.entity_id), [uid('c', 'c', 6)]);
+  eq('body-name (DB): a memo naming only a street address never links, even to a placeholder customer', (await links(9)).length, 0);
   const again = await integrity.integrityFixTenant(ctxC, { apply: ['linkBodyNames'], dryRun: false });
   eq('body-name (DB): running it again changes nothing (idempotent)', again.bodyNamesLinked.length, 0);
   const audit = await db(`SELECT count(*)::int AS n FROM audit_log WHERE action = 'integrity.link_body_name'`);
-  check('body-name (DB): each link is audited (no question/PII in logs; the audit row holds ids and the basis)', audit[0].n === 4);
+  check('body-name (DB): no link was made, so no link audit rows exist', audit[0].n === 0);
   const crossTenant = await db(`SELECT count(*)::int AS n FROM document_entity_links WHERE tenant_id = $1 AND entity_id IN (SELECT id FROM entities WHERE tenant_id <> $1)`, [tenC]);
   eq('body-name (DB): no link crosses a tenant boundary', crossTenant[0].n, 0);
   check('body-name: wired into the integrity fix list (server APPLY_ACTIONS, client ALL_INTEGRITY_FIXES, nightly sweep, ingest)',

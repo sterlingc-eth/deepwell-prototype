@@ -1,0 +1,81 @@
+{
+ "id": "newhire-32",
+ "arrival": "clean",
+ "kind": "newhire-typed",
+ "type": "hr-letter",
+ "acceptable_types": [
+  "hr-letter",
+  "internal",
+  "other"
+ ],
+ "person": "Joaquin Underhill",
+ "fields": {
+  "customer_name": "Joaquin Underhill",
+  "vendor": "Blue Agave Catering",
+  "service_date": "2026-08-11",
+  "customer_phone": "(480) 555-0162",
+  "customer_email": "joaquin.underhill@example.com"
+ },
+ "extra": {
+  "manager": "Wendell Dellinger",
+  "position": "Yard Jockey",
+  "hourly_rate": "22.25",
+  "department": "Operations",
+  "emergency_contact": "Ulises Trevino",
+  "emergency_phone": "(480) 555-0121",
+  "address": "9470 S Verde Alamo Ave",
+  "shirt_size": "L"
+ },
+ "questions": [
+  {
+   "q": "Who is Joaquin Underhill's manager?",
+   "answer": "Wendell Dellinger",
+   "key": "manager",
+   "accept": [
+    "Wendell Dellinger"
+   ]
+  },
+  {
+   "q": "What is Joaquin Underhill's start date?",
+   "answer": "2026-08-11",
+   "key": "service_date",
+   "accept": [
+    "2026-08-11",
+    "08/11/2026",
+    "August 11, 2026",
+    "Aug 11, 2026",
+    "8/11/2026",
+    "11 Aug 2026",
+    "08/11/26",
+    "August 11, 2026"
+   ]
+  },
+  {
+   "q": "What position was Joaquin Underhill hired for?",
+   "answer": "Yard Jockey",
+   "key": "position",
+   "accept": [
+    "Yard Jockey"
+   ]
+  },
+  {
+   "q": "What is Joaquin Underhill's hourly rate?",
+   "answer": "$22.25",
+   "key": "hourly_rate",
+   "accept": [
+    "$22.25",
+    "22.25"
+   ]
+  },
+  {
+   "q": "Who is Joaquin Underhill's emergency contact?",
+   "answer": "Ulises Trevino",
+   "key": "emergency_contact",
+   "accept": [
+    "Ulises Trevino"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "newhire-32.pdf"
+}

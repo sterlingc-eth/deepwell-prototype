@@ -1,0 +1,71 @@
+{
+ "id": "forklift-46",
+ "arrival": "photo",
+ "kind": "forklift-card",
+ "type": "license-certification",
+ "acceptable_types": [
+  "license-certification"
+ ],
+ "person": "Zelda Lindqvist",
+ "fields": {
+  "customer_name": "Zelda Lindqvist",
+  "license_number": "PIT-27199",
+  "start_date": "2024-06-10",
+  "vendor": "Arroyo Workforce Training",
+  "end_date": "2027-06-10"
+ },
+ "extra": {
+  "course": "Powered Industrial Truck Operator",
+  "issuer": "Arroyo Workforce Training"
+ },
+ "questions": [
+  {
+   "q": "When does Zelda Lindqvist's forklift certification expire?",
+   "answer": "2027-06-10",
+   "key": "end_date",
+   "accept": [
+    "2027-06-10",
+    "06/10/2027",
+    "June 10, 2027",
+    "Jun 10, 2027",
+    "6/10/2027",
+    "10 Jun 2027",
+    "06/10/27",
+    "June 10, 2027"
+   ]
+  },
+  {
+   "q": "What is Zelda Lindqvist's forklift certification number?",
+   "answer": "PIT-27199",
+   "key": "license_number",
+   "accept": [
+    "PIT-27199"
+   ]
+  },
+  {
+   "q": "Who issued Zelda Lindqvist's forklift certification?",
+   "answer": "Arroyo Workforce Training",
+   "key": "vendor",
+   "accept": [
+    "Arroyo Workforce Training"
+   ]
+  },
+  {
+   "q": "When was Zelda Lindqvist's forklift certification issued?",
+   "answer": "2024-06-10",
+   "key": "start_date",
+   "accept": [
+    "2024-06-10",
+    "06/10/2024",
+    "June 10, 2024",
+    "Jun 10, 2024",
+    "6/10/2024",
+    "10 Jun 2024",
+    "06/10/24",
+    "June 10, 2024"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "forklift-46.jpg"
+}

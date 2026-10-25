@@ -1,0 +1,71 @@
+{
+ "id": "w4-27",
+ "arrival": "scan",
+ "kind": "w4",
+ "type": "hr-letter",
+ "acceptable_types": [
+  "hr-letter",
+  "internal",
+  "other"
+ ],
+ "person": "Mateo Underhill",
+ "fields": {
+  "customer_name": "Mateo Underhill",
+  "vendor": "Copper State Supply Co",
+  "service_date": "2026-10-27"
+ },
+ "extra": {
+  "filing_status": "Married filing jointly",
+  "dependents_amount": "0",
+  "extra_withholding": "25",
+  "ssn": "987-65-6096",
+  "address": "4664 E Saguaro Vista Dr"
+ },
+ "questions": [
+  {
+   "q": "What filing status did Mateo Underhill choose on the W-4?",
+   "answer": "Married filing jointly",
+   "key": "filing_status",
+   "accept": [
+    "Married filing jointly",
+    "Married filing jointly",
+    "Married"
+   ]
+  },
+  {
+   "q": "Who is Mateo Underhill's employer on the W-4?",
+   "answer": "Copper State Supply Co",
+   "key": "vendor",
+   "accept": [
+    "Copper State Supply Co"
+   ]
+  },
+  {
+   "q": "When did Mateo Underhill sign the W-4?",
+   "answer": "2026-10-27",
+   "key": "service_date",
+   "accept": [
+    "2026-10-27",
+    "10/27/2026",
+    "October 27, 2026",
+    "Oct 27, 2026",
+    "10/27/2026",
+    "27 Oct 2026",
+    "10/27/26",
+    "October 27, 2026"
+   ]
+  },
+  {
+   "q": "How much extra withholding per pay period does Mateo Underhill want on the W-4?",
+   "answer": "$25",
+   "key": "extra_withholding",
+   "accept": [
+    "$25",
+    "25.00",
+    " 25 "
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "w4-27.pdf"
+}

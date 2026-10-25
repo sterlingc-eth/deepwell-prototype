@@ -1,0 +1,71 @@
+{
+ "id": "cpr-45",
+ "arrival": "scan",
+ "kind": "cpr-card",
+ "type": "license-certification",
+ "acceptable_types": [
+  "license-certification"
+ ],
+ "person": "Hollis Brannigan",
+ "fields": {
+  "customer_name": "Hollis Brannigan",
+  "license_number": "CPR-529803",
+  "start_date": "2026-11-21",
+  "vendor": "Sonoran Safety Training Institute",
+  "end_date": "2028-11-21"
+ },
+ "extra": {
+  "course": "CPR / AED / First Aid",
+  "issuer": "Sonoran Safety Training Institute"
+ },
+ "questions": [
+  {
+   "q": "When does Hollis Brannigan's CPR card expire?",
+   "answer": "2028-11-21",
+   "key": "end_date",
+   "accept": [
+    "2028-11-21",
+    "11/21/2028",
+    "November 21, 2028",
+    "Nov 21, 2028",
+    "11/21/2028",
+    "21 Nov 2028",
+    "11/21/28",
+    "November 21, 2028"
+   ]
+  },
+  {
+   "q": "What is Hollis Brannigan's CPR card number?",
+   "answer": "CPR-529803",
+   "key": "license_number",
+   "accept": [
+    "CPR-529803"
+   ]
+  },
+  {
+   "q": "Who issued Hollis Brannigan's CPR card?",
+   "answer": "Sonoran Safety Training Institute",
+   "key": "vendor",
+   "accept": [
+    "Sonoran Safety Training Institute"
+   ]
+  },
+  {
+   "q": "When was Hollis Brannigan's CPR card issued?",
+   "answer": "2026-11-21",
+   "key": "start_date",
+   "accept": [
+    "2026-11-21",
+    "11/21/2026",
+    "November 21, 2026",
+    "Nov 21, 2026",
+    "11/21/2026",
+    "21 Nov 2026",
+    "11/21/26",
+    "November 21, 2026"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "cpr-45.pdf"
+}

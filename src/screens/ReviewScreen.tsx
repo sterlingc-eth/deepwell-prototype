@@ -5,7 +5,7 @@ import { StagePill, stageLabel } from '../components/StagePill';
 import { DocumentPreview } from '../components/DocumentPreview';
 import { requiredFieldsForDoc, isSetAside } from '../core/entityGraph';
 import { documentKindFor } from '../domains/hvac/documentTypes';
-import { conflictDocs, entitiesOfType, companyFileNeedsLook, gapDocs, isCompanyFileDoc, isNothingRead, isRequirementMet, maxStageFor, unlinkedDocs, useGraph, type GraphSnapshot } from '../core/entityGraph';
+import { conflictDocs, entitiesOfType, linkSuggestions, companyFileNeedsLook, gapDocs, isCompanyFileDoc, isNothingRead, isRequirementMet, maxStageFor, unlinkedDocs, useGraph, type GraphSnapshot } from '../core/entityGraph';
 import type { Conflict, Doc, Entity, SourceRef } from '../core/types';
 import { targetFor } from '../domains/hvac/intake';
 import { fieldLabel, hvacSchema, requirementLabel } from '../domains/hvac/schema';
@@ -26,6 +26,7 @@ import { FinancialStrip } from '../components/FinancialStrip';
 import { financialsClient } from '../services/financialsClient';
 import { FILTERS, FILTER_IDS, type Filter } from './reviewFilters';
 import { needInfo, neighbourAfterRemoval, sectionsFor } from './reviewGrouping';
+import { RECHECK_ALL_LABEL, RECHECK_CHUNK, openPaperIds, recheckBanner, recheckProgress, stillOpenSummary } from './recheckAll';
 import { NeedsYouList, type QueueRowData } from '../components/inbox/NeedsYouList';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useCanAdmin, ASK_ADMIN_TITLE } from '../hooks/useCanAdmin';
@@ -628,34 +629,42 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
     }
   };
 
-  // R33 (admin): "Re-check all missing fields" — every document in this view with a missing required field gets its
-  // own page text re-read for it ($0, no model; api/_lib/recheck.js), in bounded batches until none are left.
-  const missingQueueIds = useMemo(() => queue.filter((d) => d.issues.some((i) => i.kind === 'missing-field')).map((d) => d.id), [queue]);
+  // R33 (admin), widened (Re-check-all round): "Re-check all open papers" re-reads the stored page text of EVERY open paper
+  // (missing info, needs linking, ready to verify, needs a person), $0, no model; api/_lib/recheck.js. It fills only facts that
+  // are absent, links only by an unambiguous customer name or address in the page, and checks what now passes the automatic
+  // rules. It never replaces a value a person typed or confirmed. Sent in chunks so each call stays well inside the time limit.
+  const openIds = useMemo(() => openPaperIds(graph), [graph]);
   const [recheckAllBusy, setRecheckAllBusy] = useState(false);
   const [recheckAllMsg, setRecheckAllMsg] = useState<string | null>(null);
   const runRecheckAll = async (onlyIds?: string[]) => {
-    const targetIds = onlyIds && onlyIds.length ? onlyIds : missingQueueIds;
+    const targetIds = onlyIds && onlyIds.length ? onlyIds : openIds;
     if (!targetIds.length) return;
     setRecheckAllBusy(true);
-    setRecheckAllMsg(null);
-    let checked = 0, fixedDocs = 0, fields = 0, retyped = 0, verified = 0;
+    setRecheckAllMsg(recheckProgress(0, targetIds.length));
+    let checked = 0, fields = 0, retyped = 0, linked = 0, verified = 0, errors = 0;
     try {
-      for (let i = 0; i < targetIds.length; i += 100) {
-        const r = await reviewClient.recheckMissing(targetIds.slice(i, i + 100), 100);
-        checked += r.rechecked; fixedDocs += r.filled; fields += r.fields; retyped += r.retyped ?? 0; verified += r.verified;
+      const queueIds = [...targetIds];
+      let stalls = 0;
+      while (queueIds.length) {
+        const chunk = queueIds.splice(0, RECHECK_CHUNK);
+        const r = await reviewClient.recheckMissing(chunk, RECHECK_CHUNK, { openAll: true });
+        checked += r.rechecked; fields += r.fields; retyped += r.retyped ?? 0; linked += r.linked ?? 0; verified += r.verified; errors += r.errors ?? 0;
+        // Papers the server ran out of time for go back in line; a pass that did nothing twice in a row stops the loop.
+        const left = (r.leftIds ?? []).filter((id) => chunk.includes(id));
+        if (left.length) { queueIds.unshift(...left); stalls = r.rechecked || r.errors ? 0 : stalls + 1; if (stalls >= 2) break; } else stalls = 0;
+        setRecheckAllMsg(recheckProgress(Math.min(targetIds.length, targetIds.length - queueIds.length), targetIds.length));
       }
       try { await loadGraphFromServer(); } catch { /* keep last-good data */ }
-      // Docread round: count what actually changed (facts read, types corrected, papers now checked); "still need a person" is
-      // every re-checked paper that is not checked yet, not "re-checked minus filled".
-      const typed = retyped ? ` Corrected the type of ${retyped}.` : '';
-      setRecheckAllMsg(`Re-checked ${checked} document${checked === 1 ? '' : 's'}: read ${fields} fact${fields === 1 ? '' : 's'} from the page on ${fixedDocs}.${typed} ${verified} now complete. ${Math.max(0, checked - verified)} still need a person.`);
+      // "Still need a person" is read from the refreshed Inbox itself, so it matches what the sections now show.
+      const still = stillOpenSummary(useGraph.getState(), targetIds);
+      setRecheckAllMsg(recheckBanner({ checked, fields, linked, verified, retyped, errors }, still));
     } catch (e) {
       // Never show a bare "Internal server error": say what was saved and that pressing again continues.
       const raw = e instanceof Error ? e.message : '';
       const friendly = !raw || /internal server error|^5\d\d\b|failed to fetch|networkerror/i.test(raw)
-        ? 'We couldn\'t finish re-checking just now. Press "Re-check all missing fields" again in a minute to continue.'
+        ? `We couldn't finish re-checking just now. Press "${RECHECK_ALL_LABEL}" again in a minute to continue.`
         : raw;
-      const soFar = checked ? ` (${checked} document${checked === 1 ? '' : 's'} re-checked and saved before it stopped; ${fields} field${fields === 1 ? '' : 's'} restored.)` : '';
+      const soFar = checked ? ` (${checked} paper${checked === 1 ? '' : 's'} re-checked and saved before it stopped; ${fields} fact${fields === 1 ? '' : 's'} filled in.)` : '';
       if (checked) { try { await loadGraphFromServer(); } catch { /* keep last-good data */ } }
       setRecheckAllMsg(friendly + soFar);
     } finally {
@@ -1021,10 +1030,10 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
               {!canAdmin && <AskAdminNote />}
             </div>
           )}
-          {(filter === 'gaps' || filter === 'attention') && missingQueueIds.length > 0 && !REVIEW_IS_DEMO_ONLY && (
+          {(filter === 'gaps' || filter === 'attention' || filter === 'unlinked' || filter === 'ready') && openIds.length > 0 && !REVIEW_IS_DEMO_ONLY && (
             <div className="flex flex-wrap items-center gap-2">
               <button type="button" className="dw-btn-tertiary !min-h-[44px] !py-1.5" disabled={recheckAllBusy || !canAdmin} title={canAdmin ? undefined : ASK_ADMIN_TITLE} onClick={() => void runRecheckAll()}>
-                {recheckAllBusy ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Search className="w-4 h-4" aria-hidden="true" />} Re-check all missing fields
+                {recheckAllBusy ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Search className="w-4 h-4" aria-hidden="true" />} {RECHECK_ALL_LABEL}
               </button>
               {!canAdmin && <AskAdminNote />}
             </div>
@@ -1301,6 +1310,7 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
   const next = maxStageFor(doc, graph.schema);
   const canAdvance = next !== doc.stage && !duplicate && !(companyFile && next === 'linked');
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const suggested = useMemo(() => linkSuggestions(doc, graph.entities as Record<string, Entity>), [doc, graph.entities]);
   const [linkChoice, setLinkChoice] = useState<string>(unlinked?.kind === 'unlinked' && unlinked.bestGuess ? unlinked.bestGuess : '');
   // Single-flight guard lives in the graph store (entityGraph.ts's
   // aiVerifying), not component state — it's set synchronously before the
@@ -1606,6 +1616,20 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
 
       {/* Docread2: a stored value that looks wrong against its page - evidence first, never changed for you. */}
       <SuspectValueNotice doc={doc} />
+
+      {/* "Link to <customer>?" - weak evidence kept for a person. Shown whatever the paper's missing info or type, as long as it has no link. */}
+      {!duplicate && suggested.length > 0 && (
+        <section className="px-5 pt-5" data-testid="link-suggestions">
+          <div className="rounded-md border border-line bg-surface-2 p-3 space-y-2">
+            <p className="text-ink-2">{suggested.length === 1 ? 'This paper seems to name this customer, but not clearly enough to link automatically. Check it, then link.' : 'This paper may belong to one of these customers. Check it, then pick one.'}</p>
+            <div className="flex flex-wrap gap-2">
+              {suggested.map((e) => (
+                <button key={e.id} type="button" className="dw-btn-secondary !min-h-[44px]" onClick={() => onLink(e.id)}>Link to {entityLabel(e)}</button>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Customer link — search/create, independent of the equipment/property
           link below (a document can name a customer with no serial at all). */}

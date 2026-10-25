@@ -69,6 +69,17 @@ export const FIELD_SPECS = [
   { key: 'start_date',       kind: 'date', desc: 'The date an agreement, lease, insurance policy or licence period BEGINS (commences, is effective, was issued).', example: 'Printed "for a term of 60 months beginning 02/10/2023" -> value "2023-02-10". Printed "Policy Effective: June 23, 2025" -> value "2025-06-23".' },
   { key: 'end_date',         kind: 'date', desc: 'The date an agreement, lease, insurance policy or licence period ENDS or EXPIRES.', example: 'Printed "... and ending 02/09/2028" -> value "2028-02-09". Printed "Expires 2027-08-30" on a licence -> value "2027-08-30".' },
   { key: 'license_number',   kind: 'text', desc: 'A professional, trade or business licence / certification number, exactly as printed.', example: 'Printed "License No. JP-860244" -> value "JP-860244".' },
+  // ID-document round: person-owned papers (driver licence / CDL, DOT medical examiner's certificate, new-hire sheet).
+  { key: 'holder_name',      kind: 'text', desc: 'The person a licence, card or certificate was issued to, exactly as printed.', example: 'Printed "Driver name: Jane Q Sample" -> value "Jane Q Sample".' },
+  { key: 'license_class',    kind: 'text', desc: 'The class of a driver licence / CDL: A, B, C or D.', example: 'Printed "CLASS A" -> value "A".' },
+  { key: 'issued_by',        kind: 'text', desc: 'Who issued or signed a licence / certificate: the medical examiner, or the issuing state or agency.', example: 'Printed "Medical Examiner\'s Name: Pat R Sample, MD" -> value "Pat R Sample, MD".' },
+  { key: 'employee_name',    kind: 'text', desc: 'The new hire / employee a new-hire or onboarding sheet is about.', example: 'Printed "New hire: Alex Example" -> value "Alex Example".' },
+  { key: 'employee_phone',   kind: 'text', desc: 'The phone number of the employee / new hire on an HR form, exactly as printed. Never a customer phone.', example: 'Printed "Phone: (480) 555-0100" on a new-hire form -> value "(480) 555-0100".' },
+  { key: 'employee_email',   kind: 'text', desc: 'The email address of the employee / new hire on an HR form, exactly as printed. Never a customer email.', example: 'Printed "Email: alex@example.com" on a new-hire form -> value "alex@example.com".' },
+  { key: 'signed_date',      kind: 'date', desc: 'The date an HR form (W-4, A-4, direct deposit, background check) was signed by the employee.', example: 'Printed "Date: 03/02/2026" next to the employee signature -> value "2026-03-02".' },
+  { key: 'position',         kind: 'text', desc: 'The job title or position on a new-hire sheet or offer.', example: 'Printed "Position: Field Technician" -> value "Field Technician".' },
+  { key: 'pay_rate',         kind: 'text', desc: 'The pay rate or salary on a new-hire sheet or offer, as printed.', example: 'Printed "Rate of pay: $24.50/hr" -> value "$24.50/hr".' },
+  { key: 'manager',          kind: 'text', desc: 'The manager or supervisor a new hire reports to.', example: 'Printed "Supervisor: Sam Example" -> value "Sam Example".' },
   { key: 'policy_number',    kind: 'text', desc: 'An insurance policy number, exactly as printed, when one policy number is labelled on its own.', example: 'Printed "Policy #: GL-1488527" -> value "GL-1488527".' },
   { key: 'permit_number',    kind: 'text', desc: 'A government or utility permit number referenced on the document.', example: 'Printed "Permit No: BP-2024-08841" -> value "BP-2024-08841".' },
   // CUSTOMER REMINDERS (2026-09-22): an internal memo, dispatch note or piece

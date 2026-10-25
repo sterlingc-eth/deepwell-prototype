@@ -1,0 +1,81 @@
+{
+ "id": "newhire-36",
+ "arrival": "photo",
+ "kind": "newhire-handwritten",
+ "type": "hr-letter",
+ "acceptable_types": [
+  "hr-letter",
+  "internal",
+  "other"
+ ],
+ "person": "Ulises Larkspur",
+ "fields": {
+  "customer_name": "Ulises Larkspur",
+  "vendor": "Ironwood Cold Storage",
+  "service_date": "2026-06-13",
+  "customer_phone": "(623) 555-0170",
+  "customer_email": "ulises.larkspur@example.com"
+ },
+ "extra": {
+  "manager": "Thalia Quintanilla",
+  "position": "Dispatcher",
+  "hourly_rate": "20.00",
+  "department": "Kitchen",
+  "emergency_contact": "Garrett Whitlock",
+  "emergency_phone": "(480) 555-0159",
+  "address": "626 W Ironwood Terrace",
+  "shirt_size": "XL"
+ },
+ "questions": [
+  {
+   "q": "Who is Ulises Larkspur's manager?",
+   "answer": "Thalia Quintanilla",
+   "key": "manager",
+   "accept": [
+    "Thalia Quintanilla"
+   ]
+  },
+  {
+   "q": "What is Ulises Larkspur's start date?",
+   "answer": "2026-06-13",
+   "key": "service_date",
+   "accept": [
+    "2026-06-13",
+    "06/13/2026",
+    "June 13, 2026",
+    "Jun 13, 2026",
+    "6/13/2026",
+    "13 Jun 2026",
+    "06/13/26",
+    "June 13, 2026"
+   ]
+  },
+  {
+   "q": "What position was Ulises Larkspur hired for?",
+   "answer": "Dispatcher",
+   "key": "position",
+   "accept": [
+    "Dispatcher"
+   ]
+  },
+  {
+   "q": "What is Ulises Larkspur's hourly rate?",
+   "answer": "$20.00",
+   "key": "hourly_rate",
+   "accept": [
+    "$20.00",
+    "20.00"
+   ]
+  },
+  {
+   "q": "Who is Ulises Larkspur's emergency contact?",
+   "answer": "Garrett Whitlock",
+   "key": "emergency_contact",
+   "accept": [
+    "Garrett Whitlock"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "newhire-36.jpg"
+}

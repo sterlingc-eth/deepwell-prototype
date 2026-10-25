@@ -1,0 +1,71 @@
+{
+ "id": "cpr-43",
+ "arrival": "photo",
+ "kind": "cpr-card",
+ "type": "license-certification",
+ "acceptable_types": [
+  "license-certification"
+ ],
+ "person": "Brisa Yoder",
+ "fields": {
+  "customer_name": "Brisa Yoder",
+  "license_number": "CPR-596166",
+  "start_date": "2026-05-03",
+  "vendor": "Sonoran Safety Training Institute",
+  "end_date": "2028-05-03"
+ },
+ "extra": {
+  "course": "CPR / AED / First Aid",
+  "issuer": "Sonoran Safety Training Institute"
+ },
+ "questions": [
+  {
+   "q": "When does Brisa Yoder's CPR card expire?",
+   "answer": "2028-05-03",
+   "key": "end_date",
+   "accept": [
+    "2028-05-03",
+    "05/03/2028",
+    "May 3, 2028",
+    "May 3, 2028",
+    "5/3/2028",
+    "03 May 2028",
+    "05/03/28",
+    "May 3, 2028"
+   ]
+  },
+  {
+   "q": "What is Brisa Yoder's CPR card number?",
+   "answer": "CPR-596166",
+   "key": "license_number",
+   "accept": [
+    "CPR-596166"
+   ]
+  },
+  {
+   "q": "Who issued Brisa Yoder's CPR card?",
+   "answer": "Sonoran Safety Training Institute",
+   "key": "vendor",
+   "accept": [
+    "Sonoran Safety Training Institute"
+   ]
+  },
+  {
+   "q": "When was Brisa Yoder's CPR card issued?",
+   "answer": "2026-05-03",
+   "key": "start_date",
+   "accept": [
+    "2026-05-03",
+    "05/03/2026",
+    "May 3, 2026",
+    "May 3, 2026",
+    "5/3/2026",
+    "03 May 2026",
+    "05/03/26",
+    "May 3, 2026"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "cpr-43.jpg"
+}

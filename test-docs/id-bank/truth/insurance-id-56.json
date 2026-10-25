@@ -1,0 +1,76 @@
+{
+ "id": "insurance-id-56",
+ "arrival": "clean",
+ "kind": "insurance-id-card",
+ "type": "insurance-certificate",
+ "acceptable_types": [
+  "insurance-certificate",
+  "license-certification",
+  "other"
+ ],
+ "person": "Kestrel Crowfoot",
+ "fields": {
+  "customer_name": "Kestrel Crowfoot",
+  "policy_number": "KV408779142",
+  "start_date": "2026-07-14",
+  "end_date": "2027-01-12",
+  "vendor": "Sample State Casualty"
+ },
+ "extra": {
+  "vin": "95UTBVDJSH13ESKHB",
+  "year": "2018",
+  "make": "Subaru",
+  "model": "Outback",
+  "naic": "18375"
+ },
+ "questions": [
+  {
+   "q": "What is Kestrel Crowfoot's auto insurance policy number?",
+   "answer": "KV408779142",
+   "key": "policy_number",
+   "accept": [
+    "KV408779142"
+   ]
+  },
+  {
+   "q": "When does Kestrel Crowfoot's auto insurance expire?",
+   "answer": "2027-01-12",
+   "key": "end_date",
+   "accept": [
+    "2027-01-12",
+    "01/12/2027",
+    "January 12, 2027",
+    "Jan 12, 2027",
+    "1/12/2027",
+    "12 Jan 2027",
+    "01/12/27",
+    "January 12, 2027"
+   ]
+  },
+  {
+   "q": "Who insures Kestrel Crowfoot's vehicle?",
+   "answer": "Sample State Casualty",
+   "key": "vendor",
+   "accept": [
+    "Sample State Casualty"
+   ]
+  },
+  {
+   "q": "When does Kestrel Crowfoot's insurance coverage start?",
+   "answer": "2026-07-14",
+   "key": "start_date",
+   "accept": [
+    "2026-07-14",
+    "07/14/2026",
+    "July 14, 2026",
+    "Jul 14, 2026",
+    "7/14/2026",
+    "14 Jul 2026",
+    "07/14/26",
+    "July 14, 2026"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "insurance-id-56.pdf"
+}

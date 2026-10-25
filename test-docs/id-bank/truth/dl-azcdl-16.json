@@ -1,0 +1,85 @@
+{
+ "id": "dl-azcdl-16",
+ "arrival": "scan",
+ "kind": "cdl",
+ "type": "license-certification",
+ "acceptable_types": [
+  "license-certification"
+ ],
+ "person": "Zelda Penhallow",
+ "fields": {
+  "customer_name": "Zelda Penhallow",
+  "license_number": "D67467112",
+  "end_date": "2028-02-05",
+  "start_date": "2024-02-05"
+ },
+ "extra": {
+  "dob": "1982-04-05",
+  "dl_class": "A",
+  "state": "AZ",
+  "address": "9014 S Verde Alamo Ave",
+  "endorsements": "H N"
+ },
+ "questions": [
+  {
+   "q": "When does Zelda Penhallow's CDL expire?",
+   "answer": "2028-02-05",
+   "key": "end_date",
+   "accept": [
+    "2028-02-05",
+    "02/05/2028",
+    "February 5, 2028",
+    "Feb 5, 2028",
+    "2/5/2028",
+    "05 Feb 2028",
+    "02/05/28",
+    "February 5, 2028"
+   ]
+  },
+  {
+   "q": "What is Zelda Penhallow's CDL number?",
+   "answer": "D67467112",
+   "key": "license_number",
+   "accept": [
+    "D67467112",
+    "D67467112",
+    "D67467112"
+   ]
+  },
+  {
+   "q": "What is Zelda Penhallow's date of birth?",
+   "answer": "1982-04-05",
+   "key": "dob",
+   "accept": [
+    "1982-04-05",
+    "04/05/1982",
+    "April 5, 1982",
+    "Apr 5, 1982",
+    "4/5/1982",
+    "05 Apr 1982",
+    "04/05/82",
+    "April 5, 1982"
+   ]
+  },
+  {
+   "q": "What class is Zelda Penhallow's CDL?",
+   "answer": "Class A",
+   "key": "dl_class",
+   "accept": [
+    "Class A",
+    "class A"
+   ]
+  },
+  {
+   "q": "What endorsements does Zelda Penhallow's CDL carry?",
+   "answer": "H N",
+   "key": "endorsements",
+   "accept": [
+    "H N",
+    "HN"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "dl-azcdl-16.pdf"
+}

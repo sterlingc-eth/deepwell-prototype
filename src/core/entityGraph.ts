@@ -223,6 +223,18 @@ function presentFieldNames(doc: Doc): Set<string> {
 /** The reader's "nothing read" marker fact: an `_nothing_read` extraction row written by api/_lib/modelAvoidance/storedTextReread.js. */
 export const NOTHING_READ_MARKER = '_nothing_read';
 
+/** Customers the page hints at but not clearly enough to link on its own, for a paper with no link (Doc.linkSuggestionIds, set by the sync from the server's
+ *  suggestion record, which is not a fact). Only customers that still exist (not merged away). */
+export function linkSuggestions(doc: Doc, entities: Record<string, Entity>): Entity[] {
+  if (doc.linkedEntityIds.length > 0) return [];
+  const out: Entity[] = [];
+  for (const id of doc.linkSuggestionIds ?? []) {
+    const e = typeof id === 'string' ? entities[id] : undefined;
+    if (e && e.type === 'customer' && !out.some((x) => x.id === e.id)) out.push(e);
+  }
+  return out.slice(0, 3);
+}
+
 /** Real facts on a document: non-empty and not an underscore-prefixed bookkeeping row (`_audience_notified`, `_company_folder`...). */
 export function substantiveFactNames(doc: Doc): string[] {
   return [...presentFieldNames(doc)].filter((n) => !n.startsWith('_'));
@@ -613,7 +625,7 @@ export const useGraph = create<GraphStore>((set, get) => ({
       const doc = s.docs[docId];
       if (!doc) return s;
       const linkedEntityIds = Array.from(new Set([...doc.linkedEntityIds, entityId]));
-      const next = recomputeIssues({ ...doc, linkedEntityIds, linkConfidence: 1 }, s.schema);
+      const next = recomputeIssues({ ...doc, linkedEntityIds, linkSuggestionIds: undefined, linkConfidence: 1 }, s.schema);
       return { docs: { ...s.docs, [docId]: next }, lastError: null };
     });
 
@@ -895,7 +907,7 @@ export function docCountsByStage(g: GraphSnapshot): Record<PipelineStage, number
 }
 
 /** Company files leave "Needs linking" and "Missing info" unless they have a real issue (companyFileReasons). Verified documents are never a problem. */
-const countsAsOpen = (d: Doc, g: GraphSnapshot) => d.stage !== 'verified' && !isSetAside(d) && (!isCompanyFileDoc(d, g.schema) || companyFileNeedsLook(d, g.schema));
+export const countsAsOpen = (d: Doc, g: GraphSnapshot) => d.stage !== 'verified' && !isSetAside(d) && (!isCompanyFileDoc(d, g.schema) || companyFileNeedsLook(d, g.schema));
 /** "Other" with nothing read cannot be linked until a person picks a type, so it asks for a type instead (see needInfo). */
 export const needsTypeChoice = (d: Doc) => d.typeId === 'other' && substantiveFactNames(d).length === 0;
 export function unlinkedDocs(g: GraphSnapshot): Doc[] {
@@ -1106,7 +1118,7 @@ export async function ensureDocLoaded(docId: DocumentId): Promise<void> {
       const [row, extractions, linksRes, correctionsRes] = await Promise.all([
         recordsStore.getDocument(docId) as unknown as Promise<FetchedDocumentRow | null>,
         recordsStore.listExtractionsByDocument(docId).catch(() => []) as unknown as Promise<FetchedExtractionRow[]>,
-        reviewClient.listLinks([docId]).catch(() => ({ links: [] as DocumentLink[] })),
+        reviewClient.listLinks([docId]).catch(() => ({ links: [] as DocumentLink[], suggestions: [] as { document_id: string; candidates: { id: string }[] }[] })),
         reviewClient.listCorrections([docId]).catch(() => ({ corrections: [] as Correction[] })),
       ]);
       if (!row) return; // wrong tenant, deleted, or not yet synced anywhere
@@ -1129,7 +1141,9 @@ export async function ensureDocLoaded(docId: DocumentId): Promise<void> {
       // Re-check: a slower rival call (or a real sync finishing) may have
       // already landed this doc while these round trips were in flight.
       if (useGraph.getState().docs[docId]) return;
-      const doc = docFromFetchedRow(row, extractions, linksRes.links, correctionsRes.corrections, useGraph.getState().schema, completeness);
+      const fetched = docFromFetchedRow(row, extractions, linksRes.links, correctionsRes.corrections, useGraph.getState().schema, completeness);
+      const sugIds = (linksRes.suggestions ?? []).find((s) => s.document_id === docId)?.candidates.map((c) => c.id);
+      const doc = sugIds && sugIds.length ? { ...fetched, linkSuggestionIds: sugIds } : fetched;
       useGraph.getState().upsertDoc(doc);
     } finally {
       fetchesInFlight.delete(docId);

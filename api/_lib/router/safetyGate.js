@@ -146,6 +146,13 @@ function isHostileAccess(q) {
   return HOSTILE_RES.some((re) => re.test(q));
 }
 
+// People / ID round 4: the number printed on a person's driver licence, CDL or medical card is an identifier like an SSN. The always-sensitive forms
+// (CDL / DL / DLN / driver's / medical card number) are declined whoever it is about; a plain "license number" (a contractor's, a vendor's, the
+// company's own) is a business fact and is declined only when it is plainly a named PERSON's ("Pat's ROC license number", "Pat Rivera's contractor license #").
+const PERSON_ID_ALWAYS_RE = /\b(?:cdl|dl|dln|driver'?s?\s+licen[cs]e|operator'?s?\s+licen[cs]e|medical\s+(?:examiner'?s?\s+)?(?:certificate|card))\s*(?:id\s*)?(?:numbers?|nos?\.?|#|id)\b|\bdln\b/i;
+const PERSON_ID_POSSESSIVE_RE = /\b[A-Z][a-z]+(?:\s+[A-Z][a-z'-]+)?(?:'s|’s)\s+(?:[A-Za-z]+\s+){0,3}?[Ll]icen[cs]e\s*(?:[Nn]umbers?|[Nn]os?\.?|#)/;
+// a company's own licence number ("Desert Air LLC's license number", "Bright Plumbing Co's ...") is a business fact
+const ORG_OWNER_RE = /\b(?:llc|inc|co|corp|company|plumbing|hvac|air|electric|electrical|heating|cooling|roofing|services?|supply|group|builders|construction|contractors?)\b[^?]{0,20}(?:'s|’s)\s/i;
 export function classifySafety(question) {
   const q = String(question ?? "");
   if (!q.trim()) return null;
@@ -153,6 +160,7 @@ export function classifySafety(question) {
   for (const re of INJECTION_RES) if (re.test(q)) return { kind: "injection" };
   if (isHostileAccess(q)) return { kind: "injection" };
   if (SENSITIVE_RE.test(q) && SENSITIVE_ASK_RE.test(q) && !SENSITIVE_VETO_RE.test(q)) return { kind: "sensitive" };
+  if ((PERSON_ID_ALWAYS_RE.test(q) || (PERSON_ID_POSSESSIVE_RE.test(q) && !ORG_OWNER_RE.test(q))) && !SENSITIVE_HARD_VETO_RE.test(q)) return { kind: "sensitive" };
   if (process.env.DONOVAN_OFFTOPIC_DECLINE !== "0") {
     if (SENSITIVE_STRONG_RE.test(q) && !SENSITIVE_HARD_VETO_RE.test(q) && (SENSITIVE_TARGET_RE.test(q) || q.trim().split(/\s+/).length <= 8)) return { kind: "sensitive" };
     if (COMPETITOR_RE.test(q) && !COMPETITOR_VETO_RE.test(q)) return { kind: "outside" };

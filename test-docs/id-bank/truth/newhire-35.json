@@ -1,0 +1,81 @@
+{
+ "id": "newhire-35",
+ "arrival": "photo",
+ "kind": "newhire-handwritten",
+ "type": "hr-letter",
+ "acceptable_types": [
+  "hr-letter",
+  "internal",
+  "other"
+ ],
+ "person": "Imani Tillman",
+ "fields": {
+  "customer_name": "Imani Tillman",
+  "vendor": "Kestrel Ridge Plumbing",
+  "service_date": "2026-02-21",
+  "customer_phone": "(602) 555-0146",
+  "customer_email": "imani.tillman@example.com"
+ },
+ "extra": {
+  "manager": "Soledad Duarte",
+  "position": "Dispatcher",
+  "hourly_rate": "20.50",
+  "department": "Transportation",
+  "emergency_contact": "Emmett Vandermeer",
+  "emergency_phone": "(480) 555-0142",
+  "address": "6800 W Sunrise Arroyo St",
+  "shirt_size": "L"
+ },
+ "questions": [
+  {
+   "q": "Who is Imani Tillman's manager?",
+   "answer": "Soledad Duarte",
+   "key": "manager",
+   "accept": [
+    "Soledad Duarte"
+   ]
+  },
+  {
+   "q": "What is Imani Tillman's start date?",
+   "answer": "2026-02-21",
+   "key": "service_date",
+   "accept": [
+    "2026-02-21",
+    "02/21/2026",
+    "February 21, 2026",
+    "Feb 21, 2026",
+    "2/21/2026",
+    "21 Feb 2026",
+    "02/21/26",
+    "February 21, 2026"
+   ]
+  },
+  {
+   "q": "What position was Imani Tillman hired for?",
+   "answer": "Dispatcher",
+   "key": "position",
+   "accept": [
+    "Dispatcher"
+   ]
+  },
+  {
+   "q": "What is Imani Tillman's hourly rate?",
+   "answer": "$20.50",
+   "key": "hourly_rate",
+   "accept": [
+    "$20.50",
+    "20.50"
+   ]
+  },
+  {
+   "q": "Who is Imani Tillman's emergency contact?",
+   "answer": "Emmett Vandermeer",
+   "key": "emergency_contact",
+   "accept": [
+    "Emmett Vandermeer"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "newhire-35.jpg"
+}

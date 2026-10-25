@@ -1,0 +1,76 @@
+{
+ "id": "insurance-id-57",
+ "arrival": "photo",
+ "kind": "insurance-id-card",
+ "type": "insurance-certificate",
+ "acceptable_types": [
+  "insurance-certificate",
+  "license-certification",
+  "other"
+ ],
+ "person": "Delphine Yoder",
+ "fields": {
+  "customer_name": "Delphine Yoder",
+  "policy_number": "KV670584709",
+  "start_date": "2026-04-20",
+  "end_date": "2026-10-19",
+  "vendor": "Example Mutual Auto"
+ },
+ "extra": {
+  "vin": "2WR8PND464MVBVSSX",
+  "year": "2023",
+  "make": "Ford",
+  "model": "Transit",
+  "naic": "35870"
+ },
+ "questions": [
+  {
+   "q": "What is Delphine Yoder's auto insurance policy number?",
+   "answer": "KV670584709",
+   "key": "policy_number",
+   "accept": [
+    "KV670584709"
+   ]
+  },
+  {
+   "q": "When does Delphine Yoder's auto insurance expire?",
+   "answer": "2026-10-19",
+   "key": "end_date",
+   "accept": [
+    "2026-10-19",
+    "10/19/2026",
+    "October 19, 2026",
+    "Oct 19, 2026",
+    "10/19/2026",
+    "19 Oct 2026",
+    "10/19/26",
+    "October 19, 2026"
+   ]
+  },
+  {
+   "q": "Who insures Delphine Yoder's vehicle?",
+   "answer": "Example Mutual Auto",
+   "key": "vendor",
+   "accept": [
+    "Example Mutual Auto"
+   ]
+  },
+  {
+   "q": "When does Delphine Yoder's insurance coverage start?",
+   "answer": "2026-04-20",
+   "key": "start_date",
+   "accept": [
+    "2026-04-20",
+    "04/20/2026",
+    "April 20, 2026",
+    "Apr 20, 2026",
+    "4/20/2026",
+    "20 Apr 2026",
+    "04/20/26",
+    "April 20, 2026"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "insurance-id-57.jpg"
+}

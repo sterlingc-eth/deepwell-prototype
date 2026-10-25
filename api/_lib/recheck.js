@@ -34,6 +34,7 @@ import { clearNothingReadMarker } from "./modelAvoidance/storedTextReread.js";
 import { retypeDecision } from "./modelAvoidance/retype.js";
 import { auditDocumentTx, auditEnabled } from "./storedAuditStore.js";
 import { COMPANY_FOLDER_FIELD_KEY, HR_FOLDER_ID } from "./companyFiles.js";
+import { planBodyNameLinks, isSetAsidePaper, printedNameMatches, setLinkSuggestion } from "./bodyNameLink.js";
 
 /** Docread round: the audit action Sort already writes for a re-type; Re-check writes the same one (source 'recheck'), so every
  *  move is listed with its from / to and can be put back. */
@@ -50,7 +51,7 @@ const HAS_LINK_SQL = `(EXISTS (SELECT 1 FROM extractions x WHERE x.document_id =
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** One document, inside an already-open tenant transaction (`db` = recordsStore's makeStore). */
-export async function recheckDocumentTx(db, documentId, { actorClerkId = null, source = "admin", today } = {}) {
+export async function recheckDocumentTx(db, documentId, { actorClerkId = null, source = "admin", today, shared = null } = {}) {
   // R34: the NOT EXISTS guard on the insert below is a snapshot read, so under READ COMMITTED two concurrent re-checks of the
   // SAME document (the nightly sweep, an admin's "Re-check all", and a person's click can overlap) each saw "absent" and BOTH
   // inserted - a duplicate extraction row. A per-document transaction-scoped advisory lock makes the second one wait, then see
@@ -92,13 +93,33 @@ export async function recheckDocumentTx(db, documentId, { actorClerkId = null, s
   const fieldsBefore = toCompletenessFields(rows);
   const before = completenessFor(type, fieldsBefore, null, filenameOpt);
   const highestPage = pages.reduce((n, p) => Math.max(n, Number(p.page_no) || 0), 0);
-  const ownNames = await loadOwnNames(db, {}).catch(() => []);
+  // Own names are read once per batch (`shared`), not once per paper: six statements each time otherwise.
+  const ownNames = shared?.ownNames ?? await loadOwnNames(db, {}).catch(() => []);
+  if (shared && !shared.ownNames) shared.ownNames = ownNames;
   const plan = planLabelFill({
     ownNames,
     type, fields: rows.map((r) => ({ field_key: r.field_key, value: r.value, corrected_value: r.corrected_value, confidence: Number(r.confidence ?? 0) })),
     pages: pages.map((p) => ({ page_no: p.page_no, text: p.text ?? "" })), today, method: "recheck", pageCount: highestPage,
     filename: doc.original_filename ?? null,
   });
+
+  // Re-check-all round 2 (D4): the server's own twin of the browser's isSetAside - a VOID paper or a copy is never linked and never
+  // checked automatically, whatever the caller (the Inbox button, the nightly sweep, Re-check this document, Verify with AI, a direct call).
+  const setAside = isSetAsidePaper({ filename: doc.original_filename ?? null, text: pages.slice(0, 2).map((p) => p.text ?? "").join("\n") });
+  // D6: a label-read customer_name must not contradict the customer the paper is ALREADY linked to (a person or an earlier pass chose it).
+  // The fact is simply not added (insert-only stays insert-only); the paper keeps its link and the skip is written to the audit entry.
+  const skippedConflict = [];
+  const linkedNames = (await db.raw(
+    `SELECT e.data->>'customer_name' AS name FROM document_entity_links l JOIN entities e ON e.id = l.entity_id
+      WHERE l.document_id = $1::uuid AND l.${TENANT} AND e.entity_type = 'customer' AND e.merged_into IS NULL`, [documentId])).rows.map((r) => r.name).filter(Boolean);
+  if (linkedNames.length) {
+    plan.add = plan.add.filter((f) => {
+      if (f.field_key !== "customer_name") return true;
+      if (linkedNames.some((n) => printedNameMatches(f.value, n))) return true;
+      skippedConflict.push({ value: f.value, linked_to: linkedNames[0] });
+      return false;
+    });
+  }
 
   const entityId = rows.find((r) => r.entity_id)?.entity_id ?? null;
   const written = [];
@@ -143,13 +164,52 @@ export async function recheckDocumentTx(db, documentId, { actorClerkId = null, s
   // a complete document that an older rule left unchecked is judged again here.
   let aiVerified = false;
   let checkReason = null;
+  // Re-check-all round: a paper with no customer link gets the same strict, deterministic body-name match the nightly fix uses
+  // (exactly one existing customer named in the page; never creates a customer, never overrides a link or an unlink a person made,
+  // fills customer_name only when the paper has none). It runs in a savepoint so a database error there cannot undo the fill above.
+  let linkedNow = null;
+  let hadLink = false;
+  let suggestion = null;
+  {
+    const already = await db.raw(`SELECT ${HAS_LINK_SQL} AS linked FROM documents d WHERE d.id = $1::uuid`, [documentId]);
+    hadLink = !!already.rows?.[0]?.linked;
+    // Employees are not customers: an HR letter, a licence/ID paper or anything filed under People and HR is never linked or suggested.
+    const noCustomer = type === "hr-letter" || type === "license-certification" || rows.some((r) => r.field_key === COMPANY_FOLDER_FIELD_KEY && r.value === HR_FOLDER_ID);
+    if (noCustomer && !hadLink) { try { await setLinkSuggestion(db, documentId, null); } catch { /* best effort */ } }
+    if (!hadLink && !setAside && !noCustomer) {
+      let sp = false;
+      try {
+        await db.raw("SAVEPOINT recheck_link", []);
+        sp = true;
+        // Same ordering as bodyNameLink's loadPrintedNames: a person's correction first, then the most confident read value.
+        const cns = rows.filter((r) => r.field_key === "customer_name");
+        const fixed = cns.find((r) => String(r.corrected_value ?? "").trim() !== "");
+        const read = [...cns].sort((a, b) => Number(b.confidence ?? 0) - Number(a.confidence ?? 0)).find((r) => String(r.value ?? "").trim() !== "");
+        const printedNow = fixed ? String(fixed.corrected_value).trim() : read ? String(read.value).trim() : (written.find((w) => w.field_key === "customer_name")?.value ?? null);
+        const out = await planBodyNameLinks(db, { documentId, shared, known: { pages: pages.map((p) => ({ page_no: p.page_no, text: p.text ?? "" })), printedName: printedNow } });
+        // Weak evidence (a name or a street, not both; two customers) is not linked but kept for a person: the Inbox offers it as a one-click suggestion.
+        const sugg = out.review.find((r) => r.documentId === documentId && r.weak);
+        suggestion = sugg ? sugg.candidates : null;
+        await setLinkSuggestion(db, documentId, out.linked.length ? null : suggestion);
+        await db.raw("RELEASE SAVEPOINT recheck_link", []);
+        if (out.linked.length) {
+          linkedNow = out.linked[0];
+          if (!fieldsAfter.some((f) => f.field_key === "customer_name" && String(f.value ?? "").trim() !== "")) fieldsAfter.push({ field_key: "customer_name", value: linkedNow.name, confidence: 0.6 });
+        }
+      } catch (err) {
+        console.error(`recheck: link step skipped for ${documentId}: ${err?.message}`);
+        if (sp) { try { await db.raw("ROLLBACK TO SAVEPOINT recheck_link", []); } catch { /* the fill is already written */ } }
+      }
+    }
+  }
   {
     const hasText = pages.some((p) => String(p.text ?? '').trim() !== '');
-    const link = await db.raw(`SELECT ${HAS_LINK_SQL} AS linked, d.original_filename AS filename FROM documents d WHERE d.id = $1::uuid`, [documentId]);
+    const link = { rows: [{ linked: hadLink || !!linkedNow, filename: doc.original_filename ?? null }] };
     const pageText = pages.map((p) => String(p.text ?? "")).join("\n").slice(0, 20000);
     const verdict = autoCheckDecision(type, fieldsAfter, { hasText, hasLink: !!link.rows?.[0]?.linked, filename: link.rows?.[0]?.filename ?? null, text: pageText });
     checkReason = verdict.reason;
-    if (verdict.ok) aiVerified = (await db.verifyByAi(documentId, { allowUnlinked: verdict.allowUnlinked })) > 0;
+    if (setAside) checkReason = "set-aside";
+    else if (verdict.ok) aiVerified = (await db.verifyByAi(documentId, { allowUnlinked: verdict.allowUnlinked })) > 0;
   }
 
   await db.logAction({
@@ -171,6 +231,10 @@ export async function recheckDocumentTx(db, documentId, { actorClerkId = null, s
       warranty_rederived: warrantyRederived,
       ai_verified: aiVerified,
       ai_check_reason: checkReason,
+      set_aside: setAside,
+      customer_name_conflict_skipped: skippedConflict.slice(0, 5),
+      link_suggested: suggestion ? suggestion.map((c) => c.customerId) : null,
+      linked_customer: linkedNow ? { customer_id: linkedNow.customerId, basis: linkedNow.basis } : null,
     },
   });
 
@@ -196,8 +260,9 @@ export async function recheckDocumentTx(db, documentId, { actorClerkId = null, s
   return {
     documentId,
     suspect,
-    status: written.length ? "filled" : retyped ? "retyped" : "nothing-to-fill",
+    status: written.length ? "filled" : retyped ? "retyped" : linkedNow ? "linked" : "nothing-to-fill",
     retyped,
+    linked: !!linkedNow,
     filled: written,
     ambiguous: plan.ambiguous,
     missingBefore: before.missing,
@@ -223,7 +288,7 @@ export async function recheckDocument(ctx, documentId, opts = {}) {
  * bulk action sends the documents it is showing).
  * @returns {Promise<{scanned:number, candidates:number, rechecked:number, filled:number, fields:number, verified:number, leftForNextRun:number}>}
  */
-export async function recheckTenantMissing(ctx, { limit = 40, today, deadlineAt = Infinity, actorClerkId = null, source = "cron", documentIds = null, force = false } = {}) {
+export async function recheckTenantMissing(ctx, { limit = 40, today, deadlineAt = Infinity, actorClerkId = null, source = "cron", documentIds = null, force = false, openAll = false } = {}) {
   const cap = Math.max(1, Math.min(500, Number(limit) || 40));
   const ids = Array.isArray(documentIds) ? documentIds.filter((x) => typeof x === "string" && UUID_RE.test(x)).slice(0, 500) : null;
   const candidates = await withTenant(ctx, async (db) => {
@@ -266,6 +331,8 @@ export async function recheckTenantMissing(ctx, { limit = 40, today, deadlineAt 
     return docs.filter((d) => {
       const fields = toCompletenessFields(byDoc.get(d.id) ?? []);
       const type = normalizeDocumentType(d.document_type);
+      // Re-check-all round: the Inbox button names every open paper (missing info, needs linking, ready to verify, needs a person).
+      if (openAll) return !isSetAsidePaper({ filename: d.original_filename });
       const c = completenessFor(type, fields, null, { filename: d.original_filename });
       // Would the automatic check pass today? Always worth a pass (it writes nothing but the verified stamp).
       if (autoCheckDecision(type, fields, { hasText: d.has_text, hasLink: d.has_link, filename: d.original_filename }).ok) return true;
@@ -278,21 +345,25 @@ export async function recheckTenantMissing(ctx, { limit = 40, today, deadlineAt 
     });
   });
 
-  const summary = { scanned: 0, candidates: candidates.length, rechecked: 0, filled: 0, fields: 0, retyped: 0, verified: 0, leftForNextRun: 0, errors: 0 };
+  const summary = { scanned: 0, candidates: candidates.length, rechecked: 0, filled: 0, fields: 0, retyped: 0, linked: 0, verified: 0, leftForNextRun: 0, errors: 0, leftIds: [], errorIds: [] };
+  const shared = {}; // customer list + own names, loaded once for the whole batch (not once per paper)
   for (const d of candidates.slice(0, cap)) {
-    if (Date.now() >= deadlineAt) { summary.leftForNextRun++; continue; }
+    if (Date.now() >= deadlineAt) { summary.leftForNextRun++; summary.leftIds.push(d.id); continue; }
     summary.scanned++;
     try {
-      const r = await withTenant(ctx, (db) => recheckDocumentTx(db, d.id, { actorClerkId, source, today }));
+      const r = await withTenant(ctx, (db) => recheckDocumentTx(db, d.id, { actorClerkId, source, today, shared }));
       summary.rechecked++;
       if (r.filled.length) { summary.filled++; summary.fields += r.filled.length; }
       if (r.retyped) summary.retyped++;
+      if (r.linked) summary.linked++;
       if (r.aiVerified) summary.verified++;
     } catch (err) {
       summary.errors++;
+      summary.errorIds.push(d.id);
       console.error(`recheck: ${d.id} failed: ${err?.message}`);
     }
   }
   summary.leftForNextRun += Math.max(0, candidates.length - cap);
+  for (const d of candidates.slice(cap, cap + 500)) summary.leftIds.push(d.id);
   return summary;
 }

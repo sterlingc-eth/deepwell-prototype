@@ -1,0 +1,81 @@
+{
+ "id": "newhire-33",
+ "arrival": "scan",
+ "kind": "newhire-handwritten",
+ "type": "hr-letter",
+ "acceptable_types": [
+  "hr-letter",
+  "internal",
+  "other"
+ ],
+ "person": "Oluwaseun Ruzicka",
+ "fields": {
+  "customer_name": "Oluwaseun Ruzicka",
+  "vendor": "Ironwood Cold Storage",
+  "service_date": "2026-12-26",
+  "customer_phone": "(480) 555-0198",
+  "customer_email": "oluwaseun.ruzicka@example.com"
+ },
+ "extra": {
+  "manager": "Imani Ledesma",
+  "position": "Yard Jockey",
+  "hourly_rate": "25.25",
+  "department": "Kitchen",
+  "emergency_contact": "Yara Wexford",
+  "emergency_phone": "(480) 555-0165",
+  "address": "1357 E Cholla Bend Ct",
+  "shirt_size": "XL"
+ },
+ "questions": [
+  {
+   "q": "Who is Oluwaseun Ruzicka's manager?",
+   "answer": "Imani Ledesma",
+   "key": "manager",
+   "accept": [
+    "Imani Ledesma"
+   ]
+  },
+  {
+   "q": "What is Oluwaseun Ruzicka's start date?",
+   "answer": "2026-12-26",
+   "key": "service_date",
+   "accept": [
+    "2026-12-26",
+    "12/26/2026",
+    "December 26, 2026",
+    "Dec 26, 2026",
+    "12/26/2026",
+    "26 Dec 2026",
+    "12/26/26",
+    "December 26, 2026"
+   ]
+  },
+  {
+   "q": "What position was Oluwaseun Ruzicka hired for?",
+   "answer": "Yard Jockey",
+   "key": "position",
+   "accept": [
+    "Yard Jockey"
+   ]
+  },
+  {
+   "q": "What is Oluwaseun Ruzicka's hourly rate?",
+   "answer": "$25.25",
+   "key": "hourly_rate",
+   "accept": [
+    "$25.25",
+    "25.25"
+   ]
+  },
+  {
+   "q": "Who is Oluwaseun Ruzicka's emergency contact?",
+   "answer": "Yara Wexford",
+   "key": "emergency_contact",
+   "accept": [
+    "Yara Wexford"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "newhire-33.pdf"
+}

@@ -1,0 +1,83 @@
+{
+ "id": "dotmed-card-22",
+ "arrival": "photo",
+ "kind": "dot-medical-card",
+ "type": "license-certification",
+ "acceptable_types": [
+  "hr-letter",
+  "license-certification"
+ ],
+ "person": "Dwayne Marchetti",
+ "fields": {
+  "customer_name": "Dwayne Marchetti",
+  "service_date": "2026-01-03",
+  "end_date": "2026-07-04",
+  "license_number": "D65484741"
+ },
+ "extra": {
+  "examiner": "Dr. Priscilla Voss",
+  "national_registry": "8666456219",
+  "examiner_license": "AZ-766144",
+  "certification_period": "6 months",
+  "dob": "1964-08-03"
+ },
+ "questions": [
+  {
+   "q": "When does Dwayne Marchetti's DOT medical card expire?",
+   "answer": "2026-07-04",
+   "key": "end_date",
+   "accept": [
+    "2026-07-04",
+    "07/04/2026",
+    "July 4, 2026",
+    "Jul 4, 2026",
+    "7/4/2026",
+    "04 Jul 2026",
+    "07/04/26",
+    "July 4, 2026"
+   ]
+  },
+  {
+   "q": "Who was Dwayne Marchetti's medical examiner?",
+   "answer": "Dr. Priscilla Voss",
+   "key": "examiner",
+   "accept": [
+    "Dr. Priscilla Voss",
+    "Priscilla Voss"
+   ]
+  },
+  {
+   "q": "When was Dwayne Marchetti's DOT physical?",
+   "answer": "2026-01-03",
+   "key": "service_date",
+   "accept": [
+    "2026-01-03",
+    "01/03/2026",
+    "January 3, 2026",
+    "Jan 3, 2026",
+    "1/3/2026",
+    "03 Jan 2026",
+    "01/03/26",
+    "January 3, 2026"
+   ]
+  },
+  {
+   "q": "What is the driver license number on Dwayne Marchetti's medical certificate?",
+   "answer": "D65484741",
+   "key": "license_number",
+   "accept": [
+    "D65484741"
+   ]
+  },
+  {
+   "q": "What is the examiner's national registry number on Dwayne Marchetti's DOT medical certificate?",
+   "answer": "8666456219",
+   "key": "national_registry",
+   "accept": [
+    "8666456219"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "dotmed-card-22.jpg"
+}

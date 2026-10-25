@@ -1,0 +1,60 @@
+{
+ "id": "directdeposit-38",
+ "arrival": "scan",
+ "kind": "direct-deposit",
+ "type": "hr-letter",
+ "acceptable_types": [
+  "hr-letter",
+  "internal",
+  "other",
+  "statement"
+ ],
+ "person": "Imani Xavier",
+ "fields": {
+  "customer_name": "Imani Xavier",
+  "vendor": "Ironwood Cold Storage",
+  "service_date": "2026-04-15"
+ },
+ "extra": {
+  "bank": "Sample Desert Bank",
+  "routing_number": "111898502",
+  "account_number": "0027659911",
+  "account_type": "Checking"
+ },
+ "questions": [
+  {
+   "q": "What bank does Imani Xavier use for direct deposit?",
+   "answer": "Sample Desert Bank",
+   "key": "bank",
+   "accept": [
+    "Sample Desert Bank"
+   ]
+  },
+  {
+   "q": "What is the routing number on Imani Xavier's direct deposit form?",
+   "answer": "111898502",
+   "key": "routing_number",
+   "accept": [
+    "111898502"
+   ]
+  },
+  {
+   "q": "What is Imani Xavier's direct deposit account number?",
+   "answer": "0027659911",
+   "key": "account_number",
+   "accept": [
+    "0027659911"
+   ]
+  },
+  {
+   "q": "Is Imani Xavier's direct deposit account checking or savings?",
+   "answer": "Checking",
+   "key": "account_type",
+   "accept": [
+    "Checking"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "directdeposit-38.pdf"
+}

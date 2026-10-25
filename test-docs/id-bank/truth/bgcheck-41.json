@@ -1,0 +1,58 @@
+{
+ "id": "bgcheck-41",
+ "arrival": "clean",
+ "kind": "background-consent",
+ "type": "hr-letter",
+ "acceptable_types": [
+  "agreement",
+  "hr-letter",
+  "other"
+ ],
+ "person": "Wendell Tillman",
+ "fields": {
+  "customer_name": "Wendell Tillman",
+  "vendor": "Kestrel Ridge Plumbing",
+  "service_date": "2026-03-06"
+ },
+ "extra": {
+  "agency": "Test Applicant Check Inc",
+  "dob": "1997-10-25",
+  "ssn": "987-65-9350",
+  "address": "3045 E Tumbleweed Pass"
+ },
+ "questions": [
+  {
+   "q": "When did Wendell Tillman sign the background check consent?",
+   "answer": "2026-03-06",
+   "key": "service_date",
+   "accept": [
+    "2026-03-06",
+    "03/06/2026",
+    "March 6, 2026",
+    "Mar 6, 2026",
+    "3/6/2026",
+    "06 Mar 2026",
+    "03/06/26",
+    "March 6, 2026"
+   ]
+  },
+  {
+   "q": "Which company is requesting a background check on Wendell Tillman?",
+   "answer": "Kestrel Ridge Plumbing",
+   "key": "vendor",
+   "accept": [
+    "Kestrel Ridge Plumbing"
+   ]
+  },
+  {
+   "q": "Which screening agency will run Wendell Tillman's background check?",
+   "answer": "Test Applicant Check Inc",
+   "key": "agency",
+   "accept": [
+    "Test Applicant Check Inc"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "bgcheck-41.pdf"
+}

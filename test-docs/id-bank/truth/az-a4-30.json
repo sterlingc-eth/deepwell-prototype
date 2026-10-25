@@ -1,0 +1,59 @@
+{
+ "id": "az-a4-30",
+ "arrival": "scan",
+ "kind": "az-a4",
+ "type": "hr-letter",
+ "acceptable_types": [
+  "hr-letter",
+  "internal",
+  "other"
+ ],
+ "person": "Hana Fontaine",
+ "fields": {
+  "customer_name": "Hana Fontaine",
+  "vendor": "Saguaro Freight Lines",
+  "service_date": "2026-03-02"
+ },
+ "extra": {
+  "withholding_percentage": "3.6%",
+  "ssn": "987-65-1505",
+  "address": "5186 N Ocotillo Spur"
+ },
+ "questions": [
+  {
+   "q": "What Arizona withholding percentage did Hana Fontaine choose on the A-4?",
+   "answer": "3.6%",
+   "key": "withholding_percentage",
+   "accept": [
+    "3.6%",
+    "3.6",
+    "3.6%"
+   ]
+  },
+  {
+   "q": "Who is Hana Fontaine's employer on the Arizona A-4?",
+   "answer": "Saguaro Freight Lines",
+   "key": "vendor",
+   "accept": [
+    "Saguaro Freight Lines"
+   ]
+  },
+  {
+   "q": "When did Hana Fontaine sign the A-4?",
+   "answer": "2026-03-02",
+   "key": "service_date",
+   "accept": [
+    "2026-03-02",
+    "03/02/2026",
+    "March 2, 2026",
+    "Mar 2, 2026",
+    "3/2/2026",
+    "02 Mar 2026",
+    "03/02/26",
+    "March 2, 2026"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "az-a4-30.pdf"
+}

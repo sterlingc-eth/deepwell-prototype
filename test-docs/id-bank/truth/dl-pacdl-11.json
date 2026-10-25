@@ -1,0 +1,85 @@
+{
+ "id": "dl-pacdl-11",
+ "arrival": "photo",
+ "kind": "cdl",
+ "type": "license-certification",
+ "acceptable_types": [
+  "license-certification"
+ ],
+ "person": "Winona Bellweather",
+ "fields": {
+  "customer_name": "Winona Bellweather",
+  "license_number": "99 850 622",
+  "end_date": "2030-04-11",
+  "start_date": "2026-04-11"
+ },
+ "extra": {
+  "dob": "1974-12-06",
+  "dl_class": "B",
+  "state": "PA",
+  "address": "1094 S Mesquite Hollow Rd",
+  "endorsements": "H N"
+ },
+ "questions": [
+  {
+   "q": "When does Winona Bellweather's CDL expire?",
+   "answer": "2030-04-11",
+   "key": "end_date",
+   "accept": [
+    "2030-04-11",
+    "04/11/2030",
+    "April 11, 2030",
+    "Apr 11, 2030",
+    "4/11/2030",
+    "11 Apr 2030",
+    "04/11/30",
+    "April 11, 2030"
+   ]
+  },
+  {
+   "q": "What is Winona Bellweather's CDL number?",
+   "answer": "99 850 622",
+   "key": "license_number",
+   "accept": [
+    "99 850 622",
+    "99850622",
+    "99 850 622"
+   ]
+  },
+  {
+   "q": "What is Winona Bellweather's date of birth?",
+   "answer": "1974-12-06",
+   "key": "dob",
+   "accept": [
+    "1974-12-06",
+    "12/06/1974",
+    "December 6, 1974",
+    "Dec 6, 1974",
+    "12/6/1974",
+    "06 Dec 1974",
+    "12/06/74",
+    "December 6, 1974"
+   ]
+  },
+  {
+   "q": "What class is Winona Bellweather's CDL?",
+   "answer": "Class B",
+   "key": "dl_class",
+   "accept": [
+    "Class B",
+    "class B"
+   ]
+  },
+  {
+   "q": "What endorsements does Winona Bellweather's CDL carry?",
+   "answer": "H N",
+   "key": "endorsements",
+   "accept": [
+    "H N",
+    "HN"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "dl-pacdl-11.jpg"
+}

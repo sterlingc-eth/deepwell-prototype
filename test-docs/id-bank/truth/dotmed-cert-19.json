@@ -1,0 +1,83 @@
+{
+ "id": "dotmed-cert-19",
+ "arrival": "clean",
+ "kind": "dot-medical-cert",
+ "type": "license-certification",
+ "acceptable_types": [
+  "hr-letter",
+  "license-certification"
+ ],
+ "person": "Ulises Larkspur",
+ "fields": {
+  "customer_name": "Ulises Larkspur",
+  "service_date": "2025-05-25",
+  "end_date": "2025-11-23",
+  "license_number": "D83475361"
+ },
+ "extra": {
+  "examiner": "Dr. Curtis Oyelaran",
+  "national_registry": "9002016589",
+  "examiner_license": "AZ-610281",
+  "certification_period": "6 months",
+  "dob": "1975-08-02"
+ },
+ "questions": [
+  {
+   "q": "When does Ulises Larkspur's DOT medical card expire?",
+   "answer": "2025-11-23",
+   "key": "end_date",
+   "accept": [
+    "2025-11-23",
+    "11/23/2025",
+    "November 23, 2025",
+    "Nov 23, 2025",
+    "11/23/2025",
+    "23 Nov 2025",
+    "11/23/25",
+    "November 23, 2025"
+   ]
+  },
+  {
+   "q": "Who was Ulises Larkspur's medical examiner?",
+   "answer": "Dr. Curtis Oyelaran",
+   "key": "examiner",
+   "accept": [
+    "Dr. Curtis Oyelaran",
+    "Curtis Oyelaran"
+   ]
+  },
+  {
+   "q": "When was Ulises Larkspur's DOT physical?",
+   "answer": "2025-05-25",
+   "key": "service_date",
+   "accept": [
+    "2025-05-25",
+    "05/25/2025",
+    "May 25, 2025",
+    "May 25, 2025",
+    "5/25/2025",
+    "25 May 2025",
+    "05/25/25",
+    "May 25, 2025"
+   ]
+  },
+  {
+   "q": "What is the driver license number on Ulises Larkspur's medical certificate?",
+   "answer": "D83475361",
+   "key": "license_number",
+   "accept": [
+    "D83475361"
+   ]
+  },
+  {
+   "q": "What is the examiner's national registry number on Ulises Larkspur's DOT medical certificate?",
+   "answer": "9002016589",
+   "key": "national_registry",
+   "accept": [
+    "9002016589"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "dotmed-cert-19.pdf"
+}

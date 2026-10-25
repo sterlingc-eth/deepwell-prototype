@@ -1,0 +1,76 @@
+{
+ "id": "dl-tx-03",
+ "arrival": "scan",
+ "kind": "driver-license",
+ "type": "license-certification",
+ "acceptable_types": [
+  "license-certification"
+ ],
+ "person": "Dwayne Eckhart",
+ "fields": {
+  "customer_name": "Dwayne Eckhart",
+  "license_number": "97498318",
+  "end_date": "2031-12-17",
+  "start_date": "2023-12-17"
+ },
+ "extra": {
+  "dob": "1973-06-07",
+  "dl_class": "C",
+  "state": "TX",
+  "address": "8820 N Chuparosa Way",
+  "endorsements": "M"
+ },
+ "questions": [
+  {
+   "q": "When does Dwayne Eckhart's driver license expire?",
+   "answer": "2031-12-17",
+   "key": "end_date",
+   "accept": [
+    "2031-12-17",
+    "12/17/2031",
+    "December 17, 2031",
+    "Dec 17, 2031",
+    "12/17/2031",
+    "17 Dec 2031",
+    "12/17/31",
+    "December 17, 2031"
+   ]
+  },
+  {
+   "q": "What is Dwayne Eckhart's driver license number?",
+   "answer": "97498318",
+   "key": "license_number",
+   "accept": [
+    "97498318",
+    "97498318",
+    "97498318"
+   ]
+  },
+  {
+   "q": "What is Dwayne Eckhart's date of birth?",
+   "answer": "1973-06-07",
+   "key": "dob",
+   "accept": [
+    "1973-06-07",
+    "06/07/1973",
+    "June 7, 1973",
+    "Jun 7, 1973",
+    "6/7/1973",
+    "07 Jun 1973",
+    "06/07/73",
+    "June 7, 1973"
+   ]
+  },
+  {
+   "q": "What class is Dwayne Eckhart's driver license?",
+   "answer": "Class C",
+   "key": "dl_class",
+   "accept": [
+    "Class C",
+    "class C"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "dl-tx-03.pdf"
+}

@@ -1,0 +1,83 @@
+{
+ "id": "dotmed-card-18",
+ "arrival": "scan",
+ "kind": "dot-medical-card",
+ "type": "license-certification",
+ "acceptable_types": [
+  "hr-letter",
+  "license-certification"
+ ],
+ "person": "Oluwaseun Ruzicka",
+ "fields": {
+  "customer_name": "Oluwaseun Ruzicka",
+  "service_date": "2026-11-26",
+  "end_date": "2027-02-25",
+  "license_number": "D97271373"
+ },
+ "extra": {
+  "examiner": "Dr. Priscilla Voss",
+  "national_registry": "7182386219",
+  "examiner_license": "AZ-182646",
+  "certification_period": "3 months",
+  "dob": "1992-10-27"
+ },
+ "questions": [
+  {
+   "q": "When does Oluwaseun Ruzicka's DOT medical card expire?",
+   "answer": "2027-02-25",
+   "key": "end_date",
+   "accept": [
+    "2027-02-25",
+    "02/25/2027",
+    "February 25, 2027",
+    "Feb 25, 2027",
+    "2/25/2027",
+    "25 Feb 2027",
+    "02/25/27",
+    "February 25, 2027"
+   ]
+  },
+  {
+   "q": "Who was Oluwaseun Ruzicka's medical examiner?",
+   "answer": "Dr. Priscilla Voss",
+   "key": "examiner",
+   "accept": [
+    "Dr. Priscilla Voss",
+    "Priscilla Voss"
+   ]
+  },
+  {
+   "q": "When was Oluwaseun Ruzicka's DOT physical?",
+   "answer": "2026-11-26",
+   "key": "service_date",
+   "accept": [
+    "2026-11-26",
+    "11/26/2026",
+    "November 26, 2026",
+    "Nov 26, 2026",
+    "11/26/2026",
+    "26 Nov 2026",
+    "11/26/26",
+    "November 26, 2026"
+   ]
+  },
+  {
+   "q": "What is the driver license number on Oluwaseun Ruzicka's medical certificate?",
+   "answer": "D97271373",
+   "key": "license_number",
+   "accept": [
+    "D97271373"
+   ]
+  },
+  {
+   "q": "What is the examiner's national registry number on Oluwaseun Ruzicka's DOT medical certificate?",
+   "answer": "7182386219",
+   "key": "national_registry",
+   "accept": [
+    "7182386219"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "dotmed-card-18.pdf"
+}

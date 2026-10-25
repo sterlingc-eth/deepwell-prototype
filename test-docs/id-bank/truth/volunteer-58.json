@@ -1,0 +1,72 @@
+{
+ "id": "volunteer-58",
+ "arrival": "clean",
+ "kind": "volunteer-application-typed",
+ "type": "hr-letter",
+ "acceptable_types": [
+  "agreement",
+  "hr-letter",
+  "internal",
+  "other"
+ ],
+ "person": "Enrique Trevino",
+ "fields": {
+  "customer_name": "Enrique Trevino",
+  "vendor": "Verde Valley Food Pantry",
+  "service_date": "2026-04-11",
+  "customer_phone": "(602) 555-0157",
+  "customer_email": "enrique.trevino@example.com"
+ },
+ "extra": {
+  "role": "Youth mentor",
+  "availability": "Weekday evenings",
+  "reference": "Harlow Whitlock",
+  "skills": "Spanish bilingual",
+  "address": "8249 N Ocotillo Spur"
+ },
+ "questions": [
+  {
+   "q": "What volunteer role did Enrique Trevino apply for?",
+   "answer": "Youth mentor",
+   "key": "role",
+   "accept": [
+    "Youth mentor"
+   ]
+  },
+  {
+   "q": "When is Enrique Trevino available to volunteer?",
+   "answer": "Weekday evenings",
+   "key": "availability",
+   "accept": [
+    "Weekday evenings"
+   ]
+  },
+  {
+   "q": "Who is Enrique Trevino's volunteer reference?",
+   "answer": "Harlow Whitlock",
+   "key": "reference",
+   "accept": [
+    "Harlow Whitlock"
+   ]
+  },
+  {
+   "q": "Which organization did Enrique Trevino apply to volunteer with?",
+   "answer": "Verde Valley Food Pantry",
+   "key": "vendor",
+   "accept": [
+    "Verde Valley Food Pantry"
+   ]
+  },
+  {
+   "q": "What is Enrique Trevino's phone number on the volunteer application?",
+   "answer": "(602) 555-0157",
+   "key": "customer_phone",
+   "accept": [
+    "(602) 555-0157",
+    "602-555-0157"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "volunteer-58.pdf"
+}

@@ -1150,6 +1150,28 @@ export default async function handler(req, res) {
     }
     const meta0 = classifyMetaQuestion(question);
     const meta = meta0 && meta0.kind === 'count' && amountMentioned(question) ? null : meta0; // R40: a count of ALL invoices is never the answer to a question that named an amount
+    // ---- PEOPLE PAPERS (DONOVAN_READER_V2_IDDOCS, default OFF): "when does Maria's CDL expire?", "who is Sam's manager?", "is Jo's medical card current?" are read
+    // straight from the stored people / compliance papers (api/_lib/people/peopleLane.js), no model. Runs before the early decline so a question that names a W-4 / new hire
+    // is answered for a caller who may open People and HR; everyone else, and every question the lane is unsure of, goes on exactly as before (the decline included). ----
+    if (!meta && !conversationContext && question && question.length <= 300) {
+      try {
+        const pl = await import("./_lib/people/peopleLane.js");
+        if (pl.peopleLaneApplies(question)) {
+          const gate0 = scorecardCall ? { allowed: true } : await checkAskGate(auth);
+          if (gate0.allowed) {
+            const hit = await withTenant(ctxArg, (db) => pl.runPeopleLaneFor(db, question, { today: resolveToday(today), auth }));
+            if (hit?.data) {
+              console.log(JSON.stringify({ route: "ask", people_lane: hit.detail }));
+              const { attachCitations, documentRecord } = await import("./_lib/citations/records.js");
+              const recs = (hit.cite ?? []).map((c) => documentRecord({ id: c.id, document_type: c.document_type, label: "People paper" }, { page: c.page ?? undefined })).filter(Boolean); // People / HR papers are never cited as records
+              attachCitations(hit.data, { records: recs, total: recs.length, basis: "Read from the cited document in your files." });
+              await send(200, { success: true, data: hit.data });
+              return;
+            }
+          }
+        }
+      } catch (err) { console.error("People lane failed, continuing with the older lanes:", err?.message); }
+    }
     if (!meta && earlyDeclineEnabled()) {
       const early = classifyEarlyDecline(question, { hasConversation: !!conversationContext, contextHasEntity });
       let vetoed = false;

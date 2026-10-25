@@ -42,7 +42,10 @@ export function anchorTypeFromText(pages) {
   if (titles.some((t) => MONEY_TITLE.test(t))) return null;
   const coi = titles.find((t) => COI_TITLE.test(t));
   if (coi) return { type: "insurance-certificate", evidence: coi };
-  const licTitle = titles.find((t) => LICENSE_TITLE.test(t) && t.split(/\s+/).length <= 8 && !/\b(?:application|renewal\s+notice|invoice|fee)\b/i.test(t));
+  // A permit, an inspection or a work order has a licence NUMBER line too ("License #  CO EC-218745" under a building division): the page's own title decides.
+  if (titles.slice(0, 12).some((t) => /\b(?:permit|inspection|work\s+order|service\s+(?:ticket|call)|certificate\s+of\s+occupancy|proposal|estimate)\b/i.test(t) && !/\d/.test(t) && t.split(/\s+/).length <= 6)) return null;
+  // a title is ONE short heading: a single cell, no digits, no label punctuation ("License #   CO EC-218745   Owner   ..." is a label row, not a title)
+  const licTitle = titles.find((t) => LICENSE_TITLE.test(t) && t.split(/\s+/).length <= 8 && !SEG.test(t) && !/[#:]/.test(t) && !/\b(?:application|renewal\s+notice|invoice|fee)\b/i.test(t));
   if (licTitle) {
     const numLine = lines.find((l) => { const s = segsOf(l); return s.some((seg, i) => LICENSE_NO.test(seg) && /\d/.test(s[i + 1] ?? "")) || /^(?:licen[cs]e|certificate|card|certification)\s*(?:no\.?|number|#)\s*:\s*[A-Z0-9-]*\d/i.test(l); });
     const issuer = lines.slice(0, 12).find((l) => ISSUER.test(l));

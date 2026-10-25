@@ -1,0 +1,76 @@
+{
+ "id": "dl-az-15",
+ "arrival": "photo",
+ "kind": "driver-license",
+ "type": "license-certification",
+ "acceptable_types": [
+  "license-certification"
+ ],
+ "person": "Ulises Larkspur",
+ "fields": {
+  "customer_name": "Ulises Larkspur",
+  "license_number": "D95059105",
+  "end_date": "2027-04-06",
+  "start_date": "2019-04-06"
+ },
+ "extra": {
+  "dob": "1975-08-02",
+  "dl_class": "C",
+  "state": "AZ",
+  "address": "626 W Ironwood Terrace",
+  "endorsements": "NONE"
+ },
+ "questions": [
+  {
+   "q": "When does Ulises Larkspur's driver license expire?",
+   "answer": "2027-04-06",
+   "key": "end_date",
+   "accept": [
+    "2027-04-06",
+    "04/06/2027",
+    "April 6, 2027",
+    "Apr 6, 2027",
+    "4/6/2027",
+    "06 Apr 2027",
+    "04/06/27",
+    "April 6, 2027"
+   ]
+  },
+  {
+   "q": "What is Ulises Larkspur's driver license number?",
+   "answer": "D95059105",
+   "key": "license_number",
+   "accept": [
+    "D95059105",
+    "D95059105",
+    "D95059105"
+   ]
+  },
+  {
+   "q": "What is Ulises Larkspur's date of birth?",
+   "answer": "1975-08-02",
+   "key": "dob",
+   "accept": [
+    "1975-08-02",
+    "08/02/1975",
+    "August 2, 1975",
+    "Aug 2, 1975",
+    "8/2/1975",
+    "02 Aug 1975",
+    "08/02/75",
+    "August 2, 1975"
+   ]
+  },
+  {
+   "q": "What class is Ulises Larkspur's driver license?",
+   "answer": "Class C",
+   "key": "dl_class",
+   "accept": [
+    "Class C",
+    "class C"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "dl-az-15.jpg"
+}

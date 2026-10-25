@@ -657,6 +657,9 @@ export interface DonovanScores {
   costUsd: number;
 }
 
+/** A paper the page hints at (weak evidence) but did not link: the customers a person may pick. Not a fact. */
+export interface LinkSuggestionRow { document_id: string; candidates: { id: string; name: string }[] }
+
 export const reviewClient = {
   /** Owner/admin: how many pages are searchable by meaning. */
   semanticStatus() {
@@ -744,8 +747,8 @@ export const reviewClient = {
   /** Bulk fetch for usePostgresSync: every document_entity_links row for a
    *  batch of documents in one round trip. */
   listLinks(documentIds: string[]) {
-    if (!documentIds.length) return Promise.resolve<{ links: DocumentLink[] }>({ links: [] });
-    return postJson<{ links: DocumentLink[] }>({ action: 'listLinks', documentIds });
+    if (!documentIds.length) return Promise.resolve<{ links: DocumentLink[]; suggestions?: LinkSuggestionRow[] }>({ links: [], suggestions: [] });
+    return postJson<{ links: DocumentLink[]; suggestions?: LinkSuggestionRow[] }>({ action: 'listLinks', documentIds });
   },
 
   /** Bulk fetch for usePostgresSync: every corrected field for a batch of
@@ -791,12 +794,13 @@ export const reviewClient = {
 
   /** R33 (admin): "Re-check all missing fields" — a bounded batch (<=100) of this account's documents with a missing
    *  required field, optionally restricted to `documentIds`. Loop while `leftForNextRun` > 0. */
-  recheckMissing(documentIds: string[] | null, limit = 50) {
-    return postJson<{ scanned: number; candidates: number; rechecked: number; filled: number; fields: number; retyped?: number; verified: number; leftForNextRun: number; errors: number }>({
+  recheckMissing(documentIds: string[] | null, limit = 50, opts: { openAll?: boolean } = {}) {
+    return postJson<{ scanned: number; candidates: number; rechecked: number; filled: number; fields: number; retyped?: number; linked?: number; verified: number; leftForNextRun: number; leftIds?: string[]; errors: number }>({
       action: 'recheckMissing',
       ...(documentIds ? { documentIds: documentIds.slice(0, 500) } : {}),
       limit,
       force: true,
+      ...(opts.openAll ? { openAll: true } : {}),
     });
   },
 

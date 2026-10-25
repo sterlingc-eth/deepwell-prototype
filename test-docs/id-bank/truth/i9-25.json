@@ -1,0 +1,74 @@
+{
+ "id": "i9-25",
+ "arrival": "scan",
+ "kind": "i9",
+ "type": "hr-letter",
+ "acceptable_types": [
+  "hr-letter",
+  "internal",
+  "other"
+ ],
+ "person": "Jarrod Lindqvist",
+ "fields": {
+  "customer_name": "Jarrod Lindqvist",
+  "vendor": "Blue Agave Catering",
+  "service_date": "2026-11-21"
+ },
+ "extra": {
+  "dob": "2001-05-22",
+  "address": "3550 E Tumbleweed Pass",
+  "list_a_document": "Permanent Resident Card",
+  "list_a_number": "723422446",
+  "ssn": "987-65-2046"
+ },
+ "questions": [
+  {
+   "q": "When did Jarrod Lindqvist start work according to the I-9?",
+   "answer": "2026-11-21",
+   "key": "service_date",
+   "accept": [
+    "2026-11-21",
+    "11/21/2026",
+    "November 21, 2026",
+    "Nov 21, 2026",
+    "11/21/2026",
+    "21 Nov 2026",
+    "11/21/26",
+    "November 21, 2026"
+   ]
+  },
+  {
+   "q": "What employer is Jarrod Lindqvist's I-9 for?",
+   "answer": "Blue Agave Catering",
+   "key": "vendor",
+   "accept": [
+    "Blue Agave Catering"
+   ]
+  },
+  {
+   "q": "What identity document did Jarrod Lindqvist present for Form I-9?",
+   "answer": "Permanent Resident Card",
+   "key": "list_a_document",
+   "accept": [
+    "Permanent Resident Card"
+   ]
+  },
+  {
+   "q": "What is Jarrod Lindqvist's date of birth on the I-9?",
+   "answer": "2001-05-22",
+   "key": "dob",
+   "accept": [
+    "2001-05-22",
+    "05/22/2001",
+    "May 22, 2001",
+    "May 22, 2001",
+    "5/22/2001",
+    "22 May 2001",
+    "05/22/01",
+    "May 22, 2001"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "i9-25.pdf"
+}

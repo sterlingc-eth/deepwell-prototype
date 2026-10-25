@@ -1,0 +1,81 @@
+{
+ "id": "newhire-31",
+ "arrival": "clean",
+ "kind": "newhire-typed",
+ "type": "hr-letter",
+ "acceptable_types": [
+  "hr-letter",
+  "internal",
+  "other"
+ ],
+ "person": "Yara Escalante",
+ "fields": {
+  "customer_name": "Yara Escalante",
+  "vendor": "Blue Agave Catering",
+  "service_date": "2026-08-17",
+  "customer_phone": "(602) 555-0181",
+  "customer_email": "yara.escalante@example.com"
+ },
+ "extra": {
+  "manager": "Rosalba Valdivia",
+  "position": "HVAC Installer",
+  "hourly_rate": "25.00",
+  "department": "Transportation",
+  "emergency_contact": "Tobias Castellanos",
+  "emergency_phone": "(480) 555-0123",
+  "address": "8392 S Verde Alamo Ave",
+  "shirt_size": "M"
+ },
+ "questions": [
+  {
+   "q": "Who is Yara Escalante's manager?",
+   "answer": "Rosalba Valdivia",
+   "key": "manager",
+   "accept": [
+    "Rosalba Valdivia"
+   ]
+  },
+  {
+   "q": "What is Yara Escalante's start date?",
+   "answer": "2026-08-17",
+   "key": "service_date",
+   "accept": [
+    "2026-08-17",
+    "08/17/2026",
+    "August 17, 2026",
+    "Aug 17, 2026",
+    "8/17/2026",
+    "17 Aug 2026",
+    "08/17/26",
+    "August 17, 2026"
+   ]
+  },
+  {
+   "q": "What position was Yara Escalante hired for?",
+   "answer": "HVAC Installer",
+   "key": "position",
+   "accept": [
+    "HVAC Installer"
+   ]
+  },
+  {
+   "q": "What is Yara Escalante's hourly rate?",
+   "answer": "$25.00",
+   "key": "hourly_rate",
+   "accept": [
+    "$25.00",
+    "25.00"
+   ]
+  },
+  {
+   "q": "Who is Yara Escalante's emergency contact?",
+   "answer": "Tobias Castellanos",
+   "key": "emergency_contact",
+   "accept": [
+    "Tobias Castellanos"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "newhire-31.pdf"
+}

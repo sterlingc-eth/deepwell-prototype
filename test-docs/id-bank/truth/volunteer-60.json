@@ -1,0 +1,72 @@
+{
+ "id": "volunteer-60",
+ "arrival": "photo",
+ "kind": "volunteer-application-handwritten",
+ "type": "hr-letter",
+ "acceptable_types": [
+  "agreement",
+  "hr-letter",
+  "internal",
+  "other"
+ ],
+ "person": "Garrett Xavier",
+ "fields": {
+  "customer_name": "Garrett Xavier",
+  "vendor": "Verde Valley Food Pantry",
+  "service_date": "2026-01-15",
+  "customer_phone": "(602) 555-0178",
+  "customer_email": "garrett.xavier@example.com"
+ },
+ "extra": {
+  "role": "Food sorting",
+  "availability": "Saturday mornings",
+  "reference": "Vera Jernigan",
+  "skills": "Spreadsheet skills",
+  "address": "4134 W Palo Brea Ln"
+ },
+ "questions": [
+  {
+   "q": "What volunteer role did Garrett Xavier apply for?",
+   "answer": "Food sorting",
+   "key": "role",
+   "accept": [
+    "Food sorting"
+   ]
+  },
+  {
+   "q": "When is Garrett Xavier available to volunteer?",
+   "answer": "Saturday mornings",
+   "key": "availability",
+   "accept": [
+    "Saturday mornings"
+   ]
+  },
+  {
+   "q": "Who is Garrett Xavier's volunteer reference?",
+   "answer": "Vera Jernigan",
+   "key": "reference",
+   "accept": [
+    "Vera Jernigan"
+   ]
+  },
+  {
+   "q": "Which organization did Garrett Xavier apply to volunteer with?",
+   "answer": "Verde Valley Food Pantry",
+   "key": "vendor",
+   "accept": [
+    "Verde Valley Food Pantry"
+   ]
+  },
+  {
+   "q": "What is Garrett Xavier's phone number on the volunteer application?",
+   "answer": "(602) 555-0178",
+   "key": "customer_phone",
+   "accept": [
+    "(602) 555-0178",
+    "602-555-0178"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "volunteer-60.jpg"
+}

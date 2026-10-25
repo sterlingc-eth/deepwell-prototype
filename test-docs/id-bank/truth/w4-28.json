@@ -1,0 +1,71 @@
+{
+ "id": "w4-28",
+ "arrival": "photo",
+ "kind": "w4",
+ "type": "hr-letter",
+ "acceptable_types": [
+  "hr-letter",
+  "internal",
+  "other"
+ ],
+ "person": "Leona Duarte",
+ "fields": {
+  "customer_name": "Leona Duarte",
+  "vendor": "Blue Agave Catering",
+  "service_date": "2026-11-04"
+ },
+ "extra": {
+  "filing_status": "Married filing jointly",
+  "dependents_amount": "0",
+  "extra_withholding": "50",
+  "ssn": "987-65-6432",
+  "address": "7246 E Tumbleweed Pass"
+ },
+ "questions": [
+  {
+   "q": "What filing status did Leona Duarte choose on the W-4?",
+   "answer": "Married filing jointly",
+   "key": "filing_status",
+   "accept": [
+    "Married filing jointly",
+    "Married filing jointly",
+    "Married"
+   ]
+  },
+  {
+   "q": "Who is Leona Duarte's employer on the W-4?",
+   "answer": "Blue Agave Catering",
+   "key": "vendor",
+   "accept": [
+    "Blue Agave Catering"
+   ]
+  },
+  {
+   "q": "When did Leona Duarte sign the W-4?",
+   "answer": "2026-11-04",
+   "key": "service_date",
+   "accept": [
+    "2026-11-04",
+    "11/04/2026",
+    "November 4, 2026",
+    "Nov 4, 2026",
+    "11/4/2026",
+    "04 Nov 2026",
+    "11/04/26",
+    "November 4, 2026"
+   ]
+  },
+  {
+   "q": "How much extra withholding per pay period does Leona Duarte want on the W-4?",
+   "answer": "$50",
+   "key": "extra_withholding",
+   "accept": [
+    "$50",
+    "50.00",
+    " 50 "
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "w4-28.jpg"
+}

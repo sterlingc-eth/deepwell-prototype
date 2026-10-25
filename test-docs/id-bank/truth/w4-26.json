@@ -1,0 +1,71 @@
+{
+ "id": "w4-26",
+ "arrival": "clean",
+ "kind": "w4",
+ "type": "hr-letter",
+ "acceptable_types": [
+  "hr-letter",
+  "internal",
+  "other"
+ ],
+ "person": "Winona Brannigan",
+ "fields": {
+  "customer_name": "Winona Brannigan",
+  "vendor": "Kestrel Ridge Plumbing",
+  "service_date": "2026-07-11"
+ },
+ "extra": {
+  "filing_status": "Head of household",
+  "dependents_amount": "0",
+  "extra_withholding": "50",
+  "ssn": "987-65-6345",
+  "address": "8981 E Cholla Bend Ct"
+ },
+ "questions": [
+  {
+   "q": "What filing status did Winona Brannigan choose on the W-4?",
+   "answer": "Head of household",
+   "key": "filing_status",
+   "accept": [
+    "Head of household",
+    "Head of household",
+    "Head of household"
+   ]
+  },
+  {
+   "q": "Who is Winona Brannigan's employer on the W-4?",
+   "answer": "Kestrel Ridge Plumbing",
+   "key": "vendor",
+   "accept": [
+    "Kestrel Ridge Plumbing"
+   ]
+  },
+  {
+   "q": "When did Winona Brannigan sign the W-4?",
+   "answer": "2026-07-11",
+   "key": "service_date",
+   "accept": [
+    "2026-07-11",
+    "07/11/2026",
+    "July 11, 2026",
+    "Jul 11, 2026",
+    "7/11/2026",
+    "11 Jul 2026",
+    "07/11/26",
+    "July 11, 2026"
+   ]
+  },
+  {
+   "q": "How much extra withholding per pay period does Winona Brannigan want on the W-4?",
+   "answer": "$50",
+   "key": "extra_withholding",
+   "accept": [
+    "$50",
+    "50.00",
+    " 50 "
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "w4-26.pdf"
+}

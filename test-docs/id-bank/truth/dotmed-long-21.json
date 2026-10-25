@@ -1,0 +1,83 @@
+{
+ "id": "dotmed-long-21",
+ "arrival": "scan",
+ "kind": "dot-medical-long",
+ "type": "license-certification",
+ "acceptable_types": [
+  "hr-letter",
+  "license-certification"
+ ],
+ "person": "Zelda Penhallow",
+ "fields": {
+  "customer_name": "Zelda Penhallow",
+  "service_date": "2026-08-15",
+  "end_date": "2028-08-13",
+  "license_number": "D15186220"
+ },
+ "extra": {
+  "examiner": "Dr. Curtis Oyelaran",
+  "national_registry": "5195401879",
+  "examiner_license": "AZ-462301",
+  "certification_period": "24 months",
+  "dob": "1982-04-05"
+ },
+ "questions": [
+  {
+   "q": "When does Zelda Penhallow's DOT medical card expire?",
+   "answer": "2028-08-13",
+   "key": "end_date",
+   "accept": [
+    "2028-08-13",
+    "08/13/2028",
+    "August 13, 2028",
+    "Aug 13, 2028",
+    "8/13/2028",
+    "13 Aug 2028",
+    "08/13/28",
+    "August 13, 2028"
+   ]
+  },
+  {
+   "q": "Who was Zelda Penhallow's medical examiner?",
+   "answer": "Dr. Curtis Oyelaran",
+   "key": "examiner",
+   "accept": [
+    "Dr. Curtis Oyelaran",
+    "Curtis Oyelaran"
+   ]
+  },
+  {
+   "q": "When was Zelda Penhallow's DOT physical?",
+   "answer": "2026-08-15",
+   "key": "service_date",
+   "accept": [
+    "2026-08-15",
+    "08/15/2026",
+    "August 15, 2026",
+    "Aug 15, 2026",
+    "8/15/2026",
+    "15 Aug 2026",
+    "08/15/26",
+    "August 15, 2026"
+   ]
+  },
+  {
+   "q": "What is the driver license number on Zelda Penhallow's medical certificate?",
+   "answer": "D15186220",
+   "key": "license_number",
+   "accept": [
+    "D15186220"
+   ]
+  },
+  {
+   "q": "What is the examiner's national registry number on Zelda Penhallow's DOT medical certificate?",
+   "answer": "5195401879",
+   "key": "national_registry",
+   "accept": [
+    "5195401879"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "dotmed-long-21.pdf"
+}

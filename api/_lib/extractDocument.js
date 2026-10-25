@@ -39,6 +39,7 @@ import { isDeterministicExtractEnabled, isGenericExtractEnabled } from "./modelA
 import { freeReadCompletes, isFreeFirstExtractEnabled } from "./modelAvoidance/freeFirst.js";
 // R33: a REQUIRED field the extraction left empty is looked up on the page by its printed label — see labelFill.js.
 import { planLabelFill, corroborateFields, crossCheckFields } from "./modelAvoidance/labelFill.js";
+import { dropPeopleIdFacts } from "./modelAvoidance/peopleShape.js";
 import { verifyGrounded } from "./modelAvoidance/groundedFacts.js";
 import { retypeDecision } from "./modelAvoidance/retype.js";
 import { loadOwnNames, applyOwnCompanyGuard, isOwnName, issuerNotCustomer } from "./modelAvoidance/ownCompany.js";
@@ -375,6 +376,8 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
     console.error("cross-check failed (extraction kept as is):", err?.message);
   }
   fields = applyOwnCompanyGuard(fields, ownNames).fields;
+  // People / ID round 3: an HR or person-ID paper (new-hire sheet, licence, medical card) is about an employee or a holder: never a customer_* / service_* fact.
+  fields = dropPeopleIdFacts(resolvedType, fields).fields;
   facts = Object.fromEntries(fields.map((f) => [f.field_key, f.value]));
 
   // CUSTOMER REMINDERS (2026-09-22): reminder_text/reminder_customer_name/

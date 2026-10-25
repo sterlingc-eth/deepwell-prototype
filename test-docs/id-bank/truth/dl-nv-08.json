@@ -1,0 +1,76 @@
+{
+ "id": "dl-nv-08",
+ "arrival": "photo",
+ "kind": "driver-license",
+ "type": "license-certification",
+ "acceptable_types": [
+  "license-certification"
+ ],
+ "person": "Harlow Valdivia",
+ "fields": {
+  "customer_name": "Harlow Valdivia",
+  "license_number": "9933002722",
+  "end_date": "2029-11-21",
+  "start_date": "2021-11-21"
+ },
+ "extra": {
+  "dob": "1997-05-12",
+  "dl_class": "C",
+  "state": "NV",
+  "address": "8442 E Cholla Bend Ct",
+  "endorsements": "M"
+ },
+ "questions": [
+  {
+   "q": "When does Harlow Valdivia's driver license expire?",
+   "answer": "2029-11-21",
+   "key": "end_date",
+   "accept": [
+    "2029-11-21",
+    "11/21/2029",
+    "November 21, 2029",
+    "Nov 21, 2029",
+    "11/21/2029",
+    "21 Nov 2029",
+    "11/21/29",
+    "November 21, 2029"
+   ]
+  },
+  {
+   "q": "What is Harlow Valdivia's driver license number?",
+   "answer": "9933002722",
+   "key": "license_number",
+   "accept": [
+    "9933002722",
+    "9933002722",
+    "9933002722"
+   ]
+  },
+  {
+   "q": "What is Harlow Valdivia's date of birth?",
+   "answer": "1997-05-12",
+   "key": "dob",
+   "accept": [
+    "1997-05-12",
+    "05/12/1997",
+    "May 12, 1997",
+    "May 12, 1997",
+    "5/12/1997",
+    "12 May 1997",
+    "05/12/97",
+    "May 12, 1997"
+   ]
+  },
+  {
+   "q": "What class is Harlow Valdivia's driver license?",
+   "answer": "Class C",
+   "key": "dl_class",
+   "accept": [
+    "Class C",
+    "class C"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "dl-nv-08.jpg"
+}

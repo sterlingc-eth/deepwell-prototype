@@ -175,6 +175,8 @@ export interface Doc {
   stage: PipelineStage;
   extracted: ExtractedField[];
   linkedEntityIds: EntityId[];
+  /** Customers the page hints at without naming them clearly enough to link (weak evidence kept for a person; server audit row, never a fact). Cleared on any link. */
+  linkSuggestionIds?: EntityId[];
   /** 0–1 confidence of the strongest link */
   linkConfidence: number;
   issues: DocumentIssue[];

@@ -1,0 +1,76 @@
+{
+ "id": "dl-ny-05",
+ "arrival": "photo",
+ "kind": "driver-license",
+ "type": "license-certification",
+ "acceptable_types": [
+  "license-certification"
+ ],
+ "person": "Cyrus Yoder",
+ "fields": {
+  "customer_name": "Cyrus Yoder",
+  "license_number": "401 402 834",
+  "end_date": "2029-12-21",
+  "start_date": "2021-12-21"
+ },
+ "extra": {
+  "dob": "1971-11-26",
+  "dl_class": "C",
+  "state": "NY",
+  "address": "2640 N Chuparosa Way",
+  "endorsements": "NONE"
+ },
+ "questions": [
+  {
+   "q": "When does Cyrus Yoder's driver license expire?",
+   "answer": "2029-12-21",
+   "key": "end_date",
+   "accept": [
+    "2029-12-21",
+    "12/21/2029",
+    "December 21, 2029",
+    "Dec 21, 2029",
+    "12/21/2029",
+    "21 Dec 2029",
+    "12/21/29",
+    "December 21, 2029"
+   ]
+  },
+  {
+   "q": "What is Cyrus Yoder's driver license number?",
+   "answer": "401 402 834",
+   "key": "license_number",
+   "accept": [
+    "401 402 834",
+    "401402834",
+    "401 402 834"
+   ]
+  },
+  {
+   "q": "What is Cyrus Yoder's date of birth?",
+   "answer": "1971-11-26",
+   "key": "dob",
+   "accept": [
+    "1971-11-26",
+    "11/26/1971",
+    "November 26, 1971",
+    "Nov 26, 1971",
+    "11/26/1971",
+    "26 Nov 1971",
+    "11/26/71",
+    "November 26, 1971"
+   ]
+  },
+  {
+   "q": "What class is Cyrus Yoder's driver license?",
+   "answer": "Class C",
+   "key": "dl_class",
+   "accept": [
+    "Class C",
+    "class C"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "dl-ny-05.jpg"
+}

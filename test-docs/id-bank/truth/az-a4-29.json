@@ -1,0 +1,59 @@
+{
+ "id": "az-a4-29",
+ "arrival": "clean",
+ "kind": "az-a4",
+ "type": "hr-letter",
+ "acceptable_types": [
+  "hr-letter",
+  "internal",
+  "other"
+ ],
+ "person": "Orlando Prudhomme",
+ "fields": {
+  "customer_name": "Orlando Prudhomme",
+  "vendor": "Red Mesa Builders",
+  "service_date": "2026-04-02"
+ },
+ "extra": {
+  "withholding_percentage": "2.0%",
+  "ssn": "987-65-9193",
+  "address": "3564 W Ironwood Terrace"
+ },
+ "questions": [
+  {
+   "q": "What Arizona withholding percentage did Orlando Prudhomme choose on the A-4?",
+   "answer": "2.0%",
+   "key": "withholding_percentage",
+   "accept": [
+    "2.0%",
+    "2.0",
+    "2%"
+   ]
+  },
+  {
+   "q": "Who is Orlando Prudhomme's employer on the Arizona A-4?",
+   "answer": "Red Mesa Builders",
+   "key": "vendor",
+   "accept": [
+    "Red Mesa Builders"
+   ]
+  },
+  {
+   "q": "When did Orlando Prudhomme sign the A-4?",
+   "answer": "2026-04-02",
+   "key": "service_date",
+   "accept": [
+    "2026-04-02",
+    "04/02/2026",
+    "April 2, 2026",
+    "Apr 2, 2026",
+    "4/2/2026",
+    "02 Apr 2026",
+    "04/02/26",
+    "April 2, 2026"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "az-a4-29.pdf"
+}

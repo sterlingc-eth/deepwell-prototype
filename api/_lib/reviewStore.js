@@ -112,6 +112,7 @@ import { isDeterministicClassifyEnabled } from './modelAvoidance/switches.js';
 import { listOpenReminders, REMINDER_ELIGIBLE_DOCUMENT_TYPES } from './reminders.js';
 import { normalizeReminderTrigger, normalizeDate, UNCONFIRMED_SUFFIX, validateCorrection } from './extractFields.js';
 import { recheckDocumentTx } from './recheck.js';
+import { isSetAsidePaper } from './bodyNameLink.js';
 import { COMPANY_FOLDER_FIELD_KEY, HR_FOLDER_ID } from './companyFiles.js';
 import { deriveWarranty } from './warrantyRules.js';
 import { packForTenant } from './industry/index.js';
@@ -711,7 +712,7 @@ export async function mergeEntities(ctx, { keepId, dropId }, actorClerkId) {
  *  to 500 documents at once). */
 export async function listLinks(ctx, { documentIds }) {
   const ids = [...new Set((documentIds ?? []).filter(isUuid))].slice(0, 500);
-  if (!ids.length) return { links: [] };
+  if (!ids.length) return { links: [], suggestions: [] };
 
   return withTenant(ctx, async (client) => {
     const rows = (await client.query(
@@ -720,7 +721,28 @@ export async function listLinks(ctx, { documentIds }) {
         ORDER BY document_id, created_at`,
       [ids]
     )).rows;
-    return { links: rows };
+    // "Link to <customer>?" suggestions (bodyNameLink.js LINK_SUGGESTION_ACTION: an audit row, never a fact). Live only for a paper with no link
+    // at all and no person link/unlink since the suggestion was written; a person's click or unlink therefore clears it for good.
+    const linked = new Set(rows.map((r) => r.document_id));
+    const sug = (await client.query(
+      `SELECT DISTINCT ON (resource_id) resource_id AS document_id, changes, created_at
+         FROM audit_log WHERE resource_id = ANY($1::uuid[]) AND action = 'recheck.link_suggestion' AND ${TENANT}
+        ORDER BY resource_id, created_at DESC`,
+      [ids]
+    )).rows.filter((s) => !linked.has(s.document_id) && Array.isArray(s.changes?.candidates) && s.changes.candidates.length > 0);
+    let suggestions = [];
+    if (sug.length) {
+      const touched = new Map((await client.query(
+        `SELECT resource_id, MAX(created_at) AS at FROM audit_log
+          WHERE resource_id = ANY($1::uuid[]) AND action IN ('review.document_linked','review.document_unlinked') AND ${TENANT}
+          GROUP BY resource_id`,
+        [sug.map((s) => s.document_id)]
+      )).rows.map((r) => [r.resource_id, new Date(r.at).getTime()]));
+      suggestions = sug
+        .filter((s) => !(touched.has(s.document_id) && touched.get(s.document_id) >= new Date(s.created_at).getTime()))
+        .map((s) => ({ document_id: s.document_id, candidates: s.changes.candidates.slice(0, 3).map((c) => ({ id: String(c.id), name: String(c.name ?? '') })) }));
+    }
+    return { links: rows, suggestions };
   });
 }
 
@@ -857,7 +879,9 @@ export async function aiVerifyDocument(ctx, { documentId }, actorClerkId) {
     // customer not, and this repair never even looked because an equipment
     // link already existed. Gated on the actual thing that matters instead:
     // does a DIRECT customer link exist yet.
-    if (!(await hasDirectCustomerLink(db, documentId))) {
+    // Re-check-all round 2 (D4): a VOID paper or a copy is set aside - never linked, never checked automatically, on any path.
+    const setAsidePaper = isSetAsidePaper({ filename: doc.original_filename ?? null, text: (await db.listPages(documentId)).slice(0, 2).map((p) => p.text ?? '').join('\n') });
+    if (!setAsidePaper && !(await hasDirectCustomerLink(db, documentId))) {
       const facts = Object.fromEntries(completenessFields.map((f) => [f.field_key, f.value]));
       const customer = await db.findOrCreateCustomer(facts);
       if (customer?.id) {
@@ -885,7 +909,7 @@ export async function aiVerifyDocument(ctx, { documentId }, actorClerkId) {
       hasLink: await documentHasLink(db, documentId),
       filename: doc.original_filename,
     });
-    if (verdict.ok) {
+    if (verdict.ok && !setAsidePaper) {
       verified = (await db.verifyByAi(documentId, { allowUnlinked: verdict.allowUnlinked })) > 0;
     }
 

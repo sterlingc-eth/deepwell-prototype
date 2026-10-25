@@ -1,0 +1,67 @@
+{
+ "id": "osha10-51",
+ "arrival": "scan",
+ "kind": "osha10-card",
+ "type": "license-certification",
+ "acceptable_types": [
+  "license-certification"
+ ],
+ "person": "Quentin Rosenthal",
+ "fields": {
+  "customer_name": "Quentin Rosenthal",
+  "license_number": "65-9821169",
+  "start_date": "2026-01-06",
+  "vendor": "Copperline Safety Academy"
+ },
+ "extra": {
+  "course": "OSHA 10-Hour Construction Outreach",
+  "issuer": "Copperline Safety Academy"
+ },
+ "questions": [
+  {
+   "q": "What is Quentin Rosenthal's OSHA-10 card number?",
+   "answer": "65-9821169",
+   "key": "license_number",
+   "accept": [
+    "65-9821169"
+   ]
+  },
+  {
+   "q": "Who issued Quentin Rosenthal's OSHA-10 card?",
+   "answer": "Copperline Safety Academy",
+   "key": "vendor",
+   "accept": [
+    "Copperline Safety Academy"
+   ]
+  },
+  {
+   "q": "When was Quentin Rosenthal's OSHA-10 card issued?",
+   "answer": "2026-01-06",
+   "key": "start_date",
+   "accept": [
+    "2026-01-06",
+    "01/06/2026",
+    "January 6, 2026",
+    "Jan 6, 2026",
+    "1/6/2026",
+    "06 Jan 2026",
+    "01/06/26",
+    "January 6, 2026"
+   ]
+  },
+  {
+   "q": "Does Quentin Rosenthal's OSHA-10 card expire?",
+   "answer": "No",
+   "key": "no_expiry",
+   "accept": [
+    "does not expire",
+    "no expiration",
+    "never expires",
+    "no expiry",
+    "not expire"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "osha10-51.pdf"
+}

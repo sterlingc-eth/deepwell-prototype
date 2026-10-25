@@ -1,0 +1,67 @@
+{
+ "id": "osha10-50",
+ "arrival": "photo",
+ "kind": "osha10-card",
+ "type": "license-certification",
+ "acceptable_types": [
+  "license-certification"
+ ],
+ "person": "Vera Wexford",
+ "fields": {
+  "customer_name": "Vera Wexford",
+  "license_number": "93-2443082",
+  "start_date": "2026-04-25",
+  "vendor": "Sonoran Safety Training Institute"
+ },
+ "extra": {
+  "course": "OSHA 10-Hour Construction Outreach",
+  "issuer": "Sonoran Safety Training Institute"
+ },
+ "questions": [
+  {
+   "q": "What is Vera Wexford's OSHA-10 card number?",
+   "answer": "93-2443082",
+   "key": "license_number",
+   "accept": [
+    "93-2443082"
+   ]
+  },
+  {
+   "q": "Who issued Vera Wexford's OSHA-10 card?",
+   "answer": "Sonoran Safety Training Institute",
+   "key": "vendor",
+   "accept": [
+    "Sonoran Safety Training Institute"
+   ]
+  },
+  {
+   "q": "When was Vera Wexford's OSHA-10 card issued?",
+   "answer": "2026-04-25",
+   "key": "start_date",
+   "accept": [
+    "2026-04-25",
+    "04/25/2026",
+    "April 25, 2026",
+    "Apr 25, 2026",
+    "4/25/2026",
+    "25 Apr 2026",
+    "04/25/26",
+    "April 25, 2026"
+   ]
+  },
+  {
+   "q": "Does Vera Wexford's OSHA-10 card expire?",
+   "answer": "No",
+   "key": "no_expiry",
+   "accept": [
+    "does not expire",
+    "no expiration",
+    "never expires",
+    "no expiry",
+    "not expire"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "osha10-50.jpg"
+}

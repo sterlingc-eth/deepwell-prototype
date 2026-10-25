@@ -180,6 +180,8 @@ export function scanProseFacts(pages, opts = {}) {
     const expRe = new RegExp(`\\b(?:expires|expiring|terminates|shall\\s+(?:expire|terminate|end)|ends)\\s+(?:on\\s+)?(${D})`, "gi");
     for (const m of flat.matchAll(expRe)) {
       if (!parseDate(m[1])) continue;
+      // "EXPIRES 06/10/2024 06/10/2027": two dates in a row under an "issued / expires" label pair - which one is the expiry is a guess
+      if (new RegExp(`^\\s*(?:${D})`, "i").test(flat.slice(m.index + m[0].length, m.index + m[0].length + 30))) continue;
       push("end_date", { page_no: page, line: lineAt(m.index), verbatim: quote(m), label: "expiry sentence", value: collapse(m[1]) });
     }
     // Parties: "between X (Landlord) and Y (Tenant)" / 'by and between X ("Client") and Y ("Consultant")'

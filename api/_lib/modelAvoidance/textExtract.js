@@ -28,6 +28,8 @@
  * Pure. No I/O, no clock. HVAC pack only (another industry's vocabulary is a different label table).
  */
 import { signatureLineFlags, isSignerOnly } from "./signerGuard.js";
+import { formKind, KIND_DOCUMENT_TYPE } from "./peopleForms.js";
+import { idStructure, hasIdStructure, hasCertificateStructure, hasCardData, hasLongIdNumber, hrLabelCount, hrHasNameLabel } from "./peopleShape.js";
 import { normalizeDate } from "../extractFields.js";
 import { BRAND_RULES } from "../warrantyRules.js";
 import { isFragmentName } from "../integrity.js";
@@ -87,7 +89,58 @@ export function classifyFromText(pages) {
   return classifyLines(lines);
 }
 
+const ID_CARD_TITLE_RE = /^(?:[a-z]+\s+){0,2}(?:driver'?s?|operator'?s?)\s+licen[cs]e(?:\s+card)?$/i;
+// a printed card title is in capitals (a policy that names the card is in sentence case)
+const upperRatio = (t) => { const l = String(t).replace(/[^A-Za-z]/g, ""); return l ? l.replace(/[^A-Z]/g, "").length / l.length : 0; };
+const ID_CARD_FIELD_RES = [/\b(?:dob|date\s+of\s+birth|birth\s*date)\b/i, /\bclass\b/i, /\b(?:exp(?:iration|ires)?|expiry)\b/i, /\b(?:iss|issue[d]?)\b/i, /\b(?:dln|dl\s*(?:no|number|#)|licen[cs]e\s*(?:no|number|#))\b/i, /\bendorsements?\b/i, /\brestrictions?\b/i];
+const MEC_RE = /medical\s+examiner'?s?\s+certificate|mcsa[-\s]?5876/i;
+/**
+ * Content anchors (no title line needed): a licence card, a medical examiner's certificate, a new-hire sheet. People / ID round 3: each is known by
+ * STRUCTURE (label-shaped holder / number / date lines, peopleShape.js), never by a heading or a sentence that merely names the paper.
+ * Returns {type, evidence} or null.
+ */
+function idDocAnchor(lines) {
+  const head = lines.slice(0, 60);
+  const all = lines.map((l) => l.t);
+  const mecTitle = head.slice(0, 12).find((l) => l.t.length <= 90 && MEC_RE.test(l.t) && !/\b(?:must|shall|should|required?|carry|hold|bring|submit|issued|invoice|bill|charge|fee|total|please)\b|\$\s?\d/i.test(l.t));
+  if (mecTitle && hasCertificateStructure(all)) return { type: "license-certification", evidence: mecTitle.t.slice(0, 100) };
+  const card = head.find((l) => splitSegments(l.t).some((seg) => ID_CARD_TITLE_RE.test(collapse(seg).replace(/[:.]+$/, ""))));
+  if (card && hasIdStructure(all)) return { type: "license-certification", evidence: card.t.slice(0, 100) };
+  // a photographed card: the words DRIVER'S LICENSE inside a line of OCR noise (not the form label "Driver's License Number") plus label-shaped card fields and dates
+  const photo = head.find((l) => l.t.length <= 100 && /\bdriver'?s?\s+licen[cs]e\b(?!\s*(?:no\b|number|#))/i.test(l.t));
+  if (photo && (idStructure(all).groups >= 2 || hasCardData(all) || hasLongIdNumber(all) || (upperRatio(photo.t) >= 0.6 && ID_CARD_FIELD_RES.filter((re) => re.test(all.join("\n"))).length >= 2)) && photo.t.split(/\s+/).length <= 14 && !/\b(?:must|shall|should|required?|valid|all|every|each|carry|hold)\b/i.test(photo.t) && (all.join("\n").match(/\b\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}\b/g) ?? []).length >= 2) return { type: "license-certification", evidence: photo.t.slice(0, 100) };
+  // a new-hire sheet: a form-shaped title naming a new hire, and at least three of its own labels (each with a value or a blank)
+  const nh = head.slice(0, 8).find((l) => l.t.length <= 80 && /\bnew[-\s]?hire\b/i.test(l.t) && !/[.!?]$/.test(l.t) && !/\b(?:policy|policies|procedure|handbook|agenda|memo|letter|email|reminder|schedule)\b/i.test(l.t));
+  if (nh && hrLabelCount(all, { lenient: true }) >= 3 && hrHasNameLabel(all)) return { type: "hr-letter", evidence: "new-hire sheet labels" };
+  return null;
+}
+
+/** People / ID round 3: a title that names a people-ID paper is only believed when the page has that paper's structure. */
+const PEOPLE_CARD_TITLE_RE = /driver|chauffeur|operator|^cdl$|medical|^dot\b/i;
+const HR_FORM_NOUN_RE = /\b(?:checklist|sheet|form|paperwork|packet|information|worksheet|onboarding)\b/i;
+function confirmPeopleTitles(found, lines) {
+  const all = lines.map((l) => l.t);
+  for (const [type, ev] of [...found.entries()]) {
+    if (type === "license-certification") {
+      const s = collapse(ev.seg).replace(/[:.]+$/, "").toLowerCase();
+      const peopleCard = PEOPLE_CARD_TITLE_RE.test(s);
+      // a driver licence / CDL / medical certificate needs the paper's own structure; a trade or business licence title keeps working at the top
+      // of a page, and anywhere else needs the structure too (a heading inside a policy or checklist)
+      if (peopleCard ? !(hasIdStructure(all) || hasCertificateStructure(all)) : ev.line >= 8 && !hasIdStructure(all)) found.delete(type);
+    } else if (type === "hr-letter") {
+      const s = collapse(ev.seg).replace(/[:.]+$/, "").toLowerCase();
+      if (HR_FORM_NOUN_RE.test(s) && /new[-\s]?hire|employee|hiring|onboarding/.test(s) && ev.line > 2 && hrLabelCount(all, { lenient: true }) < 2) found.delete(type);
+    }
+  }
+}
+
 function classifyLines(lines) {
+  // People-forms round: a clean people / compliance form is known by what it prints (peopleForms.js), ahead of a stray label word
+  // ("EMAIL" read as a correspondence title). Unknown papers fall through to the title rules below, unchanged.
+  try {
+    const fk = formKind([{ page_no: 1, text: lines.map((l) => l.t).join("\n") }]);
+    if (fk) return { type: KIND_DOCUMENT_TYPE[fk], confidence: 0.95, evidence: `people form: ${fk}` };
+  } catch { /* the title rules decide */ }
   const found = new Map();
   const limit = Math.min(lines.length, 16);
   for (let i = 0; i < limit; i++) {
@@ -100,6 +153,13 @@ function classifyLines(lines) {
   // A nameplate transcript announces itself in a bracketed preamble, not a title.
   const first = lines[0]?.t ?? "";
   if (/^\[(?:photo|image)\s+transcript\b.*(?:data\s+plate|nameplate)/i.test(first)) found.set("nameplate-photo", { line: 0, seg: first });
+  // ID-document round: a driver licence / CDL card, a DOT medical examiner's certificate and a new-hire sheet are known by what
+  // they print, not always by a clean title line (a card photo laid over a form). Used only when no title line decided.
+  if (found.size > 0) confirmPeopleTitles(found, lines);
+  if (found.size === 0) {
+    const anchor = idDocAnchor(lines);
+    if (anchor) return { type: anchor.type, confidence: 0.9, evidence: anchor.evidence };
+  }
   if (found.size === 1) {
     const [type, ev] = [...found.entries()][0];
     return { type, confidence: 0.95, evidence: ev.seg };
@@ -944,7 +1004,8 @@ export function scanLabeledValues(pages, opts = {}) {
           continue;
         }
         if (!cleanValue(raw) && k === marks.length - 1 && i + 1 < lines.length && !findScanLabels(lines[i + 1].t).length) {
-          // Label on one line, value on the next.
+          // Label on one line, value on the next. Two dates printed under it (issued / expires side by side) cannot be told apart from here: no value.
+          if (/date|expir|warrant|period/i.test(String(mk.def.kind) + String(mk.def.key)) && (lines[i + 1].t.match(/\b\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}\b/g) ?? []).length >= 2) continue;
           raw = lines[i + 1].t.split(/\s{3,}|\t+|\s\|\s/)[0];
           accept(mk.def, raw, lines[i + 1], i + 1, mk.label);
           continue;

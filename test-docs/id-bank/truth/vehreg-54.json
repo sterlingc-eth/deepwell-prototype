@@ -1,0 +1,69 @@
+{
+ "id": "vehreg-54",
+ "arrival": "scan",
+ "kind": "vehicle-registration",
+ "type": "license-certification",
+ "acceptable_types": [
+  "internal",
+  "license-certification",
+  "other"
+ ],
+ "person": "Yosef Santibanez",
+ "fields": {
+  "customer_name": "Yosef Santibanez",
+  "end_date": "2027-01-13",
+  "start_date": "2026-01-13"
+ },
+ "extra": {
+  "plate": "NMQ3354",
+  "vin": "MZVRBSFBLP7P4ZDBG",
+  "year": "2019",
+  "make": "Ford",
+  "model": "F-150",
+  "state": "TX"
+ },
+ "questions": [
+  {
+   "q": "When does Yosef Santibanez's vehicle registration expire?",
+   "answer": "2027-01-13",
+   "key": "end_date",
+   "accept": [
+    "2027-01-13",
+    "01/13/2027",
+    "January 13, 2027",
+    "Jan 13, 2027",
+    "1/13/2027",
+    "13 Jan 2027",
+    "01/13/27",
+    "January 13, 2027"
+   ]
+  },
+  {
+   "q": "What is the license plate on Yosef Santibanez's registration?",
+   "answer": "NMQ3354",
+   "key": "plate",
+   "accept": [
+    "NMQ3354"
+   ]
+  },
+  {
+   "q": "What is the VIN on Yosef Santibanez's vehicle registration?",
+   "answer": "MZVRBSFBLP7P4ZDBG",
+   "key": "vin",
+   "accept": [
+    "MZVRBSFBLP7P4ZDBG"
+   ]
+  },
+  {
+   "q": "What vehicle is registered to Yosef Santibanez?",
+   "answer": "2019 Ford F-150",
+   "key": "vehicle",
+   "accept": [
+    "Ford F-150",
+    "ford f-150"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "vehreg-54.pdf"
+}

@@ -1,0 +1,71 @@
+{
+ "id": "forklift-47",
+ "arrival": "photo",
+ "kind": "forklift-card",
+ "type": "license-certification",
+ "acceptable_types": [
+  "license-certification"
+ ],
+ "person": "Fiona Ruzicka",
+ "fields": {
+  "customer_name": "Fiona Ruzicka",
+  "license_number": "PIT-47992",
+  "start_date": "2025-06-27",
+  "vendor": "Arroyo Workforce Training",
+  "end_date": "2028-06-27"
+ },
+ "extra": {
+  "course": "Powered Industrial Truck Operator",
+  "issuer": "Arroyo Workforce Training"
+ },
+ "questions": [
+  {
+   "q": "When does Fiona Ruzicka's forklift certification expire?",
+   "answer": "2028-06-27",
+   "key": "end_date",
+   "accept": [
+    "2028-06-27",
+    "06/27/2028",
+    "June 27, 2028",
+    "Jun 27, 2028",
+    "6/27/2028",
+    "27 Jun 2028",
+    "06/27/28",
+    "June 27, 2028"
+   ]
+  },
+  {
+   "q": "What is Fiona Ruzicka's forklift certification number?",
+   "answer": "PIT-47992",
+   "key": "license_number",
+   "accept": [
+    "PIT-47992"
+   ]
+  },
+  {
+   "q": "Who issued Fiona Ruzicka's forklift certification?",
+   "answer": "Arroyo Workforce Training",
+   "key": "vendor",
+   "accept": [
+    "Arroyo Workforce Training"
+   ]
+  },
+  {
+   "q": "When was Fiona Ruzicka's forklift certification issued?",
+   "answer": "2025-06-27",
+   "key": "start_date",
+   "accept": [
+    "2025-06-27",
+    "06/27/2025",
+    "June 27, 2025",
+    "Jun 27, 2025",
+    "6/27/2025",
+    "27 Jun 2025",
+    "06/27/25",
+    "June 27, 2025"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "forklift-47.jpg"
+}

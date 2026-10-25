@@ -1,0 +1,71 @@
+{
+ "id": "forklift-48",
+ "arrival": "clean",
+ "kind": "forklift-card",
+ "type": "license-certification",
+ "acceptable_types": [
+  "license-certification"
+ ],
+ "person": "Hollis Ledesma",
+ "fields": {
+  "customer_name": "Hollis Ledesma",
+  "license_number": "PIT-29514",
+  "start_date": "2024-01-23",
+  "vendor": "Copperline Safety Academy",
+  "end_date": "2027-01-23"
+ },
+ "extra": {
+  "course": "Powered Industrial Truck Operator",
+  "issuer": "Copperline Safety Academy"
+ },
+ "questions": [
+  {
+   "q": "When does Hollis Ledesma's forklift certification expire?",
+   "answer": "2027-01-23",
+   "key": "end_date",
+   "accept": [
+    "2027-01-23",
+    "01/23/2027",
+    "January 23, 2027",
+    "Jan 23, 2027",
+    "1/23/2027",
+    "23 Jan 2027",
+    "01/23/27",
+    "January 23, 2027"
+   ]
+  },
+  {
+   "q": "What is Hollis Ledesma's forklift certification number?",
+   "answer": "PIT-29514",
+   "key": "license_number",
+   "accept": [
+    "PIT-29514"
+   ]
+  },
+  {
+   "q": "Who issued Hollis Ledesma's forklift certification?",
+   "answer": "Copperline Safety Academy",
+   "key": "vendor",
+   "accept": [
+    "Copperline Safety Academy"
+   ]
+  },
+  {
+   "q": "When was Hollis Ledesma's forklift certification issued?",
+   "answer": "2024-01-23",
+   "key": "start_date",
+   "accept": [
+    "2024-01-23",
+    "01/23/2024",
+    "January 23, 2024",
+    "Jan 23, 2024",
+    "1/23/2024",
+    "23 Jan 2024",
+    "01/23/24",
+    "January 23, 2024"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "forklift-48.pdf"
+}

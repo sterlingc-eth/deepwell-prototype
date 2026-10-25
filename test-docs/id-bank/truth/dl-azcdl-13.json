@@ -1,0 +1,85 @@
+{
+ "id": "dl-azcdl-13",
+ "arrival": "photo",
+ "kind": "cdl",
+ "type": "license-certification",
+ "acceptable_types": [
+  "license-certification"
+ ],
+ "person": "Joaquin Underhill",
+ "fields": {
+  "customer_name": "Joaquin Underhill",
+  "license_number": "D45237841",
+  "end_date": "2029-06-01",
+  "start_date": "2025-06-01"
+ },
+ "extra": {
+  "dob": "1985-03-25",
+  "dl_class": "A",
+  "state": "AZ",
+  "address": "9470 S Verde Alamo Ave",
+  "endorsements": "H N"
+ },
+ "questions": [
+  {
+   "q": "When does Joaquin Underhill's CDL expire?",
+   "answer": "2029-06-01",
+   "key": "end_date",
+   "accept": [
+    "2029-06-01",
+    "06/01/2029",
+    "June 1, 2029",
+    "Jun 1, 2029",
+    "6/1/2029",
+    "01 Jun 2029",
+    "06/01/29",
+    "June 1, 2029"
+   ]
+  },
+  {
+   "q": "What is Joaquin Underhill's CDL number?",
+   "answer": "D45237841",
+   "key": "license_number",
+   "accept": [
+    "D45237841",
+    "D45237841",
+    "D45237841"
+   ]
+  },
+  {
+   "q": "What is Joaquin Underhill's date of birth?",
+   "answer": "1985-03-25",
+   "key": "dob",
+   "accept": [
+    "1985-03-25",
+    "03/25/1985",
+    "March 25, 1985",
+    "Mar 25, 1985",
+    "3/25/1985",
+    "25 Mar 1985",
+    "03/25/85",
+    "March 25, 1985"
+   ]
+  },
+  {
+   "q": "What class is Joaquin Underhill's CDL?",
+   "answer": "Class A",
+   "key": "dl_class",
+   "accept": [
+    "Class A",
+    "class A"
+   ]
+  },
+  {
+   "q": "What endorsements does Joaquin Underhill's CDL carry?",
+   "answer": "H N",
+   "key": "endorsements",
+   "accept": [
+    "H N",
+    "HN"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "dl-azcdl-13.jpg"
+}

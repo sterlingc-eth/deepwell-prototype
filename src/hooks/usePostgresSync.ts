@@ -156,6 +156,11 @@ function deriveStage(row: DocumentRow, doc: Doc): PipelineStage {
   return ceiling === 'verified' ? 'linked' : ceiling;
 }
 
+/** Attaches the server's "Link to <customer>?" candidates (not facts) to a graph document. */
+function withSuggestions(doc: Doc, ids: string[] | undefined): Doc {
+  return ids && ids.length ? { ...doc, linkSuggestionIds: ids } : doc;
+}
+
 function toDoc(row: DocumentRow, extractions: ExtractionRow[], links: DocumentLink[], corrections: Correction[], completeness?: DocCompleteness): Doc {
   const receivedAt = toDateOrNull(row.created_at) ?? new Date();
   const preview = row.extract_error
@@ -485,11 +490,14 @@ async function hydrateRows(rows: DocumentRow[]): Promise<void> {
     }
   } catch { /* fields are an enhancement, not a precondition */ }
   const linksByDoc = new Map<string, DocumentLink[]>();
+  const suggestByDoc = new Map<string, string[]>();
   try {
-    for (const l of (await reviewClient.listLinks(ids)).links) {
+    const res = await reviewClient.listLinks(ids);
+    for (const l of res.links) {
       const list = linksByDoc.get(l.document_id);
       if (list) list.push(l); else linksByDoc.set(l.document_id, [l]);
     }
+    for (const s of res.suggestions ?? []) suggestByDoc.set(s.document_id, s.candidates.map((c) => c.id));
   } catch { /* manual links are an enhancement, not a precondition */ }
   const correctionsByDoc = new Map<string, Correction[]>();
   try {
@@ -498,7 +506,7 @@ async function hydrateRows(rows: DocumentRow[]): Promise<void> {
       if (list) list.push(c); else correctionsByDoc.set(c.document_id, [c]);
     }
   } catch { /* corrections are an enhancement, not a precondition */ }
-  const docs = rows.map((r) => toDoc(r, byDoc.get(r.id) ?? [], linksByDoc.get(r.id) ?? [], correctionsByDoc.get(r.id) ?? []));
+  const docs = rows.map((r) => withSuggestions(toDoc(r, byDoc.get(r.id) ?? [], linksByDoc.get(r.id) ?? [], correctionsByDoc.get(r.id) ?? []), suggestByDoc.get(r.id)));
   // Docread2: "Please check this value" - stored values the read-only audit found wrong (empty until the owner turns flags on).
   try {
     const { flags } = await reviewClient.suspectFlags();
@@ -604,13 +612,15 @@ export async function loadGraphFromServer(tenantKey = '', opts: { hydrateOlder?:
   }
 
   const linksByDoc = new Map<string, DocumentLink[]>();
+  const suggestByDoc = new Map<string, string[]>();
   try {
-    const { links } = await reviewClient.listLinks(documentIds);
+    const { links, suggestions } = await reviewClient.listLinks(documentIds);
     for (const l of links) {
       const list = linksByDoc.get(l.document_id);
       if (list) list.push(l);
       else linksByDoc.set(l.document_id, [l]);
     }
+    for (const s of suggestions ?? []) suggestByDoc.set(s.document_id, s.candidates.map((c) => c.id));
   } catch {
     /* manual links are an enhancement to the sync, not a precondition of it */
   }
@@ -652,7 +662,7 @@ export async function loadGraphFromServer(tenantKey = '', opts: { hydrateOlder?:
   }
 
   const docs = docRows.map((r) =>
-    toDoc(r, byDoc.get(r.id) ?? [], linksByDoc.get(r.id) ?? [], correctionsByDoc.get(r.id) ?? [], completenessByDoc.get(r.id))
+    withSuggestions(toDoc(r, byDoc.get(r.id) ?? [], linksByDoc.get(r.id) ?? [], correctionsByDoc.get(r.id) ?? [], completenessByDoc.get(r.id)), suggestByDoc.get(r.id))
   );
   const entities = entityRows.map(toEntity);
   addAmbiguousNameLinkIssues(docs, entityRows, linksByDoc);

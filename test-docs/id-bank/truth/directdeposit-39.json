@@ -1,0 +1,60 @@
+{
+ "id": "directdeposit-39",
+ "arrival": "photo",
+ "kind": "direct-deposit",
+ "type": "hr-letter",
+ "acceptable_types": [
+  "hr-letter",
+  "internal",
+  "other",
+  "statement"
+ ],
+ "person": "Kestrel Hartigan",
+ "fields": {
+  "customer_name": "Kestrel Hartigan",
+  "vendor": "Kestrel Ridge Plumbing",
+  "service_date": "2026-09-20"
+ },
+ "extra": {
+  "bank": "Sample Desert Bank",
+  "routing_number": "799264796",
+  "account_number": "0084656790",
+  "account_type": "Checking"
+ },
+ "questions": [
+  {
+   "q": "What bank does Kestrel Hartigan use for direct deposit?",
+   "answer": "Sample Desert Bank",
+   "key": "bank",
+   "accept": [
+    "Sample Desert Bank"
+   ]
+  },
+  {
+   "q": "What is the routing number on Kestrel Hartigan's direct deposit form?",
+   "answer": "799264796",
+   "key": "routing_number",
+   "accept": [
+    "799264796"
+   ]
+  },
+  {
+   "q": "What is Kestrel Hartigan's direct deposit account number?",
+   "answer": "0084656790",
+   "key": "account_number",
+   "accept": [
+    "0084656790"
+   ]
+  },
+  {
+   "q": "Is Kestrel Hartigan's direct deposit account checking or savings?",
+   "answer": "Checking",
+   "key": "account_type",
+   "accept": [
+    "Checking"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "directdeposit-39.jpg"
+}

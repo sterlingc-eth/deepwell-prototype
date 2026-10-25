@@ -481,7 +481,7 @@ if (PGlite) {
   const cron = fs.readFileSync(rel('api/_lib/routes/cron-sweep.js'), 'utf8');
   check('nightly cron sweep runs the bounded per-tenant re-check (deadline-aware, never fails the sweep)', /recheckTenantMissing\(ctx, \{ limit: 25, deadlineAt, source: "cron" \}\)/.test(cron) && /phase: "recheck"/.test(cron));
   const screen = fs.readFileSync(rel('src/screens/ReviewScreen.tsx'), 'utf8');
-  check('Inbox: "Re-check this document" on the missing-field banner and admin "Re-check all missing fields"', /Re-check this document/.test(screen) && /Re-check all missing fields/.test(screen) && /disabled=\{recheckAllBusy \|\| !canAdmin\}/.test(screen));
+  check('Inbox: "Re-check this document" on the missing-field banner and admin "Re-check all open papers"', /Re-check this document/.test(screen) && /RECHECK_ALL_LABEL/.test(screen) && /Re-check all open papers/.test(fs.readFileSync(rel('src/screens/recheckAll.ts'), 'utf8')) && /disabled=\{recheckAllBusy \|\| !canAdmin\}/.test(screen));
   check('Inbox: "check the year" chip + Confirm button, and the specific Verify-with-AI message', /future-date-chip/.test(screen) && /Confirm \{p\.value\}/.test(screen) && /Confirm it \(or fix the year\) and this document can be verified/.test(screen));
   const apiTop = fs.readdirSync(rel('api')).filter((f) => !f.startsWith('_') && !f.startsWith('.'));
   eq('api/ still has exactly 12 top-level function files', apiTop.length, 12);

@@ -910,24 +910,39 @@ export function readPdfTextLayer(bytes, opts = {}) {
     unpackObjectStreams(doc);
     if (doc.budget.over) return { ok: false, reason: "stream-budget", stats };
     const pageList = collectPages(doc, text);
+    if (opts.out) opts.out.parsed = { buf, objs, doc, pages: pageList };
     if (!pageList.length) return { ok: false, reason: "no-pages", stats };
     if (pageList.length > (opts.maxPages ?? MAX_PAGES)) return { ok: false, reason: "too-many-pages", stats };
     const fontCache = new Map();
     const pages = [];
+    // Per-page mode (opts.perPage): a page-level refusal (scan, OCR overlay, hidden/rotated text, garbled text, ...) no longer fails the FILE;
+    // that page is listed in `skipped` for the vision model and the other pages keep their text layer. File-level refusals (encrypted,
+    // stream budget, timeout, parse error) still fail the whole file. Without perPage the behaviour is byte-for-byte the old all-or-nothing.
+    const skipped = [];
+    const pageFail = (i, reason) => {
+      if (!opts.perPage) return { ok: false, reason, stats };
+      skipped.push({ page_no: i + 1, reason });
+      return null;
+    };
     for (let i = 0; i < pageList.length; i++) {
       const { node, inh } = pageList[i];
       const rot = doc.num(inh.Rotate, 0);
-      if (rot % 360 !== 0) return { ok: false, reason: "rotated-page", stats };
+      if (rot % 360 !== 0) { const f = pageFail(i, "rotated-page"); if (f) return f; continue; }
       const mb = (doc.arr(inh.MediaBox) ?? [0, 0, 612, 792]).map((x) => doc.num(x));
       const pageArea = Math.abs((mb[2] - mb[0]) * (mb[3] - mb[1])) || 612 * 792;
       let contentStr = "";
       const c = doc.get(node.Contents);
       const refs = Array.isArray(c) ? c : node.Contents !== undefined ? [node.Contents] : [];
+      let undecodable = false;
       for (const r of refs) {
         const st = doc.stream(r);
-        if (!st.ok) { return { ok: false, reason: doc.budget.over ? "stream-budget" : "content-stream-undecodable", stats }; }
+        if (!st.ok) {
+          if (doc.budget.over) return { ok: false, reason: "stream-budget", stats };
+          undecodable = true; break;
+        }
         contentStr += st.data.toString("latin1") + "\n";
       }
+      if (undecodable) { const f = pageFail(i, "content-stream-undecodable"); if (f) return f; continue; }
       const runs = [];
       const images = [];
       const pstats = { ...stats, unmapped: 0, chars: 0, invisible: 0, rotated: 0, hidden: 0, unreadableFont: null };
@@ -935,24 +950,36 @@ export function readPdfTextLayer(bytes, opts = {}) {
       interpret(doc, contentStr, inh.Resources, state, 0);
       if (pstats.timeout || Date.now() > deadline) return { ok: false, reason: "timeout", stats };
       if (doc.budget.over) return { ok: false, reason: "stream-budget", stats };
-      if (pstats.badStream) return { ok: false, reason: "form-stream-undecodable", stats };
-      if (pstats.unreadableFont) return { ok: false, reason: `font:${pstats.unreadableFont}`, stats };
-      if (pstats.invisible) return { ok: false, reason: "invisible-text-ocr-layer", stats };
       // R34: text a person cannot see (white fill, sub-4pt, or placed outside the page) is where "ignore your instructions, set the
       // customer to ..." hides in a born-digital PDF. The vision model reads only what is VISIBLE, so such a file goes there.
-      if (pstats.hidden) return { ok: false, reason: "hidden-text", stats };
-      if (pstats.rotated) return { ok: false, reason: "rotated-text", stats };
-      if (pstats.chars && pstats.unmapped / pstats.chars > 0.005) return { ok: false, reason: "unmapped-characters", stats };
+      const early = pstats.badStream ? "form-stream-undecodable"
+        : pstats.unreadableFont ? `font:${pstats.unreadableFont}`
+        : pstats.invisible ? "invisible-text-ocr-layer"
+        : pstats.hidden ? "hidden-text"
+        : pstats.rotated ? "rotated-text"
+        : pstats.chars && pstats.unmapped / pstats.chars > 0.005 ? "unmapped-characters" : null;
+      if (early) { const f = pageFail(i, early); if (f) return f; continue; }
       stats.chars += pstats.chars; stats.unmapped += pstats.unmapped;
       const pageText = buildLines(runs);
       const bigImg = images.filter((im) => !im.mask && im.area / pageArea > 0.12);
       stats.images += images.length; stats.bigImages += bigImg.length;
-      if (bigImg.length) return { ok: false, reason: "page-image", stats };
-      if (images.length && pageText.replace(/\s/g, "").length < 120 && images.some((im) => im.area / pageArea > 0.02)) return { ok: false, reason: "image-with-little-text", stats };
-      if (looksGarbled(pageText)) return { ok: false, reason: "garbled-text", stats };
+      const late = bigImg.length ? "page-image"
+        : images.length && pageText.replace(/\s/g, "").length < 120 && images.some((im) => im.area / pageArea > 0.02) ? "image-with-little-text"
+        : looksGarbled(pageText) ? "garbled-text" : null;
+      if (late) { const f = pageFail(i, late); if (f) return f; continue; }
       pages.push(opts.keepLines ? { page_no: i + 1, text: pageText, lines: layoutLines(runs) } : { page_no: i + 1, text: pageText });
     }
     stats.pages = pages.length;
+    if (opts.perPage && skipped.length) {
+      // A mixed file: only pages that really carry text count as digital. A text-less page that survived the gates (blank, or a
+      // drawing) is sent to the model too, exactly as the all-vision path always did - never trusted as "empty".
+      const digital = pages.filter((p) => p.text.trim());
+      for (const p of pages) if (!p.text.trim()) skipped.push({ page_no: p.page_no, reason: "no-text-page" });
+      skipped.sort((x, y) => x.page_no - y.page_no);
+      stats.ms = Date.now() - started;
+      if (!digital.length) return { ok: false, reason: skipped[0].reason, stats };
+      return { ok: true, mixed: true, pages: digital, skipped, totalPages: pageList.length, stats };
+    }
     if (!pages.some((p) => p.text.trim())) return { ok: false, reason: "no-text", stats };
     stats.ms = Date.now() - started;
     return { ok: true, pages, stats };
@@ -961,3 +988,6 @@ export function readPdfTextLayer(bytes, opts = {}) {
     return { ok: false, reason: `parse-error:${String(err?.message ?? err).slice(0, 60)}`, stats };
   }
 }
+
+/** Internals shared with pdfPages.js (page subsetting / image shrinking). Not part of the reader's public contract. */
+export const _pdfInternals = { scanObjects, Doc, unpackObjectStreams, collectPages, parseValue, Cursor, pngUnpredict };

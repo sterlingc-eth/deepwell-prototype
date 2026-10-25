@@ -1,0 +1,60 @@
+{
+ "id": "directdeposit-37",
+ "arrival": "clean",
+ "kind": "direct-deposit",
+ "type": "hr-letter",
+ "acceptable_types": [
+  "hr-letter",
+  "internal",
+  "other",
+  "statement"
+ ],
+ "person": "Ulises Zuniga",
+ "fields": {
+  "customer_name": "Ulises Zuniga",
+  "vendor": "Kestrel Ridge Plumbing",
+  "service_date": "2026-04-21"
+ },
+ "extra": {
+  "bank": "Sample Desert Bank",
+  "routing_number": "730123928",
+  "account_number": "0043714244",
+  "account_type": "Savings"
+ },
+ "questions": [
+  {
+   "q": "What bank does Ulises Zuniga use for direct deposit?",
+   "answer": "Sample Desert Bank",
+   "key": "bank",
+   "accept": [
+    "Sample Desert Bank"
+   ]
+  },
+  {
+   "q": "What is the routing number on Ulises Zuniga's direct deposit form?",
+   "answer": "730123928",
+   "key": "routing_number",
+   "accept": [
+    "730123928"
+   ]
+  },
+  {
+   "q": "What is Ulises Zuniga's direct deposit account number?",
+   "answer": "0043714244",
+   "key": "account_number",
+   "accept": [
+    "0043714244"
+   ]
+  },
+  {
+   "q": "Is Ulises Zuniga's direct deposit account checking or savings?",
+   "answer": "Savings",
+   "key": "account_type",
+   "accept": [
+    "Savings"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "directdeposit-37.pdf"
+}

@@ -1,0 +1,83 @@
+{
+ "id": "dotmed-card-17",
+ "arrival": "photo",
+ "kind": "dot-medical-card",
+ "type": "license-certification",
+ "acceptable_types": [
+  "hr-letter",
+  "license-certification"
+ ],
+ "person": "Joaquin Underhill",
+ "fields": {
+  "customer_name": "Joaquin Underhill",
+  "service_date": "2025-07-15",
+  "end_date": "2026-07-14",
+  "license_number": "D31946894"
+ },
+ "extra": {
+  "examiner": "Dr. Priscilla Voss",
+  "national_registry": "6740886883",
+  "examiner_license": "AZ-697508",
+  "certification_period": "12 months",
+  "dob": "1985-03-25"
+ },
+ "questions": [
+  {
+   "q": "When does Joaquin Underhill's DOT medical card expire?",
+   "answer": "2026-07-14",
+   "key": "end_date",
+   "accept": [
+    "2026-07-14",
+    "07/14/2026",
+    "July 14, 2026",
+    "Jul 14, 2026",
+    "7/14/2026",
+    "14 Jul 2026",
+    "07/14/26",
+    "July 14, 2026"
+   ]
+  },
+  {
+   "q": "Who was Joaquin Underhill's medical examiner?",
+   "answer": "Dr. Priscilla Voss",
+   "key": "examiner",
+   "accept": [
+    "Dr. Priscilla Voss",
+    "Priscilla Voss"
+   ]
+  },
+  {
+   "q": "When was Joaquin Underhill's DOT physical?",
+   "answer": "2025-07-15",
+   "key": "service_date",
+   "accept": [
+    "2025-07-15",
+    "07/15/2025",
+    "July 15, 2025",
+    "Jul 15, 2025",
+    "7/15/2025",
+    "15 Jul 2025",
+    "07/15/25",
+    "July 15, 2025"
+   ]
+  },
+  {
+   "q": "What is the driver license number on Joaquin Underhill's medical certificate?",
+   "answer": "D31946894",
+   "key": "license_number",
+   "accept": [
+    "D31946894"
+   ]
+  },
+  {
+   "q": "What is the examiner's national registry number on Joaquin Underhill's DOT medical certificate?",
+   "answer": "6740886883",
+   "key": "national_registry",
+   "accept": [
+    "6740886883"
+   ]
+  }
+ ],
+ "notes": "",
+ "filename": "dotmed-card-17.jpg"
+}

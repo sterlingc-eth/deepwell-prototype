@@ -40,6 +40,7 @@ import * as DA1 from './doctypealias1.js';
 import * as AD2 from './anydoc.js';
 import * as EG4 from './evidence4.js';
 import * as PW2 from './packwrongs2.js';
+import * as ID1 from './iddocs.js';
 import { configureStemFix } from './reader.js';
 import { U, RULES, configureUnified } from './unified1.js';
 const MODULES = [['agg_filter_v1', AF], ['label_clause_v1', LC], ['fields_v2', FX], ['realty_prec_v1', RP], ['rank_v2', RK], ['xdoc_v1', XD], ['hard_v1', HP], ['hard_v2', HV2], ['hard_v3', HV3], ['hard_v4', HV4],
@@ -52,6 +53,7 @@ export function configureFromBundle(B) {
   for (const [k, m] of MODULES) m.configure(s[k]);
   // unified rulebook (env DONOVAN_READER_V2_UNIFIED, default OFF): alias_compound_v1 + stem_fix_v1 + anydoc2_v1 + determinism_v1 canon; OFF = unchanged behaviour
   EG4.configureEvidence();                                     // evidence4_gate (env DONOVAN_READER_V2_EVIDENCE4, default OFF)
+  ID1.configureIdDocs();                                        // iddocs (env DONOVAN_READER_V2_IDDOCS, default OFF; app-side only, NOT mirrored in the loop)
   PW2.configurePackwrongs2();                                   // packwrongs_v2 (env DONOVAN_READER_V2_PACKWRONGS2, default OFF)
   const uni = configureUnified(); DA1.configure(uni ? RULES.alias_compound_v1 : null); configureStemFix(uni && RULES.stem_fix_v1 === true);
   if (s.clause_v3?.on || s.mainpair_v2?.on) throw new Error('switches not supported by this port are on in the bundle: clause_v3 / mainpair_v2');
@@ -72,6 +74,7 @@ export async function loadReaderV2(dir = DATA_DIR) {
     answer: async (ix, q) => {
       let r = await decide(ix, q, M);
       if (U.on && !r.answered && ix.pack) { const a = AD2.maybe(ix, ix.rawPages, q, r); if (a !== null) r = a; }      // anydoc2_v1: second tier for a released question, industry-pack companies only
+      if (ID1.ID.on && !r.answered) { const a = ID1.maybe(ix, q, r); if (a !== null) r = a; }      // iddocs: person-owned papers by type + holder name, default OFF
       if (EG4.EV.on && r.answered) { const g = EG4.gate(ix, q, r); if (g !== null) r = g; }      // evidence4_gate: last step, default OFF
       if (PW2.PW.on && r.answered) { const g = PW2.gate(ix, q, r); if (g !== null) r = g; }      // packwrongs_v2: after the evidence gate, default OFF
       return r;
