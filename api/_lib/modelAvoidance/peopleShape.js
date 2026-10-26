@@ -17,6 +17,7 @@
  */
 
 import { startsWithGivenName, stripAccents, COMMON_SURNAMES, FOREIGN_SURNAMES, FIRST_NAMES } from "./firstNames.js";
+import { familyFirstOrder, vietnameseDoName, koreanGivenBefore, koreanHyphenated, ordinaryLastWord, placeSurname, PLACE_FIRST } from "./nameOrder.js";
 const collapse = (s) => String(s ?? "").replace(/\s+/g, " ").trim();
 
 /* ------------------------------------------------------------------------------------------------ 1. name shape */
@@ -48,7 +49,7 @@ const PLACEHOLDER = /^(?:n\/?a|none|tbd|unknown|redacted|x{3,}|\*{3,}|[-_.#█�
 const isInitial = (t) => /^\p{Lu}\.?$/u.test(t);
 const tokenCase = (t) => {
   if (isInitial(t)) return "IN";
-  if (!/^\p{Lu}[\p{L}\p{M}'’]*(?:-\p{Lu}[\p{L}\p{M}'’]*)*$/u.test(t)) return null; // every part starts upper-case
+  if (!/^\p{Lu}[\p{L}\p{M}'’]*(?:-\p{Lu}[\p{L}\p{M}'’]*)*$/u.test(t)) { if (/^\p{Lu}\p{Ll}+(?:-\p{Ll}+)+$/u.test(t) && koreanHyphenated(t)) return "TC"; return null; } // every part starts upper-case ("Min-jun" is the usual Korean style)
   const letters = t.replace(/[^\p{L}]/gu, "");
   const upper = letters.replace(/[^\p{Lu}]/gu, "").length;
   if (upper === letters.length) return "UP";
@@ -75,7 +76,7 @@ const stripDot = (t) => t.replace(/\.$/, "");
  * these words (Hall, Park, Lane, Field, Brooks, Ford, Mills) are deliberately NOT in the class.
  */
 /** Compound / suffix forms of the same class (Substation, Roundhouse, Outpost, Division, Pavilion, Factory, Laboratory, Stadium, Ordnance ...), for words the list above has not seen. */
-const NON_PERSON_SUFFIX = /^(?:[a-z]{3,}(?:yard|post|station|works|shop|tory|sory|ery|ary|ium|ion|ics|hangar|wharf)|(?:green|round|club|fire|power|store|court|boat|pump|light|work|guard|farm|school|hot|ware)house)$/;
+const NON_PERSON_SUFFIX = /^(?:[a-z]{3,}(?:yard|post|station|works|shop|tory|sory|ery|ary|ium|ion|ics|hangar|wharf|ware)|(?:green|round|club|fire|power|store|court|boat|pump|light|work|guard|farm|school|hot|ware)house)$/;
 const NON_PERSON_LAST = new Set(("branch branches office offices clinic clinics center centers centre dept department departments division divisions valley county counties inc llc ltd corp program programs team teams " +
   "fleet crew staff unit units depot yard warehouse plant site sites location locations region regional zone area district campus building bldg tower terminal hub lab labs laboratory studio " +
   "pool project projects account accounts desk line route store stores base port bay station stations ranch farm  works shop gallery library museum hospital school academy institute " +
@@ -117,9 +118,12 @@ export function nameShape(raw, { kind = "person", maxCore = 4, titleLines = [] }
   const lows = toks.map((t) => stripDot(t).toLowerCase());
   // lexical features (an initial is a letter, not a word: "Ulises A. Larkspur")
   const words = lows.filter((w) => w.length > 1);
-  if (words.some((w) => FUNCTION_WORDS.has(w))) return fail("function-word");
+  const doVn = vietnameseDoName(lows); // "Do Van Hung": Do is a Vietnamese family name (round 7)
+  if (words.some((w, i) => FUNCTION_WORDS.has(w) && !(i === 0 && w === "do" && doVn))) return fail("function-word");
   if (words.some((w) => FORM_VOCAB.has(w) || isFormVerbForm(w))) return fail("form-vocabulary");
   if (words.some((w) => ORG_WORDS.has(w))) return fail("organisation");
+  // a plural trade noun ("Outfitters", "Cleaners", "Installers"): a business, not a person (real surnames in -ers are in the common list)
+  { const lw = words[words.length - 1]; if (lw && lw.length >= 8 && /^[a-z]{4,}[eo]rs$/.test(lw) && !COMMON_SURNAMES.has(lw) && !FOREIGN_SURNAMES.has(lw)) return fail("org-word"); }
   if (words.length && (NON_PERSON_LAST.has(words[words.length - 1].replace(/\.$/, "")) || (words[words.length - 1].length >= 7 && NON_PERSON_SUFFIX.test(words[words.length - 1]))) && !(kind === "examiner" && CREDENTIALS.has(words[words.length - 1]))) return fail("org-word");
   // morphology: a long word that ends like an ordinary English word (-tion, -ment, -ness, -able ...), or an -ing / -ed word that is not a known surname, is not a name
   for (const w of words) {
@@ -347,18 +351,32 @@ function foreignSurname(w) {
   return false;
 }
 /**
- * Strong evidence for a name read off a label: its first word is a given name people have, OR it stands on the person-name label itself (\`onLabel\`, same line)
- * and ends in a surname-shaped word (so an uncommon first name is fine: "Thuy Pham", "Yazmin Begay", "Khalid Al-Rashid"), OR the same name is printed again in a
- * signature / printed-name position (label + signature line). Two arbitrary repeats do not count. Otherwise the field stays empty (a missing name is cheap, a wrong one is not).
+ * Strong evidence for a name read off a label: its first word is a given name people have, OR it stands on the person-name label itself (\`onLabel\`: the label's own
+ * line, or the line right under a label that stands alone) and ends in a surname-shaped word (so an uncommon first name is fine: "Thuy Pham", "Yazmin Begay",
+ * "Khalid Al-Rashid") or is written family-name-first ("Nguyen Van Minh", "Kim Min-jun", "Wang Wei"), OR the same name is printed again in a signature /
+ * printed-name position (label + signature line). Two arbitrary repeats do not count. Otherwise the field stays empty (a missing name is cheap, a wrong one is not).
+ * Round 7: a given name followed by an ordinary English word that is no known surname ("Jordan Mill", "Carmen Hardware") needs the signature print, and "Park"
+ * stands only on a strong person label (\`strong\`: Driver's Name, Holder, Employee Name; not a bare "Name", Manager, Supervisor) or after a Korean given name.
  * @param {string} value a name that already passed nameShape
  * @param {string} fullText every page of the paper
+ * @param {{onLabel?: boolean, strong?: boolean}} [opts] strong defaults to true (callers that read a labelled grid cell)
  */
-export function hasNameEvidence(value, fullText, { onLabel = false } = {}) {
-  const real = plain(value).split(" ").filter((w) => w.length > 1 && !["dr", "mr", "mrs", "ms", "mx", "prof"].includes(w));
+export function hasNameEvidence(value, fullText, { onLabel = false, strong = true } = {}) {
+  value = String(value ?? "").replace(/,?\s+(?:II|III|IV|Jr\.?|Sr\.?)$/i, ""); // a generational suffix is no part of the evidence
+  const real = plain(value).split(" ").filter((w) => w.length > 1 && !["dr", "mr", "mrs", "ms", "mx", "prof", "ii", "iii", "iv", "jr", "sr"].includes(w));
   const lastW = real[real.length - 1] ?? "";
+  const signed = () => nameOccurrences(value, fullText, { inSignature: true }) >= 1 && nameOccurrences(value, fullText) >= 2;
+  // family name first, printed once ("Nguyen Van Minh", "Kim Min-jun", "Wang Wei"): only on the label (checked first: "Hung" and "Tam" are also English words)
+  if (onLabel && familyFirstOrder(real)) return true;
+  // an ordinary English word at the end ("Mill", "Lead", "Hardware") is no evidence of a person: only a second print in a signature position
+  if (real.length >= 2 && ordinaryLastWord(lastW)) return signed();
+  // an English-word surname (Bright, Silver, Fielding) or "Park" (a real Korean surname and a place word): a strong person label, a Korean given name, or the signature print
+  if (real.length >= 2 && placeSurname(lastW)) {
+    const trusted = (onLabel && strong && !PLACE_FIRST.has(real[0])) || (lastW === "park" && koreanGivenBefore(real)); // "Victoria Park", "Austin Lake": a place, unless printed again
+    if (!trusted) return signed();
+  }
   if (startsWithGivenName(value)) return true;
   // the label itself is the evidence for a person whose first name the list does not know, when the last word is a surname no English word shares
   if (onLabel && real.length >= 2 && foreignSurname(lastW)) return true;
-  const sig = nameOccurrences(value, fullText, { inSignature: true });
-  return sig >= 1 && nameOccurrences(value, fullText) >= 2;
+  return signed();
 }

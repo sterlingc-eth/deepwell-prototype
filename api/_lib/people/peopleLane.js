@@ -21,6 +21,7 @@
  * Pure core (answerPeople) + a small DB reader (runPeopleLane). Never throws out of the lane.
  */
 import { readPeopleForm } from "../modelAvoidance/peopleForms.js";
+import { nameShape } from "../modelAvoidance/peopleShape.js";
 
 const truthy = (v) => /^(?:1|true|on|yes)$/i.test(String(v ?? "").trim());
 export const peopleLaneOn = () => truthy(process.env.DONOVAN_READER_V2_IDDOCS);
@@ -279,6 +280,25 @@ export function findPeople(question, people) {
 
 /* ----------------------------------------------------------------------------------------------- the papers */
 /** @typedef {{id:string, type:string, fields:Record<string,string>, pages:{page_no:number,text:string}[]}} PeopleDoc */
+/**
+ * Round 7: a name that sits on a person-name label and looks like a name but that the reader did not believe (no evidence it is a person). It is never used to ANSWER, but it
+ * is a person on file: "Morgan" must not be answered for Emilio Morgan when a second paper holds "Morgan Larkspur" that the reader left unread.
+ */
+const SHADOW_LABEL = /^(?:(?:driver|licensee|holder|cardholder|applicant|employee|operator|examinee|certificate\s+holder|new\s+hire)(?:'s|’s)?\s+)?(?:full\s+|printed\s+)?name\b\s*[:#=-]?\s*(.*)$|^(?:licensee|cardholder|certificate\s+holder|employee|new\s+hire)\s*[:#=-]\s*(.*)$/i;
+function shadowName(pages) {
+  for (const p of pages ?? []) {
+    const lines = String(p?.text ?? "").split(/\r?\n/).map((l) => collapse(l)).filter(Boolean);
+    for (let i = 0; i < lines.length; i++) {
+      const m = SHADOW_LABEL.exec(lines[i]);
+      if (!m) continue;
+      const rest = collapse(m[1] ?? m[2] ?? "");
+      const cand = rest || (lines[i + 1] && !SHADOW_LABEL.test(lines[i + 1]) ? lines[i + 1] : "");
+      const r = cand ? nameShape(cand) : null;
+      if (r?.ok) return r.value;
+    }
+  }
+  return "";
+}
 function docInfo(d) {
   if (d._info) return d._info;
   const f = d.fields ?? {};
@@ -300,7 +320,8 @@ function docInfo(d) {
   let name = merged.holder_name || merged.employee_name || "";
   const cm = /^([A-Za-z'’ -]+),\s*([A-Za-z'’. -]+)$/.exec(name.trim());
   if (cm && !/^(?:md|do|dc|pa|np|dds|phd|jr|sr|ii|iii)\.?$/i.test(cm[2].trim())) name = `${cm[2].trim()} ${cm[1].trim()}`; // "PENHALLOW, ZELDA D" stored as printed
-  d._info = { kind, merged, extras: Object.fromEntries(Object.entries(form.extras).map(([k, v]) => [k, v.value])), name, page: (form.facts.start_date ?? form.facts.end_date ?? form.facts.holder_name ?? form.facts.employee_name ?? {}).page_no ?? null };
+  const shadow = name ? "" : shadowName(d.pages);
+  d._info = { shadow, kind, merged, extras: Object.fromEntries(Object.entries(form.extras).map(([k, v]) => [k, v.value])), name, page: (form.facts.start_date ?? form.facts.end_date ?? form.facts.holder_name ?? form.facts.employee_name ?? {}).page_no ?? null };
   return d._info;
 }
 
@@ -318,20 +339,21 @@ export function answerPeople(docs, question, { today, canHr = true } = {}) {
   try {
     const rq = readQuestion(question);
     if (!rq) return null;
-    const named = docs.map((d) => ({ d, i: docInfo(d) })).filter((x) => x.i.name && (canHr || x.d.type !== "hr-letter"));
+    const named = docs.map((d) => ({ d, i: docInfo(d) })).filter((x) => (x.i.name || x.i.shadow) && (canHr || x.d.type !== "hr-letter"));
     // People and HR papers are for callers who may open People and HR only. A paper whose kind is not recognised still counts as a PERSON
     // (so "Yoder" is not guessed when two Yoders are on file) but is never used to answer.
-    const usable = named.filter((x) => x.i.kind);
+    const usable = named.filter((x) => x.i.kind && x.i.name); // a shadow person (name on file, not believed) is counted but never answers
     if (!usable.length) return null;
     // one person = same first and last name (a middle name or initial may differ between papers: "Maria Lopez Santos" / "Maria L Santos")
     const idOf = (name) => { const p = nameParts(name); return p.first && p.surname ? `${p.first}|${p.surname}` : null; };
     const peopleMap = new Map();
     for (const x of named) {
-      const key = idOf(x.i.name);
+      const pn = x.i.name || x.i.shadow;
+      const key = idOf(pn);
       if (!key) continue;
-      const cur = peopleMap.get(key) ?? { key, name: x.i.name, extra: new Set() };
-      for (const w of nameParts(x.i.name).full) cur.extra.add(w);
-      if (x.i.name.length > cur.name.length) cur.name = x.i.name;
+      const cur = peopleMap.get(key) ?? { key, name: pn, extra: new Set() };
+      for (const w of nameParts(pn).full) cur.extra.add(w);
+      if (pn.length > cur.name.length) cur.name = pn;
       peopleMap.set(key, cur);
     }
     const hits = findPeople(question, [...peopleMap.values()]);

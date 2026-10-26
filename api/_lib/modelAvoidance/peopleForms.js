@@ -128,7 +128,7 @@ function cellsWithCols(line) {
 const PLACEHOLDER = /^(?:n\/?a|none|tbd|unknown|redacted|x{3,}|\*{3,}|[-_.#█▇■□\s]+|\[?redacted\]?|signature)$/i;
 const titleCase = (s) => (/[a-z]/.test(s) ? s : s.toLowerCase().replace(/(^|[\s'’-])([a-z])/g, (m, a, b) => a + b.toUpperCase()));
 let FORM_TEXT = null; // the paper being read (set by readPeopleForm, synchronous): evidence for a name
-function personVal(v, { allowDr = false } = {}) {
+function personVal(v, { allowDr = false, strong = true } = {}) {
   let s = collapse(v).replace(/[,;|]+$/, "");
   if (!s || PLACEHOLDER.test(s) || /redact/i.test(s) || /\d/.test(s)) return null;
   // "Last, First Middle" -> "First Middle Last"
@@ -144,7 +144,7 @@ function personVal(v, { allowDr = false } = {}) {
   if (!nameShape(collapse(v), { kind: allowDr ? "examiner" : "person", maxCore: 5 }).ok) return null; // structure, not a word list
   const out = titleCase(s);
   // round 5: positive evidence (a real given name, or the name printed twice); an examiner's title or credential also counts
-  if (FORM_TEXT != null && !hasNameEvidence(out, FORM_TEXT, { onLabel: !allowDr }) && !(allowDr && /,\s*[A-Za-z.-]{2,6}$|^(?:Dr|Prof)\.?\s/.test(collapse(v)))) return null;
+  if (FORM_TEXT != null && !hasNameEvidence(out, FORM_TEXT, { onLabel: !allowDr, strong }) && !(allowDr && /,\s*[A-Za-z.-]{2,6}$|\s(?:M\.?D\.?|D\.?O\.?|D\.?C\.?|P\.?A\.?(?:-C)?|N\.?P\.?|APRN|DNP|DDS|DMD)$|^(?:Dr|Prof)\.?\s/.test(collapse(v)))) return null;
   return out;
 }
 const dateVal = (v, order) => { const m = DATE_RE.exec(collapse(v)); if (!m) return null; return normalizeDate(m[0], { order }) || null; };
@@ -278,16 +278,16 @@ export function readPeopleForm(pages, { order = "mdy" } = {}) {
     if (t.employer && !isLic) put(facts, "vendor", orgVal(one("employer")), page, quote);
     if (t.employer_addr && !isLic) put(facts, "vendor", orgVal(collapse(one("employer_addr")).split(",")[0]), page, quote);
     if (t.position) put(facts, "position", textVal(one("position")), page, quote);
-    if (t.manager) { const v = personVal(one("manager")); put(facts, "manager", v, page, quote); }
+    if (t.manager) { const v = personVal(one("manager"), { strong: false }); put(facts, "manager", v, page, quote); }
     if (t.rate) put(facts, "pay_rate", moneyVal(one("rate")), page, quote);
     if (t.phone && !isLic) put(facts, "employee_phone", phoneVal(one("phone")), page, quote);
     if (t.email && !isLic) put(facts, "employee_email", emailVal(one("email")), page, quote);
     if (t.department) put(extras, "department", textVal(one("department")), page, quote);
-    if (t.econtact) put(extras, "emergency_contact", personVal(one("econtact")), page, quote);
+    if (t.econtact) put(extras, "emergency_contact", personVal(one("econtact"), { strong: false }), page, quote);
     if (t.ephone) put(extras, "emergency_phone", phoneVal(one("ephone")), page, quote);
     if (t.role) put(extras, "role", textVal(one("role")), page, quote);
     if (t.availability) put(extras, "availability", textVal(one("availability")), page, quote);
-    if (t.reference) put(extras, "reference", personVal(one("reference")), page, quote);
+    if (t.reference) put(extras, "reference", personVal(one("reference"), { strong: false }), page, quote);
     if (t.bank) put(extras, "bank", orgVal(one("bank")), page, quote);
     if (t.acct_type) { const a = /^(checking|savings)$/i.exec(collapse(one("acct_type"))); if (a) put(extras, "account_type", titleCase(a[1].toLowerCase()), page, quote); }
     if (t.extra_wh) put(extras, "extra_withholding", moneyVal(one("extra_wh")), page, quote);

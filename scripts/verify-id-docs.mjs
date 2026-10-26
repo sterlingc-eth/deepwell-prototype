@@ -46,6 +46,81 @@ t('classifyFromText anchors', () => {
   assert.equal(P.te.classifyFromText([{ page_no: 1, text: 'NOTICE\nPlease see the class schedule' }]), null);
 });
 
+// ---- Real-docs round: layouts of a DOT certificate (grid rows, two names on one line, option tails, check boxes), a CDL card (numbered fields), a new-hire sheet.
+// SYNTHETIC text in the transcription format ("label: value", "checked" / "unchecked") and in free-OCR shape. Invented values only.
+const MECV = ["Form MCSA-5876   OMB No.: 2126-0006   Expiration Date: 03/31/2028", "U.S. Department of Transportation Medical Examiner's Certificate", '(for Commercial Driver Medical Certification)', 'I certify that I have examined', 'Last Name: Brandt-Okoro', 'First Name: Lucinda',
+  'in accordance with (please check only one):', 'Wearing corrective lenses: checked', 'Wearing hearing aid: unchecked', 'Accompanied by a waiver/exemption: unchecked', "Medical Examiner's Certificate Expiration Date: 03/14/2028",
+  "Medical Examiner's Signature: (handwritten signature)", "Medical Examiner's Telephone Number: 602-555-0142", 'Date Certificate Signed: 03/14/2026', "Medical Examiner's Name (please print or type): Priya Venkataraman, M.D.", 'MD: checked', 'DO: unchecked',
+  "Medical Examiner's State License, Certificate, or Registration Number: 4410087", 'Issuing State: AZ', 'National Registry Number: 7733120055', "Driver's Signature: (handwritten signature)", "Driver's License Number: D09981234", 'Issuing State/Province: NV'].join('\n');
+const MECO = ["Form MCSA-5876 OMB No.: 2126-0006 Expiration Date: 03/31/2028", "US. Department of Transportation Medical Examiner's Certificate", "I certify that | have examined Last Name: Vandermeer II First Name: Lucas in accordance with (please check only one):",
+  'CO Wearing corrective lenses [-] Accompanied by a waiver/exemption (0 Driving within an exempt intracity zone (49 CFR 391.62) (Federal)', "Medical Examiner's Certificate Expiration Date", 'The information | have provided regarding this physical examination is true and complete. A complete Medical Examination Report Form, 04/09/2029',
+  "Medical Examiner's Signature Medical Examiner's Telephone Number Date Certificate Signed", 'tt 520-555-0188 04/09/2027',
+  "Medical Examiner's Name (please print or type) © MD © Physician Assistant | ©) Advanced Practice Nurse", 'Priya Natarajan M.D. Ovo O Chiropractor © Other Practitioner (specify)',
+  "Medical Examiner's State License, Certificate, or Registration Number Issuing State National Registry Number", '0412233 AZ 5598123412', "Driver's Signature Qo Driver's License Number Issuing State/Province", '\\ D01234567 NV'].join('\n');
+const MECR = MECO.replace('Last Name: Vandermeer II First Name: Lucas', 'Last Name: | FirstName: Lucas').replace('tt 520-555-0188', 'H§-555-0188').replace('0412233 AZ 5598123412', 'o AZ -').replace('\\ D01234567 NV', '\\ COR 8348');
+const CDLV = ['Ohio', 'COMMERCIAL DRIVER LICENSE', 'FEDERAL LIMITS APPLY', '4d DLN: QK481920357', '1,2 Name: HARLOWE', 'MARISOL T', '8 Address: 4417 CEDAR HOLLOW RD', 'COLUMBUS, OH 43215', '3 Date of Birth: 02/17/1979', '9 Class: B', '9a End: H,N',
+  '15 Sex: F    18 Eyes: BRN', '12 Restrictions: B,E', '4a Iss: 06/12/2024', '4b Exp: 02/17/2030'].join('\n');
+const HWV = ['NEW HIRE CHECKLIST', 'New Hire Name: Tomas R Whitlock', 'Position: Warehouse Associate', 'Start Date: 11/03/2026', 'Hourly Rate: $19.50', 'Manager: Denise Okafor', 'Site: Mesa Distribution Center', 'Employee #: 40817', 'Position #: 2291', 'Ticket 1: IT-55120', 'Badge issued: checked', 'Uniform ordered: unchecked'].join('\n');
+t('rd mec vision: holder from first / last lines', () => assert.equal(val(runDoc(P, doc(MECV)), 'holder_name'), 'Lucinda Brandt-Okoro'));
+t('rd mec vision: every field', () => {
+  const r = runDoc(P, doc(MECV)); assert.equal(r.type, 'license-certification');
+  const want = { license_number: 'D09981234', issued_by: 'Priya Venkataraman, M.D.', start_date: '2026-03-14', signed_date: '2026-03-14', end_date: '2028-03-14', examiner_license_number: '4410087', examiner_license_state: 'AZ', national_registry_number: '7733120055', examiner_phone: '602-555-0142', license_state: 'NV', restrictions: 'Wearing corrective lenses' };
+  for (const [k, v] of Object.entries(want)) assert.equal(val(r, k), v, k);
+});
+t('rd mec vision: an unchecked box is not a restriction; none checked -> no restrictions field', () => assert.equal(val(runDoc(P, doc(MECV.replace('lenses: checked', 'lenses: unchecked'))), 'restrictions'), undefined));
+t('rd mec vision: several checked boxes are all listed', () => assert.equal(val(runDoc(P, doc(MECV.replace('hearing aid: unchecked', 'hearing aid: checked'))), 'restrictions'), 'Wearing corrective lenses; Wearing hearing aid'));
+t('rd mec vision: tick styles', () => { for (const m of ['[x] Wearing corrective lenses', '☒ Wearing corrective lenses']) assert.equal(val(runDoc(P, doc(MECV.replace('Wearing corrective lenses: checked', m))), 'restrictions'), 'Wearing corrective lenses', m); });
+t('rd mec ocr: two names on one line, suffix kept', () => assert.equal(val(runDoc(P, doc(MECO)), 'holder_name'), 'Lucas Vandermeer II'));
+t('rd mec ocr: examiner name under a label with option tail, cut at the credential', () => assert.equal(val(runDoc(P, doc(MECO)), 'issued_by'), 'Priya Natarajan M.D.'));
+t('rd mec ocr: grid rows with single-space cells and an empty signature cell', () => {
+  const r = runDoc(P, doc(MECO));
+  const want = { examiner_phone: '520-555-0188', signed_date: '2027-04-09', start_date: '2027-04-09', examiner_license_number: '0412233', examiner_license_state: 'AZ', national_registry_number: '5598123412', license_number: 'D01234567', license_state: 'NV', end_date: '2029-04-09' };
+  for (const [k, v] of Object.entries(want)) assert.equal(val(r, k), v, k);
+});
+t('rd mec ocr: a glyph the scanner made of a box is never a restriction', () => assert.equal(val(runDoc(P, doc(MECO)), 'restrictions'), undefined));
+t('rd mec redacted: redacted cells stay empty, the state beside them is read, no partial name', () => {
+  const r = runDoc(P, doc(MECR));
+  assert.equal(val(r, 'holder_name'), undefined); assert.equal(val(r, 'examiner_phone'), undefined); assert.equal(val(r, 'examiner_license_number'), undefined); assert.equal(val(r, 'national_registry_number'), undefined);
+  assert.equal(val(r, 'license_number'), undefined); assert.equal(val(r, 'license_state'), undefined); assert.equal(val(r, 'examiner_license_state'), 'AZ');
+});
+t('rd mec: a row with the wrong number of values is not paired', () => { const r = runDoc(P, doc(MECO.replace('0412233 AZ 5598123412', '0412233 AZ 5598123412 7'))); assert.equal(val(r, 'examiner_license_number'), undefined); assert.equal(val(r, 'national_registry_number'), undefined); });
+t('rd names: junk in first / last labels is not a person', () => assert.equal(val(runDoc(P, doc(MECV.replace('Last Name: Brandt-Okoro', 'Last Name: Open Position').replace('First Name: Lucinda', 'First Name: Night Shift'))), 'holder_name'), undefined));
+t('rd names: last name only is not a holder', () => assert.equal(val(runDoc(P, doc(MECV.replace('First Name: Lucinda\n', ''))), 'holder_name'), undefined));
+t('rd cdl vision: numbered card fields', () => {
+  const r = runDoc(P, doc(CDLV)); assert.equal(r.type, 'license-certification');
+  const want = { license_number: 'QK481920357', holder_name: 'Marisol T Harlowe', license_class: 'B', endorsements: 'H,N', restrictions: 'B,E', start_date: '2024-06-12', end_date: '2030-02-17' };
+  for (const [k, v] of Object.entries(want)) assert.equal(val(r, k), v, k);
+});
+t('rd R2: a state in a title is never the licence state', () => { for (const ti of ['Texas Tech University Identification Card', 'Virginia Tech Driver Training Certificate', 'Ohio State University Student ID Card']) assert.equal(val(runDoc(P, doc(`${ti}\nName: Alex Q Tester\nID Number: D12345678\nExpires: 03/15/2030`)), 'license_state'), undefined, ti); });
+t('rd R2: ambiguous check marks are not ticks', () => { for (const L of ['Wearing corrective lenses [x]   Wearing hearing aid [ ]', 'Wearing corrective lenses   Yes   No', '(o) Wearing corrective lenses   ( ) Wearing hearing aid', 'Wearing corrective lenses X   Wearing hearing aid']) assert.equal(val(runDoc(P, doc(MECV.replace('Wearing corrective lenses: checked\nWearing hearing aid: unchecked', L))), 'restrictions'), undefined, L); });
+t('rd R2: boxes on one line, each option with its own box', () => assert.equal(val(runDoc(P, doc(MECV.replace('Wearing corrective lenses: checked\nWearing hearing aid: unchecked', '☐ Wearing corrective lenses   ☒ Wearing hearing aid'))), 'restrictions'), 'Wearing hearing aid'));
+t('rd R2: an empty cell lends nothing to its neighbour', () => {
+  const r = runDoc(P, doc(MECV.replace('Registration Number: 4410087', 'Registration Number:').replace('Telephone Number: 602-555-0142', 'Telephone Number:').replace('Date Certificate Signed: 03/14/2026', 'Date Certificate Signed:')));
+  for (const k of ['examiner_license_number', 'examiner_phone', 'signed_date']) assert.equal(val(r, k), undefined, k);
+  assert.equal(val(runDoc(P, doc(HWV.replace('Site: Mesa Distribution Center', 'Site:'))), 'work_site'), undefined);
+  assert.equal(val(runDoc(P, doc(HWV.replace('Employee #: 40817', 'Employee #:'))), 'employee_number'), undefined);
+});
+t('rd R2: registry number and phone must have their own shapes (swapped columns read nothing)', () => {
+  const r = runDoc(P, doc(MECO.replace('tt 520-555-0188 04/09/2027', 'tt 5598123412 04/09/2027').replace('0412233 AZ 5598123412', '0412233 AZ 520-555-0188')));
+  assert.equal(val(r, 'examiner_phone'), undefined); assert.equal(val(r, 'national_registry_number'), undefined);
+});
+t('rd R3: a heading under a lone site / location label is never the work site', () => { for (const lab of ['Work Site', 'Work Location', 'Location', 'Branch', 'Store', 'Site:']) for (const head of ['Section 2', 'Office Use Only', 'Page 2 of 2', 'Part B', 'Human Resources', 'Employer Use Only']) assert.equal(val(runDoc(P, doc(HWV.replace('Site: Mesa Distribution Center', `${lab}\n${head}`))), 'work_site'), undefined, `${lab} / ${head}`); });
+t('rd R3: work site is read inline after a colon only, and a heading there is refused', () => { assert.equal(val(runDoc(P, doc(HWV)), 'work_site'), 'Mesa Distribution Center'); assert.equal(val(runDoc(P, doc(HWV.replace('Site: Mesa Distribution Center', 'Location: Section 2'))), 'work_site'), undefined); });
+t('rd R3: a redaction remnant ("Lo") in the Last Name cell is no surname', () => { for (const g of ['Last Name: Lo FirstName: David in accordance', 'Last Name: Lo First Name: David in accordance', 'Last Name: | Lo First Name: David in accordance', 'Last Name: | | FirstName: David in accordance']) assert.equal(val(runDoc(P, doc(MECO.replace('Last Name: Vandermeer II First Name: Lucas in accordance', g))), 'holder_name'), undefined, g); });
+t('rd R3: a short surname printed twice is still a surname', () => assert.equal(val(runDoc(P, doc(MECO.replace('Last Name: Vandermeer II First Name: Lucas in accordance', 'Last Name: Lo First Name: Lucas in accordance') + "\nDriver's Name: Lucas Lo")), 'holder_name'), 'Lucas Lo'));
+t('rd cdl: date of birth and address are never facts', () => { const r = runDoc(P, doc(CDLV)); for (const f of r.fields) assert.ok(!/1979-02-17|CEDAR/i.test(String(f.value)), f.field_key); });
+t('rd cdl: numbered name lines "1 SAMPLE / 2 JORDAN Q"', () => assert.equal(val(runDoc(P, doc(CARD.replace('Name\nTester, Alex Q', '1 TESTER\n2 ALEX Q'))), 'holder_name'), 'Alex Q Tester'));
+t('rd cdl: "NONE" endorsements and restrictions are read as printed', () => { const r = runDoc(P, doc(CDLV.replace('H,N', 'NONE').replace('B,E', 'NONE'))); assert.equal(val(r, 'endorsements'), 'NONE'); assert.equal(val(r, 'restrictions'), 'NONE'); });
+t('rd hr vision: every field of a handwritten new-hire sheet', () => {
+  const r = runDoc(P, doc(HWV)); assert.equal(r.type, 'hr-letter');
+  const want = { employee_name: 'Tomas R Whitlock', position: 'Warehouse Associate', start_date: '2026-11-03', pay_rate: '$19.50', manager: 'Denise Okafor', work_site: 'Mesa Distribution Center', employee_number: '40817' };
+  for (const [k, v] of Object.entries(want)) assert.equal(val(r, k), v, k);
+  assert.equal(val(r, 'service_date'), undefined);
+});
+t('rd hr: first / last name lines', () => assert.equal(val(runDoc(P, doc(HWV.replace('New Hire Name: Tomas R Whitlock', 'First Name: Tomas\nLast Name: Whitlock'))), 'employee_name'), 'Tomas Whitlock'));
+t('rd hr: a social security number is not an employee number', () => assert.equal(val(runDoc(P, doc(HWV.replace('Employee #: 40817', 'Employee #: 123-45-6789'))), 'employee_number'), undefined));
+t('rd: other types never get the new keys', () => { const r = runDoc(P, doc(INVOICE + '\nIssuing State: AZ\nRestrictions: B,E\nSite: Main Plant')); for (const k of ['license_state', 'restrictions', 'work_site', 'endorsements', 'examiner_phone']) assert.equal(val(r, k), undefined, k); });
+
 // ---- Donovan reader-v2 (switch DONOVAN_READER_V2_IDDOCS, default OFF): synthetic company, invented people
 {
   const rv = await import(new URL('../api/_lib/dql/reader-v2/index.js', import.meta.url).href);
@@ -315,7 +390,52 @@ t('two medical papers: the later expiry is used', () => assert.match(ask([MEC2, 
   // uncommon real names: a surname-shaped last word on the label's own line is enough; unknown surname + unknown first name is not (by design)
   for (const n of ['Dzung Pham', 'Yazmin Begay', 'Khalid Al-Hamdan', 'Tuan Nguyen', 'Nizhoni Yazzie', 'Rashid Haddad', 'Xochitl Mendoza', 'Hyun-Woo Kim', 'Siosaia Tupou', 'Anh Dinh', 'Wei Zhang'])
     t(`uncommon real name "${n}" on a name label (same line) is read`, () => { assert.equal(hold(n), n); assert.equal(emp(n), n); });
-  t('the same uncommon name on the NEXT line of the label is not read on label strength alone, unless the first name is known', () => assert.equal(val(runDoc(P, doc("Medical Examiner's Certificate\nDriver's Name\nDzung Pham\nDriver's License Number\nX1234567\nDate of Examination 05/05/2024\n")), 'holder_name'), undefined));
+  // round 7: the line AFTER a label that stands alone is as strong as the label's own line
+  const holdNext = (name, label = "Driver's Name") => val(runDoc(P, doc(`Medical Examiner's Certificate\n${label}\n${name}\nDriver's License Number\nX1234567\nDate of Examination 05/05/2024\n`)), 'holder_name');
+  const empNext = (name, label = 'Employee Name') => val(runDoc(P, doc(`New Hire Checklist\n${label}\n${name}\nPosition\nField Technician\nStart Date 06/03/2025\n`)), 'employee_name');
+  for (const n of ['Dzung Pham', 'Yazmin Begay', 'Khalid Al-Hamdan', 'Nizhoni Yazzie', 'Rashid Haddad', 'Xochitl Mendoza', 'Siosaia Tupou', 'Tamsin Pryce'.replace('Pryce', 'Valdez')])
+    t(`R7: uncommon name "${n}" on the line after a lone label is read`, () => { assert.equal(holdNext(n), n); assert.equal(empNext(n), n); });
+  t('R7: the next-line rule keeps the evidence rule: unknown first name + unknown surname is still not read', () => { assert.equal(holdNext('Tamsin Pryce'), undefined); assert.equal(empNext('Tamsin Pryce'), undefined); });
+  for (const j of ['Mobile Lot West', 'Dallas Branch', 'Jordan Mill', 'Casey Lead', 'Night Shift Lead', 'Standby Tank East', 'Rich Gear', 'Carmen Bolt'])
+    t(`R7: junk "${j}" on the line after a lone label reads nothing`, () => { assert.equal(holdNext(j), undefined); assert.equal(empNext(j), undefined); });
+  t('R7: the line after a label that has a label of its own is not a value', () => assert.equal(val(runDoc(P, doc("Medical Examiner's Certificate\nDriver's Name\nDriver's License Number: X1234567\nDate of Examination 05/05/2024\n")), 'holder_name'), undefined));
+  t('R7: a next line of several cells is not trusted as a bare name', () => assert.equal(holdNext('Dzung Pham      Class A'), undefined));
+  // round 7: family-name-first order (Vietnamese, Korean, Chinese) on a person-name label
+  for (const n of ['Nguyen Van Minh', 'Tran Thi Lan', 'Le Hoai Nam', 'Pham Duc Thanh', 'Do Van Hung', 'Ho Thanh Tam', 'Hoang Thi Thuy', 'NGUYEN VAN MINH', 'Kim Min-jun', 'Park Ji-hoon', 'Lee Seo-yeon', 'Choi Hyun-woo', 'Kim Min Jun', 'Wang Wei', 'Li Na', 'Zhang Wenjie', 'Chen Meiling', 'Huang Lei'])
+    t(`R7: family-name-first "${n}" printed once on a name label is read`, () => { assert.equal(hold(n), n); assert.equal(emp(n), n); assert.equal(holdNext(n), n); });
+  for (const j of ['Dang Warehouse', 'Bui Truck Lot', 'Ho Shift Lead', 'Le Mans Garage', 'Do Not Enter', 'Ngo Tool Crib', 'Kim Tool Room', 'Lee Pump Shed', 'Song Bird Feeder', 'Lin Valve Room', 'Hu Gear Box', 'Tang Shift Lead', 'Ma Boiler Room', 'Mai Tai Lounge'])
+    t(`R7: junk "${j}" that starts with a family name reads nothing`, () => { assert.equal(hold(j), undefined); assert.equal(emp(j), undefined); assert.equal(holdNext(j), undefined); });
+  t('R7: family-name-first order is evidence on a label only, not by itself', () => { assert.equal(PS.hasNameEvidence('Nguyen Van Minh', 'Nguyen Van Minh', { onLabel: false }), false); assert.equal(PS.hasNameEvidence('Nguyen Van Minh', 'x', { onLabel: true }), true); });
+  t('R7: "Do" leads a Vietnamese name only', () => { assert.equal(PS.nameShape('Do Van Hung').ok, true); assert.equal(PS.nameShape('Do Not Enter').ok, false); assert.equal(PS.nameShape('Do Check').ok, false); });
+  t('R7: a Korean hyphenated given name with a lower-case second part is a name shape; an English hyphen word is not', () => { assert.equal(PS.nameShape('Park Ji-hoon').ok, true); assert.equal(PS.nameShape('Casey Lead-in').ok, false); });
+  // round 7: a given name + an ordinary English word that is no surname ("Mill", "Lead", "Gear") needs the signature print; Park needs a strong label or a Korean given name
+  for (const j of ['Jordan Mill', 'Florence Mill', 'Casey Lead', 'Rich Gear', 'Carmen Bolt', 'Dana Foreman', 'Taylor Vent', 'Riley Conveyor', 'Austin Dumpster'])
+    t(`R7: "${j}" (given name + ordinary word) is not read on a name label`, () => { assert.equal(hold(j), undefined); assert.equal(emp(j), undefined); });
+  t('R7: ...but is read when it is printed again on a signature line', () => assert.equal(val(runDoc(P, doc('New Hire Checklist\nEmployee Name: Jordan Mill\nPosition\nField Technician\nStart Date 06/03/2025\nPrinted Name\nJordan Mill\n')), 'employee_name'), 'Jordan Mill'));
+  for (const n of ['Dana Bright', 'Casey Silver', 'Riley Bacon', 'Jordan Hall', 'Casey Hill', 'Morgan Tester', 'Casey Example', 'Casey Fielding'])
+    t(`R7: real English-word surname "${n}" is still read on a strong label`, () => { assert.equal(hold(n), n); assert.equal(emp(n), n); });
+  // round 8: a given name + ANY everyday noun that is no surname needs the second print; the signal is structural (dictionary noun, compound of two, noun suffix, thing-participle)
+  const NO = await import(new URL('../api/_lib/modelAvoidance/nameOrder.js', import.meta.url).href);
+  for (const j of ['John Forklift', 'Maria Playground', 'Grace Trenchbox', 'Dallas Warehouse', 'Linda Scaffold', 'Paul Backhoe', 'Susan Swingset', 'Derek Girders', 'Nora Greenhouse', 'Carlos Excavator', 'Emily Pavilion', 'Robert Flooring', 'Ines Scaffolding', 'Austin Stockroom', 'Derek Skylift', 'Hector Fieldhouse', 'Gloria Rollcage', 'Leon Ductbank'])
+    t(`R8: "${j}" (given name + everyday noun) is not read on a name label, strong or weak, same line or next`, () => { assert.equal(hold(j), undefined); assert.equal(emp(j), undefined); assert.equal(holdNext(j), undefined); assert.equal(empNext(j), undefined); assert.equal(val(runDoc(P, doc(`New Hire Checklist\nManager: ${j}\nPosition\nField Technician\nStart Date 06/03/2025\n`)), 'manager'), undefined); });
+  t('R8: ...printed again in a signature position, the same name is read', () => { for (const j of ['John Forklift', 'Grace Trenchbox']) assert.equal(val(runDoc(P, doc(`New Hire Checklist\nEmployee Name: ${j}\nPosition\nField Technician\nStart Date 06/03/2025\nPrinted Name\n${j}\n`)), 'employee_name'), j); });
+  t('R8: the same word is a person when the common surname lists know it', () => { for (const w of ['park', 'stone', 'hill', 'wood', 'baker', 'mills', 'fields', 'rivers', 'green', 'black', 'young', 'king', 'bird', 'fox', 'lane', 'moon', 'glass', 'hammer', 'barrios', 'solano', 'greenwood', 'whitfield', 'bellweather', 'larkspur', 'tamarack', 'hawthorn', 'walking']) assert.equal(NO.ordinaryLastWord(w), false, w); });
+  t('R8: everyday nouns are ordinary last words, whatever their length', () => { for (const w of ['forklift', 'playground', 'trenchbox', 'warehouse', 'scaffold', 'girders', 'swingset', 'skylift', 'excavator', 'pavilion', 'mill', 'foreman', 'bolt', 'flooring', 'scaffolding', 'backfilling', 'ductware']) assert.equal(NO.ordinaryLastWord(w), true, w); });
+  t('R8: a word that is neither a dictionary noun nor a compound of two keeps the old path (uncommon real surnames)', () => { for (const w of ['zavala', 'okonkwo', 'oyelaran', 'tsosie', 'kowalczyk', 'penhallow', 'mondragon', 'pennington', 'cromwell', 'ainsworth', 'hollister', 'cunninghame', 'whitcombe']) assert.equal(NO.ordinaryLastWord(w), false, w); });
+  t('R8: uncommon real names with a non-noun surname are still read on a strong label', () => { for (const n of ['Casey Zavala', 'Alice Okonkwo', 'Raul Penhallow', 'Nina Pennington', 'Glenn Tsosie', 'Irene Ainsworth']) { assert.equal(hold(n), n); assert.equal(emp(n), n); } });
+  t('R8: the Census top 1,000 vouches for a word that is also a noun; further down, it does not', () => { assert.equal(NO.knownSurname('moon'), true); assert.equal(NO.knownSurname('bolt'), false); assert.equal(NO.knownSurname('forklift'), false); });
+  t('R7: Park: read on a strong label and after a Korean given name; not on a weak label after an English one', () => {
+    assert.equal(hold('Jordan Park'), 'Jordan Park');
+    const mgr = (n) => val(runDoc(P, doc(`New Hire Checklist\nNew Hire Name: Dana Sample\nPosition: Installer\nStart Date 06/03/2025\nSupervisor: ${n}\n`)), 'manager');
+    assert.equal(mgr('Ji-hoon Park'), 'Ji-hoon Park'); assert.equal(mgr('Seo-yeon Park'), 'Seo-yeon Park'); assert.equal(mgr('Victoria Park'), undefined); assert.equal(mgr('Jordan Park'), undefined);
+    assert.equal(val(runDoc(P, doc("Medical Examiner's Certificate\nName: Austin Park\nDriver's License Number\nX1234567\nDate of Examination 05/05/2024\n")), 'holder_name'), undefined);
+  });
+  t('R7: a name on a label that the reader does not believe is still a person on file: the lane abstains instead of answering for the other person', () => {
+    const mk = (id, type, text, fields) => ({ id, type, fields, pages: [{ page_no: 1, text }] });
+    const docs = [mk('cdl', 'license-certification', 'COMMERCIAL DRIVER LICENSE\nDLN: T60525712   CLASS: A\nISS 03/15/2022   EXP 03/15/2032\nName: Emilio Morgan', { holder_name: 'Emilio Morgan', end_date: '2032-03-15', license_class: 'A' }), mk('hire', 'hr-letter', 'New Hire Checklist\nEmployee Name\nMorgan Mill\nPosition\nInstaller\nStart Date 09/01/2026', { start_date: '2026-09-01' })];
+    assert.equal(answerPeople(docs, "When does Morgan's CDL expire?", { today: '2026-10-25', canHr: true }), null);
+    assert.ok(answerPeople(docs.slice(0, 1), "When does Morgan's CDL expire?", { today: '2026-10-25', canHr: true }));
+  });
   t('name occurrences count either order and ignore accents', () => { assert.equal(PS.nameOccurrences('José García', 'Name: García, Jose\nSigned: José García'), 2); assert.equal(PS.nameOccurrences('Ana Reyes', 'Ana Reyes'), 1); assert.equal(PS.nameOccurrences('Ana', 'Ana Ana'), 0); });
   t('given-name test: first word only, prefix and accents ignored', () => { assert.equal(FN.startsWithGivenName('Dr. José García'), true); assert.equal(FN.startsWithGivenName('Fleet Mark Alpha'), false); assert.equal(FN.startsWithGivenName('Łukasz Kowalski'), true); });
   t('the evidence rule is applied to a form reader too (direct deposit with junk as the employee)', () => assert.equal(val(runDoc(P, doc('Direct Deposit Authorization Form\nKestrel Ridge Plumbing - Payroll Department\n\nEMPLOYEE NAME                                                               DATE\n\n Night Cart Lead                                                           04/21/2026\nBANK NAME                                                                   ACCOUNT TYPE\n\n Sample Desert Bank                                                         Savings\n')), 'employee_name'), undefined));
