@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="DeepWell for photo studio: a sample workspace of 20 documents, with example questions answered and linked to the source.">
+<meta property="og:title" content="Photo studio — DeepWell Technology">
+<meta property="og:description" content="DeepWell for photo studio: a sample workspace of 20 documents, with example questions answered and linked to the source.">
+<meta property="og:image" content="https://deepwelltechnology.com/og-image.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:site_name" content="DeepWell Technology">
+<meta property="og:url" content="https://deepwelltechnology.com/industries/photostudio.html">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Photo studio — DeepWell Technology">
+<meta name="twitter:description" content="DeepWell for photo studio: a sample workspace of 20 documents, with example questions answered and linked to the source.">
+<meta name="twitter:image" content="https://deepwelltechnology.com/og-image.jpg">
+<link rel="canonical" href="https://deepwelltechnology.com/industries/photostudio.html">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#0B1613">
+<title>Photo studio — DeepWell Technology</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --well:#163C2C; --navy:#123D6B; --brass:#B98A4E; --ink:#0B1613;
+  --ground:#EEF2EE; --surface:#FFFFFF; --surface-2:#E2E9E4; --text:#0F1F19;
+  --muted:#4F6259; --faint:#576A62; --line:rgba(22,60,44,.18);
+  --line-strong:rgba(22,60,44,.38); --brass-text:#8E6530;
+  --shadow:0 20px 50px -30px rgba(11,22,19,.45);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#0B1613; --surface:#10201A; --surface-2:#152A22; --text:#E6EEE9;
+    --muted:#A9BBB2; --faint:#7B9286; --line:rgba(230,238,233,.14);
+    --line-strong:rgba(230,238,233,.32); --brass-text:#D8AE6E;
+    --shadow:0 20px 50px -30px rgba(0,0,0,.8);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark; --ground:#0B1613; --surface:#10201A; --surface-2:#152A22;
+  --text:#E6EEE9; --muted:#A9BBB2; --faint:#7B9286; --line:rgba(230,238,233,.14);
+  --line-strong:rgba(230,238,233,.32); --brass-text:#D8AE6E;
+  --shadow:0 20px 50px -30px rgba(0,0,0,.8);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--text);font-family:"IBM Plex Sans",-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+h1,h2{font-family:"Newsreader",Georgia,serif;font-weight:500;line-height:1.12;letter-spacing:-.01em;margin:0}
+h1{font-size:clamp(2rem,4.4vw,2.9rem)}
+h2{font-size:1.3rem;margin-bottom:6px}
+p{margin:0}
+a{color:inherit}
+.wrap{max-width:820px;margin:0 auto;padding-inline:clamp(16px,4vw,40px)}
+.eyebrow{font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);display:flex;align-items:center;gap:12px}
+.eyebrow::before{content:"";width:22px;height:1px;background:var(--brass)}
+.lede{font-size:1.1rem;color:var(--muted);max-width:62ch}
+:focus-visible{outline:2px solid var(--brass);outline-offset:3px}
+
+/* nav — same markup/classes as index.html so this is one design system,
+   not a lookalike. Links point back to sections on the main site since
+   this page has none of its own. */
+.nav{position:sticky;top:0;z-index:20;backdrop-filter:blur(12px);
+  background:color-mix(in srgb,var(--ground) 82%,transparent);border-bottom:1px solid var(--line);
+  --ground:#F4F7F4;--surface:#FFFFFF;--surface-2:#E2E9E4;--text:#0F1F19;--muted:#4F6259;--faint:#576A62;
+  --line:rgba(22,60,44,.18);--line-strong:rgba(22,60,44,.38);--well:#0D3827;
+  color:var(--text);background:#F4F7F4}
+.nav .wrap{display:flex;align-items:center;justify-content:space-between;height:68px;gap:24px}
+.brand{display:flex;align-items:center;gap:12px;text-decoration:none}
+.brand .mark{width:34px;height:34px}
+.brand .word{display:flex;flex-direction:column;gap:4px;font-family:"Newsreader",serif;font-weight:600;font-size:1.45rem;letter-spacing:-.01em;line-height:1}
+.brand .word small{font-family:"IBM Plex Mono",monospace;font-weight:500;font-size:.56rem;letter-spacing:.3em;text-transform:uppercase;color:var(--faint);padding-left:.1em}
+.brand .word b{color:#04315A;font-weight:600}
+.brand .word i{font-style:normal;color:var(--well)}
+.navlinks{display:flex;align-items:center;gap:28px;font-size:.92rem;font-weight:500;position:relative}
+.navlinks a{text-decoration:none;color:var(--muted)}
+.navlinks a:hover{color:var(--text)}
+.navlinks a[aria-current="page"]{color:var(--text)}
+.navcta{display:flex;align-items:center;gap:12px}
+@media (max-width:1100px){.navlinks{display:none}}
+@media (max-width:520px){.navcta .btn-primary{display:none}}
+.btn{display:inline-flex;align-items:center;gap:10px;padding:12px 20px;border-radius:4px;font-weight:600;font-size:.95rem;text-decoration:none;border:1px solid transparent;transition:transform .2s ease,background .2s ease;min-height:44px}
+.btn-primary{background:var(--well);color:#fff}
+.btn-primary:hover{background:var(--navy);transform:translateY(-1px)}
+.btn-ghost{border-color:var(--line-strong);color:var(--text);background:transparent}
+.btn-ghost:hover{background:var(--surface)}
+
+/* Industries nav dropdown — copied from index.html verbatim (see that
+   file's labeled CSS block); kept in sync by hand until there's a shared
+   stylesheet. */
+.nav-dropdown{position:relative}
+.nav-dropdown-toggle{display:inline-flex;align-items:center;gap:5px;font:inherit;font-size:.92rem;
+  font-weight:500;color:var(--muted);background:none;border:0;padding:0;cursor:pointer}
+.nav-dropdown-toggle:hover,.nav-dropdown.open .nav-dropdown-toggle{color:var(--text)}
+.nav-dropdown-caret{flex:none;transition:transform .2s ease}
+.nav-dropdown.open .nav-dropdown-caret{transform:rotate(180deg)}
+.nav-dropdown-menu{position:absolute;top:calc(100% + 18px);left:50%;min-width:250px;
+  transform:translateX(-50%) translateY(-6px);background:var(--surface);border:1px solid var(--line);
+  border-radius:10px;box-shadow:var(--shadow);padding:8px;opacity:0;visibility:hidden;pointer-events:none;
+  transition:opacity .18s ease,transform .18s ease;z-index:30}
+.nav-dropdown.open .nav-dropdown-menu{opacity:1;visibility:visible;pointer-events:auto;
+  transform:translateX(-50%) translateY(0)}
+.nav-dropdown-menu a{display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:9px 12px;border-radius:6px;font-size:.88rem;font-weight:500;color:var(--text);text-decoration:none}
+.nav-dropdown-menu a:hover,.nav-dropdown-menu a:focus-visible{background:var(--surface-2)}
+.nav-dropdown-menu .tag{flex:none;font-family:"IBM Plex Mono",monospace;font-size:.64rem;
+  letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:20px}
+.nav-dropdown-menu .tag.live{color:#0D3827;background:color-mix(in srgb,#0D3827 16%,transparent)}
+.nav-dropdown-menu .tag.soon{color:#7A5326;background:color-mix(in srgb,var(--brass) 18%,transparent)}
+.nav-dropdown-menu{width:max-content;max-width:min(340px,calc(100vw - 32px))}
+.nav-dropdown-menu{max-height:calc(100vh - 96px);overflow-y:auto;overscroll-behavior:contain}
+.navlinks .nav-dropdown-menu a,.nav.menu-open .navlinks .nav-dropdown-menu a{flex-direction:column;align-items:flex-start;justify-content:center;gap:1px;white-space:normal;text-align:left}
+.nav.menu-open .nav-dropdown-menu{max-width:none}
+.nav-dropdown-menu .dd-t{font-size:.9rem;font-weight:600;line-height:1.3;color:var(--text)}
+.nav-dropdown-menu .dd-d{font-size:.8rem;font-weight:400;line-height:1.35;color:var(--muted)}
+.nav-dropdown-menu .dd-group{font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:8px 12px 4px}
+.nav-dropdown-menu .dd-group:not(:first-child){margin-top:6px;padding-top:12px;border-top:1px solid var(--line)}
+
+main{padding-block:clamp(36px,7vw,64px)}
+.hero-block{display:flex;flex-direction:column;gap:18px;padding-bottom:36px;border-bottom:1px solid var(--line);margin-bottom:36px}
+.status-pill{display:inline-flex;align-self:flex-start;align-items:center;gap:6px;font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:20px}
+.status-pill.live{color:#9DC4B2;background:color-mix(in srgb,#9DC4B2 16%,transparent)}
+.status-pill.soon{color:var(--brass-text);background:color-mix(in srgb,var(--brass) 18%,transparent)}
+.card-list{display:grid;gap:16px;margin:20px 0 44px}
+.card{border:1px solid var(--line);border-radius:10px;padding:20px 22px;background:var(--surface)}
+.card h2{font-size:1.05rem;margin-bottom:6px}
+.card p{color:var(--muted);font-size:.94rem}
+.card .tag{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:.64rem;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:20px;margin-bottom:8px}
+.card.today .tag{color:#9DC4B2;background:color-mix(in srgb,#9DC4B2 14%,transparent)}
+.card.soon .tag{color:var(--brass-text);background:color-mix(in srgb,var(--brass) 16%,transparent)}
+.cta{border:1px solid var(--line-strong);border-radius:12px;padding:28px 30px;background:var(--surface);
+  display:flex;flex-direction:column;gap:14px}
+.cta h2{font-size:1.2rem}
+.cta p{color:var(--muted)}
+.cta-row{display:flex;gap:12px;flex-wrap:wrap}
+.back-home{display:inline-flex;gap:8px;align-items:center;font-size:.88rem;color:var(--muted);text-decoration:none;margin-top:28px}
+.back-home:hover{color:var(--text)}
+
+footer{border-top:1px solid var(--line);padding-block:28px;font-size:.84rem;color:var(--faint)}
+footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+footer .wrap>div:last-child{display:flex;flex-wrap:wrap;gap:8px 18px;min-width:0}
+footer a{color:var(--muted);text-decoration:none}
+footer a:hover{color:var(--text)}
+.nav .wrap{max-width:1080px}
+/* limit-test 2026-10-03: header never wraps; phone menu reachable */
+.navlinks a,.nav-dropdown-toggle,.navcta .btn{white-space:nowrap}
+@media (max-width:690px){.nav-dropdown-toggle{white-space:nowrap;max-width:none;font-size:.76rem}}
+@media (max-width:520px){.nav .wrap{gap:10px}.navcta{gap:6px}.navcta .btn{padding-inline:10px}}
+@media (max-width:400px){.brand .word small{letter-spacing:.08em}.brand{gap:6px}.brand .word{font-size:1.1rem}}
+@media (max-width:360px){.navcta .btn{padding-inline:8px}}
+@media (max-width:1100px){.navlinks{display:flex;gap:0}.navlinks>a{display:none}.navlinks .nav-dropdown-menu{position:fixed;left:16px;right:16px;top:76px;width:auto;max-width:none;min-width:0;transform:none!important}.nav-dropdown-toggle,.navcta .btn{min-height:44px}}
+@media (min-width:1101px) and (max-width:1299px){.nav .wrap{gap:10px}.navlinks{gap:10px;font-size:.84rem}.navcta .btn{padding:10px 10px}}
+footer a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px}.brand{min-height:44px}
+
+
+.wrap.wide{max-width:1080px}
+h3{font-family:"Newsreader",Georgia,serif;font-weight:500;font-size:1.05rem;line-height:1.2;margin:0 0 6px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:0 0 36px}
+.stat{border:1px solid var(--line);border-radius:10px;padding:14px 16px;background:var(--surface)}
+.stat b{display:block;font-family:"Newsreader",Georgia,serif;font-weight:500;font-size:1.8rem;line-height:1.1}
+.stat span{font-size:.84rem;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 0;padding:0;list-style:none}
+.chips li{border:1px solid var(--line-strong);border-radius:20px;padding:4px 12px;font-size:.88rem;color:var(--muted)}
+.chips li b{color:var(--text);font-weight:600}
+.qa{display:grid;gap:12px;margin:14px 0 36px;padding:0;list-style:none}
+.qa li{border:1px solid var(--line);border-radius:10px;padding:14px 18px;background:var(--surface)}
+.qa .q{font-weight:600}
+.qa .a{margin-top:4px;color:var(--text)}
+.qa .src{margin-top:2px;font-size:.84rem;color:var(--faint)}
+.note{font-size:.88rem;color:var(--faint);margin:0 0 36px}
+.sec{margin:0 0 6px}
+.hub-tools{display:flex;flex-direction:column;gap:12px;margin:8px 0 28px}
+.hub-search{width:100%;max-width:520px;min-height:44px;padding:10px 14px;border-radius:6px;border:1px solid var(--line-strong);background:var(--surface);color:var(--text);font:inherit}
+.hub-filters{display:flex;flex-wrap:wrap;gap:8px}
+.hub-filters button{min-height:40px;padding:6px 14px;border-radius:20px;border:1px solid var(--line-strong);background:transparent;color:var(--muted);font:inherit;font-size:.88rem;cursor:pointer}
+.hub-filters button[aria-pressed="true"]{background:var(--well);border-color:var(--well);color:#fff}
+.hub-count{font-size:.88rem;color:var(--faint)}
+.hub-group{margin:0 0 40px}
+.hub-group>p{color:var(--muted);margin:0 0 14px;font-size:.94rem}
+.hub-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;list-style:none;margin:0;padding:0}
+.hub-card{border:1px solid var(--line);border-radius:10px;padding:16px 18px;background:var(--surface);display:flex;flex-direction:column;gap:6px;height:100%}
+.hub-card h3{margin:0}
+.hub-card h3 a{text-decoration:none}
+.hub-card h3 a:hover{text-decoration:underline}
+.hub-card p{margin:0;color:var(--muted);font-size:.88rem}
+.hub-card .row{display:flex;gap:14px;flex-wrap:wrap;margin-top:auto;padding-top:8px;font-size:.9rem;font-weight:600}
+.hub-card .row a{display:inline-flex;align-items:center;min-height:44px}
+.hub-card .row a.go{color:var(--brass-text)}
+.hub-empty{display:none;padding:20px;border:1px dashed var(--line-strong);border-radius:10px;color:var(--muted)}
+.hub-guides{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:8px}
+.hub-guides a{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;text-decoration:none;min-height:44px;align-content:center}
+.hub-guides a b{font-weight:600}
+.hub-guides a span{color:var(--muted);font-size:.9rem}
+.related{display:flex;flex-wrap:wrap;gap:8px 18px;margin:12px 0 0;padding:0;list-style:none}
+.related a{display:inline-flex;align-items:center;min-height:44px;color:var(--muted)}
+</style>
+</head>
+<body>
+<nav class="nav" aria-label="Primary">
+  <div class="wrap">
+    <a class="brand" href="/" aria-label="DeepWell Technology home">
+      <svg class="mark" viewBox="0 0 100 100" aria-hidden="true"><g fill="none" stroke="var(--well)" stroke-width="4"><circle cx="50" cy="50" r="10"/><circle cx="50" cy="50" r="19"/><circle cx="50" cy="50" r="28"/><circle cx="50" cy="50" r="37"/><circle cx="50" cy="50" r="46"/></g></svg>
+      <span class="word"><span class="name"><b>Deep</b><i>Well</i></span><small>Technology</small></span>
+    </a>
+    <div class="navlinks">
+      <a href="/#how-it-works">How it works</a>
+      <a href="/#demo">Try it</a>
+      <a href="/industries/" style="color:var(--text);font-weight:600">Industries</a>
+      <div class="nav-dropdown">
+        <button type="button" class="nav-dropdown-toggle" aria-haspopup="true" aria-expanded="false" aria-controls="industriesMenu">
+          Any Business, One App
+          <svg class="nav-dropdown-caret" width="10" height="6" viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="nav-dropdown-menu" id="industriesMenu" role="menu" aria-label="Any Business, One App">
+          <div class="dd-group" role="presentation">By role</div>
+          <a role="menuitem" href="/who.html#office"><span class="dd-t">Office staff</span><span class="dd-d">Answer a caller with the original page in hand.</span></a>
+          <a role="menuitem" href="/who.html#field"><span class="dd-t">People in the field</span><span class="dd-d">Look things up and scan paperwork from a phone.</span></a>
+          <a role="menuitem" href="/who.html#owners"><span class="dd-t">Owners</span><span class="dd-d">See which warranties and agreements are expiring.</span></a>
+          <div class="dd-group" role="presentation">By industry</div>
+          <a role="menuitem" href="/industries/"><span class="dd-t">All industries</span><span class="dd-d">Pick yours and try the demo.</span></a>
+          <a role="menuitem" href="/who.html#industries"><span class="dd-t">Every industry, one app</span><span class="dd-d">See how Donovan fits your kind of business.</span></a>
+          <a role="menuitem" href="/industries/any-business.html"><span class="dd-t">Any business</span><span class="dd-d">If you keep paperwork, it works.</span></a>
+          <a role="menuitem" href="/industries/hvac.html"><span class="dd-t">HVAC</span><span class="dd-d">Warranties, serial numbers and service tickets.</span></a>
+          <a role="menuitem" href="/industries/electrical.html"><span class="dd-t">Electrical</span><span class="dd-d">Permits, inspections and work orders.</span></a>
+          <a role="menuitem" href="/industries/plumbing.html"><span class="dd-t">Plumbing</span><span class="dd-d">Service tickets, permits and warranty paperwork.</span></a>
+          <a role="menuitem" href="/industries/property-management.html"><span class="dd-t">Property management</span><span class="dd-d">Work orders, vendor contracts and invoices.</span></a>
+          <a role="menuitem" href="/industries/fleet-equipment-rental.html"><span class="dd-t">Fleet and equipment rental</span><span class="dd-d">Service records, inspections and rental agreements.</span></a>
+          <a role="menuitem" href="/industries/contractors.html"><span class="dd-t">Contractors</span><span class="dd-d">Contracts, permits and purchase orders.</span></a>
+          <a role="menuitem" href="/industries/offices.html"><span class="dd-t">Offices</span><span class="dd-d">Vendor contracts, agreements and forms.</span></a>
+          <a role="menuitem" href="/industries/nonprofits.html"><span class="dd-t">Nonprofits</span><span class="dd-d">Agreements, invoices and correspondence.</span></a>
+        </div>
+      </div>
+      <a href="/#plans">Pricing</a>
+      <a href="/#team">Founders</a>
+      <a href="/#contact">Contact</a>
+    </div>
+    <div class="navcta">
+      <a class="btn btn-ghost" href="/app/">Log in</a>
+      <a class="btn btn-primary" href="/app/?plan=solo&interval=month">Start free trial</a>
+    </div>
+  </div>
+</nav>
+<main class="wrap">
+  <div class="hero-block">
+    <div class="eyebrow">Who it&rsquo;s for · Photo studio</div>
+    <h1>DeepWell for photo studio</h1>
+    <p class="lede">The photo studio demo is a sample workspace for Juniper Glen Photo Co, a made-up company. DeepWell reads its 20 documents (photography invoice, photography services contract, print order form, client call note and more) and answers questions about them, with a link back to the page each answer came from.</p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="/demo/?industry=photostudio">Try the photo studio demo</a>
+      <a class="btn btn-ghost" href="/industries/">All industries</a>
+    </div>
+  </div>
+
+  <div class="stats" role="list" aria-label="Sample workspace at a glance">
+    <div class="stat" role="listitem"><b>20</b><span>documents in the sample</span></div>
+    <div class="stat" role="listitem"><b>7</b><span>document types</span></div>
+    <div class="stat" role="listitem"><b>8</b><span>customer records</span></div>
+    <div class="stat" role="listitem"><b>6</b><span>example questions</span></div>
+  </div>
+
+  <h2 class="sec">Documents it reads in the demo</h2>
+  <p class="note">The paperwork in the photo studio sample workspace, by type.</p>
+  <ul class="chips">
+    <li><b>Photography invoice</b> · 4</li>
+    <li><b>Photography services contract</b> · 4</li>
+    <li><b>Print order form</b> · 4</li>
+    <li><b>Client call note</b> · 2</li>
+    <li><b>Gallery delivery notice</b> · 2</li>
+    <li><b>Model release</b> · 2</li>
+    <li><b>Session log</b> · 2</li>
+  </ul>
+
+  <h2 class="sec" style="margin-top:36px">Questions to try</h2>
+  <p class="note">Each answer below is what the demo returns from the sample records.</p>
+  <ul class="qa">
+    <li><div class="q">What's the total on PO-1056?</div><div class="a">Total: $695.00</div><div class="src">Source: Print order form PO-1056 — Harper Moonpenny</div></li>
+    <li><div class="q">How much in total across Harper Moonpenny's print order forms?</div><div class="a">Total of 2 print order forms for Harper Moonpenny: $1,115.00</div><div class="src">Source: Print order form PO-1056 — Harper Moonpenny</div></li>
+    <li><div class="q">How many photography invoices were created in 2026?</div><div class="a">3 photography invoices on file (2026).</div><div class="src">Source: Photography invoice PI-1057 — Wren Nettlefield</div></li>
+    <li><div class="q">When was Quinn Puddleby's latest photography services contract?</div><div class="a">Latest photography services contract for Quinn Puddleby: 2025-10-30</div><div class="src">Source: Photography services contract PC-1061 — Quinn Puddleby</div></li>
+    <li><div class="q">What does PO-1056 say about reprints?</div><div class="a">Damaged or misprinted items are reprinted free if reported within 28 days. (page 1, Print order form PO-1056 (Harper Moonpenny, 2025-05-13))</div><div class="src">Source: Print order form PO-1056 — Harper Moonpenny</div></li>
+    <li><div class="q">Who is the client at 599 Puzzle Pl, Maple Hollow, AZ 85003?</div><div class="a">Ellis Fernsby is at 599 Puzzle Pl, Maple Hollow, AZ 85003.</div></li>
+  </ul>
+
+  <div class="cta">
+    <h2>Ask it yourself</h2>
+    <p>Open the photo studio demo and ask these questions, or your own, against the sample records. The sample company and every record in it are made up. When you are ready, start with your own files: Solo has a 30-day free trial, card required, cancel anytime.</p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="/demo/?industry=photostudio">Try the photo studio demo</a>
+      <a class="btn btn-ghost" href="/app/?plan=solo&amp;interval=month">Start free trial</a>
+    </div>
+  </div>
+
+  <h2 class="sec" style="margin-top:36px">More in professional services &amp; offices</h2>
+  <ul class="related">
+    <li><a href="/industries/bookkeeping.html">Bookkeeping</a></li>
+    <li><a href="/industries/legal.html">Law office</a></li>
+    <li><a href="/industries/insagency.html">Insurance agency</a></li>
+    <li><a href="/industries/msp.html">IT services</a></li>
+    <li><a href="/industries/filmprod.html">Film production</a></li>
+    <li><a href="/industries/tutoring.html">Tutoring</a></li>
+  </ul>
+
+  <a class="back-home" href="/industries/">&larr; All industries</a>
+</main>
+<footer>
+  <div class="wrap">
+    <div>© 2026 DeepWell Technology · Knowledge Builds Business.</div>
+    <div><a href="/industries/">Industries</a><a href="/#how-it-works">How it works</a><a href="/#plans">Plans</a><a href="/#team">Founders</a><a href="/#contact">Contact</a><a href="/security.html">Security</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a><a href="/patch-notes.html">Patch notes</a><a href="https://status.deepwelltechnology.com">Status</a></div>
+  </div>
+</footer>
+<script>
+(function () {
+  var dd = document.querySelector('.nav-dropdown');
+  if (!dd) return;
+  var toggle = dd.querySelector('.nav-dropdown-toggle');
+  var menu = dd.querySelector('.nav-dropdown-menu');
+  if (!toggle || !menu) return;
+  var items = Array.prototype.slice.call(menu.querySelectorAll('a'));
+
+  function isOpen() { return dd.classList.contains('open'); }
+  function open() {
+    dd.classList.add('open');
+    toggle.setAttribute('aria-expanded', 'true');
+  }
+  function close(focusToggle) {
+    dd.classList.remove('open');
+    toggle.setAttribute('aria-expanded', 'false');
+    if (focusToggle) toggle.focus();
+  }
+
+  toggle.addEventListener('click', function (e) {
+    e.stopPropagation();
+    if (isOpen()) { close(false); } else { open(); }
+  });
+
+  toggle.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      open();
+      if (items[0]) items[0].focus();
+    } else if (e.key === 'Escape' && isOpen()) {
+      close(true);
+    }
+  });
+
+  menu.addEventListener('keydown', function (e) {
+    var i = items.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      var next = items[(i + 1) % items.length];
+      if (next) next.focus();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      var prev = items[(i - 1 + items.length) % items.length];
+      if (prev) prev.focus();
+    } else if (e.key === 'Escape') {
+      close(true);
+    } else if (e.key === 'Tab') {
+      setTimeout(function () {
+        if (!dd.contains(document.activeElement)) close(false);
+      }, 0);
+    }
+  });
+
+  document.addEventListener('click', function (e) {
+    if (!dd.contains(e.target)) close(false);
+  });
+  document.addEventListener('focusin', function (e) {
+    if (!dd.contains(e.target)) close(false);
+  });
+})();
+</script>
+<script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
+<script defer src="/_vercel/insights/script.js"></script>
+<script defer src="/support/widget.js"></script>
+</body>
+</html>

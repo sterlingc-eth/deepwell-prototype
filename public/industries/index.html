@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="DeepWell works with the paperwork of 43 kinds of business. Pick yours, see the documents and questions in its sample workspace, and try the demo.">
+<meta property="og:title" content="Industries — DeepWell Technology">
+<meta property="og:description" content="DeepWell works with the paperwork of 43 kinds of business. Pick yours, see the documents and questions in its sample workspace, and try the demo.">
+<meta property="og:image" content="https://deepwelltechnology.com/og-image.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:site_name" content="DeepWell Technology">
+<meta property="og:url" content="https://deepwelltechnology.com/industries/">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Industries — DeepWell Technology">
+<meta name="twitter:description" content="DeepWell works with the paperwork of 43 kinds of business. Pick yours, see the documents and questions in its sample workspace, and try the demo.">
+<meta name="twitter:image" content="https://deepwelltechnology.com/og-image.jpg">
+<link rel="canonical" href="https://deepwelltechnology.com/industries/">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#0B1613">
+<title>Industries — DeepWell Technology</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --well:#163C2C; --navy:#123D6B; --brass:#B98A4E; --ink:#0B1613;
+  --ground:#EEF2EE; --surface:#FFFFFF; --surface-2:#E2E9E4; --text:#0F1F19;
+  --muted:#4F6259; --faint:#576A62; --line:rgba(22,60,44,.18);
+  --line-strong:rgba(22,60,44,.38); --brass-text:#8E6530;
+  --shadow:0 20px 50px -30px rgba(11,22,19,.45);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#0B1613; --surface:#10201A; --surface-2:#152A22; --text:#E6EEE9;
+    --muted:#A9BBB2; --faint:#7B9286; --line:rgba(230,238,233,.14);
+    --line-strong:rgba(230,238,233,.32); --brass-text:#D8AE6E;
+    --shadow:0 20px 50px -30px rgba(0,0,0,.8);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark; --ground:#0B1613; --surface:#10201A; --surface-2:#152A22;
+  --text:#E6EEE9; --muted:#A9BBB2; --faint:#7B9286; --line:rgba(230,238,233,.14);
+  --line-strong:rgba(230,238,233,.32); --brass-text:#D8AE6E;
+  --shadow:0 20px 50px -30px rgba(0,0,0,.8);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--text);font-family:"IBM Plex Sans",-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+h1,h2{font-family:"Newsreader",Georgia,serif;font-weight:500;line-height:1.12;letter-spacing:-.01em;margin:0}
+h1{font-size:clamp(2rem,4.4vw,2.9rem)}
+h2{font-size:1.3rem;margin-bottom:6px}
+p{margin:0}
+a{color:inherit}
+.wrap{max-width:820px;margin:0 auto;padding-inline:clamp(16px,4vw,40px)}
+.eyebrow{font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);display:flex;align-items:center;gap:12px}
+.eyebrow::before{content:"";width:22px;height:1px;background:var(--brass)}
+.lede{font-size:1.1rem;color:var(--muted);max-width:62ch}
+:focus-visible{outline:2px solid var(--brass);outline-offset:3px}
+
+/* nav — same markup/classes as index.html so this is one design system,
+   not a lookalike. Links point back to sections on the main site since
+   this page has none of its own. */
+.nav{position:sticky;top:0;z-index:20;backdrop-filter:blur(12px);
+  background:color-mix(in srgb,var(--ground) 82%,transparent);border-bottom:1px solid var(--line);
+  --ground:#F4F7F4;--surface:#FFFFFF;--surface-2:#E2E9E4;--text:#0F1F19;--muted:#4F6259;--faint:#576A62;
+  --line:rgba(22,60,44,.18);--line-strong:rgba(22,60,44,.38);--well:#0D3827;
+  color:var(--text);background:#F4F7F4}
+.nav .wrap{display:flex;align-items:center;justify-content:space-between;height:68px;gap:24px}
+.brand{display:flex;align-items:center;gap:12px;text-decoration:none}
+.brand .mark{width:34px;height:34px}
+.brand .word{display:flex;flex-direction:column;gap:4px;font-family:"Newsreader",serif;font-weight:600;font-size:1.45rem;letter-spacing:-.01em;line-height:1}
+.brand .word small{font-family:"IBM Plex Mono",monospace;font-weight:500;font-size:.56rem;letter-spacing:.3em;text-transform:uppercase;color:var(--faint);padding-left:.1em}
+.brand .word b{color:#04315A;font-weight:600}
+.brand .word i{font-style:normal;color:var(--well)}
+.navlinks{display:flex;align-items:center;gap:28px;font-size:.92rem;font-weight:500;position:relative}
+.navlinks a{text-decoration:none;color:var(--muted)}
+.navlinks a:hover{color:var(--text)}
+.navlinks a[aria-current="page"]{color:var(--text)}
+.navcta{display:flex;align-items:center;gap:12px}
+@media (max-width:1100px){.navlinks{display:none}}
+@media (max-width:520px){.navcta .btn-primary{display:none}}
+.btn{display:inline-flex;align-items:center;gap:10px;padding:12px 20px;border-radius:4px;font-weight:600;font-size:.95rem;text-decoration:none;border:1px solid transparent;transition:transform .2s ease,background .2s ease;min-height:44px}
+.btn-primary{background:var(--well);color:#fff}
+.btn-primary:hover{background:var(--navy);transform:translateY(-1px)}
+.btn-ghost{border-color:var(--line-strong);color:var(--text);background:transparent}
+.btn-ghost:hover{background:var(--surface)}
+
+/* Industries nav dropdown — copied from index.html verbatim (see that
+   file's labeled CSS block); kept in sync by hand until there's a shared
+   stylesheet. */
+.nav-dropdown{position:relative}
+.nav-dropdown-toggle{display:inline-flex;align-items:center;gap:5px;font:inherit;font-size:.92rem;
+  font-weight:500;color:var(--muted);background:none;border:0;padding:0;cursor:pointer}
+.nav-dropdown-toggle:hover,.nav-dropdown.open .nav-dropdown-toggle{color:var(--text)}
+.nav-dropdown-caret{flex:none;transition:transform .2s ease}
+.nav-dropdown.open .nav-dropdown-caret{transform:rotate(180deg)}
+.nav-dropdown-menu{position:absolute;top:calc(100% + 18px);left:50%;min-width:250px;
+  transform:translateX(-50%) translateY(-6px);background:var(--surface);border:1px solid var(--line);
+  border-radius:10px;box-shadow:var(--shadow);padding:8px;opacity:0;visibility:hidden;pointer-events:none;
+  transition:opacity .18s ease,transform .18s ease;z-index:30}
+.nav-dropdown.open .nav-dropdown-menu{opacity:1;visibility:visible;pointer-events:auto;
+  transform:translateX(-50%) translateY(0)}
+.nav-dropdown-menu a{display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:9px 12px;border-radius:6px;font-size:.88rem;font-weight:500;color:var(--text);text-decoration:none}
+.nav-dropdown-menu a:hover,.nav-dropdown-menu a:focus-visible{background:var(--surface-2)}
+.nav-dropdown-menu .tag{flex:none;font-family:"IBM Plex Mono",monospace;font-size:.64rem;
+  letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:20px}
+.nav-dropdown-menu .tag.live{color:#0D3827;background:color-mix(in srgb,#0D3827 16%,transparent)}
+.nav-dropdown-menu .tag.soon{color:#7A5326;background:color-mix(in srgb,var(--brass) 18%,transparent)}
+.nav-dropdown-menu{width:max-content;max-width:min(340px,calc(100vw - 32px))}
+.nav-dropdown-menu{max-height:calc(100vh - 96px);overflow-y:auto;overscroll-behavior:contain}
+.navlinks .nav-dropdown-menu a,.nav.menu-open .navlinks .nav-dropdown-menu a{flex-direction:column;align-items:flex-start;justify-content:center;gap:1px;white-space:normal;text-align:left}
+.nav.menu-open .nav-dropdown-menu{max-width:none}
+.nav-dropdown-menu .dd-t{font-size:.9rem;font-weight:600;line-height:1.3;color:var(--text)}
+.nav-dropdown-menu .dd-d{font-size:.8rem;font-weight:400;line-height:1.35;color:var(--muted)}
+.nav-dropdown-menu .dd-group{font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:8px 12px 4px}
+.nav-dropdown-menu .dd-group:not(:first-child){margin-top:6px;padding-top:12px;border-top:1px solid var(--line)}
+
+main{padding-block:clamp(36px,7vw,64px)}
+.hero-block{display:flex;flex-direction:column;gap:18px;padding-bottom:36px;border-bottom:1px solid var(--line);margin-bottom:36px}
+.status-pill{display:inline-flex;align-self:flex-start;align-items:center;gap:6px;font-family:"IBM Plex Mono",monospace;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:20px}
+.status-pill.live{color:#9DC4B2;background:color-mix(in srgb,#9DC4B2 16%,transparent)}
+.status-pill.soon{color:var(--brass-text);background:color-mix(in srgb,var(--brass) 18%,transparent)}
+.card-list{display:grid;gap:16px;margin:20px 0 44px}
+.card{border:1px solid var(--line);border-radius:10px;padding:20px 22px;background:var(--surface)}
+.card h2{font-size:1.05rem;margin-bottom:6px}
+.card p{color:var(--muted);font-size:.94rem}
+.card .tag{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:.64rem;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:20px;margin-bottom:8px}
+.card.today .tag{color:#9DC4B2;background:color-mix(in srgb,#9DC4B2 14%,transparent)}
+.card.soon .tag{color:var(--brass-text);background:color-mix(in srgb,var(--brass) 16%,transparent)}
+.cta{border:1px solid var(--line-strong);border-radius:12px;padding:28px 30px;background:var(--surface);
+  display:flex;flex-direction:column;gap:14px}
+.cta h2{font-size:1.2rem}
+.cta p{color:var(--muted)}
+.cta-row{display:flex;gap:12px;flex-wrap:wrap}
+.back-home{display:inline-flex;gap:8px;align-items:center;font-size:.88rem;color:var(--muted);text-decoration:none;margin-top:28px}
+.back-home:hover{color:var(--text)}
+
+footer{border-top:1px solid var(--line);padding-block:28px;font-size:.84rem;color:var(--faint)}
+footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+footer .wrap>div:last-child{display:flex;flex-wrap:wrap;gap:8px 18px;min-width:0}
+footer a{color:var(--muted);text-decoration:none}
+footer a:hover{color:var(--text)}
+.nav .wrap{max-width:1080px}
+/* limit-test 2026-10-03: header never wraps; phone menu reachable */
+.navlinks a,.nav-dropdown-toggle,.navcta .btn{white-space:nowrap}
+@media (max-width:690px){.nav-dropdown-toggle{white-space:nowrap;max-width:none;font-size:.76rem}}
+@media (max-width:520px){.nav .wrap{gap:10px}.navcta{gap:6px}.navcta .btn{padding-inline:10px}}
+@media (max-width:400px){.brand .word small{letter-spacing:.08em}.brand{gap:6px}.brand .word{font-size:1.1rem}}
+@media (max-width:360px){.navcta .btn{padding-inline:8px}}
+@media (max-width:1100px){.navlinks{display:flex;gap:0}.navlinks>a{display:none}.navlinks .nav-dropdown-menu{position:fixed;left:16px;right:16px;top:76px;width:auto;max-width:none;min-width:0;transform:none!important}.nav-dropdown-toggle,.navcta .btn{min-height:44px}}
+@media (min-width:1101px) and (max-width:1299px){.nav .wrap{gap:10px}.navlinks{gap:10px;font-size:.84rem}.navcta .btn{padding:10px 10px}}
+footer a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px}.brand{min-height:44px}
+
+
+.wrap.wide{max-width:1080px}
+h3{font-family:"Newsreader",Georgia,serif;font-weight:500;font-size:1.05rem;line-height:1.2;margin:0 0 6px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:0 0 36px}
+.stat{border:1px solid var(--line);border-radius:10px;padding:14px 16px;background:var(--surface)}
+.stat b{display:block;font-family:"Newsreader",Georgia,serif;font-weight:500;font-size:1.8rem;line-height:1.1}
+.stat span{font-size:.84rem;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 0;padding:0;list-style:none}
+.chips li{border:1px solid var(--line-strong);border-radius:20px;padding:4px 12px;font-size:.88rem;color:var(--muted)}
+.chips li b{color:var(--text);font-weight:600}
+.qa{display:grid;gap:12px;margin:14px 0 36px;padding:0;list-style:none}
+.qa li{border:1px solid var(--line);border-radius:10px;padding:14px 18px;background:var(--surface)}
+.qa .q{font-weight:600}
+.qa .a{margin-top:4px;color:var(--text)}
+.qa .src{margin-top:2px;font-size:.84rem;color:var(--faint)}
+.note{font-size:.88rem;color:var(--faint);margin:0 0 36px}
+.sec{margin:0 0 6px}
+.hub-tools{display:flex;flex-direction:column;gap:12px;margin:8px 0 28px}
+.hub-search{width:100%;max-width:520px;min-height:44px;padding:10px 14px;border-radius:6px;border:1px solid var(--line-strong);background:var(--surface);color:var(--text);font:inherit}
+.hub-filters{display:flex;flex-wrap:wrap;gap:8px}
+.hub-filters button{min-height:40px;padding:6px 14px;border-radius:20px;border:1px solid var(--line-strong);background:transparent;color:var(--muted);font:inherit;font-size:.88rem;cursor:pointer}
+.hub-filters button[aria-pressed="true"]{background:var(--well);border-color:var(--well);color:#fff}
+.hub-count{font-size:.88rem;color:var(--faint)}
+.hub-group{margin:0 0 40px}
+.hub-group>p{color:var(--muted);margin:0 0 14px;font-size:.94rem}
+.hub-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;list-style:none;margin:0;padding:0}
+.hub-card{border:1px solid var(--line);border-radius:10px;padding:16px 18px;background:var(--surface);display:flex;flex-direction:column;gap:6px;height:100%}
+.hub-card h3{margin:0}
+.hub-card h3 a{text-decoration:none}
+.hub-card h3 a:hover{text-decoration:underline}
+.hub-card p{margin:0;color:var(--muted);font-size:.88rem}
+.hub-card .row{display:flex;gap:14px;flex-wrap:wrap;margin-top:auto;padding-top:8px;font-size:.9rem;font-weight:600}
+.hub-card .row a{display:inline-flex;align-items:center;min-height:44px}
+.hub-card .row a.go{color:var(--brass-text)}
+.hub-empty{display:none;padding:20px;border:1px dashed var(--line-strong);border-radius:10px;color:var(--muted)}
+.hub-guides{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:8px}
+.hub-guides a{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;text-decoration:none;min-height:44px;align-content:center}
+.hub-guides a b{font-weight:600}
+.hub-guides a span{color:var(--muted);font-size:.9rem}
+.related{display:flex;flex-wrap:wrap;gap:8px 18px;margin:12px 0 0;padding:0;list-style:none}
+.related a{display:inline-flex;align-items:center;min-height:44px;color:var(--muted)}
+</style>
+</head>
+<body>
+<nav class="nav" aria-label="Primary">
+  <div class="wrap">
+    <a class="brand" href="/" aria-label="DeepWell Technology home">
+      <svg class="mark" viewBox="0 0 100 100" aria-hidden="true"><g fill="none" stroke="var(--well)" stroke-width="4"><circle cx="50" cy="50" r="10"/><circle cx="50" cy="50" r="19"/><circle cx="50" cy="50" r="28"/><circle cx="50" cy="50" r="37"/><circle cx="50" cy="50" r="46"/></g></svg>
+      <span class="word"><span class="name"><b>Deep</b><i>Well</i></span><small>Technology</small></span>
+    </a>
+    <div class="navlinks">
+      <a href="/#how-it-works">How it works</a>
+      <a href="/#demo">Try it</a>
+      <a href="/industries/" style="color:var(--text);font-weight:600">Industries</a>
+      <div class="nav-dropdown">
+        <button type="button" class="nav-dropdown-toggle" aria-haspopup="true" aria-expanded="false" aria-controls="industriesMenu">
+          Any Business, One App
+          <svg class="nav-dropdown-caret" width="10" height="6" viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="nav-dropdown-menu" id="industriesMenu" role="menu" aria-label="Any Business, One App">
+          <div class="dd-group" role="presentation">By role</div>
+          <a role="menuitem" href="/who.html#office"><span class="dd-t">Office staff</span><span class="dd-d">Answer a caller with the original page in hand.</span></a>
+          <a role="menuitem" href="/who.html#field"><span class="dd-t">People in the field</span><span class="dd-d">Look things up and scan paperwork from a phone.</span></a>
+          <a role="menuitem" href="/who.html#owners"><span class="dd-t">Owners</span><span class="dd-d">See which warranties and agreements are expiring.</span></a>
+          <div class="dd-group" role="presentation">By industry</div>
+          <a role="menuitem" href="/industries/"><span class="dd-t">All industries</span><span class="dd-d">Pick yours and try the demo.</span></a>
+          <a role="menuitem" href="/who.html#industries"><span class="dd-t">Every industry, one app</span><span class="dd-d">See how Donovan fits your kind of business.</span></a>
+          <a role="menuitem" href="/industries/any-business.html"><span class="dd-t">Any business</span><span class="dd-d">If you keep paperwork, it works.</span></a>
+          <a role="menuitem" href="/industries/hvac.html"><span class="dd-t">HVAC</span><span class="dd-d">Warranties, serial numbers and service tickets.</span></a>
+          <a role="menuitem" href="/industries/electrical.html"><span class="dd-t">Electrical</span><span class="dd-d">Permits, inspections and work orders.</span></a>
+          <a role="menuitem" href="/industries/plumbing.html"><span class="dd-t">Plumbing</span><span class="dd-d">Service tickets, permits and warranty paperwork.</span></a>
+          <a role="menuitem" href="/industries/property-management.html"><span class="dd-t">Property management</span><span class="dd-d">Work orders, vendor contracts and invoices.</span></a>
+          <a role="menuitem" href="/industries/fleet-equipment-rental.html"><span class="dd-t">Fleet and equipment rental</span><span class="dd-d">Service records, inspections and rental agreements.</span></a>
+          <a role="menuitem" href="/industries/contractors.html"><span class="dd-t">Contractors</span><span class="dd-d">Contracts, permits and purchase orders.</span></a>
+          <a role="menuitem" href="/industries/offices.html"><span class="dd-t">Offices</span><span class="dd-d">Vendor contracts, agreements and forms.</span></a>
+          <a role="menuitem" href="/industries/nonprofits.html"><span class="dd-t">Nonprofits</span><span class="dd-d">Agreements, invoices and correspondence.</span></a>
+        </div>
+      </div>
+      <a href="/#plans">Pricing</a>
+      <a href="/#team">Founders</a>
+      <a href="/#contact">Contact</a>
+    </div>
+    <div class="navcta">
+      <a class="btn btn-ghost" href="/app/">Log in</a>
+      <a class="btn btn-primary" href="/app/?plan=solo&interval=month">Start free trial</a>
+    </div>
+  </div>
+</nav>
+<main class="wrap wide">
+  <div class="hero-block">
+    <div class="eyebrow">Who it&rsquo;s for · Industries</div>
+    <h1>43 kinds of business, one app</h1>
+    <p class="lede">Every industry below has a sample workspace you can open without signing in. Pick yours to see the paperwork DeepWell reads there and the questions it answers, then try the demo.</p>
+  </div>
+
+  <div class="hub-tools">
+    <label for="hub-q" class="eyebrow">Find your industry</label>
+    <input id="hub-q" class="hub-search" type="search" placeholder="Search by industry or document, e.g. roofing or invoice" autocomplete="off">
+    <div class="hub-filters" role="group" aria-label="Filter by group">
+      <button type="button" data-filter="all" aria-pressed="true">All</button>
+      <button type="button" data-filter="trades" aria-pressed="false">Trades &amp; field service</button>
+      <button type="button" data-filter="property" aria-pressed="false">Property &amp; real estate</button>
+      <button type="button" data-filter="hospitality" aria-pressed="false">Hospitality, events &amp; food</button>
+      <button type="button" data-filter="professional" aria-pressed="false">Professional services &amp; offices</button>
+      <button type="button" data-filter="health" aria-pressed="false">Healthcare &amp; personal care</button>
+      <button type="button" data-filter="community" aria-pressed="false">Nonprofit &amp; community</button>
+      <button type="button" data-filter="transport" aria-pressed="false">Transport, goods &amp; manufacturing</button>
+    </div>
+    <div class="hub-count" id="hub-count" aria-live="polite">Showing all 43 industries</div>
+  </div>
+
+  <section class="hub-group" data-group="trades" aria-labelledby="g-trades">
+    <h2 id="g-trades">Trades &amp; field service</h2>
+    <p>Crews on the road and paperwork in the truck.</p>
+    <ul class="hub-grid">
+      <li class="hub-item" data-search="plumbing &amp; hvac pebbleworth climate control trades &amp; field service hvac invoice hvac replacement quote hvac service ticket drain cleaning ticket maintenance agreement tune up checklist"><div class="hub-card">
+        <h3><a href="/industries/hvac.html">Plumbing &amp; HVAC</a></h3>
+        <p>18 sample documents · 6 types</p>
+        <p>HVAC invoice, HVAC replacement quote, HVAC service ticket</p>
+        <div class="row"><a href="/industries/hvac.html">Read more</a><a class="go" href="/demo/?industry=plumbing-hvac">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="electrical zephyr crossing electrical contractors trades &amp; field service electrical estimate electrical invoice electrical service ticket electrical permit panel upgrade record rough electrical inspection card"><div class="hub-card">
+        <h3><a href="/industries/electrical.html">Electrical</a></h3>
+        <p>18 sample documents · 6 types</p>
+        <p>Electrical estimate, Electrical invoice, Electrical service ticket</p>
+        <div class="row"><a href="/industries/electrical.html">Read more</a><a class="go" href="/demo/?industry=electrical">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="general contractor moonpenny builders trades &amp; field service change order draw request remodel proposal building inspection record conditional lien waiver construction contract superintendent daily log"><div class="hub-card">
+        <h3><a href="/industries/contractors.html">General contractor</a></h3>
+        <p>20 sample documents · 7 types</p>
+        <p>Change order, Draw request, Remodel proposal</p>
+        <div class="row"><a href="/industries/contractors.html">Read more</a><a class="go" href="/demo/?industry=general-contractor">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="roofing sparrowgate roofing trades &amp; field service insurance claim estimate roofing estimate roofing invoice crew daily log roof inspection report roofing contract sales lead note"><div class="hub-card">
+        <h3><a href="/industries/roofing.html">Roofing</a></h3>
+        <p>20 sample documents · 7 types</p>
+        <p>Insurance claim estimate, Roofing estimate, Roofing invoice</p>
+        <div class="row"><a href="/industries/roofing.html">Read more</a><a class="go" href="/demo/?industry=roofing">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="landscaping thistle creek grounds care trades &amp; field service landscape change order landscape estimate landscaping invoice irrigation repair ticket irrigation system check landscape maintenance agreement weekly maintenance ticket"><div class="hub-card">
+        <h3><a href="/industries/landscaping.html">Landscaping</a></h3>
+        <p>20 sample documents · 7 types</p>
+        <p>Landscape change order, Landscape estimate, Landscaping invoice</p>
+        <div class="row"><a href="/industries/landscaping.html">Read more</a><a class="go" href="/demo/?industry=landscaping">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="pest control kettleby springs exterminating trades &amp; field service pest control invoice pest control quote rodent exclusion proposal initial inspection report pest control service agreement pest service report pesticide application record"><div class="hub-card">
+        <h3><a href="/industries/pestcontrol.html">Pest control</a></h3>
+        <p>20 sample documents · 7 types</p>
+        <p>Pest control invoice, Pest control quote, Rodent exclusion proposal</p>
+        <div class="row"><a href="/industries/pestcontrol.html">Read more</a><a class="go" href="/demo/?industry=pestcontrol">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="pool service pinecone hollow pools &amp; spas trades &amp; field service pool repair estimate pool service invoice weekly pool service report equipment repair ticket pool service agreement route note"><div class="hub-card">
+        <h3><a href="/industries/poolservice.html">Pool service</a></h3>
+        <p>18 sample documents · 6 types</p>
+        <p>Pool repair estimate, Pool service invoice, Weekly pool service report</p>
+        <div class="row"><a href="/industries/poolservice.html">Read more</a><a class="go" href="/demo/?industry=poolservice">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="cleaning &amp; janitorial pebbleworth cleaning co trades &amp; field service cleaning estimate cleaning invoice gift certificate cleaning visit ticket recurring cleaning agreement room by room cleaning checklist scheduling memo"><div class="hub-card">
+        <h3><a href="/industries/cleaning.html">Cleaning &amp; janitorial</a></h3>
+        <p>20 sample documents · 7 types</p>
+        <p>Cleaning estimate, Cleaning invoice, Gift certificate</p>
+        <div class="row"><a href="/industries/cleaning.html">Read more</a><a class="go" href="/demo/?industry=cleaning">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="auto repair pinecone hollow auto repair trades &amp; field service final invoice repair order written estimate multi point inspection repair warranty certificate work authorization"><div class="hub-card">
+        <h3><a href="/industries/auto.html">Auto repair</a></h3>
+        <p>18 sample documents · 6 types</p>
+        <p>Final invoice, Repair order, Written estimate</p>
+        <div class="row"><a href="/industries/auto.html">Read more</a><a class="go" href="/demo/?industry=auto">Try the demo</a></div>
+      </div></li>
+    </ul>
+  </section>
+  <section class="hub-group" data-group="property" aria-labelledby="g-property">
+    <h2 id="g-property">Property &amp; real estate</h2>
+    <p>Listings, leases, rentals and units.</p>
+    <ul class="hub-grid">
+      <li class="hub-item" data-search="real estate pinecone hollow home team property &amp; real estate closing statement listing agreement purchase contract buyer advisory inspection contingency notice seller disclosure showing log"><div class="hub-card">
+        <h3><a href="/industries/realty.html">Real estate</a></h3>
+        <p>20 sample documents · 7 types</p>
+        <p>Closing statement, Listing agreement, Purchase contract</p>
+        <div class="row"><a href="/industries/realty.html">Read more</a><a class="go" href="/demo/?industry=realty">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="property management willowmere rentals property &amp; real estate owner statement rent statement work order lease agreement move in inspection move out inspection rental application"><div class="hub-card">
+        <h3><a href="/industries/property-management.html">Property management</a></h3>
+        <p>20 sample documents · 7 types</p>
+        <p>Owner statement, Rent statement, Work order</p>
+        <div class="row"><a href="/industries/property-management.html">Read more</a><a class="go" href="/demo/?industry=property-management">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="self storage starling point storage solutions property &amp; real estate monthly billing statement move in receipt past due notice autopay authorization notice to vacate rate change notice storage rental agreement"><div class="hub-card">
+        <h3><a href="/industries/storage.html">Self storage</a></h3>
+        <p>20 sample documents · 7 types</p>
+        <p>Monthly billing statement, Move in receipt, Past due notice</p>
+        <div class="row"><a href="/industries/storage.html">Read more</a><a class="go" href="/demo/?industry=storage">Try the demo</a></div>
+      </div></li>
+    </ul>
+  </section>
+  <section class="hub-group" data-group="hospitality" aria-labelledby="g-hospitality">
+    <h2 id="g-hospitality">Hospitality, events &amp; food</h2>
+    <p>Guests, bookings, menus and suppliers.</p>
+    <ul class="hub-grid">
+      <li class="hub-item" data-search="hotel moonpenny hotel and suites hospitality, events &amp; food banquet event order guest folio reservation confirmation credit card authorization guest complaint log registration card reservation cancellation notice"><div class="hub-card">
+        <h3><a href="/industries/hotel.html">Hotel</a></h3>
+        <p>20 sample documents · 7 types</p>
+        <p>Banquet event order, Guest folio, Reservation confirmation</p>
+        <div class="row"><a href="/industries/hotel.html">Read more</a><a class="go" href="/demo/?industry=hotel">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="event venue pebbleworth event center hospitality, events &amp; food event rental agreement payment schedule invoice retainer receipt event liability insurance certificate event timeline setup and teardown checklist tour inquiry form"><div class="hub-card">
+        <h3><a href="/industries/eventvenue.html">Event venue</a></h3>
+        <p>20 sample documents · 7 types</p>
+        <p>Event rental agreement, Payment schedule invoice, Retainer receipt</p>
+        <div class="row"><a href="/industries/eventvenue.html">Read more</a><a class="go" href="/demo/?industry=eventvenue">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="marina fernsby ridge docks hospitality, events &amp; food dockage invoice fuel dock ticket transient dockage reservation hold harmless waiver hull and liability insurance certificate slip rental agreement vessel registration copy"><div class="hub-card">
+        <h3><a href="/industries/marina.html">Marina</a></h3>
+        <p>20 sample documents · 7 types</p>
+        <p>Dockage invoice, Fuel dock ticket, Transient dockage reservation</p>
+        <div class="row"><a href="/industries/marina.html">Read more</a><a class="go" href="/demo/?industry=marina">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="wedding planning willowmere planning studio hospitality, events &amp; food installment invoice retainer invoice wedding planning agreement couple intake questionnaire planning meeting notes planning timeline checklist wedding day timeline"><div class="hub-card">
+        <h3><a href="/industries/weddingplan.html">Wedding planning</a></h3>
+        <p>20 sample documents · 7 types</p>
+        <p>Installment invoice, Retainer invoice, Wedding planning agreement</p>
+        <div class="row"><a href="/industries/weddingplan.html">Read more</a><a class="go" href="/demo/?industry=weddingplan">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="restaurant copperkettle steakhouse hospitality, events &amp; food banquet event order guest feedback note supplier invoice delivery receiving log food temperature log health inspection report"><div class="hub-card">
+        <h3><a href="/industries/restaurant.html">Restaurant</a></h3>
+        <p>18 sample documents · 6 types</p>
+        <p>Banquet event order, Guest feedback note, Supplier invoice</p>
+        <div class="row"><a href="/industries/restaurant.html">Read more</a><a class="go" href="/demo/?industry=restaurant">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="brewery moonpenny beer works hospitality, events &amp; food distributor call log distributor invoice keg tracking log brew log distributor agreement supplier invoice"><div class="hub-card">
+        <h3><a href="/industries/brewery.html">Brewery</a></h3>
+        <p>18 sample documents · 6 types</p>
+        <p>Distributor call log, Distributor invoice, Keg tracking log</p>
+        <div class="row"><a href="/industries/brewery.html">Read more</a><a class="go" href="/demo/?industry=brewery">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="food truck lantern bay smokehouse hospitality, events &amp; food catering order form customer comment log event vendor agreement daily sales report prep and par list supplier receipt"><div class="hub-card">
+        <h3><a href="/industries/foodtruck.html">Food truck</a></h3>
+        <p>18 sample documents · 6 types</p>
+        <p>Catering order form, Customer comment log, Event vendor agreement</p>
+        <div class="row"><a href="/industries/foodtruck.html">Read more</a><a class="go" href="/demo/?industry=foodtruck">Try the demo</a></div>
+      </div></li>
+    </ul>
+  </section>
+  <section class="hub-group" data-group="professional" aria-labelledby="g-professional">
+    <h2 id="g-professional">Professional services &amp; offices</h2>
+    <p>Client files, engagements and policies.</p>
+    <ul class="hub-grid">
+      <li class="hub-item" data-search="bookkeeping quillback ledger works professional services &amp; offices bookkeeping engagement letter bookkeeping invoice profit and loss report bank reconciliation report client call note journal entry memo tax organizer"><div class="hub-card">
+        <h3><a href="/industries/bookkeeping.html">Bookkeeping</a></h3>
+        <p>20 sample documents · 7 types</p>
+        <p>Bookkeeping engagement letter, Bookkeeping invoice, Profit and loss report</p>
+        <div class="row"><a href="/industries/bookkeeping.html">Read more</a><a class="go" href="/demo/?industry=bookkeeping">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="law office starling point attorneys at law professional services &amp; offices engagement letter legal invoice retainer agreement attorney file memo client intake form demand letter time entry report"><div class="hub-card">
+        <h3><a href="/industries/legal.html">Law office</a></h3>
+        <p>20 sample documents · 7 types</p>
+        <p>Engagement letter, Legal invoice, Retainer agreement</p>
+        <div class="row"><a href="/industries/legal.html">Read more</a><a class="go" href="/demo/?industry=legal">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="insurance agency honeycomb hill family insurance professional services &amp; offices declarations page insurance quote premium invoice account file note auto insurance id card cancellation notice first notice of loss"><div class="hub-card">
+        <h3><a href="/industries/insagency.html">Insurance agency</a></h3>
+        <p>20 sample documents · 7 types</p>
+        <p>Declarations page, Insurance quote, Premium invoice</p>
+        <div class="row"><a href="/industries/insagency.html">Read more</a><a class="go" href="/demo/?industry=insagency">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="it services larkspur vale managed technology professional services &amp; offices managed services invoice master services agreement statement of work account manager note backup verification report service level agreement service ticket"><div class="hub-card">
+        <h3><a href="/industries/msp.html">IT services</a></h3>
+        <p>20 sample documents · 7 types</p>
+        <p>Managed services invoice, Master services agreement, Statement of work</p>
+        <div class="row"><a href="/industries/msp.html">Read more</a><a class="go" href="/demo/?industry=msp">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="film production copperkettle film co professional services &amp; offices crew deal memo location release production invoice call sheet daily production report producer note talent release"><div class="hub-card">
+        <h3><a href="/industries/filmprod.html">Film production</a></h3>
+        <p>20 sample documents · 7 types</p>
+        <p>Crew deal memo, Location release, Production invoice</p>
+        <div class="row"><a href="/industries/filmprod.html">Read more</a><a class="go" href="/demo/?industry=filmprod">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="photo studio juniper glen photo co professional services &amp; offices photography invoice photography services contract print order form client call note gallery delivery notice model release session log"><div class="hub-card">
+        <h3><a href="/industries/photostudio.html">Photo studio</a></h3>
+        <p>20 sample documents · 7 types</p>
+        <p>Photography invoice, Photography services contract, Print order form</p>
+        <div class="row"><a href="/industries/photostudio.html">Read more</a><a class="go" href="/demo/?industry=photostudio">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="tutoring sparrowgate learning center professional services &amp; offices enrollment agreement session package receipt tutoring invoice diagnostic assessment results progress report session log student intake form"><div class="hub-card">
+        <h3><a href="/industries/tutoring.html">Tutoring</a></h3>
+        <p>20 sample documents · 7 types</p>
+        <p>Enrollment agreement, Session package receipt, Tutoring invoice</p>
+        <div class="row"><a href="/industries/tutoring.html">Read more</a><a class="go" href="/demo/?industry=tutoring">Try the demo</a></div>
+      </div></li>
+    </ul>
+  </section>
+  <section class="hub-group" data-group="health" aria-labelledby="g-health">
+    <h2 id="g-health">Healthcare &amp; personal care</h2>
+    <p>Patients, clients and appointments.</p>
+    <ul class="hub-grid">
+      <li class="hub-item" data-search="medical office willowmere medical group healthcare &amp; personal care cms 1500 claim patient balance statement superbill lab result report prescription refill request soap visit note specialist referral letter"><div class="hub-card">
+        <h3><a href="/industries/medicaloffice.html">Medical office</a></h3>
+        <p>20 sample documents · 7 types</p>
+        <p>Cms 1500 claim, Patient balance statement, Superbill</p>
+        <div class="row"><a href="/industries/medicaloffice.html">Read more</a><a class="go" href="/demo/?industry=medicaloffice">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="dental office moonpenny dentistry healthcare &amp; personal care ada dental claim patient ledger statement treatment plan estimate clinical exam note dental treatment consent front desk note health history form"><div class="hub-card">
+        <h3><a href="/industries/dentaloffice.html">Dental office</a></h3>
+        <p>20 sample documents · 7 types</p>
+        <p>Ada dental claim, Patient ledger statement, Treatment plan estimate</p>
+        <div class="row"><a href="/industries/dentaloffice.html">Read more</a><a class="go" href="/demo/?industry=dentaloffice">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="dental lab kettleby springs dental laboratory healthcare &amp; personal care case quote lab invoice monthly lab statement job board note lab prescription shade and impression sheet shipping manifest"><div class="hub-card">
+        <h3><a href="/industries/dentallabco.html">Dental lab</a></h3>
+        <p>20 sample documents · 7 types</p>
+        <p>Case quote, Lab invoice, Monthly lab statement</p>
+        <div class="row"><a href="/industries/dentallabco.html">Read more</a><a class="go" href="/demo/?industry=dentallabco">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="medical billing copperkettle medical billing healthcare &amp; personal care claim batch report client invoice era posting report account note appeal letter billing work order payer call log"><div class="hub-card">
+        <h3><a href="/industries/medbillingco.html">Medical billing</a></h3>
+        <p>20 sample documents · 7 types</p>
+        <p>Claim batch report, Client invoice, Era posting report</p>
+        <div class="row"><a href="/industries/medbillingco.html">Read more</a><a class="go" href="/demo/?industry=medbillingco">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="veterinary clinic marigold flats animal hospital healthcare &amp; personal care client invoice payment receipt treatment estimate anesthesia consent exam record lab result report vaccination certificate"><div class="hub-card">
+        <h3><a href="/industries/vetclinic.html">Veterinary clinic</a></h3>
+        <p>20 sample documents · 7 types</p>
+        <p>Client invoice, Payment receipt, Treatment estimate</p>
+        <div class="row"><a href="/industries/vetclinic.html">Read more</a><a class="go" href="/demo/?industry=vetclinic">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="pet grooming kettleby springs pet grooming healthcare &amp; personal care grooming receipt grooming ticket package invoice grooming waiver pet profile card vaccination proof"><div class="hub-card">
+        <h3><a href="/industries/petgroomco.html">Pet grooming</a></h3>
+        <p>18 sample documents · 6 types</p>
+        <p>Grooming receipt, Grooming ticket, Package invoice</p>
+        <div class="row"><a href="/industries/petgroomco.html">Read more</a><a class="go" href="/demo/?industry=petgroomco">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="gym &amp; fitness zephyr crossing gym healthcare &amp; personal care failed payment notice monthly dues invoice payment receipt ach authorization class attendance record liability waiver membership agreement"><div class="hub-card">
+        <h3><a href="/industries/gymfit.html">Gym &amp; fitness</a></h3>
+        <p>20 sample documents · 7 types</p>
+        <p>Failed payment notice, Monthly dues invoice, Payment receipt</p>
+        <div class="row"><a href="/industries/gymfit.html">Read more</a><a class="go" href="/demo/?industry=gymfit">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="salon &amp; spa nettlefield cuts and color healthcare &amp; personal care bridal party invoice client account statement sales receipt color formula card consultation form front desk note service ticket"><div class="hub-card">
+        <h3><a href="/industries/salonspa.html">Salon &amp; spa</a></h3>
+        <p>20 sample documents · 7 types</p>
+        <p>Bridal party invoice, Client account statement, Sales receipt</p>
+        <div class="row"><a href="/industries/salonspa.html">Read more</a><a class="go" href="/demo/?industry=salonspa">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="daycare center sparrowgate preschool and daycare healthcare &amp; personal care family account statement payment receipt tuition invoice authorized pickup list child registration form daily attendance sheet enrollment agreement"><div class="hub-card">
+        <h3><a href="/industries/daycarecenter.html">Daycare center</a></h3>
+        <p>20 sample documents · 7 types</p>
+        <p>Family account statement, Payment receipt, Tuition invoice</p>
+        <div class="row"><a href="/industries/daycarecenter.html">Read more</a><a class="go" href="/demo/?industry=daycarecenter">Try the demo</a></div>
+      </div></li>
+    </ul>
+  </section>
+  <section class="hub-group" data-group="community" aria-labelledby="g-community">
+    <h2 id="g-community">Nonprofit &amp; community</h2>
+    <p>Grants, members, donors and public records.</p>
+    <ul class="hub-grid">
+      <li class="hub-item" data-search="nonprofit starling point food bank nonprofit &amp; community donation receipt event registration receipt year end giving statement board minutes recurring gift authorization treasurer report volunteer agreement"><div class="hub-card">
+        <h3><a href="/industries/nonprofits.html">Nonprofit</a></h3>
+        <p>20 sample documents · 7 types</p>
+        <p>Donation receipt, Event registration receipt, Year end giving statement</p>
+        <div class="row"><a href="/industries/nonprofits.html">Read more</a><a class="go" href="/demo/?industry=nonprofit">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="grant-funded nonprofit bramblewood community services nonprofit &amp; community grant ledger statement payment request vendor invoice award letter grant agreement progress report project budget"><div class="hub-card">
+        <h3><a href="/industries/grantnp.html">Grant-funded nonprofit</a></h3>
+        <p>20 sample documents · 7 types</p>
+        <p>Grant ledger statement, Payment request, Vendor invoice</p>
+        <div class="row"><a href="/industries/grantnp.html">Read more</a><a class="go" href="/demo/?industry=grantnp">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="church copperkettle chapel nonprofit &amp; community annual contribution statement offering receipt vendor invoice board meeting minutes childrens ministry registration membership application visitor connection card"><div class="hub-card">
+        <h3><a href="/industries/church.html">Church</a></h3>
+        <p>20 sample documents · 7 types</p>
+        <p>Annual contribution statement, Offering receipt, Vendor invoice</p>
+        <div class="row"><a href="/industries/church.html">Read more</a><a class="go" href="/demo/?industry=church">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="records office fernsby ridge police services nonprofit &amp; community impound tow sheet public records request traffic citation dispatch call log evidence log incident report supplemental report"><div class="hub-card">
+        <h3><a href="/industries/policerecords.html">Records office</a></h3>
+        <p>20 sample documents · 7 types</p>
+        <p>Impound tow sheet, Public records request, Traffic citation</p>
+        <div class="row"><a href="/industries/policerecords.html">Read more</a><a class="go" href="/demo/?industry=policerecords">Try the demo</a></div>
+      </div></li>
+    </ul>
+  </section>
+  <section class="hub-group" data-group="transport" aria-labelledby="g-transport">
+    <h2 id="g-transport">Transport, goods &amp; manufacturing</h2>
+    <p>Loads, stock, batches and quality records.</p>
+    <ul class="hub-grid">
+      <li class="hub-item" data-search="trucking marigold flats logistics transport, goods &amp; manufacturing bill of lading freight invoice rate confirmation fuel purchase receipt proof of delivery shipper call log"><div class="hub-card">
+        <h3><a href="/industries/trucking.html">Trucking</a></h3>
+        <p>18 sample documents · 6 types</p>
+        <p>Bill of lading, Freight invoice, Rate confirmation</p>
+        <div class="row"><a href="/industries/trucking.html">Read more</a><a class="go" href="/demo/?industry=trucking">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="warehouse nettlefield storage transport, goods &amp; manufacturing packing slip return authorization storage and handling invoice advance ship notice outbound shipping order pick ticket receiving report"><div class="hub-card">
+        <h3><a href="/industries/warehouse.html">Warehouse</a></h3>
+        <p>20 sample documents · 7 types</p>
+        <p>Packing slip, Return authorization, Storage and handling invoice</p>
+        <div class="row"><a href="/industries/warehouse.html">Read more</a><a class="go" href="/demo/?industry=warehouse">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="manufacturing juniper glen machine works transport, goods &amp; manufacturing certificate of conformance production traveler shipping invoice corrective and preventive action first article inspection report in process inspection record nonconformance report"><div class="hub-card">
+        <h3><a href="/industries/mfgqa.html">Manufacturing</a></h3>
+        <p>20 sample documents · 7 types</p>
+        <p>Certificate of conformance, Production traveler, Shipping invoice</p>
+        <div class="row"><a href="/industries/mfgqa.html">Read more</a><a class="go" href="/demo/?industry=mfgqa">Try the demo</a></div>
+      </div></li>
+      <li class="hub-item" data-search="feed &amp; farm store starling point farm supply transport, goods &amp; manufacturing bulk delivery ticket charge account statement feed sales invoice customer phone note scale ticket veterinary feed directive"><div class="hub-card">
+        <h3><a href="/industries/feedstore.html">Feed &amp; farm store</a></h3>
+        <p>18 sample documents · 6 types</p>
+        <p>Bulk delivery ticket, Charge account statement, Feed sales invoice</p>
+        <div class="row"><a href="/industries/feedstore.html">Read more</a><a class="go" href="/demo/?industry=feedstore">Try the demo</a></div>
+      </div></li>
+    </ul>
+  </section>
+  <div class="hub-empty" id="hub-empty">No industry matches that search. Try a shorter word, or clear the filter.</div>
+
+  <section class="hub-group" id="guides" data-group="guides" aria-labelledby="g-guides">
+    <h2 id="g-guides">More guides</h2>
+    <ul class="hub-guides">
+      <li><a href="/industries/any-business.html"><b>Any business</b><span>If you keep paperwork, it works.</span></a></li>
+      <li><a href="/industries/offices.html"><b>Offices</b><span>Vendor contracts, agreements and forms.</span></a></li>
+      <li><a href="/industries/fleet-equipment-rental.html"><b>Fleet and equipment rental</b><span>Service records, inspections and rental agreements.</span></a></li>
+      <li><a href="/industries/plumbing.html"><b>Plumbing</b><span>Service tickets, permits and warranty paperwork.</span></a></li>
+    </ul>
+  </section>
+
+  <p class="note">Sample workspaces use made-up companies and records. Nothing in them is real customer data.</p>
+  <a class="back-home" href="/">&larr; Back to deepwelltechnology.com</a>
+</main>
+<script>
+(function () {
+  var q = document.getElementById('hub-q');
+  var items = Array.prototype.slice.call(document.querySelectorAll('.hub-item'));
+  var groups = Array.prototype.slice.call(document.querySelectorAll('.hub-group[data-group]'));
+  var btns = Array.prototype.slice.call(document.querySelectorAll('.hub-filters button'));
+  var count = document.getElementById('hub-count');
+  var empty = document.getElementById('hub-empty');
+  var active = 'all';
+  function apply() {
+    var term = (q.value || '').trim().toLowerCase();
+    var shown = 0;
+    items.forEach(function (li) {
+      var g = li.closest('.hub-group').getAttribute('data-group');
+      var ok = (active === 'all' || active === g) && (!term || li.getAttribute('data-search').indexOf(term) !== -1);
+      li.hidden = !ok;
+      if (ok) shown++;
+    });
+    groups.forEach(function (sec) {
+      if (sec.id === 'guides') { sec.hidden = !(active === 'all' && !term); return; }
+      sec.hidden = !sec.querySelector('.hub-item:not([hidden])');
+    });
+    empty.style.display = shown ? 'none' : 'block';
+    count.textContent = shown === items.length ? 'Showing all ' + items.length + ' industries' : 'Showing ' + shown + ' of ' + items.length + ' industries';
+  }
+  q.addEventListener('input', apply);
+  btns.forEach(function (b) {
+    b.addEventListener('click', function () {
+      active = b.getAttribute('data-filter');
+      btns.forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+      apply();
+    });
+  });
+  try { var pre = new URLSearchParams(location.search).get('q'); if (pre) { q.value = pre; apply(); } } catch (e) {}
+})();
+</script>
+<footer>
+  <div class="wrap">
+    <div>© 2026 DeepWell Technology · Knowledge Builds Business.</div>
+    <div><a href="/industries/">Industries</a><a href="/#how-it-works">How it works</a><a href="/#plans">Plans</a><a href="/#team">Founders</a><a href="/#contact">Contact</a><a href="/security.html">Security</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a><a href="/patch-notes.html">Patch notes</a><a href="https://status.deepwelltechnology.com">Status</a></div>
+  </div>
+</footer>
+<script>
+(function () {
+  var dd = document.querySelector('.nav-dropdown');
+  if (!dd) return;
+  var toggle = dd.querySelector('.nav-dropdown-toggle');
+  var menu = dd.querySelector('.nav-dropdown-menu');
+  if (!toggle || !menu) return;
+  var items = Array.prototype.slice.call(menu.querySelectorAll('a'));
+
+  function isOpen() { return dd.classList.contains('open'); }
+  function open() {
+    dd.classList.add('open');
+    toggle.setAttribute('aria-expanded', 'true');
+  }
+  function close(focusToggle) {
+    dd.classList.remove('open');
+    toggle.setAttribute('aria-expanded', 'false');
+    if (focusToggle) toggle.focus();
+  }
+
+  toggle.addEventListener('click', function (e) {
+    e.stopPropagation();
+    if (isOpen()) { close(false); } else { open(); }
+  });
+
+  toggle.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      open();
+      if (items[0]) items[0].focus();
+    } else if (e.key === 'Escape' && isOpen()) {
+      close(true);
+    }
+  });
+
+  menu.addEventListener('keydown', function (e) {
+    var i = items.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      var next = items[(i + 1) % items.length];
+      if (next) next.focus();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      var prev = items[(i - 1 + items.length) % items.length];
+      if (prev) prev.focus();
+    } else if (e.key === 'Escape') {
+      close(true);
+    } else if (e.key === 'Tab') {
+      setTimeout(function () {
+        if (!dd.contains(document.activeElement)) close(false);
+      }, 0);
+    }
+  });
+
+  document.addEventListener('click', function (e) {
+    if (!dd.contains(e.target)) close(false);
+  });
+  document.addEventListener('focusin', function (e) {
+    if (!dd.contains(e.target)) close(false);
+  });
+})();
+</script>
+<script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
+<script defer src="/_vercel/insights/script.js"></script>
+<script defer src="/support/widget.js"></script>
+</body>
+</html>

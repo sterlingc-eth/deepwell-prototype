@@ -1,0 +1,2893 @@
+{
+ "source": "src/demo/fixtures/*.demo.json",
+ "synthetic": true,
+ "industries": [
+  {
+   "slug": "realty",
+   "label": "Real estate",
+   "company": "Pinecone Hollow Home Team",
+   "documents": 20,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Closing statement",
+     "count": 4
+    },
+    {
+     "label": "Listing agreement",
+     "count": 4
+    },
+    {
+     "label": "Purchase contract",
+     "count": 4
+    },
+    {
+     "label": "Buyer advisory",
+     "count": 2
+    },
+    {
+     "label": "Inspection contingency notice",
+     "count": 2
+    },
+    {
+     "label": "Seller disclosure",
+     "count": 2
+    },
+    {
+     "label": "Showing log",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on PC-1049?",
+     "answer": "Total: $161,820.00",
+     "source": "Purchase contract PC-1049 — Emery Thistledown"
+    },
+    {
+     "q": "How much in total across Lantern Bay Group's closing statements?",
+     "answer": "Total of 3 closing statements for Lantern Bay Group: $1,152,740.00",
+     "source": "Closing statement CS-1042 — Lantern Bay Group"
+    },
+    {
+     "q": "How many listing agreements were created in 2026?",
+     "answer": "3 listing agreements on file (2026).",
+     "source": "Listing agreement LA-1054 — Sage Kettleby"
+    },
+    {
+     "q": "When was Tatum Bumblethorn's latest buyer advisory?",
+     "answer": "Latest buyer advisory for Tatum Bumblethorn: 2025-11-30",
+     "source": "Buyer advisory — Tatum Bumblethorn"
+    },
+    {
+     "q": "Who is the client at 572 Lullaby Ln, Lantern Bay, AZ 85002?",
+     "answer": "Emery Thistledown is at 572 Lullaby Ln, Lantern Bay, AZ 85002.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "property-management",
+   "label": "Property management",
+   "company": "Willowmere Rentals",
+   "documents": 20,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Owner statement",
+     "count": 4
+    },
+    {
+     "label": "Rent statement",
+     "count": 4
+    },
+    {
+     "label": "Work order",
+     "count": 4
+    },
+    {
+     "label": "Lease agreement",
+     "count": 2
+    },
+    {
+     "label": "Move in inspection",
+     "count": 2
+    },
+    {
+     "label": "Move out inspection",
+     "count": 2
+    },
+    {
+     "label": "Rental application",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on WO-1056?",
+     "answer": "Total: $275.00",
+     "source": "Work order WO-1056 — Morgan Pebbleworth"
+    },
+    {
+     "q": "What are the open charges on RS-1041?",
+     "answer": "Open charges: 3",
+     "source": "Rent statement RS-1041 — Rowan Zephyrton"
+    },
+    {
+     "q": "How much in total across Rowan Zephyrton's rent statements?",
+     "answer": "Total of 2 rent statements for Rowan Zephyrton: $2,855.00",
+     "source": "Rent statement RS-1041 — Rowan Zephyrton"
+    },
+    {
+     "q": "How many owner statements were created in 2026?",
+     "answer": "3 owner statements on file (2026).",
+     "source": "Owner statement OS-1071 — Remy Bumblethorn"
+    },
+    {
+     "q": "When was Morgan Pebbleworth's latest work order?",
+     "answer": "Latest work order for Morgan Pebbleworth: 2025-08-04",
+     "source": "Work order WO-1057 — Morgan Pebbleworth"
+    },
+    {
+     "q": "What does OS-1069 say about fees charged?",
+     "answer": "The statement lists the manager's fee and placement charge individually. (page 1, Owner statement OS-1069 (Copperkettle Ventures, 2025-06-05))",
+     "source": "Owner statement OS-1069 — Copperkettle Ventures"
+    },
+    {
+     "q": "Who is the tenant at 593 Sprocket St, Unit 7A, Maple Hollow, AZ 85003?",
+     "answer": "Hayden Pippinwood is at 593 Sprocket St, Unit 7A, Maple Hollow, AZ 85003.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "plumbing-hvac",
+   "label": "Plumbing & HVAC",
+   "company": "Pebbleworth Climate Control",
+   "documents": 18,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "HVAC invoice",
+     "count": 4
+    },
+    {
+     "label": "HVAC replacement quote",
+     "count": 4
+    },
+    {
+     "label": "HVAC service ticket",
+     "count": 4
+    },
+    {
+     "label": "Drain cleaning ticket",
+     "count": 2
+    },
+    {
+     "label": "Maintenance agreement",
+     "count": 2
+    },
+    {
+     "label": "Tune up checklist",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on HV-1054?",
+     "answer": "Total: $146.61",
+     "source": "HVAC invoice HV-1054 — Sage Zephyrton"
+    },
+    {
+     "q": "How much in total across Sage Zephyrton's HVAC invoices?",
+     "answer": "Total of 2 HVAC invoices for Sage Zephyrton: $249.78",
+     "source": "HVAC invoice HV-1054 — Sage Zephyrton"
+    },
+    {
+     "q": "How many HVAC invoices were created in 2026?",
+     "answer": "3 HVAC invoices on file (2026).",
+     "source": "HVAC invoice HV-1056 — Sage Zephyrton"
+    },
+    {
+     "q": "When was Reese Fernsby's latest HVAC replacement quote?",
+     "answer": "Latest HVAC replacement quote for Reese Fernsby: 2026-03-30",
+     "source": "HVAC replacement quote HQ-1065 — Reese Fernsby"
+    },
+    {
+     "q": "What does HV-1054 say about late charge?",
+     "answer": "Past-due invoices are charged interest at 3% each month. (page 1, HVAC invoice HV-1054 (Sage Zephyrton, 2025-08-11))",
+     "source": "HVAC invoice HV-1054 — Sage Zephyrton"
+    },
+    {
+     "q": "Who is the customer at 896 Marigold Ave, Maple Hollow, AZ 85003?",
+     "answer": "Emery Pebbleworth is at 896 Marigold Ave, Maple Hollow, AZ 85003.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "electrical",
+   "label": "Electrical",
+   "company": "Zephyr Crossing Electrical Contractors",
+   "documents": 18,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Electrical estimate",
+     "count": 4
+    },
+    {
+     "label": "Electrical invoice",
+     "count": 4
+    },
+    {
+     "label": "Electrical service ticket",
+     "count": 4
+    },
+    {
+     "label": "Electrical permit",
+     "count": 2
+    },
+    {
+     "label": "Panel upgrade record",
+     "count": 2
+    },
+    {
+     "label": "Rough electrical inspection card",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on INV-1062?",
+     "answer": "Total: $5,440.86",
+     "source": "Electrical invoice INV-1062 — Ellis Zephyrton"
+    },
+    {
+     "q": "How much in total across Dakota Pebbleworth's electrical estimates?",
+     "answer": "Total of 2 electrical estimates for Dakota Pebbleworth: $3,426.33",
+     "source": "Electrical estimate EST-1055 — Dakota Pebbleworth"
+    },
+    {
+     "q": "How many electrical invoices were created in 2026?",
+     "answer": "3 electrical invoices on file (2026).",
+     "source": "Electrical invoice INV-1063 — Ellis Zephyrton"
+    },
+    {
+     "q": "When was Ellis Zephyrton's latest electrical invoice?",
+     "answer": "Latest electrical invoice for Ellis Zephyrton: 2026-03-07",
+     "source": "Electrical invoice INV-1063 — Ellis Zephyrton"
+    },
+    {
+     "q": "What does EST-1055 say about estimate validity?",
+     "answer": "This estimate is good for 51 days from the date shown. (page 2, Electrical estimate EST-1055 (Dakota Pebbleworth, 2025-08-21))",
+     "source": "Electrical estimate EST-1055 — Dakota Pebbleworth"
+    },
+    {
+     "q": "Who is the customer at 117 Lullaby Ln, Maple Hollow, AZ 85003?",
+     "answer": "Rowan Thistledown is at 117 Lullaby Ln, Maple Hollow, AZ 85003.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "general-contractor",
+   "label": "General contractor",
+   "company": "Moonpenny Builders",
+   "documents": 20,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Change order",
+     "count": 4
+    },
+    {
+     "label": "Draw request",
+     "count": 4
+    },
+    {
+     "label": "Remodel proposal",
+     "count": 4
+    },
+    {
+     "label": "Building inspection record",
+     "count": 2
+    },
+    {
+     "label": "Conditional lien waiver",
+     "count": 2
+    },
+    {
+     "label": "Construction contract",
+     "count": 2
+    },
+    {
+     "label": "Superintendent daily log",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on DR-1056?",
+     "answer": "Total: $39,096.00",
+     "source": "Draw request DR-1056 — Sage Rosethorn"
+    },
+    {
+     "q": "How much in total across Sage Rosethorn's draw requests?",
+     "answer": "Total of 2 draw requests for Sage Rosethorn: $78,192.00",
+     "source": "Draw request DR-1056 — Sage Rosethorn"
+    },
+    {
+     "q": "How many remodel proposals were created in 2026?",
+     "answer": "3 remodel proposals on file (2026).",
+     "source": "Remodel proposal PRP-1062 — Skyler Juniperfield"
+    },
+    {
+     "q": "When was Skyler Juniperfield's latest remodel proposal?",
+     "answer": "Latest remodel proposal for Skyler Juniperfield: 2026-02-07",
+     "source": "Remodel proposal PRP-1062 — Skyler Juniperfield"
+    },
+    {
+     "q": "What does DR-1056 say about retainage?",
+     "answer": "We hold 8% retention on every progress payment. (page 2, Draw request DR-1056 (Sage Rosethorn, 2025-05-19))",
+     "source": "Draw request DR-1056 — Sage Rosethorn"
+    },
+    {
+     "q": "Who is the owner at 411 Thimble St, Maple Hollow, AZ 85003?",
+     "answer": "Blair Bumblethorn is at 411 Thimble St, Maple Hollow, AZ 85003.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "auto",
+   "label": "Auto repair",
+   "company": "Pinecone Hollow Auto Repair",
+   "documents": 18,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Final invoice",
+     "count": 4
+    },
+    {
+     "label": "Repair order",
+     "count": 4
+    },
+    {
+     "label": "Written estimate",
+     "count": 4
+    },
+    {
+     "label": "Multi point inspection",
+     "count": 2
+    },
+    {
+     "label": "Repair warranty certificate",
+     "count": 2
+    },
+    {
+     "label": "Work authorization",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on INV-1069?",
+     "answer": "Total: $48.87",
+     "source": "Final invoice INV-1069 — Parker Pebbleworth"
+    },
+    {
+     "q": "How much in total across Parker Pebbleworth's final invoices?",
+     "answer": "Total of 2 final invoices for Parker Pebbleworth: $130.32",
+     "source": "Final invoice INV-1069 — Parker Pebbleworth"
+    },
+    {
+     "q": "How many written estimates were created in 2026?",
+     "answer": "3 written estimates on file (2026).",
+     "source": "Written estimate EST-1049 — Emery Juniperfield"
+    },
+    {
+     "q": "When was Emery Juniperfield's latest written estimate?",
+     "answer": "Latest written estimate for Emery Juniperfield: 2026-04-23",
+     "source": "Written estimate EST-1049 — Emery Juniperfield"
+    },
+    {
+     "q": "Who is the customer at 958 Biscuit Blvd, Maple Hollow, AZ 85003?",
+     "answer": "Remy Lanternby is at 958 Biscuit Blvd, Maple Hollow, AZ 85003.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "bookkeeping",
+   "label": "Bookkeeping",
+   "company": "Quillback Ledger Works",
+   "documents": 20,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Bookkeeping engagement letter",
+     "count": 4
+    },
+    {
+     "label": "Bookkeeping invoice",
+     "count": 4
+    },
+    {
+     "label": "Profit and loss report",
+     "count": 4
+    },
+    {
+     "label": "Bank reconciliation report",
+     "count": 2
+    },
+    {
+     "label": "Client call note",
+     "count": 2
+    },
+    {
+     "label": "Journal entry memo",
+     "count": 2
+    },
+    {
+     "label": "Tax organizer",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on EN-1047?",
+     "answer": "Total: $1,175.00",
+     "source": "Bookkeeping engagement letter EN-1047 — Avery Sparrowgate"
+    },
+    {
+     "q": "How much in total across Avery Sparrowgate's bookkeeping engagement letters?",
+     "answer": "Total of 2 bookkeeping engagement letters for Avery Sparrowgate: $1,975.00",
+     "source": "Bookkeeping engagement letter EN-1047 — Avery Sparrowgate"
+    },
+    {
+     "q": "How many bookkeeping invoices were created in 2026?",
+     "answer": "3 bookkeeping invoices on file (2026).",
+     "source": "Bookkeeping invoice BI-1072 — Morgan Copperkettle"
+    },
+    {
+     "q": "When was Harper Bumblethorn's latest bank reconciliation report?",
+     "answer": "Latest bank reconciliation report for Harper Bumblethorn: 2025-10-26",
+     "source": "Bank reconciliation report — Harper Bumblethorn"
+    },
+    {
+     "q": "What does EN-1047 say about not an audit?",
+     "answer": "We do not audit or review your records and give no opinion on them. (page 1, Bookkeeping engagement letter EN-1047 (Avery Sparrowgate, 2025-06-07))",
+     "source": "Bookkeeping engagement letter EN-1047 — Avery Sparrowgate"
+    },
+    {
+     "q": "Who is the client at 592 Marigold Ave, Fableton, AZ 85001?",
+     "answer": "Jordan Pippinwood is at 592 Marigold Ave, Fableton, AZ 85001.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "brewery",
+   "label": "Brewery",
+   "company": "Moonpenny Beer Works",
+   "documents": 18,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Distributor call log",
+     "count": 4
+    },
+    {
+     "label": "Distributor invoice",
+     "count": 4
+    },
+    {
+     "label": "Keg tracking log",
+     "count": 4
+    },
+    {
+     "label": "Brew log",
+     "count": 2
+    },
+    {
+     "label": "Distributor agreement",
+     "count": 2
+    },
+    {
+     "label": "Supplier invoice",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on SB-1045?",
+     "answer": "Total: $915.00",
+     "source": "Supplier invoice SB-1045 — Fernsby Ridge Supply Co"
+    },
+    {
+     "q": "What are the kegs out on KG-1067?",
+     "answer": "Kegs out: 100",
+     "source": "Keg tracking log KG-1067 — Rowan Lanternby"
+    },
+    {
+     "q": "How much in total across Rowan Lanternby's keg tracking logs?",
+     "answer": "Total of 2 keg tracking logs for Rowan Lanternby: $2,935.00",
+     "source": "Keg tracking log KG-1067 — Rowan Lanternby"
+    },
+    {
+     "q": "How many keg tracking logs were created in 2026?",
+     "answer": "3 keg tracking logs on file (2026).",
+     "source": "Keg tracking log KG-1068 — Rowan Lanternby"
+    },
+    {
+     "q": "When was Avery Kettleby's latest distributor invoice?",
+     "answer": "Latest distributor invoice for Avery Kettleby: 2026-05-14",
+     "source": "Distributor invoice DV-1063 — Avery Kettleby"
+    },
+    {
+     "q": "Who is the distributor at 878 Thimble St, Maple Hollow, AZ 85003?",
+     "answer": "Tatum Copperkettle is at 878 Thimble St, Maple Hollow, AZ 85003.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "church",
+   "label": "Church",
+   "company": "Copperkettle Chapel",
+   "documents": 20,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Annual contribution statement",
+     "count": 4
+    },
+    {
+     "label": "Offering receipt",
+     "count": 4
+    },
+    {
+     "label": "Vendor invoice",
+     "count": 4
+    },
+    {
+     "label": "Board meeting minutes",
+     "count": 2
+    },
+    {
+     "label": "Childrens ministry registration",
+     "count": 2
+    },
+    {
+     "label": "Membership application",
+     "count": 2
+    },
+    {
+     "label": "Visitor connection card",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on VND-1058?",
+     "answer": "Total: $560.00",
+     "source": "Vendor invoice VND-1058 — Harper Honeyvale"
+    },
+    {
+     "q": "What is the fund on GV-1051?",
+     "answer": "Fund: Benevolence",
+     "source": "Offering receipt GV-1051 — Jordan Nettlefield"
+    },
+    {
+     "q": "How much in total across Ellis Tumbleby's annual contribution statements?",
+     "answer": "Total of 2 annual contribution statements for Ellis Tumbleby: $2,480.00",
+     "source": "Annual contribution statement GS-1050 — Ellis Tumbleby"
+    },
+    {
+     "q": "How many vendor invoices were created in 2026?",
+     "answer": "3 vendor invoices on file (2026).",
+     "source": "Vendor invoice VND-1060 — Riley Fernsby"
+    },
+    {
+     "q": "When was Jordan Nettlefield's latest offering receipt?",
+     "answer": "Latest offering receipt for Jordan Nettlefield: 2025-11-29",
+     "source": "Offering receipt GV-1054 — Jordan Nettlefield"
+    },
+    {
+     "q": "Who is the member at 987 Biscuit Blvd, Maple Hollow, AZ 85003?",
+     "answer": "Ellis Moonpenny is at 987 Biscuit Blvd, Maple Hollow, AZ 85003.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "cleaning",
+   "label": "Cleaning & janitorial",
+   "company": "Pebbleworth Cleaning Co",
+   "documents": 20,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Cleaning estimate",
+     "count": 4
+    },
+    {
+     "label": "Cleaning invoice",
+     "count": 4
+    },
+    {
+     "label": "Gift certificate",
+     "count": 4
+    },
+    {
+     "label": "Cleaning visit ticket",
+     "count": 2
+    },
+    {
+     "label": "Recurring cleaning agreement",
+     "count": 2
+    },
+    {
+     "label": "Room by room cleaning checklist",
+     "count": 2
+    },
+    {
+     "label": "Scheduling memo",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on INV-1051?",
+     "answer": "Total: $250.00",
+     "source": "Cleaning invoice INV-1051 — Quinn Pippinwood"
+    },
+    {
+     "q": "How much in total across Jordan Thistledown's cleaning estimates?",
+     "answer": "Total of 2 cleaning estimates for Jordan Thistledown: $565.00",
+     "source": "Cleaning estimate CE-1047 — Jordan Thistledown"
+    },
+    {
+     "q": "How many cleaning invoices were created in 2026?",
+     "answer": "3 cleaning invoices on file (2026).",
+     "source": "Cleaning invoice INV-1052 — Quinn Pippinwood"
+    },
+    {
+     "q": "When was Quinn Pippinwood's latest cleaning invoice?",
+     "answer": "Latest cleaning invoice for Quinn Pippinwood: 2026-01-21",
+     "source": "Cleaning invoice INV-1052 — Quinn Pippinwood"
+    },
+    {
+     "q": "What does CE-1047 say about estimate validity?",
+     "answer": "This estimate is good for 30 days from the date shown. (page 1, Cleaning estimate CE-1047 (Jordan Thistledown, 2025-05-18))",
+     "source": "Cleaning estimate CE-1047 — Jordan Thistledown"
+    },
+    {
+     "q": "Who is the client at 115 Marigold Ave, Maple Hollow, AZ 85003?",
+     "answer": "Marlowe Rosethorn is at 115 Marigold Ave, Maple Hollow, AZ 85003.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "daycarecenter",
+   "label": "Daycare center",
+   "company": "Sparrowgate Preschool and Daycare",
+   "documents": 20,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Family account statement",
+     "count": 4
+    },
+    {
+     "label": "Payment receipt",
+     "count": 4
+    },
+    {
+     "label": "Tuition invoice",
+     "count": 4
+    },
+    {
+     "label": "Authorized pickup list",
+     "count": 2
+    },
+    {
+     "label": "Child registration form",
+     "count": 2
+    },
+    {
+     "label": "Daily attendance sheet",
+     "count": 2
+    },
+    {
+     "label": "Enrollment agreement",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on TU-1067?",
+     "answer": "Total: $1,155.00",
+     "source": "Tuition invoice TU-1067 — Harper Puddleby"
+    },
+    {
+     "q": "What are the days per week on TU-1067?",
+     "answer": "Days per week: 5",
+     "source": "Tuition invoice TU-1067 — Harper Puddleby"
+    },
+    {
+     "q": "How much in total across Morgan Moonpenny's family account statements?",
+     "answer": "Total of 3 family account statements for Morgan Moonpenny: $845.00",
+     "source": "Family account statement FA-1069 — Morgan Moonpenny"
+    },
+    {
+     "q": "How many tuition invoices were created in 2026?",
+     "answer": "4 tuition invoices on file (2026).",
+     "source": "Tuition invoice TU-1067 — Harper Puddleby"
+    },
+    {
+     "q": "When was Hayden Wickerby's latest enrollment agreement?",
+     "answer": "Latest enrollment agreement for Hayden Wickerby: 2026-02-11",
+     "source": "Enrollment agreement — Hayden Wickerby"
+    },
+    {
+     "q": "What does FA-1069 say about care suspension?",
+     "answer": "Care is suspended when an account is 16 days overdue. (page 1, Family account statement FA-1069 (Morgan Moonpenny, 2025-07-05))",
+     "source": "Family account statement FA-1069 — Morgan Moonpenny"
+    },
+    {
+     "q": "Who is the family at 492 Biscuit Blvd, Lantern Bay, AZ 85002?",
+     "answer": "Quinn Pippinwood is at 492 Biscuit Blvd, Lantern Bay, AZ 85002.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "dentallabco",
+   "label": "Dental lab",
+   "company": "Kettleby Springs Dental Laboratory",
+   "documents": 20,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Case quote",
+     "count": 4
+    },
+    {
+     "label": "Lab invoice",
+     "count": 4
+    },
+    {
+     "label": "Monthly lab statement",
+     "count": 4
+    },
+    {
+     "label": "Job board note",
+     "count": 2
+    },
+    {
+     "label": "Lab prescription",
+     "count": 2
+    },
+    {
+     "label": "Shade and impression sheet",
+     "count": 2
+    },
+    {
+     "label": "Shipping manifest",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on LI-1055?",
+     "answer": "Total: $420.00",
+     "source": "Lab invoice LI-1055 — Remy Pippinwood"
+    },
+    {
+     "q": "How much in total across Remy Pippinwood's lab invoices?",
+     "answer": "Total of 2 lab invoices for Remy Pippinwood: $3,170.00",
+     "source": "Lab invoice LI-1055 — Remy Pippinwood"
+    },
+    {
+     "q": "How many monthly lab statements were created in 2026?",
+     "answer": "3 monthly lab statements on file (2026).",
+     "source": "Monthly lab statement LS-1046 — Tatum Quillfeather"
+    },
+    {
+     "q": "When was Tatum Quillfeather's latest monthly lab statement?",
+     "answer": "Latest monthly lab statement for Tatum Quillfeather: 2026-02-25",
+     "source": "Monthly lab statement LS-1046 — Tatum Quillfeather"
+    },
+    {
+     "q": "Who is the dentist at 786 Biscuit Blvd, Maple Hollow, AZ 85003?",
+     "answer": "Morgan Willowmere is at 786 Biscuit Blvd, Maple Hollow, AZ 85003.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "dentaloffice",
+   "label": "Dental office",
+   "company": "Moonpenny Dentistry",
+   "documents": 20,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Ada dental claim",
+     "count": 4
+    },
+    {
+     "label": "Patient ledger statement",
+     "count": 4
+    },
+    {
+     "label": "Treatment plan estimate",
+     "count": 4
+    },
+    {
+     "label": "Clinical exam note",
+     "count": 2
+    },
+    {
+     "label": "Dental treatment consent",
+     "count": 2
+    },
+    {
+     "label": "Front desk note",
+     "count": 2
+    },
+    {
+     "label": "Health history form",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on DC-1050?",
+     "answer": "Total: $110.00",
+     "source": "Ada dental claim DC-1050 — Quinn Lanternby"
+    },
+    {
+     "q": "How much in total across Tatum Zephyrton's treatment plan estimates?",
+     "answer": "Total of 2 treatment plan estimates for Tatum Zephyrton: $405.00",
+     "source": "Treatment plan estimate TP-1042 — Tatum Zephyrton"
+    },
+    {
+     "q": "How many treatment plan estimates were created in 2026?",
+     "answer": "2 treatment plan estimates on file (2026).",
+     "source": "Treatment plan estimate TP-1046 — Copperkettle Benefits Group"
+    },
+    {
+     "q": "When was Quinn Lanternby's latest ada dental claim?",
+     "answer": "Latest ada dental claim for Quinn Lanternby: 2025-12-31",
+     "source": "Ada dental claim DC-1051 — Quinn Lanternby"
+    },
+    {
+     "q": "Who is the patient at 552 Puzzle Pl, Maple Hollow, AZ 85003?",
+     "answer": "Tatum Fernsby is at 552 Puzzle Pl, Maple Hollow, AZ 85003.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "eventvenue",
+   "label": "Event venue",
+   "company": "Pebbleworth Event Center",
+   "documents": 20,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Event rental agreement",
+     "count": 4
+    },
+    {
+     "label": "Payment schedule invoice",
+     "count": 4
+    },
+    {
+     "label": "Retainer receipt",
+     "count": 4
+    },
+    {
+     "label": "Event liability insurance certificate",
+     "count": 2
+    },
+    {
+     "label": "Event timeline",
+     "count": 2
+    },
+    {
+     "label": "Setup and teardown checklist",
+     "count": 2
+    },
+    {
+     "label": "Tour inquiry form",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on PS-1060?",
+     "answer": "Total: $1,420.00",
+     "source": "Payment schedule invoice PS-1060 — Hayden Moonpenny"
+    },
+    {
+     "q": "What is the event type on IQ-1059?",
+     "answer": "Event type: Holiday party",
+     "source": "Tour inquiry form IQ-1059 — Avery Fernsby"
+    },
+    {
+     "q": "How much in total across Hayden Puddleby's event rental agreements?",
+     "answer": "Total of 2 event rental agreements for Hayden Puddleby: $7,810.00",
+     "source": "Event rental agreement EC-1059 — Hayden Puddleby"
+    },
+    {
+     "q": "How many event rental agreements were created in 2026?",
+     "answer": "3 event rental agreements on file (2026).",
+     "source": "Event rental agreement EC-1062 — Hayden Puddleby"
+    },
+    {
+     "q": "When was Hayden Moonpenny's latest payment schedule invoice?",
+     "answer": "Latest payment schedule invoice for Hayden Moonpenny: 2025-10-14",
+     "source": "Payment schedule invoice PS-1062 — Hayden Moonpenny"
+    },
+    {
+     "q": "What does IQ-1059 say about tour availability?",
+     "answer": "Tours are offered weekdays from 10 AM. (page 1, Tour inquiry form IQ-1059 (Avery Fernsby, 2025-05-05))",
+     "source": "Tour inquiry form IQ-1059 — Avery Fernsby"
+    },
+    {
+     "q": "Who is the client at 844 Marigold Ave, Maple Hollow, AZ 85003?",
+     "answer": "Avery Fernsby is at 844 Marigold Ave, Maple Hollow, AZ 85003.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "feedstore",
+   "label": "Feed & farm store",
+   "company": "Starling Point Farm Supply",
+   "documents": 18,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Bulk delivery ticket",
+     "count": 4
+    },
+    {
+     "label": "Charge account statement",
+     "count": 4
+    },
+    {
+     "label": "Feed sales invoice",
+     "count": 4
+    },
+    {
+     "label": "Customer phone note",
+     "count": 2
+    },
+    {
+     "label": "Scale ticket",
+     "count": 2
+    },
+    {
+     "label": "Veterinary feed directive",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on FS-1060?",
+     "answer": "Total: $282.36",
+     "source": "Feed sales invoice FS-1060 — Morgan Gingerbrook"
+    },
+    {
+     "q": "How much in total across Morgan Gingerbrook's feed sales invoices?",
+     "answer": "Total of 2 feed sales invoices for Morgan Gingerbrook: $1,346.64",
+     "source": "Feed sales invoice FS-1060 — Morgan Gingerbrook"
+    },
+    {
+     "q": "How many feed sales invoices were created in 2026?",
+     "answer": "3 feed sales invoices on file (2026).",
+     "source": "Feed sales invoice FS-1061 — Morgan Gingerbrook"
+    },
+    {
+     "q": "When was Hayden Lanternby's latest bulk delivery ticket?",
+     "answer": "Latest bulk delivery ticket for Hayden Lanternby: 2026-07-14",
+     "source": "Bulk delivery ticket — Hayden Lanternby"
+    },
+    {
+     "q": "What does FS-1060 say about bulk discount?",
+     "answer": "Orders of 7 tons or more earn a 5% discount. (page 1, Feed sales invoice FS-1060 (Morgan Gingerbrook, 2025-07-06))",
+     "source": "Feed sales invoice FS-1060 — Morgan Gingerbrook"
+    },
+    {
+     "q": "Who is the farmer at 703 Lullaby Ln, Lantern Bay, AZ 85002?",
+     "answer": "Wren Pippinwood is at 703 Lullaby Ln, Lantern Bay, AZ 85002.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "filmprod",
+   "label": "Film production",
+   "company": "Copperkettle Film Co",
+   "documents": 20,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Crew deal memo",
+     "count": 4
+    },
+    {
+     "label": "Location release",
+     "count": 4
+    },
+    {
+     "label": "Production invoice",
+     "count": 4
+    },
+    {
+     "label": "Call sheet",
+     "count": 2
+    },
+    {
+     "label": "Daily production report",
+     "count": 2
+    },
+    {
+     "label": "Producer note",
+     "count": 2
+    },
+    {
+     "label": "Talent release",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on PI-1045?",
+     "answer": "Total: $43,140.00",
+     "source": "Production invoice PI-1045 — Hayden Tumbleby"
+    },
+    {
+     "q": "How much in total across Hayden Tumbleby's production invoices?",
+     "answer": "Total of 2 production invoices for Hayden Tumbleby: $46,070.00",
+     "source": "Production invoice PI-1045 — Hayden Tumbleby"
+    },
+    {
+     "q": "How many crew deal memos were created in 2026?",
+     "answer": "3 crew deal memos on file (2026).",
+     "source": "Crew deal memo DM-1061 — Finley Thistledown"
+    },
+    {
+     "q": "When was Finley Thistledown's latest crew deal memo?",
+     "answer": "Latest crew deal memo for Finley Thistledown: 2026-02-02",
+     "source": "Crew deal memo DM-1061 — Finley Thistledown"
+    },
+    {
+     "q": "What does PI-1045 say about final deliverables?",
+     "answer": "Final masters are released upon receipt of payment. (page 1, Production invoice PI-1045 (Hayden Tumbleby, 2025-05-29))",
+     "source": "Production invoice PI-1045 — Hayden Tumbleby"
+    },
+    {
+     "q": "Who is the client at 414 Marigold Ave, Maple Hollow, AZ 85003?",
+     "answer": "Reese Quillfeather is at 414 Marigold Ave, Maple Hollow, AZ 85003.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "foodtruck",
+   "label": "Food truck",
+   "company": "Lantern Bay Smokehouse",
+   "documents": 18,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Catering order form",
+     "count": 4
+    },
+    {
+     "label": "Customer comment log",
+     "count": 4
+    },
+    {
+     "label": "Event vendor agreement",
+     "count": 4
+    },
+    {
+     "label": "Daily sales report",
+     "count": 2
+    },
+    {
+     "label": "Prep and par list",
+     "count": 2
+    },
+    {
+     "label": "Supplier receipt",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on CO-1062?",
+     "answer": "Total: $5,348.55",
+     "source": "Catering order form CO-1062 — Quinn Moonpenny"
+    },
+    {
+     "q": "What is the guest count on CO-1062?",
+     "answer": "Guest count: 25",
+     "source": "Catering order form CO-1062 — Quinn Moonpenny"
+    },
+    {
+     "q": "How much in total across Quinn Moonpenny's catering order forms?",
+     "answer": "Total of 2 catering order forms for Quinn Moonpenny: $7,954.95",
+     "source": "Catering order form CO-1062 — Quinn Moonpenny"
+    },
+    {
+     "q": "How many customer comment logs were created in 2026?",
+     "answer": "3 customer comment logs on file (2026).",
+     "source": "Customer comment log — Moonpenny Office Park"
+    },
+    {
+     "q": "When was Finley Bumblethorn's latest event vendor agreement?",
+     "answer": "Latest event vendor agreement for Finley Bumblethorn: 2026-02-02",
+     "source": "Event vendor agreement EA-1064 — Finley Bumblethorn"
+    },
+    {
+     "q": "What does CO-1062 say about cancellation?",
+     "answer": "Cancel more than 5 days ahead to get money back. (page 2, Catering order form CO-1062 (Quinn Moonpenny, 2025-08-10))",
+     "source": "Catering order form CO-1062 — Quinn Moonpenny"
+    },
+    {
+     "q": "Who is the customer at 820 Sprocket St, Maple Hollow, AZ 85003?",
+     "answer": "Dakota Juniperfield is at 820 Sprocket St, Maple Hollow, AZ 85003.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "grantnp",
+   "label": "Grant-funded nonprofit",
+   "company": "Bramblewood Community Services",
+   "documents": 20,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Grant ledger statement",
+     "count": 4
+    },
+    {
+     "label": "Payment request",
+     "count": 4
+    },
+    {
+     "label": "Vendor invoice",
+     "count": 4
+    },
+    {
+     "label": "Award letter",
+     "count": 2
+    },
+    {
+     "label": "Grant agreement",
+     "count": 2
+    },
+    {
+     "label": "Progress report",
+     "count": 2
+    },
+    {
+     "label": "Project budget",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on VND-1056?",
+     "answer": "Total: $29,005.00",
+     "source": "Vendor invoice VND-1056 — Avery Rosethorn"
+    },
+    {
+     "q": "How much in total across Blair Zephyrton's grant ledger statements?",
+     "answer": "Total of 2 grant ledger statements for Blair Zephyrton: $6,155.00",
+     "source": "Grant ledger statement LED-1058 — Blair Zephyrton"
+    },
+    {
+     "q": "How many payment requests were created in 2026?",
+     "answer": "3 payment requests on file (2026).",
+     "source": "Payment request DRW-1062 — Avery Tumbleby"
+    },
+    {
+     "q": "When was Avery Rosethorn's latest vendor invoice?",
+     "answer": "Latest vendor invoice for Avery Rosethorn: 2026-04-03",
+     "source": "Vendor invoice VND-1061 — Avery Rosethorn"
+    },
+    {
+     "q": "Who is the funder at 116 Pinecone Way, Maple Hollow, AZ 85003?",
+     "answer": "Hayden Willowmere is at 116 Pinecone Way, Maple Hollow, AZ 85003.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "gymfit",
+   "label": "Gym & fitness",
+   "company": "Zephyr Crossing Gym",
+   "documents": 20,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Failed payment notice",
+     "count": 4
+    },
+    {
+     "label": "Monthly dues invoice",
+     "count": 4
+    },
+    {
+     "label": "Payment receipt",
+     "count": 4
+    },
+    {
+     "label": "Ach authorization",
+     "count": 2
+    },
+    {
+     "label": "Class attendance record",
+     "count": 2
+    },
+    {
+     "label": "Liability waiver",
+     "count": 2
+    },
+    {
+     "label": "Membership agreement",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on MD-1060?",
+     "answer": "Total: $155.00",
+     "source": "Monthly dues invoice MD-1060 — Skyler Nettlefield"
+    },
+    {
+     "q": "How much in total across Skyler Nettlefield's monthly dues invoices?",
+     "answer": "Total of 2 monthly dues invoices for Skyler Nettlefield: $175.00",
+     "source": "Monthly dues invoice MD-1060 — Skyler Nettlefield"
+    },
+    {
+     "q": "How many payment receipts were created in 2026?",
+     "answer": "4 payment receipts on file (2026).",
+     "source": "Payment receipt GR-1046 — Parker Bumblethorn"
+    },
+    {
+     "q": "When was Parker Bumblethorn's latest payment receipt?",
+     "answer": "Latest payment receipt for Parker Bumblethorn: 2026-04-28",
+     "source": "Payment receipt GR-1048 — Parker Bumblethorn"
+    },
+    {
+     "q": "What does MD-1060 say about price increase?",
+     "answer": "Dues may rise up to 8% annually. (page 1, Monthly dues invoice MD-1060 (Skyler Nettlefield, 2025-05-11))",
+     "source": "Monthly dues invoice MD-1060 — Skyler Nettlefield"
+    },
+    {
+     "q": "Who is the member at 759 Lullaby Ln, Maple Hollow, AZ 85003?",
+     "answer": "Quinn Gingerbrook is at 759 Lullaby Ln, Maple Hollow, AZ 85003.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "hotel",
+   "label": "Hotel",
+   "company": "Moonpenny Hotel and Suites",
+   "documents": 20,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Banquet event order",
+     "count": 4
+    },
+    {
+     "label": "Guest folio",
+     "count": 4
+    },
+    {
+     "label": "Reservation confirmation",
+     "count": 4
+    },
+    {
+     "label": "Credit card authorization",
+     "count": 2
+    },
+    {
+     "label": "Guest complaint log",
+     "count": 2
+    },
+    {
+     "label": "Registration card",
+     "count": 2
+    },
+    {
+     "label": "Reservation cancellation notice",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on FO-1057?",
+     "answer": "Total: $2,027.68",
+     "source": "Guest folio FO-1057 — Quinn Willowmere"
+    },
+    {
+     "q": "What's the room nights on FO-1057?",
+     "answer": "Room nights: 9",
+     "source": "Guest folio FO-1057 — Quinn Willowmere"
+    },
+    {
+     "q": "How much in total across Quinn Willowmere's guest folios?",
+     "answer": "Total of 2 guest folios for Quinn Willowmere: $2,690.68",
+     "source": "Guest folio FO-1057 — Quinn Willowmere"
+    },
+    {
+     "q": "How many banquet event orders were created in 2026?",
+     "answer": "3 banquet event orders on file (2026).",
+     "source": "Banquet event order BE-1063 — Tatum Lanternby"
+    },
+    {
+     "q": "When was Hayden Starlingford's latest banquet event order?",
+     "answer": "Latest banquet event order for Hayden Starlingford: 2026-08-28",
+     "source": "Banquet event order BE-1065 — Hayden Starlingford"
+    },
+    {
+     "q": "Who is the guest at 388 Marigold Ave, Lantern Bay, AZ 85002?",
+     "answer": "Avery Wickerby is at 388 Marigold Ave, Lantern Bay, AZ 85002.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "insagency",
+   "label": "Insurance agency",
+   "company": "Honeycomb Hill Family Insurance",
+   "documents": 20,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Declarations page",
+     "count": 4
+    },
+    {
+     "label": "Insurance quote",
+     "count": 4
+    },
+    {
+     "label": "Premium invoice",
+     "count": 4
+    },
+    {
+     "label": "Account file note",
+     "count": 2
+    },
+    {
+     "label": "Auto insurance id card",
+     "count": 2
+    },
+    {
+     "label": "Cancellation notice",
+     "count": 2
+    },
+    {
+     "label": "First notice of loss",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on PI-1069?",
+     "answer": "Total: $2,135.00",
+     "source": "Premium invoice PI-1069 — Sage Tumbleby"
+    },
+    {
+     "q": "How much in total across Juniper Moonpenny's insurance quotes?",
+     "answer": "Total of 2 insurance quotes for Juniper Moonpenny: $28,355.00",
+     "source": "Insurance quote QT-1044 — Juniper Moonpenny"
+    },
+    {
+     "q": "How many insurance quotes were created in 2026?",
+     "answer": "3 insurance quotes on file (2026).",
+     "source": "Insurance quote QT-1046 — Juniper Moonpenny"
+    },
+    {
+     "q": "When was Sage Tumbleby's latest premium invoice?",
+     "answer": "Latest premium invoice for Sage Tumbleby: 2026-02-25",
+     "source": "Premium invoice PI-1072 — Sage Tumbleby"
+    },
+    {
+     "q": "Who is the client at 547 Sprocket St, Maple Hollow, AZ 85003?",
+     "answer": "Marlowe Thistledown is at 547 Sprocket St, Maple Hollow, AZ 85003.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "msp",
+   "label": "IT services",
+   "company": "Larkspur Vale Managed Technology",
+   "documents": 20,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Managed services invoice",
+     "count": 4
+    },
+    {
+     "label": "Master services agreement",
+     "count": 4
+    },
+    {
+     "label": "Statement of work",
+     "count": 4
+    },
+    {
+     "label": "Account manager note",
+     "count": 2
+    },
+    {
+     "label": "Backup verification report",
+     "count": 2
+    },
+    {
+     "label": "Service level agreement",
+     "count": 2
+    },
+    {
+     "label": "Service ticket",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on IV-1043?",
+     "answer": "Total: $1,450.00",
+     "source": "Managed services invoice IV-1043 — Finley Zephyrton"
+    },
+    {
+     "q": "How much in total across Finley Zephyrton's managed services invoices?",
+     "answer": "Total of 2 managed services invoices for Finley Zephyrton: $2,100.00",
+     "source": "Managed services invoice IV-1043 — Finley Zephyrton"
+    },
+    {
+     "q": "How many master services agreements were created in 2026?",
+     "answer": "4 master services agreements on file (2026).",
+     "source": "Master services agreement MS-1048 — Skyler Thistledown"
+    },
+    {
+     "q": "When was Quinn Marbleworth's latest account manager note?",
+     "answer": "Latest account manager note for Quinn Marbleworth: 2026-03-27",
+     "source": "Account manager note — Quinn Marbleworth"
+    },
+    {
+     "q": "Pull the payment terms wording from IV-1043",
+     "answer": "Services are billed in advance, due on day 13. (page 1, Managed services invoice IV-1043 (Finley Zephyrton, 2025-06-09))",
+     "source": "Managed services invoice IV-1043 — Finley Zephyrton"
+    },
+    {
+     "q": "Who is the client at 288 Kite Rd, Lantern Bay, AZ 85002?",
+     "answer": "Skyler Thistledown is at 288 Kite Rd, Lantern Bay, AZ 85002.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "landscaping",
+   "label": "Landscaping",
+   "company": "Thistle Creek Grounds Care",
+   "documents": 20,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Landscape change order",
+     "count": 4
+    },
+    {
+     "label": "Landscape estimate",
+     "count": 4
+    },
+    {
+     "label": "Landscaping invoice",
+     "count": 4
+    },
+    {
+     "label": "Irrigation repair ticket",
+     "count": 2
+    },
+    {
+     "label": "Irrigation system check",
+     "count": 2
+    },
+    {
+     "label": "Landscape maintenance agreement",
+     "count": 2
+    },
+    {
+     "label": "Weekly maintenance ticket",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on INV-1051?",
+     "answer": "Total: $9,334.17",
+     "source": "Landscaping invoice INV-1051 — Wren Nettlefield"
+    },
+    {
+     "q": "How much in total across Reese Marbleworth's landscape estimates?",
+     "answer": "Total of 2 landscape estimates for Reese Marbleworth: $14,058.27",
+     "source": "Landscape estimate LE-1051 — Reese Marbleworth"
+    },
+    {
+     "q": "How many landscape change orders were created in 2026?",
+     "answer": "3 landscape change orders on file (2026).",
+     "source": "Landscape change order CO-1049 — Remy Tumbleby"
+    },
+    {
+     "q": "When was Marlowe Fernsby's latest landscape change order?",
+     "answer": "Latest landscape change order for Marlowe Fernsby: 2026-03-20",
+     "source": "Landscape change order CO-1052 — Marlowe Fernsby"
+    },
+    {
+     "q": "Who is the customer at 780 Puzzle Pl, Maple Hollow, AZ 85003?",
+     "answer": "Wren Quillfeather is at 780 Puzzle Pl, Maple Hollow, AZ 85003.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "legal",
+   "label": "Law office",
+   "company": "Starling Point Attorneys at Law",
+   "documents": 20,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Engagement letter",
+     "count": 4
+    },
+    {
+     "label": "Legal invoice",
+     "count": 4
+    },
+    {
+     "label": "Retainer agreement",
+     "count": 4
+    },
+    {
+     "label": "Attorney file memo",
+     "count": 2
+    },
+    {
+     "label": "Client intake form",
+     "count": 2
+    },
+    {
+     "label": "Demand letter",
+     "count": 2
+    },
+    {
+     "label": "Time entry report",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on RT-1047?",
+     "answer": "Total: $22,490.00",
+     "source": "Retainer agreement RT-1047 — Remy Thistledown"
+    },
+    {
+     "q": "How much in total across Remy Thistledown's retainer agreements?",
+     "answer": "Total of 2 retainer agreements for Remy Thistledown: $33,735.00",
+     "source": "Retainer agreement RT-1047 — Remy Thistledown"
+    },
+    {
+     "q": "How many legal invoices were created in 2026?",
+     "answer": "3 legal invoices on file (2026).",
+     "source": "Legal invoice LI-1051 — Morgan Quillfeather"
+    },
+    {
+     "q": "When was Blair Fernsby's latest engagement letter?",
+     "answer": "Latest engagement letter for Blair Fernsby: 2025-12-23",
+     "source": "Engagement letter EL-1051 — Blair Fernsby"
+    },
+    {
+     "q": "What does RT-1047 say about refund of unearned funds?",
+     "answer": "At conclusion, unspent retainer money goes back to the client. (page 1, Retainer agreement RT-1047 (Remy Thistledown, 2025-05-07))",
+     "source": "Retainer agreement RT-1047 — Remy Thistledown"
+    },
+    {
+     "q": "Who is the client at 581 Biscuit Blvd, Maple Hollow, AZ 85003?",
+     "answer": "Quinn Pebbleworth is at 581 Biscuit Blvd, Maple Hollow, AZ 85003.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "mfgqa",
+   "label": "Manufacturing",
+   "company": "Juniper Glen Machine Works",
+   "documents": 20,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Certificate of conformance",
+     "count": 4
+    },
+    {
+     "label": "Production traveler",
+     "count": 4
+    },
+    {
+     "label": "Shipping invoice",
+     "count": 4
+    },
+    {
+     "label": "Corrective and preventive action",
+     "count": 2
+    },
+    {
+     "label": "First article inspection report",
+     "count": 2
+    },
+    {
+     "label": "In process inspection record",
+     "count": 2
+    },
+    {
+     "label": "Nonconformance report",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on SI-1052?",
+     "answer": "Total: $461.55",
+     "source": "Shipping invoice SI-1052 — Kettleby Springs Medical Devices"
+    },
+    {
+     "q": "What is the job number on WO-1048?",
+     "answer": "Job number: 11333",
+     "source": "Production traveler WO-1048 — Morgan Marbleworth"
+    },
+    {
+     "q": "How much in total across Morgan Marbleworth's production travelers?",
+     "answer": "Total of 2 production travelers for Morgan Marbleworth: $19,645.00",
+     "source": "Production traveler WO-1048 — Morgan Marbleworth"
+    },
+    {
+     "q": "How many shipping invoices were created in 2026?",
+     "answer": "4 shipping invoices on file (2026).",
+     "source": "Shipping invoice SI-1052 — Kettleby Springs Medical Devices"
+    },
+    {
+     "q": "When was Arden Starlingford's latest certificate of conformance?",
+     "answer": "Latest certificate of conformance for Arden Starlingford: 2025-10-02",
+     "source": "Certificate of conformance CC-1071 — Arden Starlingford"
+    },
+    {
+     "q": "Who is the buyer at 820 Puzzle Pl, Maple Hollow, AZ 85003?",
+     "answer": "Casey Moonpenny is at 820 Puzzle Pl, Maple Hollow, AZ 85003.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "marina",
+   "label": "Marina",
+   "company": "Fernsby Ridge Docks",
+   "documents": 20,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Dockage invoice",
+     "count": 4
+    },
+    {
+     "label": "Fuel dock ticket",
+     "count": 4
+    },
+    {
+     "label": "Transient dockage reservation",
+     "count": 4
+    },
+    {
+     "label": "Hold harmless waiver",
+     "count": 2
+    },
+    {
+     "label": "Hull and liability insurance certificate",
+     "count": 2
+    },
+    {
+     "label": "Slip rental agreement",
+     "count": 2
+    },
+    {
+     "label": "Vessel registration copy",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on DK-1062?",
+     "answer": "Total: $1,120.00",
+     "source": "Dockage invoice DK-1062 — Ellis Puddleby"
+    },
+    {
+     "q": "What are the gallons pumped on FD-1049?",
+     "answer": "Gallons pumped: 187",
+     "source": "Fuel dock ticket FD-1049 — Riley Honeyvale"
+    },
+    {
+     "q": "How much in total across Riley Honeyvale's fuel dock tickets?",
+     "answer": "Total of 2 fuel dock tickets for Riley Honeyvale: $350.00",
+     "source": "Fuel dock ticket FD-1049 — Riley Honeyvale"
+    },
+    {
+     "q": "How many transient dockage reservations were created in 2026?",
+     "answer": "3 transient dockage reservations on file (2026).",
+     "source": "Transient dockage reservation TD-1058 — Sage Tumbleby"
+    },
+    {
+     "q": "When was Ellis Puddleby's latest dockage invoice?",
+     "answer": "Latest dockage invoice for Ellis Puddleby: 2025-08-01",
+     "source": "Dockage invoice DK-1064 — Ellis Puddleby"
+    },
+    {
+     "q": "What does FD-1049 say about fuel pricing?",
+     "answer": "Dockside fuel is billed at the current posted price. (page 1, Fuel dock ticket FD-1049 (Riley Honeyvale, 2025-05-22))",
+     "source": "Fuel dock ticket FD-1049 — Riley Honeyvale"
+    },
+    {
+     "q": "Who is the boater at 641 Lullaby Ln, Maple Hollow, AZ 85003?",
+     "answer": "Skyler Bumblethorn is at 641 Lullaby Ln, Maple Hollow, AZ 85003.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "medbillingco",
+   "label": "Medical billing",
+   "company": "Copperkettle Medical Billing",
+   "documents": 20,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Claim batch report",
+     "count": 4
+    },
+    {
+     "label": "Client invoice",
+     "count": 4
+    },
+    {
+     "label": "Era posting report",
+     "count": 4
+    },
+    {
+     "label": "Account note",
+     "count": 2
+    },
+    {
+     "label": "Appeal letter",
+     "count": 2
+    },
+    {
+     "label": "Billing work order",
+     "count": 2
+    },
+    {
+     "label": "Payer call log",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on INV-1053?",
+     "answer": "Total: $8,715.00",
+     "source": "Client invoice INV-1053 — Hayden Honeyvale"
+    },
+    {
+     "q": "What is the fee pct on INV-1053?",
+     "answer": "Fee pct: 3",
+     "source": "Client invoice INV-1053 — Hayden Honeyvale"
+    },
+    {
+     "q": "How much in total across Casey Kettleby's era posting reports?",
+     "answer": "Total of 2 era posting reports for Casey Kettleby: $23,585.00",
+     "source": "Era posting report ERA-1069 — Casey Kettleby"
+    },
+    {
+     "q": "How many era posting reports were created in 2026?",
+     "answer": "3 era posting reports on file (2026).",
+     "source": "Era posting report ERA-1072 — Marigold Flats Orthopedics"
+    },
+    {
+     "q": "When was Hayden Honeyvale's latest client invoice?",
+     "answer": "Latest client invoice for Hayden Honeyvale: 2025-07-31",
+     "source": "Client invoice INV-1056 — Hayden Honeyvale"
+    },
+    {
+     "q": "Who is the client at 632 Teacup Dr, Lantern Bay, AZ 85002?",
+     "answer": "Parker Nettlefield is at 632 Teacup Dr, Lantern Bay, AZ 85002.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "medicaloffice",
+   "label": "Medical office",
+   "company": "Willowmere Medical Group",
+   "documents": 20,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Cms 1500 claim",
+     "count": 4
+    },
+    {
+     "label": "Patient balance statement",
+     "count": 4
+    },
+    {
+     "label": "Superbill",
+     "count": 4
+    },
+    {
+     "label": "Lab result report",
+     "count": 2
+    },
+    {
+     "label": "Prescription refill request",
+     "count": 2
+    },
+    {
+     "label": "Soap visit note",
+     "count": 2
+    },
+    {
+     "label": "Specialist referral letter",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on SB-1043?",
+     "answer": "Total: $500.00",
+     "source": "Superbill SB-1043 — Reese Starlingford"
+    },
+    {
+     "q": "How much in total across Thistle Creek Staffing LLC's patient balance statements?",
+     "answer": "Total of 3 patient balance statements for Thistle Creek Staffing LLC: $1,020.00",
+     "source": "Patient balance statement PS-1064 — Thistle Creek Staffing LLC"
+    },
+    {
+     "q": "How many patient balance statements were created in 2026?",
+     "answer": "3 patient balance statements on file (2026).",
+     "source": "Patient balance statement PS-1065 — Skyler Pebbleworth"
+    },
+    {
+     "q": "When was Reese Starlingford's latest superbill?",
+     "answer": "Latest superbill for Reese Starlingford: 2025-07-28",
+     "source": "Superbill SB-1046 — Reese Starlingford"
+    },
+    {
+     "q": "Who is the patient at 937 Puzzle Pl, Lantern Bay, AZ 85002?",
+     "answer": "Remy Lanternby is at 937 Puzzle Pl, Lantern Bay, AZ 85002.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "nonprofit",
+   "label": "Nonprofit",
+   "company": "Starling Point Food Bank",
+   "documents": 20,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Donation receipt",
+     "count": 4
+    },
+    {
+     "label": "Event registration receipt",
+     "count": 4
+    },
+    {
+     "label": "Year end giving statement",
+     "count": 4
+    },
+    {
+     "label": "Board minutes",
+     "count": 2
+    },
+    {
+     "label": "Recurring gift authorization",
+     "count": 2
+    },
+    {
+     "label": "Treasurer report",
+     "count": 2
+    },
+    {
+     "label": "Volunteer agreement",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on EVT-1043?",
+     "answer": "Total: $1,120.00",
+     "source": "Event registration receipt EVT-1043 — Emery Willowmere"
+    },
+    {
+     "q": "What is the fund on DON-1061?",
+     "answer": "Fund: Programs",
+     "source": "Donation receipt DON-1061 — Blair Sparrowgate"
+    },
+    {
+     "q": "How much in total across Jordan Honeyvale's year end giving statements?",
+     "answer": "Total of 2 year end giving statements for Jordan Honeyvale: $6,270.00",
+     "source": "Year end giving statement YE-1061 — Jordan Honeyvale"
+    },
+    {
+     "q": "How many donation receipts were created in 2026?",
+     "answer": "3 donation receipts on file (2026).",
+     "source": "Donation receipt DON-1064 — Blair Sparrowgate"
+    },
+    {
+     "q": "When was Blair Sparrowgate's latest donation receipt?",
+     "answer": "Latest donation receipt for Blair Sparrowgate: 2026-06-13",
+     "source": "Donation receipt DON-1064 — Blair Sparrowgate"
+    },
+    {
+     "q": "Who is the donor at 158 Marigold Ave, Maple Hollow, AZ 85003?",
+     "answer": "Emery Willowmere is at 158 Marigold Ave, Maple Hollow, AZ 85003.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "pestcontrol",
+   "label": "Pest control",
+   "company": "Kettleby Springs Exterminating",
+   "documents": 20,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Pest control invoice",
+     "count": 4
+    },
+    {
+     "label": "Pest control quote",
+     "count": 4
+    },
+    {
+     "label": "Rodent exclusion proposal",
+     "count": 4
+    },
+    {
+     "label": "Initial inspection report",
+     "count": 2
+    },
+    {
+     "label": "Pest control service agreement",
+     "count": 2
+    },
+    {
+     "label": "Pest service report",
+     "count": 2
+    },
+    {
+     "label": "Pesticide application record",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on INV-1051?",
+     "answer": "Total: $765.63",
+     "source": "Pest control invoice INV-1051 — Harper Starlingford"
+    },
+    {
+     "q": "How much in total across Skyler Kettleby's pest control quotes?",
+     "answer": "Total of 2 pest control quotes for Skyler Kettleby: $5,630.91",
+     "source": "Pest control quote PQ-1043 — Skyler Kettleby"
+    },
+    {
+     "q": "How many pest control quotes were created in 2026?",
+     "answer": "3 pest control quotes on file (2026).",
+     "source": "Pest control quote PQ-1046 — Skyler Kettleby"
+    },
+    {
+     "q": "When was Parker Lanternby's latest initial inspection report?",
+     "answer": "Latest initial inspection report for Parker Lanternby: 2026-09-20",
+     "source": "Initial inspection report — Parker Lanternby"
+    },
+    {
+     "q": "Who is the customer at 553 Biscuit Blvd, Maple Hollow, AZ 85003?",
+     "answer": "Juniper Rosethorn is at 553 Biscuit Blvd, Maple Hollow, AZ 85003.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "petgroomco",
+   "label": "Pet grooming",
+   "company": "Kettleby Springs Pet Grooming",
+   "documents": 18,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Grooming receipt",
+     "count": 4
+    },
+    {
+     "label": "Grooming ticket",
+     "count": 4
+    },
+    {
+     "label": "Package invoice",
+     "count": 4
+    },
+    {
+     "label": "Grooming waiver",
+     "count": 2
+    },
+    {
+     "label": "Pet profile card",
+     "count": 2
+    },
+    {
+     "label": "Vaccination proof",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on PK-1068?",
+     "answer": "Total: $874.23",
+     "source": "Package invoice PK-1068 — Jordan Zephyrton"
+    },
+    {
+     "q": "How much in total across Jordan Zephyrton's package invoices?",
+     "answer": "Total of 2 package invoices for Jordan Zephyrton: $1,004.55",
+     "source": "Package invoice PK-1068 — Jordan Zephyrton"
+    },
+    {
+     "q": "How many grooming receipts were created in 2026?",
+     "answer": "4 grooming receipts on file (2026).",
+     "source": "Grooming receipt GR-1063 — Remy Copperkettle"
+    },
+    {
+     "q": "When was Remy Copperkettle's latest grooming receipt?",
+     "answer": "Latest grooming receipt for Remy Copperkettle: 2026-06-13",
+     "source": "Grooming receipt GR-1064 — Remy Copperkettle"
+    },
+    {
+     "q": "What does PK-1068 say about package expiry?",
+     "answer": "Package visits must be used within 8 months. (page 1, Package invoice PK-1068 (Jordan Zephyrton, 2025-07-14))",
+     "source": "Package invoice PK-1068 — Jordan Zephyrton"
+    },
+    {
+     "q": "Who is the owner at 902 Marigold Ave, Maple Hollow, AZ 85003?",
+     "answer": "Blair Pebbleworth is at 902 Marigold Ave, Maple Hollow, AZ 85003.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "photostudio",
+   "label": "Photo studio",
+   "company": "Juniper Glen Photo Co",
+   "documents": 20,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Photography invoice",
+     "count": 4
+    },
+    {
+     "label": "Photography services contract",
+     "count": 4
+    },
+    {
+     "label": "Print order form",
+     "count": 4
+    },
+    {
+     "label": "Client call note",
+     "count": 2
+    },
+    {
+     "label": "Gallery delivery notice",
+     "count": 2
+    },
+    {
+     "label": "Model release",
+     "count": 2
+    },
+    {
+     "label": "Session log",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on PO-1056?",
+     "answer": "Total: $695.00",
+     "source": "Print order form PO-1056 — Harper Moonpenny"
+    },
+    {
+     "q": "How much in total across Harper Moonpenny's print order forms?",
+     "answer": "Total of 2 print order forms for Harper Moonpenny: $1,115.00",
+     "source": "Print order form PO-1056 — Harper Moonpenny"
+    },
+    {
+     "q": "How many photography invoices were created in 2026?",
+     "answer": "3 photography invoices on file (2026).",
+     "source": "Photography invoice PI-1057 — Wren Nettlefield"
+    },
+    {
+     "q": "When was Quinn Puddleby's latest photography services contract?",
+     "answer": "Latest photography services contract for Quinn Puddleby: 2025-10-30",
+     "source": "Photography services contract PC-1061 — Quinn Puddleby"
+    },
+    {
+     "q": "What does PO-1056 say about reprints?",
+     "answer": "Damaged or misprinted items are reprinted free if reported within 28 days. (page 1, Print order form PO-1056 (Harper Moonpenny, 2025-05-13))",
+     "source": "Print order form PO-1056 — Harper Moonpenny"
+    },
+    {
+     "q": "Who is the client at 599 Puzzle Pl, Maple Hollow, AZ 85003?",
+     "answer": "Ellis Fernsby is at 599 Puzzle Pl, Maple Hollow, AZ 85003.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "poolservice",
+   "label": "Pool service",
+   "company": "Pinecone Hollow Pools & Spas",
+   "documents": 18,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Pool repair estimate",
+     "count": 4
+    },
+    {
+     "label": "Pool service invoice",
+     "count": 4
+    },
+    {
+     "label": "Weekly pool service report",
+     "count": 4
+    },
+    {
+     "label": "Equipment repair ticket",
+     "count": 2
+    },
+    {
+     "label": "Pool service agreement",
+     "count": 2
+    },
+    {
+     "label": "Route note",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on INV-1071?",
+     "answer": "Total: $5,978.43",
+     "source": "Pool service invoice INV-1071 — Arden Juniperfield"
+    },
+    {
+     "q": "How much in total across Quinn Puddleby's pool repair estimates?",
+     "answer": "Total of 2 pool repair estimates for Quinn Puddleby: $347.52",
+     "source": "Pool repair estimate PE-1070 — Quinn Puddleby"
+    },
+    {
+     "q": "How many pool service invoices were created in 2026?",
+     "answer": "3 pool service invoices on file (2026).",
+     "source": "Pool service invoice INV-1073 — Arden Juniperfield"
+    },
+    {
+     "q": "When was Arden Juniperfield's latest pool service invoice?",
+     "answer": "Latest pool service invoice for Arden Juniperfield: 2026-02-27",
+     "source": "Pool service invoice INV-1073 — Arden Juniperfield"
+    },
+    {
+     "q": "Who is the customer at 764 Lantern Ln, Maple Hollow, AZ 85003?",
+     "answer": "Emery Thistledown is at 764 Lantern Ln, Maple Hollow, AZ 85003.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "policerecords",
+   "label": "Records office",
+   "company": "Fernsby Ridge Police Services",
+   "documents": 20,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Impound tow sheet",
+     "count": 4
+    },
+    {
+     "label": "Public records request",
+     "count": 4
+    },
+    {
+     "label": "Traffic citation",
+     "count": 4
+    },
+    {
+     "label": "Dispatch call log",
+     "count": 2
+    },
+    {
+     "label": "Evidence log",
+     "count": 2
+    },
+    {
+     "label": "Incident report",
+     "count": 2
+    },
+    {
+     "label": "Supplemental report",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on CIT-1073?",
+     "answer": "Total: $55.00",
+     "source": "Traffic citation CIT-1073 — Quinn Bramblewood"
+    },
+    {
+     "q": "How much in total across Quinn Bramblewood's traffic citations?",
+     "answer": "Total of 2 traffic citations for Quinn Bramblewood: $455.00",
+     "source": "Traffic citation CIT-1073 — Quinn Bramblewood"
+    },
+    {
+     "q": "How many impound tow sheets were created in 2026?",
+     "answer": "3 impound tow sheets on file (2026).",
+     "source": "Impound tow sheet IMP-1067 — Juniper Quillfeather"
+    },
+    {
+     "q": "When was Hayden Bumblethorn's latest public records request?",
+     "answer": "Latest public records request for Hayden Bumblethorn: 2025-11-01",
+     "source": "Public records request PRR-1054 — Hayden Bumblethorn"
+    },
+    {
+     "q": "What does CIT-1073 say about court appearance?",
+     "answer": "To dispute this notice, appear in court within 43 days. (page 1, Traffic citation CIT-1073 (Quinn Bramblewood, 2025-05-31))",
+     "source": "Traffic citation CIT-1073 — Quinn Bramblewood"
+    },
+    {
+     "q": "Who is the reporting party at 514 Lullaby Ln, Maple Hollow, AZ 85003?",
+     "answer": "Quinn Gingerbrook is at 514 Lullaby Ln, Maple Hollow, AZ 85003.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "restaurant",
+   "label": "Restaurant",
+   "company": "Copperkettle Steakhouse",
+   "documents": 18,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Banquet event order",
+     "count": 4
+    },
+    {
+     "label": "Guest feedback note",
+     "count": 4
+    },
+    {
+     "label": "Supplier invoice",
+     "count": 4
+    },
+    {
+     "label": "Delivery receiving log",
+     "count": 2
+    },
+    {
+     "label": "Food temperature log",
+     "count": 2
+    },
+    {
+     "label": "Health inspection report",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on BEO-1058?",
+     "answer": "Total: $11,815.00",
+     "source": "Banquet event order BEO-1058 — Ellis Fernsby"
+    },
+    {
+     "q": "What is the guest count on BEO-1058?",
+     "answer": "Guest count: 203",
+     "source": "Banquet event order BEO-1058 — Ellis Fernsby"
+    },
+    {
+     "q": "How much in total across Ellis Fernsby's banquet event orders?",
+     "answer": "Total of 2 banquet event orders for Ellis Fernsby: $12,450.00",
+     "source": "Banquet event order BEO-1058 — Ellis Fernsby"
+    },
+    {
+     "q": "How many guest feedback notes were created in 2026?",
+     "answer": "3 guest feedback notes on file (2026).",
+     "source": "Guest feedback note — Emery Zephyrton"
+    },
+    {
+     "q": "When was Emery Zephyrton's latest guest feedback note?",
+     "answer": "Latest guest feedback note for Emery Zephyrton: 2026-03-26",
+     "source": "Guest feedback note — Emery Zephyrton"
+    },
+    {
+     "q": "Who is the guest at 473 Lantern Ln, Maple Hollow, AZ 85003?",
+     "answer": "Blair Copperkettle is at 473 Lantern Ln, Maple Hollow, AZ 85003.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "roofing",
+   "label": "Roofing",
+   "company": "Sparrowgate Roofing",
+   "documents": 20,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Insurance claim estimate",
+     "count": 4
+    },
+    {
+     "label": "Roofing estimate",
+     "count": 4
+    },
+    {
+     "label": "Roofing invoice",
+     "count": 4
+    },
+    {
+     "label": "Crew daily log",
+     "count": 2
+    },
+    {
+     "label": "Roof inspection report",
+     "count": 2
+    },
+    {
+     "label": "Roofing contract",
+     "count": 2
+    },
+    {
+     "label": "Sales lead note",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on INV-1066?",
+     "answer": "Total: $41,300.58",
+     "source": "Roofing invoice INV-1066 — Avery Wickerby"
+    },
+    {
+     "q": "How much in total across Reese Starlingford's roofing estimates?",
+     "answer": "Total of 2 roofing estimates for Reese Starlingford: $26,482.11",
+     "source": "Roofing estimate RE-1061 — Reese Starlingford"
+    },
+    {
+     "q": "How many insurance claim estimates were created in 2026?",
+     "answer": "3 insurance claim estimates on file (2026).",
+     "source": "Insurance claim estimate CLM-1051 — Pinecone Hollow Property Management"
+    },
+    {
+     "q": "When was Avery Wickerby's latest roofing invoice?",
+     "answer": "Latest roofing invoice for Avery Wickerby: 2025-08-17",
+     "source": "Roofing invoice INV-1068 — Avery Wickerby"
+    },
+    {
+     "q": "Who is the homeowner at 591 Meadowlark Way, Maple Hollow, AZ 85003?",
+     "answer": "Riley Lanternby is at 591 Meadowlark Way, Maple Hollow, AZ 85003.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "salonspa",
+   "label": "Salon & spa",
+   "company": "Nettlefield Cuts and Color",
+   "documents": 20,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Bridal party invoice",
+     "count": 4
+    },
+    {
+     "label": "Client account statement",
+     "count": 4
+    },
+    {
+     "label": "Sales receipt",
+     "count": 4
+    },
+    {
+     "label": "Color formula card",
+     "count": 2
+    },
+    {
+     "label": "Consultation form",
+     "count": 2
+    },
+    {
+     "label": "Front desk note",
+     "count": 2
+    },
+    {
+     "label": "Service ticket",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on EV-1049?",
+     "answer": "Total: $1,900.00",
+     "source": "Bridal party invoice EV-1049 — Marlowe Copperkettle"
+    },
+    {
+     "q": "How much in total across Marlowe Copperkettle's bridal party invoices?",
+     "answer": "Total of 2 bridal party invoices for Marlowe Copperkettle: $2,575.00",
+     "source": "Bridal party invoice EV-1049 — Marlowe Copperkettle"
+    },
+    {
+     "q": "How many client account statements were created in 2026?",
+     "answer": "3 client account statements on file (2026).",
+     "source": "Client account statement CS-1067 — Wren Bramblewood"
+    },
+    {
+     "q": "When was Remy Gingerbrook's latest sales receipt?",
+     "answer": "Latest sales receipt for Remy Gingerbrook: 2025-10-05",
+     "source": "Sales receipt SR-1070 — Remy Gingerbrook"
+    },
+    {
+     "q": "What does SR-1069 say about refund policy?",
+     "answer": "Product returns are accepted inside 23 days. (page 1, Sales receipt SR-1069 (Remy Gingerbrook, 2025-06-06))",
+     "source": "Sales receipt SR-1069 — Remy Gingerbrook"
+    },
+    {
+     "q": "Who is the client at 779 Kite Rd, Maple Hollow, AZ 85003?",
+     "answer": "Dakota Sparrowgate is at 779 Kite Rd, Maple Hollow, AZ 85003.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "storage",
+   "label": "Self storage",
+   "company": "Starling Point Storage Solutions",
+   "documents": 20,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Monthly billing statement",
+     "count": 4
+    },
+    {
+     "label": "Move in receipt",
+     "count": 4
+    },
+    {
+     "label": "Past due notice",
+     "count": 4
+    },
+    {
+     "label": "Autopay authorization",
+     "count": 2
+    },
+    {
+     "label": "Notice to vacate",
+     "count": 2
+    },
+    {
+     "label": "Rate change notice",
+     "count": 2
+    },
+    {
+     "label": "Storage rental agreement",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on BL-1042?",
+     "answer": "Total: $205.00",
+     "source": "Monthly billing statement BL-1042 — Quinn Starlingford"
+    },
+    {
+     "q": "What are the days past due on PD-1070?",
+     "answer": "Days past due: 12",
+     "source": "Past due notice PD-1070 — Juniper Pebbleworth"
+    },
+    {
+     "q": "How much in total across Juniper Pebbleworth's past due notices?",
+     "answer": "Total of 2 past due notices for Juniper Pebbleworth: $455.00",
+     "source": "Past due notice PD-1070 — Juniper Pebbleworth"
+    },
+    {
+     "q": "How many move in receipts were created in 2026?",
+     "answer": "3 move in receipts on file (2026).",
+     "source": "Move in receipt MI-1059 — Hayden Willowmere"
+    },
+    {
+     "q": "When was Quinn Starlingford's latest monthly billing statement?",
+     "answer": "Latest monthly billing statement for Quinn Starlingford: 2025-11-19",
+     "source": "Monthly billing statement BL-1044 — Quinn Starlingford"
+    },
+    {
+     "q": "Who is the tenant at 838 Biscuit Blvd, Unit 1A, Maple Hollow, AZ 85003?",
+     "answer": "Hayden Willowmere is at 838 Biscuit Blvd, Unit 1A, Maple Hollow, AZ 85003.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "trucking",
+   "label": "Trucking",
+   "company": "Marigold Flats Logistics",
+   "documents": 18,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Bill of lading",
+     "count": 4
+    },
+    {
+     "label": "Freight invoice",
+     "count": 4
+    },
+    {
+     "label": "Rate confirmation",
+     "count": 4
+    },
+    {
+     "label": "Fuel purchase receipt",
+     "count": 2
+    },
+    {
+     "label": "Proof of delivery",
+     "count": 2
+    },
+    {
+     "label": "Shipper call log",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on FI-1042?",
+     "answer": "Total: $415.00",
+     "source": "Freight invoice FI-1042 — Emery Moonpenny"
+    },
+    {
+     "q": "How much in total across Casey Kettleby's rate confirmations?",
+     "answer": "Total of 2 rate confirmations for Casey Kettleby: $4,845.00",
+     "source": "Rate confirmation RC-1050 — Casey Kettleby"
+    },
+    {
+     "q": "How many bill of ladings were created in 2026?",
+     "answer": "3 bill of ladings on file (2026).",
+     "source": "Bill of lading BOL-1045 — Ellis Lanternby"
+    },
+    {
+     "q": "When was Emery Moonpenny's latest freight invoice?",
+     "answer": "Latest freight invoice for Emery Moonpenny: 2025-12-02",
+     "source": "Freight invoice FI-1045 — Emery Moonpenny"
+    },
+    {
+     "q": "Who is the shipper at 297 Sprocket St, Maple Hollow, AZ 85003?",
+     "answer": "Dakota Juniperfield is at 297 Sprocket St, Maple Hollow, AZ 85003.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "tutoring",
+   "label": "Tutoring",
+   "company": "Sparrowgate Learning Center",
+   "documents": 20,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Enrollment agreement",
+     "count": 4
+    },
+    {
+     "label": "Session package receipt",
+     "count": 4
+    },
+    {
+     "label": "Tutoring invoice",
+     "count": 4
+    },
+    {
+     "label": "Diagnostic assessment results",
+     "count": 2
+    },
+    {
+     "label": "Progress report",
+     "count": 2
+    },
+    {
+     "label": "Session log",
+     "count": 2
+    },
+    {
+     "label": "Student intake form",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on EA-1046?",
+     "answer": "Total: $180.00",
+     "source": "Enrollment agreement EA-1046 — Wren Copperkettle"
+    },
+    {
+     "q": "How much in total across Wren Copperkettle's enrollment agreements?",
+     "answer": "Total of 2 enrollment agreements for Wren Copperkettle: $5,780.00",
+     "source": "Enrollment agreement EA-1046 — Wren Copperkettle"
+    },
+    {
+     "q": "How many session package receipts were created in 2026?",
+     "answer": "3 session package receipts on file (2026).",
+     "source": "Session package receipt PK-1048 — Harper Bramblewood"
+    },
+    {
+     "q": "When was Rowan Honeyvale's latest progress report?",
+     "answer": "Latest progress report for Rowan Honeyvale: 2025-10-10",
+     "source": "Progress report — Rowan Honeyvale"
+    },
+    {
+     "q": "Who is the student at 432 Sprocket St, Fableton, AZ 85001?",
+     "answer": "Quinn Pebbleworth is at 432 Sprocket St, Fableton, AZ 85001.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "vetclinic",
+   "label": "Veterinary clinic",
+   "company": "Marigold Flats Animal Hospital",
+   "documents": 20,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Client invoice",
+     "count": 4
+    },
+    {
+     "label": "Payment receipt",
+     "count": 4
+    },
+    {
+     "label": "Treatment estimate",
+     "count": 4
+    },
+    {
+     "label": "Anesthesia consent",
+     "count": 2
+    },
+    {
+     "label": "Exam record",
+     "count": 2
+    },
+    {
+     "label": "Lab result report",
+     "count": 2
+    },
+    {
+     "label": "Vaccination certificate",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on VI-1049?",
+     "answer": "Total: $685.00",
+     "source": "Client invoice VI-1049 — Marlowe Rosethorn"
+    },
+    {
+     "q": "How much in total across Marlowe Rosethorn's client invoices?",
+     "answer": "Total of 2 client invoices for Marlowe Rosethorn: $1,225.00",
+     "source": "Client invoice VI-1049 — Marlowe Rosethorn"
+    },
+    {
+     "q": "How many treatment estimates were created in 2026?",
+     "answer": "3 treatment estimates on file (2026).",
+     "source": "Treatment estimate VE-1054 — Remy Bramblewood"
+    },
+    {
+     "q": "When was Remy Bramblewood's latest treatment estimate?",
+     "answer": "Latest treatment estimate for Remy Bramblewood: 2026-01-11",
+     "source": "Treatment estimate VE-1054 — Remy Bramblewood"
+    },
+    {
+     "q": "Who is the client at 608 Sprocket St, Maple Hollow, AZ 85003?",
+     "answer": "Sage Gingerbrook is at 608 Sprocket St, Maple Hollow, AZ 85003.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "warehouse",
+   "label": "Warehouse",
+   "company": "Nettlefield Storage",
+   "documents": 20,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Packing slip",
+     "count": 4
+    },
+    {
+     "label": "Return authorization",
+     "count": 4
+    },
+    {
+     "label": "Storage and handling invoice",
+     "count": 4
+    },
+    {
+     "label": "Advance ship notice",
+     "count": 2
+    },
+    {
+     "label": "Outbound shipping order",
+     "count": 2
+    },
+    {
+     "label": "Pick ticket",
+     "count": 2
+    },
+    {
+     "label": "Receiving report",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on SH-1061?",
+     "answer": "Total: $1,629.00",
+     "source": "Storage and handling invoice SH-1061 — Quinn Nettlefield"
+    },
+    {
+     "q": "How much in total across Tatum Juniperfield's packing slips?",
+     "answer": "Total of 2 packing slips for Tatum Juniperfield: $2,075.00",
+     "source": "Packing slip PK-1064 — Tatum Juniperfield"
+    },
+    {
+     "q": "How many storage and handling invoices were created in 2026?",
+     "answer": "3 storage and handling invoices on file (2026).",
+     "source": "Storage and handling invoice SH-1063 — Quinn Nettlefield"
+    },
+    {
+     "q": "When was Casey Gingerbrook's latest return authorization?",
+     "answer": "Latest return authorization for Casey Gingerbrook: 2026-03-27",
+     "source": "Return authorization RMA-1075 — Casey Gingerbrook"
+    },
+    {
+     "q": "What does RMA-1070 say about restocking fee?",
+     "answer": "A 15% restocking fee applies to returned goods. (page 1, Return authorization RMA-1070 (Casey Gingerbrook, 2025-08-27))",
+     "source": "Return authorization RMA-1070 — Casey Gingerbrook"
+    },
+    {
+     "q": "Who is the client at 190 Puzzle Pl, Lantern Bay, AZ 85002?",
+     "answer": "Quinn Nettlefield is at 190 Puzzle Pl, Lantern Bay, AZ 85002.",
+     "source": null
+    }
+   ]
+  },
+  {
+   "slug": "weddingplan",
+   "label": "Wedding planning",
+   "company": "Willowmere Planning Studio",
+   "documents": 20,
+   "customers": 8,
+   "docTypes": [
+    {
+     "label": "Installment invoice",
+     "count": 4
+    },
+    {
+     "label": "Retainer invoice",
+     "count": 4
+    },
+    {
+     "label": "Wedding planning agreement",
+     "count": 4
+    },
+    {
+     "label": "Couple intake questionnaire",
+     "count": 2
+    },
+    {
+     "label": "Planning meeting notes",
+     "count": 2
+    },
+    {
+     "label": "Planning timeline checklist",
+     "count": 2
+    },
+    {
+     "label": "Wedding day timeline",
+     "count": 2
+    }
+   ],
+   "questions": [
+    {
+     "q": "What's the total on IV-1052?",
+     "answer": "Total: $3,540.00",
+     "source": "Installment invoice IV-1052 — Morgan Moonpenny"
+    },
+    {
+     "q": "What is the installment number on IV-1052?",
+     "answer": "Installment number: 5",
+     "source": "Installment invoice IV-1052 — Morgan Moonpenny"
+    },
+    {
+     "q": "How much in total across Morgan Moonpenny's installment invoices?",
+     "answer": "Total of 2 installment invoices for Morgan Moonpenny: $3,870.00",
+     "source": "Installment invoice IV-1052 — Morgan Moonpenny"
+    },
+    {
+     "q": "How many retainer invoices were created in 2026?",
+     "answer": "4 retainer invoices on file (2026).",
+     "source": "Retainer invoice RT-1053 — Copperkettle Partners"
+    },
+    {
+     "q": "When was Harper Juniperfield's latest wedding planning agreement?",
+     "answer": "Latest wedding planning agreement for Harper Juniperfield: 2025-10-27",
+     "source": "Wedding planning agreement WA-1058 — Harper Juniperfield"
+    },
+    {
+     "q": "What does MN-1048 say about action items?",
+     "answer": "7 action items were assigned at the meeting. (page 1, Planning meeting notes MN-1048 (Juniper Marbleworth, 2025-05-03))",
+     "source": "Planning meeting notes MN-1048 — Juniper Marbleworth"
+    },
+    {
+     "q": "Who is the client at 429 Fable Ct, Maple Hollow, AZ 85003?",
+     "answer": "Jordan Lanternby is at 429 Fable Ct, Maple Hollow, AZ 85003.",
+     "source": null
+    }
+   ]
+  }
+ ]
+}
