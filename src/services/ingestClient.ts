@@ -154,6 +154,8 @@ export interface PresignRequestItem {
   sha256: string;
   contentType?: string;
   sizeBytes?: number;
+  /** Bulk import autopilot: every file of one big drop carries the same import id (a uuid made in the browser). */
+  batchId?: string;
 }
 export interface PresignResultItem {
   filename?: string;

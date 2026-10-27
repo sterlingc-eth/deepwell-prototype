@@ -536,7 +536,7 @@ export async function linkDocument(ctx, { documentId, entityId, by }, actorClerk
   });
 }
 
-export async function unlinkDocument(ctx, { documentId, entityId }, actorClerkId) {
+export async function unlinkDocument(ctx, { documentId, entityId, restoreStage = null, restoreSuggestion = null }, actorClerkId) {
   assertUuid('documentId', documentId);
   assertUuid('entityId', entityId);
 
@@ -557,7 +557,31 @@ export async function unlinkDocument(ctx, { documentId, entityId }, actorClerkId
       changes: { entityId, removed: r.rowCount > 0 },
     });
 
-    return { document: documentRow };
+    // Inbox "Undo" of a link: put the paper back the way it was. Only when this was the paper's last link: the stage goes back to what it was
+    // before the link (never above 'mapped'), and the "Link to <customer>?" suggestion the link used up is written again (newer than the unlink,
+    // which would otherwise have killed it). Customers must exist in this shop; nothing here ever links.
+    let stage = documentRow.stage;
+    if (r.rowCount > 0) {
+      const left = (await client.query(`SELECT 1 FROM document_entity_links WHERE document_id = $1 AND ${TENANT} LIMIT 1`, [documentId])).rowCount;
+      if (!left && documentRow.stage === 'linked') {
+        const back = ['received', 'read', 'mapped'].includes(restoreStage) ? restoreStage : 'read';
+        await client.query(`UPDATE documents SET stage = $2 WHERE id = $1 AND ${TENANT} AND stage = 'linked'`, [documentId, back]);
+        stage = back;
+      }
+      if (!left && Array.isArray(restoreSuggestion) && restoreSuggestion.length) {
+        const ids = restoreSuggestion.map((c) => String(c?.id ?? '')).filter((x) => UUID_RE.test(x)).slice(0, 3);
+        const alive = ids.length ? (await client.query(`SELECT id, data->>'customer_name' AS name FROM entities WHERE id = ANY($1::uuid[]) AND entity_type = 'customer' AND merged_into IS NULL AND ${TENANT}`, [ids])).rows : [];
+        const cands = alive.map((e) => ({ id: e.id, name: e.name ?? '', ...(restoreSuggestion.find((c) => String(c?.id) === e.id)?.strong === true ? { strong: true } : {}) }));
+        if (cands.length) {
+          await client.query(
+            `INSERT INTO audit_log (tenant_id, action, resource_type, resource_id, changes, created_at)
+             VALUES ($3::uuid, 'recheck.link_suggestion', 'document', $1::uuid, $2::jsonb, clock_timestamp() + INTERVAL '2 milliseconds')`,
+            [documentId, JSON.stringify({ candidates: cands, restoredByUndo: true }), tenantId]);
+        }
+      }
+    }
+
+    return { document: { ...documentRow, stage } };
   });
 }
 
@@ -740,7 +764,7 @@ export async function listLinks(ctx, { documentIds }) {
       )).rows.map((r) => [r.resource_id, new Date(r.at).getTime()]));
       suggestions = sug
         .filter((s) => !(touched.has(s.document_id) && touched.get(s.document_id) >= new Date(s.created_at).getTime()))
-        .map((s) => ({ document_id: s.document_id, candidates: s.changes.candidates.slice(0, 3).map((c) => ({ id: String(c.id), name: String(c.name ?? '') })) }));
+        .map((s) => ({ document_id: s.document_id, candidates: s.changes.candidates.slice(0, 3).map((c) => ({ id: String(c.id), name: String(c.name ?? ''), ...(c.strong === true ? { strong: true } : {}) })) }));
     }
     return { links: rows, suggestions };
   });

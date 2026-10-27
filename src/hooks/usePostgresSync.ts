@@ -157,8 +157,8 @@ function deriveStage(row: DocumentRow, doc: Doc): PipelineStage {
 }
 
 /** Attaches the server's "Link to <customer>?" candidates (not facts) to a graph document. */
-function withSuggestions(doc: Doc, ids: string[] | undefined): Doc {
-  return ids && ids.length ? { ...doc, linkSuggestionIds: ids } : doc;
+function withSuggestions(doc: Doc, ids: string[] | undefined, strong?: string[]): Doc {
+  return ids && ids.length ? { ...doc, linkSuggestionIds: ids, ...(strong && strong.length ? { linkSuggestionStrongIds: strong } : {}) } : doc;
 }
 
 function toDoc(row: DocumentRow, extractions: ExtractionRow[], links: DocumentLink[], corrections: Correction[], completeness?: DocCompleteness): Doc {
@@ -238,7 +238,11 @@ function toDoc(row: DocumentRow, extractions: ExtractionRow[], links: DocumentLi
   // deriveStage then reads those same issues/links to place the document at
   // its real reachable stage instead of trusting the backend's raw stage
   // column at face value (see deriveStage's own comment above).
-  const withIssues = recomputeIssues(doc, hvacSchema);
+  const base = recomputeIssues(doc, hvacSchema);
+  // Bulk import autopilot: "Set aside these copies" is stored as a `_set_aside` row (value = the filed original). The Inbox already
+  // sets a likely copy aside on its own (isSetAside); this makes the stored decision survive a reload and a graph of any size.
+  const asideOf = extractions.find((x) => x.field_key === '_set_aside' && x.value);
+  const withIssues = asideOf && !base.issues.some((i) => i.kind === 'possible-copy') ? { ...base, issues: [...base.issues, { kind: 'possible-copy' as const, of: asideOf.value as string }] } : base;
   return { ...withIssues, stage: deriveStage(row, withIssues) };
 }
 
@@ -491,13 +495,14 @@ async function hydrateRows(rows: DocumentRow[]): Promise<void> {
   } catch { /* fields are an enhancement, not a precondition */ }
   const linksByDoc = new Map<string, DocumentLink[]>();
   const suggestByDoc = new Map<string, string[]>();
+  const strongByDoc = new Map<string, string[]>();
   try {
     const res = await reviewClient.listLinks(ids);
     for (const l of res.links) {
       const list = linksByDoc.get(l.document_id);
       if (list) list.push(l); else linksByDoc.set(l.document_id, [l]);
     }
-    for (const s of res.suggestions ?? []) suggestByDoc.set(s.document_id, s.candidates.map((c) => c.id));
+    for (const s of res.suggestions ?? []) { suggestByDoc.set(s.document_id, s.candidates.map((c) => c.id)); strongByDoc.set(s.document_id, s.candidates.filter((c) => c.strong).map((c) => c.id)); }
   } catch { /* manual links are an enhancement, not a precondition */ }
   const correctionsByDoc = new Map<string, Correction[]>();
   try {
@@ -506,7 +511,7 @@ async function hydrateRows(rows: DocumentRow[]): Promise<void> {
       if (list) list.push(c); else correctionsByDoc.set(c.document_id, [c]);
     }
   } catch { /* corrections are an enhancement, not a precondition */ }
-  const docs = rows.map((r) => withSuggestions(toDoc(r, byDoc.get(r.id) ?? [], linksByDoc.get(r.id) ?? [], correctionsByDoc.get(r.id) ?? []), suggestByDoc.get(r.id)));
+  const docs = rows.map((r) => withSuggestions(toDoc(r, byDoc.get(r.id) ?? [], linksByDoc.get(r.id) ?? [], correctionsByDoc.get(r.id) ?? []), suggestByDoc.get(r.id), strongByDoc.get(r.id)));
   // Docread2: "Please check this value" - stored values the read-only audit found wrong (empty until the owner turns flags on).
   try {
     const { flags } = await reviewClient.suspectFlags();
@@ -613,6 +618,7 @@ export async function loadGraphFromServer(tenantKey = '', opts: { hydrateOlder?:
 
   const linksByDoc = new Map<string, DocumentLink[]>();
   const suggestByDoc = new Map<string, string[]>();
+  const strongByDoc = new Map<string, string[]>();
   try {
     const { links, suggestions } = await reviewClient.listLinks(documentIds);
     for (const l of links) {
@@ -620,7 +626,7 @@ export async function loadGraphFromServer(tenantKey = '', opts: { hydrateOlder?:
       if (list) list.push(l);
       else linksByDoc.set(l.document_id, [l]);
     }
-    for (const s of suggestions ?? []) suggestByDoc.set(s.document_id, s.candidates.map((c) => c.id));
+    for (const s of suggestions ?? []) { suggestByDoc.set(s.document_id, s.candidates.map((c) => c.id)); strongByDoc.set(s.document_id, s.candidates.filter((c) => c.strong).map((c) => c.id)); }
   } catch {
     /* manual links are an enhancement to the sync, not a precondition of it */
   }
@@ -662,7 +668,7 @@ export async function loadGraphFromServer(tenantKey = '', opts: { hydrateOlder?:
   }
 
   const docs = docRows.map((r) =>
-    withSuggestions(toDoc(r, byDoc.get(r.id) ?? [], linksByDoc.get(r.id) ?? [], correctionsByDoc.get(r.id) ?? [], completenessByDoc.get(r.id)), suggestByDoc.get(r.id))
+    withSuggestions(toDoc(r, byDoc.get(r.id) ?? [], linksByDoc.get(r.id) ?? [], correctionsByDoc.get(r.id) ?? [], completenessByDoc.get(r.id)), suggestByDoc.get(r.id), strongByDoc.get(r.id))
   );
   const entities = entityRows.map(toEntity);
   addAmbiguousNameLinkIssues(docs, entityRows, linksByDoc);

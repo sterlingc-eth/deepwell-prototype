@@ -18,6 +18,9 @@ import { runAutopilotSweepStep } from "../learning/autopilot.js";
 import { runDossierCatchup } from "../search/dossier.js";
 import { runKnowledgeReportSweepStep } from "../search/mapReduce.js";
 import { recheckTenantMissing } from "../recheck.js";
+import { autoFileSweep } from "../importAutopilot.js";
+import { finishTenantPapers, isAiFinishEnabled } from "../aiFinish.js";
+import { getCachedBillingRow } from "../plan.js";
 import { auditStoredTenant, flagsVisible } from "../storedAuditStore.js";
 
 /**
@@ -76,6 +79,11 @@ export const MAX_ENQUEUE_PER_TENANT = 400;
 // The $0 re-check (no model, label-fill + automatic check) was capped at 25 documents a night, so a 600-document inbox took
 // weeks to settle. It is cheap SQL, bounded by the shared deadline below; the rest carries to the next run (leftForNextRun).
 export const RECHECK_PER_TENANT_PER_NIGHT = 300;
+// AI finish (api/_lib/aiFinish.js): Haiku finishes the papers the free reader left open, in small chunks inside this sweep (the Anthropic
+// SDK pinned here has no Batch API, so there is no 50%-off batch; the chunks are cheap anyway). Internal only: no dollar figure is ever shown.
+// Bounded per tenant (papers), per invocation across ALL tenants (platform cap, USD) and by each tenant's plan-sized monthly budget.
+export const AI_FINISH_PER_TENANT_PER_NIGHT = 60;
+export const AI_FINISH_PLATFORM_CAP_USD = Number(process.env.AI_FINISH_PLATFORM_CAP_USD) > 0 ? Number(process.env.AI_FINISH_PLATFORM_CAP_USD) : 25;
 // Documents the read step finished that never got extracted (lost event, extract billing-gated, process killed).
 const UNEXTRACTED_MINUTES = 60;
 // R35: with the queue on, a document can legitimately wait hours behind a big import (e.g. 5,000 documents at the default
@@ -138,6 +146,9 @@ export default async function handler(req, res) {
   // during a first big import so documents do not wait for the nightly run. Same auth, same summary shape.
   const docsOnly = req.query?.mode === "docs" || (() => { try { return new URL(req.url ?? "", "http://x").searchParams.get("mode") === "docs"; } catch { return false; } })();
   const deadlineAt = Date.now() + 45_000;
+  // AI finish gets what is left of the 300 s function after the stuck-document phase (docRetryDeadlineAt = 200 s) and the steps above.
+  const aiFinishDeadlineAt = Date.now() + 230_000;
+  const aiFinishPlatform = { remainingUsd: AI_FINISH_PLATFORM_CAP_USD };
   // Stuck-document re-reads (model calls) get their own, longer budget: api/account.js runs this on a 300s
   // ceiling, so 200s leaves ~100s for the integrity/notification/outreach steps and the response.
   const docRetryDeadlineAt = Date.now() + 200_000;
@@ -211,8 +222,16 @@ export default async function handler(req, res) {
     recheckFilledDocuments: 0,
     recheckFilledFields: 0,
     recheckVerified: 0,
+    importAutoFiled: 0,
     recheckLeftForNextRun: 0,
     recheckSkippedTenants: 0,
+    aiFinishPapers: 0,
+    aiFinishFacts: 0,
+    aiFinishSuggested: 0,
+    aiFinishTyped: 0,
+    aiFinishFailed: 0,
+    aiFinishCostUsd: 0,
+    aiFinishStopped: {},
     // Docread2 (2026-10-23): read-only audit of already-stored values. Counts per rule; flags are written only when STORED_FACT_FLAGS=1.
     storedAuditScanned: 0,
     storedAuditFlagged: 0,
@@ -454,6 +473,39 @@ export default async function handler(req, res) {
       }
     } else {
       summary.recheckSkippedTenants += 1;
+    }
+
+    // Bulk import autopilot: papers of a big import that pass every automatic check are filed (the tenant setting, ON for imports by default;
+    // never links, never creates, never writes a value; audited and undoable per batch). $0, no model. Bounded per tenant.
+    if (Date.now() < deadlineAt) {
+      try {
+        const af = await autoFileSweep(ctx, { perTenant: 400, deadlineAt: Math.min(deadlineAt, Date.now() + 20_000) });
+        summary.importAutoFiled += af.filed;
+      } catch (err) {
+        summary.errors.push({ tenant: t.tenant_key, phase: "import-autofile", message: err?.message });
+        await captureException(err, { route: "/api/cron-sweep", tenant: t.tenant_key, stage: "import-autofile" });
+      }
+    }
+
+    // AI finish: after the $0 re-check, whatever is still open goes to Haiku (exact-quote evidence, insert-only, customers only ever
+    // SUGGESTED). Own deadline inside the 300 s function; never runs for a demo, unbilled or plan-less tenant.
+    if (isAiFinishEnabled() && !summary.aiFinishPlatformStopped && Date.now() < aiFinishDeadlineAt) {
+      try {
+        const gate = await assertActiveBilling(ctx);
+        const row = gate?.allowed ? await getCachedBillingRow(ctx) : null;
+        if (row && row.plan && row.plan !== "demo") {
+          const r = await finishTenantPapers(ctx, {
+            plan: row.plan, limit: AI_FINISH_PER_TENANT_PER_NIGHT, deadlineAt: Math.min(aiFinishDeadlineAt, Date.now() + 60_000), platform: aiFinishPlatform, source: "cron",
+          });
+          summary.aiFinishPapers += r.finished; summary.aiFinishFacts += r.facts; summary.aiFinishSuggested += r.suggested;
+          summary.aiFinishTyped += r.typed; summary.aiFinishFailed += r.failed; summary.aiFinishCostUsd += r.costUsd;
+          if (r.stoppedBy) summary.aiFinishStopped[r.stoppedBy] = (summary.aiFinishStopped[r.stoppedBy] ?? 0) + 1;
+          if (r.stoppedBy === "platform-cap") summary.aiFinishPlatformStopped = true;
+        }
+      } catch (err) {
+        summary.errors.push({ tenant: t.tenant_key, phase: "ai-finish", message: err?.message });
+        await captureException(err, { route: "/api/cron-sweep", tenant: t.tenant_key, stage: "ai-finish" });
+      }
     }
 
     // Docread2: read-only audit of already-stored values (never overwrites). Bounded (60 documents per tenant per night, resumable);

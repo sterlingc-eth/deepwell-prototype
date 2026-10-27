@@ -3,9 +3,10 @@ import { AppShell } from '../components/AppShell';
 import { useGraph } from '../core/entityGraph';
 import { useAppStore } from '../store/appStore';
 import { IntakeBody } from './IntakeScreen';
-import { ReviewBody, needsPersonCount } from './ReviewScreen';
+import { ReviewBody, todoCount } from './ReviewScreen';
 import { FILTERS, type Filter } from './reviewFilters';
 import { IntakeQueuePanel } from '../components/intake/IntakeQueuePanel';
+import { ImportAutopilot } from '../components/inbox/ImportAutopilot';
 
 /** The store only knows about the two tabs it always has ('add'/'needs-person' —
  *  store/appStore.ts's own `inboxTab`, which Dashboard's tiles and other screens navigate to
@@ -19,7 +20,9 @@ type UiTab = 'add' | 'needs';
  *  (round 13's "Needs a decision", server-backed) or one of ReviewBody's 9 document filters. */
 type Chip = 'decisions' | Filter;
 
-const PRIMARY_FILTERS: Filter[] = ['attention', 'gaps', 'unlinked', 'ready'];
+// Inbox redesign (2026-10-26): one calm default view ("To do": everything a person can act on, grouped by the action
+// needed). The older per-reason views are still there, one tap away under "More views".
+const PRIMARY_FILTERS: Filter[] = ['todo'];
 
 const chipClass = (on: boolean) =>
   ['dw-btn !min-h-[44px] !py-1.5 !px-3 text-body-lg justify-center shrink-0 whitespace-nowrap', on ? 'bg-forest-700 text-stone-0 dark:bg-brass-300 dark:text-forest-950' : 'bg-surface border border-line text-ink-2 hover:bg-surface-2'].join(' ');
@@ -46,9 +49,9 @@ export function InboxScreen() {
   const pendingReviewFilter = useAppStore((s) => s.pendingReviewFilter);
   const [tab, setTab] = useState<UiTab>(storeTab === 'needs-person' ? 'needs' : 'add');
   const [lastStoreTab, setLastStoreTab] = useState(storeTab);
-  const [chip, setChip] = useState<Chip>('attention');
+  const [chip, setChip] = useState<Chip>('todo');
   const [counts, setCounts] = useState<Record<Filter, number> | null>(null);
-  const badge = needsPersonCount(graph.docs);
+  const badge = todoCount(graph.docs); // the same number the list shows as "N to clear"
 
   if (storeTab !== lastStoreTab) {
     setLastStoreTab(storeTab);
@@ -61,7 +64,7 @@ export function InboxScreen() {
   // the default filter chip first so that hand-off never gets silently
   // dropped (ReviewBody's own effect then applies the exact filter it asked for).
   useEffect(() => {
-    if (pendingReviewFilter && chip === 'decisions') setChip('attention');
+    if (pendingReviewFilter && chip === 'decisions') setChip('todo');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingReviewFilter]);
 
@@ -87,7 +90,7 @@ export function InboxScreen() {
       <div className="space-y-3 lg:space-y-4">
         <header className="lg:flex lg:flex-wrap lg:items-baseline lg:gap-x-4">
           <h1>Inbox</h1>
-          <p className="text-ink-2 mt-1 lg:mt-0">Add paperwork, answer what autofill couldn't, and clear what needs your attention.</p>
+          <p className="text-ink-2 mt-1 lg:mt-0">Add paperwork and clear what needs you.</p>
         </header>
 
         <div role="tablist" aria-label="Inbox view" className="flex flex-wrap gap-1.5">
@@ -109,6 +112,9 @@ export function InboxScreen() {
           ))}
         </div>
 
+        {/* Bulk import autopilot: only appears when a drop of 20 or more papers exists. */}
+        <ImportAutopilot onOpenList={() => { selectTab('needs'); setChip('todo'); }} />
+
         {tab === 'add' ? (
           <IntakeBody />
         ) : (
@@ -116,7 +122,7 @@ export function InboxScreen() {
             <div className="space-y-2">
               <div className="flex items-start gap-1.5 overflow-x-auto sm:flex-wrap sm:overflow-visible -mx-4 px-4 sm:mx-0 sm:px-0 pb-1 sm:pb-0">
                 <div role="tablist" aria-label="Needs you filters" className="flex gap-1.5 shrink-0 sm:flex-wrap sm:shrink sm:min-w-0">
-                  {[{ id: 'decisions' as const, label: 'Decisions' }, ...primaryFilters, ...(moreOpen || moreForced ? moreFilters : [])].map((f) => (
+                  {[...primaryFilters, { id: 'decisions' as const, label: 'Decisions' }, ...(moreOpen || moreForced ? moreFilters : [])].map((f) => (
                     <button
                       key={f.id}
                       type="button"
@@ -125,13 +131,13 @@ export function InboxScreen() {
                       onClick={() => setChip(f.id)}
                       className={chipClass(chip === f.id)}
                     >
-                      {f.label} {f.id !== 'decisions' && counts && <span className="font-mono text-caption opacity-80">{counts[f.id]}</span>}
+                      {f.label} {f.id !== 'decisions' && f.id !== 'todo' && counts && <span className="font-mono text-caption opacity-80">{counts[f.id]}</span>}
                     </button>
                   ))}
                 </div>
                 {!moreForced && (
                   <button type="button" aria-expanded={moreOpen} onClick={() => setMoreOpen((v) => !v)} className={chipClass(false) + ' shrink-0'}>
-                    {moreOpen ? 'Less' : 'More'}
+                    {moreOpen ? 'Fewer views' : 'More views'}
                     {!moreOpen && moreAttention > 0 && <span className="font-mono text-caption opacity-80">{moreAttention}</span>}
                   </button>
                 )}

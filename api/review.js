@@ -30,8 +30,11 @@ import { deleteDocuments } from './_lib/routes/document-delete.js';
 import { integrityScan, integrityFix } from './_lib/routes/integrity.js';
 import { limit } from './_lib/rateLimit.js';
 import { recheckDocument, recheckTenantMissing } from './_lib/recheck.js';
+import { finishTenantPapers } from './_lib/aiFinish.js';
+import * as importAutopilot from './_lib/importAutopilot.js';
+import { listFieldSuggestions, acceptFieldSuggestion, dismissFieldSuggestion } from './_lib/aiFinishSuggest.js';
 import { auditStoredTenant, listStoredFlags, dismissStoredFlag, flagsVisible } from './_lib/storedAuditStore.js';
-import { assertActiveBilling } from './_lib/plan.js';
+import { assertActiveBilling, getCachedBillingRow } from './_lib/plan.js';
 // Miss loop (handoffs/DONOVAN_TRAINING_PLAN_2026-09-21.md): owner/admin-only
 // read of the ask_misses table missStore.js writes from api/ask.js.
 import { missReport, exportMisses } from './_lib/missStore.js';
@@ -94,7 +97,7 @@ import { notifyStaffOfGrant } from './_lib/support/accessHelp.js';
 // (list_autopilot_summary_window / a live gap-report rebuild can scan list_ask_misses_window and
 // list_scorecard_failures_window) an operator's dashboard could otherwise poll without limit — same
 // reasoning as missDigest above, even though neither makes a billed model call.
-const INTEGRITY_RATE_LIMIT_ACTIONS = new Set(['auditStoredFacts', 'recheckDocument', 'recheckMissing', 'resortDocuments', 'undoResort', 'integrityScan', 'integrityFix', 'missDigest', 'learningRunNow', 'learningReplay', 'learningRejectAllGaps', 'askFeedback', 'scorecardRun', 'scorecardBaseline', 'semanticBackfill', 'dossierBackfill', 'learningAutopilotStatus', 'learningGapReport']);
+const INTEGRITY_RATE_LIMIT_ACTIONS = new Set(['importPlan', 'importAutoFile', 'importApply', 'auditStoredFacts', 'recheckDocument', 'recheckMissing', 'aiFinish', 'resortDocuments', 'undoResort', 'integrityScan', 'integrityFix', 'missDigest', 'learningRunNow', 'learningReplay', 'learningRejectAllGaps', 'askFeedback', 'scorecardRun', 'scorecardBaseline', 'semanticBackfill', 'dossierBackfill', 'learningAutopilotStatus', 'learningGapReport']);
 const OPERATOR_ACTIONS = new Set(['missDigest', 'learningList', 'learningDecide', 'learningDeactivate', 'learningRunNow', 'learningExport', 'learningReplay', 'learningRejectAllGaps', 'scorecardRun', 'scorecardStatus', 'scorecardBaseline', 'learningAutopilotStatus', 'learningGapReport', 'examPromote', 'examList', 'examExport', 'donovanScores']);
 
 // HARD GATE (Reviewer NO-GO, 2026-09-21): which of this route's actions
@@ -105,7 +108,7 @@ const OPERATOR_ACTIONS = new Set(['missDigest', 'learningList', 'learningDecide'
 // (reviewStore.reclassifyDocuments) does, as a Haiku fallback when its
 // deterministic heuristic can't place a document — see RECLASSIFY_MODEL in
 // reviewStore.js.
-const MODEL_BILLED_ACTIONS = new Set(['reclassify', 'extractReminders', 'semanticBackfill', 'dossierBackfill']);
+const MODEL_BILLED_ACTIONS = new Set(['aiFinish', 'reclassify', 'extractReminders', 'semanticBackfill', 'dossierBackfill']);
 
 // Same admin gate as integrityFix (routes/integrity.js) — a merge irreversibly
 // renumbers/retires customer or equipment records, so on a Clerk org tenant
@@ -172,6 +175,8 @@ export const config = {
 };
 
 const ACTIONS = new Set([
+  // Bulk import autopilot (api/_lib/importAutopilot.js): progress, pattern decisions, auto-file with undo, the tenant setting.
+  'importList', 'importStatus', 'importPlan', 'importSettings', 'importAutoFile', 'importUndoAutoFile', 'importResume', 'importApply', 'importUndoDecision',
   'correctField',
   'setUnitInstallDate',
   'classifyDocument',
@@ -182,11 +187,16 @@ const ACTIONS = new Set([
   'mergeEntities',
   'listLinks',
   'listCorrections',
+  'fieldSuggestions',
+  'acceptFieldSuggestion',
+  'dismissFieldSuggestion',
   'deleteDocuments',
   'aiVerify',
   // R33: $0 re-read of a stored document's own page text for a missing required field (api/_lib/recheck.js).
   'recheckDocument',
   'recheckMissing',
+  // AI finish (api/_lib/aiFinish.js): optional staff button; Haiku, exact-quote evidence, insert-only, customers only suggested. Admin.
+  'aiFinish',
   // Document-rules round: one-time owner-triggered re-sort + automatic check, $0 (reviewStore.resortDocuments).
   'resortDocuments',
   'undoResort',
@@ -300,6 +310,37 @@ export default async (req, res) => {
   try {
     let result;
     switch (action) {
+      // ---- Bulk import autopilot. Staff can read and answer decisions; the setting and the batch-wide undo are admin. $0, no model.
+      case 'importList':
+        result = { imports: await importAutopilot.listImports(ctx, { limit: Math.min(20, Number(payload.limit) || 10) }), settings: await importAutopilot.getImportSettings(ctx) };
+        break;
+      case 'importStatus':
+        result = await importAutopilot.importStatus(ctx, payload);
+        break;
+      case 'importPlan':
+        result = await importAutopilot.importPlan(ctx, { ...payload, fresh: payload.fresh === true });
+        break;
+      case 'importSettings':
+        if (payload.set === true) { requireAdmin(auth); result = await importAutopilot.setImportSettings(ctx, payload, auth.userId); }
+        else result = await importAutopilot.getImportSettings(ctx);
+        break;
+      case 'importAutoFile':
+        result = await importAutopilot.importAutoFile(ctx, { ...payload, force: false, source: 'inbox', deadlineAt: Date.now() + 120_000 }, auth.userId);
+        break;
+      case 'importUndoAutoFile':
+        requireAdmin(auth);
+        result = await importAutopilot.importUndoAutoFile(ctx, payload, auth.userId);
+        break;
+      case 'importResume':
+        requireAdmin(auth);
+        result = await importAutopilot.importResume(ctx, payload, auth.userId);
+        break;
+      case 'importApply':
+        result = await importAutopilot.importApplyDecision(ctx, payload, auth.userId);
+        break;
+      case 'importUndoDecision':
+        result = await importAutopilot.importUndoDecision(ctx, payload, auth.userId);
+        break;
       case 'correctField':
         result = await reviewStore.correctField(ctx, payload, auth.userId);
         break;
@@ -327,6 +368,21 @@ export default async (req, res) => {
         break;
       case 'listLinks':
         result = await reviewStore.listLinks(ctx, payload);
+        break;
+      // AI-finish field suggestions (api/_lib/aiFinishSuggest.js): audit rows, never facts. Accept writes the value through correctField (a person's value).
+      case 'fieldSuggestions':
+        result = await listFieldSuggestions(ctx, { documentIds: Array.isArray(payload.documentIds) ? payload.documentIds : [] });
+        break;
+      case 'acceptFieldSuggestion':
+      case 'dismissFieldSuggestion':
+        try {
+          result = action === 'acceptFieldSuggestion'
+            ? await acceptFieldSuggestion(ctx, { documentId: payload.documentId, key: payload.key, value: payload.value, by: payload.by }, auth.userId, { correctField: reviewStore.correctField })
+            : await dismissFieldSuggestion(ctx, { documentId: payload.documentId, key: payload.key }, auth.userId);
+        } catch (err) {
+          if (err?.name === 'SuggestionError') throw new reviewStore.ReviewError(err.message, err.status);
+          throw err;
+        }
         break;
       case 'listCorrections':
         result = await reviewStore.listCorrections(ctx, payload);
@@ -387,6 +443,29 @@ export default async (req, res) => {
           if (err instanceof reviewStore.ReviewError || err instanceof AuthError) throw err;
           console.error('review API error (recheckMissing):', err);
           throw new reviewStore.ReviewError("We couldn't finish re-checking just now. Anything already re-checked is saved, so press \"Re-check all open papers\" again in a minute to continue.", 503);
+        }
+        break;
+      }
+      // AI finish (optional, staff/owner): one chunk (<= 20 papers) of the papers still open after Re-check goes to Haiku. The same pass also
+      // runs by itself in the nightly sweep, so this button is never required. The answer carries NO dollar figure: cost is internal
+      // (usage counters, the paper's ai_finish.run audit row, the plan-sized monthly budget in rate_limit_windows).
+      case 'aiFinish': {
+        requireAdmin(auth);
+        try {
+          const row = await getCachedBillingRow(ctx);
+          const r = await finishTenantPapers(ctx, {
+            plan: row?.plan, documentIds: Array.isArray(payload.documentIds) ? payload.documentIds : null,
+            limit: Math.min(20, Number(payload.limit) || 20), deadlineAt: Date.now() + 150_000,
+            source: 'inbox', actorClerkId: auth.userId,
+          });
+          // costUsd is deliberately NOT returned. "stoppedBy" is reduced to plain categories the screen can word without money.
+          const stop = r.stoppedBy === 'run-cap' || r.stoppedBy === 'month-budget' || r.stoppedBy === 'day-budget' || r.stoppedBy === 'platform-cap' || r.stoppedBy === 'tenant-model-budget' ? 'allowance'
+            : r.stoppedBy === 'switched-off' ? 'off' : r.stoppedBy === 'provider-busy' ? 'busy' : null;
+          result = { considered: r.considered, processed: r.processed, finished: r.finished, facts: r.facts, fieldSuggestions: r.fieldSuggestions, suggested: r.suggested, typed: r.typed, verified: r.verified, nothing: r.nothing, failed: r.failed, skipped: r.skipped, stopped: stop, leftIds: r.leftIds };
+        } catch (err) {
+          if (err instanceof reviewStore.ReviewError || err instanceof AuthError) throw err;
+          console.error('review API error (aiFinish):', err);
+          throw new reviewStore.ReviewError("We couldn't finish that just now. Anything already finished is saved. Try again in a minute.", 503);
         }
         break;
       }
@@ -887,6 +966,9 @@ export default async (req, res) => {
     }
     return res.json(result ?? null);
   } catch (err) {
+    if (err instanceof importAutopilot.ImportError) {
+      return res.status(err.status).json({ error: err.message, ...(err.details ? { details: err.details } : {}) });
+    }
     if (err instanceof reviewStore.ReviewError) {
       return res.status(err.status).json({ error: err.message, ...(err.details ? { details: err.details } : {}) });
     }

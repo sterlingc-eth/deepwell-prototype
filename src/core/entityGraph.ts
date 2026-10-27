@@ -235,6 +235,12 @@ export function linkSuggestions(doc: Doc, entities: Record<string, Entity>): Ent
   return out.slice(0, 3);
 }
 
+/** Of the suggestions above, the ones whose page evidence is STRONG under the R6 rule (name AND street, or the exact name as a customer-label value).
+ *  Only these may be linked in bulk; every other suggestion is a one-at-a-time click. */
+export function strongLinkSuggestionIds(doc: Doc): string[] {
+  return doc.linkedEntityIds.length > 0 ? [] : doc.linkSuggestionStrongIds ?? [];
+}
+
 /** Real facts on a document: non-empty and not an underscore-prefixed bookkeeping row (`_audience_notified`, `_company_folder`...). */
 export function substantiveFactNames(doc: Doc): string[] {
   return [...presentFieldNames(doc)].filter((n) => !n.startsWith('_'));
@@ -1118,7 +1124,7 @@ export async function ensureDocLoaded(docId: DocumentId): Promise<void> {
       const [row, extractions, linksRes, correctionsRes] = await Promise.all([
         recordsStore.getDocument(docId) as unknown as Promise<FetchedDocumentRow | null>,
         recordsStore.listExtractionsByDocument(docId).catch(() => []) as unknown as Promise<FetchedExtractionRow[]>,
-        reviewClient.listLinks([docId]).catch(() => ({ links: [] as DocumentLink[], suggestions: [] as { document_id: string; candidates: { id: string }[] }[] })),
+        reviewClient.listLinks([docId]).catch(() => ({ links: [] as DocumentLink[], suggestions: [] as { document_id: string; candidates: { id: string; strong?: boolean }[] }[] })),
         reviewClient.listCorrections([docId]).catch(() => ({ corrections: [] as Correction[] })),
       ]);
       if (!row) return; // wrong tenant, deleted, or not yet synced anywhere
@@ -1142,8 +1148,10 @@ export async function ensureDocLoaded(docId: DocumentId): Promise<void> {
       // already landed this doc while these round trips were in flight.
       if (useGraph.getState().docs[docId]) return;
       const fetched = docFromFetchedRow(row, extractions, linksRes.links, correctionsRes.corrections, useGraph.getState().schema, completeness);
-      const sugIds = (linksRes.suggestions ?? []).find((s) => s.document_id === docId)?.candidates.map((c) => c.id);
-      const doc = sugIds && sugIds.length ? { ...fetched, linkSuggestionIds: sugIds } : fetched;
+      const sugRow = (linksRes.suggestions ?? []).find((s) => s.document_id === docId);
+      const sugIds = sugRow?.candidates.map((c) => c.id);
+      const strongIds = sugRow?.candidates.filter((c) => c.strong).map((c) => c.id);
+      const doc = sugIds && sugIds.length ? { ...fetched, linkSuggestionIds: sugIds, ...(strongIds && strongIds.length ? { linkSuggestionStrongIds: strongIds } : {}) } : fetched;
       useGraph.getState().upsertDoc(doc);
     } finally {
       fetchesInFlight.delete(docId);

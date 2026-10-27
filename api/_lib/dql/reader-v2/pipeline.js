@@ -23,6 +23,8 @@ import * as AG1 from './agree1.js';
 import * as MP1 from './mentionparty.js';
 import * as CA from './cueagree.js';
 import * as TRP from './typorepair.js';
+import * as CS289 from './clausestack289.js';      // clausepm289 (precfix.ck289, env DONOVAN_READER_V2_CLAUSESTACK289; absent flag = never reached)
+import * as CT98 from './clausetopic98.js';      // clausepm289: the _ct98s stamp the rescue reads (log path of lib/clausetopic98.py)
 
 const CUEK = ['min', 'max', 'early', 'late', 'sum', 'count', 'list', 'many'];
 const CAND_INT = { field: 'text', clause: 'text', count0: 'count', who_by_address: 'who_addr', count_year: 'count_year' };
@@ -143,7 +145,12 @@ async function candidatesBase(ix, q, M, probs = null) {
   blk(() => { if (PV1.enabled()) for (const [, c] of res) { const r_ = PV1.veto(q2, c, ix); if (r_) c._pv1_veto = r_; } });
   return [res, out, q2];
 }
-export async function candidates(ix, q, M, probs = null) {
+export async function candidates(ix, q, M, probs = null) {      // clausepm289: Python pipeline.candidates stamps clausetopic98 after every other mark/reroute; only a bundle that carries ck289 pays for it
+  const r = await candidatesInner(ix, q, M, probs);
+  try { if (CS289.switchOn() && (CS289.flagOf(M && M.thr) || CS289.flagOf(M && M.pmInc && M.pmInc.thr))) CT98.mark(ix, q, r[0]); } catch (e) { /* swallowed like the reference */ }
+  return r;
+}
+async function candidatesInner(ix, q, M, probs = null) {
   let [res, out, q2] = await candidatesBase(ix, q, M, probs);
   const base = async (ix_, q_, M_, p_) => { const r = await candidatesBase(ix_, q_, M_, p_); return [r[0], r[1]]; };
   let rr = null;
@@ -165,9 +172,11 @@ function pmIncOk(M, c) {
     return !!passesT(M, { ...inc.thr, precfix: pf }, c, inc.verifier.score(v));
   } catch (e) { return false; }
 }
+let CS_CTX_ = null; const csCtx = () => CS_CTX_ || (CS_CTX_ = { VI: Object.fromEntries(VF.map((k, i) => [k, i])), INTENTS });      // clausepm289
 function passesT(M, T, c, pv) {
   const pf = T.precfix || {};
   if (T.group_thr || pf.agree_hard) throw new Error('release options not supported by this port: ' + JSON.stringify({ group_thr: !!T.group_thr, agree_hard: !!pf.agree_hard }));
+  if ((pf.ck289 || CS289.flagOf(M && M.pmInc && M.pmInc.thr)) && !CS289.switchOn()) throw new Error('ck289 is in this version (or in its precision_match incumbent) but DONOVAN_READER_V2_CLAUSESTACK289 is not set (R79b: loop and app switch on together)');      // clausepm289: a flagged bundle is never served silently without its rescue
   if (c._wp2_veto || c._wp_veto || c._mp_veto || c._mp2_veto || c._pv1_veto || c._mr2_veto || c._hv2 || c._hv3 || c._hv4 || c._sl1 || c._rp_veto) return false;
   const pm = pf.pmatch || null;      // precision_match operating point of this version (null = incumbent behaviour)
   const gh = !!(pf.grounding_hard && c._ungrounded);
@@ -180,6 +189,7 @@ function passesT(M, T, c, pv) {
   if (pv < thr && !(pm && pm.anchor && pv >= thr0 && pmIncOk(M, c))) {      // anchor: an answer the incumbent also releases keeps the base threshold; only NEW answers must clear the shifted one
     if ((pm === null || pv >= Number(pm.cf2_floor ?? 0.0)) && CF2.rescue(pf, c)) return true;      // clause_free_v2: strict rescue of an unambiguous clause answer
     if (CA.rescue(pf, c, pv)) return true;      // cue_agree_v1: strict rescue of an unfiltered lowest/highest answer
+    if (pf.ck289 && CS289.rescue(pf, c, pv, csCtx())) return true;      // clausepm289: per-version stacked-evidence rescue of a withheld single-document clause line (precfix.ck289)
     return false;
   }
   if (gh) return false;

@@ -9,7 +9,7 @@ import { isAdminRole } from '../services/teamClient';
 import { reviewClient } from '../services/reviewClient';
 import { NotificationsPanel } from './NotificationsPanel';
 import { useGraph } from '../core/entityGraph';
-import { needsPersonCount } from '../screens/ReviewScreen';
+import { todoCount } from '../screens/ReviewScreen';
 import { CommandPalette } from './command/CommandPalette';
 import { SupportWidget } from './support/SupportWidget';
 import { NAV } from './nav';
@@ -62,7 +62,7 @@ export function AppShell({ children, width = 'content' }: AppShellProps) {
   // DataHealthStrip's tile already use (needsPersonCount), so this can never
   // disagree with what Inbox itself shows once you're in it.
   const docs = useGraph((s) => s.docs);
-  const inboxBadge = needsPersonCount(docs);
+  const inboxBadge = todoCount(docs);
 
   // HARD GATE (owner decision, 2026-09-21): a tenant App.tsx has routed into
   // the paywall (billingStatus 'none' or 'canceled') gets a stripped-down

@@ -19,6 +19,8 @@
  *                                receipt with tableRows.js and give the VERIFIED rows to the financials pipeline (invoice_lines).
  *                                Rows are kept only when qty x unit = amount and the rows add up to the printed subtotal / total.
  *
+ *   LICENSE_BARCODE=0            skip the AAMVA PDF417 licence-barcode lane (licenseBarcode.js): licence photos go to the vision model as before.
+ *
  * Pure functions of an env object so verify scripts can flip them without touching process.env.
  */
 const off = (env, name) => env?.MODEL_AVOIDANCE === "0" || env?.[name] === "0";
@@ -34,3 +36,5 @@ export const isDossierModelEnabled = (env = process.env) => optIn(env, "DOSSIER_
 export const isAutopilotModelEnabled = (env = process.env) => optIn(env, "DONOVAN_AUTOPILOT_MODEL");
 /** Tables lane: strictly opt-in; the master MODEL_AVOIDANCE=0 does not turn it on. */
 export const isTableRowsReaderEnabled = (env = process.env) => env?.TABLE_ROWS_READER === "1";
+/** Licence-barcode lane (free, exact read of the AAMVA PDF417 on a driver licence). Default ON; LICENSE_BARCODE=0 or MODEL_AVOIDANCE=0 turns it off. */
+export const isLicenseBarcodeEnabled = (env = process.env) => !off(env, "LICENSE_BARCODE");

@@ -177,6 +177,8 @@ export interface Doc {
   linkedEntityIds: EntityId[];
   /** Customers the page hints at without naming them clearly enough to link (weak evidence kept for a person; server audit row, never a fact). Cleared on any link. */
   linkSuggestionIds?: EntityId[];
+  /** The subset of linkSuggestionIds with STRONG page evidence (R6: name and street, or the exact name as a customer-label value); only these may be linked in bulk. */
+  linkSuggestionStrongIds?: EntityId[];
   /** 0–1 confidence of the strongest link */
   linkConfidence: number;
   issues: DocumentIssue[];

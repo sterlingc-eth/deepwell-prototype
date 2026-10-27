@@ -6,9 +6,11 @@
  * components — Fast Refresh only works when a file exports only
  * components). No behavior change: same 9 filters, same labels, same order.
  */
-export type Filter = 'attention' | 'gaps' | 'unlinked' | 'conflicts' | 'duplicates' | 'ready' | 'shop-records' | 'money' | 'all';
+export type Filter = 'todo' | 'attention' | 'gaps' | 'unlinked' | 'conflicts' | 'duplicates' | 'ready' | 'shop-records' | 'money' | 'all';
 
 export const FILTERS: { id: Filter; label: string }[] = [
+  // Inbox redesign (2026-10-26): the default view - everything a person can act on, grouped by the action needed.
+  { id: 'todo', label: 'To do' },
   { id: 'attention', label: 'Needs a person' },
   { id: 'gaps', label: 'Missing info' },
   { id: 'unlinked', label: 'Needs linking' },

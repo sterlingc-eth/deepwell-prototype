@@ -13,6 +13,7 @@
 import { COMMON_WORDS } from "../router/lexicon.generated.js";
 import { COMMON_SURNAMES, FOREIGN_SURNAMES } from "./firstNames.js";
 import { FLORA_FAUNA, NATURE, THING_PARTICIPLES } from "./natureWords.js";
+import { NAME_EXEMPT } from "./nameExempt.js";
 import { CENSUS_TOP5K, CENSUS_TOP1K, CENSUS_ETHNIC, EXTRA_SURNAMES } from "./surnamesCensus.js";
 
 const set = (s) => new Set(s.split(/\s+/).filter(Boolean));
@@ -103,10 +104,10 @@ const topoCompound = (w) => { for (const t of TOPO_DICT) if (w.length >= t.lengt
 const natureNoun = (w) => stems(w).some((x) => x.length >= 7 && FLORA_FAUNA.has(x)); // 7+ letters: a short plant or animal word (Weld, Reed, Lark) is as likely a tool or a place // larkspur, tamarack, kingfisher: a plant or an animal is how English surnames are made
 const dictionaryNoun = (w) => stems(w).some(englishWord) && !topoCompound(w) && !natureNoun(w);
 // the head (last part) of a compound names a THING or a PLACE of work: skylift, busway, fieldhouse, toolroom, switchyard. Surnames end in a topographic part (TOPO), not in one of these.
-const THING_HEAD = set("site car cart tool work wash down kit bank board room yard shop works house lift box rack bay dock pit line rail way shed deck gate door pipe tank bed bin lot pad hall out cage stack bar rig");
+const THING_HEAD = set("site car cart tool work wash down kit bank board room yard shop works house lift box rack bay dock pit line rail way shed deck gate door pipe tank bed bin lot pad hall out cage stack bar rig desk store stand trailer counter hole bolt wall");
 const compoundNoun = (w) => {
   if (w.length < 7) return false;
-  for (let i = 3; i <= w.length - 3; i++) if (stems(w.slice(i)).some((x) => THING_HEAD.has(x)) && englishWord(w.slice(0, i))) return !CENSUS_TOP5K.has(w);
+  for (let i = 3; i <= w.length - 3; i++) if (stems(w.slice(i)).some((x) => THING_HEAD.has(x)) && stems(w.slice(0, i)).some(englishWord)) return !CENSUS_TOP5K.has(w);
   for (let i = 4; i <= w.length - 3; i++) if (englishWord(w.slice(0, i)) && w.slice(0, i).length >= 4 && FLORA_FAUNA.has(w.slice(0, i))) return false; // alder+shot, lark+spur, wolf+enden: a plant or an animal in front
   for (let i = 4; i <= w.length - 3; i++) {
     const a = w.slice(0, i); const b = w.slice(i);
@@ -118,7 +119,36 @@ const compoundNoun = (w) => {
 // an agent / instrument noun: a dictionary word of 4+ letters plus -er (skid+der, grind+er, hop+per): the doubled consonant is undone. Surnames of that shape (Walker, Parker, Fowler, Hopper) are on the lists above.
 const agentNoun = (w) => { const m = /^([a-z]{3,})ers?$/.exec(w); if (!m) return false; const b = m[1]; return (b.length >= 4 && englishWord(b)) || englishWord(`${b}e`) || (b.length >= 4 && b.slice(-1) === b.slice(-2, -1) && englishWord(b.slice(0, -1))); };
 const longParticiple = (w) => w.length >= 9 && /(?:ing|ed)$/.test(w); // Scaffolding, Backfilling, Excavating: a gerund that long is work, not a family (Kettering, Pickering are on the lists)
-export const ordinaryLastWord = (w) => w.length >= 3 && !w.includes("-") && !knownSurname(w) && !PLACE_SURNAMES.has(w) && !PLACEHOLDER_SURNAMES.has(w) && (/(?:ing|ed)$/.test(w) ? longParticiple(w) || THING_PARTICIPLES.has(w) || compoundNoun(w) : dictionaryNoun(w) || compoundNoun(w) || (agentNoun(w) && !CENSUS_TOP5K.has(w)) || (w.length >= 6 && NOUN_SUFFIX.test(w)));
+// topographic / family-place tails of real compound surnames (Winterbottom, Stonebridge, Southgate, Penhallow, Thistlewaite): never read as a thing
+const PLACE_TAIL = /(?:bottom|bridge|(?:north|south|east|west)gate|sall|dish|thwaite|waite|hallow)$/;
+const R9_KEEP = set("walking"); // a real surname (Walking Eagle, Walkingstick) that is also a gerund
+const TRADE_WORDS = set("endcap rebar gunite shotcrete paver pavers telehandler mudsill sillplate plumbob");
+const noGuard = (w) => w.length >= 3 && !PLACE_TAIL.test(w) && !R9_KEEP.has(w) && !w.includes("-") && !knownSurname(w) && !PLACE_SURNAMES.has(w) && !PLACEHOLDER_SURNAMES.has(w);
+/** Round 8 rules (dictionary noun, compound, thing head, noun suffix, thing participle, agent noun). Exported for scripts/people-lane/build-name-models.mjs. */
+export const r8NounLike = (w) => noGuard(w) && ((/(?:ing|ed)$/.test(w) ? longParticiple(w) || THING_PARTICIPLES.has(w) || compoundNoun(w) : dictionaryNoun(w) || compoundNoun(w) || (agentNoun(w) && !CENSUS_TOP5K.has(w)) || (w.length >= 6 && NOUN_SUFFIX.test(w))));
+
+/* ---- round 9: what the dictionary does not hold. Trade jargon, run-together shop words, gerunds that name work. */
+// words that open place / family compounds (high+tower, black+well, fair+child, under+wood, stone+bridge): the front half of a surname, not of a thing
+const MODIFIER = set("wild high low black white red green blue gold silver grey gray new old fair long short north south east west under over great little broad sweet swift bright hard stone wood water sun moon rose");
+// trade / technical word-forming parts: re+bar, geo+grid, poly+bag, aqua+stat, tele+handler, sub+cooling; -stat -crete -gram -meter -scope -vac
+const TRADE_PREFIX = /^(?:re|geo|poly|aqua|tele|sub|super|hydro|thermo|micro|macro|mega|multi|inter|trans|semi|auto|electro|pneumo|retro)/;
+const TRADE_SUFFIX = /(?:stat|crete|gram|meter|scope|matic|graph|vac|tronic)$/;
+const gerundOfWork = (w) => { const m = /^(.{3,})ing$/.exec(w); if (!m || w.length < 6) return false; const b = m[1]; return [b, `${b}e`, b.length > 3 && b.slice(-1) === b.slice(-2, -1) ? b.slice(0, -1) : b].some((x) => x.length >= 3 && englishWord(x)); };
+const THING3 = set("nut cap tap bar box rig pad bin cab van jar tub pan pot lid peg set tag out");
+const shortCompound = (w) => {
+  if (w.length < 6 || /(?:ing|ed)$/.test(w)) return false;
+  for (let i = 4; i <= w.length - 3; i++) if (FLORA_FAUNA.has(w.slice(0, i))) return false; // alder+shot: a plant or an animal in front
+  for (let i = 3; i <= w.length - 3; i++) {
+    const a = w.slice(0, i); const b = w.slice(i);
+    if (!((a.length >= 3 && b.length >= 4) || (a.length >= 4 && THING3.has(b)) || (a.length >= 5 && b.length >= 3))) continue; // harl+owe, ratch+ed: short fragments are everywhere in a 100k-word list
+    if (englishWord(a) && !MODIFIER.has(a) && !(a.length >= 4 && FLORA_FAUNA.has(a)) && stems(b).some(englishWord) && !stems(b).some((x) => TOPO.has(x) || FLORA_FAUNA.has(x) || NATURE.has(x) || x === "flower")) return true;
+  }
+  return false;
+};
+const tradeMorph = (w) => w.length >= 6 && ((TRADE_PREFIX.test(w) && [2, 3, 4, 5, 6].some((k) => /^(?:re|geo|poly|aqua|tele|sub|super|hydro|thermo|micro|macro|mega|multi|inter|trans|semi|auto|electro|pneumo|retro)$/.test(w.slice(0, k)) && w.length - k >= 3 && englishWord(w.slice(k)))) || TRADE_SUFFIX.test(w));
+/** Round 9 rules. Real census surnames these rules catch are listed in nameExempt.js (generated), so Walking, Hightower, Crenshaw keep reading. */
+export const r9NounLike = (w) => noGuard(w) && (TRADE_WORDS.has(w) || gerundOfWork(w) || shortCompound(w) || tradeMorph(w));
+export const ordinaryLastWord = (w) => r8NounLike(w) || (r9NounLike(w) && (!NAME_EXEMPT.has(w) || TRADE_WORDS.has(w)));
 /** An English-word surname, or a participle-looking word (Fielding, Waring): strong label, Korean given name (Park), or a signature print. */
 /** A participle-looking word (-ing / -ed) that no list knows as a surname and is a dictionary word of 6+ letters ("Fielding", "Walking"): a strong person label is enough (round 7). */
 const participleWord = (w) => !knownSurname(w) && w.length >= 6 && /(?:ing|ed)$/.test(w) && englishWord(w);

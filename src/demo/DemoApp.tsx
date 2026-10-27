@@ -3,6 +3,8 @@ import { CheckCircle2, FileText, LayoutDashboard, Loader2, MessageSquare, Rotate
 import { Wordmark } from '../components/Wordmark';
 import { DidYouMeanChips } from '../components/ask/PromptChips';
 import { DEMO_INDEX, loadFixture } from './fixtures';
+import { TryOwn } from './TryOwn';
+import { TRYOWN_TEXT } from './tryown';
 import {
   INGEST_STAGES, askDemo, capFirst, dashboardOf, ingestPlan, money, niceDate, niceText, nounPlural, stagesAfter,
   type DemoDocument, type DemoFixture, type DemoReply, type IngestStage,
@@ -17,7 +19,11 @@ function initialSlug(): string {
   return all.find((i) => i.slug === want)?.slug ?? all[0]?.slug ?? '';
 }
 
+/** ?try=1 opens the "Try your own documents" panel straight away (a link a presenter can bookmark). */
+const initialOwn = () => new URLSearchParams(window.location.search).get('try') === '1';
+
 export function DemoApp() {
+  const [own, setOwn] = useState(initialOwn);
   const [slug, setSlug] = useState(initialSlug);
   const [fx, setFx] = useState<DemoFixture | null>(null);
   const [step, setStep] = useState<Step>('upload');
@@ -69,8 +75,11 @@ export function DemoApp() {
                 </optgroup>
               ))}
             </select>
-            <button type="button" className="dw-btn dw-btn-secondary min-h-11" onClick={() => setLoadKey((k) => k + 1)}>
+            <button type="button" className="dw-btn dw-btn-secondary min-h-11" onClick={() => { setOwn(false); setLoadKey((k) => k + 1); }}>
               <RotateCcw className="w-4 h-4" aria-hidden="true" /> Start over
+            </button>
+            <button type="button" className={`dw-btn min-h-11 ${own ? 'dw-btn-secondary' : 'dw-btn-primary'}`} aria-pressed={own} onClick={() => setOwn(true)}>
+              <Upload className="w-4 h-4" aria-hidden="true" /> {TRYOWN_TEXT.panelTitle}
             </button>
           </div>
         </div>
@@ -85,7 +94,9 @@ export function DemoApp() {
       </header>
 
       <main className="max-w-content mx-auto px-4 py-6 space-y-5">
-        {!fx ? (
+        {own ? (
+          <TryOwn pack={fx?.pack?.id} onBack={() => setOwn(false)} />
+        ) : !fx ? (
           <div className="dw-card p-8 flex items-center gap-3 text-ink-2"><Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Getting the sample workspace ready…</div>
         ) : (
           <>
@@ -105,7 +116,7 @@ export function DemoApp() {
 
             {step === 'upload' && <UploadStep fx={fx} done={done} running={running} finished={finished} planLength={plan.length}
               onStart={() => { setDone(0); setRunning(true); }} onSkip={() => { setDone(plan.length); setRunning(false); }}
-              onOpen={(doc) => setOpenDoc({ doc })} onNext={() => setStep('dashboard')} />}
+              onOpen={(doc) => setOpenDoc({ doc })} onNext={() => setStep('dashboard')} onTryOwn={() => setOwn(true)} />}
             {step === 'dashboard' && (finished ? <DashboardStep fx={fx} onOpen={(doc) => setOpenDoc({ doc })} onNext={() => setStep('ask')} />
               : <NotYet onGo={() => setStep('upload')} />)}
             {step === 'ask' && (finished ? <AskStep fx={fx} input={input} setInput={setInput} asked={asked} onAsk={ask} onOpen={(doc, page) => setOpenDoc({ doc, page })} />
@@ -129,9 +140,9 @@ function NotYet({ onGo }: { onGo: () => void }) {
 
 const STAGE_PILL: Record<IngestStage, string> = { 'Uploaded': 'dw-pill-muted', 'Reading pages': 'dw-pill-info', 'Fields found': 'dw-pill-info', 'Matched': 'dw-pill-ok' };
 
-function UploadStep({ fx, done, running, finished, planLength, onStart, onSkip, onOpen, onNext }: {
+function UploadStep({ fx, done, running, finished, planLength, onStart, onSkip, onOpen, onNext, onTryOwn }: {
   fx: DemoFixture; done: number; running: boolean; finished: boolean; planLength: number;
-  onStart: () => void; onSkip: () => void; onOpen: (d: DemoDocument) => void; onNext: () => void;
+  onStart: () => void; onSkip: () => void; onOpen: (d: DemoDocument) => void; onNext: () => void; onTryOwn: () => void;
 }) {
   const stages = stagesAfter(fx, done);
   const started = done > 0 || running;
@@ -153,6 +164,7 @@ function UploadStep({ fx, done, running, finished, planLength, onStart, onSkip, 
           <FileText className="w-8 h-8 mx-auto text-ink-3" aria-hidden="true" />
           <p className="text-ink-2">Sample documents in this workspace include {[...new Set(fx.documents.map((d) => d.typeLabel))].slice(0, 5).join(', ')}.</p>
           <p className="text-ink-3 text-body">DeepWell reads each one, finds the key fields and matches it to the right {fx.customerNoun}.</p>
+          <button type="button" className="dw-btn dw-btn-tertiary min-h-11" onClick={onTryOwn}>{TRYOWN_TEXT.entry}</button>
         </div>
       ) : (
         <>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, AlertTriangle, ArrowLeft, Bell, Link2, GitMerge, Copy, Loader2, Plus, Search, Sparkles, Trash2, UserCog } from 'lucide-react';
 import { StagePill, stageLabel } from '../components/StagePill';
@@ -26,12 +26,19 @@ import { FinancialStrip } from '../components/FinancialStrip';
 import { financialsClient } from '../services/financialsClient';
 import { FILTERS, FILTER_IDS, type Filter } from './reviewFilters';
 import { needInfo, neighbourAfterRemoval, sectionsFor } from './reviewGrouping';
-import { RECHECK_ALL_LABEL, RECHECK_CHUNK, openPaperIds, recheckBanner, recheckProgress, stillOpenSummary } from './recheckAll';
+import { RECHECK_ALL_LABEL, RECHECK_CHUNK, openPaperIds, recheckBanner, recheckProgress, stillOpenSummary, FINISH_AI_LABEL, FINISH_AI_TITLE, FINISH_AI_ERROR, FINISH_CHUNK, finishProgress, finishBanner } from './recheckAll';
 import { NeedsYouList, type QueueRowData } from '../components/inbox/NeedsYouList';
+import { FieldSuggestions } from '../components/inbox/FieldSuggestions';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useCanAdmin, ASK_ADMIN_TITLE } from '../hooks/useCanAdmin';
 import { AskAdminNote } from '../components/AskAdminNote';
 import { baseFieldOf, futureDateNote, isUnconfirmedField, todayYmd, unconfirmedDates, visibleExtracted } from '../core/dateFlags';
+// INBOX_REDESIGN:BEGIN imports
+import { InboxTriage } from '../components/inbox/InboxTriage';
+import { InboxToolsToggle } from '../components/inbox/InboxTools';
+import { openGroupKey, triageSections } from '../components/inbox/inboxPlan';
+import { useWorkAreaSize } from '../components/inbox/useWorkAreaSize';
+// INBOX_REDESIGN:END imports
 
 const CURRENT_USER = 'You';
 
@@ -123,6 +130,8 @@ function matches(doc: Doc, f: Filter, sets: QueueSets): boolean {
     case 'shop-records': return doc.stage !== 'verified' && companyFileNeedsLook(doc, hvacSchema);
     case 'money': return sets.money.has(doc.id);
     case 'all': return true;
+    // INBOX_REDESIGN: everything a person can act on in one list (needs a person, plus ready to approve).
+    case 'todo': return isAttention(doc) || matches(doc, 'ready', sets);
   }
 }
 
@@ -131,6 +140,12 @@ function matches(doc: Doc, f: Filter, sets: QueueSets): boolean {
  *  first-run redirect (App.tsx) don't reimplement it separately. */
 export function needsPersonCount(docs: Record<string, Doc>): number {
   return Object.values(docs).filter(isAttention).length;
+}
+
+/** The ONE count of open papers: everything in the "To do" list (needs a person + ready to approve). The Inbox tab badge and the list's
+ *  own "N to clear" both read this, so they can never show two different numbers. (needsPersonCount above stays the "needs a person" part.) */
+export function todoCount(docs: Record<string, Doc>): number {
+  return Object.values(docs).filter((d) => isAttention(d) || (d.stage === 'linked' && d.issues.length === 0 && !isNothingRead(d))).length;
 }
 
 function queueSetsFor(graph: GraphSnapshot): QueueSets {
@@ -672,6 +687,36 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
     }
   };
 
+  // AI finish (optional, staff/owner; api/_lib/aiFinish.js). Papers still open after Re-check go to Haiku in chunks of 20: it fills only
+  // facts whose exact quote is on the page, never replaces a person's value, never links (a customer is only SUGGESTED, one click).
+  // The nightly sweep does the same by itself, so this button is never required. Nothing on screen shows a price.
+  const [finishBusy, setFinishBusy] = useState(false);
+  const [finishMsg, setFinishMsg] = useState<string | null>(null);
+  const runFinishAi = async () => {
+    const targetIds = [...openIds];
+    if (!targetIds.length) return;
+    setFinishBusy(true);
+    setFinishMsg(finishProgress(0, targetIds.length));
+    const t = { processed: 0, facts: 0, fieldSuggestions: 0, suggested: 0, typed: 0, failed: 0, stopped: null as 'allowance' | 'off' | 'busy' | null };
+    try {
+      const queueIds = [...targetIds];
+      while (queueIds.length && !t.stopped) {
+        const chunk = queueIds.splice(0, FINISH_CHUNK);
+        const r = await reviewClient.aiFinish(chunk, FINISH_CHUNK);
+        t.processed += r.processed; t.facts += r.facts; t.fieldSuggestions += r.fieldSuggestions ?? 0; t.suggested += r.suggested; t.typed += r.typed; t.failed += r.failed;
+        if (r.stopped) t.stopped = r.stopped;
+        setFinishMsg(finishProgress(Math.min(targetIds.length, targetIds.length - queueIds.length), targetIds.length));
+      }
+      try { await loadGraphFromServer(); } catch { /* keep last-good data */ }
+      setFinishMsg(finishBanner(t, stillOpenSummary(useGraph.getState(), targetIds).count));
+    } catch {
+      if (t.processed) { try { await loadGraphFromServer(); } catch { /* keep last-good data */ } }
+      setFinishMsg(FINISH_AI_ERROR);
+    } finally {
+      setFinishBusy(false);
+    }
+  };
+
   // Owner action (admin): "Sort my documents" - a one-time tidy. Documents typed Invoice/Other/Correspondence whose title
   // or file name clearly says Receipt, Statement, Agreement... are moved to that type, then complete ones that need no
   // customer link are checked. Runs on the server in bounded pages ($0, no model; reviewStore.resortDocuments).
@@ -769,9 +814,15 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
       };
     });
   }, [queue, graph.schema.documentTypes, work.hasShop, work.nameByUserId]);
-  const sections = useMemo(() => sectionsFor(rows, filter), [rows, filter]);
-  // Keyboard / selection order is the order rows appear on screen (section by section).
-  const flatIds = useMemo(() => sections.flatMap((sec) => sec.items.map((r) => r.doc.id)), [sections]);
+  // INBOX_REDESIGN:BEGIN sections (the "To do" view groups by the action needed; every other view is unchanged)
+  const triageSecs = useMemo(() => (filter === 'todo' ? triageSections(rows, graph, moneyIds) : []), [rows, filter, graph.schema, graph.entities, moneyIds]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [chosenGroup, setChosenGroup] = useState<string | null>(null);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const openKey = filter === 'todo' ? openGroupKey(triageSecs, chosenGroup, selectedDocumentId ?? undefined, (sec) => (sec.items as QueueRowData[]).map((r) => r.doc.id)) : null;
+  const sections = useMemo(() => (filter === 'todo' ? triageSecs : sectionsFor(rows, filter)), [rows, filter, triageSecs]);
+  // Keyboard / selection order is the order rows appear on screen (only the open group's rows in the "To do" view).
+  const flatIds = useMemo(() => (filter === 'todo' ? (triageSecs.find((sec) => sec.key === openKey)?.items ?? []) : sections.flatMap((sec) => sec.items)).map((r) => r.doc.id), [sections, triageSecs, openKey, filter]);
+  // INBOX_REDESIGN:END sections
   const [cap, setCap] = useState(LIST_INITIAL_ROWS);
   useEffect(() => { setCap(LIST_INITIAL_ROWS); }, [filter, inboxCustomerScope, shopTechFilter]);
   const activeInQueue = !!doc && flatIds.includes(doc.id);
@@ -791,36 +842,9 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
   const backRef = useRef<HTMLButtonElement>(null);
   const returnFocusId = useRef<string | null>(null);
   const savedScrollY = useRef(0);
-  const [stickyTop, setStickyTop] = useState(80);
-  const regionRef = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    const measure = () => {
-      // The app's pinned top bar (not the page's own <header> heading).
-      const bar = [...document.querySelectorAll('header')].find((el) => ['sticky', 'fixed'].includes(getComputedStyle(el).position));
-      const bottom = bar ? Math.round(bar.getBoundingClientRect().bottom) : 64;
-      setStickyTop(bottom + 12);
-    };
-    measure();
-    window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
-  }, []);
-  // Size both columns to the space actually left on screen (never below the pinned top), so the
-  // detail's action bar is visible on first view without scrolling the page.
-  useLayoutEffect(() => {
-    let raf = 0;
-    const size = () => {
-      raf = 0;
-      const el = regionRef.current;
-      if (!el) return;
-      const top = Math.max(stickyTop, el.getBoundingClientRect().top);
-      el.style.setProperty('--dw-col-h', `${Math.max(360, Math.round(window.innerHeight - top - 16))}px`);
-    };
-    const queueSize = () => { if (!raf) raf = requestAnimationFrame(size); };
-    size();
-    window.addEventListener('scroll', queueSize, { passive: true });
-    window.addEventListener('resize', queueSize);
-    return () => { window.removeEventListener('scroll', queueSize); window.removeEventListener('resize', queueSize); if (raf) cancelAnimationFrame(raf); };
-  }, [stickyTop]);
+  // INBOX_REDESIGN:BEGIN work area (replaces the old sticky + negative-margin sizing that slid over the footer)
+  const { regionRef, stickyTop } = useWorkAreaSize();
+  // INBOX_REDESIGN:END work area
 
   const rowEl = (id: string) => listRef.current?.querySelector<HTMLElement>(`[data-doc-id="${CSS.escape(id)}"]`) ?? null;
   /** Scrolls only the list's own column, never the page, so the selected row is in view. */
@@ -1016,7 +1040,8 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
           </div>
         )}
 
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+        <InboxToolsToggle open={toolsOpen} onToggle={() => setToolsOpen((v) => !v)} controls="inbox-tools" />{/* INBOX_REDESIGN: the controls below are unchanged, only folded away */}
+        <div id="inbox-tools" className={toolsOpen ? 'flex flex-wrap items-center gap-x-5 gap-y-2' : 'hidden'}>
           {work.hasShop && <WorkFilterControl choice={work.choice} onChange={work.setChoice} showHint={work.showHint} />}
           <label className="inline-flex items-center gap-2 min-h-[44px] text-body text-ink-2 cursor-pointer">
             <input type="checkbox" className="w-5 h-5" checked={hideShopRecords} onChange={toggleHideShopRecords} aria-label="Hide company files" />
@@ -1036,6 +1061,11 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
                 {recheckAllBusy ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Search className="w-4 h-4" aria-hidden="true" />} {RECHECK_ALL_LABEL}
               </button>
               {!canAdmin && <AskAdminNote />}
+              {canAdmin && (
+                <button type="button" className="dw-btn-tertiary !min-h-[44px] !py-1.5" disabled={finishBusy || recheckAllBusy} title={FINISH_AI_TITLE} onClick={() => void runFinishAi()}>
+                  {finishBusy ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <Sparkles className="w-4 h-4" aria-hidden="true" />} {FINISH_AI_LABEL}
+                </button>
+              )}
             </div>
           )}
           {filter === 'attention' && setAsideCount > 0 && (
@@ -1047,6 +1077,7 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
           <span className="hidden lg:inline text-caption text-ink-3 lg:ml-auto">Tip: j / k to move, Enter to open</span>
         </div>
         {recheckAllMsg && <p className="text-caption text-ink-3">{recheckAllMsg}</p>}
+        {finishMsg && <p className="text-caption text-ink-3">{finishMsg}</p>}
         {resortMsg && (
           <p className="text-caption text-ink-3">
             {resortMsg}
@@ -1163,10 +1194,10 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
           </div>
         )}
 
-        <div className="lg:!-mb-40">
+        <div>
         <div
           ref={regionRef}
-          className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-6 items-start lg:sticky lg:top-[var(--dw-sticky-top)]"
+          className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-6 items-start sticky top-[var(--dw-sticky-top)]"
           style={{ ['--dw-sticky-top' as string]: `${stickyTop}px` }}
         >
           {/* Desktop: the list scrolls inside its own column and the detail stays pinned beside it,
@@ -1174,7 +1205,7 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
           <div
             ref={listRef}
             data-testid="needs-list"
-            className="min-w-0 border border-line rounded-lg bg-surface lg:max-h-[var(--dw-col-h)] lg:overflow-y-auto lg:overscroll-contain"
+            className="min-w-0 border border-line rounded-lg bg-surface max-h-[var(--dw-col-h)] overflow-y-auto overscroll-contain"
           >
             {queue.length === 0 ? (
               <div className="px-4 py-8 text-center">
@@ -1182,6 +1213,20 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
                 <p className="mt-2 text-ink-2">Nothing here. The queue is clear.</p>
               </div>
             ) : (
+              filter === 'todo' ? (
+                <InboxTriage
+                  sections={triageSecs}
+                  openKey={openKey}
+                  onOpenKey={(k) => { setChosenGroup(k); setCap(LIST_INITIAL_ROWS); const first = triageSecs.find((sec) => sec.key === k)?.items[0]; if (first && isDesktop) openDocument(first.doc.id); }}
+                  cap={cap}
+                  step={LIST_STEP_ROWS}
+                  onShowMore={() => setCap((c) => c + LIST_STEP_ROWS)}
+                  activeId={activeInQueue ? doc?.id : undefined}
+                  fallbackFocusId={flatIds[0]}
+                  onSelect={selectRow}
+                  lookAgain={canAdmin && !REVIEW_IS_DEMO_ONLY ? { busy: recheckAllBusy, run: (ids) => void runRecheckAll(ids) } : undefined}
+                />
+              ) : (
               <NeedsYouList
                 sectionAction={(filter === 'gaps' || filter === 'attention') && canAdmin && !REVIEW_IS_DEMO_ONLY ? (sec) => (sec.key.startsWith('missing:') ? { label: LOOK_AGAIN_LABEL(sec.items.length), busy: recheckAllBusy, run: () => void runRecheckAll(sec.items.map((r) => r.doc.id)) } : null) : undefined}
                 sections={sections}
@@ -1193,6 +1238,7 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
                 onShowMore={() => setCap((c) => c + LIST_STEP_ROWS)}
                 step={LIST_STEP_ROWS}
               />
+              )
             )}
           </div>
 
@@ -1207,8 +1253,6 @@ export function ReviewBody({ filter, onFilterChange, onCounts }: ReviewBodyProps
             </div>
           )}
         </div>
-        {/* Slack below the pinned area so scrolling to the footer without the columns sliding under the app header. */}
-        <div className="hidden lg:block h-40 pointer-events-none" aria-hidden="true" />
         </div>
       </div>
       {sheetShown && docPanel && createPortal(
@@ -1547,6 +1591,7 @@ function DocPanel({ doc, conflicts, onPreview, onCorrect, onClassify, onLink, on
               ))}
             </div>
           )}
+          <FieldSuggestions docId={doc.id} onChanged={() => void loadGraphFromServer()} />
           {missing.length > 0 && (
             <div className="rounded-lg border border-warn/40 bg-warn-bg dark:bg-forest-800 p-3 space-y-3">
               <p className="flex items-center gap-2 text-warn-ink dark:text-brass-200 font-medium"><AlertTriangle className="w-4 h-4" aria-hidden="true" /> Missing information — fill in the highlighted fields to continue.</p>

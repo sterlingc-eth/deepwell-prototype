@@ -6,8 +6,11 @@
   "env": {},
   "functions": {
     "api/ask.js": { "includeFiles": "api/_lib/{wording/*.json,dql/learned/*.json,dql/reader-ml/data/*,dql/reader-v2/data/*,dql/reader-v2/vendor/ort/*}" },
+    "api/read-document.js": { "includeFiles": "node_modules/zxing-wasm/dist/reader/zxing_reader.wasm" },
+    "api/extract.js": { "includeFiles": "node_modules/zxing-wasm/dist/reader/zxing_reader.wasm" },
+    "api/inngest.js": { "includeFiles": "node_modules/zxing-wasm/dist/reader/zxing_reader.wasm" },
     "api/review.js": { "includeFiles": "test-docs/scorecard/exam.json" },
-    "api/account.js": { "includeFiles": "test-docs/scorecard/exam.json" }
+    "api/account.js": { "includeFiles": "{test-docs/scorecard/exam.json,node_modules/zxing-wasm/dist/reader/zxing_reader.wasm}" }
   },
   "redirects": [
     { "source": "/download", "destination": "/get", "permanent": false },
@@ -100,6 +103,10 @@
     {
       "path": "/api/account?action=demo&op=reset-all",
       "schedule": "5 10 * * *"
+    },
+    {
+      "path": "/api/account?action=demo-try&op=sweep",
+      "schedule": "23 * * * *"
     }
   ],
   "headers": [

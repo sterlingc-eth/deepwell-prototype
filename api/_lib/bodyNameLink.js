@@ -357,7 +357,8 @@ export function findCustomersInBody(pages, customers, opts = {}) {
   const strong = legacy ? all : all.filter((m) => m.valueHit || (m.nameHit && m.addrHit));
   const basisOf = (m) => (m.valueHit && m.addrHit ? "name-value+address" : m.valueHit ? "name-value" : m.nameHit && m.addrHit ? "name+address" : m.nameHit ? "full-name" : "address");
   const toMatch = (m) => ({ customerId: m.customerId, name: m.name, basis: legacy ? (m.nameHit && m.addrHit ? "full-name+address" : m.nameHit ? "full-name" : "address") : basisOf(m), page: pageNo });
-  const cand = (list) => list.map(({ customerId, name }) => ({ customerId, name }));
+  // `strong` is recorded on a candidate that meets the R6 rule (name AND street, or the name as a customer-label value), so a stored suggestion says how good its evidence was. Older stored suggestions have no flag = weak.
+  const cand = (list) => list.map((m) => ({ customerId: m.customerId, name: m.name, ...(!legacy && (m.valueHit || (m.nameHit && m.addrHit)) ? { strong: true } : {}) }));
   if (legacy) {
     if (all.length === 1) return { status: "unique", matches: all.map(toMatch), candidates: cand(all), page: pageNo };
     if (all.length > 1) return { status: "ambiguous", matches: all.map(toMatch), candidates: cand(all), page: pageNo };
@@ -398,7 +399,7 @@ export const LINK_SUGGESTION_ACTION = "recheck.link_suggestion";
 
 /** Idempotent: writes a row only when the newest one differs. Empty/null candidates write a "cleared" row only if a live suggestion exists. */
 export async function setLinkSuggestion(db, documentId, candidates) {
-  const list = (candidates ?? []).slice(0, 3).map((c) => ({ id: c.customerId ?? c.id, name: c.name }));
+  const list = (candidates ?? []).slice(0, 3).map((c) => ({ id: c.customerId ?? c.id, name: c.name, ...(c.strong === true ? { strong: true } : {}) })); // strong = R6 evidence (name+street, or the name as a customer-label value); weak-branch candidates never carry it
   const next = JSON.stringify(list);
   const cur = await db.raw(`SELECT changes FROM audit_log WHERE resource_id = $1::uuid AND action = $2::text AND tenant_id = ${TENANT} ORDER BY created_at DESC LIMIT 1`, [documentId, LINK_SUGGESTION_ACTION]);
   const last = cur.rows?.[0] ? JSON.stringify(cur.rows[0].changes?.candidates ?? []) : "[]";

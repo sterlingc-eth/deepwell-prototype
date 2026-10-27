@@ -20,7 +20,15 @@ async function loadPdfPages() {
     return null;
   }
 }
-import { isTextLayerReadEnabled } from "./modelAvoidance/switches.js";
+import { isTextLayerReadEnabled, isLicenseBarcodeEnabled } from "./modelAvoidance/switches.js";
+// License barcode lane: the AAMVA PDF417 on the back of a driver licence holds the fields exactly (no model, no OCR). Lazy and fail-soft like
+// the vision-lane helpers: a missing decoder package means "no barcode read", never a broken ingest.
+async function loadLicenseBarcode() {
+  try { return await import("./modelAvoidance/licenseBarcode.js"); } catch (err) {
+    console.warn(`readDocument: license-barcode lane unavailable (${err?.message}); reading as before`);
+    return null;
+  }
+}
 // Word / Excel / CSV: read in-process (no model, no cost). decodeText lives with the readers so both share one copy.
 import { readOfficeFile, extOf, decodeText, REFUSED_OFFICE_EXT } from "./office/index.js";
 // The ONE accepted-types sentence (Engineer B's allow-list module) so every message says the same thing.
@@ -505,8 +513,31 @@ export async function readPdfOrImage(bytes, contentType, ctx, startedAt) {
   // PDF_PER_PAGE=0 restores the all-or-nothing per-file text layer (kill switch for the mixed-PDF split).
   const perPage = process.env.PDF_PER_PAGE !== "0";
   const scan = {}; // the text-layer reader's parse, reused below so the file is scanned once
-  const layer = isPdf && isTextLayerReadEnabled() ? readPdfTextLayer(bytes, { perPage, out: scan, ...(oversize ? { budgetMs: 8_000 } : {}) }) : null;
+  let layer = isPdf && isTextLayerReadEnabled() ? readPdfTextLayer(bytes, { perPage, out: scan, ...(oversize ? { budgetMs: 8_000 } : {}) }) : null;
   const tooLarge = () => new IngestError("File is too large to extract in one pass", 413);
+
+  // License barcode lane (free, exact): image pages / scanned PDF pages are tried for an AAMVA PDF417 first. A page whose barcode decodes
+  // AND passes the strict AAMVA parse becomes a text page (model "aamva-barcode") and is not sent to the model; every other page, and every
+  // file with no valid barcode, goes through exactly the code below as before. LICENSE_BARCODE=0 switches the lane off.
+  let barcodeUsed = 0;
+  if (isLicenseBarcodeEnabled() && !(layer?.ok && !layer.mixed) && (isPdf || bytes.length <= 40 * 1024 * 1024)) {
+    const bc = await loadLicenseBarcode();
+    const lib = bc && isPdf ? await loadPdfPages() : null;
+    const only = layer?.ok && layer.mixed ? layer.skipped.map((x) => x.page_no) : null;
+    const found = bc && (!isPdf || lib) ? await bc.readLicenseBarcodePages(bytes, contentType, { parsed: scan.parsed, pdfLib: lib, onlyPages: only }) : null;
+    if (found) {
+      const bcPages = [...found.pages].map(([page_no, v]) => ({ page_no, text: v.text, model: "aamva-barcode", confidence: 1 }));
+      if (!isPdf) return { pages: bcPages, method: "text", readSource: "aamva-barcode" };
+      const digital = layer?.ok ? layer.pages.map((p) => ({ ...p, model: "pdf-text-layer", confidence: 1 })) : [];
+      const have = new Set([...digital.map((p) => p.page_no), ...bcPages.map((p) => p.page_no)]);
+      const need = [];
+      for (let n = 1; n <= found.pageCount; n++) if (!have.has(n)) need.push(n);
+      const all = [...digital, ...bcPages].sort((a, b) => a.page_no - b.page_no);
+      if (!need.length) return { pages: all, method: "text", readSource: "aamva-barcode" };
+      barcodeUsed = bcPages.length;
+      layer = { ok: true, mixed: true, pages: all, skipped: need.map((page_no) => ({ page_no })) };
+    }
+  }
 
   if (layer?.ok && !layer.mixed) {
     return { pages: layer.pages.map((p) => ({ ...p, model: "pdf-text-layer", confidence: 1 })), method: "text", readSource: "pdf-text-layer" };
@@ -514,7 +545,7 @@ export async function readPdfOrImage(bytes, contentType, ctx, startedAt) {
 
   if (layer?.ok && layer.mixed) {
     const need = layer.skipped.map((x) => x.page_no);
-    const digital = layer.pages.map((p) => ({ ...p, model: "pdf-text-layer", confidence: 1 }));
+    const digital = layer.pages.map((p) => ({ ...p, model: p.model ?? "pdf-text-layer", confidence: 1 }));
     const lib = await loadPdfPages();
     const sub = lib ? lib.buildPdfSubset(lib.openPdf(bytes, { budgetMs: 8_000, parsed: scan.parsed }), need, { shrink: oversize }) : { ok: false };
     let visionPages;
@@ -525,7 +556,7 @@ export async function readPdfOrImage(bytes, contentType, ctx, startedAt) {
       visionPages = (await extractWithClaude(bytes, contentType, ctx, startedAt, { onlyPages: need })).filter((p) => need.includes(p.page_no));
     } else throw tooLarge();
     const pages = [...digital, ...visionPages].sort((a, b) => a.page_no - b.page_no);
-    return { pages, method: "model", readSource: `pdf-mixed:${digital.length}text+${need.length}model` };
+    return { pages, method: "model", readSource: barcodeUsed ? `pdf-mixed:${digital.length - barcodeUsed}text+${barcodeUsed}barcode+${need.length}model` : `pdf-mixed:${digital.length}text+${need.length}model` };
   }
 
   let readSource = layer && !layer.ok ? `model:${String(layer.reason).slice(0, 40)}` : null;
@@ -797,6 +828,12 @@ export async function recordIngestFailure(ctx, documentId, error) {
  * this build does not own; this wrapper is defense in depth so a change over
  * there can never turn a successful transcription into a failed ingestion. */
 async function recordUsageSafely(ctx, usage) {
+  // Public "Try your own documents" demo (api/_lib/demo/tryown): there is no tenant, so usage goes to the demo's own spend
+  // counter through ctx.onUsage and NEVER to recordModelCall (which writes tenant usage rows).
+  if (typeof ctx?.onUsage === "function") {
+    try { await ctx.onUsage(usage); } catch (err) { console.error("readDocument: demo usage hook failed:", err?.name); }
+    return;
+  }
   try {
     await recordModelCall(ctx, usage);
   } catch (err) {
@@ -959,7 +996,11 @@ async function callTranscribe({ model, bytes, contentType, timeoutMs, pageFilter
  * at all.
  */
 export async function extractWithClaude(bytes, contentType, ctx, startedAt, opts = {}) {
-  const { fast, strong, legacy } = resolveTranscribeModels();
+  // ctx.haikuOnly (public demo): ONE Haiku call per file, no escalation pass, whatever the TRANSCRIBE_MODEL* environment says.
+  if (ctx?.haikuOnly && !/haiku/i.test(String(ctx.model ?? ""))) throw new IngestError("The demo reads with Haiku only", 500);
+  const { fast, strong, legacy } = ctx?.haikuOnly
+    ? { fast: ctx.model, strong: ctx.model, legacy: true }
+    : resolveTranscribeModels();
   // `pageMap` (optional): `bytes` is a subset PDF whose Nth page is page pageMap[N-1] of the real document. Everything inside this
   // function works in the subset's own numbering ("local"); the pages it returns are renumbered to the real ones on the way out.
   const pageMap = Array.isArray(opts.pageMap) ? opts.pageMap : null;

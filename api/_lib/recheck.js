@@ -105,7 +105,8 @@ export async function recheckDocumentTx(db, documentId, { actorClerkId = null, s
 
   // Re-check-all round 2 (D4): the server's own twin of the browser's isSetAside - a VOID paper or a copy is never linked and never
   // checked automatically, whatever the caller (the Inbox button, the nightly sweep, Re-check this document, Verify with AI, a direct call).
-  const setAside = isSetAsidePaper({ filename: doc.original_filename ?? null, text: pages.slice(0, 2).map((p) => p.text ?? "").join("\n") });
+  const setAside = rows.some((r) => r.field_key === "_set_aside" && String(r.value ?? "").trim()) || isSetAsidePaper({ filename: doc.original_filename ?? null, text: pages.slice(0, 2).map((p) => p.text ?? "").join("\n") });
+  // (a "_set_aside" row is what a person's one-click "set aside these copies" on an import writes; see importAutopilot.js)
   // D6: a label-read customer_name must not contradict the customer the paper is ALREADY linked to (a person or an earlier pass chose it).
   // The fact is simply not added (insert-only stays insert-only); the paper keeps its link and the skip is written to the audit entry.
   const skippedConflict = [];

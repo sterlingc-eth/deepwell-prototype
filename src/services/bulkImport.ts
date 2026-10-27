@@ -514,9 +514,16 @@ export interface BulkImportCallbacks {
 export interface BulkImportOptions {
   concurrency?: number;
   signal?: AbortSignal;
+  /** Import id. When omitted, a drop of IMPORT_MIN_FILES or more files gets a new one so the Inbox can show it as an import. */
+  batchId?: string;
 }
 
+/** Same threshold as the server's IMPORT_MIN_DOCS: a smaller drop is just a few papers, not an import job. */
+export const IMPORT_MIN_FILES = 20;
+
 export interface BulkImportHandle {
+  /** The import id the files were tagged with, or null for a small drop. */
+  batchId: string | null;
   /** Resolves with the final state of every file once the run stops (finished, cancelled, or daily-capped). */
   result: Promise<BulkFileState[]>;
   cancel: () => void;
@@ -532,11 +539,12 @@ export interface BulkImportHandle {
  */
 async function presignGroup(
   group: { source: WalkedFile; file: File; sha256: string }[],
-  signal: AbortSignal
+  signal: AbortSignal,
+  batchId: string | null = null
 ): Promise<PresignResultItem[] | null> {
   try {
     return await requestUploadUrlsBatch(
-      group.map((g) => ({ filename: g.source.path, sha256: g.sha256, contentType: g.file.type || undefined, sizeBytes: g.file.size })),
+      group.map((g) => ({ filename: g.source.path, sha256: g.sha256, contentType: g.file.type || undefined, sizeBytes: g.file.size, ...(batchId ? { batchId } : {}) })),
       signal
     );
   } catch (err) {
@@ -569,6 +577,8 @@ export function startBulkImport(
   const emit = () => callbacks.onState?.(states.slice());
   const gate = new RateGate(signal);
   const dailyCap = { hit: false, message: 'Daily upload limit reached' };
+  const acceptable = sources.filter((s) => classifyEntry({ path: s.path, isDir: false, sizeBytes: s.sizeBytes }).accept).length;
+  const batchId: string | null = opts.batchId ?? (acceptable >= IMPORT_MIN_FILES && typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : null);
 
   const result = (async (): Promise<BulkFileState[]> => {
     const workIndexes: number[] = [];
@@ -628,7 +638,7 @@ export function startBulkImport(
 
       let presignResults: PresignResultItem[] | null;
       try {
-        presignResults = await presignGroup(prepared, signal);
+        presignResults = await presignGroup(prepared, signal, batchId);
       } catch (err) {
         if (isDailyCapError(err) || isPlanLimitError(err)) {
           dailyCap.hit = true;
@@ -656,7 +666,7 @@ export function startBulkImport(
         async (i, groupPos) => {
           const p = prepared[groupPos] as { source: WalkedFile; file: File; sha256: string };
           const firstResult = presignResults?.[groupPos] ?? null;
-          await uploadPresigned(p.source, p.file, p.sha256, firstResult, states, i, emit, gate, signal, dailyCap);
+          await uploadPresigned(p.source, p.file, p.sha256, firstResult, states, i, emit, gate, signal, dailyCap, batchId);
         },
         concurrency,
         signal
@@ -682,7 +692,7 @@ export function startBulkImport(
     return states;
   })();
 
-  return { result, cancel: () => controller.abort() };
+  return { batchId, result, cancel: () => controller.abort() };
 }
 
 /**
@@ -700,7 +710,8 @@ async function uploadPresigned(
   emit: () => void,
   gate: RateGate,
   signal: AbortSignal,
-  dailyCap: { hit: boolean; message: string }
+  dailyCap: { hit: boolean; message: string },
+  batchId: string | null = null
 ): Promise<void> {
   const set = (patch: Partial<BulkFileState>) => {
     states[index] = { ...(states[index] as BulkFileState), ...patch };
@@ -723,7 +734,7 @@ async function uploadPresigned(
       const presign: PresignResultItem =
         attempt === 1 && firstPresign
           ? firstPresign
-          : await requestUploadUrl({ filename: source.path, sha256, contentType: file.type || undefined, sizeBytes: file.size }, signal);
+          : await requestUploadUrl({ filename: source.path, sha256, contentType: file.type || undefined, sizeBytes: file.size, ...(batchId ? { batchId } : {}) }, signal);
       if (presign.error) throw new IngestHttpError(presign.error, presign.status ?? 500, presign);
 
       if (!presign.alreadyUploaded && presign.uploadUrl) {

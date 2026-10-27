@@ -33,6 +33,7 @@ const KIND_TYPE = { mec: "license-certification", cpr: "license-certification", 
 
 /** An examiner's title or credential is evidence of a person: "Pat R Sample, MD", "Dr. Pat Sample", "Pat Sample M.D.". */
 const EXAMINER_CRED = /,\s*[A-Za-z.-]{2,6}$|\s(?:M\.?D\.?|D\.?O\.?|D\.?C\.?|P\.?A\.?(?:-C)?|N\.?P\.?|APRN|DNP|DDS|DMD)$|^(?:Dr|Prof)\.?\s/;
+const BARCODE_PAGE = /^\[aamva-pdf417 exact read\]\nDRIVER LICENSE$/m;
 const collapse = (s) => String(s ?? "").replace(/\s+/g, " ").trim();
 const WORD = "[a-z'’.]+";
 const PLACEHOLDER = /^(?:n\/?a|none|tbd|unknown|redacted|x{3,}|\*{3,}|[-_.#█▇■□\s]+|\[?redacted\]?|signature|see\s+(?:above|below))$/i;
@@ -43,7 +44,9 @@ const nameVal = (v, { kind = "person", titleLines = [], maxCore = 4, fullText = 
   const r = nameShape(v, { kind, titleLines, maxCore });
   if (!r.ok) return null;
   // round 5: a name is believed only with positive evidence (a real given name, or printed twice); an examiner's credential / title also counts
-  if (fullText != null && !hasNameEvidence(r.value, fullText, { onLabel: onLabel && kind === "person", strong }) && !(kind === "examiner" && EXAMINER_CRED.test(r.value))) return null;
+  // a name read from the licence's own AAMVA barcode (licenseBarcode.js) is exact: it needs no corroboration (the shape check above still applies)
+  const fromBarcode = kind === "person" && fullText != null && BARCODE_PAGE.test(fullText);
+  if (!fromBarcode && fullText != null && !hasNameEvidence(r.value, fullText, { onLabel: onLabel && kind === "person", strong }) && !(kind === "examiner" && EXAMINER_CRED.test(r.value))) return null;
   return r.value;
 };
 const numberVal = (v) => {

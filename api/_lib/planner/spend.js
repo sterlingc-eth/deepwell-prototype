@@ -69,6 +69,11 @@ export const ROUTE_BUCKETS = Object.freeze({
   // sonnetAllowed, which returns "disabled" whenever DONOVAN_ESCALATION=0, and turning Sonnet escalation off
   // must never silently turn the support assistant's cap into "always denied".
   support: { bucket: 'support_usd_micro', envVar: 'SUPPORT_DAILY_USD', defaultUsd: 0.5 },
+  // AI-finish pass (api/_lib/aiFinish.js): Haiku fills the facts the free reader left open. This is its per-tenant DAILY ceiling; the
+  // plan-sized MONTHLY budget lives in aiFinish.js (same rate_limit_windows table, window = first of the month). Internal only: no
+  // customer-facing screen shows a dollar figure. Read through sonnetSpentTodayUsd (not assertDailySpend) so DONOVAN_ESCALATION=0 cannot
+  // switch this cap into "always denied".
+  aiFinish: { bucket: 'ai_finish_usd_micro', envVar: 'AI_FINISH_DAILY_USD', defaultUsd: 1.5 },
 });
 
 /** This route's daily $ cap: its own env var if set (and a valid non-negative number), else its default. */

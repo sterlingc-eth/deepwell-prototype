@@ -1,0 +1,28 @@
+/** Inbox redesign (2026-10-26): every new customer-facing string of the triage list, in one place. */
+/** PROPOSED wording, awaiting owner approval (INBOX_REDESIGN_REPORT.md lists every string). */
+export const TRIAGE_TEXT = {
+  summary: (total: number) => (total === 0 ? 'All clear' : `${total} to clear`),
+  summarySplit: (needYou: number, ready: number) => `${needYou} need you · ${ready} ready to approve`,
+  empty: 'Nothing to clear. New papers show up here.',
+  link: 'Link',
+  customer: (name: string) => `Customer: ${name}`,
+  approve: 'Approve',
+  linkAll: (n: number) => `Link all ${n} with a clear match`,
+  approveAll: (n: number) => `Approve all ${n} that passed checks`,
+  confirmLinkTitle: (n: number) => `Link ${n} ${n === 1 ? 'paper' : 'papers'}?`,
+  confirmLinkBody: 'The page of each paper names this customer clearly (name and address, or the exact name as the customer). Each is linked to its own customer. You can undo this right after.',
+  confirmApproveTitle: (n: number) => `Approve ${n} ${n === 1 ? 'paper' : 'papers'}?`,
+  confirmApproveBody: 'Every check passed on each of these. No value anyone typed or confirmed is changed. You can undo this right after.',
+  cancel: 'Cancel',
+  working: (done: number, total: number) => `${done} of ${total}...`,
+  linkedOne: (name: string) => `Linked to ${name}.`,
+  linkedMany: (n: number) => `Linked ${n} ${n === 1 ? 'paper' : 'papers'}.`,
+  partial: (done: number, failed: number) => `${done} saved, ${failed} could not be saved. Nothing half-done: refresh and try those again.`,
+  approvedOne: 'Approved.',
+  approvedMany: (n: number) => `Approved ${n} ${n === 1 ? 'paper' : 'papers'}.`,
+  undo: 'Undo',
+  undone: (n: number, left: number, failed: number) => `Undone: ${n} back as they were.${left ? ` ${left} left as they are because they changed since.` : ''}${failed ? ` ${failed} could not be undone; refresh and check them.` : ''}`,
+  showMore: (n: number) => `Show ${n} more`,
+  shortcuts: 'j / k move · a do it · u undo',
+  more: (n: number) => `+${n} more`,
+};

@@ -1059,6 +1059,10 @@ export const FIELD_EXTRACT_SEGMENT = 'field-extract';
  * `method: 'recheck'` (facets.mapping_method is CHECK-constrained, segment_id is not). Swept by the same
  * replace-on-re-extraction as FIELD_EXTRACT_SEGMENT, so a later full re-read converges instead of stacking. */
 export const FIELD_RECHECK_SEGMENT = 'field-recheck';
+/** AI-finish pass (api/_lib/aiFinish.js): facets written from a Claude answer whose exact quote was found on the page. This is the
+ * "filled by AI" provenance marker (same idea as FIELD_RECHECK_SEGMENT: facets.mapping_method is CHECK-constrained, segment_id is not).
+ * Swept by a later full re-extraction like the other two extractor segments. */
+export const FIELD_AI_SEGMENT = 'field-ai';
 
 /**
  * Collapse whitespace and refuse a value that is only punctuation or
@@ -2886,11 +2890,11 @@ function makeStore(db, tenantId) {
             AND source_facet_id IN (
                   SELECT id FROM facets
                    WHERE document_id = $1 AND ${TENANT} AND segment_id = ANY($2::text[]))`,
-        [documentId, [FIELD_EXTRACT_SEGMENT, FIELD_RECHECK_SEGMENT]]
+        [documentId, [FIELD_EXTRACT_SEGMENT, FIELD_RECHECK_SEGMENT, FIELD_AI_SEGMENT]]
       );
       const delFacets = await db.query(
         `DELETE FROM facets WHERE document_id = $1 AND ${TENANT} AND segment_id = ANY($2::text[])`,
-        [documentId, [FIELD_EXTRACT_SEGMENT, FIELD_RECHECK_SEGMENT]]
+        [documentId, [FIELD_EXTRACT_SEGMENT, FIELD_RECHECK_SEGMENT, FIELD_AI_SEGMENT]]
       );
 
       // Advance the pipeline stage so the browser can tell "read but not yet

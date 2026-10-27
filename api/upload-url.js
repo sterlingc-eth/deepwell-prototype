@@ -282,7 +282,9 @@ function validateUploadBody(body) {
   if (!verdict.ok) throw new UploadValidationError(verdict.message, verdict.status);
   // The stored type is the canonical one for the extension (a Windows browser's "application/vnd.ms-excel" for a .csv becomes
   // text/csv), so the reader and the page estimate see one spelling.
-  return { filename, sha256, contentType: verdict.contentType, sizeBytes };
+  // Bulk import autopilot: a drop of many files shares one import id (a uuid made by the browser). Anything that is not a uuid is ignored, never an error.
+  const batchId = typeof body?.batchId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.batchId) ? body.batchId.toLowerCase() : null;
+  return { filename, sha256, contentType: verdict.contentType, sizeBytes, batchId };
 }
 
 /**
@@ -297,9 +299,10 @@ function validateUploadBody(body) {
  * @throws {StorageUnavailableError} when R2 is not configured
  */
 async function createUploadUrlTx(db, validated, auth) {
-  const { filename, sha256, contentType, sizeBytes } = validated;
+  const { filename, sha256, contentType, sizeBytes, batchId } = validated;
   const key = objectKey(db.tenantId, sha256, filename);
   const doc = await db.createDocument({
+    batch_id: batchId ?? null,
     original_filename: filename,
     sha256_hash: sha256,
     file_size_bytes: sizeBytes,

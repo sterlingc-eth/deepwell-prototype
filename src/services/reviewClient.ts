@@ -658,9 +658,60 @@ export interface DonovanScores {
 }
 
 /** A paper the page hints at (weak evidence) but did not link: the customers a person may pick. Not a fact. */
-export interface LinkSuggestionRow { document_id: string; candidates: { id: string; name: string }[] }
+/** `strong` = the page evidence meets the R6 linking rule (name AND street, or the exact name as a customer-label value). Only strong suggestions may be linked in bulk. */
+export interface LinkSuggestionRow { document_id: string; candidates: { id: string; name: string; strong?: boolean }[] }
+
+/** An open AI-finish suggestion: one value (or the two readings of an ambiguous date) with the exact quote it came from. */
+export interface FieldSuggestion { document_id: string; key: string; field_key: string; label: string; value?: string; options?: string[]; quote: string; page_no: number | null }
+
+// ---- Bulk import autopilot (api/_lib/importAutopilot.js). The server groups the papers; the browser only shows and presses.
+export type ImportDecisionKind = 'link-suggested' | 'create-customer' | 'use-invoice-date' | 'set-aside-copies' | 'choose-type' | 'file-passed';
+export interface ImportCounts { total: number; filed: number; filedAutomatically: number; filedByPerson: number; reading: number; filing: number; needYou: number; failed: number; setAside: number; eligible: number; inProgress: number }
+export interface ImportSettings { autoFileImports: boolean; autoFileSingles: boolean; pausedBatches: string[] }
+export interface ImportDecision { id: string; kind: ImportDecisionKind; params: { customerId?: string; customerName?: string; name?: string; options?: string[] }; count: number; samples: { documentId: string; name: string; typeId: string | null; note: string }[]; documentIds: string[] }
+export interface ImportPlan {
+  batchId: string | null; singles: boolean; settings: ImportSettings; autoFileOn: boolean; counts: ImportCounts;
+  summary: { filedAutomatically: number; decisions: number; lookAt: number };
+  decisions: ImportDecision[];
+  lookAt: { count: number; reasons: { reason: string; count: number }[]; samples: { documentId: string; name: string; typeId: string | null; reason: string }[]; documentIds: string[] };
+  asOf: string;
+}
+export interface ImportListItem { batchId: string; total: number; filed: number; startedAt: string; lastAt: string; paused: boolean }
+export interface ImportApplyResult { applied: number; skipped: { documentId: string; reason: string }[]; runId: string; customerId?: string; filed?: number }
+export interface ImportUndoResult { undone: number; restored: number; unfiled: number; left: number; customersRemoved: number; more: boolean }
 
 export const reviewClient = {
+  /** Bulk import autopilot: the recent imports (20 papers or more in one drop) and the tenant settings. */
+  importList() {
+    return postJson<{ imports: ImportListItem[]; settings: ImportSettings }>({ action: 'importList' });
+  },
+  importStatus(batchId: string) {
+    return postJson<{ batchId: string; settings: ImportSettings; autoFileOn: boolean; counts: ImportCounts; autoFiledUndoable: number; asOf: string }>({ action: 'importStatus', batchId });
+  },
+  importPlan(batchId: string, fresh = false) {
+    return postJson<ImportPlan>({ action: 'importPlan', batchId, fresh });
+  },
+  /** Read the "File papers automatically when every check passes" setting, or (owner/admin) change it. */
+  importSettings(patch?: { autoFileImports?: boolean; autoFileSingles?: boolean }) {
+    return postJson<ImportSettings>({ action: 'importSettings', ...(patch ? { set: true, ...patch } : {}) });
+  },
+  /** File one chunk (<= 200) of the papers that pass every check. Call again while remaining > 0. */
+  importAutoFile(batchId: string) {
+    return postJson<{ filed: number; skipped: number; remaining: number; off: boolean; runId: string | null }>({ action: 'importAutoFile', batchId });
+  },
+  importUndoAutoFile(batchId: string) {
+    return postJson<{ undone: number; more: boolean; paused: boolean }>({ action: 'importUndoAutoFile', batchId });
+  },
+  importResume(batchId: string) {
+    return postJson<{ ok: true }>({ action: 'importResume', batchId });
+  },
+  /** One click on a decision card, one chunk (<= 100 papers). Pass runId from the first chunk's answer on the rest. */
+  importApply(args: { batchId: string; kind: ImportDecisionKind; key: string; documentIds: string[]; customerId?: string; name?: string; choice?: string; by: string; runId?: string | null }) {
+    return postJson<ImportApplyResult>({ action: 'importApply', ...args });
+  },
+  importUndoDecision(batchId: string, runId: string) {
+    return postJson<ImportUndoResult>({ action: 'importUndoDecision', batchId, runId });
+  },
   /** Owner/admin: how many pages are searchable by meaning. */
   semanticStatus() {
     return postJson<SemanticStatus>({ action: 'semanticStatus' });
@@ -713,11 +764,14 @@ export const reviewClient = {
     });
   },
 
-  unlinkDocument(documentId: string, entityId: string) {
+  /** `restore` (the Inbox's Undo of a link): the stage the paper had before, and the "Link to <customer>?" suggestion to write again. */
+  unlinkDocument(documentId: string, entityId: string, restore?: { stage?: string; suggestion?: { id: string; name: string; strong?: boolean }[] }) {
     return postJson<{ document: ReviewDocument }>({
       action: 'unlinkDocument',
       documentId,
       entityId,
+      ...(restore?.stage ? { restoreStage: restore.stage } : {}),
+      ...(restore?.suggestion?.length ? { restoreSuggestion: restore.suggestion } : {}),
     });
   },
 
@@ -802,6 +856,28 @@ export const reviewClient = {
       force: true,
       ...(opts.openAll ? { openAll: true } : {}),
     });
+  },
+
+  /** AI finish (optional, staff/owner; api/_lib/aiFinish.js): one chunk (<= 20) of the papers still open goes to Haiku, which fills only
+   *  facts whose exact quote is on the page, never overwrites a person's value, never links (customers come back as one-click
+   *  suggestions). The same pass runs by itself in the nightly sweep. The reply carries no cost. */
+  aiFinish(documentIds: string[], limit = 20) {
+    return postJson<{ considered: number; processed: number; finished: number; facts: number; fieldSuggestions?: number; suggested: number; typed: number; verified: number; nothing: number; failed: number; skipped: number; stopped: 'allowance' | 'off' | 'busy' | null; leftIds: string[] }>({
+      action: 'aiFinish',
+      documentIds: documentIds.slice(0, 500),
+      limit,
+    });
+  },
+
+  /** AI-finish field suggestions (audit rows, never facts): open ones for these papers; Accept writes the value as a person's; Dismiss is final. */
+  fieldSuggestions(documentIds: string[]) {
+    return postJson<{ suggestions: FieldSuggestion[] }>({ action: 'fieldSuggestions', documentIds: documentIds.slice(0, 200) });
+  },
+  acceptFieldSuggestion(documentId: string, key: string, value: string | undefined, by: string) {
+    return postJson<{ ok: true; field_key: string; value: string }>({ action: 'acceptFieldSuggestion', documentId, key, value, by });
+  },
+  dismissFieldSuggestion(documentId: string, key: string) {
+    return postJson<{ ok: true }>({ action: 'dismissFieldSuggestion', documentId, key });
   },
 
   /** One-time owner re-sort (admin): moves documents typed Invoice/Other/Correspondence to a better type when their

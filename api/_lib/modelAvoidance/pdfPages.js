@@ -222,6 +222,46 @@ function decodeImageRGB(doc, ref) {
   return { rgb, w, h };
 }
 
+/**
+ * Barcode lane: the image XObjects a page draws (directly or through one level of form XObjects), largest first, decoded to 8-bit grey.
+ * Same refusals as decodeImageRGB (masks, SMask, unmarked CMYK, 1-bit scans ...): an image it cannot decode safely is simply not offered.
+ * @returns {{gray:Uint8Array, w:number, h:number}[]}
+ */
+export function pageImagesForBarcode(pdf, pageNo, { minEdge = 0, maxImages = 3, maxPixels = 16e6, maxFlatePixels = 70e6 } = {}) {
+  const out = [];
+  try {
+    const { doc, pages } = pdf;
+    const pg = pages[pageNo - 1];
+    if (!pg) return out;
+    const refs = [];
+    const scanRes = (resVal, depth) => {
+      const res = doc.dict(resVal);
+      const xo = res ? doc.dict(res.XObject) : null;
+      if (!xo) return;
+      for (const ref of Object.values(xo)) {
+        const d = doc.dict(ref);
+        if (!d || !ref?.r) continue;
+        if (d.Subtype === "/Image") refs.push({ ref, w: doc.num(d.Width, 0), h: doc.num(d.Height, 0), dct: filtersOf(doc, d).some((f) => f === "/DCTDecode" || f === "/DCT") });
+        else if (d.Subtype === "/Form" && depth < 1 && d.Resources !== undefined) scanRes(d.Resources, depth + 1);
+      }
+    };
+    scanRes(pg.inh.Resources, 0);
+    refs.sort((a, b) => b.w * b.h - a.w * a.h);
+    for (const r of refs) {
+      if (out.length >= maxImages) break;
+      // a JPEG costs ~25 bytes per pixel to decode (jpeg-js), a Flate raster only its raw size: they get different ceilings
+      if (Math.min(r.w, r.h) < minEdge || r.w * r.h > (r.dct ? maxPixels : maxFlatePixels)) continue;
+      const dec = decodeImageRGB(doc, r.ref);
+      if (!dec) continue;
+      const gray = new Uint8Array(dec.w * dec.h);
+      if (dec.rgba) for (let i = 0, j = 0; i < gray.length; i++, j += 4) gray[i] = (dec.rgba[j] * 77 + dec.rgba[j + 1] * 151 + dec.rgba[j + 2] * 28) >> 8;
+      else for (let i = 0, j = 0; i < gray.length; i++, j += 3) gray[i] = (dec.rgb[j] * 77 + dec.rgb[j + 1] * 151 + dec.rgb[j + 2] * 28) >> 8;
+      out.push({ gray, w: dec.w, h: dec.h });
+    }
+  } catch { /* an unreadable page offers no image */ }
+  return out;
+}
+
 /** Area-average downscale of packed RGB (stride 3) or RGBA (stride 4) to outW x outH, returned as RGBA for jpeg-js. */
 export function boxDownscale(src, stride, w, h, outW, outH) {
   const out = Buffer.allocUnsafe(outW * outH * 4);
