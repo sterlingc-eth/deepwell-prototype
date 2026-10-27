@@ -7,10 +7,16 @@
 
 export interface DemoIndustryEntry { slug: string; label: string; family: string; familyLabel: string; company: string; core: boolean }
 export interface DemoIndex { schema: number; industries: DemoIndustryEntry[] }
+export interface DemoPay { status: string; paid: number; balance: number; dueOn: string; paidOn: string | null }
+export interface DemoLine { desc: string; amount: number }
 export interface DemoDocument {
   id: string; type: string; typeLabel: string; name: string; file: string; date: string; number: string | null;
   customer: string | null; vendor: string | null; total: number | null; direction: string | null; kind: string | null; status: string | null;
-  pay: { status: string; paid: number; balance: number } | null; endsOn: string | null; fields: Array<[string, string]>; pages: string[];
+  /** A bill (invoice, statement of account): it has a payment status and counts in Billed, Collected and Open. Contracts, quotes and receipts do not. */
+  billable: boolean;
+  /** The charges on the paper. The lines add up to the subtotal; subtotal plus tax is the total. */
+  lines: DemoLine[] | null; subtotal: number | null; tax: number | null; taxRate: number | null; taxLabel: string | null;
+  pay: DemoPay | null; endsOn: string | null; fields: Array<[string, string]>; pages: string[];
 }
 export interface DemoCustomer { id: string; name: string; address: string; phone: string; email: string; docs: number }
 export interface DemoAnswer { text: string; headline: string | null; docs: string[]; page: number | null }
@@ -55,21 +61,60 @@ export function stagesAfter(fx: DemoFixture, done: number): Map<string, IngestSt
 
 // ---------------------------------------------------------------- dashboard
 const dayNum = (s: string) => Math.floor(Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10)) / 86400000);
+/** Money is added up in whole cents so nothing drifts; every figure on the dashboard comes from the documents through the functions below. */
+export const toCents = (n: number) => Math.round(n * 100);
+export const fromCents = (c: number) => c / 100;
+/** Days a bill is past its due date on the demo's own "today" (fx.demoToday, never the real clock). 0 = not yet due. */
+export function daysOverdue(d: DemoDocument, demoToday: string): number {
+  if (!d.pay || toCents(d.pay.balance) <= 0) return 0;
+  return Math.max(0, dayNum(demoToday) - dayNum(d.pay.dueOn));
+}
+export const AGING_BUCKETS = [
+  { key: 'current', label: 'Not yet due', min: 0, max: 0 },
+  { key: '1-30', label: '1 to 30 days overdue', min: 1, max: 30 },
+  { key: '31-60', label: '31 to 60 days overdue', min: 31, max: 60 },
+  { key: '61-90', label: '61 to 90 days overdue', min: 61, max: 90 },
+  { key: '90+', label: 'Over 90 days overdue', min: 91, max: Infinity },
+] as const;
+export interface DemoCustomerBilling { name: string; invoices: number; billed: number; collected: number; open: number }
+export interface DemoBilling {
+  invoices: number; billed: number; collected: number; open: number; openInvoices: number; overdue: number; overdueInvoices: number;
+  aging: Array<{ key: string; label: string; invoices: number; amount: number }>; byCustomer: DemoCustomerBilling[];
+}
+/** Billed, collected, open, overdue, the aging of what is open, and the same by customer. null when the workspace has no bills. */
+export function billingOf(docs: DemoDocument[], demoToday: string): DemoBilling | null {
+  const bills = docs.filter((d) => d.billable && d.pay && d.total != null);
+  if (!bills.length) return null;
+  const sum = (xs: DemoDocument[], f: (d: DemoDocument) => number) => xs.reduce((a, d) => a + f(d), 0);
+  const open = bills.filter((d) => toCents(d.pay!.balance) > 0);
+  const late = open.filter((d) => daysOverdue(d, demoToday) > 0);
+  const names = [...new Set(bills.map((d) => d.customer ?? d.vendor ?? 'Other'))].sort();
+  return {
+    invoices: bills.length,
+    billed: fromCents(sum(bills, (d) => toCents(d.total!))), collected: fromCents(sum(bills, (d) => toCents(d.pay!.paid))), open: fromCents(sum(open, (d) => toCents(d.pay!.balance))),
+    openInvoices: open.length, overdue: fromCents(sum(late, (d) => toCents(d.pay!.balance))), overdueInvoices: late.length,
+    aging: AGING_BUCKETS.map((b) => { const xs = open.filter((d) => { const n = daysOverdue(d, demoToday); return n >= b.min && n <= b.max; }); return { key: b.key, label: b.label, invoices: xs.length, amount: fromCents(sum(xs, (d) => toCents(d.pay!.balance))) }; }),
+    byCustomer: names.map((name) => { const xs = bills.filter((d) => (d.customer ?? d.vendor ?? 'Other') === name); return { name, invoices: xs.length, billed: fromCents(sum(xs, (d) => toCents(d.total!))), collected: fromCents(sum(xs, (d) => toCents(d.pay!.paid))), open: fromCents(sum(xs, (d) => toCents(d.pay!.balance))) }; }),
+  };
+}
 export interface DemoDashboard {
-  documents: number; customers: number; billed: number; openBalance: number; openInvoices: number;
+  documents: number; customers: number; billing: DemoBilling | null; amountsOnFile: number; amountDocuments: number;
+  /** kept for the older checks: billed and the open balance (0 when there are no bills) */
+  billed: number; openBalance: number; openInvoices: number;
   comingUp: Array<{ doc: DemoDocument; on: string; days: number }>; byType: Array<{ label: string; count: number }>; recent: DemoDocument[];
 }
 export function dashboardOf(fx: DemoFixture, ingested = fx.documents.length): DemoDashboard {
   const docs = fx.documents.slice(0, ingested);
-  const recv = docs.filter((d) => d.kind === 'invoice' && d.direction === 'receivable' && d.total != null);
-  const open = recv.filter((d) => d.pay && d.pay.balance > 0);
+  const billing = billingOf(docs, fx.demoToday);
+  const withAmount = docs.filter((d) => d.total != null);
   const today = dayNum(fx.demoToday);
   const comingUp = docs.filter((d) => d.endsOn).map((d) => ({ doc: d, on: d.endsOn as string, days: dayNum(d.endsOn as string) - today }))
     .filter((x) => x.days >= 0 && x.days <= 365).sort((a, b) => a.days - b.days).slice(0, 5);
   const counts = new Map<string, number>(); for (const d of docs) counts.set(d.typeLabel, (counts.get(d.typeLabel) ?? 0) + 1);
   return {
-    documents: docs.length, customers: new Set(docs.map((d) => d.customer).filter(Boolean)).size,
-    billed: recv.reduce((s, d) => s + (d.total ?? 0), 0), openBalance: open.reduce((s, d) => s + (d.pay?.balance ?? 0), 0), openInvoices: open.length,
+    documents: docs.length, customers: new Set(docs.map((d) => d.customer).filter(Boolean)).size, billing,
+    amountsOnFile: fromCents(withAmount.reduce((a, d) => a + toCents(d.total!), 0)), amountDocuments: withAmount.length,
+    billed: billing?.billed ?? 0, openBalance: billing?.open ?? 0, openInvoices: billing?.openInvoices ?? 0,
     comingUp, byType: [...counts.entries()].map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count),
     recent: docs.slice().sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 6),
   };

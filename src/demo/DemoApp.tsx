@@ -6,7 +6,7 @@ import { DEMO_INDEX, loadFixture } from './fixtures';
 import { TryOwn } from './TryOwn';
 import { TRYOWN_TEXT } from './tryown';
 import {
-  INGEST_STAGES, askDemo, capFirst, dashboardOf, ingestPlan, money, niceDate, niceText, nounPlural, stagesAfter,
+  INGEST_STAGES, askDemo, capFirst, dashboardOf, daysOverdue, ingestPlan, money, niceDate, niceText, nounPlural, stagesAfter,
   type DemoDocument, type DemoFixture, type DemoReply, type IngestStage,
 } from './engine';
 
@@ -124,7 +124,7 @@ export function DemoApp() {
           </>
         )}
       </main>
-      {openDoc && <DocPreview doc={openDoc.doc} page={openDoc.page} onClose={() => setOpenDoc(null)} />}
+      {openDoc && <DocPreview doc={openDoc.doc} page={openDoc.page} today={fx?.demoToday ?? ''} onClose={() => setOpenDoc(null)} />}
     </div>
   );
 }
@@ -199,7 +199,7 @@ function plan(fx: DemoFixture, id: string, st: IngestStage | undefined): string 
 
 function Tile({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
-    <div className="dw-card p-4">
+    <div className="dw-card p-4" data-tile={label}>
       <p className="dw-label text-ink-3">{label}</p>
       <p className="text-h2 font-medium mt-1">{value}</p>
       {note && <p className="text-caption text-ink-3 mt-1">{note}</p>}
@@ -209,6 +209,7 @@ function Tile({ label, value, note }: { label: string; value: string; note?: str
 
 function DashboardStep({ fx, onOpen, onNext }: { fx: DemoFixture; onOpen: (d: DemoDocument) => void; onNext: () => void }) {
   const dash = dashboardOf(fx);
+  const bill = dash.billing;
   const max = Math.max(1, ...dash.byType.map((x) => x.count));
   return (
     <section className="space-y-4" aria-labelledby="demo-dash-h">
@@ -216,12 +217,51 @@ function DashboardStep({ fx, onOpen, onNext }: { fx: DemoFixture; onOpen: (d: De
         <h2 id="demo-dash-h" className="text-h3 font-medium">Dashboard</h2>
         <button type="button" className="dw-btn dw-btn-primary min-h-11 ml-auto" onClick={onNext}><MessageSquare className="w-4 h-4" aria-hidden="true" /> Ask Donovan</button>
       </div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* Every figure below comes from the documents through dashboardOf: Billed = Collected + Open, Open = the aging rows = the customer rows. */}
+      <div className={`grid grid-cols-2 gap-3 ${bill ? 'lg:grid-cols-5' : 'lg:grid-cols-3'}`}>
         <Tile label="Documents" value={String(dash.documents)} note={`${dash.byType.length} kinds of documents`} />
         <Tile label={capFirst(nounPlural(fx.customerNoun))} value={String(dash.customers)} note="matched automatically" />
-        <Tile label="Billed" value={money(dash.billed)} note="across invoices on file" />
-        <Tile label="Open balance" value={money(dash.openBalance)} note={`${dash.openInvoices} open ${dash.openInvoices === 1 ? 'invoice' : 'invoices'}`} />
+        {bill ? (
+          <>
+            <Tile label="Billed" value={money(bill.billed)} note={`${bill.invoices} ${bill.invoices === 1 ? 'bill' : 'bills'} on file`} />
+            <Tile label="Collected" value={money(bill.collected)} note="payments received" />
+            <Tile label="Open balance" value={money(bill.open)} note={`${bill.openInvoices} open · ${money(bill.overdue)} overdue`} />
+          </>
+        ) : (
+          <Tile label="Amounts on file" value={money(dash.amountsOnFile)} note={`across ${dash.amountDocuments} documents with an amount`} />
+        )}
       </div>
+      {bill && (
+        <div className="grid lg:grid-cols-2 gap-3">
+          <div className="dw-card p-4 space-y-3">
+            <h3 className="dw-label">Open balance by age (as of {niceDate(fx.demoToday)})</h3>
+            <table className="w-full text-body" data-testid="aging">
+              <caption className="sr-only">Open balance by age</caption>
+              <tbody>
+                {bill.aging.map((a) => (
+                  <tr key={a.key} className="border-b border-line">
+                    <td className="py-1.5">{a.label}</td><td className="py-1.5 text-ink-3 text-right">{a.invoices}</td><td className="py-1.5 text-right whitespace-nowrap">{money(a.amount)}</td>
+                  </tr>
+                ))}
+                <tr><th scope="row" className="py-1.5 text-left font-medium">Open balance</th><td className="py-1.5 text-ink-3 text-right">{bill.openInvoices}</td><td className="py-1.5 text-right font-medium whitespace-nowrap">{money(bill.open)}</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div className="dw-card p-4 space-y-3 overflow-x-auto">
+            <h3 className="dw-label">Billing by {fx.customerNoun}</h3>
+            <table className="w-full text-body" data-testid="by-customer">
+              <caption className="sr-only">Billing by {fx.customerNoun}</caption>
+              <thead><tr className="text-left text-ink-3 border-b border-line"><th className="py-1.5 font-normal">{capFirst(fx.customerNoun)}</th><th className="py-1.5 font-normal text-right">Billed</th><th className="py-1.5 font-normal text-right">Collected</th><th className="py-1.5 font-normal text-right">Open</th></tr></thead>
+              <tbody>
+                {bill.byCustomer.map((c) => (
+                  <tr key={c.name} className="border-b border-line"><td className="py-1.5">{c.name}</td><td className="py-1.5 text-right whitespace-nowrap">{money(c.billed)}</td><td className="py-1.5 text-right whitespace-nowrap">{money(c.collected)}</td><td className="py-1.5 text-right whitespace-nowrap">{money(c.open)}</td></tr>
+                ))}
+                <tr><th scope="row" className="py-1.5 text-left font-medium">All {nounPlural(fx.customerNoun)}</th><td className="py-1.5 text-right font-medium whitespace-nowrap">{money(bill.billed)}</td><td className="py-1.5 text-right font-medium whitespace-nowrap">{money(bill.collected)}</td><td className="py-1.5 text-right font-medium whitespace-nowrap">{money(bill.open)}</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
       <div className="grid lg:grid-cols-2 gap-3">
         <div className="dw-card p-4 space-y-3">
           <h3 className="dw-label">Documents by kind</h3>
@@ -266,7 +306,7 @@ function DashboardStep({ fx, onOpen, onNext }: { fx: DemoFixture; onOpen: (d: De
         </div>
       </div>
       <div className="dw-card overflow-x-auto">
-        <table className="w-full text-body">
+        <table className="w-full text-body" data-testid="docs">
           <caption className="sr-only">All documents</caption>
           <thead><tr className="text-left text-ink-3 border-b border-line">
             <th className="px-3 py-2 font-normal">Document</th><th className="px-3 py-2 font-normal">{capFirst(fx.customerNoun)}</th>
@@ -279,7 +319,7 @@ function DashboardStep({ fx, onOpen, onNext }: { fx: DemoFixture; onOpen: (d: De
                 <td className="px-3 py-2 text-ink-2">{d.customer ?? d.vendor ?? '—'}</td>
                 <td className="px-3 py-2 text-ink-2 whitespace-nowrap">{niceDate(d.date)}</td>
                 <td className="px-3 py-2 text-right whitespace-nowrap">{d.total != null ? money(d.total) : '—'}</td>
-                <td className="px-3 py-2">{d.pay ? <span className={d.pay.balance > 0 ? 'dw-pill-warn' : 'dw-pill-ok'}>{d.pay.balance > 0 ? `Open ${money(d.pay.balance)}` : 'Paid'}</span> : d.status ? <span className="dw-pill-muted">{d.status}</span> : null}</td>
+                <td className="px-3 py-2">{d.pay ? <span className={d.pay.balance > 0 ? (daysOverdue(d, fx.demoToday) > 0 ? 'dw-pill-bad' : 'dw-pill-warn') : 'dw-pill-ok'}>{d.pay.balance > 0 ? `${daysOverdue(d, fx.demoToday) > 0 ? 'Overdue' : 'Open'} ${money(d.pay.balance)}` : 'Paid'}</span> : d.status ? <span className="dw-pill-muted">{d.status}</span> : null}</td>
               </tr>
             ))}
           </tbody>
@@ -321,7 +361,7 @@ function AskStep({ fx, input, setInput, asked, onAsk, onOpen }: {
           {reply.kind === 'answer' && (
             <>
               {reply.question.answer.headline && <p className="text-h2 font-medium">{niceText(reply.question.answer.headline)}</p>}
-              <p className="text-body-lg">{niceText(reply.question.answer.text)}</p>
+              <p className="text-body-lg" data-testid="answer">{niceText(reply.question.answer.text)}</p>
               {reply.question.answer.docs.length > 0 && (
                 <div className="space-y-2">
                   <h4 className="dw-label">From {reply.question.answer.docs.length === 1 ? 'this document' : `these ${reply.question.answer.docs.length} documents`}</h4>
@@ -347,7 +387,7 @@ function AskStep({ fx, input, setInput, asked, onAsk, onOpen }: {
   );
 }
 
-function DocPreview({ doc, page, onClose }: { doc: DemoDocument; page?: number; onClose: () => void }) {
+function DocPreview({ doc, page, today, onClose }: { doc: DemoDocument; page?: number; today: string; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => { ref.current?.focus(); const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [onClose]);
   return (
@@ -376,6 +416,27 @@ function DocPreview({ doc, page, onClose }: { doc: DemoDocument; page?: number; 
               {doc.total != null && <div><dt className="text-caption text-ink-3">Total</dt><dd className="text-body">{money(doc.total)}</dd></div>}
               {doc.fields.map(([k, v]) => <div key={k}><dt className="text-caption text-ink-3">{k}</dt><dd className="text-body break-words">{/^\d{4}-\d{2}-\d{2}$/.test(v) ? niceDate(v) : v}</dd></div>)}
             </dl>
+            {doc.lines && (
+              <>
+                <h3 className="dw-label pt-2">Charges</h3>
+                <dl className="space-y-1" aria-label="Charges">
+                  {doc.lines.map((l, i) => <div key={i} className="flex justify-between gap-3"><dt className="text-caption text-ink-3">{l.desc}</dt><dd className="text-body whitespace-nowrap">{money(l.amount)}</dd></div>)}
+                  {doc.tax != null && doc.subtotal != null && <div className="flex justify-between gap-3"><dt className="text-caption text-ink-3">Subtotal</dt><dd className="text-body whitespace-nowrap">{money(doc.subtotal)}</dd></div>}
+                  {doc.tax != null && <div className="flex justify-between gap-3"><dt className="text-caption text-ink-3">{doc.taxLabel} ({((doc.taxRate ?? 0) * 100).toFixed(1)}%)</dt><dd className="text-body whitespace-nowrap">{money(doc.tax)}</dd></div>}
+                </dl>
+              </>
+            )}
+            {doc.pay && doc.total != null && (
+              <>
+                <h3 className="dw-label pt-2">Payment</h3>
+                <dl className="space-y-1" aria-label="Payment">
+                  <div className="flex justify-between gap-3"><dt className="text-caption text-ink-3">Paid</dt><dd className="text-body whitespace-nowrap">{money(doc.pay.paid)}</dd></div>
+                  <div className="flex justify-between gap-3"><dt className="text-caption text-ink-3">Balance</dt><dd className="text-body whitespace-nowrap">{money(doc.pay.balance)}</dd></div>
+                  <div className="flex justify-between gap-3"><dt className="text-caption text-ink-3">Due</dt><dd className="text-body whitespace-nowrap">{niceDate(doc.pay.dueOn)}{daysOverdue(doc, today) > 0 ? `, ${daysOverdue(doc, today)} days overdue` : ''}</dd></div>
+                  {doc.pay.paidOn && <div className="flex justify-between gap-3"><dt className="text-caption text-ink-3">Last payment</dt><dd className="text-body whitespace-nowrap">{niceDate(doc.pay.paidOn)}</dd></div>}
+                </dl>
+              </>
+            )}
           </div>
         </div>
       </div>

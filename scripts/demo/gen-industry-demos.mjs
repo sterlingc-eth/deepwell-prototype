@@ -7,7 +7,7 @@
 // Every answer shown in the demo is the real Donovan reader's answer over these records (api/_lib/dql/reader-v2), checked against a gold
 // answer computed from the records. Synthetic data only: invented names, 555-01xx phones, example.com e-mail. Never written anywhere the training loop reads.
 import fs from 'node:fs'; import path from 'node:path'; import { fileURLToPath } from 'node:url';
-import { buildWorkspace, candidateQuestions, misspell, goldMatches, labelOf, hum, cap, acro, polish, DEMO_TODAY } from './demoData.mjs';
+import { buildWorkspace, candidateQuestions, misspell, goldMatches, labelOf, hum, cap, acro, polish, fmtMoney, DEMO_TODAY } from './demoData.mjs';
 import { CORE, LABELS, FAMILY_LABELS } from './industries.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -64,7 +64,8 @@ for (const s of specs) {
     id: d.id, type: d.type, typeLabel: acro(cap(hum(d.type))), name: `${acro(cap(hum(d.type)))}${d.num ? ' ' + d.num : ''}${d.cust ? ' — ' + d.cust.name : d.ext.vendor_name ? ' — ' + d.ext.vendor_name : ''}`,
     file: ws.records.documents.find((x) => x.id === d.id).original_filename, date: d.date, number: d.num, customer: d.cust?.name ?? null, vendor: d.ext.vendor_name ?? null,
     total: d.total, direction: d.spec.fin?.[1] ?? null, kind: d.spec.fin?.[0] ?? null, status: d.ext.status ?? null, pay: d.pay ?? null, endsOn: d.endsOn ?? null,
-    fields: Object.entries(d.ext).filter(([k]) => !['work_performed', 'notes'].includes(k)).map(([k, v]) => [fkLabel(k), /amount|deposit|fee|charge|price|total|cost/.test(k) && /^\d+(\.\d+)?$/.test(v) ? '$' + Number(v).toLocaleString('en-US') : v]),
+    fields: Object.entries(d.ext).filter(([k]) => !['work_performed', 'notes'].includes(k)).map(([k, v]) => [fkLabel(k), d.moneyKeys.includes(k) ? fmtMoney(v) : v]),
+    billable: d.billable, lines: d.lines, subtotal: d.subtotal, tax: d.tax, taxRate: d.taxRate, taxLabel: d.taxLabel,
     pages: d.pages,
   }));
   const customers = ws.custs.map((c) => ({ id: c.id, name: c.name, address: c.addr, phone: c.phone, email: c.email, docs: ws.docs.filter((d) => d.cust === c).length }));

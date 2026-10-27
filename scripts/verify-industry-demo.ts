@@ -76,7 +76,7 @@ for (const i of list) {
   const dash = dashboardOf(fx);
   ok(dash.documents === fx.documents.length && dash.byType.reduce((s, x) => s + x.count, 0) === fx.documents.length, `${t} dashboard counts every document once`);
   ok(dash.customers >= 3 && dash.recent.length > 0, `${t} dashboard shows customers and recent documents`);
-  const billed = fx.documents.filter((d) => d.kind === 'invoice' && d.direction === 'receivable').reduce((s, d) => s + (d.total ?? 0), 0);
+  const billed = fx.documents.filter((d) => d.billable).reduce((s, d) => s + (d.total ?? 0), 0);   // the bills only (contracts, quotes and receipts are not billed); the full money check is verify:demo-financials
   ok(Math.abs(dash.billed - billed) < 0.005 && dash.openBalance <= dash.billed + 0.005, `${t} billed and open balance add up`);
 
   /* ------------------------------------------------------------ demo ask logic */

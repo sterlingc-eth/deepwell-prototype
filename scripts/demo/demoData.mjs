@@ -31,12 +31,128 @@ const mdy = (s) => `${s.slice(5, 7)}/${s.slice(8, 10)}/${s.slice(0, 4)}`;
 const money2 = (n) => (Math.round(n * 100) / 100).toFixed(2);
 export const fmtMoney = (n) => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const addMonths = (s, m) => { const y = +s.slice(0, 4), mo = +s.slice(5, 7) - 1 + m; const d = new Date(Date.UTC(y + Math.floor(mo / 12), ((mo % 12) + 12) % 12, 1)); const dim = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate(); return n2d(Math.floor(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), Math.min(+s.slice(8, 10), dim)) / 86400000)); };
+// ---- money: every amount is handled in whole cents (integers), so sums never drift, and every dollar amount is shown as $1,234.00
+export const toC = (n) => Math.round(Number(n) * 100);
+export const fromC = (c) => c / 100;
+/** Canonical display of any dollar amount found in generated text: $5 -> $5.00, $2445 -> $2,445.00, $1,230 -> $1,230.00 */
+export const normMoney = (t) => String(t).replace(/\$(\d[\d,]*)(?:\.(\d{1,2}))?(?![\d])/g, (m, a, b) => fmtMoney(Number(a.replace(/,/g, '')) + (b ? Number('0.' + b.padEnd(2, '0')) : 0)));
+/** Documents that are bills (they get payment status, due date, aging and count in Billed / Collected / Open). The pack marks contracts, orders, claims
+ *  and citations as "invoice" too (so the reader can read their totals); those are NOT bills and are not counted as billed. */
+export const BILL_RE = /(^|-)invoice$|^guest-folio$|^draw-request$|^payment-request$|^superbill$|^banquet-event-order$|^catering-order-form$|^(rent|patient-balance|patient-ledger|client-account|family-account|charge-account|monthly-lab|monthly-billing)-statement$/;
+export const PRICED_RE = /(estimate|quote|proposal|change-order)$/;
+export const isBillable = (type, fin) => !!fin && fin[1] === 'receivable' && (fin[0] === 'invoice' || fin[0] === 'statement') && BILL_RE.test(type);
+const isPriced = (type, fin) => !!fin && fin[1] === 'receivable' && fin[0] === 'estimate' && PRICED_RE.test(type);
+const FAMILY_ITEMS = { trades_field_service: ['Labor', 'Parts and materials', 'Trip and disposal'], professional_office: ['Professional services', 'Expenses', 'Administrative fees'], food_goods_logistics: ['Goods and services', 'Delivery', 'Handling fees'] };
+const ITEMS_DEFAULT = ['Services', 'Supplies and materials', 'Fees'];
+/** Industries that charge sales tax on what they bill (invented rate); the rest bill without tax. */
+export const TAXED = new Set(['auto', 'brewery', 'feedstore', 'foodtruck', 'restaurant', 'plumbing-hvac', 'electrical', 'general-contractor', 'roofing', 'landscaping', 'poolservice', 'pestcontrol', 'petgroomco', 'photostudio', 'warehouse', 'mfgqa']);
+export const SALES_TAX_PER_MILLE = 86;     // 8.6%
+export const LODGING_TAX_PER_MILLE = 105;  // 10.5%
+const PAYTIME_TOPIC = /pay|due|term|net\b|late|overdue|interest|discount|credit|remit|balance|grace|invoice|billing/i;
+const HAS_DAYS = /\b\d+\s*(?:business\s+)?days?\b|\bnet\s*\d+|\b\d+(?:st|nd|rd|th)\b|\b(?:15|30|45)\b/i;
+const r5 = (c) => Math.round(c / 500) * 500;
+
 export const hum = (t) => String(t).replace(/[_-]+/g, ' ');
 export const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 export const pluralOf = (w) => (/[^aeiou]y$/.test(w) ? w.slice(0, -1) + 'ies' : /is$/.test(w) ? w.slice(0, -2) + 'es' : /(?:s|x|z|ch|sh)$/.test(w) ? w + 'es' : w + 's');
 const CLRE = /\{([^{}]+)\}/g;
 function fillClause(r, t, c) { return fillRaw(r, t, c).replace(/(\d+)% percent/g, '$1 percent'); }
-function fillRaw(r, t, c) { return t.replace(CLRE, (m, k) => { if (k[0] === '=') { const v = c[k.slice(1)]; return v !== undefined ? String(v) : ''; } if (c[k] !== undefined) return c[k]; let mm; if ((mm = /^n:(\d+)-(\d+)$/.exec(k))) return String(r.int(+mm[1], +mm[2])); if ((mm = /^\$:(\d+)-(\d+)$/.exec(k))) return '$' + Math.round(r.int(+mm[1], +mm[2]) / 5) * 5; if ((mm = /^pct:(\d+)-(\d+)$/.exec(k))) return r.int(+mm[1], +mm[2]) + '%'; if (k.includes('|')) return r.pick(k.split('|')); return m; }); }
+function fillRaw(r, t, c) { return t.replace(CLRE, (m, k) => { if (k[0] === '=') { const v = c[k.slice(1)]; return v !== undefined ? String(v) : ''; } if (c[k] !== undefined) return c[k]; let mm; if ((mm = /^n:(\d+)-(\d+)$/.exec(k))) return String(r.int(+mm[1], +mm[2])); if ((mm = /^\$:(\d+)-(\d+)$/.exec(k))) return '$' + Math.max(5, Math.round(r.int(+mm[1], +mm[2]) / 5) * 5); if ((mm = /^pct:(\d+)-(\d+)$/.exec(k))) return r.int(+mm[1], +mm[2]) + '%'; if (k.includes('|')) return r.pick(k.split('|')); return m; }); }
+
+
+/**
+ * Works out every dollar figure of one paper from the paper's own numbers, in whole cents:
+ *   - a paper with charges lists them as lines; the lines add up to the subtotal; subtotal + tax is the total (and the total is what every screen shows)
+ *   - a money field that is part of the charges (admin fee, late fee, resort fee, prior balance...) IS one of the lines; one that is only a reference (deductible,
+ *     deposit paid) is kept inside the total
+ *   - amounts are written with cents, thousands separators and a $, the same way everywhere (money2 in the extractions, fmtMoney on screen)
+ * Sets d.total, d.lines [{desc, amount}], d.subtotal, d.tax, d.taxRate, d.taxLabel, d.moneyKeys, d.billable, d.depositC.
+ */
+function reconcileMoney(d, ctx) {
+  const e = d.ext, s = d.spec, { slug, rf, family } = ctx;
+  d.moneyKeys = (d.t.fields ?? []).filter((f) => (f.t === 'money' || f.t === 'total') && !/_pct$/.test(f.k)).map((f) => f.k);
+  if (s.extra === 'lease') d.moneyKeys.push('rent_amount', 'security_deposit');
+  const val = (k) => (e[k] !== undefined && e[k] !== '' ? Number(e[k]) : null);
+  const has = (k) => val(k) != null;
+  let lines = null, taxC = 0, taxRate = null, taxLabel = null;
+  const L = (desc, c) => (c !== 0 ? [desc, c] : null);
+  if (d.total != null) {
+    const baseC = toC(d.total);
+    const priced = isPriced(d.type, s.fin), bill = ctx.billable;
+    if (s.extra === 'lease' && has('rent_amount')) {
+      const rent = val('rent_amount'); lines = [[`Rent (12 months at ${fmtMoney(rent)})`, toC(rent) * 12]];
+    } else if (has('linehaul_rate') && has('fuel_surcharge')) {
+      lines = [L('Linehaul rate', toC(val('linehaul_rate'))), L('Fuel surcharge', toC(val('fuel_surcharge')))];
+    } else if (has('net_to_owner') && has('management_fee')) {
+      lines = [L('Net paid to owner', toC(val('net_to_owner'))), L('Management fee', toC(val('management_fee')))];
+    } else if (has('weekly_rate')) {
+      const wk = val('weekly_rate'); const weeks = Math.max(1, Math.min(12, Math.round(d.total / wk))); lines = [[`Tuition (${weeks} ${weeks === 1 ? 'week' : 'weeks'} at ${fmtMoney(wk)})`, toC(wk) * weeks]];
+    } else if (has('room_nights') && has('resort_fee') && has('lodging_tax')) {
+      const n = Math.max(1, Math.round(val('room_nights'))); const rate = Math.max(55, r5(baseC / n) / 100); const roomC = toC(rate) * n; const resC = toC(val('resort_fee'));
+      lines = [[`Room (${n} ${n === 1 ? 'night' : 'nights'} at ${fmtMoney(rate)})`, roomC], L('Resort fee', resC)];
+      taxC = Math.round(((roomC + resC) * LODGING_TAX_PER_MILLE) / 1000); taxRate = LODGING_TAX_PER_MILLE / 1000; taxLabel = 'Lodging tax';
+    } else if (has('nights') && d.type === 'reservation-confirmation') {
+      const n = Math.max(1, Math.round(val('nights'))); const rate = Math.max(55, r5(baseC / n) / 100); const roomC = toC(rate) * n;
+      lines = [[`Room (${n} ${n === 1 ? 'night' : 'nights'} at ${fmtMoney(rate)})`, roomC]];
+      taxC = Math.round((roomC * LODGING_TAX_PER_MILLE) / 1000); taxRate = LODGING_TAX_PER_MILLE / 1000; taxLabel = 'Lodging tax';
+    } else if (has('admin_fee') && has('lock_purchase')) {
+      lines = [['Rent and other charges', baseC], L('Admin fee', toC(val('admin_fee'))), L('Lock purchase', toC(val('lock_purchase')))];
+    } else if (has('late_fee_assessed')) {
+      lines = [['Past-due balance', baseC], L('Late fee', toC(val('late_fee_assessed')))];
+    } else if (has('prior_balance')) {
+      lines = [L('Prior balance', toC(val('prior_balance'))), ['Current charges', baseC]];
+    } else if (bill || priced) {
+      const items = FAMILY_ITEMS[family] ?? ITEMS_DEFAULT; const parts = [];
+      if (baseC >= 40000) { const three = baseC >= 200000; const sh = three ? [0.65 + rf.f() * 0.1, 0.08 + rf.f() * 0.07] : [0.75 + rf.f() * 0.15]; let left = baseC; for (const f of sh) { const c = Math.round((baseC * f) / 500) * 500; parts.push(c); left -= c; } parts.push(left); } else parts.push(baseC);
+      lines = parts.map((c, i) => [items[i], c]);
+    }
+    if (lines) {
+      lines = lines.filter(Boolean);
+      if (taxRate == null && TAXED.has(slug) && (bill || priced) && !s.extra) { taxRate = SALES_TAX_PER_MILLE / 1000; taxLabel = 'Sales tax'; taxC = Math.round((lines.reduce((a, l) => a + l[1], 0) * SALES_TAX_PER_MILLE) / 1000); }
+      const subC = lines.reduce((a, l) => a + l[1], 0);
+      d.lines = lines.map(([desc, c]) => ({ desc, amount: fromC(c) })); d.subtotal = fromC(subC);
+      d.tax = taxRate != null ? fromC(taxC) : null; d.taxRate = taxRate; d.taxLabel = taxLabel; d.total = fromC(subC + (taxRate != null ? taxC : 0));
+    }
+    // a lodging-tax field is the tax line itself
+    if (taxLabel === 'Lodging tax' && has('lodging_tax')) e.lodging_tax = money2(d.tax);
+    // reference amounts can never exceed what they are part of
+    const totC = toC(d.total);
+    if (has('deductible') && toC(val('deductible')) > Math.round(totC * 0.4)) e.deductible = Math.max(100, r5(Math.round(totC * 0.4)) / 100);
+    if (has('deposit_paid') || has('deposit_requested')) {
+      const k = has('deposit_paid') ? 'deposit_paid' : 'deposit_requested'; const depC = Math.max(500, r5(Math.round(totC * rf.pick([0.25, 0.3, 0.4, 0.5]))));
+      e[k] = money2(fromC(Math.min(depC, Math.round(totC * 0.5)))); if (k === 'deposit_paid') d.depositC = toC(e[k]);
+    }
+    for (const k of d.moneyKeys) if (has(k) && !['rent_amount', 'security_deposit'].includes(k) && toC(val(k)) > totC) e[k] = money2(Math.max(5, r5(Math.round(totC * 0.4))) / 100);
+  }
+  for (const k of d.moneyKeys) if (has(k)) e[k] = money2(val(k));
+  if (d.total != null) for (const f of d.t.fields ?? []) if (f.t === 'total') e[f.k] = money2(d.total);
+  d.billable = !!ctx.billable && d.total != null;
+}
+
+/** Payment status of one bill, measured against DEMO_TODAY: paid, partly paid or open, the due date and the date the payment came in. */
+function payFor(d, rf) {
+  const today = d2n(DEMO_TODAY), age = today - d2n(d.date), totC = toC(d.total);
+  let st = age > 120 ? 'paid' : age > 75 ? (rf.f() < 0.2 ? 'unpaid' : 'paid') : rf.pick(['paid', 'unpaid', 'partial']);   // nothing older than four months is left open
+  const share = rf.pick([0.4, 0.5, 0.6]); const terms = rf.pick([15, 30, 30, 45]); const lag = rf.int(2, 40);
+  let paidC = st === 'paid' ? totC : st === 'partial' ? Math.floor((totC * share) / 100) * 100 : 0;
+  if (d.depositC != null && st !== 'paid') { paidC = Math.min(d.depositC, totC - 100); st = 'partial'; }
+  if (paidC > 0 && paidC < totC) st = 'partial'; else if (paidC === 0) st = 'unpaid'; else st = 'paid';
+  const paidOn = paidC > 0 ? n2d(d2n(d.date) + Math.min(lag, Math.max(0, age))) : null;
+  return { status: st, paid: fromC(paidC), balance: fromC(totC - paidC), dueOn: n2d(d2n(d.date) + terms), paidOn };
+}
+
+/** A demo with bills should show at least one open and one overdue bill (that is what the product is for): if the draw produced none, the nearest fitting bill is left open. */
+function ensureOpenAndOverdue(D) {
+  const today = d2n(DEMO_TODAY); const bills = D.filter((d) => d.billable && d.pay);
+  if (!bills.length) return;
+  const overdue = (d) => d.pay.balance > 0 && d2n(d.pay.dueOn) < today;
+  const leave = (d) => {
+    const totC = toC(d.total); const paidC = d.depositC != null ? Math.min(d.depositC, totC - 100) : 0;   // a deposit already paid stays paid
+    d.pay = { status: paidC > 0 ? 'partial' : 'unpaid', paid: fromC(paidC), balance: fromC(totC - paidC), dueOn: d.pay.dueOn, paidOn: paidC > 0 ? (d.pay.paidOn ?? d.date) : null };
+  };
+  if (!bills.some(overdue)) { const cand = bills.filter((d) => d2n(d.pay.dueOn) < today && today - d2n(d.date) <= 120).sort((a, b) => (a.date < b.date ? 1 : -1))[0]; if (cand) leave(cand); }
+  if (!bills.some((d) => d.pay.balance > 0 && !overdue(d))) { const cand = bills.filter((d) => d2n(d.pay.dueOn) >= today).sort((a, b) => (a.date < b.date ? 1 : -1))[0] ?? bills.slice().sort((a, b) => (a.date < b.date ? 1 : -1))[0]; if (cand && !overdue(cand)) leave(cand); }
+}
 
 /** Short, friendly industry label from a pack title ("Auto trades (independent repair shop...)" -> "Auto trades"). */
 export function labelOf(pack) { return String(pack.title || pack.id).split(/[:(]/)[0].trim(); }
@@ -62,6 +178,8 @@ export function buildWorkspace(spec) {
   // field name aliases: index 0 (index 3 is the training loop's reserved exam wording and is never used here)
   const fk = {}; for (const [k, e] of Object.entries(pack.field_names?.standard ?? {})) fk[k] = e.aliases?.[0] ?? k;
   const F = (k) => fk[k] ?? k;
+  const rf = rng(hash32('demo-fin:' + slug + ':' + (spec.seed ?? 1)));   // all money decisions come from this stream, so the people, dates and wording stay exactly as before
+  const family = pack.team_family ?? 'other';
   // people
   const usedN = new Set(); const person = () => { for (;;) { const n = `${r.pick(FIRST)} ${r.pick(SURNAMES)}`; if (!usedN.has(n) && !usedN.has(n.split(' ')[1])) { usedN.add(n); usedN.add(n.split(' ')[1]); return n; } } };
   const staff = [person(), person(), person()];
@@ -83,7 +201,7 @@ export function buildWorkspace(spec) {
     const date = n2d(lo + Math.floor(((hi - lo) * (i + r.f())) / planS.length));
     const nth = planS.slice(0, i).filter((x) => x === t).length;
     const cust = t.standard?.cust ? (t === types[0] && nth < 2 ? custs[0] : t === types[1] && nth < 2 ? custs[1] : custs[2 + ((i * 3 + r.int(0, 2)) % (custs.length - 2))]) : null;
-    D.push({ id: r.uid('doc'), t, spec: t.standard ?? {}, type: t.names[0], date, cust, ext: {}, total: null, num: null });
+    D.push({ id: r.uid('doc'), t, spec: t.standard ?? {}, type: t.names[0], date, cust, ext: {}, total: null, num: null, moneyKeys: [], lines: null, subtotal: null, tax: null, taxRate: null, taxLabel: null, billable: false, pay: null });
   });
   D.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
   const counters = {}; const T = pack.texts ?? {}; const bank = {}; for (const c of pack.clause_banks ?? []) if (c.bank === 'v1') (bank[c.role] ??= []).push(c);
@@ -107,23 +225,45 @@ export function buildWorkspace(spec) {
       if (x.t === 'enum') tag(x.k, r.pick(x.v)); else if (x.t === 'int') tag(x.k, r.int(x.lo, x.hi)); else if (x.t === 'money') tag(x.k, Math.round(r.int(x.lo, x.hi) / 5) * 5);
       else if (x.t === 'date+') tag(x.k, n2d(d2n(d.date) + r.int(x.lo, x.hi))); else if (x.t === 'total' && d.total != null) tag(x.k, d.total);
     }
+    // Money: from here every amount on the paper is worked out from the paper's own numbers (lines add to the subtotal, subtotal plus tax is the total).
+    reconcileMoney(d, { slug, rf, family, billable: isBillable(d.type, d.spec.fin) && !!V0.pay_status });
+    if (d.billable) d.pay = payFor(d, rf);
     // page text, laid out the way the reader expects (same order as the training generator)
     const title = d.type.replace(/-/g, ' ').toUpperCase(); const c = d.cust;
     const head = [company, title, c ? `${cap(custNoun)}: ${c.name}` : e.vendor_name ? `Vendor: ${e.vendor_name}` : '', d.num ? `Document no: ${d.num}` : '', `Date: ${mdy(d.date)}`, e.technician ? `${cap(staffNoun)}: ${e.technician}` : '', e.status ? `Status: ${e.status}` : ''].filter(Boolean);
-    const xl = []; for (const x of d.t.fields ?? []) { const v = e[x.k]; if (v === undefined) continue; xl.push(`${cap(hum(x.k))}: ${x.t === 'money' || x.t === 'total' ? '$' + Number(v).toLocaleString('en-US') : v}`); }
+    const xl = []; for (const x of d.t.fields ?? []) { const v = e[x.k]; if (v === undefined) continue; xl.push(`${cap(hum(x.k))}: ${d.moneyKeys.includes(x.k) ? fmtMoney(v) : v}`); }
     const body = []; const w = e.work_performed ?? e.notes; if (w) body.push(w); if (e.work_performed && e.notes) body.push('Note: ' + e.notes);
-    const cx = { cust: c ? c.name : '', date: mdy(d.date), num: d.num ?? '', total: d.total != null ? '$' + money2(d.total) : '', tech: e.technician ?? '', vendor: e.vendor_name ?? '', term: e.agreement_term ?? '', ...Object.fromEntries(Object.entries(e).map(([k, v]) => [k, v])) };
+    const cx = { cust: c ? c.name : '', date: mdy(d.date), num: d.num ?? '', total: d.total != null ? fmtMoney(d.total) : '', tech: e.technician ?? '', vendor: e.vendor_name ?? '', term: e.agreement_term ?? '', ...Object.fromEntries(Object.entries(e).map(([k, v]) => [k, v])) };
     const topics = r.shuffle(bank[d.t.role] ?? []).slice(0, Math.min((bank[d.t.role] ?? []).length, r.int(2, 3)));
-    d.clauses = topics.map((t) => ({ topic: t.topic, text: fillClause(r, t.variants[r.int(0, 2)], cx), paraphrases: t.paraphrases }));
+    // A paper that carries money (a total or a money field) states no other lump-sum dollar figure in its terms, so no clause can contradict its own numbers
+    // (a policy clause such as "a $135 fee" on a $120 invoice). The draws from r are made exactly as before; only the wording that is kept changes.
+    // A bill states its own due date (below), so no clause on it may give a different payment deadline.
+    const moneyDoc = d.total != null || d.moneyKeys.length > 0;
+    const hasDeposit = d.ext.deposit_paid !== undefined || d.ext.deposit_requested !== undefined;
+    const clashes = (txt) => (moneyDoc && /\$/.test(txt)) || (d.billable && PAYTIME_TOPIC.test(t0) && HAS_DAYS.test(txt))
+      || (d.taxRate != null && /tax/i.test(txt) && /%/.test(txt)) || (hasDeposit && /%/.test(txt) && /deposit|retainer|date|book|reserv|paid|pay|due/i.test(txt));   // a percentage that would contradict the paper's own tax or deposit
+    let t0 = '';
+    d.clauses = topics.map((t) => {
+      t0 = t.topic;
+      const text = fillClause(r, t.variants[r.int(0, 2)], cx);
+      if (!moneyDoc) return { topic: t.topic, text: normMoney(text), paraphrases: t.paraphrases };
+      if (!clashes(text)) return { topic: t.topic, text, paraphrases: t.paraphrases };
+      const alt = rng(hash32('alt:' + d.id + t.topic));
+      for (const v of t.variants) { const x = fillClause(alt, v, cx); if (!clashes(x)) return { topic: t.topic, text: x, paraphrases: t.paraphrases }; }
+      return null;
+    }).filter(Boolean);
     const p1 = [...head, ...xl, '', ...body], p2 = [];
     const twoPage = d.clauses.length >= 3 || (s.pages === 2 && d.clauses.length >= 2);
     d.clauses.forEach((t, i) => { if (twoPage && i > 0) { p2.push(t.text); t.page = 2; } else { p1.push(t.text); t.page = 1; } });
-    if (d.total != null) p1.push(`TOTAL: $${money2(d.total)}`);
+    if (d.lines) { if (p1[p1.length - 1] !== '') p1.push(''); p1.push('Charges'); for (const l of d.lines) p1.push(`${l.desc}: ${fmtMoney(l.amount)}`); if (d.tax != null) { p1.push(`Subtotal: ${fmtMoney(d.subtotal)}`); p1.push(`${d.taxLabel} (${(d.taxRate * 100).toFixed(1)}%): ${fmtMoney(d.tax)}`); } }
+    if (d.pay) p1.push(`Payment terms: net ${d2n(d.pay.dueOn) - d2n(d.date)} days. Due date: ${mdy(d.pay.dueOn)}`);
+    if (d.total != null) p1.push(`TOTAL: ${fmtMoney(d.total)}`);
     if (p2.length) { p2.unshift(`${company} - ${title} - page 2`, 'Terms and conditions'); p2.push('', c ? `Signed: ${c.name}   Date: ${mdy(d.date)}` : 'Authorized signature on file'); }
     d.pages = [p1.join('\n'), ...(p2.length ? [p2.join('\n')] : [])];
-    // money status on receivable invoices
-    if (s.fin?.[0] === 'invoice' && V0.pay_status && d.total != null) { const old = d2n(DEMO_TODAY) - d2n(d.date) > 75; const st = old ? 'paid' : r.pick(['paid', 'unpaid', 'partial']); const paid = st === 'paid' ? d.total : st === 'partial' ? Math.round(d.total * 0.5) : 0; d.pay = { status: st, paid, balance: Math.round((d.total - paid) * 100) / 100 }; }
+    // payment status of a bill: paid, partly paid or open, with the dates the paper and the dashboard both use (everything is measured against DEMO_TODAY)
+    if (s.fin?.[0] === 'invoice' && V0.pay_status && d.total != null && d2n(DEMO_TODAY) - d2n(d.date) <= 75) r.pick(['paid', 'unpaid', 'partial']);   // keeps the people, dates and wording drawn after this paper exactly as before
   }
+  ensureOpenAndOverdue(D);
   // ---- export rows (reader format)
   const exported = DEMO_TODAY + 'T12:00:00.000Z'; const rows = { documents: [], pages: [], extractions: [], entities: [], document_entity_links: [], facets: [], audit_log: [], financials: [], financial_lines: [] };
   D.forEach((d, i) => {
@@ -132,7 +272,7 @@ export function buildWorkspace(spec) {
     d.pages.forEach((text, k) => rows.pages.push({ id: r.uid('pg'), document_id: d.id, page_no: k + 1, text, created_at: at }));
     for (const [k, v] of Object.entries(d.ext)) rows.extractions.push({ id: r.uid('ex'), document_id: d.id, entity_id: null, field_key: F(k), value: v, confidence: 0.92, source_facet_id: null, schema_version: 1, created_at: at });
     if (d.cust) rows.document_entity_links.push({ id: r.uid('ln'), document_id: d.id, entity_id: d.cust.id, confidence: 0.9, linked_by: 'demo', created_at: exported });
-    if (d.spec.fin) { const [kind, dir] = d.spec.fin; rows.financials.push({ id: r.uid('fn'), document_id: d.id, doc_kind: kind, direction: dir, currency: 'USD', invoice_number: d.ext.invoice_number ?? null, po_number: d.ext.po_number ?? null, invoice_date: d.spec.visit ? null : d.date, due_date: kind === 'invoice' && dir === 'receivable' ? n2d(d2n(d.date) + 30) : null, period_start: null, period_end: null, agreement_term: d.ext.agreement_term ?? null, subtotal: null, tax: null, total: d.total == null ? null : money2(d.total), amount_paid: d.pay ? money2(d.pay.paid) : null, balance_due: d.pay ? money2(d.pay.balance) : null, status: d.pay?.status ?? 'unknown', customer_name: d.cust?.name ?? null, vendor_name: d.ext.vendor_name ?? null, confidence: 0.9, flags: [], evidence: {}, corrections: {}, corrected_by: null, corrected_at: null, verified_by: null, verified_at: null, model: 'demo', extracted_at: at, created_at: at, job_key: null, job_key_source: null, job_confidence: 0, job_raw: null }); }
+    if (d.spec.fin) { const [kind, dir] = d.spec.fin; rows.financials.push({ id: r.uid('fn'), document_id: d.id, doc_kind: kind, direction: dir, currency: 'USD', invoice_number: d.ext.invoice_number ?? null, po_number: d.ext.po_number ?? null, invoice_date: d.spec.visit ? null : d.date, due_date: d.pay ? d.pay.dueOn : null, period_start: null, period_end: null, agreement_term: d.ext.agreement_term ?? null, subtotal: d.subtotal == null ? null : money2(d.subtotal), tax: d.tax == null ? null : money2(d.tax), total: d.total == null ? null : money2(d.total), amount_paid: d.pay ? money2(d.pay.paid) : null, balance_due: d.pay ? money2(d.pay.balance) : null, status: d.pay?.status ?? 'unknown', customer_name: d.cust?.name ?? null, vendor_name: d.ext.vendor_name ?? null, confidence: 0.9, flags: [], evidence: {}, corrections: {}, corrected_by: null, corrected_at: null, verified_by: null, verified_at: null, model: 'demo', extracted_at: at, created_at: at, job_key: null, job_key_source: null, job_confidence: 0, job_raw: null }); }
   });
   for (const c of custs) rows.entities.push({ id: c.id, entity_type: 'customer', merged_into: null, customer_number: c.num, data: { customer_name: c.name, service_address: c.addr, phone: c.phone, email: c.email }, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' });
   const records = { industry: slug, tenantKey: 'demo-' + slug, tenantName: company, exportedAt: exported, ...rows, truncated: false };
