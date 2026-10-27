@@ -335,3 +335,64 @@ export function sitemapUrls(data = loadData()) {
   for (const d of data.industries) urls.push(`${SITE}/industries/${pageFile(d.slug)}`);
   return urls;
 }
+
+/** One-line notes for the industries that have a hand-written page (kept from the original menu; the homepage tiles reuse them). */
+const PAGE_NOTE = {
+  'plumbing-hvac': 'Warranties, serial numbers and service tickets.',
+  electrical: 'Permits, inspections and work orders.',
+  'property-management': 'Work orders, vendor contracts and invoices.',
+  'general-contractor': 'Contracts, permits and purchase orders.',
+  nonprofit: 'Agreements, invoices and correspondence.',
+};
+
+/** The "Any Business, One App" nav dropdown: every demo industry (same grouping as the hub) + the guides, all live links. */
+export function navMenuHtml(data = loadData()) {
+  const label = new Map(data.industries.map((d) => [d.slug, d.label]));
+  const a = (href, t, d) => `          <a role="menuitem" href="${href}"><span class="dd-t">${esc(t)}</span>${d ? `<span class="dd-d">${esc(d)}</span>` : ''}</a>`;
+  const g = (t) => `          <div class="dd-group" role="presentation">${esc(t)}</div>`;
+  const out = [
+    g('By role'),
+    a('/who.html#office', 'Office staff', 'Answer a caller with the original page in hand.'),
+    a('/who.html#field', 'People in the field', 'Look things up and scan paperwork from a phone.'),
+    a('/who.html#owners', 'Owners', 'See which warranties and agreements are expiring.'),
+    g('By industry'),
+    a('/industries/', `All ${data.industries.length} industries`, 'Pick yours and try the demo.'),
+    a('/who.html#industries', 'Every industry, one app', 'See how Donovan fits your kind of business.'),
+    a('/industries/any-business.html', 'Any business', 'If you keep paperwork, it works.'),
+  ];
+  for (const grp of GROUPS) {
+    out.push(g(grp.title));
+    for (const s of grp.slugs) out.push(a(`/industries/${pageFile(s)}`, label.get(s) || s, PAGE_NOTE[s]));
+  }
+  out.push(g('More guides'));
+  for (const e of EXTRA_GUIDES.filter((x) => x.href !== '/industries/any-business.html')) out.push(a(e.href, e.title, e.note));
+  return `<div class="nav-dropdown-menu" id="industriesMenu" role="menu" aria-label="Any Business, One App">\n${out.join('\n')}\n        </div>`;
+}
+
+/** Replace the dropdown menu block (balanced <div>s) in one html string. Returns the new string, or null when the page has none. */
+export function replaceMenu(html, menu) {
+  const start = html.indexOf('<div class="nav-dropdown-menu"');
+  if (start < 0) return null;
+  let depth = 0, i = start;
+  const re = /<div\b|<\/div>/g; re.lastIndex = start;
+  for (let m; (m = re.exec(html)); ) {
+    depth += m[0] === '</div>' ? -1 : 1;
+    if (depth === 0) { i = m.index + 6; break; }
+  }
+  return html.slice(0, start) + menu + html.slice(i);
+}
+
+/** Pages whose nav carries the dropdown: index.html + every public/*.html + public/industries/*.html (hub and generated pages are re-rendered after this). */
+export function navFiles() {
+  const files = ['index.html', 'patch-notes.html'];
+  for (const dir of ['public', 'public/industries']) for (const f of fs.readdirSync(path.join(ROOT, dir))) if (f.endsWith('.html')) files.push(`${dir}/${f}`);
+  return files;
+}
+export function syncNav(data = loadData()) {
+  const menu = navMenuHtml(data), changed = [];
+  for (const rel of navFiles()) {
+    const p = path.join(ROOT, rel), html = fs.readFileSync(p, 'utf8'), next = replaceMenu(html, menu);
+    if (next !== null && next !== html) { fs.writeFileSync(p, next); changed.push(rel); }
+  }
+  return changed;
+}

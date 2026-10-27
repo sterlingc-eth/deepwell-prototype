@@ -2,9 +2,12 @@
 //   --refresh  re-extract data.json from src/demo/fixtures, then rebuild pages
 import fs from 'node:fs';
 import path from 'node:path';
-import { ROOT, DATA_FILE, extractData, loadData, renderAll, sitemapUrls } from './lib.mjs';
+import { ROOT, DATA_FILE, extractData, loadData, renderAll, sitemapUrls, syncNav } from './lib.mjs';
 
 if (process.argv.includes('--refresh')) fs.writeFileSync(DATA_FILE, JSON.stringify(extractData(), null, 1) + '\n');
+// nav dropdown first: the generated pages lift their nav from public/industries/offices.html
+const navChanged = syncNav(loadData());
+console.log(`industries-site: nav dropdown synced in ${navChanged.length} files`);
 let n = 0;
 for (const [rel, content] of renderAll(loadData())) {
   fs.mkdirSync(path.dirname(path.join(ROOT, rel)), { recursive: true });

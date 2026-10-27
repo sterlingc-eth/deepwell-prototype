@@ -346,43 +346,9 @@ section{padding-block:clamp(36px,5vw,64px);border-top:1px solid var(--line)}
 .src .ic{width:26px;height:26px;border:1px solid var(--line-strong);display:grid;place-items:center;font-family:"IBM Plex Mono",monospace;font-size:.62rem;color:var(--brass-text);flex:none}
 .src b{color:var(--text);font-weight:500}
 .demo-note{font-size:.8rem;color:var(--faint);font-family:"IBM Plex Mono",monospace}
-/* answer reveal: a quick staggered rise-in, not a loop */
-#demo-main.demo-reveal .answer,#demo-main.demo-reveal .kv>div,#demo-main.demo-reveal .src,#demo-main.demo-reveal .answer-head{
-  animation:dw-rise .5s ease both;
-}
-#demo-main.demo-reveal .answer-head{animation-delay:0ms}
-#demo-main.demo-reveal .answer{animation-delay:60ms}
-#demo-main.demo-reveal .kv>div{animation-delay:calc(140ms + var(--i,0)*55ms)}
-#demo-main.demo-reveal .src{animation-delay:calc(380ms + var(--i,0)*70ms)}
 @keyframes dw-rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 .ask input.dw-typing{caret-color:var(--brass)}
 @media (max-width:860px){.demo{grid-template-columns:1fr}.demo-side{border-right:0;border-bottom:1px solid var(--line)}}
-
-/* industry picker + example documents (Try it) */
-.ind{display:flex;flex-direction:column;gap:8px}
-.ind-chips{display:flex;flex-wrap:wrap;gap:8px}
-.ind-chip{all:unset;box-sizing:border-box;cursor:pointer;min-height:44px;padding:0 14px;display:inline-flex;align-items:center;border:1px solid var(--line);background:var(--surface);color:var(--text);font:600 .86rem "IBM Plex Sans",system-ui,sans-serif;border-radius:3px}
-.ind-chip:hover{border-color:var(--line-strong)}
-.ind-chip[aria-pressed="true"]{border-color:var(--line-strong);box-shadow:inset 3px 0 0 var(--brass)}
-.ind-chip:focus-visible,.ind-select:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
-.ind-select{display:none;width:100%;box-sizing:border-box;min-height:48px;padding:0 12px;border:1px solid var(--line-strong);background:var(--surface);color:var(--text);font:600 1rem "IBM Plex Sans",system-ui,sans-serif;border-radius:3px}
-.ind-hint{margin:0;font-size:.84rem;color:var(--muted)}
-.docs-eyebrow{margin-bottom:8px}
-.docs-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}
-.doc{border:1px solid var(--line);background:var(--surface);padding:10px 12px;display:flex;flex-direction:column;gap:6px;min-width:0}
-.doc-top{display:flex;gap:10px;align-items:flex-start}
-.doc .ic{width:30px;height:30px;border:1px solid var(--line-strong);display:grid;place-items:center;font-family:"IBM Plex Mono",monospace;font-size:.6rem;color:var(--brass-text);flex:none}
-.doc b{display:block;font-weight:600;font-size:.88rem;line-height:1.3;overflow-wrap:anywhere}
-.doc .meta{display:block;font-family:"IBM Plex Mono",monospace;font-size:.7rem;color:var(--faint);margin-top:2px}
-.doc dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:.78rem}
-.doc dt{color:var(--faint)}
-.doc dd{margin:0;color:var(--text);overflow-wrap:anywhere}
-@media (max-width:640px){
-  .ind-chips{display:none}
-  .ind-select{display:block}
-  .docs-row{display:flex;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x proximity;gap:8px;padding-bottom:4px}
-  .docs-row>.doc{flex:0 0 min(78%,260px);scroll-snap-align:start}
-}
 
 /* people */
 .people{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
@@ -537,6 +503,8 @@ footer a{color:var(--muted);text-decoration:none;display:inline-flex;align-items
   .nav.menu-open .nav-dropdown{width:100%}
   .nav.menu-open .nav-dropdown-menu{position:static;display:none;transform:none;min-width:0;width:100%;box-shadow:none;opacity:1;visibility:visible;pointer-events:auto;margin-top:2px}
   .nav.menu-open .nav-dropdown.open .nav-dropdown-menu{display:block;transform:none}
+  .nav.menu-open .navlinks{max-height:calc(100vh - 68px);max-height:calc(100dvh - 68px);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+  .nav.menu-open .nav-dropdown-menu{max-height:none;overflow:visible}
 }
 </style>
 
@@ -576,6 +544,7 @@ footer{padding-block:12px}
 @media (max-width:560px){
   .lede{font-size:1rem;line-height:1.45}
   .hero .btn{padding:10px 14px}
+  .hero .hero-see{display:none}
   .q{padding:6px 12px;font-size:.82rem}
   .hiw-feat > span{font-size:.72rem;padding:1px 8px}
   .plans-every{font-size:.82rem;gap:0 12px}
@@ -1412,7 +1381,7 @@ footer .wrap a.ft-ind{font-weight:600}
     </a>
     <div class="navlinks" id="navLinks">
       <a href="#how-it-works">How it works</a>
-      <a href="#demo">Try it</a>
+      <a href="/demo/">Try it</a>
       <a class="nav-ind" href="/industries/">Industries</a>
       <!-- Industries nav dropdown (Workstream C, 2026-09-21) — see the
            labeled CSS block above and the standalone script near the end
@@ -1431,17 +1400,63 @@ footer .wrap a.ft-ind{font-weight:600}
           <a role="menuitem" href="/who.html#field"><span class="dd-t">People in the field</span><span class="dd-d">Look things up and scan paperwork from a phone.</span></a>
           <a role="menuitem" href="/who.html#owners"><span class="dd-t">Owners</span><span class="dd-d">See which warranties and agreements are expiring.</span></a>
           <div class="dd-group" role="presentation">By industry</div>
-          <a role="menuitem" href="/industries/"><span class="dd-t">All industries</span><span class="dd-d">Pick yours and try the demo.</span></a>
+          <a role="menuitem" href="/industries/"><span class="dd-t">All 43 industries</span><span class="dd-d">Pick yours and try the demo.</span></a>
           <a role="menuitem" href="/who.html#industries"><span class="dd-t">Every industry, one app</span><span class="dd-d">See how Donovan fits your kind of business.</span></a>
           <a role="menuitem" href="/industries/any-business.html"><span class="dd-t">Any business</span><span class="dd-d">If you keep paperwork, it works.</span></a>
-          <a role="menuitem" href="/industries/hvac.html"><span class="dd-t">HVAC</span><span class="dd-d">Warranties, serial numbers and service tickets.</span></a>
+          <div class="dd-group" role="presentation">Trades &amp; field service</div>
+          <a role="menuitem" href="/industries/hvac.html"><span class="dd-t">Plumbing &amp; HVAC</span><span class="dd-d">Warranties, serial numbers and service tickets.</span></a>
           <a role="menuitem" href="/industries/electrical.html"><span class="dd-t">Electrical</span><span class="dd-d">Permits, inspections and work orders.</span></a>
-          <a role="menuitem" href="/industries/plumbing.html"><span class="dd-t">Plumbing</span><span class="dd-d">Service tickets, permits and warranty paperwork.</span></a>
+          <a role="menuitem" href="/industries/contractors.html"><span class="dd-t">General contractor</span><span class="dd-d">Contracts, permits and purchase orders.</span></a>
+          <a role="menuitem" href="/industries/roofing.html"><span class="dd-t">Roofing</span></a>
+          <a role="menuitem" href="/industries/landscaping.html"><span class="dd-t">Landscaping</span></a>
+          <a role="menuitem" href="/industries/pestcontrol.html"><span class="dd-t">Pest control</span></a>
+          <a role="menuitem" href="/industries/poolservice.html"><span class="dd-t">Pool service</span></a>
+          <a role="menuitem" href="/industries/cleaning.html"><span class="dd-t">Cleaning &amp; janitorial</span></a>
+          <a role="menuitem" href="/industries/auto.html"><span class="dd-t">Auto repair</span></a>
+          <div class="dd-group" role="presentation">Property &amp; real estate</div>
+          <a role="menuitem" href="/industries/realty.html"><span class="dd-t">Real estate</span></a>
           <a role="menuitem" href="/industries/property-management.html"><span class="dd-t">Property management</span><span class="dd-d">Work orders, vendor contracts and invoices.</span></a>
-          <a role="menuitem" href="/industries/fleet-equipment-rental.html"><span class="dd-t">Fleet and equipment rental</span><span class="dd-d">Service records, inspections and rental agreements.</span></a>
-          <a role="menuitem" href="/industries/contractors.html"><span class="dd-t">Contractors</span><span class="dd-d">Contracts, permits and purchase orders.</span></a>
+          <a role="menuitem" href="/industries/storage.html"><span class="dd-t">Self storage</span></a>
+          <div class="dd-group" role="presentation">Hospitality, events &amp; food</div>
+          <a role="menuitem" href="/industries/hotel.html"><span class="dd-t">Hotel</span></a>
+          <a role="menuitem" href="/industries/eventvenue.html"><span class="dd-t">Event venue</span></a>
+          <a role="menuitem" href="/industries/marina.html"><span class="dd-t">Marina</span></a>
+          <a role="menuitem" href="/industries/weddingplan.html"><span class="dd-t">Wedding planning</span></a>
+          <a role="menuitem" href="/industries/restaurant.html"><span class="dd-t">Restaurant</span></a>
+          <a role="menuitem" href="/industries/brewery.html"><span class="dd-t">Brewery</span></a>
+          <a role="menuitem" href="/industries/foodtruck.html"><span class="dd-t">Food truck</span></a>
+          <div class="dd-group" role="presentation">Professional services &amp; offices</div>
+          <a role="menuitem" href="/industries/bookkeeping.html"><span class="dd-t">Bookkeeping</span></a>
+          <a role="menuitem" href="/industries/legal.html"><span class="dd-t">Law office</span></a>
+          <a role="menuitem" href="/industries/insagency.html"><span class="dd-t">Insurance agency</span></a>
+          <a role="menuitem" href="/industries/msp.html"><span class="dd-t">IT services</span></a>
+          <a role="menuitem" href="/industries/filmprod.html"><span class="dd-t">Film production</span></a>
+          <a role="menuitem" href="/industries/photostudio.html"><span class="dd-t">Photo studio</span></a>
+          <a role="menuitem" href="/industries/tutoring.html"><span class="dd-t">Tutoring</span></a>
+          <div class="dd-group" role="presentation">Healthcare &amp; personal care</div>
+          <a role="menuitem" href="/industries/medicaloffice.html"><span class="dd-t">Medical office</span></a>
+          <a role="menuitem" href="/industries/dentaloffice.html"><span class="dd-t">Dental office</span></a>
+          <a role="menuitem" href="/industries/dentallabco.html"><span class="dd-t">Dental lab</span></a>
+          <a role="menuitem" href="/industries/medbillingco.html"><span class="dd-t">Medical billing</span></a>
+          <a role="menuitem" href="/industries/vetclinic.html"><span class="dd-t">Veterinary clinic</span></a>
+          <a role="menuitem" href="/industries/petgroomco.html"><span class="dd-t">Pet grooming</span></a>
+          <a role="menuitem" href="/industries/gymfit.html"><span class="dd-t">Gym &amp; fitness</span></a>
+          <a role="menuitem" href="/industries/salonspa.html"><span class="dd-t">Salon &amp; spa</span></a>
+          <a role="menuitem" href="/industries/daycarecenter.html"><span class="dd-t">Daycare center</span></a>
+          <div class="dd-group" role="presentation">Nonprofit &amp; community</div>
+          <a role="menuitem" href="/industries/nonprofits.html"><span class="dd-t">Nonprofit</span><span class="dd-d">Agreements, invoices and correspondence.</span></a>
+          <a role="menuitem" href="/industries/grantnp.html"><span class="dd-t">Grant-funded nonprofit</span></a>
+          <a role="menuitem" href="/industries/church.html"><span class="dd-t">Church</span></a>
+          <a role="menuitem" href="/industries/policerecords.html"><span class="dd-t">Records office</span></a>
+          <div class="dd-group" role="presentation">Transport, goods &amp; manufacturing</div>
+          <a role="menuitem" href="/industries/trucking.html"><span class="dd-t">Trucking</span></a>
+          <a role="menuitem" href="/industries/warehouse.html"><span class="dd-t">Warehouse</span></a>
+          <a role="menuitem" href="/industries/mfgqa.html"><span class="dd-t">Manufacturing</span></a>
+          <a role="menuitem" href="/industries/feedstore.html"><span class="dd-t">Feed &amp; farm store</span></a>
+          <div class="dd-group" role="presentation">More guides</div>
           <a role="menuitem" href="/industries/offices.html"><span class="dd-t">Offices</span><span class="dd-d">Vendor contracts, agreements and forms.</span></a>
-          <a role="menuitem" href="/industries/nonprofits.html"><span class="dd-t">Nonprofits</span><span class="dd-d">Agreements, invoices and correspondence.</span></a>
+          <a role="menuitem" href="/industries/fleet-equipment-rental.html"><span class="dd-t">Fleet and equipment rental</span><span class="dd-d">Service records, inspections and rental agreements.</span></a>
+          <a role="menuitem" href="/industries/plumbing.html"><span class="dd-t">Plumbing</span><span class="dd-d">Service tickets, permits and warranty paperwork.</span></a>
         </div>
       </div>
       <a href="#roadmap">Roadmap</a>
@@ -1485,8 +1500,9 @@ footer .wrap a.ft-ind{font-weight:600}
       <h1 class="mm-headline">Your paperwork already has the answer. <em>Now anyone can ask.</em></h1>
       <p class="lede">DeepWell turns your paperwork — invoices, work orders, contracts, forms, receipts, photos of documents — into answers your whole team can look up in seconds, each with the original page attached.</p>
       <div class="cta-row">
-        <a class="btn btn-primary" href="/app/?plan=solo&interval=month">Start free trial</a>
-        <a class="btn btn-ghost" href="#what">See how it works</a>
+        <a class="btn btn-primary" href="/demo/">Try the demo</a>
+        <a class="btn btn-ghost" href="/app/?plan=solo&interval=month">Start free trial</a>
+        <a class="btn btn-ghost hero-see" href="#what">See how it works</a>
         <p class="hero-trial">30-day free trial on Solo. Card required, cancel anytime.</p>
       </div>
       <ol class="hero-steps" aria-label="How it works in 3 steps">
@@ -2090,43 +2106,11 @@ footer .wrap a.ft-ind{font-weight:600}
 </script>
 
 
-<section id="demo">
+<section id="views" aria-labelledby="views-h">
   <div class="wrap">
-    <div class="sec-head dw-observe dw-once">
-      <div>
-        <div class="eyebrow">Try it</div>
-        <h2>Ask Donovan a question.</h2>
-      </div>
-      <p class="lede">Ask about a customer, an address, a name, a date or an amount, the way you'd ask a coworker who never forgets. Every answer shows its source.</p>
-    </div>
-    <div class="demo-wrap">
-    <div class="ind" id="ind">
-      <div class="eyebrow" id="ind-label">Your industry</div>
-      <div class="ind-chips" id="ind-chips" role="group" aria-labelledby="ind-label"></div>
-      <select class="ind-select" id="ind-select" aria-labelledby="ind-label"></select>
-      <p class="ind-hint" id="ind-hint">Pick your industry to see example documents and questions from your kind of work.</p>
-    </div>
-    <form class="ask" id="ask" role="search">
-      <input id="ask-input" type="text" autocomplete="off" required placeholder="Ask anything — an address, a serial, a name, a question…" aria-label="Ask a question about your records">
-      <button type="submit">Ask</button>
-    </form>
-    <div class="demo">
-      <div class="demo-side">
-        <div class="eyebrow">Or try one of these</div>
-        <div class="q-list" data-snap role="group" aria-label="Suggested questions" id="q-list"></div>
-      </div>
-      <div class="demo-main" id="demo-main" aria-live="polite">
-        <!-- rendered by script -->
-      </div>
-    </div>
-    <section class="docs" id="docs" aria-labelledby="docs-label">
-      <div class="eyebrow docs-eyebrow" id="docs-label">Example documents</div>
-      <div class="docs-row" id="docs-row" tabindex="0" role="group" aria-label="Example documents for the chosen industry"></div>
-    </section>
-    </div>
     <div class="who" id="who">
       <div class="who-head">
-        <h3>One system. Three views.</h3>
+        <h3 id="views-h">One system. Three views.</h3>
         <p>The same records, seen from the front desk, the job site, and the owner's office. Everybody gets the view that matches their day.</p>
       </div>
     <div class="people" data-snap role="group" aria-label="Three views of the same records">
@@ -2732,9 +2716,6 @@ footer .wrap a.ft-ind{font-weight:600}
   </div>
 </footer>
 
-<!-- tryit-data:start -->
-<script type="application/json" id="tryit-data">{"schema":1,"industries":[{"slug":"real-estate","label":"Real estate","documents":[{"id":"la1","name":"Listing agreement — 88 Birchwood Ct","type":"Listing agreement","icon":"LST","date":"2026-04-30","fields":[["Seller","R. Whitfield"],["List price","$489,000"],["Expires","17 Oct 2026"]]},{"id":"la2","name":"Listing agreement — 27 Larkspur Way","type":"Listing agreement","icon":"LST","date":"2026-05-02","fields":[["Seller","T. Brandt"],["List price","$615,000"],["Expires","30 Oct 2026"]]},{"id":"pc","name":"Purchase contract — 412 Elm St","type":"Purchase contract","icon":"CON","date":"2026-08-11","fields":[["Buyers","A. and L. Garcia"],["Price","$372,500"],["Closing","22 Sep 2026"]]},{"id":"cs","name":"Commission statement — Garcia sale","type":"Commission statement","icon":"COM","date":"2026-09-25","fields":[["Property","412 Elm St"],["Gross commission","$18,625.00"],["Paid to agent","$13,037.50"]]},{"id":"cl","name":"Closing statement — 412 Elm St","type":"Closing statement","icon":"CLS","date":"2026-09-22","fields":[["Settlement date","22 Sep 2026"],["Sale price","$372,500"],["Title company","Summit Title Co."]]}],"questions":[{"q":"What's the closing date on 412 Elm St?","keys":{"s":["412 elm"],"w":["closing","close","date"]},"answer":"The closing date on 412 Elm St was 22 Sep 2026. The purchase contract set that date, and the closing statement carries the same one.","fields":[["Property","412 Elm St","",""],["Buyers","A. and L. Garcia","",""],["Contract signed","11 Aug 2026","",""],["Closing date","22 Sep 2026","ok","Closed"],["Sale price","$372,500","",""]],"sources":[{"doc":"pc","where":"page 2, closing date"},{"doc":"cl","where":"page 1, settlement date"}]},{"q":"What commission did we pay on the Garcia sale?","keys":{"s":["garcia"],"w":["commission","pay","paid"]},"answer":"On the Garcia sale at 412 Elm St, $13,037.50 was paid to the agent. That is a 70% split of the $18,625.00 gross commission, which is 5.0% of the $372,500 sale price.","fields":[["Sale","412 Elm St","",""],["Gross commission","$18,625.00","",""],["Agent split","70%","",""],["Paid to agent","$13,037.50","ok","Paid"],["Kept by brokerage","$5,587.50","",""]],"sources":[{"doc":"cs","where":"page 1, commission breakdown"},{"doc":"cl","where":"page 2, commission line"}]},{"q":"Which listings expire this month?","keys":{"s":["expire"],"w":["listing","listings","month"]},"answer":"Two listings expire this month: 88 Birchwood Ct on 17 Oct 2026 and 27 Larkspur Way on 30 Oct 2026.","fields":[["Expiring this month","2","",""],["88 Birchwood Ct","17 Oct 2026","warn","Expiring"],["27 Larkspur Way","30 Oct 2026","warn","Expiring"],["Combined list price","$1,104,000","",""]],"sources":[{"doc":"la1","where":"page 1, listing term"},{"doc":"la2","where":"page 1, listing term"}]},{"q":"What is the list price on 27 Larkspur Way?","keys":{"s":["larkspur"],"w":["list price","price","listed"]},"answer":"27 Larkspur Way is listed at $615,000. The listing agreement sets the total commission at 5.0%.","fields":[["Property","27 Larkspur Way","",""],["Seller","T. Brandt","",""],["List price","$615,000","",""],["Total commission","5.0%","",""]],"sources":[{"doc":"la2","where":"page 1, price and commission"}]},{"q":"Who are the buyers on 412 Elm St?","keys":{"s":["buyers","buyer"],"w":["who","412 elm"]},"answer":"The buyers on 412 Elm St are A. and L. Garcia, who agreed to a purchase price of $372,500.","fields":[["Property","412 Elm St","",""],["Buyers","A. and L. Garcia","",""],["Purchase price","$372,500","",""]],"sources":[{"doc":"pc","where":"page 1, parties"},{"doc":"cl","where":"page 1, buyer"}]}]},{"slug":"property-management","label":"Property management","documents":[{"id":"ls","name":"Lease agreement — Unit 4B, 220 Maple Ct","type":"Lease","icon":"LSE","date":"2026-02-14","fields":[["Tenant","D. Pemberton"],["Term","1 Mar 2026 – 28 Feb 2027"],["Rent","$1,425 / month"]]},{"id":"mi","name":"Move-in inspection — Unit 4B","type":"Inspection report","icon":"INS","date":"2026-03-01","fields":[["Unit","4B, 220 Maple Ct"],["Inspector","K. Osei"],["Items noted","2"]]},{"id":"wo","name":"Work order 2291 — Unit 6A","type":"Work order","icon":"WO","date":"2026-07-14","fields":[["Unit","6A, 220 Maple Ct"],["Vendor","Lantern Maintenance"],["Cost","$186.00"]]},{"id":"ci","name":"Insurance certificate — 220 Maple Ct","type":"Certificate of insurance","icon":"CRT","date":"2026-01-02","fields":[["Insurer","Northgate Mutual"],["Policy period","1 Jan 2026 – 1 Jan 2027"],["Liability limit","$1,000,000"]]}],"questions":[{"q":"When does the lease for Unit 4B end?","keys":{"s":["unit 4b","4b"],"w":["lease","end","ends"]},"answer":"The lease for Unit 4B at 220 Maple Ct ends on 28 Feb 2027. It started on 1 Mar 2026.","fields":[["Unit","4B, 220 Maple Ct","",""],["Tenant","D. Pemberton","",""],["Start","1 Mar 2026","",""],["End","28 Feb 2027","ok","Active"],["Rent","$1,425 / month","",""]],"sources":[{"doc":"ls","where":"page 1, lease term"}]},{"q":"How much is the security deposit for Unit 4B?","keys":{"s":["deposit"],"w":["security","unit 4b","4b"]},"answer":"The security deposit for Unit 4B is $1,425, equal to one month of rent.","fields":[["Unit","4B, 220 Maple Ct","",""],["Security deposit","$1,425","",""],["Monthly rent","$1,425","",""]],"sources":[{"doc":"ls","where":"page 2, deposit"}]},{"q":"What was noted at move-in for Unit 4B?","keys":{"s":["move-in","move in"],"w":["noted","unit 4b","4b"]},"answer":"Two items were noted at move-in: a small scuff on the living room wall and a cracked cover on the bathroom outlet. All appliances were working.","fields":[["Unit","4B, 220 Maple Ct","",""],["Inspected","1 Mar 2026","",""],["Items noted","2","warn","Noted"],["Appliances","All working","ok","OK"]],"sources":[{"doc":"mi","where":"page 2, condition notes"}]},{"q":"What was repaired on work order 2291?","keys":{"s":["2291"],"w":["work order","repaired","repair"]},"answer":"Work order 2291 covered replacing the dishwasher supply line in Unit 6A on 14 Jul 2026. Lantern Maintenance charged $186.00.","fields":[["Unit","6A, 220 Maple Ct","",""],["Date","14 Jul 2026","",""],["Vendor","Lantern Maintenance","",""],["Cost","$186.00","",""]],"sources":[{"doc":"wo","where":"page 1, work performed"}]},{"q":"When does the building insurance expire?","keys":{"s":["insurance"],"w":["expire","building","policy"]},"answer":"The insurance policy for 220 Maple Ct runs through 1 Jan 2027. It carries a $1,000,000 liability limit.","fields":[["Property","220 Maple Ct","",""],["Insurer","Northgate Mutual","",""],["Expires","1 Jan 2027","ok","Active"],["Liability limit","$1,000,000","",""]],"sources":[{"doc":"ci","where":"page 1, policy period"}]}]},{"slug":"hvac","label":"HVAC","documents":[{"id":"sa","name":"Service agreement — Smith, 118 Oak St","type":"Service agreement","icon":"PDF","date":"2026-03-14","fields":[["Customer","Smith"],["Start","14 Mar 2026"],["End","14 Mar 2027"]]},{"id":"ac","name":"Statement — Acme Supply, March 2026","type":"Vendor statement","icon":"INV","date":"2026-03-31","fields":[["Invoices","2"],["Billed","$1,696.50"],["Open balance","$412.00"]]},{"id":"hs","name":"Account statement — Henderson","type":"Customer statement","icon":"INV","date":"2026-10-01","fields":[["Billed","$4,000.00"],["Paid","$1,860.00"],["Open balance","$2,140.00"]]},{"id":"bp","name":"Permit BP-2025-0417 — 12 Main St","type":"Building permit","icon":"PDF","date":"2025-04-08","fields":[["Issued","8 Apr 2025"],["Final inspection","2 Jun 2025"],["Customer","Delgado, M."]]},{"id":"wr","name":"Warranty registration — 3247 Elm St","type":"Warranty registration","icon":"PDF","date":"2019-03-19","fields":[["Equipment","Carrier 59TP6A080V17"],["Installed","14 Mar 2019"],["Parts coverage","Through 14 Mar 2029"]]}],"questions":[{"q":"When does the Smith contract end?","keys":{"s":["smith","118 oak"],"w":["contract","agreement","ends"]},"answer":"The Smith service agreement for 118 Oak St ends on 14 Mar 2027. It started on 14 Mar 2026.","fields":[["Document","Service agreement","",""],["Customer","Smith","",""],["Address","118 Oak St","",""],["Start","14 Mar 2026","",""],["End","14 Mar 2027","ok","Active"],["Original","1 page, scanned","",""]],"sources":[{"doc":"sa","where":"page 1, term"}]},{"q":"What did we pay Acme Supply in March?","keys":{"s":["acme"],"w":["supply","march","pay","paid"]},"answer":"Acme Supply billed you $1,696.50 across two invoices dated in March. $1,284.50 is marked paid; $412.00 is still open.","fields":[["Vendor","Acme Supply","",""],["Invoices","2 · March 2026","",""],["Billed","$1,696.50","",""],["Paid","$1,284.50","ok","Paid"],["Open balance","$412.00","warn","Open"],["Largest","INV-20418 · 4 Mar","",""]],"sources":[{"doc":"ac","where":"page 1, invoice INV-20418 total, 4 Mar"},{"doc":"ac","where":"page 2, invoice INV-20511 balance due, 21 Mar"}]},{"q":"What's still unpaid on the Henderson invoices?","keys":{"s":["henderson"],"w":["unpaid","invoices","owe","balance"]},"answer":"Henderson has two open invoices totaling $2,140.00: INV-3017 for $1,240.00 and INV-3052 for $900.00. Of $4,000.00 billed, $1,860.00 is paid.","fields":[["Customer","Henderson","",""],["Billed","$4,000.00","",""],["Paid","$1,860.00","ok","Paid"],["Open balance","$2,140.00","warn","Open"],["Open invoices","2","",""],["Oldest open","INV-3017 · $1,240.00","",""]],"sources":[{"doc":"hs","where":"page 1, open invoices"},{"doc":"hs","where":"page 2, paid to date"}]},{"q":"Show me the signed permit for 12 Main.","keys":{"s":["12 main"],"w":["permit","signed","show me"]},"answer":"Found it: building permit BP-2025-0417 for 12 Main St, issued 8 Apr 2025 and signed off after the final inspection on 2 Jun 2025. The original pages are attached.","fields":[["Document","Permit · BP-2025-0417","",""],["Address","12 Main St","",""],["Issued","08 Apr 2025","",""],["Final inspection","02 Jun 2025","ok","Passed"],["Customer","Delgado, M.","",""],["Original","2 pages, scanned","",""]],"sources":[{"doc":"bp","where":"page 1, signature block"},{"doc":"bp","where":"page 2, final sign-off"}]},{"q":"Is the furnace at 3247 Elm still under warranty?","keys":{"s":["furnace","carrier","59tp6"],"w":["warranty","under","3247"]},"answer":"Yes — parts coverage on the Carrier 59TP6 at 3247 Elm St runs through 14 Mar 2029. Labor coverage ended 14 Mar 2024. Where documents describe equipment, DeepWell links them to the unit by serial.","fields":[["Equipment","Carrier 59TP6A080V17","",""],["Serial","4N2119-08772","",""],["Installed","14 Mar 2019 · M. Reyes","",""],["Parts warranty","Active · 2y 6m left","ok","Active"],["Labor warranty","Ended Mar 2024","bad","Expired"],["Last service","02 Nov 2025 · igniter","",""]],"sources":[{"doc":"wr","where":"page 1, coverage terms"},{"doc":"wr","where":"page 2, serial field"}]}]},{"slug":"plumbing","label":"Plumbing","documents":[{"id":"inv","name":"Invoice P-5521 — 63 Hollis Ave","type":"Invoice","icon":"INV","date":"2026-06-18","fields":[["Customer","Larkin"],["Job","50-gal water heater"],["Total","$1,845.00"]]},{"id":"wc","name":"Warranty certificate — water heater","type":"Warranty certificate","icon":"WTY","date":"2026-06-18","fields":[["Installed","18 Jun 2026"],["Tank warranty","6 years"],["Parts warranty","1 year"]]},{"id":"pm","name":"Permit PL-2026-0788 — 63 Hollis Ave","type":"Permit","icon":"PRM","date":"2026-06-10","fields":[["Issued","10 Jun 2026"],["Final inspection","22 Jun 2026"],["Result","Passed"]]},{"id":"bf","name":"Backflow test report — Redwood Bistro","type":"Test report","icon":"TST","date":"2026-08-12","fields":[["Tested","12 Aug 2026"],["Result","Passed"],["Next due","12 Aug 2027"]]}],"questions":[{"q":"What did we charge for the water heater at 63 Hollis Ave?","keys":{"s":["hollis","p-5521","5521"],"w":["charge","water heater","invoice"]},"answer":"The invoice for the water heater at 63 Hollis Ave totals $1,845.00: $1,320.00 for the unit and $525.00 for labor.","fields":[["Customer","Larkin","",""],["Unit","$1,320.00","",""],["Labor","$525.00","",""],["Total","$1,845.00","",""]],"sources":[{"doc":"inv","where":"page 1, line items and total"}]},{"q":"Is the water heater at 63 Hollis Ave still under warranty?","keys":{"s":["warranty"],"w":["water heater","hollis","under"]},"answer":"Yes. The tank is covered for 6 years, through 18 Jun 2032, and parts for 1 year, through 18 Jun 2027.","fields":[["Installed","18 Jun 2026","",""],["Tank warranty","Through 18 Jun 2032","ok","Active"],["Parts warranty","Through 18 Jun 2027","ok","Active"]],"sources":[{"doc":"wc","where":"page 1, coverage terms"},{"doc":"inv","where":"page 1, install date"}]},{"q":"Was the permit for 63 Hollis Ave signed off?","keys":{"s":["permit"],"w":["signed","final","inspection","hollis"]},"answer":"Yes. Permit PL-2026-0788 for 63 Hollis Ave was issued 10 Jun 2026 and passed final inspection on 22 Jun 2026.","fields":[["Permit","PL-2026-0788","",""],["Issued","10 Jun 2026","",""],["Final inspection","22 Jun 2026","ok","Passed"]],"sources":[{"doc":"pm","where":"page 1, issue date"},{"doc":"pm","where":"page 2, final inspection"}]},{"q":"When is the backflow test due again for Redwood Bistro?","keys":{"s":["backflow","redwood"],"w":["test","due","bistro"]},"answer":"The backflow test for Redwood Bistro was passed on 12 Aug 2026. The next test is due 12 Aug 2027.","fields":[["Customer","Redwood Bistro","",""],["Last tested","12 Aug 2026","ok","Passed"],["Next due","12 Aug 2027","",""]],"sources":[{"doc":"bf","where":"page 1, test result and next due date"}]}]},{"slug":"electrical","label":"Electrical","documents":[{"id":"pm","name":"Permit EL-2026-0312 — 29 Quarry Rd","type":"Permit","icon":"PRM","date":"2026-08-18","fields":[["Work","Panel upgrade"],["Service size","200 amp"],["Issued","18 Aug 2026"]]},{"id":"ir","name":"Inspection report — 29 Quarry Rd","type":"Inspection report","icon":"INS","date":"2026-09-09","fields":[["Inspection","Final"],["Result","Passed"],["Date","9 Sep 2026"]]},{"id":"es","name":"Estimate E-3304 — 7 Alder Ln","type":"Estimate","icon":"EST","date":"2026-09-24","fields":[["Customer","Moreau"],["Job","EV charger install"],["Amount","$2,380.00"]]},{"id":"sw","name":"Warranty — whole-home surge protector","type":"Warranty","icon":"WTY","date":"2026-09-03","fields":[["Installed","3 Sep 2026"],["Coverage","10 years"],["Address","29 Quarry Rd"]]}],"questions":[{"q":"What size panel did we install at 29 Quarry Rd?","keys":{"s":["panel","quarry"],"w":["size","amp","install"]},"answer":"The permit for 29 Quarry Rd covers a panel upgrade to a 200 amp service.","fields":[["Address","29 Quarry Rd","",""],["Work","Panel upgrade","",""],["Service size","200 amp","",""]],"sources":[{"doc":"pm","where":"page 1, scope of work"}]},{"q":"Did 29 Quarry Rd pass final inspection?","keys":{"s":["inspection"],"w":["pass","final","quarry"]},"answer":"Yes. The final inspection at 29 Quarry Rd passed on 9 Sep 2026.","fields":[["Address","29 Quarry Rd","",""],["Final inspection","9 Sep 2026","ok","Passed"],["Permit","EL-2026-0312","",""]],"sources":[{"doc":"ir","where":"page 2, final result"},{"doc":"pm","where":"page 1, permit number"}]},{"q":"What was the estimate for the EV charger at 7 Alder Ln?","keys":{"s":["ev charger","alder"],"w":["estimate","charger","quote"]},"answer":"The estimate for the EV charger at 7 Alder Ln is $2,380.00, and it is good through 30 Nov 2026.","fields":[["Customer","Moreau","",""],["Job","EV charger install","",""],["Amount","$2,380.00","",""],["Valid through","30 Nov 2026","ok","Valid"]],"sources":[{"doc":"es","where":"page 1, total and validity"}]},{"q":"How long is the surge protector warranty at 29 Quarry Rd?","keys":{"s":["surge"],"w":["warranty","protector","long"]},"answer":"The whole-home surge protector at 29 Quarry Rd is covered for 10 years from its 3 Sep 2026 install, through 3 Sep 2036.","fields":[["Installed","3 Sep 2026","",""],["Coverage","10 years","",""],["Ends","3 Sep 2036","ok","Active"]],"sources":[{"doc":"sw","where":"page 1, coverage terms"}]}]},{"slug":"general-contractor","label":"General contractor","documents":[{"id":"sc","name":"Subcontract — Ridgeline Framing","type":"Subcontract","icon":"CON","date":"2026-05-12","fields":[["Job","Hartwell addition"],["Amount","$84,500"],["Signed","12 May 2026"]]},{"id":"co","name":"Change order 3 — Hartwell residence","type":"Change order","icon":"CHG","date":"2026-08-20","fields":[["Added cost","$6,250.00"],["Added time","4 working days"],["Reason","Window relocation"]]},{"id":"lw","name":"Lien waiver — Ridgeline Framing","type":"Lien waiver","icon":"LWV","date":"2026-09-09","fields":[["Payment","2 of 4"],["Amount","$28,000.00"],["Signed","9 Sep 2026"]]},{"id":"ci","name":"Insurance certificate — Ridgeline Framing","type":"Certificate of insurance","icon":"CRT","date":"2026-02-01","fields":[["General liability","$2,000,000"],["Expires","1 Feb 2027"],["Insurer","Pinecrest Mutual"]]}],"questions":[{"q":"What's the contract amount for Ridgeline Framing?","keys":{"s":["ridgeline"],"w":["contract","amount","subcontract"]},"answer":"The Ridgeline Framing subcontract for the Hartwell addition is $84,500, signed 12 May 2026.","fields":[["Subcontractor","Ridgeline Framing","",""],["Job","Hartwell addition","",""],["Amount","$84,500","",""],["Signed","12 May 2026","",""]],"sources":[{"doc":"sc","where":"page 1, contract sum"}]},{"q":"What did change order 3 add to the Hartwell job?","keys":{"s":["change order"],"w":["hartwell","added","add"]},"answer":"Change order 3 adds $6,250.00 and 4 working days to the Hartwell job, for relocating a window.","fields":[["Change order","3","",""],["Added cost","$6,250.00","",""],["Added time","4 working days","",""],["Reason","Window relocation","",""]],"sources":[{"doc":"co","where":"page 1, cost and schedule impact"}]},{"q":"Do we have a lien waiver for Ridgeline's second payment?","keys":{"s":["lien"],"w":["waiver","payment","second"]},"answer":"Yes. A lien waiver for Ridgeline's second payment of $28,000.00 was signed on 9 Sep 2026.","fields":[["Subcontractor","Ridgeline Framing","",""],["Payment","2 of 4","",""],["Amount","$28,000.00","",""],["Waiver signed","9 Sep 2026","ok","On file"]],"sources":[{"doc":"lw","where":"page 1, signature block"}]},{"q":"When does Ridgeline's insurance expire?","keys":{"s":["insurance"],"w":["expire","ridgeline","coverage"]},"answer":"Ridgeline Framing's insurance certificate shows general liability coverage of $2,000,000 through 1 Feb 2027.","fields":[["Subcontractor","Ridgeline Framing","",""],["General liability","$2,000,000","",""],["Expires","1 Feb 2027","ok","Active"]],"sources":[{"doc":"ci","where":"page 1, policy dates"}]}]},{"slug":"landscaping","label":"Landscaping","documents":[{"id":"mc","name":"Maintenance contract — Oakridge HOA","type":"Service contract","icon":"CON","date":"2025-12-15","fields":[["Term","1 Jan – 31 Dec 2026"],["Visits","Weekly, Apr – Oct"],["Fee","$2,150 / month"]]},{"id":"ir","name":"Irrigation check — Oakridge HOA","type":"Inspection report","icon":"INS","date":"2026-08-18","fields":[["Zones checked","8"],["Issues found","3"],["Repaired","18 Aug 2026"]]},{"id":"es","name":"Estimate — Pruitt patio planting","type":"Estimate","icon":"EST","date":"2026-10-02","fields":[["Customer","Pruitt"],["Amount","$7,940.00"],["Valid through","15 Nov 2026"]]},{"id":"pa","name":"Application record — Oakridge HOA","type":"Treatment record","icon":"REC","date":"2026-05-06","fields":[["Product","Pre-emergent"],["Applied","6 May 2026"],["Applicator","M. Tran"]]}],"questions":[{"q":"How often do we mow Oakridge HOA?","keys":{"s":["oakridge"],"w":["mow","often","weekly"]},"answer":"Oakridge HOA is serviced weekly from April through October, at $2,150 per month.","fields":[["Customer","Oakridge HOA","",""],["Visits","Weekly, Apr – Oct","",""],["Fee","$2,150 / month","",""]],"sources":[{"doc":"mc","where":"page 1, service schedule and fee"}]},{"q":"When does the Oakridge contract end?","keys":{"s":["contract"],"w":["end","ends","term","oakridge"]},"answer":"The Oakridge HOA maintenance contract runs from 1 Jan to 31 Dec 2026, and it renews each year unless either side gives 30 days' notice.","fields":[["Customer","Oakridge HOA","",""],["Start","1 Jan 2026","",""],["End","31 Dec 2026","ok","Active"],["Notice to cancel","30 days","",""]],"sources":[{"doc":"mc","where":"page 1, term"},{"doc":"mc","where":"page 3, renewal"}]},{"q":"What did the irrigation check find at Oakridge?","keys":{"s":["irrigation"],"w":["found","check","find","zones"]},"answer":"The irrigation check at Oakridge found three issues across 8 zones: two broken heads in zone 3 and a leaking valve. All three were repaired on 18 Aug 2026.","fields":[["Zones checked","8","",""],["Issues found","3","warn","Found"],["Repaired","18 Aug 2026","ok","Done"]],"sources":[{"doc":"ir","where":"page 1, findings"},{"doc":"ir","where":"page 2, repairs"}]},{"q":"What was the estimate for the Pruitt patio planting?","keys":{"s":["pruitt"],"w":["estimate","patio","planting"]},"answer":"The estimate for the Pruitt patio planting is $7,940.00, valid through 15 Nov 2026.","fields":[["Customer","Pruitt","",""],["Amount","$7,940.00","",""],["Valid through","15 Nov 2026","ok","Valid"]],"sources":[{"doc":"es","where":"page 1, total and validity"}]}]},{"slug":"cleaning-facilities","label":"Cleaning & facilities","documents":[{"id":"sa","name":"Service agreement — Brightline Offices","type":"Service agreement","icon":"CON","date":"2026-01-05","fields":[["Schedule","Mon, Wed, Fri evenings"],["Fee","$3,200 / month"],["Term","Through 31 Dec 2026"]]},{"id":"in","name":"Site inspection — Brightline Offices","type":"Inspection report","icon":"INS","date":"2026-08-28","fields":[["Score","94 / 100"],["Inspector","L. Danso"],["Notes","1"]]},{"id":"ci","name":"Insurance certificate — cleaning liability","type":"Certificate of insurance","icon":"CRT","date":"2026-03-15","fields":[["Coverage","$1,000,000"],["Expires","15 Mar 2027"],["Insurer","Harborline Mutual"]]},{"id":"fs","name":"Service record — floor scrubber","type":"Equipment record","icon":"REC","date":"2026-07-06","fields":[["Serviced","6 Jul 2026"],["Work","Brushes replaced"],["Next service","6 Jan 2027"]]}],"questions":[{"q":"What days do we clean Brightline Offices?","keys":{"s":["brightline"],"w":["days","clean","schedule"]},"answer":"Brightline Offices is cleaned Monday, Wednesday and Friday evenings, at $3,200 per month.","fields":[["Customer","Brightline Offices","",""],["Schedule","Mon, Wed, Fri evenings","",""],["Fee","$3,200 / month","",""]],"sources":[{"doc":"sa","where":"page 1, service schedule"}]},{"q":"What score did the August inspection give Brightline Offices?","keys":{"s":["inspection"],"w":["score","august","brightline"]},"answer":"The August inspection scored Brightline Offices 94 out of 100, with one note about the restroom dispensers.","fields":[["Inspection","28 Aug 2026","",""],["Score","94 / 100","ok","Pass"],["Notes","1 · restroom dispensers","warn","Noted"]],"sources":[{"doc":"in","where":"page 1, score"},{"doc":"in","where":"page 2, notes"}]},{"q":"When does our cleaning liability insurance expire?","keys":{"s":["insurance"],"w":["expire","liability","expires"]},"answer":"The cleaning liability insurance carries $1,000,000 in coverage and expires on 15 Mar 2027.","fields":[["Coverage","$1,000,000","",""],["Expires","15 Mar 2027","ok","Active"],["Insurer","Harborline Mutual","",""]],"sources":[{"doc":"ci","where":"page 1, policy dates"}]},{"q":"When was the floor scrubber last serviced?","keys":{"s":["scrubber"],"w":["serviced","floor","last"]},"answer":"The floor scrubber was last serviced on 6 Jul 2026, when its brushes were replaced. The next service is due 6 Jan 2027.","fields":[["Equipment","Floor scrubber","",""],["Last serviced","6 Jul 2026","",""],["Next service","6 Jan 2027","",""]],"sources":[{"doc":"fs","where":"page 1, service details"}]}]},{"slug":"auto-repair","label":"Auto repair","documents":[{"id":"ro","name":"Repair order RO-10482","type":"Repair order","icon":"RO","date":"2026-09-03","fields":[["Vehicle","2018 Ford F-150"],["Mileage","41,820"],["Total","$673.93"]]},{"id":"au","name":"Customer authorization — RO-10482","type":"Authorization","icon":"AUT","date":"2026-09-03","fields":[["Approved","Add rotor replacement"],["Method","Phone"],["Date","3 Sep 2026"]]},{"id":"pi","name":"Parts invoice — Midland Auto Parts","type":"Parts invoice","icon":"INV","date":"2026-09-02","fields":[["Items","Pads, rotors"],["Parts total","$412.90"],["Repair order","RO-10482"]]},{"id":"wy","name":"Warranty — brake pads and rotors","type":"Warranty","icon":"WTY","date":"2026-09-03","fields":[["Coverage","24 months / 24,000 mi"],["Starts","3 Sep 2026"],["Repair order","RO-10482"]]}],"questions":[{"q":"What was done on repair order 10482?","keys":{"s":["10482"],"w":["repair order","done","work"]},"answer":"Repair order RO-10482 covered replacing the front brake pads and rotors on a 2018 Ford F-150 at 41,820 miles, on 3 Sep 2026.","fields":[["Vehicle","2018 Ford F-150","",""],["Mileage","41,820","",""],["Work","Front pads and rotors","",""],["Date","3 Sep 2026","",""]],"sources":[{"doc":"ro","where":"page 1, work performed"}]},{"q":"What was the total on repair order 10482?","keys":{"s":["total"],"w":["10482","repair order","cost"]},"answer":"The total on RO-10482 is $673.93: $412.90 in parts, $210.00 in labor, $18.00 in shop supplies and $33.03 in tax.","fields":[["Parts","$412.90","",""],["Labor","$210.00","",""],["Shop supplies","$18.00","",""],["Tax","$33.03","",""],["Total","$673.93","",""]],"sources":[{"doc":"ro","where":"page 1, totals"},{"doc":"pi","where":"page 1, parts total"}]},{"q":"Did the customer approve the rotor replacement?","keys":{"s":["approve","approved","authoriz"],"w":["rotor","customer","replacement"]},"answer":"Yes. The customer approved adding the rotor replacement by phone on 3 Sep 2026.","fields":[["Repair order","RO-10482","",""],["Added work","Rotor replacement","",""],["Approved","3 Sep 2026, phone","ok","Approved"]],"sources":[{"doc":"au","where":"page 1, approval note"}]},{"q":"How long is the brake warranty on RO-10482?","keys":{"s":["warranty"],"w":["brake","how long","10482"]},"answer":"The brake pads and rotors are covered for 24 months or 24,000 miles, whichever comes first: through 3 Sep 2028 or 65,820 miles.","fields":[["Coverage","24 months / 24,000 mi","",""],["Ends","3 Sep 2028 or 65,820 mi","ok","Active"],["Repair order","RO-10482","",""]],"sources":[{"doc":"wy","where":"page 1, coverage terms"},{"doc":"ro","where":"page 1, mileage"}]}]},{"slug":"nonprofit","label":"Nonprofit","documents":[{"id":"ga","name":"Grant award letter — Harbor Valley Foundation","type":"Grant award","icon":"GRN","date":"2026-06-20","fields":[["Award","$45,000"],["Period","1 Jul 2026 – 30 Jun 2027"],["Payments","2 installments"]]},{"id":"dr","name":"Donation receipt D-0418 — Whitaker family","type":"Donation receipt","icon":"RCT","date":"2026-09-14","fields":[["Amount","$2,500.00"],["Date","14 Sep 2026"],["Receipt","D-0418"]]},{"id":"bm","name":"Board minutes — 9 Sep 2026","type":"Meeting minutes","icon":"MIN","date":"2026-09-09","fields":[["Present","7 of 9 members"],["Motions","3"],["Next meeting","14 Oct 2026"]]},{"id":"vw","name":"Volunteer agreement — T. Castellan","type":"Volunteer agreement","icon":"AGR","date":"2026-04-11","fields":[["Role","Food pantry"],["Signed","11 Apr 2026"],["Background check","On file"]]}],"questions":[{"q":"How much was the Harbor Valley grant?","keys":{"s":["harbor valley","grant"],"w":["award","how much","amount"]},"answer":"The Harbor Valley Foundation awarded $45,000 for 1 Jul 2026 through 30 Jun 2027, paid in two installments.","fields":[["Funder","Harbor Valley Foundation","",""],["Award","$45,000","",""],["Period","1 Jul 2026 – 30 Jun 2027","",""],["Payments","2 installments","",""]],"sources":[{"doc":"ga","where":"page 1, award amount and period"}]},{"q":"When is the grant report due?","keys":{"s":["report"],"w":["grant","due","when"]},"answer":"The interim report for the Harbor Valley grant is due 15 Jan 2027, and the final report is due 31 Jul 2027.","fields":[["Interim report","15 Jan 2027","warn","Upcoming"],["Final report","31 Jul 2027","",""]],"sources":[{"doc":"ga","where":"page 2, reporting schedule"}]},{"q":"What did the board decide about the office lease?","keys":{"s":["board"],"w":["lease","decide","decided","minutes"]},"answer":"On 9 Sep 2026 the board approved renewing the office lease for 24 months at $2,100 per month.","fields":[["Meeting","9 Sep 2026","",""],["Decision","Renew office lease","ok","Approved"],["Term","24 months","",""],["Rent","$2,100 / month","",""]],"sources":[{"doc":"bm","where":"page 2, motion 2"}]},{"q":"What did we receive from the Whitaker family in September?","keys":{"s":["whitaker"],"w":["donation","receive","received","september"]},"answer":"The Whitaker family gave $2,500.00 on 14 Sep 2026. Receipt D-0418 states that no goods or services were provided in return.","fields":[["Donor","Whitaker family","",""],["Amount","$2,500.00","",""],["Date","14 Sep 2026","",""],["Receipt","D-0418","ok","Issued"]],"sources":[{"doc":"dr","where":"page 1, amount and acknowledgment"}]}]},{"slug":"office-professional","label":"Office / professional services","documents":[{"id":"el","name":"Engagement letter — Brightwater Design Co.","type":"Engagement letter","icon":"ENG","date":"2026-02-10","fields":[["Rate","$165 / hour"],["Signed","10 Feb 2026"],["Term","12 months"]]},{"id":"sw","name":"Statement of work 2 — Brightwater Design Co.","type":"Statement of work","icon":"SOW","date":"2026-08-24","fields":[["Fixed fee","$18,400"],["Due","20 Nov 2026"],["Milestones","3"]]},{"id":"iv","name":"Invoice 2207 — Brightwater Design Co.","type":"Invoice","icon":"INV","date":"2026-09-30","fields":[["Amount","$5,520.00"],["Due","30 Oct 2026"],["Status","Open"]]},{"id":"nd","name":"Mutual NDA — Brightwater Design Co.","type":"Confidentiality agreement","icon":"NDA","date":"2026-03-04","fields":[["Signed","4 Mar 2026"],["Term","3 years"],["Ends","4 Mar 2029"]]}],"questions":[{"q":"What's our hourly rate for Brightwater Design?","keys":{"s":["hourly","rate"],"w":["brightwater","hour","engagement"]},"answer":"The engagement letter sets the hourly rate for Brightwater Design Co. at $165.","fields":[["Client","Brightwater Design Co.","",""],["Rate","$165 / hour","",""],["Signed","10 Feb 2026","",""]],"sources":[{"doc":"el","where":"page 1, fees"}]},{"q":"When is the Brightwater statement of work due?","keys":{"s":["statement of work","sow"],"w":["due","deliver","deliverables"]},"answer":"Statement of work 2 is a fixed fee of $18,400, with the final deliverables due 20 Nov 2026.","fields":[["Fixed fee","$18,400","",""],["Milestones","3","",""],["Final due","20 Nov 2026","warn","Upcoming"]],"sources":[{"doc":"sw","where":"page 1, fee"},{"doc":"sw","where":"page 3, delivery schedule"}]},{"q":"Is invoice 2207 paid?","keys":{"s":["2207"],"w":["invoice","paid","unpaid"]},"answer":"Not yet. Invoice 2207 for $5,520.00, the first milestone, is open and due 30 Oct 2026.","fields":[["Invoice","2207","",""],["Amount","$5,520.00","",""],["Due","30 Oct 2026","",""],["Status","Open","warn","Open"]],"sources":[{"doc":"iv","where":"page 1, amount and due date"},{"doc":"sw","where":"page 2, milestone 1"}]},{"q":"How long does the Brightwater NDA last?","keys":{"s":["nda","confidentiality"],"w":["how long","last","expire"]},"answer":"The mutual NDA with Brightwater Design Co. runs for 3 years from 4 Mar 2026, through 4 Mar 2029.","fields":[["Signed","4 Mar 2026","",""],["Term","3 years","",""],["Ends","4 Mar 2029","ok","Active"]],"sources":[{"doc":"nd","where":"page 2, term"}]}]}]}</script>
-<!-- tryit-data:end -->
 <script>
 /* ---- ambient well rings ---- */
 (function(){
@@ -2787,141 +2768,6 @@ footer .wrap a.ft-ind{font-weight:600}
   els.forEach(el=>io.observe(el));
 })();
 
-/* ---- demo ---- */
-let DEMO=[];
-(function(){
-  /* Example content for every industry lives in src/data/tryIt.json; scripts/build-tryit.mjs keeps the copy below in step. */
-  let INDS=[];
-  try{INDS=JSON.parse(document.getElementById('tryit-data').textContent).industries||[]}catch(e){}
-  if(!INDS.length)return;
-  const main=document.getElementById('demo-main');
-  const list=document.getElementById('q-list');
-  const chipBox=document.getElementById('ind-chips');
-  const sel=document.getElementById('ind-select');
-  const docsRow=document.getElementById('docs-row');
-  const docsLabel=document.getElementById('docs-label');
-  const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const esc=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const day=iso=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);return m?(+m[3])+' '+MON[+m[2]-1]+' '+m[1]:iso};
-  let ind=INDS[0],btns=[],KEYS=[],cur=0;
-  function render(i,quiet){
-    const d=DEMO[i];cur=i;
-    btns.forEach(b=>b.setAttribute('aria-pressed',String(+b.dataset.i===i)));
-    main.classList.remove('demo-reveal');
-    main.innerHTML=`
-      <div class="answer-head"><div class="eyebrow">Answer</div><div class="t">${d.sources.length} sources</div></div>
-      <p class="answer">${d.answer}</p>
-      <div class="kv">${d.fields.map(([k,v,cls,label],idx)=>`<div style="--i:${idx}"><span class="k">${k}</span><span class="v">${v}</span>${cls?`<span class="pill ${cls}">${label}</span>`:''}</div>`).join('')}</div>
-      <div class="sources">${d.sources.map(([t,n,w],idx)=>`<div class="src" style="--i:${idx}"><span class="ic">${t}</span><span><b>${n}</b> · ${w}</span></div>`).join('')}</div>
-      <div class="demo-note">Example records. Names, addresses and figures are illustrative.</div>`;
-    if(!reduceMotion&&!quiet){
-      // force reflow so the class can retrigger the animation on repeat clicks
-      void main.offsetWidth;
-      main.classList.add('demo-reveal');
-    }
-  }
-  /* Single run controller: at most one typing run exists at a time. Every
-     start/cancel bumps runId and clears the timer, so a stale run can never
-     write to the input or the answer area. */
-  const input=document.getElementById('ask-input');
-  let runId=0,timer=null,activeIdx=-1;
-  function cancelRun(){
-    runId++;
-    if(timer){clearInterval(timer);timer=null;}
-    activeIdx=-1;
-    input.classList.remove('dw-typing');
-  }
-  function startRun(i){
-    cancelRun();
-    const my=runId,text=DEMO[i].q;
-    if(reduceMotion){input.value=text;render(i);return;}
-    activeIdx=i;
-    input.classList.add('dw-typing');
-    input.value='';
-    let n=0;
-    timer=setInterval(()=>{
-      if(my!==runId){clearInterval(timer);return;}
-      n++;
-      input.value=text.slice(0,n);   /* absolute write, never append */
-      if(n>=text.length){cancelRun();render(i);}
-    },18);
-  }
-  /* user typing takes over from any running animation */
-  input.addEventListener('input',cancelRun);
-  /* Focusing the field mid-animation also takes over, and selects what the demo had typed so far: the visitor's
-     first keystroke then REPLACES it. (Only 'input' used to cancel, so a click + type appended the visitor's
-     text to the demo's half-typed question: "What did Marc" + "carrier expire 90".) */
-  input.addEventListener('focus',()=>{if(activeIdx>=0){cancelRun();input.select();}});
-  /* s = strong keys (a name or document), w = weak keys. A question needs a score of 2+: one strong key, or two weak ones.
-     A visitor who types a sample question word for word always gets that question. */
-  function match(q){
-    q=q.toLowerCase();
-    const exact=DEMO.findIndex(d=>d.q.toLowerCase()===q);
-    if(exact>=0)return exact;
-    let best=1,bi=-1;
-    KEYS.forEach((k,i)=>{const n=k.s.filter(x=>q.includes(x)).length*2+k.w.filter(x=>q.includes(x)).length;if(n>best){best=n;bi=i}});
-    return bi;
-  }
-  document.getElementById('ask').addEventListener('submit',e=>{
-    e.preventDefault();
-    cancelRun();
-    const q=input.value.trim();if(!q)return;
-    const i=match(q);
-    if(i>=0){render(i);return;}
-    btns.forEach(b=>b.setAttribute('aria-pressed','false'));cur=-1;
-    main.innerHTML=`<div class="answer-head"><div class="eyebrow">Answer</div><div class="t">0 sources</div></div>
-      <p class="answer">Nothing in the sample records matches "${q.replace(/</g,'&lt;')}". In your own account this would search every document you've uploaded — try one of the questions on the left to see how an answer is built.</p>
-      <div class="demo-note">This preview holds a handful of example records. Your account answers from your files.</div>`;
-  });
-  /* reserve the height of the tallest sample answer so switching questions never moves the page */
-  function reserve(){
-    if(cur<0||activeIdx>=0)return;
-    const keep=cur,live=main.getAttribute('aria-live');
-    main.removeAttribute('aria-live');main.style.minHeight='';
-    let mx=0;
-    for(let k=0;k<DEMO.length;k++){render(k,true);mx=Math.max(mx,main.offsetHeight);}
-    main.style.minHeight=mx+'px';render(keep,true);
-    if(live)main.setAttribute('aria-live',live);
-  }
-  /* ---- industry picker ---- */
-  function showIndustry(x){
-    cancelRun();
-    ind=x;
-    const docs=Object.fromEntries(x.documents.map(d=>[d.id,d]));
-    DEMO=x.questions.map(q=>({q:q.q,answer:q.answer,fields:q.fields,sources:q.sources.map(s=>[docs[s.doc].icon,docs[s.doc].name,s.where])}));
-    KEYS=x.questions.map(q=>q.keys);
-    list.innerHTML=DEMO.map((d,i)=>`<button class="q" type="button" id="q${i}" data-i="${i}" aria-pressed="${i===0}">${esc(d.q)}</button>`).join('');
-    btns=[...list.querySelectorAll('.q')];
-    btns.forEach(b=>b.addEventListener('click',()=>{
-      const i=+b.dataset.i;
-      if(activeIdx===i)return;   /* same chip already typing: don't restart */
-      startRun(i);
-    }));
-    docsLabel.textContent='Example documents · '+x.label;
-    docsRow.innerHTML=x.documents.map(d=>`<div class="doc"><div class="doc-top"><span class="ic">${esc(d.icon)}</span><span><b>${esc(d.name)}</b><span class="meta">${esc(d.type)} · <time datetime="${esc(d.date)}">${esc(day(d.date))}</time></span></span></div><dl>${d.fields.map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl></div>`).join('');
-    chipBox.querySelectorAll('.ind-chip').forEach(c=>c.setAttribute('aria-pressed',String(c.dataset.slug===x.slug)));
-    sel.value=x.slug;
-    input.value='';
-    render(0,true);
-    reserve();
-  }
-  function choose(slug){
-    const x=INDS.find(i=>i.slug===slug);if(!x)return;
-    if(x!==ind)showIndustry(x);
-    /* keep the choice in the address so it can be sent as a direct link */
-    try{const u=new URL(location.href);u.searchParams.set('industry',x.slug);history.replaceState(null,'',u)}catch(e){}
-  }
-  chipBox.innerHTML=INDS.map(x=>`<button class="ind-chip" type="button" data-slug="${esc(x.slug)}" aria-pressed="false">${esc(x.label)}</button>`).join('');
-  sel.innerHTML=INDS.map(x=>`<option value="${esc(x.slug)}">${esc(x.label)}</option>`).join('');
-  chipBox.addEventListener('click',e=>{const c=e.target.closest('.ind-chip');if(c)choose(c.dataset.slug)});
-  sel.addEventListener('change',()=>choose(sel.value));
-  let want=null;
-  try{want=new URLSearchParams(location.search).get('industry')}catch(e){}
-  showIndustry(INDS.find(x=>x.slug===want)||INDS[0]);
-  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(reserve);
-  let rt;addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(reserve,150)});
-})();
 </script>
 
 <script>
