@@ -55,8 +55,9 @@ const ind = read(path.join(ROOT, 'src/demoAccount/industries.ts'));
 const known = new Set([...ind.matchAll(/'([^'\n]+)'/g)].map((m) => m[1].toLowerCase()));
 const catTitles = [...ind.matchAll(/title:\s*'([^']+)'/g)].map((m) => m[1].toLowerCase());
 for (const t of tiles) check(`home tile "${t.name}": name exists in demo data (industries.ts)`, known.has(t.name.toLowerCase()) || catTitles.some((c) => c.split(/\s*&\s*/).includes(t.name.toLowerCase())), 'not in industries.ts');
-const navMenu = (home.match(/id="industriesMenu"[\s\S]*?<\/div>\s*<\/div>/) || [''])[0];
-for (const t of tiles) check(`home tile "${t.name}": description already exists in the nav menu`, navMenu.includes(t.desc));
+// tile copy was reused from the old nav menu notes; those notes now live in the industries generator (PAGE_NOTE), the mega-menu itself carries no descriptions
+const navMenu = read(path.join(ROOT, 'scripts/industries-site/lib.mjs'));
+for (const t of tiles) check(`home tile "${t.name}": description already exists in the industries notes (PAGE_NOTE)`, navMenu.includes(t.desc));
 check('home section: no percentages, prices, accuracy or testimonial claims', !/%|\$\d|\baccura|testimonial|guarantee|\d+\s*(industries|customers|companies)/i.test(sec.replace(/<[^>]+>/g, ' ')));
 const hrefs = [...navOf(home).matchAll(/href="([^"]+)"/g), ...sec.matchAll(/href="([^"]+)"/g), ...footOf(home).matchAll(/href="([^"]+)"/g)].map((m) => m[1]);
 const vercel = JSON.parse(read(path.join(ROOT, 'vercel.json')));

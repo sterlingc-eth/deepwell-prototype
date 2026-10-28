@@ -118,6 +118,34 @@ a{color:inherit}
 .nav-dropdown-menu .dd-d{font-size:.8rem;font-weight:400;line-height:1.35;color:var(--muted)}
 .nav-dropdown-menu .dd-group{font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:8px 12px 4px}
 .nav-dropdown-menu .dd-group:not(:first-child){margin-top:6px;padding-top:12px;border-top:1px solid var(--line)}
+/*dd-mega*/
+.eyebrow a.crumb{color:inherit;text-transform:none;letter-spacing:.04em;font-size:.8rem;text-decoration:underline;text-underline-offset:3px;display:inline-flex;align-items:center;min-height:24px}
+.eyebrow a.crumb:hover{color:var(--text)}
+.navlinks .nav-dropdown-menu .dd-mega{display:block}
+.navlinks .nav-dropdown-menu .dd-col{display:flex;flex-direction:column;min-width:0;margin-bottom:8px}
+.navlinks .nav-dropdown-menu .dd-items{display:grid;grid-template-columns:1fr 1fr;gap:0 8px}
+.navlinks .nav-dropdown-menu a{min-height:44px;padding:6px 10px}
+.navlinks .nav-dropdown-menu a.dd-head{font-family:"IBM Plex Mono",monospace;font-size:.68rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line);border-radius:0;padding:6px 10px;margin-bottom:2px}
+.navlinks .nav-dropdown-menu a.dd-head:hover,.navlinks .nav-dropdown-menu a.dd-head:focus-visible{color:var(--text);background:var(--surface-2)}
+.navlinks .nav-dropdown-menu .dd-t{font-weight:500}
+.navlinks .nav-dropdown-menu a.dd-all{font-weight:600;color:var(--brass-text,var(--text));margin-bottom:2px}
+.navlinks .nav-dropdown-menu .dd-any{margin:0;padding:0 10px;font-size:.86rem;line-height:1.45;color:var(--muted)}
+.navlinks .nav-dropdown-menu .dd-any a{display:inline;padding:14px 2px;font-weight:600;color:var(--text);text-decoration:underline;text-underline-offset:3px}
+@media (min-width:1101px){
+.navlinks .nav-dropdown-menu a.dd-head{min-height:46px;align-items:flex-start;justify-content:flex-end;padding-bottom:6px}
+.nav-dropdown{position:static}
+.navlinks .nav-dropdown-menu{position:fixed;top:74px;left:50%;width:min(960px,calc(100vw - 48px));max-width:none;padding:18px 20px 14px}
+.navlinks .nav-dropdown-menu .dd-mega{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px 24px}
+.navlinks .nav-dropdown-menu .dd-items{display:flex;flex-direction:column}
+.navlinks .nav-dropdown-menu .dd-col{margin-bottom:0}
+.navlinks .nav-dropdown-menu a{min-height:36px;padding:4px 10px}
+}
+@media (max-width:1100px){
+.nav .navlinks .nav-dropdown-menu a.dd-head,.nav.menu-open .navlinks .nav-dropdown-menu a.dd-head{font-size:.7rem}
+.nav.menu-open .navlinks .nav-dropdown-menu a.dd-all,.nav.menu-open .navlinks .nav-dropdown-menu .dd-any{font-size:.9rem}
+.navlinks .nav-dropdown-menu{max-height:calc(100vh - 92px);max-height:calc(100dvh - 92px);overflow-y:auto;padding:8px 10px 10px}
+}
+/*/dd-mega*/
 
 main{padding-block:clamp(36px,7vw,64px)}
 .hero-block{display:flex;flex-direction:column;gap:18px;padding-bottom:36px;border-bottom:1px solid var(--line);margin-bottom:36px}
@@ -225,68 +253,78 @@ footer a{display:inline-flex;align-items:center;justify-content:center;min-heigh
           <svg class="nav-dropdown-caret" width="10" height="6" viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
         <div class="nav-dropdown-menu" id="industriesMenu" role="menu" aria-label="Any Business, One App">
-          <div class="dd-group" role="presentation">By role</div>
-          <a role="menuitem" href="/who.html#office"><span class="dd-t">Office staff</span><span class="dd-d">Answer a caller with the original page in hand.</span></a>
-          <a role="menuitem" href="/who.html#field"><span class="dd-t">People in the field</span><span class="dd-d">Look things up and scan paperwork from a phone.</span></a>
-          <a role="menuitem" href="/who.html#owners"><span class="dd-t">Owners</span><span class="dd-d">See which warranties and agreements are expiring.</span></a>
-          <div class="dd-group" role="presentation">By industry</div>
-          <a role="menuitem" href="/industries/"><span class="dd-t">All 43 industries</span><span class="dd-d">Pick yours and try the demo.</span></a>
-          <a role="menuitem" href="/who.html#industries"><span class="dd-t">Every industry, one app</span><span class="dd-d">See how Donovan fits your kind of business.</span></a>
-          <a role="menuitem" href="/industries/any-business.html"><span class="dd-t">Any business</span><span class="dd-d">If you keep paperwork, it works.</span></a>
-          <div class="dd-group" role="presentation">Trades &amp; field service</div>
-          <a role="menuitem" href="/industries/hvac.html"><span class="dd-t">Plumbing &amp; HVAC</span><span class="dd-d">Warranties, serial numbers and service tickets.</span></a>
-          <a role="menuitem" href="/industries/electrical.html"><span class="dd-t">Electrical</span><span class="dd-d">Permits, inspections and work orders.</span></a>
-          <a role="menuitem" href="/industries/contractors.html"><span class="dd-t">General contractor</span><span class="dd-d">Contracts, permits and purchase orders.</span></a>
-          <a role="menuitem" href="/industries/roofing.html"><span class="dd-t">Roofing</span></a>
-          <a role="menuitem" href="/industries/landscaping.html"><span class="dd-t">Landscaping</span></a>
-          <a role="menuitem" href="/industries/pestcontrol.html"><span class="dd-t">Pest control</span></a>
-          <a role="menuitem" href="/industries/poolservice.html"><span class="dd-t">Pool service</span></a>
-          <a role="menuitem" href="/industries/cleaning.html"><span class="dd-t">Cleaning &amp; janitorial</span></a>
-          <a role="menuitem" href="/industries/auto.html"><span class="dd-t">Auto repair</span></a>
-          <div class="dd-group" role="presentation">Property &amp; real estate</div>
-          <a role="menuitem" href="/industries/realty.html"><span class="dd-t">Real estate</span></a>
-          <a role="menuitem" href="/industries/property-management.html"><span class="dd-t">Property management</span><span class="dd-d">Work orders, vendor contracts and invoices.</span></a>
-          <a role="menuitem" href="/industries/storage.html"><span class="dd-t">Self storage</span></a>
-          <div class="dd-group" role="presentation">Hospitality, events &amp; food</div>
-          <a role="menuitem" href="/industries/hotel.html"><span class="dd-t">Hotel</span></a>
-          <a role="menuitem" href="/industries/eventvenue.html"><span class="dd-t">Event venue</span></a>
-          <a role="menuitem" href="/industries/marina.html"><span class="dd-t">Marina</span></a>
-          <a role="menuitem" href="/industries/weddingplan.html"><span class="dd-t">Wedding planning</span></a>
-          <a role="menuitem" href="/industries/restaurant.html"><span class="dd-t">Restaurant</span></a>
-          <a role="menuitem" href="/industries/brewery.html"><span class="dd-t">Brewery</span></a>
-          <a role="menuitem" href="/industries/foodtruck.html"><span class="dd-t">Food truck</span></a>
-          <div class="dd-group" role="presentation">Professional services &amp; offices</div>
-          <a role="menuitem" href="/industries/bookkeeping.html"><span class="dd-t">Bookkeeping</span></a>
-          <a role="menuitem" href="/industries/legal.html"><span class="dd-t">Law office</span></a>
-          <a role="menuitem" href="/industries/insagency.html"><span class="dd-t">Insurance agency</span></a>
-          <a role="menuitem" href="/industries/msp.html"><span class="dd-t">IT services</span></a>
-          <a role="menuitem" href="/industries/filmprod.html"><span class="dd-t">Film production</span></a>
-          <a role="menuitem" href="/industries/photostudio.html"><span class="dd-t">Photo studio</span></a>
-          <a role="menuitem" href="/industries/tutoring.html"><span class="dd-t">Tutoring</span></a>
-          <div class="dd-group" role="presentation">Healthcare &amp; personal care</div>
-          <a role="menuitem" href="/industries/medicaloffice.html"><span class="dd-t">Medical office</span></a>
-          <a role="menuitem" href="/industries/dentaloffice.html"><span class="dd-t">Dental office</span></a>
-          <a role="menuitem" href="/industries/dentallabco.html"><span class="dd-t">Dental lab</span></a>
-          <a role="menuitem" href="/industries/medbillingco.html"><span class="dd-t">Medical billing</span></a>
-          <a role="menuitem" href="/industries/vetclinic.html"><span class="dd-t">Veterinary clinic</span></a>
-          <a role="menuitem" href="/industries/petgroomco.html"><span class="dd-t">Pet grooming</span></a>
-          <a role="menuitem" href="/industries/gymfit.html"><span class="dd-t">Gym &amp; fitness</span></a>
-          <a role="menuitem" href="/industries/salonspa.html"><span class="dd-t">Salon &amp; spa</span></a>
-          <a role="menuitem" href="/industries/daycarecenter.html"><span class="dd-t">Daycare center</span></a>
-          <div class="dd-group" role="presentation">Nonprofit &amp; community</div>
-          <a role="menuitem" href="/industries/nonprofits.html"><span class="dd-t">Nonprofit</span><span class="dd-d">Agreements, invoices and correspondence.</span></a>
-          <a role="menuitem" href="/industries/grantnp.html"><span class="dd-t">Grant-funded nonprofit</span></a>
-          <a role="menuitem" href="/industries/church.html"><span class="dd-t">Church</span></a>
-          <a role="menuitem" href="/industries/policerecords.html"><span class="dd-t">Records office</span></a>
-          <div class="dd-group" role="presentation">Transport, goods &amp; manufacturing</div>
-          <a role="menuitem" href="/industries/trucking.html"><span class="dd-t">Trucking</span></a>
-          <a role="menuitem" href="/industries/warehouse.html"><span class="dd-t">Warehouse</span></a>
-          <a role="menuitem" href="/industries/mfgqa.html"><span class="dd-t">Manufacturing</span></a>
-          <a role="menuitem" href="/industries/feedstore.html"><span class="dd-t">Feed &amp; farm store</span></a>
-          <div class="dd-group" role="presentation">More guides</div>
-          <a role="menuitem" href="/industries/offices.html"><span class="dd-t">Offices</span><span class="dd-d">Vendor contracts, agreements and forms.</span></a>
-          <a role="menuitem" href="/industries/fleet-equipment-rental.html"><span class="dd-t">Fleet and equipment rental</span><span class="dd-d">Service records, inspections and rental agreements.</span></a>
-          <a role="menuitem" href="/industries/plumbing.html"><span class="dd-t">Plumbing</span><span class="dd-d">Service tickets, permits and warranty paperwork.</span></a>
+        <div class="dd-mega" role="presentation">
+          <div class="dd-col" role="presentation">
+            <a role="menuitem" class="dd-head" href="/industries/#g-trades">Trades &amp; field service</a>
+            <div class="dd-items" role="presentation">
+              <a role="menuitem" href="/industries/hvac.html"><span class="dd-t">Plumbing &amp; HVAC</span></a>
+              <a role="menuitem" href="/industries/electrical.html"><span class="dd-t">Electrical</span></a>
+              <a role="menuitem" href="/industries/contractors.html"><span class="dd-t">General contractor</span></a>
+              <a role="menuitem" href="/industries/roofing.html"><span class="dd-t">Roofing</span></a>
+              <a role="menuitem" href="/industries/landscaping.html"><span class="dd-t">Landscaping</span></a>
+            </div>
+          </div>
+          <div class="dd-col" role="presentation">
+            <a role="menuitem" class="dd-head" href="/industries/#g-property">Property &amp; real estate</a>
+            <div class="dd-items" role="presentation">
+              <a role="menuitem" href="/industries/realty.html"><span class="dd-t">Real estate</span></a>
+              <a role="menuitem" href="/industries/property-management.html"><span class="dd-t">Property management</span></a>
+              <a role="menuitem" href="/industries/storage.html"><span class="dd-t">Self storage</span></a>
+            </div>
+          </div>
+          <div class="dd-col" role="presentation">
+            <a role="menuitem" class="dd-head" href="/industries/#g-hospitality">Hospitality, events &amp; food</a>
+            <div class="dd-items" role="presentation">
+              <a role="menuitem" href="/industries/hotel.html"><span class="dd-t">Hotel</span></a>
+              <a role="menuitem" href="/industries/restaurant.html"><span class="dd-t">Restaurant</span></a>
+              <a role="menuitem" href="/industries/eventvenue.html"><span class="dd-t">Event venue</span></a>
+              <a role="menuitem" href="/industries/brewery.html"><span class="dd-t">Brewery</span></a>
+              <a role="menuitem" href="/industries/foodtruck.html"><span class="dd-t">Food truck</span></a>
+            </div>
+          </div>
+          <div class="dd-col" role="presentation">
+            <a role="menuitem" class="dd-head" href="/industries/#g-professional">Professional services &amp; offices</a>
+            <div class="dd-items" role="presentation">
+              <a role="menuitem" href="/industries/bookkeeping.html"><span class="dd-t">Bookkeeping</span></a>
+              <a role="menuitem" href="/industries/legal.html"><span class="dd-t">Law office</span></a>
+              <a role="menuitem" href="/industries/insagency.html"><span class="dd-t">Insurance agency</span></a>
+              <a role="menuitem" href="/industries/msp.html"><span class="dd-t">IT services</span></a>
+              <a role="menuitem" href="/industries/photostudio.html"><span class="dd-t">Photo studio</span></a>
+            </div>
+          </div>
+          <div class="dd-col" role="presentation">
+            <a role="menuitem" class="dd-head" href="/industries/#g-health">Healthcare &amp; personal care</a>
+            <div class="dd-items" role="presentation">
+              <a role="menuitem" href="/industries/medicaloffice.html"><span class="dd-t">Medical office</span></a>
+              <a role="menuitem" href="/industries/dentaloffice.html"><span class="dd-t">Dental office</span></a>
+              <a role="menuitem" href="/industries/vetclinic.html"><span class="dd-t">Veterinary clinic</span></a>
+              <a role="menuitem" href="/industries/salonspa.html"><span class="dd-t">Salon &amp; spa</span></a>
+              <a role="menuitem" href="/industries/gymfit.html"><span class="dd-t">Gym &amp; fitness</span></a>
+            </div>
+          </div>
+          <div class="dd-col" role="presentation">
+            <a role="menuitem" class="dd-head" href="/industries/#g-community">Nonprofit &amp; community</a>
+            <div class="dd-items" role="presentation">
+              <a role="menuitem" href="/industries/nonprofits.html"><span class="dd-t">Nonprofit</span></a>
+              <a role="menuitem" href="/industries/grantnp.html"><span class="dd-t">Grant-funded nonprofit</span></a>
+              <a role="menuitem" href="/industries/church.html"><span class="dd-t">Church</span></a>
+              <a role="menuitem" href="/industries/policerecords.html"><span class="dd-t">Records office</span></a>
+            </div>
+          </div>
+          <div class="dd-col" role="presentation">
+            <a role="menuitem" class="dd-head" href="/industries/#g-transport">Transport, goods &amp; manufacturing</a>
+            <div class="dd-items" role="presentation">
+              <a role="menuitem" href="/industries/trucking.html"><span class="dd-t">Trucking</span></a>
+              <a role="menuitem" href="/industries/warehouse.html"><span class="dd-t">Warehouse</span></a>
+              <a role="menuitem" href="/industries/mfgqa.html"><span class="dd-t">Manufacturing</span></a>
+              <a role="menuitem" href="/industries/feedstore.html"><span class="dd-t">Feed &amp; farm store</span></a>
+            </div>
+          </div>
+          <div class="dd-col" role="presentation">
+            <a role="menuitem" class="dd-all" href="/industries/"><span class="dd-t">Browse all industries &rarr;</span></a>
+            <p class="dd-any">Don&rsquo;t see your business? DeepWell works for any business. <a role="menuitem" href="/demo/">Try the demo</a></p>
+          </div>
+        </div>
         </div>
       </div>
       <a href="/#plans">Pricing</a>
@@ -301,7 +339,7 @@ footer a{display:inline-flex;align-items:center;justify-content:center;min-heigh
 </nav>
 <main class="wrap">
   <div class="hero-block"><!--SM--><div class="sm-amb" data-sm="loop" aria-hidden="true"><svg viewBox="0 0 640 400" preserveAspectRatio="xMaxYMid meet" focusable="false"><g fill="none" stroke="#9DC4B2" stroke-width="2" stroke-linecap="round"><path d="M200 362 H640"/><path d="M262 362 V236 H346 V362"/><path d="M262 236 l-6 0 M346 236 h6"/><rect x="272" y="248" width="16" height="24" rx="2"/><rect x="296" y="248" width="16" height="24" rx="2"/><rect x="320" y="248" width="16" height="24" rx="2"/><rect x="272" y="288" width="16" height="24" rx="2"/><rect x="296" y="288" width="16" height="24" rx="2"/><rect x="320" y="288" width="16" height="24" rx="2"/><g opacity=".7"><path d="M238 362 V346.4"/><ellipse cx="238" cy="334.4" rx="9.600000000000001" ry="13.200000000000001"/><path d="M618 362 V343.8"/><ellipse cx="618" cy="329.8" rx="11.200000000000001" ry="15.400000000000002"/></g></g><g fill="none" stroke="#9DC4B2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M360 100 H602 M366 100 V362 H596 V100"/><path d="M435 100 v-14 h64.4 v14 M441 86 v-8"/><path d="M468 362 v-38 h26 v38"/><rect x="378" y="114" width="28" height="32" rx="2"/><rect x="422.5" y="114" width="28" height="32" rx="2"/><rect x="467" y="114" width="28" height="32" rx="2"/><rect x="511.5" y="114" width="28" height="32" rx="2"/><rect x="556" y="114" width="28" height="32" rx="2"/><rect x="378" y="170" width="28" height="32" rx="2"/><rect x="422.5" y="170" width="28" height="32" rx="2"/><rect x="467" y="170" width="28" height="32" rx="2"/><rect x="511.5" y="170" width="28" height="32" rx="2"/><rect x="556" y="170" width="28" height="32" rx="2"/><rect x="378" y="226" width="28" height="32" rx="2"/><rect x="422.5" y="226" width="28" height="32" rx="2"/><rect x="467" y="226" width="28" height="32" rx="2"/><rect x="511.5" y="226" width="28" height="32" rx="2"/><rect x="556" y="226" width="28" height="32" rx="2"/><rect x="378" y="282" width="28" height="32" rx="2"/><rect x="422.5" y="282" width="28" height="32" rx="2"/><rect x="467" y="282" width="28" height="32" rx="2"/><rect x="511.5" y="282" width="28" height="32" rx="2"/><rect x="556" y="282" width="28" height="32" rx="2"/></g><g fill="#9DC4B2" fill-opacity=".38"><rect x="381" y="117" width="22" height="26"  class="lp" style="--lk:pm-br;--per:12s;--ld:-9000"/><rect x="425.5" y="117" width="22" height="26"  class="lp" style="--lk:pm-br;--per:12s;--ld:-8910"/><rect x="470" y="117" width="22" height="26"  class="lp" style="--lk:pm-br;--per:12s;--ld:-8820"/><rect x="514.5" y="117" width="22" height="26"  class="lp" style="--lk:pm-br;--per:12s;--ld:-8730"/><rect x="381" y="173" width="22" height="26"  class="lp" style="--lk:pm-br;--per:12s;--ld:-6000"/><rect x="425.5" y="173" width="22" height="26"  class="lp" style="--lk:pm-br;--per:12s;--ld:-5910"/><rect x="470" y="173" width="22" height="26"  class="lp" style="--lk:pm-br;--per:12s;--ld:-5820"/><rect x="514.5" y="173" width="22" height="26"  class="lp" style="--lk:pm-br;--per:12s;--ld:-5730"/><rect x="559" y="173" width="22" height="26"  class="lp" style="--lk:pm-br;--per:12s;--ld:-5640"/><rect x="381" y="229" width="22" height="26"  class="lp" style="--lk:pm-br;--per:12s;--ld:-3000"/><rect x="470" y="229" width="22" height="26"  class="lp" style="--lk:pm-br;--per:12s;--ld:-2820"/><rect x="514.5" y="229" width="22" height="26"  class="lp" style="--lk:pm-br;--per:12s;--ld:-2730"/><rect x="559" y="229" width="22" height="26"  class="lp" style="--lk:pm-br;--per:12s;--ld:-2640"/><rect x="381" y="285" width="22" height="26"  class="lp" style="--lk:pm-br;--per:12s;--ld:0"/><rect x="425.5" y="285" width="22" height="26"  class="lp" style="--lk:pm-br;--per:12s;--ld:90"/><rect x="470" y="285" width="22" height="26"  class="lp" style="--lk:pm-br;--per:12s;--ld:180"/><rect x="559" y="285" width="22" height="26"  class="lp" style="--lk:pm-br;--per:12s;--ld:360"/></g></svg></div><!--/SM-->
-    <div class="eyebrow">Who it&rsquo;s for · Property management</div>
+    <div class="eyebrow"><a class="crumb" href="/industries/">Any Business, One App</a> · Property management</div>
     <span class="status-pill soon">Coming soon</span>
     <h1>Coming for property management</h1>
     <p class="lede">Property management runs on a different document set than a trade company — leases, inspections, vendor compliance — but the same idea applies: every document linked to the property, the unit and the tenant it belongs to, answerable in seconds. You can already upload your paperwork and ask Donovan; the property-specific features below are coming.</p>

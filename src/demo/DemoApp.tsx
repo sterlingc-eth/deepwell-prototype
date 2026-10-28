@@ -4,6 +4,7 @@ import { Wordmark } from '../components/Wordmark';
 import { DidYouMeanChips } from '../components/ask/PromptChips';
 import { DEMO_INDEX, loadFixture } from './fixtures';
 import { TryOwn } from './TryOwn';
+import { HomeBackBar } from './HomeBackBar';
 import { TRYOWN_TEXT } from './tryown';
 import {
   INGEST_STAGES, askDemo, capFirst, dashboardOf, daysOverdue, ingestPlan, money, niceDate, niceText, nounPlural, stagesAfter,
@@ -62,6 +63,7 @@ export function DemoApp() {
 
   return (
     <div className="min-h-screen bg-bg text-ink">
+      <HomeBackBar />
       <header className="border-b border-line bg-surface">
         <div className="max-w-content mx-auto px-4 py-3 flex flex-wrap items-center gap-3">
           <Wordmark />

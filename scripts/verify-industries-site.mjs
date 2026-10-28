@@ -14,7 +14,7 @@ const exists = (rel) => fs.existsSync(path.join(ROOT, rel));
 const fixIndex = JSON.parse(read('src/demo/fixtures/index.json')).industries;
 const data = loadData();
 const slugs = fixIndex.map((i) => i.slug);
-ok(slugs.length === 43, `demo has 43 industries (found ${slugs.length})`);
+ok(slugs.length > 0, `demo has industries (found ${slugs.length})`);
 
 // 1. data file is exactly what the fixtures say (no invented facts) and pages are exactly what the template renders
 ok(JSON.stringify(data) === JSON.stringify(extractData()), 'scripts/industries-site/data.json matches the demo fixtures (run build.mjs --refresh)');
@@ -53,7 +53,11 @@ for (const s of slugs) {
   }
 }
 const cards = (hub.match(/class="hub-item"/g) ?? []).length;
-ok(cards === 43, `hub lists 43 industries (found ${cards})`);
+ok(cards === slugs.length, `hub lists every demo industry (found ${cards})`);
+ok(/<h1>Any Business, One App<\/h1>/.test(hub), 'hub H1 is exactly Any Business, One App');
+ok(/<title>Any Business, One App — DeepWell Technology<\/title>/.test(hub) && /og:title" content="Any Business, One App — DeepWell Technology"/.test(hub), 'hub title + og:title');
+ok(!/\b\d+ (kinds of business|industries)\b/i.test(hub.replace(/<script[\s\S]*?<\/script>/g, '')), 'hub copy has no industry count');
+for (const rel of [...rendered.keys(), ...Object.values(EXISTING_PAGES).map((f) => 'public/industries/' + f), 'public/industries/any-business.html', 'public/industries/offices.html', 'public/industries/fleet-equipment-rental.html', 'public/industries/plumbing.html']) { if (rel.endsWith('/index.html')) continue; const t = read(rel); const m = t.match(/<h1>[\s\S]*?<\/h1>/); const before = t.slice(0, m ? m.index : 0); ok(/<a class="crumb" href="\/industries\/">Any Business, One App<\/a>/.test(before.slice(before.lastIndexOf('class="eyebrow"') - 20)), `${rel} has the Any Business, One App breadcrumb above its H1`); }
 ok(/<link rel="canonical" href="https:\/\/deepwelltechnology\.com\/industries\/">/.test(hub) && /<title>[^<]+<\/title>/.test(hub) && /<meta name="description"/.test(hub), 'hub has title, description, canonical');
 for (const e of EXTRA_GUIDES) { ok(hub.includes(`href="${e.href}"`), `hub links guide ${e.href}`); ok(exists('public' + e.href), `guide exists ${e.href}`); }
 

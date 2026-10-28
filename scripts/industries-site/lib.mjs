@@ -180,7 +180,7 @@ export function renderIndustry(d, all) {
   const related = g.slugs.filter((s) => s !== d.slug).map((s) => all.find((x) => x.slug === s)).filter(Boolean);
   const body = `<main class="wrap">
   <div class="hero-block">
-    <div class="eyebrow">Who it&rsquo;s for · ${esc(d.label)}</div>
+    <div class="eyebrow"><a class="crumb" href="/industries/">Any Business, One App</a> · ${esc(d.label)}</div>
     <h1>DeepWell for ${esc(d.label.toLowerCase())}</h1>
     <p class="lede">The ${esc(d.label.toLowerCase())} demo is a sample workspace for ${esc(d.company)}, a made-up company. DeepWell reads its ${d.documents} documents (${types.slice(0, 4).map(esc).join(', ')}${types.length > 4 ? ' and more' : ''}) and answers questions about them, with a link back to the page each answer came from.</p>
     <div class="cta-row">
@@ -230,7 +230,7 @@ ${related.map((r) => `    <li><a href="/industries/${pageFile(r.slug)}">${esc(r.
 export function renderHub(data) {
   const all = data.industries;
   const n = all.length;
-  const description = `DeepWell works with the paperwork of ${n} kinds of business. Pick yours, see the documents and questions in its sample workspace, and try the demo.`;
+  const description = `DeepWell works for any business that keeps paperwork. Pick your kind of business, see the documents and questions in its sample workspace, and try the demo.`;
   const groups = GROUPS.map((g) => {
     const items = g.slugs.map((s) => all.find((x) => x.slug === s)).filter(Boolean);
     return `  <section class="hub-group" data-group="${g.id}" aria-labelledby="g-${g.id}">
@@ -252,8 +252,8 @@ ${items.map((d) => {
   const body = `<main class="wrap wide">
   <div class="hero-block">
     <div class="eyebrow">Who it&rsquo;s for · Industries</div>
-    <h1>${n} kinds of business, one app</h1>
-    <p class="lede">Every industry below has a sample workspace you can open without signing in. Pick yours to see the paperwork DeepWell reads there and the questions it answers, then try the demo.</p>
+    <h1>Any Business, One App</h1>
+    <p class="lede">Whatever you run, DeepWell reads your paperwork and answers questions about it. Every industry below has a sample workspace you can open without signing in. Pick yours to see the paperwork DeepWell reads there and the questions it answers, then try the demo.</p>
   </div>
 
   <div class="hub-tools">
@@ -263,7 +263,7 @@ ${items.map((d) => {
       <button type="button" data-filter="all" aria-pressed="true">All</button>
 ${GROUPS.map((g) => `      <button type="button" data-filter="${g.id}" aria-pressed="false">${esc(g.title)}</button>`).join('\n')}
     </div>
-    <div class="hub-count" id="hub-count" aria-live="polite">Showing all ${n} industries</div>
+    <div class="hub-count" id="hub-count" aria-live="polite">Showing all industries</div>
   </div>
 
 ${groups}
@@ -302,7 +302,7 @@ ${EXTRA_GUIDES.map((e) => `      <li><a href="${e.href}"><b>${esc(e.title)}</b><
       sec.hidden = !sec.querySelector('.hub-item:not([hidden])');
     });
     empty.style.display = shown ? 'none' : 'block';
-    count.textContent = shown === items.length ? 'Showing all ' + items.length + ' industries' : 'Showing ' + shown + ' of ' + items.length + ' industries';
+    count.textContent = shown === items.length ? 'Showing all industries' : (shown ? 'Showing matching industries' : 'No matching industries');
   }
   q.addEventListener('input', apply);
   btns.forEach(function (b) {
@@ -315,7 +315,7 @@ ${EXTRA_GUIDES.map((e) => `      <li><a href="${e.href}"><b>${esc(e.title)}</b><
   try { var pre = new URLSearchParams(location.search).get('q'); if (pre) { q.value = pre; apply(); } } catch (e) {}
 })();
 </script>`;
-  return page({ title: 'Industries — DeepWell Technology', description, canonicalPath: '/industries/', body });
+  return page({ title: 'Any Business, One App — DeepWell Technology', description, canonicalPath: '/industries/', body });
 }
 
 /** Everything the generator owns: path (relative to repo root) -> content. */
@@ -329,7 +329,7 @@ export function renderAll(data = loadData()) {
   return out;
 }
 
-/** Sitemap entries for every industries page (hub + all 43 industries + the hand-written extras). */
+/** Sitemap entries for every industries page (hub + every demo industry + the hand-written extras). */
 export function sitemapUrls(data = loadData()) {
   const urls = [`${SITE}/industries/`];
   for (const d of data.industries) urls.push(`${SITE}/industries/${pageFile(d.slug)}`);
@@ -345,28 +345,30 @@ const PAGE_NOTE = {
   nonprofit: 'Agreements, invoices and correspondence.',
 };
 
-/** The "Any Business, One App" nav dropdown: every demo industry (same grouping as the hub) + the guides, all live links. */
+/** Most common industries shown per category in the nav mega-menu (the hub lists every one). Slugs are demo-industry slugs. */
+export const MENU_PICKS = {
+  trades: ['plumbing-hvac', 'electrical', 'general-contractor', 'roofing', 'landscaping'],
+  property: ['realty', 'property-management', 'storage'],
+  hospitality: ['hotel', 'restaurant', 'eventvenue', 'brewery', 'foodtruck'],
+  professional: ['bookkeeping', 'legal', 'insagency', 'msp', 'photostudio'],
+  health: ['medicaloffice', 'dentaloffice', 'vetclinic', 'salonspa', 'gymfit'],
+  community: ['nonprofit', 'grantnp', 'church', 'policerecords'],
+  transport: ['trucking', 'warehouse', 'mfgqa', 'feedstore'],
+};
+
+/** The "Any Business, One App" nav mega-menu: category headings (each links to its hub section) with a handful of common
+ *  industries each, then one Browse-all link and a short "any business" line. No counts, no repeated destinations. */
 export function navMenuHtml(data = loadData()) {
   const label = new Map(data.industries.map((d) => [d.slug, d.label]));
-  const a = (href, t, d) => `          <a role="menuitem" href="${href}"><span class="dd-t">${esc(t)}</span>${d ? `<span class="dd-d">${esc(d)}</span>` : ''}</a>`;
-  const g = (t) => `          <div class="dd-group" role="presentation">${esc(t)}</div>`;
-  const out = [
-    g('By role'),
-    a('/who.html#office', 'Office staff', 'Answer a caller with the original page in hand.'),
-    a('/who.html#field', 'People in the field', 'Look things up and scan paperwork from a phone.'),
-    a('/who.html#owners', 'Owners', 'See which warranties and agreements are expiring.'),
-    g('By industry'),
-    a('/industries/', `All ${data.industries.length} industries`, 'Pick yours and try the demo.'),
-    a('/who.html#industries', 'Every industry, one app', 'See how Donovan fits your kind of business.'),
-    a('/industries/any-business.html', 'Any business', 'If you keep paperwork, it works.'),
-  ];
-  for (const grp of GROUPS) {
-    out.push(g(grp.title));
-    for (const s of grp.slugs) out.push(a(`/industries/${pageFile(s)}`, label.get(s) || s, PAGE_NOTE[s]));
-  }
-  out.push(g('More guides'));
-  for (const e of EXTRA_GUIDES.filter((x) => x.href !== '/industries/any-business.html')) out.push(a(e.href, e.title, e.note));
-  return `<div class="nav-dropdown-menu" id="industriesMenu" role="menu" aria-label="Any Business, One App">\n${out.join('\n')}\n        </div>`;
+  const a = (href, t) => `<a role="menuitem" href="${href}"><span class="dd-t">${esc(t)}</span></a>`;
+  const col = (inner) => `          <div class="dd-col" role="presentation">\n${inner}\n          </div>`;
+  const cols = GROUPS.map((g) => col(`            <a role="menuitem" class="dd-head" href="/industries/#g-${g.id}">${esc(g.title)}</a>\n            <div class="dd-items" role="presentation">\n${MENU_PICKS[g.id].map((s) => `              ${a(`/industries/${pageFile(s)}`, label.get(s) || s)}`).join('\n')}\n            </div>`));
+  cols.push(col(`            <a role="menuitem" class="dd-all" href="/industries/"><span class="dd-t">Browse all industries &rarr;</span></a>\n            <p class="dd-any">Don&rsquo;t see your business? DeepWell works for any business. <a role="menuitem" href="/demo/">Try the demo</a></p>`));
+  return `<div class="nav-dropdown-menu" id="industriesMenu" role="menu" aria-label="Any Business, One App">
+        <div class="dd-mega" role="presentation">
+${cols.join('\n')}
+        </div>
+        </div>`;
 }
 
 /** Replace the dropdown menu block (balanced <div>s) in one html string. Returns the new string, or null when the page has none. */
@@ -388,10 +390,23 @@ export function navFiles() {
   for (const dir of ['public', 'public/industries']) for (const f of fs.readdirSync(path.join(ROOT, dir))) if (f.endsWith('.html')) files.push(`${dir}/${f}`);
   return files;
 }
+/** Mega-menu CSS lives in mega.css and is injected (idempotent, between markers) into every page that carries the dropdown. */
+export const MEGA_CSS = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'mega.css'), 'utf8').trim();
+const CSS_ANCHOR = /^\.nav-dropdown-menu \.dd-group:not\(:first-child\)\{[^\n]*\n/m;
+export function injectMegaCss(html) {
+  const block = `/*dd-mega*/\n${MEGA_CSS}\n/*/dd-mega*/\n`;
+  if (html.includes('/*dd-mega*/')) return html.replace(/\/\*dd-mega\*\/[\s\S]*?\/\*\/dd-mega\*\/\n/, () => block);
+  const m = html.match(CSS_ANCHOR);
+  if (!m) return null;
+  const at = m.index + m[0].length;
+  return html.slice(0, at) + block + html.slice(at);
+}
 export function syncNav(data = loadData()) {
   const menu = navMenuHtml(data), changed = [];
   for (const rel of navFiles()) {
-    const p = path.join(ROOT, rel), html = fs.readFileSync(p, 'utf8'), next = replaceMenu(html, menu);
+    const p = path.join(ROOT, rel), html = fs.readFileSync(p, 'utf8');
+    let next = replaceMenu(html, menu);
+    if (next !== null) { const c = injectMegaCss(next); if (c === null) throw new Error('mega css anchor missing in ' + rel); next = c; }
     if (next !== null && next !== html) { fs.writeFileSync(p, next); changed.push(rel); }
   }
   return changed;

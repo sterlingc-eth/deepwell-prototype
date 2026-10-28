@@ -9,7 +9,7 @@
 // BROWSER part (Playwright, runs when it is installed): at 1440 and 390 it opens the dropdown by click / keyboard / tap,
 //   closes it (Esc, outside click), clicks every Try button and checks it lands on a loading demo page, checks no overlay
 //   covers a nav/CTA control, no disabled nav item, and no console errors on load.
-// Usage: node scripts/verify-site-clicks.mjs [--dist <dir>] [--audit <out.json>] [--shots <dir>] [--no-browser]
+// Usage: node scripts/verify-site-clicks.mjs [--quick] [--dist <dir>] [--audit <out.json>] [--shots <dir>] [--no-browser]
 //   --dist  serve a built dist/ (needed to really load /demo/); default serves the source tree like Vercel would.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -23,6 +23,7 @@ const DIST = arg('--dist') ? path.resolve(arg('--dist')) : null;
 const AUDIT_OUT = arg('--audit');
 const SHOTS = arg('--shots') ? path.resolve(arg('--shots')) : null;
 const NO_BROWSER = process.argv.includes('--no-browser');
+const QUICK = process.argv.includes('--quick'); // browser part: only a representative page subset (full run takes minutes)
 const cfg = JSON.parse(fs.readFileSync(path.join(ROOT, 'vercel.json'), 'utf8'));
 const data = JSON.parse(fs.readFileSync(path.join(ROOT, 'scripts/industries-site/data.json'), 'utf8'));
 const DEMO_SLUGS = data.industries.map((i) => i.slug);
@@ -30,6 +31,8 @@ const EXISTING = { 'plumbing-hvac': 'hvac.html', electrical: 'electrical.html', 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon', '.xml': 'application/xml', '.txt': 'text/plain', '.webmanifest': 'application/manifest+json', '.woff2': 'font/woff2' };
 
 const failures = [];
+const T0 = Date.now(); // --trace: print the last finished check every 5s (to spot slow steps)
+if (process.argv.includes('--trace')) setInterval(() => { const r = rows[rows.length - 1]; console.error(`[${Math.round((Date.now() - T0) / 1000)}s] ${rows.length} checks, last: ${r ? r.page + ' | ' + r.el : '-'}`); }, 5000).unref();
 const rows = []; // audit table rows
 const fail = (page, el, expected, actual, fix) => { failures.push({ page, el, expected, actual, fix }); rows.push({ page, el, expected, actual, status: 'FAIL', fix }); };
 const ok = (page, el, expected, actual) => rows.push({ page, el, expected, actual, status: 'ok', fix: '' });
@@ -151,19 +154,35 @@ for (const t of tryTargets) {
   /VITE_DEEPWELL_DEMO/.test(vc) && /demo\/index\.html/.test(vc) ? ok('vite.config.ts', 'demo build entry', 'built when VITE_DEEPWELL_DEMO=true', 'gated (set VITE_DEEPWELL_DEMO=true in Vercel env)') : fail('vite.config.ts', 'demo build entry', 'demo page in build', 'missing', 'restore');
 }
 // nav dropdown static contract + homepage leftovers
+const GROUP_IDS = ['trades', 'property', 'hospitality', 'professional', 'health', 'community', 'transport'];
+/** The nav dropdown block with balanced <div>s. */
+function menuOf(html) {
+  const start = html.indexOf('<div class="nav-dropdown-menu"'); if (start < 0) return null;
+  let depth = 0; const re = /<div\b|<\/div>/g; re.lastIndex = start;
+  for (let m; (m = re.exec(html)); ) { depth += m[0] === '</div>' ? -1 : 1; if (depth === 0) return html.slice(start, m.index + 6); }
+  return null;
+}
 const allowedNoDropdown = new Set(['/404.html']);
 const needPages = DEMO_SLUGS.map((s) => '/industries/' + (EXISTING[s] || s + '.html'));
 for (const p of PAGES) {
   const r0 = resolveUrl(p, '/'); if (r0.r.kind !== 'file') continue;
   const html = fs.readFileSync(r0.r.file, 'utf8');
   if (!/nav-dropdown-toggle/.test(html)) continue; // simple legal/status pages carry only Industries + Contact + Home
-  const dm = /<div class="nav-dropdown-menu"[\s\S]*?<\/div>\s*<\/div>/.exec(html);
-  if (!dm) { fail(p, 'Any Business, One App', 'dropdown present', 'missing', 'add dropdown'); continue; }
-  const links = [...dm[0].matchAll(/<a\b[^>]*href="([^"]+)"/g)].map((m) => m[1].replace(/#.*/, ''));
-  const miss = needPages.filter((h) => !links.includes(h));
+  const dm = [menuOf(html)];
+  if (!dm[0]) { fail(p, 'Any Business, One App', 'dropdown present', 'missing', 'add dropdown'); continue; }
+  const links = [...dm[0].matchAll(/<a\b[^>]*href="([^"]+)"/g)].map((m) => m[1]);
+  const dup = links.filter((h, i) => links.indexOf(h) !== i);
+  dup.length ? fail(p, 'dropdown duplicate links', 'each destination once', dup.join(', '), 'remove the repeat (node scripts/industries-site/build.mjs)') : ok(p, 'dropdown duplicate links', 'none', `${links.length} unique`);
+  const heads = [...dm[0].matchAll(/class="dd-head" href="([^"]+)"/g)].map((m) => m[1]);
+  const wantHeads = GROUP_IDS.map((g) => '/industries/#g-' + g);
+  const headsOk = wantHeads.every((h) => heads.includes(h)) && heads.length === wantHeads.length;
   const hub = links.includes('/industries/');
-  if (miss.length || !hub) fail(p, 'Any Business, One App dropdown', `links all ${DEMO_SLUGS.length} industries + hub`, `${miss.length} missing${hub ? '' : ', no hub link'}`, 'regenerate nav (node scripts/industries-site/build.mjs)');
-  else ok(p, 'Any Business, One App dropdown', `all ${DEMO_SLUGS.length} industries + hub`, `${links.length} links`);
+  const pickBad = links.filter((h) => /^\/industries\/[^#]+\.html$/.test(h) && !needPages.includes(h) && !fs.existsSync(path.join(ROOT, 'public', h)));
+  const perCat = dm[0].split('class="dd-col"').slice(1).map((c) => (c.match(/class="dd-items"[\s\S]*?<\/div>/) || [''])[0].match(/<a\b/g)?.length ?? 0);
+  const text = dm[0].replace(/<[^>]+>/g, ' ');
+  if (!headsOk || !hub || pickBad.length || Math.max(...perCat) > 5 || /\b\d+\b/.test(text) || /Browse all industries/.test(text) === false)
+    fail(p, 'Any Business, One App dropdown', 'category headings -> hub anchors, <=5 per category, Browse all, no numbers', JSON.stringify({ headsOk, hub, pickBad, perCat, digits: /\b\d+\b/.test(text) }), 'regenerate nav (node scripts/industries-site/build.mjs)');
+  else ok(p, 'Any Business, One App dropdown', 'mega-menu structure, no counts', `${links.length} links, per category ${perCat.join('/')}`);
   if (/class="tag soon|aria-disabled|\sdisabled[\s>]|pointer-events:\s*none/.test(dm[0])) fail(p, 'dropdown item', 'no disabled/soon items', 'disabled or soon marker', 'remove');
 }
 {
@@ -176,6 +195,24 @@ for (const p of PAGES) {
   const body = home.slice(home.indexOf('<main'));
   const i = body.search(/<a[^>]*href="\/demo\/"[^>]*>\s*Try the demo/i);
   i > -1 && i < body.length * 0.4 ? ok('/', 'primary Try the demo', 'high on page', '/demo/') : fail('/', 'primary Try the demo', 'a "Try the demo" button to /demo/ in the hero', 'missing', 'add to hero');
+}
+
+{
+  const hubHtml = fs.readFileSync(path.join(ROOT, 'public/industries/index.html'), 'utf8');
+  const h1 = (hubHtml.match(/<h1>([^<]*)<\/h1>/) || [])[1];
+  h1 === 'Any Business, One App' ? ok('/industries/', 'hub H1', 'Any Business, One App', h1) : fail('/industries/', 'hub H1', 'Any Business, One App', String(h1), 'fix template');
+  const ttl = (hubHtml.match(/<title>([^<]*)<\/title>/) || [])[1];
+  /^Any Business, One App/.test(ttl || '') ? ok('/industries/', 'hub title', 'starts with Any Business, One App', ttl) : fail('/industries/', 'hub title', 'Any Business, One App', String(ttl), 'fix template');
+  for (const g of GROUP_IDS) hubHtml.includes(`<h2 id="g-${g}">`) ? ok('/industries/', 'hub anchor g-' + g, 'exists', 'yes') : fail('/industries/', 'hub anchor g-' + g, 'exists', 'missing', 'fix template');
+  const visible = (h) => h.replace(/<(script|style|svg)[\s\S]*?<\/\1>/g, ' ').replace(/<[^>]+>/g, ' ') + ' ' + [...h.matchAll(/<meta[^>]+(?:description|title)[^>]+content="([^"]*)"/g)].map((m) => m[1]).join(' ');
+  const homeHtml = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  for (const [n, h] of [['hub', hubHtml], ['home', homeHtml]]) {
+    const hit = visible(h).match(/\b\d+\s+(?:kinds? of business|industries|trades)\b|All \d+ industries/i);
+    hit ? fail(n, 'no industry counts in copy', 'none', hit[0], 'rephrase without a number') : ok(n, 'no industry counts in copy', 'none', 'clean');
+  }
+  const demoSrc = fs.readFileSync(path.join(ROOT, 'src/demo/DemoApp.tsx'), 'utf8'), barSrc = fs.readFileSync(path.join(ROOT, 'src/demo/HomeBackBar.tsx'), 'utf8'), mainSrc = fs.readFileSync(path.join(ROOT, 'src/demo/main.tsx'), 'utf8');
+  /<HomeBackBar\s*\/>/.test(demoSrc) && /<HomeBackBar\s*\/>/.test(mainSrc) && /<a\s[^>]*href="\/"/.test(barSrc) && /Back to home/.test(barSrc) && /min-h-11/.test(barSrc)
+    ? ok('/demo/', 'back-to-home bar wired', 'DemoApp + not-available screen use <a href="/"> >=44px', 'yes') : fail('/demo/', 'back-to-home bar wired', 'DemoApp + not-available screen use <a href="/"> >=44px', 'missing', 'add HomeBackBar');
 }
 
 // ---------- browser part ----------
@@ -197,13 +234,14 @@ async function browserPart() {
   const demoBuilt = !!lookupFile('/demo/index.html') && (DIST ? true : false);
   for (const vp of [{ w: 1440, h: 900, tag: '1440' }, { w: 390, h: 844, tag: '390', touch: true }]) {
     const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h }, hasTouch: !!vp.touch, isMobile: !!vp.touch });
+    await ctx.route((u) => !u.href.startsWith(base), (r) => r.abort()); // external fonts/analytics are never needed (and stall offline runs)
     const errs = [];
     const page = await ctx.newPage();
     page.on('pageerror', (e) => errs.push(String(e.message)));
     page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource|net::ERR/.test(m.text())) errs.push(m.text()); });
     const openMenuIfPhone = async () => { if (vp.touch) { const t = page.locator('#navMenuToggle'); if (await t.count() && (await t.getAttribute('aria-expanded')) !== 'true') await t.tap().catch(() => t.click()); } };
     const pn = (p) => `${p} @${vp.tag}`;
-    for (const p of PAGES) {
+    for (const p of QUICK ? PAGES.filter((x) => ['/', '/industries/', '/industries/hotel.html', '/industries/hvac.html', '/who.html'].includes(x)) : PAGES) {
       errs.length = 0;
       const resp = await page.goto(base + p, { waitUntil: 'load' }).catch((e) => ({ status: () => 'ERR ' + e.message }));
       if (!resp || resp.status() !== 200) { fail(pn(p), '(page)', '200', String(resp && resp.status()), 'fix'); continue; }
@@ -231,7 +269,7 @@ async function browserPart() {
       for (const [t, why] of bad) fail(pn(p), t, 'enabled and not covered', why, 'fix css/z-index');
     }
     // every button / summary / [role=button] outside the dropdown: click it and see that something happens (WARN rows, listed in the audit; hard failures are disabled / covered / throwing handlers)
-    for (const p of PAGES) {
+    for (const p of QUICK ? PAGES.filter((x) => ['/', '/industries/', '/industries/hotel.html', '/industries/hvac.html', '/who.html'].includes(x)) : PAGES) {
       await page.goto(base + p, { waitUntil: 'load' }); await page.waitForTimeout(120);
       const n = await page.locator('button, summary, [role="button"]').count();
       for (let i = 0; i < n; i++) {
@@ -256,15 +294,15 @@ async function browserPart() {
       const toggle = page.locator('.nav-dropdown-toggle').first();
       if (!(await toggle.count())) { fail(pn(p), 'dropdown toggle', 'present', 'missing', 'add'); continue; }
       vp.touch ? await toggle.tap() : await toggle.click();
-      await page.waitForTimeout(250);
+      await page.waitForTimeout(450); // menu fade is .18s; leave slack for slow machines
       const st = await page.evaluate(() => {
         const dd = document.querySelector('.nav-dropdown'); const menu = dd.querySelector('.nav-dropdown-menu');
         const items = [...menu.querySelectorAll('a')]; const mr = menu.getBoundingClientRect();
         const vis = items.filter((a) => { const r = a.getBoundingClientRect(); return r.width > 0 && r.height > 0; }).length;
         const cs = getComputedStyle(menu);
-        return { open: dd.classList.contains('open'), expanded: dd.querySelector('.nav-dropdown-toggle').getAttribute('aria-expanded'), n: items.length, vis, vismenu: cs.visibility !== 'hidden' && cs.display !== 'none' && +cs.opacity > 0.9, scrolls: menu.scrollHeight > menu.clientHeight, w: Math.round(mr.width), inView: mr.left >= -1 && mr.right <= innerWidth + 1 };
+        return { open: dd.classList.contains('open'), expanded: dd.querySelector('.nav-dropdown-toggle').getAttribute('aria-expanded'), n: items.length, vis, vismenu: cs.visibility !== 'hidden' && cs.display !== 'none' && +cs.opacity > 0.9, scrolls: menu.scrollHeight > menu.clientHeight, w: Math.round(mr.width), inView: mr.left >= -1 && mr.right <= innerWidth + 1, noHScroll: document.documentElement.scrollWidth <= innerWidth + 1 };
       });
-      st.open && st.expanded === 'true' && st.vismenu && st.n >= DEMO_SLUGS.length + 1 && st.inView ? ok(pn(p), 'dropdown opens on click/tap', 'open, all items', `${st.n} items, scrollable=${st.scrolls}`) : fail(pn(p), 'dropdown opens on click/tap', 'open with all items visible', JSON.stringify(st), 'fix dropdown');
+      st.open && st.expanded === 'true' && st.vismenu && st.n >= 20 && st.inView && st.noHScroll ? ok(pn(p), 'dropdown opens on click/tap', 'open, mega-menu items, no h-scroll', `${st.n} items, scrollable=${st.scrolls}`) : fail(pn(p), 'dropdown opens on click/tap', 'open with all items visible', JSON.stringify(st), 'fix dropdown');
       if (SHOTS && (p === '/' || p === '/industries/hotel.html')) await page.screenshot({ path: path.join(SHOTS, `nav_dropdown_open${p === '/' ? '' : '_industry_page'}_${vp.tag}.png`) });
       // last item reachable by scrolling and clickable (not covered)
       const last = page.locator('.nav-dropdown-menu a').last(); await last.scrollIntoViewIfNeeded().catch(() => {});
@@ -286,7 +324,7 @@ async function browserPart() {
     // click every dropdown link on the home page: lands on 200 page
     await page.goto(base + '/', { waitUntil: 'load' });
     const hrefs = await page.evaluate(() => [...document.querySelectorAll('.nav-dropdown-menu a')].map((a) => a.getAttribute('href')));
-    for (const h of hrefs) {
+    for (const h of (QUICK ? hrefs.slice(0, 6) : hrefs)) {
       await page.goto(base + '/', { waitUntil: 'load' }); await openMenuIfPhone();
       const t = page.locator('.nav-dropdown-toggle').first(); vp.touch ? await t.tap() : await t.click();
       const a = page.locator(`.nav-dropdown-menu a[href="${h}"]`).first(); await a.scrollIntoViewIfNeeded();
@@ -295,7 +333,7 @@ async function browserPart() {
       (st === 200 || st === 'hash') ? ok(pn('/'), 'dropdown -> ' + h, '200', String(st)) : fail(pn('/'), 'dropdown -> ' + h, '200', String(st), 'fix link');
     }
     // real clicks on every Try button on key pages
-    for (const p of ['/', '/industries/', '/industries/hotel.html', '/industries/hvac.html', '/industries/any-business.html', '/who.html']) {
+    for (const p of (QUICK ? ['/', '/industries/hotel.html'] : ['/', '/industries/', '/industries/hotel.html', '/industries/hvac.html', '/industries/any-business.html', '/who.html'])) {
       await page.goto(base + p, { waitUntil: 'load' });
       const tries = await page.evaluate(() => [...document.querySelectorAll('a,button')].filter((e) => /^\s*try\b/i.test(e.textContent || '')).map((e, i) => ({ t: (e.textContent || '').trim().slice(0, 50), h: e.getAttribute('href') })));
       for (let i = 0; i < tries.length; i++) {
@@ -321,7 +359,34 @@ async function browserPart() {
     }
     await ctx.close();
   }
+  if (DIST) await demoBackLink(browser, base);
   await browser.close(); srv.close();
+}
+/** /demo/ and /demo/?industry= show a >=44px "Back to home" link (full navigation to /) at 1440, 820 and 390, with no h-scroll. */
+async function demoBackLink(browser, base) {
+  for (const vp of [{ w: 1440, h: 900 }, { w: 820, h: 1000 }, { w: 390, h: 844, touch: true }]) {
+    const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h }, hasTouch: !!vp.touch, isMobile: !!vp.touch });
+    await ctx.route((u) => !u.href.startsWith(base), (r) => r.abort());
+    const page = await ctx.newPage();
+    for (const u of ['/demo/', '/demo/?industry=hvac']) {
+      const pn = `${u} @${vp.w}`;
+      await page.goto(base + u, { waitUntil: 'load' }); await page.waitForSelector('[data-testid=demo-home-link]', { timeout: 8000 }).catch(() => {});
+      const info = await page.evaluate(() => {
+        const a = document.querySelector('[data-testid=demo-home-link]'); if (!a) return null;
+        const r = a.getBoundingClientRect(); const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        const ctl = [...document.querySelectorAll('header select, header button')].map((e) => e.getBoundingClientRect());
+        const overlap = ctl.some((c) => c.width && r.left < c.right && r.right > c.left && r.top < c.bottom && r.bottom > c.top);
+        return { h: Math.round(r.height), inView: r.top >= 0 && r.bottom <= innerHeight && r.right <= innerWidth, href: a.getAttribute('href'), onTop: !!top && (a === top || a.contains(top)), overlap, hscroll: document.documentElement.scrollWidth > innerWidth + 1 };
+      });
+      const good = info && info.h >= 44 && info.inView && info.href === '/' && info.onTop && !info.overlap && !info.hscroll;
+      good ? ok(pn, 'demo back-to-home link', 'visible, >=44px, no overlap, no h-scroll', JSON.stringify(info)) : fail(pn, 'demo back-to-home link', 'visible, >=44px, href=/, no overlap, no h-scroll', JSON.stringify(info), 'fix HomeBackBar');
+      if (SHOTS && u === '/demo/' || SHOTS && vp.w === 390) await page.screenshot({ path: path.join(SHOTS, `demo_back_link${u.includes('industry') ? '_industry' : ''}_${vp.w}.png`) });
+      const [nav] = await Promise.all([page.waitForNavigation({ waitUntil: 'load', timeout: 8000 }).catch(() => null), vp.touch ? page.locator('[data-testid=demo-home-link]').tap() : page.locator('[data-testid=demo-home-link]').click()]);
+      const url = new URL(page.url());
+      nav && url.pathname === '/' && nav.status() === 200 ? ok(pn, 'demo back link click', 'lands on /', url.pathname) : fail(pn, 'demo back link click', 'lands on /', url.pathname, 'fix link');
+    }
+    await ctx.close();
+  }
 }
 if (!NO_BROWSER) await browserPart();
 
