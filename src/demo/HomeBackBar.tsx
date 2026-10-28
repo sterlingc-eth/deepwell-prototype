@@ -1,7 +1,6 @@
 import { ArrowLeft } from 'lucide-react';
-import { Wordmark } from '../components/Wordmark';
 
-/** Always-visible way back to the marketing site from /demo/. A plain link (full page load), never a router push. */
+/** Way back to the marketing site from /demo/: one plain text link (full page load), no logo. The demo header below carries the wordmark. */
 export function HomeBackBar() {
   return (
     <div className="border-b border-line bg-surface-2" data-testid="demo-home-bar">
@@ -9,10 +8,9 @@ export function HomeBackBar() {
         <a
           href="/"
           data-testid="demo-home-link"
-          className="inline-flex items-center gap-3 min-h-11 py-1 text-body text-ink-2 hover:text-ink rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+          className="inline-flex items-center gap-1.5 min-h-11 py-2 text-body font-medium text-ink-2 hover:text-ink rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
         >
-          <Wordmark />
-          <span className="inline-flex items-center gap-1.5 font-medium"><ArrowLeft className="w-4 h-4" aria-hidden="true" /> Back to home</span>
+          <ArrowLeft className="w-4 h-4" aria-hidden="true" /> Back to home
         </a>
       </div>
     </div>

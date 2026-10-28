@@ -133,15 +133,15 @@ if (chromium) {
       check(`[${vp} ${w}] every section link is >= ${MIN_TARGET}px tall (${m.targets.length} links)`, m.targets.every((t) => t.h >= MIN_TARGET - 0.5 && t.w >= MIN_TARGET), JSON.stringify(m.targets.filter((t) => t.h < MIN_TARGET)));
       check(`[${vp} ${w}] footer Industries link is >= ${MIN_TARGET}px tall`, !!m.foot && m.foot.h >= MIN_TARGET - 0.5, JSON.stringify(m.foot));
       // nav link: visible directly when the link bar shows, otherwise inside the Menu panel
-      const navLink = page.locator('nav .navlinks a.nav-ind');
+      const navLink = page.locator('nav .navlinks .nav-dropdown-toggle');
       if (!(await navLink.isVisible())) { await page.locator('#navMenuToggle').click(); await page.waitForTimeout(200); }
-      check(`[${vp} ${w}] nav Industries link is visible${(await navLink.isVisible()) && vp === 'phone' ? ' (in the Menu panel)' : ''}`, await navLink.isVisible());
+      check(`[${vp} ${w}] nav Any Business, One App toggle is visible${(await navLink.isVisible()) && vp === 'phone' ? ' (in the Menu panel)' : ''}`, await navLink.isVisible());
       const nb = await navLink.boundingBox();
-      check(`[${vp} ${w}] nav Industries link is >= ${MIN_TARGET}px tall (${Math.round(nb?.height ?? 0)}px)`, !!nb && nb.height >= MIN_TARGET - 0.5 || (vp === 'desktop' && !!nb && nb.height >= 20 && (await page.evaluate(() => document.querySelector('.nav .wrap').getBoundingClientRect().height)) >= MIN_TARGET));
+      check(`[${vp} ${w}] nav Any Business, One App toggle is >= ${MIN_TARGET}px tall (${Math.round(nb?.height ?? 0)}px)`, !!nb && nb.height >= MIN_TARGET - 0.5 || (vp === 'desktop' && !!nb && nb.height >= 20 && (await page.evaluate(() => document.querySelector('.nav .wrap').getBoundingClientRect().height)) >= MIN_TARGET));
       // keyboard: the nav link is reachable by Tab and shows a visible focus ring; so is the first tile
       await navLink.focus();
       const fnav = await page.evaluate(() => { const a = document.activeElement; const c = getComputedStyle(a); return { cls: a.className, ow: parseFloat(c.outlineWidth), os: c.outlineStyle, bs: c.boxShadow }; });
-      check(`[${vp} ${w}] nav Industries link takes keyboard focus`, /nav-ind/.test(fnav.cls));
+      check(`[${vp} ${w}] nav Any Business, One App toggle takes keyboard focus`, /nav-dropdown-toggle/.test(fnav.cls));
       await page.reload({ waitUntil: 'load' }); await page.waitForTimeout(300);
       await page.keyboard.press('Tab'); // start from the top
       let hit = null;

@@ -363,7 +363,7 @@ export function navMenuHtml(data = loadData()) {
   const a = (href, t) => `<a role="menuitem" href="${href}"><span class="dd-t">${esc(t)}</span></a>`;
   const col = (inner) => `          <div class="dd-col" role="presentation">\n${inner}\n          </div>`;
   const cols = GROUPS.map((g) => col(`            <a role="menuitem" class="dd-head" href="/industries/#g-${g.id}">${esc(g.title)}</a>\n            <div class="dd-items" role="presentation">\n${MENU_PICKS[g.id].map((s) => `              ${a(`/industries/${pageFile(s)}`, label.get(s) || s)}`).join('\n')}\n            </div>`));
-  cols.push(col(`            <a role="menuitem" class="dd-all" href="/industries/"><span class="dd-t">Browse all industries &rarr;</span></a>\n            <p class="dd-any">Don&rsquo;t see your business? DeepWell works for any business. <a role="menuitem" href="/demo/">Try the demo</a></p>`));
+  cols.push(col(`            <a role="menuitem" class="dd-all" href="/industries/"><span class="dd-t">Browse all industries &rarr;</span></a>\n            <p class="dd-any">Don&rsquo;t see your business? DeepWell works for any business.</p>`));
   return `<div class="nav-dropdown-menu" id="industriesMenu" role="menu" aria-label="Any Business, One App">
         <div class="dd-mega" role="presentation">
 ${cols.join('\n')}

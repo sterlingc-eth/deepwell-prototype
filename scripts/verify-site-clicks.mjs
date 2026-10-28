@@ -167,6 +167,13 @@ const needPages = DEMO_SLUGS.map((s) => '/industries/' + (EXISTING[s] || s + '.h
 for (const p of PAGES) {
   const r0 = resolveUrl(p, '/'); if (r0.r.kind !== 'file') continue;
   const html = fs.readFileSync(r0.r.file, 'utf8');
+  const ni = html.indexOf('<nav');
+  if (ni >= 0) {
+    const navHtml = html.slice(ni, html.indexOf('</nav>', ni) + 6);
+    const navAll = [...navHtml.matchAll(/<a\b[^>]*href="([^"]+)"/g)].map((m) => m[1]);
+    const navDup = navAll.filter((h, i) => navAll.indexOf(h) !== i);
+    navDup.length ? fail(p, 'nav duplicate links', 'each destination once across the top bar, nav and Menu panel', navDup.join(', '), 'remove the repeat (top-bar link vs Any Business, One App menu)') : ok(p, 'nav duplicate links', 'none', `${navAll.length} nav links`);
+  }
   if (!/nav-dropdown-toggle/.test(html)) continue; // simple legal/status pages carry only Industries + Contact + Home
   const dm = [menuOf(html)];
   if (!dm[0]) { fail(p, 'Any Business, One App', 'dropdown present', 'missing', 'add dropdown'); continue; }
@@ -376,9 +383,9 @@ async function demoBackLink(browser, base) {
         const r = a.getBoundingClientRect(); const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
         const ctl = [...document.querySelectorAll('header select, header button')].map((e) => e.getBoundingClientRect());
         const overlap = ctl.some((c) => c.width && r.left < c.right && r.right > c.left && r.top < c.bottom && r.bottom > c.top);
-        return { h: Math.round(r.height), inView: r.top >= 0 && r.bottom <= innerHeight && r.right <= innerWidth, href: a.getAttribute('href'), onTop: !!top && (a === top || a.contains(top)), overlap, hscroll: document.documentElement.scrollWidth > innerWidth + 1 };
+        return { h: Math.round(r.height), inView: r.top >= 0 && r.bottom <= innerHeight && r.right <= innerWidth, href: a.getAttribute('href'), onTop: !!top && (a === top || a.contains(top)), overlap, hscroll: document.documentElement.scrollWidth > innerWidth + 1, noLogo: !a.querySelector('[class*="bg-stone-50"]') };
       });
-      const good = info && info.h >= 44 && info.inView && info.href === '/' && info.onTop && !info.overlap && !info.hscroll;
+      const good = info && info.h >= 44 && info.inView && info.href === '/' && info.onTop && !info.overlap && !info.hscroll && info.noLogo;
       good ? ok(pn, 'demo back-to-home link', 'visible, >=44px, no overlap, no h-scroll', JSON.stringify(info)) : fail(pn, 'demo back-to-home link', 'visible, >=44px, href=/, no overlap, no h-scroll', JSON.stringify(info), 'fix HomeBackBar');
       if (SHOTS && u === '/demo/' || SHOTS && vp.w === 390) await page.screenshot({ path: path.join(SHOTS, `demo_back_link${u.includes('industry') ? '_industry' : ''}_${vp.w}.png`) });
       const [nav] = await Promise.all([page.waitForNavigation({ waitUntil: 'load', timeout: 8000 }).catch(() => null), vp.touch ? page.locator('[data-testid=demo-home-link]').tap() : page.locator('[data-testid=demo-home-link]').click()]);
