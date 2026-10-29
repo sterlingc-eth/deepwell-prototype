@@ -70,15 +70,15 @@ export function artChecks(ok, read = (rel) => fs.readFileSync(path.join(ROOT, re
     const m = html.match(/<!--ia-hero-->([\s\S]*?)<!--\/ia-hero-->/);
     ok(!!m, `${rel}: has the themed stage (<!--ia-hero--> markers)`);
     if (!m) continue;
-    const stage = m[0], d = data.industries.find((x) => x.slug === srcSlug), story = pickStory(d);
+    const stage = m[0], d = data.industries.find((x) => x.slug === srcSlug), story = pickStory(d, key);
     ok((html.match(/class="ia-stage"/g) || []).length === 1, `${rel}: exactly one stage`);
     ok(stage.includes(`data-scene="${t.scene}"`) && stage.includes(`data-ch="${t.ch}"`), `${rel}: stage carries its own scene id (${t.scene}) and choreography`);
     ok(/role="group" aria-label="[^"]{80,}"/.test(stage), `${rel}: stage has a text alternative describing the example`);
     ok(/<div class="ia-art" aria-hidden="true">/.test(stage) && /<svg [^>]*aria-hidden="true"/.test(stage), `${rel}: decorative art is aria-hidden`);
     ok(/<button class="ia-pb" type="button" aria-pressed="false" aria-label="Pause the animation">/.test(stage), `${rel}: keyboard-reachable pause button`);
     ok(stage.includes(story.q.replace(/&/g, '&amp;')) || stage.includes(story.q.replace(/'/g, '&#39;')) || stage.includes(story.q), `${rel}: question comes from the demo data`);
-    ok(d.questions.some((q) => q.q === story.q && q.answer === story.a), `${rel}: question + answer are a real pair in data.json`);
-    ok(story.s ? d.questions.some((q) => q.q === story.q && q.source === story.s) : true, `${rel}: source is the real source of that answer`);
+    ok(t.story || d.questions.some((q) => q.q === story.q && q.answer === story.a), `${rel}: question + answer are a real pair in data.json (or fixed from the sample records)`);
+    ok(t.story || (story.s ? d.questions.some((q) => q.q === story.q && q.source === story.s) : true), `${rel}: source is the real source of that answer`);
     ok(story.docs.every((x) => d.docTypes.some((dt) => dt.label === x)), `${rel}: document chips are real document types`);
     ok(/made-up company/.test(stage), `${rel}: labels the records as example / made-up`);
     const vis = stage.replace(/<script[\s\S]*?<\/script>/g, '').replace(/<[^>]+>/g, ' ');

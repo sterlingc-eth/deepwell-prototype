@@ -18,7 +18,17 @@
    "hue2": 170,
    "page": "plumbing.html",
    "data": "plumbing-hvac",
-   "label": "Plumbing"
+   "label": "Plumbing",
+   "story": {
+    "q": "How many feet were cabled on Blair Starlingford's drain cleaning ticket?",
+    "a": "Feet cabled: 115",
+    "s": "Drain cleaning ticket — Blair Starlingford",
+    "docs": [
+     "Drain cleaning ticket",
+     "Maintenance agreement",
+     "Tune up checklist"
+    ]
+   }
   },
   "electrical": {
    "scene": "electrical",
@@ -386,7 +396,7 @@
    "hue": 50,
    "hue2": 65,
    "page": "fleet-equipment-rental.html",
-   "data": "trucking",
+   "data": "auto",
    "label": "Fleet and equipment rental"
   }
  }

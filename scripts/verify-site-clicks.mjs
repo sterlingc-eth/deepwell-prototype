@@ -84,7 +84,7 @@ function idsOf(file) {
 
 // ---------- pages ----------
 const smLocs = [...fs.readFileSync(path.join(ROOT, 'public/sitemap.xml'), 'utf8').matchAll(/<loc>https?:\/\/[^/]+([^<]*)<\/loc>/g)].map((m) => m[1] || '/');
-const pageSet = new Set(['/', '/who.html', '/industries/', '/get', ...smLocs]);
+const pageSet = new Set(['/', '/industries/', '/get', ...smLocs]);
 for (const f of fs.readdirSync(path.join(ROOT, 'public'))) if (f.endsWith('.html') && f !== '404.html') pageSet.add('/' + f);
 for (const f of fs.readdirSync(path.join(ROOT, 'public/industries'))) if (f.endsWith('.html')) pageSet.add(f === 'index.html' ? '/industries/' : '/industries/' + f);
 pageSet.add('/patch-notes.html');
@@ -260,7 +260,7 @@ async function browserPart() {
     page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource|net::ERR/.test(m.text())) errs.push(m.text()); });
     const openMenuIfPhone = async () => { if (vp.touch) { const t = page.locator('#navMenuToggle'); if (await t.count() && (await t.getAttribute('aria-expanded')) !== 'true') await t.tap().catch(() => t.click()); } };
     const pn = (p) => `${p} @${vp.tag}`;
-    for (const p of QUICK ? PAGES.filter((x) => ['/', '/industries/', '/industries/hotel.html', '/industries/hvac.html', '/who.html'].includes(x)) : PAGES) {
+    for (const p of QUICK ? PAGES.filter((x) => ['/', '/industries/', '/industries/hotel.html', '/industries/hvac.html'].includes(x)) : PAGES) {
       errs.length = 0;
       const resp = await page.goto(base + p, { waitUntil: 'load' }).catch((e) => ({ status: () => 'ERR ' + e.message }));
       if (!resp || resp.status() !== 200) { fail(pn(p), '(page)', '200', String(resp && resp.status()), 'fix'); continue; }
@@ -288,7 +288,7 @@ async function browserPart() {
       for (const [t, why] of bad) fail(pn(p), t, 'enabled and not covered', why, 'fix css/z-index');
     }
     // every button / summary / [role=button] outside the dropdown: click it and see that something happens (WARN rows, listed in the audit; hard failures are disabled / covered / throwing handlers)
-    for (const p of QUICK ? PAGES.filter((x) => ['/', '/industries/', '/industries/hotel.html', '/industries/hvac.html', '/who.html'].includes(x)) : PAGES) {
+    for (const p of QUICK ? PAGES.filter((x) => ['/', '/industries/', '/industries/hotel.html', '/industries/hvac.html'].includes(x)) : PAGES) {
       await page.goto(base + p, { waitUntil: 'load' }); await page.waitForTimeout(120);
       const n = await page.locator('button, summary, [role="button"]').count();
       for (let i = 0; i < n; i++) {
@@ -307,7 +307,7 @@ async function browserPart() {
       }
     }
     // dropdown behaviour on a few representative pages (home, hub, a generated industry page, who)
-    for (const p of ['/', '/industries/', '/industries/hotel.html', '/who.html']) {
+    for (const p of ['/', '/industries/', '/industries/hotel.html']) {
       await page.goto(base + p, { waitUntil: 'load' }); await page.waitForTimeout(100);
       await openMenuIfPhone();
       const toggle = page.locator('.nav-dropdown-toggle').first();
@@ -352,7 +352,7 @@ async function browserPart() {
       (st === 200 || st === 'hash') ? ok(pn('/'), 'dropdown -> ' + h, '200', String(st)) : fail(pn('/'), 'dropdown -> ' + h, '200', String(st), 'fix link');
     }
     // real clicks on every Try button on key pages
-    for (const p of (QUICK ? ['/', '/industries/hotel.html'] : ['/', '/industries/', '/industries/hotel.html', '/industries/hvac.html', '/industries/any-business.html', '/who.html'])) {
+    for (const p of (QUICK ? ['/', '/industries/hotel.html'] : ['/', '/industries/', '/industries/hotel.html', '/industries/hvac.html', '/industries/any-business.html'])) {
       await page.goto(base + p, { waitUntil: 'load' });
       const tries = await page.evaluate(() => [...document.querySelectorAll('a,button')].filter((e) => /^\s*try\b/i.test(e.textContent || '')).map((e, i) => ({ t: (e.textContent || '').trim().slice(0, 50), h: e.getAttribute('href') })));
       for (let i = 0; i < tries.length; i++) {

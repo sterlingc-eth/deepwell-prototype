@@ -13,6 +13,8 @@
     "api/account.js": { "includeFiles": "{test-docs/scorecard/exam.json,node_modules/zxing-wasm/dist/reader/zxing_reader.wasm}" }
   },
   "redirects": [
+    { "source": "/who.html", "destination": "/industries/", "permanent": true },
+    { "source": "/who", "destination": "/industries/", "permanent": true },
     { "source": "/download", "destination": "/get", "permanent": false },
     { "source": "/mobile", "destination": "/get", "permanent": false },
     { "source": "/app-download", "destination": "/get", "permanent": false }

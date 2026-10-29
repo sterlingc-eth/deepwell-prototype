@@ -24,7 +24,11 @@ function hsl(h, s, l) {
   const f = (n) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
   return '#' + [f(0), f(8), f(4)].map((x) => Math.round(x * 255).toString(16).padStart(2, '0')).join('');
 }
-export const palette = (t) => ({ a: hsl(t.hue, 56, 68), b: hsl(t.hue2, 62, 64), bg: hsl(t.hue, 30, 9), sf: hsl(t.hue, 24, 14), ln: hsl(t.hue, 22, 30) });
+const lum = (h) => { const c = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+export const contrast = (x, y) => { const a = lum(x), b = lum(y); return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05); };
+/** Accent colour lifted (lightness only, hue kept) until it reads >= 4.5:1 on both the stage background and the surface. */
+function accent(h, s, l, bg, sf) { let c = hsl(h, s, l); while (l < 96 && Math.min(contrast(c, bg), contrast(c, sf)) < 4.5) c = hsl(h, s, ++l); return c; }
+export const palette = (t) => { const bg = hsl(t.hue, 30, 9), sf = hsl(t.hue, 24, 14); return { a: accent(t.hue, 56, 68, bg, sf), b: accent(t.hue2, 62, 64, bg, sf), bg, sf, ln: hsl(t.hue, 22, 30) }; };
 export const paletteKey = (t) => { const p = palette(t); return `${p.a}/${p.b}`; };
 
 /** Hand-written pages that get the stage too (file under public/industries, theme key). */
@@ -52,11 +56,19 @@ function backdrop(kind) {
 
 // ---- story: pick the question, the documents and the source from the demo data ----
 const AGG = /\b(across|how many|all|total of|every|combined)\b/i;
-export function pickStory(d) {
+const SHAPES = [['field', (q) => /^what('s| is| are) the .+ on [A-Z]+-?\d+/i.test(q) && !/^what'?s the total on\b/i.test(q)], ['clause', (q) => /^what does .+ say about/i.test(q)], ['total', (q) => /^what'?s the total on\b/i.test(q)], ['when', (q) => /^when was\b/i.test(q)]];
+const ORDERS = [[0, 1, 3, 2], [3, 0, 1, 2], [1, 2, 0, 3], [2, 3, 0, 1]]; // indexes into SHAPES, by theme position mod 4
+/** The story for one industry. `key` (theme key) rotates the question shape (field lookup / clause / total / latest-date) so neighbouring pages do not all open with "When was ... latest ...?"; a theme may carry a hand-fixed `story` taken from its sample records. */
+export function pickStory(d, key) {
+  if (key && THEMES[key]?.story) return { ...THEMES[key].story };
   const withSrc = d.questions.filter((q) => q.source);
+  const ok = withSrc.filter((q) => !AGG.test(q.q) && q.answer.length <= 90);
+  const idx = Math.max(0, Object.keys(THEMES).indexOf(key));
+  let q;
+  for (const n of ORDERS[idx % 4]) { if (q) break; q = ok.find((x) => SHAPES[n][1](x.q)); }
   const single = withSrc.filter((q) => !AGG.test(q.q) && !/^what'?s the total on\b/i.test(q.q) && q.answer.length <= 90);
   const total = withSrc.filter((q) => /^what'?s the total on\b/i.test(q.q));
-  const q = single.find((x) => !/^when was\b/i.test(x.q)) ?? single[0] ?? total[0] ?? withSrc[0] ?? d.questions[0];
+  q = q ?? single[0] ?? total[0] ?? withSrc[0] ?? d.questions[0];
   const src = (q.source || '').toLowerCase();
   const first = d.docTypes.find((t) => src.startsWith(t.label.toLowerCase()));
   const docs = [first, ...d.docTypes.filter((t) => t !== first)].filter(Boolean).slice(0, 3).map((t) => t.label);
@@ -70,7 +82,7 @@ export function stageHtml(slug, d, opts = {}) {
   const t = THEMES[slug];
   if (!t) throw new Error('no theme for ' + slug);
   const p = palette(t);
-  const st = pickStory(d);
+  const st = pickStory(d, slug);
   const label = t.label || d.label;
   const style = `--a:${p.a};--b:${p.b};--bg:${p.bg};--sf:${p.sf};--ln:${p.ln}`;
   const chips = st.docs.map((x, i) => `<div class="ia-chip" style="--n:${i}"><b>${esc(x)}</b><i></i><i class="s"></i></div>`).join('');
@@ -111,6 +123,19 @@ function closeOf(html, start, open = /<div\b/g) {
   return -1;
 }
 /** Insert (or refresh, idempotently) the stage after the hero block of a page, plus the css link and script. Returns the new html, or null when no hero block. */
+/** Retire the older hand-made hero art so only the themed stage shows: the ambient sm-amb scene or np-scene figure inside the hero block, and the sm-sc body scene right under the stage. Idempotent. */
+export function retireOldHero(html) {
+  const hb = html.indexOf('<div class="hero-block"');
+  if (hb >= 0) {
+    const end = closeOf(html, hb);
+    if (end > 0) {
+      let seg = html.slice(hb, end);
+      seg = seg.replace(/<!--SM--><div class="sm-amb"(?![^>]*sm-close)[\s\S]*?<!--\/SM-->/, '').replace(/\n?[ \t]*<figure class="np-fig np-scene"[\s\S]*?<\/figure>/, '');
+      html = html.slice(0, hb) + seg + html.slice(end);
+    }
+  }
+  return html.replace(/(<!--\/ia-hero-->\s*)<!--SM--><div class="sm-sc"[\s\S]*?<!--\/SM-->/, '$1');
+}
 export function injectStage(html, stage) {
   let out = html.replace(/\n\n  <!--ia-hero-->[\s\S]*?<!--\/ia-hero-->/, '').replace(/<!--ia-hero-->[\s\S]*?<!--\/ia-hero-->/, '');
   const hb = out.indexOf('<div class="hero-block"');
@@ -118,6 +143,7 @@ export function injectStage(html, stage) {
   const end = closeOf(out, hb);
   if (end < 0) return null;
   out = out.slice(0, end) + '\n\n  ' + stage + out.slice(end);
+  out = retireOldHero(out).replace(/<a class="back-home" href="\/who\.html">&larr; Back to Who it&rsquo;s for<\/a>/, '<a class="back-home" href="/industries/">&larr; Back to all industries</a>');
   if (!out.includes('href="/industries/ia.css"')) out = out.replace('</head>', headLink + '\n</head>');
   if (!out.includes('src="/industries/ia.js"')) out = out.replace('</body>', bodyScript + '\n</body>');
   return out;
