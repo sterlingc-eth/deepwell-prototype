@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { stageHtml, iconHtml, headLink, bodyScript, artFiles, injectStage, HANDWRITTEN, THEMES, palette } from './art.mjs';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const SITE = 'https://deepwelltechnology.com';
@@ -125,7 +126,7 @@ h3{font-family:"Newsreader",Georgia,serif;font-weight:500;font-size:1.05rem;line
 .related a{display:inline-flex;align-items:center;min-height:44px;color:var(--muted)}
 `;
 
-function page({ title, description, canonicalPath, body }) {
+function page({ title, description, canonicalPath, body, art = '' }) {
   const s = shell();
   const url = SITE + canonicalPath;
   return `<!DOCTYPE html>
@@ -156,14 +157,14 @@ function page({ title, description, canonicalPath, body }) {
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 ${s.fonts}
 <style>${s.style}${EXTRA_CSS}</style>
-</head>
+${art ? headLink + '\n' : ''}</head>
 <body>
 ${s.nav}
 ${body}
 ${s.footer}
 ${s.dropdown}
 ${s.tail}
-</body>
+${art === 'stage' ? bodyScript + '\n' : ''}</body>
 </html>
 `;
 }
@@ -188,6 +189,8 @@ export function renderIndustry(d, all) {
       <a class="btn btn-ghost" href="/industries/">All industries</a>
     </div>
   </div>
+
+  ${stageHtml(d.slug, d, { demo: d.slug })}
 
   <div class="stats" role="list" aria-label="Sample workspace at a glance">
     <div class="stat" role="listitem"><b>${d.documents}</b><span>documents in the sample</span></div>
@@ -224,7 +227,7 @@ ${related.map((r) => `    <li><a href="/industries/${pageFile(r.slug)}">${esc(r.
 
   <a class="back-home" href="/industries/">&larr; All industries</a>
 </main>`;
-  return page({ title, description, canonicalPath: `/industries/${d.slug}.html`, body });
+  return page({ title, description, canonicalPath: `/industries/${d.slug}.html`, body, art: 'stage' });
 }
 
 export function renderHub(data) {
@@ -239,7 +242,8 @@ export function renderHub(data) {
     <ul class="hub-grid">
 ${items.map((d) => {
       const search = [d.label, d.company, g.title, ...d.docTypes.map((t) => t.label)].join(' ').toLowerCase();
-      return `      <li class="hub-item" data-search="${esc(search)}"><div class="hub-card">
+      return `      <li class="hub-item" data-search="${esc(search)}"><div class="hub-card" style="--ca:${palette(THEMES[d.slug]).a}">
+        ${iconHtml(d.slug)}
         <h3><a href="/industries/${pageFile(d.slug)}">${esc(d.label)}</a></h3>
         <p>${plural(d.documents, 'sample document', 'sample documents')} · ${plural(d.docTypes.length, 'type', 'types')}</p>
         <p>${esc(d.docTypes.slice(0, 3).map((t) => t.label).join(', '))}</p>
@@ -315,7 +319,7 @@ ${EXTRA_GUIDES.map((e) => `      <li><a href="${e.href}"><b>${esc(e.title)}</b><
   try { var pre = new URLSearchParams(location.search).get('q'); if (pre) { q.value = pre; apply(); } } catch (e) {}
 })();
 </script>`;
-  return page({ title: 'Any Business, One App — DeepWell Technology', description, canonicalPath: '/industries/', body });
+  return page({ title: 'Any Business, One App — DeepWell Technology', description, canonicalPath: '/industries/', body, art: 'hub' });
 }
 
 /** Everything the generator owns: path (relative to repo root) -> content. */
@@ -325,6 +329,22 @@ export function renderAll(data = loadData()) {
   for (const d of data.industries) {
     if (EXISTING_PAGES[d.slug]) continue;
     out.set(`public/industries/${d.slug}.html`, renderIndustry(d, data.industries));
+  }
+  return out;
+}
+
+/** The hand-written pages keep their content; they only gain the themed stage (inserted idempotently after the hero block). Returns rel -> new html for pages that need a change. */
+export function renderHandwritten(data = loadData(), read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8')) {
+  const out = new Map();
+  for (const [file, key] of HANDWRITTEN) {
+    const rel = `public/industries/${file}`;
+    const t = THEMES[key];
+    const src = data.industries.find((x) => x.slug === (t.data || key));
+    const demo = data.industries.some((x) => x.slug === key) ? key : (key === 'plumbing' ? 'plumbing-hvac' : null);
+    const html = read(rel);
+    const next = injectStage(html, stageHtml(key, { ...src, label: t.label || src.label }, { demo }));
+    if (next === null) throw new Error('no hero block in ' + rel);
+    out.set(rel, next);
   }
   return out;
 }

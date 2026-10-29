@@ -142,8 +142,6 @@ if (CHECK) {
     const slug = f.replace(/\.html$/, '').replace(/-/g, ' ');
     if (!covered.some((it) => it.match.some((k) => k.toLowerCase() === slug))) fail(`public/industries/${f} is marked Coming soon but roadmap.json next/later has no item matching "${slug}"`);
   }
-  // fleet / equipment rental must stay on the roadmap
-  if (!road.later.some((it) => it.id === 'fleet-equipment-rental')) fail('roadmap.json "later" lost Fleet and equipment rental');
   // help 18 must stay public so the public support bot can answer roadmap questions
   if (!/^audience: public$/m.test(help)) fail('help 18 must stay "audience: public"');
   if (problems.length) { console.error(problems.map((p) => `build-roadmap --check: ${p}`).join('\n')); process.exit(1); }

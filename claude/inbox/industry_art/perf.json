@@ -1,0 +1,55 @@
+[
+ {
+  "pg": "hvac.html",
+  "w": 1440,
+  "cpu": "4x slowdown",
+  "dcl": 235,
+  "load": 292,
+  "lcp": 260,
+  "longTasks": [
+   128,
+   69
+  ],
+  "kb": 55,
+  "anims": 43
+ },
+ {
+  "pg": "realty.html",
+  "w": 390,
+  "cpu": "4x slowdown",
+  "dcl": 220,
+  "load": 223,
+  "lcp": 196,
+  "longTasks": [
+   109
+  ],
+  "kb": 34,
+  "anims": 3
+ },
+ {
+  "pg": "nonprofits.html",
+  "w": 820,
+  "cpu": "4x slowdown",
+  "dcl": 243,
+  "load": 244,
+  "lcp": 228,
+  "longTasks": [
+   109
+  ],
+  "kb": 49,
+  "anims": 5
+ },
+ {
+  "pg": "index.html",
+  "w": 1440,
+  "cpu": "4x slowdown",
+  "dcl": 183,
+  "load": 184,
+  "lcp": 208,
+  "longTasks": [
+   113
+  ],
+  "kb": 83,
+  "anims": 0
+ }
+]

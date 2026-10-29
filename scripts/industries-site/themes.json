@@ -1,0 +1,393 @@
+{
+ "_note": "Per-industry art direction for the industry heroes. hue/hue2 pick the accent pair; glyph, bd (backdrop) and ch (choreography) are defined in glyphs.mjs / art.mjs. Hero facts come from data.json only.",
+ "themes": {
+  "plumbing-hvac": {
+   "scene": "hvac",
+   "glyph": "condenser",
+   "bd": "rings",
+   "ch": "merge",
+   "hue": 192,
+   "hue2": 18
+  },
+  "plumbing": {
+   "scene": "plumbing",
+   "glyph": "pipe",
+   "bd": "grid",
+   "ch": "draw",
+   "hue": 205,
+   "hue2": 170,
+   "page": "plumbing.html",
+   "data": "plumbing-hvac",
+   "label": "Plumbing"
+  },
+  "electrical": {
+   "scene": "electrical",
+   "glyph": "panel",
+   "bd": "circuit",
+   "ch": "light",
+   "hue": 48,
+   "hue2": 200
+  },
+  "general-contractor": {
+   "scene": "general-contractor",
+   "glyph": "crane",
+   "bd": "hatch",
+   "ch": "stack",
+   "hue": 32,
+   "hue2": 335
+  },
+  "roofing": {
+   "scene": "roofing",
+   "glyph": "roof",
+   "bd": "tiles",
+   "ch": "stack",
+   "hue": 20,
+   "hue2": 295
+  },
+  "landscaping": {
+   "scene": "landscaping",
+   "glyph": "tree",
+   "bd": "topo",
+   "ch": "fill",
+   "hue": 105,
+   "hue2": 55
+  },
+  "pestcontrol": {
+   "scene": "pestcontrol",
+   "glyph": "bug",
+   "bd": "dots",
+   "ch": "scan",
+   "hue": 82,
+   "hue2": 350
+  },
+  "poolservice": {
+   "scene": "poolservice",
+   "glyph": "pool",
+   "bd": "waves",
+   "ch": "wave",
+   "hue": 186,
+   "hue2": 215
+  },
+  "cleaning": {
+   "scene": "cleaning",
+   "glyph": "spray",
+   "bd": "dots",
+   "ch": "pop",
+   "hue": 168,
+   "hue2": 290
+  },
+  "auto": {
+   "scene": "auto",
+   "glyph": "car",
+   "bd": "rays",
+   "ch": "draw",
+   "hue": 356,
+   "hue2": 215
+  },
+  "realty": {
+   "scene": "realty",
+   "glyph": "house",
+   "bd": "grid",
+   "ch": "merge",
+   "hue": 28,
+   "hue2": 160
+  },
+  "property-management": {
+   "scene": "property-management",
+   "glyph": "apartments",
+   "bd": "tiles",
+   "ch": "light",
+   "hue": 200,
+   "hue2": 275
+  },
+  "storage": {
+   "scene": "storage",
+   "glyph": "units",
+   "bd": "tiles",
+   "ch": "stack",
+   "hue": 215,
+   "hue2": 315
+  },
+  "hotel": {
+   "scene": "hotel",
+   "glyph": "bell",
+   "bd": "rays",
+   "ch": "pop",
+   "hue": 262,
+   "hue2": 38
+  },
+  "eventvenue": {
+   "scene": "eventvenue",
+   "glyph": "spots",
+   "bd": "rays",
+   "ch": "sweep",
+   "hue": 320,
+   "hue2": 45
+  },
+  "marina": {
+   "scene": "marina",
+   "glyph": "boat",
+   "bd": "waves",
+   "ch": "wave",
+   "hue": 232,
+   "hue2": 150
+  },
+  "weddingplan": {
+   "scene": "weddingplan",
+   "glyph": "rings2",
+   "bd": "topo",
+   "ch": "orbit",
+   "hue": 338,
+   "hue2": 15
+  },
+  "restaurant": {
+   "scene": "restaurant",
+   "glyph": "cloche",
+   "bd": "dots",
+   "ch": "pop",
+   "hue": 15,
+   "hue2": 48
+  },
+  "brewery": {
+   "scene": "brewery",
+   "glyph": "mug",
+   "bd": "waves",
+   "ch": "fill",
+   "hue": 38,
+   "hue2": 28
+  },
+  "foodtruck": {
+   "scene": "foodtruck",
+   "glyph": "truck",
+   "bd": "tiles",
+   "ch": "drift",
+   "hue": 22,
+   "hue2": 250
+  },
+  "bookkeeping": {
+   "scene": "bookkeeping",
+   "glyph": "ledger",
+   "bd": "ledger",
+   "ch": "draw",
+   "hue": 150,
+   "hue2": 48
+  },
+  "legal": {
+   "scene": "legal",
+   "glyph": "scales",
+   "bd": "rings",
+   "ch": "stamp",
+   "hue": 225,
+   "hue2": 85
+  },
+  "insagency": {
+   "scene": "insagency",
+   "glyph": "shield",
+   "bd": "tiles",
+   "ch": "draw",
+   "hue": 200,
+   "hue2": 130
+  },
+  "msp": {
+   "scene": "msp",
+   "glyph": "rack",
+   "bd": "circuit",
+   "ch": "light",
+   "hue": 255,
+   "hue2": 175
+  },
+  "filmprod": {
+   "scene": "filmprod",
+   "glyph": "clap",
+   "bd": "rays",
+   "ch": "stamp",
+   "hue": 85,
+   "hue2": 300
+  },
+  "photostudio": {
+   "scene": "photostudio",
+   "glyph": "camera",
+   "bd": "rings",
+   "ch": "scan",
+   "hue": 275,
+   "hue2": 195
+  },
+  "tutoring": {
+   "scene": "tutoring",
+   "glyph": "book",
+   "bd": "ledger",
+   "ch": "drift",
+   "hue": 66,
+   "hue2": 320
+  },
+  "medicaloffice": {
+   "scene": "medicaloffice",
+   "glyph": "cross",
+   "bd": "grid",
+   "ch": "draw",
+   "hue": 172,
+   "hue2": 350
+  },
+  "dentaloffice": {
+   "scene": "dentaloffice",
+   "glyph": "tooth",
+   "bd": "tiles",
+   "ch": "pop",
+   "hue": 230,
+   "hue2": 255
+  },
+  "dentallabco": {
+   "scene": "dentallabco",
+   "glyph": "crown",
+   "bd": "hatch",
+   "ch": "scan",
+   "hue": 168,
+   "hue2": 245
+  },
+  "medbillingco": {
+   "scene": "medbillingco",
+   "glyph": "claim",
+   "bd": "ledger",
+   "ch": "sweep",
+   "hue": 140,
+   "hue2": 215
+  },
+  "vetclinic": {
+   "scene": "vetclinic",
+   "glyph": "paw",
+   "bd": "topo",
+   "ch": "orbit",
+   "hue": 120,
+   "hue2": 28
+  },
+  "petgroomco": {
+   "scene": "petgroomco",
+   "glyph": "dog",
+   "bd": "dots",
+   "ch": "drift",
+   "hue": 300,
+   "hue2": 70
+  },
+  "gymfit": {
+   "scene": "gymfit",
+   "glyph": "dumbbell",
+   "bd": "rays",
+   "ch": "fill",
+   "hue": 4,
+   "hue2": 120
+  },
+  "salonspa": {
+   "scene": "salonspa",
+   "glyph": "mirror",
+   "bd": "rings",
+   "ch": "sweep",
+   "hue": 330,
+   "hue2": 150
+  },
+  "daycarecenter": {
+   "scene": "daycarecenter",
+   "glyph": "blocks",
+   "bd": "tiles",
+   "ch": "stack",
+   "hue": 85,
+   "hue2": 125
+  },
+  "nonprofit": {
+   "scene": "nonprofit",
+   "glyph": "folder",
+   "bd": "topo",
+   "ch": "drift",
+   "hue": 350,
+   "hue2": 85
+  },
+  "grantnp": {
+   "scene": "grantnp",
+   "glyph": "letter",
+   "bd": "ledger",
+   "ch": "fill",
+   "hue": 95,
+   "hue2": 265
+  },
+  "church": {
+   "scene": "church",
+   "glyph": "church",
+   "bd": "rays",
+   "ch": "light",
+   "hue": 240,
+   "hue2": 50
+  },
+  "policerecords": {
+   "scene": "policerecords",
+   "glyph": "badge",
+   "bd": "hatch",
+   "ch": "stamp",
+   "hue": 218,
+   "hue2": 0
+  },
+  "trucking": {
+   "scene": "trucking",
+   "glyph": "semi",
+   "bd": "hatch",
+   "ch": "drift",
+   "hue": 118,
+   "hue2": 200
+  },
+  "warehouse": {
+   "scene": "warehouse",
+   "glyph": "racks",
+   "bd": "grid",
+   "ch": "stack",
+   "hue": 70,
+   "hue2": 175
+  },
+  "mfgqa": {
+   "scene": "mfgqa",
+   "glyph": "gear",
+   "bd": "circuit",
+   "ch": "orbit",
+   "hue": 188,
+   "hue2": 75
+  },
+  "feedstore": {
+   "scene": "feedstore",
+   "glyph": "sack",
+   "bd": "topo",
+   "ch": "pop",
+   "hue": 90,
+   "hue2": 35
+  },
+  "offices": {
+   "scene": "offices",
+   "glyph": "cabinet",
+   "bd": "ledger",
+   "ch": "scan",
+   "hue": 160,
+   "hue2": 110,
+   "page": "offices.html",
+   "data": "msp",
+   "label": "Offices"
+  },
+  "any-business": {
+   "scene": "any-business",
+   "glyph": "mix",
+   "bd": "dots",
+   "ch": "orbit",
+   "hue": 40,
+   "hue2": 110,
+   "page": "any-business.html",
+   "data": "bookkeeping",
+   "label": "Any business"
+  },
+  "fleet-equipment-rental": {
+   "scene": "fleet-equipment-rental",
+   "glyph": "excavator",
+   "bd": "hatch",
+   "ch": "wave",
+   "hue": 50,
+   "hue2": 65,
+   "page": "fleet-equipment-rental.html",
+   "data": "trucking",
+   "label": "Fleet and equipment rental"
+  }
+ }
+}

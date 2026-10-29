@@ -2,7 +2,8 @@
 //   --refresh  re-extract data.json from src/demo/fixtures, then rebuild pages
 import fs from 'node:fs';
 import path from 'node:path';
-import { ROOT, DATA_FILE, extractData, loadData, renderAll, sitemapUrls, syncNav } from './lib.mjs';
+import { artFiles } from './art.mjs';
+import { ROOT, DATA_FILE, extractData, loadData, renderAll, renderHandwritten, sitemapUrls, syncNav } from './lib.mjs';
 
 if (process.argv.includes('--refresh')) fs.writeFileSync(DATA_FILE, JSON.stringify(extractData(), null, 1) + '\n');
 // nav dropdown first: the generated pages lift their nav from public/industries/offices.html
@@ -15,6 +16,11 @@ for (const [rel, content] of renderAll(loadData())) {
   n++;
 }
 console.log(`industries-site: wrote ${n} pages`);
+// shared art css/js (one cached file each) used by every themed page
+for (const [rel, content] of artFiles()) fs.writeFileSync(path.join(ROOT, rel), content);
+// hand-written pages: content untouched, themed stage inserted/refreshed after the hero block
+for (const [rel, content] of renderHandwritten(loadData())) fs.writeFileSync(path.join(ROOT, rel), content);
+console.log('industries-site: themed stage applied to the hand-written pages');
 
 // sitemap: append any missing industries URL (idempotent)
 const smPath = path.join(ROOT, 'public/sitemap.xml');

@@ -1,0 +1,109 @@
+/* Industry hero art (ia = industry art). Final frame is the default; motion only exists under .ia-arm, which ia.js/the inline guard add when motion is allowed. */
+.ia-stage{--a:#9DC4B2;--b:#D8AE6E;--bg:#0f1c17;--sf:#13251e;--ln:#2c4a3f;--ink:#E8F0EB;--mut:#9FB4A9;container-type:inline-size;margin:0 0 36px;border:1px solid var(--ln);border-radius:14px;background:var(--bg);color:var(--ink);overflow:hidden;--tq:4.3s;--ta:5.7s;--ts:6.9s}
+.ia-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 8px 8px 16px;border-bottom:1px solid var(--ln)}
+.ia-kicker{font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--a)}
+.ia-pb{display:none;align-items:center;min-height:36px;padding:4px 14px;border-radius:18px;border:1px solid var(--ln);background:transparent;color:var(--ink);font:inherit;font-size:.82rem;cursor:pointer}
+.ia-pb:hover{border-color:var(--a)}
+.ia-pb:focus-visible{outline:2px solid var(--b);outline-offset:2px}
+.ia-arm .ia-pb{display:inline-flex}
+.ia-body{display:grid;grid-template-columns:1fr}
+.ia-art{position:relative;aspect-ratio:400/300;overflow:hidden;min-width:0}
+.ia-art>svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+.g0{stop-color:var(--b);stop-opacity:.2}.g1{stop-color:var(--b);stop-opacity:0}
+.ia-chip{position:absolute;left:4%;top:calc(6% + var(--n)*31%);width:37%;height:26%;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;gap:4px;padding:6px 9px;background:var(--sf);border:1px solid var(--ln);border-left:3px solid var(--a);border-radius:6px;box-shadow:0 8px 16px -10px rgba(0,0,0,.7);font-size:clamp(9.5px,2.9cqi,13px);line-height:1.2;overflow:hidden}
+.ia-chip b{font-weight:600;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ia-chip i{display:block;height:3px;width:82%;border-radius:2px;background:var(--ln)}
+.ia-chip i.s{width:54%}
+.ia-qa{display:flex;flex-direction:column;justify-content:center;gap:12px;padding:16px 18px 14px;border-top:1px solid var(--ln);min-width:0}
+.ia-qa p{margin:0;display:grid;grid-template-columns:58px minmax(0,1fr);gap:8px;font-size:.95rem;line-height:1.4}
+.ia-who{font-family:"IBM Plex Mono",monospace;font-size:.64rem;letter-spacing:.12em;text-transform:uppercase;color:var(--b);padding-top:4px}
+.ia-q .ia-qt{font-weight:600;display:block}
+.ia-a span:last-child{font-family:"Newsreader",Georgia,serif;font-size:1.2rem;line-height:1.25;color:#fff}
+.ia-s span:last-child{border:1px dashed var(--a);border-radius:6px;padding:5px 9px;color:var(--a);font-size:.88rem;justify-self:start}
+.ia-qa .ia-ft{display:block;font-size:.78rem;color:var(--mut);line-height:1.5;margin-top:2px}
+.ia-demo{display:flex;align-items:center;width:fit-content;min-height:44px;color:var(--a);text-underline-offset:3px}
+.ia-demo:hover{color:#fff}
+@container (min-width:640px){.ia-body{grid-template-columns:1.25fr 1fr}.ia-qa{border-top:0;border-left:1px solid var(--ln);padding:18px 20px 14px}}
+/* glyph roles (stage + hub icons) */
+.ia-glyph .p,.ia-ic :is(.o,.f,.g,.d,.w){fill:none;stroke:var(--a);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;transform-box:fill-box;transform-origin:50% 50%}
+.ia-glyph .f,.ia-ic .f{fill:var(--a);--fo:.16;fill-opacity:var(--fo)}
+.ia-glyph .g,.ia-ic .g{fill:var(--b);--fo:.34;fill-opacity:var(--fo);stroke:var(--b)}
+.ia-glyph .d,.ia-ic .d{fill:var(--b);stroke:none}
+.ia-glyph .w,.ia-ic .w{stroke-width:6;stroke-opacity:.55}
+.ia-flow{stroke-width:1.5;stroke-dasharray:4 5;opacity:.7}
+.ia-scan{fill:var(--b);opacity:0}
+.amb{transform-box:fill-box;transform-origin:50% 50%}
+.ia-bd{stroke-linecap:round}
+/* motion */
+@media (prefers-reduced-motion:no-preference){
+.ia-arm:not(.ia-go) *,.ia-arm.ia-paused *{animation-play-state:paused!important}
+.ia-arm .ia-body{transition:opacity .5s}
+.ia-arm.ia-fo .ia-body{opacity:0}
+.ia-arm .ia-chip{animation:ia-chip var(--dur,.8s) var(--ease,cubic-bezier(.2,.8,.2,1)) calc(.2s + var(--n)*.4s) both}
+@keyframes ia-chip{from{opacity:0;transform:translate(var(--fx,-40px),var(--fy,0px)) rotate(var(--fr,0deg)) scale(var(--fs,1)) perspective(500px) rotateY(var(--fry,0deg))}to{opacity:1;transform:none}}
+[data-ch=draw]{--fx:-90px}
+[data-ch=light]{--fx:0px;--fy:-80px;--fr:-6deg;--ease:cubic-bezier(.3,1.45,.5,1)}
+[data-ch=pop]{--fx:0px;--fs:.4}
+[data-ch=stack]{--fx:0px;--fy:80px}
+[data-ch=fill]{--fx:-70px;--fs:.9}
+[data-ch=scan]{--fx:0px;--fry:85deg;--dur:.9s}
+[data-ch=merge]{--fx:-110px;--dur:1s}
+[data-ch=merge] .ia-chip:nth-of-type(1){--fy:-70px}[data-ch=merge] .ia-chip:nth-of-type(3){--fy:70px}
+[data-ch=drift]{--fx:-30px;--fy:-50px;--fr:8deg;--dur:1.3s;--ease:ease-out}
+[data-ch=orbit]{--fx:150px;--fy:-90px;--fr:140deg;--fs:.5;--dur:1.1s}
+[data-ch=wave]{--fx:190px;--fy:30px;--dur:1s}
+[data-ch=stamp]{--fx:0px;--fs:1.8;--fr:-5deg;--dur:.35s;--ease:ease-in}
+[data-ch=sweep]{--fx:160px;--fs:.6;--dur:1s}
+.ia-arm .ia-flow{animation:ia-fade .6s ease-out calc(1.3s + var(--n)*.3s) both,ia-dash 1.4s linear 3.2s infinite}
+@keyframes ia-dash{to{stroke-dashoffset:-18}}
+@keyframes ia-fade{from{opacity:0}}
+/* glyph choreographies; --i is the shape index */
+.ia-arm[data-ch=draw] .ia-glyph .p:not(.d),.ia-arm[data-ch=drift] .ia-glyph .p:not(.d){animation:ia-draw .8s ease-out calc(1.4s + var(--i)*.14s) both,ia-fillin .6s ease-out calc(2s + var(--i)*.14s) both}
+.ia-arm[data-ch=drift] .ia-glyph .p:not(.d){animation-duration:1s,.8s}
+.ia-arm[data-ch=draw] .ia-glyph .d,.ia-arm[data-ch=drift] .ia-glyph .d,.ia-arm[data-ch=fill] .ia-glyph .o,.ia-arm[data-ch=fill] .ia-glyph .w,.ia-arm[data-ch=fill] .ia-glyph .d,.ia-arm[data-ch=scan] .ia-glyph .p,.ia-arm[data-ch=merge] .ia-glyph .p{animation:ia-fade .5s ease-out calc(1.4s + var(--i)*.1s) both}
+@keyframes ia-draw{0%{opacity:0;stroke-dasharray:1;stroke-dashoffset:1}2%{opacity:1}100%{opacity:1;stroke-dasharray:1;stroke-dashoffset:0}}
+@keyframes ia-fillin{from{fill-opacity:0}to{fill-opacity:var(--fo,0)}}
+.ia-arm[data-ch=light] .ia-glyph .p,.ia-arm[data-ch=sweep] .ia-glyph .p{animation:ia-light .6s ease-out calc(1.4s + var(--i)*.16s) both}
+@keyframes ia-light{0%{opacity:.14}45%{opacity:1;stroke:var(--b);filter:drop-shadow(0 0 3px var(--b))}100%{opacity:1}}
+.ia-arm[data-ch=pop] .ia-glyph .p{animation:ia-pop .55s cubic-bezier(.3,1.6,.5,1) calc(1.4s + var(--i)*.1s) both}
+@keyframes ia-pop{from{opacity:0;transform:scale(.3)}to{opacity:1;transform:none}}
+.ia-arm[data-ch=orbit] .ia-glyph .p{animation:ia-orb .8s cubic-bezier(.3,1.3,.5,1) calc(1.4s + var(--i)*.09s) both}
+@keyframes ia-orb{from{opacity:0;transform:rotate(-60deg) scale(.3)}to{opacity:1;transform:none}}
+.ia-arm[data-ch=stack] .ia-glyph .p{animation:ia-drop .55s cubic-bezier(.3,1.5,.5,1) calc(1.4s + var(--i)*.16s) both}
+@keyframes ia-drop{from{opacity:0;transform:translateY(-40px)}to{opacity:1;transform:none}}
+.ia-arm[data-ch=fill] .ia-glyph .f,.ia-arm[data-ch=fill] .ia-glyph .g{transform-origin:50% 100%;animation:ia-fy .9s ease-out calc(1.4s + var(--i)*.12s) both}
+@keyframes ia-fy{from{opacity:.2;transform:scaleY(0)}to{opacity:1;transform:none}}
+.ia-arm[data-ch=wave] .ia-glyph .p{animation:ia-rise .7s ease-out calc(1.4s + var(--i)*.1s) both}
+@keyframes ia-rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+.ia-arm[data-ch=stamp] .ia-glyph .p{animation:ia-stamp .32s ease-in calc(1.5s + var(--i)*.2s) both}
+@keyframes ia-stamp{from{opacity:0;transform:scale(1.6)}to{opacity:1;transform:none}}
+.ia-arm[data-ch=scan] .ia-scan,.ia-arm[data-ch=sweep] .ia-scan{animation:ia-sc 1.9s ease-in-out 1.4s both}
+@keyframes ia-sc{0%{opacity:0;transform:translateX(0)}10%{opacity:.55}90%{opacity:.55}100%{opacity:0;transform:translateX(180px)}}
+.ia-arm[data-ch=scan] .ia-glyph .p{animation-duration:.3s;animation-delay:calc(1.5s + var(--i)*.14s)}
+.ia-arm .bdw{animation:ia-wv 7s linear infinite}
+@keyframes ia-wv{to{transform:translateX(-80px)}}
+/* question, answer, source */
+.ia-arm .ia-q,.ia-arm .ia-a,.ia-arm .ia-s,.ia-arm .ia-ft{animation:ia-up .5s ease-out var(--t) both}
+.ia-arm .ia-q{--t:var(--tq)}.ia-arm .ia-a{--t:var(--ta)}.ia-arm .ia-s{--t:var(--ts)}.ia-arm .ia-ft{--t:calc(var(--ts) + .5s)}
+@keyframes ia-up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.ia-arm .ia-qt{animation:ia-wipe 1.1s steps(26,end) calc(var(--tq) + .3s) both}
+@keyframes ia-wipe{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+.ia-arm .ia-s span:last-child{animation:ia-ring .9s ease-out calc(var(--ts) + .3s) both}
+@keyframes ia-ring{from{box-shadow:0 0 0 0 var(--a)}to{box-shadow:0 0 0 9px transparent}}
+/* gentle ambient loops, start after the story has finished */
+.ia-arm .amb.spin{animation:ia-spin 14s linear 8s infinite}
+@keyframes ia-spin{to{transform:rotate(360deg)}}
+.ia-arm .amb.bob{animation:ia-bob 4s ease-in-out 8s infinite}
+@keyframes ia-bob{50%{transform:translateY(-3px)}}
+.ia-arm .amb.blink{animation:ia-bl 2.4s ease-in-out 8s infinite}
+@keyframes ia-bl{50%{opacity:.35}}
+.ia-arm .amb.clap{transform-origin:0 100%;animation:ia-cl 5s ease-in-out 8s infinite}
+@keyframes ia-cl{0%,86%,100%{transform:none}92%{transform:rotate(-9deg)}}
+}
+/* hub cards: themed mark + accent edge */
+.hub-card{position:relative;border-top:2px solid var(--ca,var(--line))}
+.hub-card .ia-ic{position:absolute;right:14px;top:14px;width:44px;height:44px}
+.hub-card h3{padding-right:54px}
+.ia-ic :is(.o,.f,.g,.w){stroke-width:4}.ia-ic .w{stroke-width:12}
+@media (prefers-reduced-motion:no-preference){.hub-card:hover .ia-ic :is(.o,.f,.g,.d,.w),.hub-card:focus-within .ia-ic :is(.o,.f,.g,.d,.w){animation:ia-pop .45s cubic-bezier(.3,1.6,.5,1) both}}
+@media (prefers-reduced-motion:reduce){.ia-stage *{animation:none!important;transition:none!important}.ia-pb{display:none!important}}

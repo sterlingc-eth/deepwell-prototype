@@ -225,6 +225,7 @@ h3{font-family:"Newsreader",Georgia,serif;font-weight:500;font-size:1.05rem;line
 .related{display:flex;flex-wrap:wrap;gap:8px 18px;margin:12px 0 0;padding:0;list-style:none}
 .related a{display:inline-flex;align-items:center;min-height:44px;color:var(--muted)}
 </style>
+<link rel="stylesheet" href="/industries/ia.css">
 </head>
 <body>
 <nav class="nav" aria-label="Primary">
@@ -336,6 +337,22 @@ h3{font-family:"Newsreader",Georgia,serif;font-weight:500;font-size:1.05rem;line
       <a class="btn btn-ghost" href="/industries/">All industries</a>
     </div>
   </div>
+
+  <!--ia-hero--><section class="ia-stage" data-scene="hotel" data-ch="pop" data-bd="rays" style="--a:#a180db;--b:#dcb26a;--bg:#15101e;--sf:#211b2c;--ln:#483c5d" role="group" aria-label="Example from the hotel sample workspace (Moonpenny Hotel and Suites, a made-up company). Documents read: Guest folio, Banquet event order, Reservation confirmation. Question: What's the room nights on FO-1057? Answer: Room nights: 9 Source: Guest folio FO-1057 — Quinn Willowmere.">
+  <div class="ia-head"><span class="ia-kicker">Hotel &middot; example</span><button class="ia-pb" type="button" aria-pressed="false" aria-label="Pause the animation">Pause</button></div>
+  <div class="ia-body">
+    <div class="ia-art" aria-hidden="true">
+      <svg viewBox="0 0 400 300" focusable="false" aria-hidden="true"><defs><radialGradient id="ia-gl" cx="74%" cy="50%" r="46%"><stop class="g0" offset="0"/><stop class="g1" offset="1"/></radialGradient></defs><rect width="400" height="300" fill="url(#ia-gl)"/><g class="ia-bd" fill="none" stroke="var(--a)"><path d="M296 150L716 150M296 150L705 243M296 150L674 332M296 150L624 412M296 150L558 478M296 150L478 528M296 150L389 559M296 150L296 570M296 150L203 559M296 150L114 528M296 150L34 478M296 150L-32 412M296 150L-82 332M296 150L-113 243M296 150L-124 150M296 150L-113 57M296 150L-82 -32M296 150L-32 -112M296 150L34 -178M296 150L114 -228M296 150L203 -259M296 150L296 -270M296 150L389 -259M296 150L478 -228M296 150L558 -178M296 150L624 -112M296 150L674 -32M296 150L705 57" stroke-width=".7" opacity=".14"/></g><g class="ia-flows" stroke="var(--b)"><path class="ia-flow" style="--n:0" d="M164 57C192 57 192 150 214 150" fill="none"/><path class="ia-flow" style="--n:1" d="M164 150C192 150 192 150 214 150" fill="none"/><path class="ia-flow" style="--n:2" d="M164 243C192 243 192 150 214 150" fill="none"/></g><g class="ia-glyph" transform="translate(196 50) scale(2)"><path class="p f" style="--i:0" pathLength="1" d="M18 72a32 32 0 0 1 64 0Z"/><rect class="p o" style="--i:1" pathLength="1" x="10" y="72" width="80" height="9" rx="3"/><g class="amb bob"><circle class="p g" style="--i:2" pathLength="1" cx="50" cy="34" r="5"/></g><line class="p o" style="--i:3" pathLength="1" x1="50" y1="40" x2="50" y2="36"/><path class="p o" style="--i:4" pathLength="1" d="M36 56q2-12 12-16"/><line class="p o" style="--i:5" pathLength="1" x1="8" y1="90" x2="92" y2="90"/><path class="p o" style="--i:6" pathLength="1" d="M82 36l6-6M88 46h6M18 36l-6-6"/></g><rect class="ia-scan" x="200" y="40" width="10" height="220" rx="5"/></svg>
+      <div class="ia-chip" style="--n:0"><b>Guest folio</b><i></i><i class="s"></i></div><div class="ia-chip" style="--n:1"><b>Banquet event order</b><i></i><i class="s"></i></div><div class="ia-chip" style="--n:2"><b>Reservation confirmation</b><i></i><i class="s"></i></div>
+    </div>
+    <div class="ia-qa">
+      <p class="ia-q"><span class="ia-who">Ask</span><span class="ia-qt">What's the room nights on FO-1057?</span></p>
+      <p class="ia-a"><span class="ia-who">Answer</span><span>Room nights: 9</span></p>
+      <p class="ia-s"><span class="ia-who">Source</span><span>Guest folio FO-1057 — Quinn Willowmere</span></p>
+      <p class="ia-ft">Example records from the hotel sample workspace (Moonpenny Hotel and Suites, a made-up company). <a class="ia-demo" href="/demo/?industry=hotel">Ask it in the demo &rarr;</a></p>
+    </div>
+  </div>
+</section><script>(function(){var s=document.currentScript.previousElementSibling;if(s&&window.IntersectionObserver&&!matchMedia('(prefers-reduced-motion: reduce)').matches){s.classList.add('ia-arm');setTimeout(function(){if(!s.__ia)s.classList.remove('ia-arm')},4000)}})()</script><!--/ia-hero-->
 
   <div class="stats" role="list" aria-label="Sample workspace at a glance">
     <div class="stat" role="listitem"><b>20</b><span>documents in the sample</span></div>
@@ -459,5 +476,6 @@ h3{font-family:"Newsreader",Georgia,serif;font-weight:500;font-size:1.05rem;line
 <script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
 <script defer src="/_vercel/insights/script.js"></script>
 <script defer src="/support/widget.js"></script>
+<script defer src="/industries/ia.js"></script>
 </body>
 </html>

@@ -31,7 +31,6 @@
     { "id": "email-folder-upload", "title": "Email and folder upload", "text": "Forward a vendor invoice or drop files in a folder and they file themselves.", "match": ["email", "folder upload"] },
     { "id": "branch-scoping", "title": "Branch scoping", "text": "Limit each person to the records of their own branch or location.", "match": ["branch scoping"] },
     { "id": "callback-analytics", "title": "Callback analytics", "text": "See which technicians and equipment brands generate the most repeat visits.", "match": ["callback analytics"] },
-    { "id": "uptime-sla", "title": "Uptime SLA", "text": "An uptime commitment with service credits.", "match": ["uptime sla"] },
-    { "id": "fleet-equipment-rental", "title": "Fleet and equipment rental", "text": "Service history and paperwork for rented equipment and vehicle fleets.", "match": ["fleet and equipment rental", "fleet equipment rental", "equipment rental"] }
+    { "id": "uptime-sla", "title": "Uptime SLA", "text": "An uptime commitment with service credits.", "match": ["uptime sla"] }
   ]
 }

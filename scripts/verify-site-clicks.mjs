@@ -222,6 +222,18 @@ for (const p of PAGES) {
     ? ok('/demo/', 'back-to-home bar wired', 'DemoApp + not-available screen use <a href="/"> >=44px', 'yes') : fail('/demo/', 'back-to-home bar wired', 'DemoApp + not-available screen use <a href="/"> >=44px', 'missing', 'add HomeBackBar');
 }
 
+// ---------- themed industry stage (public/industries/*): every demo link inside it is a real deep link, the pause control exists ----------
+for (const f of fs.readdirSync(path.join(ROOT, 'public/industries')).filter((x) => x.endsWith('.html') && x !== 'index.html')) {
+  const html = fs.readFileSync(path.join(ROOT, 'public/industries', f), 'utf8');
+  const stage = (html.match(/<!--ia-hero-->[\s\S]*?<!--\/ia-hero-->/) || [''])[0];
+  const pg = '/industries/' + f;
+  if (!stage) { fail(pg, 'themed stage', 'present', 'missing', 'node scripts/industries-site/build.mjs'); continue; }
+  const demos = [...stage.matchAll(/href="([^"]+)"/g)].map((m) => m[1]);
+  const badDemo = demos.filter((h) => !/^\/demo\/\?industry=([a-z0-9-]+)$/.test(h) || !DEMO_SLUGS.includes(h.split('=')[1]));
+  badDemo.length ? fail(pg, 'stage demo link', '/demo/?industry=<real slug>', badDemo.join(', '), 'fix art.mjs demo link') : ok(pg, 'stage demo link', 'real deep link or none', demos.join(' ') || 'none (page has no demo industry)');
+  /<button class="ia-pb" type="button" aria-pressed="false"/.test(stage) ? ok(pg, 'stage pause control', 'button with aria-pressed', 'yes') : fail(pg, 'stage pause control', 'button with aria-pressed', 'missing', 'fix art.mjs');
+}
+
 // ---------- browser part ----------
 async function browserPart() {
   let chromium;
@@ -356,6 +368,27 @@ async function browserPart() {
         const loaded = !DIST || (good && !/not available/i.test(body) && body.length > 20);
         good && loaded ? ok(pn(p), 'Try: ' + tries[i].t, '/demo/ loads', url.pathname + url.search) : fail(pn(p), 'Try: ' + tries[i].t, '/demo/ loads', `${url.pathname} status ${nav && nav.status()} ${body.slice(0, 60)}`, 'point at /demo/');
         if (SHOTS && i === 0 && (p === '/' || p === '/industries/') && good) { /* shot of destination */ await page.screenshot({ path: path.join(SHOTS, `try_destination${p === '/' ? '_home' : '_hub'}_${vp.tag}.png`) }); }
+      }
+    }
+    // themed industry stage: the pause control works from the keyboard (Enter, Space) and the demo link inside it lands on /demo/?industry=
+    for (const p of ['/industries/hotel.html', '/industries/hvac.html']) {
+      await page.goto(base + p, { waitUntil: 'load' }); await page.waitForTimeout(150);
+      const pb = page.locator('.ia-pb');
+      if (!(await pb.count())) { fail(pn(p), 'stage pause button', 'present', 'missing', 'fix stage'); continue; }
+      if (!(await pb.isVisible())) { ok(pn(p), 'stage pause button', 'hidden only when motion is reduced', 'hidden (no animation armed)'); }
+      else {
+        await pb.scrollIntoViewIfNeeded(); await pb.focus(); await page.keyboard.press('Enter'); await page.waitForTimeout(120);
+        const a = await page.evaluate(() => [document.querySelector('.ia-pb').getAttribute('aria-pressed'), document.querySelector('.ia-stage').classList.contains('ia-paused')]);
+        await page.keyboard.press('Space'); await page.waitForTimeout(120);
+        const b = await page.evaluate(() => document.querySelector('.ia-pb').getAttribute('aria-pressed'));
+        a[0] === 'true' && a[1] && b === 'false' ? ok(pn(p), 'stage pause button (Enter pauses, Space resumes)', 'toggles', 'yes') : fail(pn(p), 'stage pause button', 'Enter pauses, Space resumes', JSON.stringify([a, b]), 'fix ia.js');
+      }
+      const dl = page.locator('.ia-demo').first();
+      if (await dl.count()) {
+        await dl.scrollIntoViewIfNeeded();
+        const [nav] = await Promise.all([page.waitForNavigation({ waitUntil: 'load', timeout: 8000 }).catch(() => null), vp.touch ? dl.tap() : dl.click()]);
+        const url = new URL(page.url());
+        nav && nav.status() === 200 && url.pathname === '/demo/' && /^\?industry=[a-z0-9-]+$/.test(url.search) ? ok(pn(p), 'stage demo link', '/demo/?industry= loads', url.pathname + url.search) : fail(pn(p), 'stage demo link', '/demo/?industry= loads', `${url.pathname}${url.search} status ${nav && nav.status()}`, 'fix link');
       }
     }
     if (SHOTS) {

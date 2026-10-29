@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT, SITE, extractData, loadData, renderAll, sitemapUrls, pageFile, demoLink, GROUPS, EXISTING_PAGES, EXTRA_GUIDES } from './industries-site/lib.mjs';
+import { artChecks } from './verify-industry-art.mjs';
 
 let fails = 0;
 let checks = 0;
@@ -115,6 +116,9 @@ for (const rel of rendered.keys()) {
   ok(!/\b(accura|precision|guarantee|testimonial)/i.test(t), `${rel}: unsupported claim wording`);
   ok(!/<img /i.test(html), `${rel}: no images (no logos)`);
 }
+
+// 6b. themed industry heroes: a scene + palette per industry, reduced-motion fallback, a11y markup, size budget, links intact (details in verify-industry-art.mjs)
+artChecks(ok, read, exists);
 
 // 7. api/ keeps exactly 12 top-level files
 const apiFiles = fs.readdirSync(path.join(ROOT, 'api'), { withFileTypes: true }).filter((e) => e.isFile()).length;

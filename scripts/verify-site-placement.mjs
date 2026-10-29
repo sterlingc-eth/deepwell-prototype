@@ -166,6 +166,34 @@ if (chromium) {
       check(`[nav squeeze ${w}] home: no horizontal scroll and the nav row fits (${o[0]} <= ${o[1]})`, o[0] <= o[1] && o[2]);
       await ctx.close();
     }
+    // themed industry heroes (public/industries/*): the stage fits every width, does not shift, plays only when motion is allowed, and the nav still fits at the 1100 breakpoint
+    for (const [pg, w, h] of [['hotel.html', 1440, 900], ['hvac.html', 820, 1180], ['realty.html', 390, 844], ['electrical.html', 360, 740], ['hotel.html', 1101, 900], ['hotel.html', 1100, 900]]) {
+      for (const rm of [false, true]) {
+        const tag = `[industry art ${pg} ${w}${rm ? ' reduced-motion' : ''}]`;
+        const ctx = await browser.newContext({ viewport: { width: w, height: h }, reducedMotion: rm ? 'reduce' : 'no-preference' });
+        await ctx.route(/^https?:\/\/(?!127\.0\.0\.1)/, (r) => r.abort());
+        const p = await ctx.newPage();
+        await p.addInitScript(() => { window.__cls = 0; try { new PerformanceObserver((l) => { for (const e of l.getEntries()) if (!e.hadRecentInput) window.__cls += e.value; }).observe({ type: 'layout-shift', buffered: true }); } catch (e) {} });
+        await p.goto(base + '/industries/' + pg, { waitUntil: 'load' }); await p.waitForTimeout(300);
+        const top0 = await p.evaluate(() => document.querySelector('.ia-stage')?.getBoundingClientRect().top + scrollY);
+        await p.evaluate(() => document.querySelector('.ia-stage')?.scrollIntoView({ block: 'center' })); await p.waitForTimeout(rm ? 300 : 2500);
+        const o = await p.evaluate(() => { const s = document.querySelector('.ia-stage'); if (!s) return null; const r = s.getBoundingClientRect(); return { top: r.top + scrollY, l: r.left, rt: r.right, iw: innerWidth, sw: document.documentElement.scrollWidth, cls: window.__cls, anims: s.getAnimations({ subtree: true }).length, arm: s.classList.contains('ia-arm'), nav: document.querySelector('.nav').getBoundingClientRect().height <= 80 && getComputedStyle(document.querySelector('.nav-dropdown-toggle')).display !== 'none' && document.querySelector('.nav-dropdown-toggle').getBoundingClientRect().width > 0, visible: [...s.querySelectorAll('.ia-q,.ia-a,.ia-chip')].every((e) => +getComputedStyle(e).opacity === 1) }; });
+        check(`${tag} has a themed stage`, !!o);
+        if (!o) { await ctx.close(); continue; }
+        check(`${tag} stage inside the viewport, no horizontal scroll (${o.sw} <= ${o.iw})`, o.l >= 0 && o.rt <= o.iw && o.sw <= o.iw);
+        check(`${tag} stage did not move after load (${Math.round(top0)} -> ${Math.round(o.top)}px)`, Math.abs(top0 - o.top) <= 1);
+        check(`${tag} layout shift score ${o.cls.toFixed(3)} <= 0.1`, o.cls <= 0.1);
+        check(`${tag} nav stays one row with its Any Business, One App control (1100 breakpoint)`, o.nav);
+        if (rm) check(`${tag} no animation runs and the final frame is fully visible`, o.anims === 0 && !o.arm && o.visible, JSON.stringify(o));
+        else check(`${tag} animation is armed and running only while visible`, o.arm && o.anims > 0, JSON.stringify(o));
+        await ctx.close();
+      }
+    }
+    // hub: every card carries its themed mark, 44px square, not covering the heading link
+    { const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }); await ctx.route(/^https?:\/\/(?!127\.0\.0\.1)/, (r) => r.abort());
+      const p = await ctx.newPage(); await p.goto(base + '/industries/', { waitUntil: 'load' });
+      const hb = await p.evaluate(() => { const cards = [...document.querySelectorAll('.hub-card')]; return { n: cards.length, marks: cards.filter((c) => c.querySelector('.ia-ic')).length, overlap: cards.filter((c) => { const i = c.querySelector('.ia-ic').getBoundingClientRect(), a = c.querySelector('h3 a').getBoundingClientRect(); return i.left < a.right && i.right > a.left && i.top < a.bottom && i.bottom > a.top; }).length, sw: document.documentElement.scrollWidth, iw: innerWidth }; });
+      check(`[hub 390] every card has a themed mark (${hb.marks}/${hb.n}), none covers its title link, no horizontal scroll`, hb.marks === hb.n && hb.overlap === 0 && hb.sw <= hb.iw, JSON.stringify(hb)); await ctx.close(); }
     const warned = {};
     // no horizontal scroll on the other public pages that carry the nav
     for (const f of pages) {
