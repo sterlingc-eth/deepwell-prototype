@@ -51,6 +51,7 @@ import { parseDocFieldAsk, extractField } from "./lookups/docFieldAsk.js";
 // material — see fastPath.js's isTeamScopedQuestion and audience/sql.js's own header.
 import { documentsHaveAudience } from "./audience/probe.js";
 import { notPrivateSql, notPrivateIdSql, withoutPrivateIds } from "./privacy/privateDocs.js";
+import { storedDocsMentioning, mentionedPointerText } from "./lookups/storedPointer.js"; // LOWRISK-1
 import { audienceFilterSql, AUDIENCE_FALLBACK_FIELD_KEY } from "./audience/sql.js";
 import { isTeamScopedQuestion } from "./fastPath.js";
 
@@ -1131,6 +1132,14 @@ async function runDocNumberField(db, parsed) {
     [docTypeAliases(doctype), num]
   );
   if (!rows.length) {
+    // LOWRISK-1 (F4): the number may be written in a stored paper of another type (or its file name): point at it, never deny it.
+    const mentioned = await storedDocsMentioning(db, num);
+    if (mentioned.length) {
+      return attachCitations({
+        kind: "answer", text: mentionedPointerText(`${lower} ${num}`, mentioned),
+        facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],
+      }, { records: [], total: mentioned.length, kind: "searched", basis: `No ${lower} carries ${num} as read, but it is written in ${mentioned.length === 1 ? "a stored document" : `${mentioned.length} stored documents`}; nothing was read from ${mentioned.length === 1 ? "it" : "them"}.` });
+    }
     return attachCitations({
       kind: "answer", text: `I couldn't find ${lower} ${num} on file.`,
       facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [],

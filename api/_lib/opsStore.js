@@ -129,6 +129,30 @@ export async function listBudgetDeferredDocuments(ctx, message) {
 }
 
 /**
+ * Readiness P1-3: documents whose read failed on a provider outage / transient provider error and are still inside the
+ * retry cap, i.e. extract_error is one of readDocument.js PROVIDER_RETRY_MESSAGES (the fixed texts that encode the attempt
+ * number). Only documents never read (stage 'received'). The give-up message is NOT in `messages`, so a document that used
+ * up its attempts is never picked again. Spaced at least `olderThanMinutes` after the last write so one outage does not burn
+ * all attempts in a single sweep.
+ */
+export async function listProviderRetryDocuments(ctx, messages, olderThanMinutes = 10) {
+  return withTenant(ctx, async (client) => {
+    const { rows } = await client.query(
+      `SELECT id, original_filename, created_at
+         FROM documents
+        WHERE stage = 'received'
+          AND extract_error = ANY($1::text[])
+          AND COALESCE(updated_at, created_at) < NOW() - ($2 || ' minutes')::interval
+          AND ${TENANT}
+        ORDER BY created_at ASC
+        LIMIT 200`,
+      [messages, olderThanMinutes]
+    );
+    return rows;
+  });
+}
+
+/**
  * Cross-tenant tenant listing, for the cron sweep — which has to visit every
  * tenant, not one at a time by request.
  *

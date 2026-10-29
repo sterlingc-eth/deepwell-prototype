@@ -730,6 +730,13 @@ export async function extractDocumentFields(ctx, documentId, { userId, documentT
     facts, fields, resolvedType, pack, entityId: written.entityId, customerId: written.customerId,
   }).catch(() => {});
 
+  // DOCRECORD (DONOVAN_DOCRECORD_EXTRACT=1, default OFF): one validated record per document (verbatim span + page on every value), stored for
+  // model-free answers. Best-effort: a failure here never fails ingest. See api/_lib/docrecord/.
+  if (/^(?:1|true|on|yes)$/i.test(String(process.env.DONOVAN_DOCRECORD_EXTRACT ?? "").trim())) {
+    try { await (await import("./docrecord/hook.js")).buildDocRecordForDocument(ctx, documentId, pages, { modelAttempts, userId }); }
+    catch (err) { console.error("docrecord hook failed:", err?.message); }
+  }
+
   return {
     documentId,
     documentType: written.documentType,

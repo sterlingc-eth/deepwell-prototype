@@ -8,6 +8,7 @@
  * Several documents: each is listed with its date, newest first, capped at CAP, and the rest are counted. Two customers with the same name are named, never merged.
  * Turn it off with DONOVAN_RECORDS_FIRST=0 (no redeploy of code needed beyond the environment setting).
  */
+import { newerVersionsOf } from "../lookups/storedPointer.js"; // LOWRISK-1
 import { readerTopicAsk } from "../dql/families/reader.js";
 import { parseRecordsQuestion, findFacts, tokensOf, MAY_HAVE_WINDOW, alnum, STOP } from "./parse.js";
 import { FACTS, factById } from "./directory.js";
@@ -554,6 +555,14 @@ async function runCore(db, question, { today, phase = "early", customers = null,
       const extra = await answerEntityFacts(db, scope.kind === "customer" ? scope : { ...scope, kind: "customer", who: scope.customer?.name ?? null, label: scope.customer?.name ?? null }, customerFacts, unitFacts, customerRec, p).catch(() => null);
       if (base && extra) { base.text = `${base.text} ${extra.text}`; base.facts = [...base.facts, ...extra.facts]; base.sources = [...base.sources, ...extra.sources]; }
       return { data: base, ...trace("mixed") };
+    }
+    // LOWRISK-1 (F7): a numbered paper with a newer stored version (revised / supersedes / amended / replaces) states no figure from the older copies.
+    if (scope.kind === "doc" && scoped.length) {
+      const numTyped = p.docNumbers?.[0]?.raw ?? scoped.map((x) => x.document_number ?? x.invoice_number).find(Boolean);
+      const newer = numTyped ? await newerVersionsOf(db, numTyped, scoped.map((x) => x.document_id ?? x.id)) : [];
+      if (newer.length) {
+        return { data: envelope({ text: `${numTyped} has a newer or revised version on file (${newer.map((n) => n.name).join("; ")}), so I don't have one current figure to give from the earlier ${scoped.length === 1 ? "copy" : "copies"}. Open the newer document for the current numbers.`, cards: [], sources: [], records: [], total: scoped.length + newer.length, basis: `Another stored document prints ${numTyped} and says it revises or replaces it; no value was taken from the earlier copies.` }), ...trace("revised-version-pointer") };
+      }
     }
     const data = answerForDocs({ docs: scoped, bundle, factsWanted: docFacts, who: scope.who, order: p.order, all: p.all, askText: p.text, scopeLabel: scope.kind === "doc" ? (scoped.length === 1 ? docHead(scoped[0], bundle) : "That number") : scope.label, customerRec, win: p.window });
     return { data, ...trace(scope.kind === "doc" ? "document-facts" : "customer-document-facts") };

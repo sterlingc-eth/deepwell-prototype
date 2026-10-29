@@ -10,6 +10,7 @@
  * Wired into api/ask.js AFTER the meta-router and fast path, BEFORE
  * retrieval — see handoffs/DONOVAN_ANALYTICS_A_2026-09-21.md.
  */
+import { placeWordInsideName } from "../lookups/storedPointer.js"; // LOWRISK-1
 import { notPrivateSql } from '../privacy/privateDocs.js';
 import { countSubject } from '../understanding/understand.js';
 import Anthropic from '@anthropic-ai/sdk';
@@ -2212,6 +2213,12 @@ async function runAnalyticsQuestionInner({ withTenant, ctxArg, question, today, 
     // than threading it through planAnalyticsQuestion/validatePlan, since the
     // label is display-only and never part of the closed plan vocabulary.
     const timeRangeLabel = planWithOverrides.timeRange ? resolveAnyTimeRange(question_n, today)?.label ?? null : null;
+
+    // LOWRISK-1 (F2): a city / county word that is part of a business name in the question ("Mesa Mechanical Systems Inc.") is not a place filter; never answer a count or a
+    // "0 customers" for it - say plainly that it could not be found. Withholds only.
+    if (placeWordInsideName(question, planWithOverrides)) {
+      return { handled: true, data: { kind: 'no-answer', text: 'I could not find that. The name in your question contains a place word, and I did not read it as a location; try the company name on its own.', facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [] }, cacheHit: false, modelCalled: true, writes: [] };
+    }
 
     let data;
     if (isCacheHit(pProbe.row, pProbe.corpusStamp)) {

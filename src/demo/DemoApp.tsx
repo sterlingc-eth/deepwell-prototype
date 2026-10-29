@@ -3,6 +3,7 @@ import { CheckCircle2, FileText, LayoutDashboard, Loader2, MessageSquare, Rotate
 import { Wordmark } from '../components/Wordmark';
 import { DidYouMeanChips } from '../components/ask/PromptChips';
 import { DEMO_INDEX, loadFixture } from './fixtures';
+import { resolveDemoSlug } from './aliases';
 import { TryOwn } from './TryOwn';
 import { HomeBackBar } from './HomeBackBar';
 import { TRYOWN_TEXT } from './tryown';
@@ -17,8 +18,11 @@ const STEP_MS = 70;
 function initialSlug(): string {
   const want = new URLSearchParams(window.location.search).get('industry');
   const all = DEMO_INDEX.industries;
-  return all.find((i) => i.slug === want)?.slug ?? all[0]?.slug ?? '';
+  if (!want) return all[0]?.slug ?? '';
+  // known slug or alias -> that workspace; anything else -> '' (the picker), never a silent fallback to Real estate
+  return resolveDemoSlug(want, all.map((i) => i.slug));
 }
+const unknownAsked = () => new URLSearchParams(window.location.search).get('industry') ?? '';
 
 /** ?try=1 opens the "Try your own documents" panel straight away (a link a presenter can bookmark). */
 const initialOwn = () => new URLSearchParams(window.location.search).get('try') === '1';
@@ -39,6 +43,7 @@ export function DemoApp() {
   useEffect(() => {
     let live = true;
     setFx(null); setStep('upload'); setDone(0); setRunning(false); setOpenDoc(null); setAsked(null); setInput('');
+    if (!slug) return () => { live = false; };
     void loadFixture(slug).then((f) => { if (live) setFx(f); });
     try { const u = new URL(window.location.href); u.searchParams.set('industry', slug); window.history.replaceState(null, '', u); } catch { /* address bar is optional */ }
     return () => { live = false; };
@@ -71,6 +76,7 @@ export function DemoApp() {
           <div className="ml-auto flex flex-wrap items-center gap-2">
             <label htmlFor="demo-industry" className="dw-label">Industry</label>
             <select id="demo-industry" value={slug} onChange={(e) => setSlug(e.target.value)} className="dw-input min-h-11 max-w-[16rem]">
+              {!slug && <option value="" disabled>Pick an industry</option>}
               {families.map(([fam, list]) => (
                 <optgroup key={fam} label={fam}>
                   {list.map((i) => <option key={i.slug} value={i.slug}>{i.label}</option>)}
@@ -98,6 +104,16 @@ export function DemoApp() {
       <main className="max-w-content mx-auto px-4 py-6 space-y-5">
         {own ? (
           <TryOwn pack={fx?.pack?.id} onBack={() => setOwn(false)} />
+        ) : !slug ? (
+          <section className="dw-card p-6 space-y-4" aria-labelledby="demo-pick">
+            <h1 id="demo-pick" className="font-display text-h1">Pick an industry</h1>
+            <p className="text-ink-2">{unknownAsked() ? 'We do not have a sample workspace with that name. ' : ''}Choose the one closest to your business to open its sample workspace.</p>
+            <div className="flex flex-wrap gap-2">
+              {DEMO_INDEX.industries.map((i) => (
+                <button key={i.slug} type="button" onClick={() => setSlug(i.slug)} className="min-h-11 px-3 rounded-full border border-line-2 text-body text-ink-2 hover:text-ink">{i.label}</button>
+              ))}
+            </div>
+          </section>
         ) : !fx ? (
           <div className="dw-card p-8 flex items-center gap-3 text-ink-2"><Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Getting the sample workspace ready…</div>
         ) : (

@@ -17,6 +17,7 @@ import { documentRecordsFor } from "../citations/enrich.js";
 import { TENANT_SQL, humanDate, answerEnvelope } from "../scope.js";
 import { nameTokens, tokenSame, withinOne } from "./nameMatch.js";
 import { notPrivateSql } from "../privacy/privateDocs.js";
+import { storedDocsMentioning, mentionedPointerText, pageTextHas, newerVersionsOf } from "./storedPointer.js"; // LOWRISK-1
 
 const PREFIXES = { INV: "invoice", WO: "work order", PO: "purchase order", BP: "permit", EST: "estimate", Q: "quote", TKT: "ticket" };
 const WORD_KIND = [
@@ -224,6 +225,14 @@ export async function runDocNumberLookup(db, intent) {
     // HANDOFF: this search only reads the invoice / work-order / PO / permit numbers. It is a FINAL "not on file" only when the typed number appears nowhere else either (another
     // extracted field such as a document reference, or the page text); a number that is there under another kind of document goes on to the Claude path instead.
     const present = await typedNumberPresent(db, intent.typed);
+    // LOWRISK-1 (F4): never deny paperwork that is stored. When the number is written in a stored document or file name, point at it (no value claimed).
+    const mentioned = present ? await storedDocsMentioning(db, intent.typed) : [];
+    if (mentioned.length) {
+      return attachCitations(
+        { kind: "no-answer", text: mentionedPointerText(shownTyped, mentioned), facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [] },
+        { records: await documentRecordsFor(db, mentioned.map((m) => m.id)), total: mentioned.length, kind: "searched", basis: `No extracted number matches ${intent.typed}, but its text is written in ${mentioned.length === 1 ? "a stored document" : `${mentioned.length} stored documents`}; nothing was read from ${mentioned.length === 1 ? "it" : "them"}.` }
+      );
+    }
     return attachCitations(
       { kind: "no-answer", text: `No ${shownTyped} on file.`, facts: [], sources: [], confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [], ...(present ? {} : { finalDecline: "absent-number" }) },
       { records: [], total: 0, kind: "searched", basis: `Searched the invoice, work-order, PO and permit numbers printed on every document for ${intent.typed} (ignoring case, dashes and spaces); none matches.` }
@@ -260,6 +269,16 @@ export async function runDocNumberLookup(db, intent) {
       { kind: "no-answer", text: `${label} is on file for ${who ?? det.vendor ?? "someone else"}, not ${wrongOwner}, so I have not answered for ${wrongOwner}. Ask about ${d.number} on its own, or ask for ${wrongOwner}'s own invoices.`, facts: [], sources: src, confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [] },
       { records, total: records.length, kind: "searched", basis: `Matched ${intent.typed} to one document; its customer is ${who ?? det.vendor ?? "a different party"}, which is not the party the question names.` }
     );
+  }
+  // LOWRISK-1 (F7): a newer stored version of this paper (revised / supersedes / amended / replaces) means no single figure is stated from the older one.
+  {
+    const newer = await newerVersionsOf(db, d.number, d.document_id);
+    if (newer.length) {
+      return attachCitations(
+        { kind: "no-answer", text: `${label} has a newer or revised version on file (${newer.map((n) => n.name).join("; ")}), so I don't have one current figure to give from this copy. Open the newer document for the current numbers.`, facts: [], sources: src, confidence: 1, verifiedCount: 0, unverifiedCount: 0, closest: [] },
+        { records: await documentRecordsFor(db, [d.document_id, ...newer.map((n) => n.id)]), total: 1 + newer.length, kind: "searched", basis: `Another stored document prints ${d.number} and says it revises or replaces it; no value was taken from the earlier copy.` }
+      );
+    }
   }
   if (intent.focus === "status" && !det.status) {
     // paid / open can't be told from this document: an honest "not on file", never a guess (the total is context, not the answer)
@@ -305,7 +324,12 @@ export async function runDocNumberLookup(db, intent) {
       }
     } catch { alsoTotal = ""; }
   }
-  if (notInvoice && ["invoice", "bill"].includes(intent.kind)) alsoTotal = ` It is not an invoice.${alsoTotal}`;
+  // LOWRISK-1 (F1): "not an invoice" is only said when the stored text never calls the paper an invoice; a stored type label is not proof.
+  const printsInvoice = notInvoice && ["invoice", "bill"].includes(intent.kind) && await pageTextHas(db, d.document_id, /\binvoice\b/i);
+  if (notInvoice && ["invoice", "bill"].includes(intent.kind) && !printsInvoice) alsoTotal = ` It is not an invoice.${alsoTotal}`;
+  // LOWRISK-1 (F1b): "has no <field> printed" is only said when the stored text does not show that field; otherwise it is "not read", never a denial.
+  const FIELD_WORD = { total: /\b(?:total|amount due|balance due)\b/i, who: /\b(?:bill(?:ed)? to|customer|sold to|client|attn)\b/i, date: /\b(?:date|due)\b/i, work: /\b(?:description|work|service)\b/i };
+  const unreadField = (intent.focus in FIELD_WORD) && await pageTextHas(db, d.document_id, FIELD_WORD[intent.focus]) ? intent.focus : null;
   let text;
   if (askedVendor) text = `${label} is from ${det.vendor}${when ? ` (${when})` : ""}${det.total != null ? `, ${money(det.total)}` : ""}.`;
   else switch (intent.focus) {
@@ -315,14 +339,16 @@ export async function runDocNumberLookup(db, intent) {
         : `${label} has no payment status on file${det.total != null ? ` (total ${money(det.total)})` : ""}${who ? ` — ${who}` : ""}.`;
       break;
     case "total":
-      text = det.total != null ? `${label} was ${money(det.total)}${who ? ` (${who})` : ""}.` : `${label} has no total printed${who ? ` (${who})` : ""}.`;
+      text = det.total != null ? `${label} was ${money(det.total)}${who ? ` (${who})` : ""}.` : unreadField ? `I could not find a total for ${label}${who ? ` (${who})` : ""} from its stored details, but the document is on file; open it to check.` : `${label} has no total printed${who ? ` (${who})` : ""}.`;
       break;
-    case "who": text = who ? `${label} is for ${who}${when ? ` (${when})` : ""}.` : `${label} has no customer linked to it.`; break;
-    case "date": text = when ? `${label} is dated ${when}${who ? ` (${who})` : ""}.` : `${label} has no date printed${who ? ` (${who})` : ""}.`; break;
+    case "who": text = who ? `${label} is for ${who}${when ? ` (${when})` : ""}.` : unreadField ? `I could not find a customer for ${label} from its stored details, but the document is on file; open it to check.` : `${label} has no customer linked to it.`; break;
+    case "date": text = when ? `${label} is dated ${when}${who ? ` (${who})` : ""}.` : unreadField ? `I could not find a date for ${label} from its stored details, but the document is on file; open it to check.` : `${label} has no date printed${who ? ` (${who})` : ""}.`; break;
     case "work": text = det.work.length ? `${label}${who ? ` (${who}${when ? `, ${when}` : ""})` : ""}: ${det.work.join("; ")}.` : `${label}${who ? ` (${who})` : ""} has no work description printed.`; break;
     default:
       text = `${label}: ${[who, det.total != null ? money(det.total) : null, when].filter(Boolean).join(", ") || "on file"}.`;
   }
+  // LOWRISK-1 (F1c): a paper listed without a total although its stored text shows a total word: say so instead of leaving a silent gap.
+  if (intent.focus === "default" && det.total == null && await pageTextHas(db, d.document_id, FIELD_WORD.total)) text += " I could not find a total in its stored details; open the document to check.";
   text += alsoTotal;
   const facts = [
     { label: "Document", value: label, sources: src },

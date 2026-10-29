@@ -475,11 +475,11 @@ export function handleError(res, error, req, extra = {}) {
     : classifyProviderError(error);
   if (providerOutage) {
     recordProviderOutage(providerOutage);
+    // Readiness P1-4: customers never see account state (credits, keys) - one fixed friendly line. The reason stays server-side.
+    console.error("provider outage (customer sees the generic message):", providerOutage.reason);
     return handleCors(res, req).status(503).json({
-      error: "AI features are temporarily unavailable — the provider account " +
-        (providerOutage.reason === "credits" ? "is out of credits." : providerOutage.reason === "auth" ? "key is invalid." : "is overloaded."),
+      error: "Donovan is briefly unavailable. We are on it - please try again in a few minutes. Nothing was lost.",
       code: "provider_unavailable",
-      reason: providerOutage.reason,
     });
   }
 

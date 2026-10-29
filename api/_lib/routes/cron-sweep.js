@@ -1,8 +1,8 @@
 import { timingSafeEqual } from "node:crypto";
-import { ingestDocument, recordIngestFailure } from "../readDocument.js";
+import { ingestDocument, recordIngestFailure, PROVIDER_RETRY_MESSAGES } from "../readDocument.js";
 import { extractDocumentFields } from "../extractDocument.js";
 import { withTenant } from "../recordsStore.js";
-import { listStuckDocuments, listBudgetDeferredDocuments, listTenantKeysWithSource, listDemoTenantKeys } from "../opsStore.js";
+import { listStuckDocuments, listBudgetDeferredDocuments, listProviderRetryDocuments, listTenantKeysWithSource, listDemoTenantKeys } from "../opsStore.js";
 import { DAILY_BUDGET_EXCEEDED_MESSAGE, isQueueEnabled, enqueueDocument } from "../queue.js";
 import { getDailyModelBudgetStatus } from "../rateLimit.js";
 import { assertActiveBilling } from "../plan.js";
@@ -337,7 +337,9 @@ export default async function handler(req, res) {
           continue;
         }
         stillFailing += 1;
-        await recordIngestFailure(ctx, doc.id, new Error(failMessage(err)));
+        // Readiness P1-3/P1-5: record the REAL error; recordIngestFailure turns it into a fixed customer message (and counts the
+        // provider-retry attempt). The old failMessage(err) text put raw error text on the document.
+        await recordIngestFailure(ctx, doc.id, err);
       }
     }
     summary.docsLeftForNextRun = (summary.docsLeftForNextRun ?? 0) + Math.max(0, docs.length - MAX_DOCS_PER_TENANT);
@@ -365,6 +367,18 @@ export default async function handler(req, res) {
     );
     summary.recovered += stuckResult.recovered;
     summary.stillFailing += stuckResult.stillFailing;
+
+    // Readiness P1-3: documents whose read failed on a provider outage / transient provider error. Capped at 2 automatic
+    // retries (the attempt is encoded in the fixed message on the row); after that the customer's Retry button is the way.
+    try {
+      const providerRetry = await listProviderRetryDocuments(ctx, PROVIDER_RETRY_MESSAGES);
+      summary.providerRetryFound = (summary.providerRetryFound ?? 0) + providerRetry.length;
+      const r = await retryOnce(ctx, providerRetry, () => "");
+      summary.recovered += r.recovered;
+      summary.stillFailing += r.stillFailing;
+    } catch (err) {
+      summary.errors.push({ tenant: t.tenant_key, phase: "list-provider-retry", message: err?.message });
+    }
 
     // Documents the ingest queue deliberately deferred yesterday (or earlier
     // today) because the tenant's daily model-spend cap was already spent —

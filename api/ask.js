@@ -1404,6 +1404,25 @@ export default async function handler(req, res) {
     // answers gets 2-3 tap-able reformulations (the client fetches them through the existing didyoumean channel) instead of a model call.
     // RECORDS-FIRST (see api/_lib/records/lane.js). phase "early" = before the older lanes; "late" = after they declined (also covers facts the older lanes own when they are right).
     let _recordsLaneModule = null;
+    // DOCRECORD (DONOVAN_DOCRECORD_ANSWERS=1, default OFF): a one-fact question answered from a VERIFIED stored record (verbatim span + page), no model.
+    // Stricter-only: runs after every existing deterministic stage and before any model call; null = the chain continues unchanged.
+    const tryDocRecords = async () => {
+      if (meta || conversationContext || !question) return false;
+      if (!/^(?:1|true|on|yes)$/i.test(String(process.env.DONOVAN_DOCRECORD_ANSWERS ?? "").trim())) return false;
+      try {
+        const data = await timer.time("docrecord", async () => (await import("./_lib/docrecord/hook.js")).runDocRecordAnswer(ctxArg, question));
+        if (!data) return false;
+        console.log(JSON.stringify({ route: "ask", docrecord: true }));
+        await send(200, { success: true, data });
+        await timer.time("bookkeeping", () =>
+          withTenant(ctxArg, (db) => db.logAction({
+            action: "document.queried", resource_type: "question", clerk_user_id: auth.userId,
+            changes: { question_hash: hashQuestion(question), documents: [...new Set((data.sources ?? []).map((x) => x.documentId).filter(Boolean))], passages: 0, docrecord: true },
+          })).catch((err) => console.error("Failed to write document.queried audit row (docrecord):", err?.message))
+        );
+        return true;
+      } catch (err) { console.error("docrecord answer skipped:", err?.message); return false; }
+    };
     const tryRecordsFirst = async (phase) => {
       if (meta || conversationContext || !question) return false;
       try {
@@ -2553,6 +2572,7 @@ export default async function handler(req, res) {
 
     if (!moneyQuestion && (await tryNamedMoney())) return;
     if (await tryRecordsFirst("late")) return;
+    if (await tryDocRecords()) return; // DOCRECORD
 
     // ---- 0.7 analytics pre-router (ONE Haiku tool-use call, before retrieval) --
     // "how many customers in Arizona", "list customers in Gilbert", "which

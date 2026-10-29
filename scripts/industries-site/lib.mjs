@@ -340,8 +340,9 @@ export function renderHandwritten(data = loadData(), read = (rel) => fs.readFile
     const rel = `public/industries/${file}`;
     const t = THEMES[key];
     const src = data.industries.find((x) => x.slug === (t.data || key));
-    const demo = data.industries.some((x) => x.slug === key) ? key : (key === 'plumbing' ? 'plumbing-hvac' : null);
-    const html = read(rel);
+    // deep link: the page's own demo industry, else the workspace its stage borrows (offices -> msp, any-business -> bookkeeping, fleet -> auto)
+    const demo = data.industries.some((x) => x.slug === key) ? key : (data.industries.some((x) => x.slug === t.data) ? t.data : null);
+    const html = read(rel).replace(/class="btn btn-primary" href="\/demo\/"/g, demo ? `class="btn btn-primary" href="${demoLink(demo)}"` : 'class="btn btn-primary" href="/demo/"');
     const next = injectStage(html, stageHtml(key, { ...src, label: t.label || src.label }, { demo }));
     if (next === null) throw new Error('no hero block in ' + rel);
     out.set(rel, next);

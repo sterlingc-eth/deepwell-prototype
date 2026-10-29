@@ -10,7 +10,9 @@
  */
 import { captureException, captureMessage, scrubContext } from '../api/_lib/telemetry.js';
 import { hashForLog } from '../api/_lib/privacy/redact.js';
-import { alreadyIngested } from '../api/_lib/readDocument.js';
+import { alreadyIngested, failureMessageFor, isProviderRetryable, PROVIDER_RETRY_MESSAGES, PROVIDER_GIVE_UP_MESSAGE, GENERIC_READ_FAILURE_MESSAGE, IngestError } from '../api/_lib/readDocument.js';
+import { DAILY_BUDGET_EXCEEDED_MESSAGE } from '../api/_lib/queue.js';
+import { readFileSync } from 'node:fs';
 import { DELETE_ORDER } from '../api/_lib/opsStore.js';
 import { isValidCronAuth } from '../api/_lib/routes/cron-sweep.js';
 import { isValidConfirm } from '../api/_lib/routes/tenant-delete.js';
@@ -159,6 +161,41 @@ const eq = (name, got, want) =>
   check('a different question hashes differently', hashQuestion(q + '?') !== h1);
   check('the hash never contains the literal question text or a customer name from it',
     !h1.toLowerCase().includes('anderson') && !h1.includes('Elm'));
+}
+
+/* ------------------------------------------- readiness P1: provider-failure messages + capped retry */
+{
+  const credit = { status: 400, error: { type: 'invalid_request_error', message: 'Your credit balance is too low to access the Claude API.' } };
+  const rate = { status: 429, name: 'RateLimitError', message: '429 rate limited req_abc' };
+  check('credit outage is retryable', isProviderRetryable(credit));
+  check('transient 5xx is retryable', isProviderRetryable({ status: 503, message: 'x' }));
+  check('IngestError 415 / unknown error are not retryable', !isProviderRetryable(new IngestError('nope', 415)) && !isProviderRetryable(new Error('boom')));
+  // attempt cap: null -> retry1 -> retry2 -> give up, and give-up is never in the retry list
+  const m1 = failureMessageFor(credit, null, 'received');
+  const m2 = failureMessageFor(credit, m1, 'received');
+  const m3 = failureMessageFor(rate, m2, 'received');
+  const m4 = failureMessageFor(rate, m3, 'received');
+  eq('attempt 1 -> first retry message', m1, PROVIDER_RETRY_MESSAGES[0]);
+  eq('attempt 2 -> second retry message', m2, PROVIDER_RETRY_MESSAGES[1]);
+  eq('attempt 3 -> give-up message (cap)', m3, PROVIDER_GIVE_UP_MESSAGE);
+  check('give-up message is not in the sweep retry list (never retried forever)', !PROVIDER_RETRY_MESSAGES.includes(PROVIDER_GIVE_UP_MESSAGE));
+  eq('a manual retry after give-up restarts the capped cycle, not an infinite one', m4, PROVIDER_RETRY_MESSAGES[0]);
+  eq('a document already past "received" gets the give-up message (sweep only re-reads unread documents)', failureMessageFor(credit, null, 'read'), PROVIDER_GIVE_UP_MESSAGE);
+  // no raw text, credits, costs or keys in anything a customer reads
+  const all = [...PROVIDER_RETRY_MESSAGES, PROVIDER_GIVE_UP_MESSAGE, GENERIC_READ_FAILURE_MESSAGE, failureMessageFor(new Error('ECONNxyz secret sk-ant-123 at /var/task/x.js:9'), null, 'received')];
+  check('no customer message mentions credits, cost, balance, key, provider or raw error text', all.every((t) => !/credit|balance|\$|key|provider|billing|sk-ant|\/var\/task|ECONN/i.test(t)), all.join(' | '));
+  eq('unknown internal error -> fixed generic message', failureMessageFor(new Error('relation "documents" does not exist'), null, 'received'), GENERIC_READ_FAILURE_MESSAGE);
+  eq('our curated IngestError text passes through', failureMessageFor(new IngestError('This PDF is password protected.', 415), null, 'received'), 'This PDF is password protected.');
+  eq('daily-limit deferral text still passes through unchanged (the sweep matches it exactly)', failureMessageFor(new Error(DAILY_BUDGET_EXCEEDED_MESSAGE), null, 'received'), DAILY_BUDGET_EXCEEDED_MESSAGE);
+  // static: the customer-visible handleError body no longer names credits/keys; the sweep is scheduled
+  const claudeSrc = readFileSync(new URL('../api/_lib/claude.js', import.meta.url), 'utf8');
+  check('handleError provider-outage body has no "out of credits" / "key is invalid" text', !/is out of credits\.",|key is invalid\."/.test(claudeSrc.slice(claudeSrc.indexOf('recordProviderOutage(providerOutage)'), claudeSrc.indexOf('recordProviderOutage(providerOutage)') + 900)));
+  const vj = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'));
+  const paths = vj.crons.map((c) => c.path);
+  check('vercel.json keeps the nightly sweep', paths.includes('/api/account?action=sweep'));
+  const docsCron = vj.crons.find((c) => c.path === '/api/account?action=sweep&mode=docs');
+  check('vercel.json schedules the light docs-only sweep every 15-30 minutes', Boolean(docsCron) && /^\*\/(15|20|30) \* \* \* \*$/.test(docsCron.schedule), JSON.stringify(docsCron));
+  check('vercel.json keeps the CSP header', vj.headers.some((h) => h.headers.some((x) => x.key === 'Content-Security-Policy')));
 }
 
 /* ------------------------------------------------------------------ done */

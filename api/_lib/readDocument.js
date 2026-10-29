@@ -819,9 +819,63 @@ export async function ingestDocument(ctx, documentId, { userId, force = false } 
 export async function recordIngestFailure(ctx, documentId, error) {
   // R35: an abandoned upload is an expected, user-visible condition (see ABANDONED_UPLOAD_MESSAGE), not an incident.
   if (!error?.abandoned) await captureException(error, { route: "ingestDocument", documentId, tenant: ctx?.tenantKey });
-  await withTenant(ctx, (db) =>
-    db.markExtracted(documentId, { error: (providerFailureMessage(error) ?? String(error?.message ?? error)).slice(0, 500) })
-  ).catch(() => {});
+  // Readiness P1-5: the detail (status, name, first 300 chars) goes to the server log only; the document row, which the
+  // customer reads, gets a fixed friendly message from failureMessageFor and never the raw error text.
+  console.error("ingest failure recorded:", error?.name ?? "Error", error?.status ?? error?.statusCode ?? "", String(error?.message ?? error).slice(0, 300));
+  let message = GENERIC_READ_FAILURE_MESSAGE;
+  try {
+    // Readiness P1-3: the attempt number is carried by WHICH fixed retry message is already on the row (no new column).
+    const doc = await withTenant(ctx, (db) => db.getDocument(documentId));
+    message = failureMessageFor(error, doc?.extract_error, doc?.stage);
+  } catch {
+    message = isProviderRetryable(error) ? PROVIDER_GIVE_UP_MESSAGE : failureMessageFor(error, null, null);
+  }
+  await withTenant(ctx, (db) => db.markExtracted(documentId, { error: message.slice(0, 500) })).catch(() => {});
+}
+
+/**
+ * Readiness P1-3/P1-4/P1-5. What a customer reads on a document that failed to read.
+ *
+ * - A provider outage (no credits, bad key, overloaded) or any transient provider/network error is RETRYABLE: the sweep
+ *   (cron-sweep.js, light ?mode=docs run every 20 minutes) re-reads documents carrying one of PROVIDER_RETRY_MESSAGES.
+ *   The message on the row says which attempt this was, so the cap needs no new column and no migration: first failure ->
+ *   retry message 1, second -> retry message 2, third -> PROVIDER_GIVE_UP_MESSAGE (terminal, the sweep leaves it alone and the
+ *   customer's Retry button restarts the cycle). Never retried forever.
+ * - Our own curated refusals (IngestError, OfficeError, ConfigError, the abandoned upload, the daily-limit deferral) already
+ *   carry a message written for people; they pass through unchanged.
+ * - Anything else (a parser crash, a Postgres error) becomes one fixed line. Detail stays in the log and in Sentry.
+ * No dollar amount, credit balance or account state ever appears in any of these.
+ */
+export const PROVIDER_RETRY_MESSAGES = [
+  "Donovan was briefly unavailable while reading this file. It will be retried automatically in a few minutes.",
+  "Donovan was still unavailable when this file was retried. It will be tried one more time automatically.",
+];
+export const PROVIDER_GIVE_UP_MESSAGE =
+  "Donovan could not read this file right now. Please press Retry in a few minutes, or contact support if it keeps happening.";
+export const GENERIC_READ_FAILURE_MESSAGE =
+  "We could not read this file. Re-save it and try again, or contact support.";
+// Same text as queue.js DAILY_BUDGET_EXCEEDED_MESSAGE (the sweep matches it exactly; verify-ops asserts the two are equal).
+// Not imported: queue.js imports this module.
+const DAILY_LIMIT_PASSTHROUGH = "Daily processing limit reached \u2014 resumes tomorrow";
+
+/** Pure: is this a provider outage or a transient provider/network failure that is worth re-reading later? */
+export function isProviderRetryable(error) {
+  if (!error) return false;
+  if (error.name === "IngestError" || error.name === "OfficeError" || error.abandoned) return false;
+  return error.name === "ProviderUnavailableError" || Boolean(classifyProviderError(error)) || isAnthropicApiError(error) || isTransientError(error);
+}
+
+/** Pure: the fixed message to store. `currentError`/`stage` are the row's values before this failure. */
+export function failureMessageFor(error, currentError, stage) {
+  if (isProviderRetryable(error)) {
+    if (stage !== "received") return PROVIDER_GIVE_UP_MESSAGE; // the sweep only re-reads documents that were never read
+    const next = PROVIDER_RETRY_MESSAGES.indexOf(String(currentError ?? "")) + 1; // unknown/other text -> 0 (first retry)
+    return next < PROVIDER_RETRY_MESSAGES.length ? PROVIDER_RETRY_MESSAGES[next] : PROVIDER_GIVE_UP_MESSAGE;
+  }
+  const curated = error?.name === "IngestError" || error?.name === "OfficeError" || error?.name === "ConfigError" || error?.abandoned
+    || (error instanceof Error && error.message === DAILY_LIMIT_PASSTHROUGH);
+  if (curated && typeof error.message === "string" && error.message) return error.message;
+  return GENERIC_READ_FAILURE_MESSAGE;
 }
 
 /** recordModelCall already swallows its own errors, but that lives in a file

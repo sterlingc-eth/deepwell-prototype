@@ -187,7 +187,7 @@ export function resolveCalendarSpan(question, today) {
   }
 
   // Year ranges: "between 2020 and 2022", "from 2018 to 2019", "2018-2020", "2018 through 2020".
-  if ((m = q.match(/\b(?:between|from)\s+(?:the\s+year\s+)?(\d{4})\s+(?:and|to|through|thru|until|till)\s+(\d{4})\b/)) || (m = q.match(/\b(\d{4})\s*(?:-|–|to|through|thru)\s*(\d{4})\b/))) {
+  if ((m = q.match(/\b(?:between|from)\s+(?:the\s+year\s+)?(\d{4})\s+(?:and|to|through|thru|until|till)\s+(\d{4})\b/)) || (m = q.match(/(?<![A-Za-z0-9]-)\b((?:19|20)\d{2})\s*(?:-|–|to|through|thru)\s*((?:19|20)\d{2})\b(?!-\d)/))) {
     let a = year4(m[1]); let b = year4(m[2]);
     // A reversed range ("between 2012 and 2010") is read oldest-to-newest and the answer says so (DONOVAN_REVERSED_RANGE=0 restores the silent swap).
     const rev = a > b && process.env.DONOVAN_REVERSED_RANGE !== '0';
