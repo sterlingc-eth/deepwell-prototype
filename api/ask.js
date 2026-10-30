@@ -1423,6 +1423,24 @@ export default async function handler(req, res) {
         return true;
       } catch (err) { console.error("docrecord answer skipped:", err?.message); return false; }
     };
+    // VALUEREADER (DONOVAN_VALUEREADER=1, default OFF): deterministic no-model one-fact reader (api/_lib/valuereader). Verified value + page citation, or null = the chain continues unchanged.
+    const tryValueReader = async () => {
+      if (meta || conversationContext || !question) return false;
+      if (!/^(?:1|true|on|yes)$/i.test(String(process.env.DONOVAN_VALUEREADER ?? "").trim())) return false;
+      try {
+        const data = await timer.time("valuereader", async () => (await import("./_lib/valuereader/app.js")).runValueReaderAnswer(ctxArg, question));
+        if (!data) return false;
+        console.log(JSON.stringify({ route: "ask", valuereader: true }));
+        await send(200, { success: true, data });
+        await timer.time("bookkeeping", () =>
+          withTenant(ctxArg, (db) => db.logAction({
+            action: "document.queried", resource_type: "question", clerk_user_id: auth.userId,
+            changes: { question_hash: hashQuestion(question), documents: [...new Set((data.sources ?? []).map((x) => x.documentId).filter(Boolean))], passages: 0, valuereader: true },
+          })).catch((err) => console.error("Failed to write document.queried audit row (valuereader):", err?.message))
+        );
+        return true;
+      } catch (err) { console.error("valuereader answer skipped:", err?.message); return false; }
+    };
     const tryRecordsFirst = async (phase) => {
       if (meta || conversationContext || !question) return false;
       try {
@@ -2573,6 +2591,7 @@ export default async function handler(req, res) {
     if (!moneyQuestion && (await tryNamedMoney())) return;
     if (await tryRecordsFirst("late")) return;
     if (await tryDocRecords()) return; // DOCRECORD
+    if (await tryValueReader()) return; // VALUEREADER (DONOVAN_VALUEREADER, default OFF)
 
     // ---- 0.7 analytics pre-router (ONE Haiku tool-use call, before retrieval) --
     // "how many customers in Arizona", "list customers in Gilbert", "which
