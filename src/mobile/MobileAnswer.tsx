@@ -62,7 +62,7 @@ function FactRow({ fact, onOpenCustomer }: { fact: Fact; onOpenCustomer: (ref: s
   )
 }
 
-function Feedback({ question }: { question: string }) {
+function Feedback({ question, report }: { question: string; report?: { answerText: string; lane?: string; sources: { documentId: string; page: number | null }[] } }) {
   // Optional and one tap each way: no note form (2026-10-10), so the customer never has to type or teach anything.
   const [message, setMessage] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
@@ -71,7 +71,7 @@ function Feedback({ question }: { question: string }) {
   const send = async (rating: 'up' | 'down') => {
     setSending(true)
     try {
-      const r = await reviewClient.askFeedback(question, rating)
+      const r = await reviewClient.askFeedback(question, rating, undefined, rating === 'down' ? report : undefined)
       setMessage(
         rating === 'up'
           ? 'Thanks, noted.'
@@ -92,7 +92,7 @@ function Feedback({ question }: { question: string }) {
       <button type="button" className={btn} aria-label="This answer was right" data-tap-target="true" disabled={sending} onClick={() => void send('up')}>
         <ThumbsUp className="w-4 h-4" />
       </button>
-      <button type="button" className={btn} aria-label="This answer was wrong" data-tap-target="true" disabled={sending} onClick={() => void send('down')}>
+      <button type="button" className={btn} aria-label="Report a wrong answer" data-tap-target="true" disabled={sending} onClick={() => void send('down')}>
         <ThumbsDown className="w-4 h-4" />
       </button>
     </span>
@@ -244,7 +244,7 @@ export const MobileAnswer = memo(function MobileAnswer({
         )}
         <span className="ml-auto shrink-0 inline-flex items-center gap-1">
           <ShareButton text={shareBody} />
-          <Feedback question={question} />
+          <Feedback question={question} report={{ answerText: answer.text, lane: (answer as { valueReader?: boolean; docRecords?: boolean }).valueReader ? 'valuereader' : (answer as { docRecords?: boolean }).docRecords ? 'docrecord' : undefined, sources: answer.sources.map((x) => ({ documentId: x.documentId, page: (x as { location?: { page?: number } }).location?.page ?? null })) }} />
         </span>
       </div>
 

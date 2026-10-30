@@ -1420,6 +1420,8 @@ export default async function handler(req, res) {
             changes: { question_hash: hashQuestion(question), documents: [...new Set((data.sources ?? []).map((x) => x.documentId).filter(Boolean))], passages: 0, docrecord: true },
           })).catch((err) => console.error("Failed to write document.queried audit row (docrecord):", err?.message))
         );
+        // SAFETY NET (DONOVAN_AUDIT, default OFF): the customer already has the answer; a cheap background verifier may now double-check it. Never throws, never delays the reply.
+        await (await import("./_lib/safetynet/hook.js")).afterAloneAnswer(ctxArg, { question, data, lane: "docrecord" });
         return true;
       } catch (err) { console.error("docrecord answer skipped:", err?.message); return false; }
     };
@@ -1438,6 +1440,7 @@ export default async function handler(req, res) {
             changes: { question_hash: hashQuestion(question), documents: [...new Set((data.sources ?? []).map((x) => x.documentId).filter(Boolean))], passages: 0, valuereader: true },
           })).catch((err) => console.error("Failed to write document.queried audit row (valuereader):", err?.message))
         );
+        await (await import("./_lib/safetynet/hook.js")).afterAloneAnswer(ctxArg, { question, data, lane: "valuereader", score: data._audit?.score });
         return true;
       } catch (err) { console.error("valuereader answer skipped:", err?.message); return false; }
     };
@@ -1638,6 +1641,8 @@ export default async function handler(req, res) {
         }
       }
       await send(200, { success: true, data: agentDebug ? { ...data, debug: agentModule.agentDebugTrace(result) } : data });
+      // SAFETY NET (DONOVAN_LEARNING_CASES, default OFF): a Claude handoff becomes a structured learning case for the training team.
+      if (data?.kind === "answer") (await import("./_lib/safetynet/hook.js")).recordHandoffCase(ctxArg, { question, data }).catch(() => {});
       await timer.time("bookkeeping", async () => {
         try {
           await withTenantRetry(ctxArg, async (db) => {

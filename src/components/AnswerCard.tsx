@@ -257,7 +257,7 @@ export function AnswerCard({ answer: answerIn, question, includeUnverified, onTo
           </>
         )}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <AnswerFeedback key={`${question}|${answer.text}`} question={question} />
+          <AnswerFeedback key={`${question}|${answer.text}`} question={question} answer={{ text: answer.text, lane: (answer as { valueReader?: boolean; docRecords?: boolean }).valueReader ? 'valuereader' : (answer as { docRecords?: boolean }).docRecords ? 'docrecord' : undefined, sources: (answer.sources ?? []).map((x: { documentId: string; location?: { page?: number } }) => ({ documentId: x.documentId, page: x.location?.page ?? null })) }} />
           <ShareButton text={shareText(question, answer, resolveDocName)} />
         </div>
         {chips.length > 0 && onAsk && <FollowupChips chips={chips} onPick={onAsk} />}

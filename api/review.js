@@ -224,6 +224,8 @@ const ACTIONS = new Set([
   'learningReplay',
   'learningRejectAllGaps',
   'askFeedback',
+  'auditNote',
+  'safetyNetStats',
   'scorecardRun',
   'scorecardStatus',
   'scorecardBaseline',
@@ -749,10 +751,26 @@ export default async (req, res) => {
         requireOperator(auth);
         result = await loadPerfScores({ days: payload.days });
         break;
+      // SAFETY NET: the follow-up note a disagreeing background audit left for this answer (DONOVAN_AUDIT_CORRECT=1; otherwise always {note:null}).
+      case 'auditNote': {
+        const question = typeof payload.question === 'string' ? payload.question.trim().slice(0, 300) : '';
+        result = { ok: true, ...(question ? await (await import('./_lib/safetynet/hook.js')).correctionFor(ctx, question) : { note: null }) };
+        break;
+      }
+      // SAFETY NET owner view: sampled precision (audit disagreement rate) and flag rate for this organization. Operator only: it carries the audit cost.
+      case 'safetyNetStats':
+        requireOperator(auth);
+        result = { ok: true, stats: await (await import('./_lib/safetynet/hook.js')).statsFor(ctx, payload.days) };
+        break;
       case 'askFeedback': {
         const question = typeof payload.question === 'string' ? payload.question.trim().slice(0, 300) : '';
         if (!question || (payload.rating !== 'up' && payload.rating !== 'down')) {
           throw new reviewStore.ReviewError('askFeedback requires a question and a rating of "up" or "down".', 400);
+        }
+        if (payload.rating === 'down' && payload.report && typeof payload.report === 'object') {
+          // REPORT A WRONG ANSWER (DONOVAN_LEARNING_CASES, default OFF): keep question + answer + cited pages as a learning case; the replacement answer is the replay below.
+          const rp = payload.report;
+          await (await import('./_lib/safetynet/hook.js')).recordReport(ctx, { question, report: { answerText: String(rp.answerText ?? '').slice(0, 800), lane: String(rp.lane ?? '').slice(0, 20), sources: Array.isArray(rp.sources) ? rp.sources.slice(0, 8) : [] } });
         }
         if (payload.rating === 'up') {
           result = { ok: true, ...(await applyThumbsUp({ ctxArg: ctx, question, isOperator: isPlatformOperator(auth), decidedBy: auth.userId })) };

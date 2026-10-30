@@ -1058,11 +1058,16 @@ export const reviewClient = {
 
   /** Thumbs on an answer. Up confirms the recipe behind it; down records a correction miss, retires any
    *  live shortcut for that question and re-asks Donovan once, with the note as a hint. */
-  askFeedback(question: string, rating: 'up' | 'down', note?: string) {
+  askFeedback(question: string, rating: 'up' | 'down', note?: string, report?: { answerText: string; lane?: string; sources: { documentId: string; page: number | null }[] }) {
     return postJson<{
       ok: boolean; status?: string; retired?: boolean; budget?: boolean;
       replay?: { outcome: 'answered_now' | 'still_failing'; reason: string | null; answer: MissReplay['answer'] } | null;
-    }>({ action: 'askFeedback', question, rating, note });
+    }>({ action: 'askFeedback', question, rating, note, report });
+  },
+
+  /** Follow-up note from the background double-check of a Donovan-alone answer ({note:null} unless the server switch is on and it disagreed). */
+  auditNote(question: string) {
+    return postJson<{ ok: boolean; note: string | null }>({ action: 'auditNote', question });
   },
 
   /** approved + auto_approved items as JSON, for folding into the repo's

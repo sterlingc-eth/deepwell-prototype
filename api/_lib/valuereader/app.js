@@ -34,11 +34,14 @@ export function answerFromPrepared({ corpus, idx }, question) {
   for (const x of ex) { const h = idx.get(`${x.doc}\u0000${x.page}`); if (!h || h.dup) return null; const k = `${h.documentId}:${x.page}`; if (seen.has(k)) continue; seen.add(k); srcs.push({ documentId: h.documentId, location: { page: Number(x.page) } }); names.push(`page ${x.page} of ${h.name}`); }
   if (!srcs.length) { srcs.push({ documentId: hit.documentId, location: { page: Number(r.page) } }); names.push(`page ${r.page} of ${hit.name}`); }
   const detail = r.detail ? ` Worked from: ${String(r.detail).slice(0, 400)}.` : "";
-  return {
+  const out = {
     kind: "answer", text: `${label}: ${shown} (${names.join("; ")}, printed as "${shown}").${detail}`, facts: [{ label, value: shown }],
     sources: srcs,
     confidence: 1, verifiedCount: 1, unverifiedCount: 0, closest: [], valueReader: true,
   };
+  // safety net: the reader's score, kept OFF the wire (non-enumerable, never serialized to the customer)
+  Object.defineProperty(out, "_audit", { value: { score: typeof r.score === "number" ? r.score : undefined }, enumerable: false });
+  return out;
 }
 
 /** Ask side. ctx = the ask handler's ctxArg. Returns an answer `data` object or null. Never throws. */

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Loader2, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { reviewClient } from '../services/reviewClient';
 
@@ -9,14 +9,26 @@ import { reviewClient } from '../services/reviewClient';
  * teach anything.) Everything it says back is what the server actually did - no pretending. The parent keys it by question +
  * answer so a new answer starts fresh.
  */
-export function AnswerFeedback({ question }: { question: string }) {
+export type ReportedAnswer = { text: string; lane?: string; sources: { documentId: string; page: number | null }[] };
+
+export function AnswerFeedback({ question, answer }: { question: string; answer?: ReportedAnswer }) {
   const [step, setStep] = useState<'idle' | 'sending' | 'done'>('idle');
   const [message, setMessage] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+
+  // Background double-check (server switch DONOVAN_AUDIT_CORRECT, default off): only Donovan-alone answers are checked, so ask twice, late, and show a note only if one exists.
+  useEffect(() => {
+    if (!answer?.lane) return;
+    let live = true;
+    const ask = () => { reviewClient.auditNote(question).then((r) => { if (live && r.note) setNote(r.note); }).catch(() => {}); };
+    const t1 = window.setTimeout(ask, 9000); const t2 = window.setTimeout(ask, 25000);
+    return () => { live = false; window.clearTimeout(t1); window.clearTimeout(t2); };
+  }, [question, answer?.lane]);
 
   const send = async (rating: 'up' | 'down') => {
     setStep('sending');
     try {
-      const r = await reviewClient.askFeedback(question, rating);
+      const r = await reviewClient.askFeedback(question, rating, undefined, rating === 'down' && answer ? { answerText: answer.text, lane: answer.lane, sources: answer.sources } : undefined);
       if (rating === 'up') setMessage('Thanks - noted.');
       else if (r.budget) setMessage('Logged. The daily AI budget is used up, so Donovan will re-check it later.');
       else if (r.replay?.outcome === 'answered_now') setMessage(`Checked again: ${r.replay.answer?.text ?? 'Donovan has a new answer.'}`);
@@ -39,12 +51,14 @@ export function AnswerFeedback({ question }: { question: string }) {
           <button type="button" className={btn} aria-label="Yes, this answer was right" disabled={step === 'sending'} onClick={() => void send('up')} data-tap-target="true">
             <ThumbsUp className="w-4 h-4" aria-hidden="true" />
           </button>
-          <button type="button" className={btn} aria-label="No, this answer was wrong" disabled={step === 'sending'} onClick={() => void send('down')} data-tap-target="true">
+          <button type="button" className={`${btn} !w-auto gap-1.5 px-3`} aria-label="Report a wrong answer" disabled={step === 'sending'} onClick={() => void send('down')} data-tap-target="true">
             {step === 'sending' ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <ThumbsDown className="w-4 h-4" aria-hidden="true" />}
+            <span>Report a wrong answer</span>
           </button>
         </>
       )}
       {step === 'done' && message && <span role="status">{message}</span>}
+      {note && <span role="status" data-testid="audit-note" className="basis-full">{note}</span>}
     </div>
   );
 }
