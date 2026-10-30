@@ -358,6 +358,7 @@
     "verify:dql-vocabcard-r25": "node scripts/verify-dql-vocabcard-r25.mjs",
     "verify:google-sync": "tsx scripts/verify-google-sync.ts",
     "verify:google-picker": "tsx scripts/verify-google-picker.ts",
+    "verify:connectors": "node scripts/verify-connectors.mjs",
     "verify:reader-verifier": "node scripts/verify-reader-verifier.mjs",
     "verify:license-barcode": "node scripts/verify-license-barcode.mjs",
     "verify:demo-tryown": "tsx scripts/verify-demo-tryown.ts"

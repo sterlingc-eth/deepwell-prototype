@@ -950,6 +950,7 @@ export default async function handler(req, res) {
     return b;
   };
   const releaseOn = () => releaseEscalationEnabled() && (!scorecardCall || scorecardCall.releaseEscalation === true);
+  let absAuditCtx = null; // H327: set once the tenant ctx exists
   const send = async (status, body) => {
     // while the escalation runs, an ANSWER is delivered at once; a decline is held (the original decline, or the chips, is the fallback)
     if (release.active && status === 200) {
@@ -985,6 +986,10 @@ export default async function handler(req, res) {
       b = { ...b, data: release.pendingClarify };
     }
     if (b?.data && typeof b.data === "object") stripReleaseMarker(b.data);
+    // H327 absence_audit (DONOVAN_ABSAUDIT, default OFF): a "No X on file" decline is replaced by a pointer when X is in any stored document's text or filename. Stricter-only: claims no value.
+    if (absAuditCtx && status === 200 && b?.data && b.data.kind === "no-answer" && /^(?:1|true|on|yes)$/i.test(String(process.env.DONOVAN_ABSAUDIT ?? "").trim())) {
+      try { const rep = await (await import("./_lib/valuereader/app.js")).auditAbsence(absAuditCtx.ctx, absAuditCtx.question, String(b.data.text ?? "")); if (rep) b = { ...b, data: { ...b.data, text: rep, absenceAudit: true } }; } catch { /* leave the decline unchanged */ }
+    }
     const sent = sendBase(status, b);
     if (v2ShadowLater) await readerV2Hook(readerV2Ctx, b); // shadow log only (never replaces the reply that has already gone out)
     return sent;
@@ -1117,6 +1122,7 @@ export default async function handler(req, res) {
     }
 
     const ctxArg = { tenantKey: auth.tenantId, tenantName: auth.orgId ?? auth.tenantId };
+    absAuditCtx = { ctx: ctxArg, question };
     // ENTITY SAFETY: which customer(s) does the question name? Several fit -> "which one?" with address / phone / last job of each, never a guess.
     setEntityHint(null);
     if (entityGateEnabled()) {

@@ -102,14 +102,17 @@ export const IMPORT_ALLOWANCE_CODE = 'import-allowance-exhausted';
  * DONOVAN_SAFETY_MESSAGE.
  */
 export const DONOVAN_SAFETY = Object.freeze({ perDay: 3_000, perMonth: 30_000 });
+/** Secondary guard (owner 2026-10-30): per-tier monthly model-reaching asks. The AI dollar allowance (aiAllowance.js) is the primary guard. */
+export const DONOVAN_SAFETY_PER_MONTH_BY_PLAN = Object.freeze({ solo: 1_000, shop: 3_000, crew: 8_000, fleet: 20_000, demo: 500 });
 export const DONOVAN_SAFETY_MESSAGE =
   "Donovan is seeing unusually high usage on your account. Please contact support@deepwelltechnology.com and we'll get you sorted out.";
 
 /** Monthly safety ceiling, with DONOVAN_SAFETY_ASKS_PER_MONTH layered on top
  * (a positive number, anything else falls back to the default). */
-export function donovanSafetyPerMonth(env = process.env) {
+export function donovanSafetyPerMonth(env = process.env, plan = null) {
   const n = Number(env?.DONOVAN_SAFETY_ASKS_PER_MONTH);
-  return Number.isFinite(n) && n > 0 ? Math.trunc(n) : DONOVAN_SAFETY.perMonth;
+  if (Number.isFinite(n) && n > 0) return Math.trunc(n);
+  return DONOVAN_SAFETY_PER_MONTH_BY_PLAN[plan] ?? DONOVAN_SAFETY.perMonth;
 }
 
 /**
@@ -466,7 +469,7 @@ export function gateAsk(tenantRow, usage, now = new Date(), env = process.env) {
     return requireActiveBilling(tenantRow, now);
   }
 
-  if ((Number(usage?.asksThisMonth) || 0) >= donovanSafetyPerMonth(env)) {
+  if ((Number(usage?.asksThisMonth) || 0) >= donovanSafetyPerMonth(env, tenantRow?.plan)) {
     return { allowed: false, status: 429, error: DONOVAN_SAFETY_MESSAGE, scope: 'safety' };
   }
   return { allowed: true };

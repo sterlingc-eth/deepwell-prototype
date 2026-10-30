@@ -90,6 +90,11 @@ const ACTIONS = { keys, export: tenantExport, "export-files": accountExport, del
   // Data backup (nightly encrypted copy to a separate bucket): ships OFF. With DEEPWELL_BACKUP unset the handler answers
   // 404 / {enabled:false} and nothing else in backup/ is loaded. Cron-secret or platform operator only.
   backup: (q, s) => import("./_lib/backup/route.js").then((m) => m.default(q, s)),
+  // Storage connectors (Google Drive folders, Dropbox, OneDrive/SharePoint, email-in): ships OFF. With DEEPWELL_CONNECTORS unset
+  // nothing from _lib/connectors/ is imported and every operation but "status" answers 404.
+  connectors: (q, s) => process.env.DEEPWELL_CONNECTORS === "1"
+    ? import("./_lib/connectors/route.js").then((m) => m.default(q, s))
+    : s.status(q.method === "POST" && q.body?.op === "status" ? 200 : 404).json(q.method === "POST" && q.body?.op === "status" ? { enabled: false } : { error: "Not available." }),
   "google-sync": (q, s) => process.env.DEEPWELL_GOOGLE_SYNC === "1"
     ? import("./_lib/googleSync/route.js").then((m) => m.default(q, s))
     : s.status(q.method === "POST" && q.body?.op === "status" ? 200 : 404).json(q.method === "POST" && q.body?.op === "status" ? { enabled: false } : { error: "Not available." }) };

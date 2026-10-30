@@ -544,5 +544,22 @@ function buildFunctions(inngest, NonRetriableError) {
     ));
   }
 
+  // Storage connectors (api/_lib/connectors): checks every linked folder every 20 minutes. Defined ONLY when DEEPWELL_CONNECTORS=1.
+  if (process.env.DEEPWELL_CONNECTORS === "1") {
+    extra.push(inngest.createFunction(
+      {
+        id: "connectors-sync",
+        name: "Check linked storage folders for new files",
+        concurrency: [{ limit: 1 }],
+        retries: 1,
+        triggers: [{ cron: "*/20 * * * *" }],
+      },
+      async ({ step }) => step.run("sync-linked-folders", async () => {
+        const { runConnectorSweep } = await import("./connectors/sweep.js");
+        return runConnectorSweep({ deadlineAt: Date.now() + 40_000 });
+      })
+    ));
+  }
+
   return [readDocument, extractFields, accountExport, ...extra];
 }

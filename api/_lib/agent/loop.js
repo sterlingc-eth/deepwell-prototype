@@ -35,7 +35,7 @@ import { shapeAgentAnswer } from "./shape.js";
 import { citeAgentData } from "../citations/agent.js";
 import { selectWorkedExamples, formatWorkedExamples } from "../learning/recipes.js";
 // Sonnet escalation for hard questions / failed Haiku runs (escalation.js) and the page-image tool's prompt text.
-import { escalationModel, classifyQuestionDifficulty, needsEscalation, sonnetAllowed, recordSonnetSpend, MIN_ESCALATION_MS, isEscalationEnabled } from "./escalation.js";
+import { escalationModel, classifyQuestionDifficulty, needsEscalation, sonnetAllowed, recordSonnetSpend, MIN_ESCALATION_MS, isEscalationEnabled, logEscalation, QUESTION_SONNET_INPUT_CAP } from "./escalation.js";
 import { VIEW_PAGE_DOCS } from "./viewPage.js";
 import { packForTenant } from "../industry/index.js";
 
@@ -391,7 +391,8 @@ export async function runDonovanAgent(p) {
   let firstReason = null;
   if (canEscalate) {
     if (escalate) firstReason = "forced";
-    else if (classifyQuestionDifficulty(question).hard) firstReason = "hard-question";
+    // Tiered policy: Haiku answers first. Starting on Sonnet because a question LOOKS hard is opt-in (DONOVAN_SONNET_FIRST_ON_HARD=1).
+    else if (env?.DONOVAN_SONNET_FIRST_ON_HARD === "1" && classifyQuestionDifficulty(question).hard) firstReason = "hard-question";
   }
   // The daily-cap read is a DB round trip: only made when an escalation is actually being considered.
   let gate;
@@ -416,7 +417,7 @@ export async function runDonovanAgent(p) {
     else if (deadline - Date.now() < MIN_ESCALATION_MS) escalation = { skipped: "no-time", wanted: why };
     else {
       try {
-        second = await runAgentOnce({ ...args, model: sonnet, deadlineAt: deadline });
+        second = await runAgentOnce({ ...args, model: sonnet, deadlineAt: deadline, limits: { ...(args.limits ?? {}), inputTokenCap: Math.min(args.limits?.inputTokenCap ?? QUESTION_SONNET_INPUT_CAP, QUESTION_SONNET_INPUT_CAP) } });
         sonnetCostUsd += second.costUsd;
         const better = second.handled && (!first.handled || (second.dropped?.facts ?? 0) < (first.dropped?.facts ?? 0));
         const merged = mergeRuns(first, second);
@@ -434,6 +435,7 @@ export async function runDonovanAgent(p) {
   // Meter the Sonnet share of today's spend (best-effort): what is left of the cap is what the next ask may use.
   if (sonnetCostUsd > 0) await recordSonnetSpend(withTenant, ctxArg, sonnetCostUsd);
 
+  if (escalation) logEscalation({ path: "agent-v1", from: escalation.from ?? AGENT_MODEL, to: escalation.to ?? null, reason: escalation.reason ?? escalation.wanted ?? null, skipped: escalation.skipped ?? null, outcome: escalation.outcome ?? null, sonnetCostUsd: Math.round(sonnetCostUsd * 1e6) / 1e6 });
   const models = [...new Set([first.model, ...(second ? [second.model] : [])])];
   return { ...result, models, ...(escalation ? { escalation } : {}) };
 }

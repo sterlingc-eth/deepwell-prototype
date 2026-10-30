@@ -81,6 +81,22 @@
       "destination": "/api/account?action=sweep"
     },
     {
+      "source": "/api/connectors/callback",
+      "destination": "/api/account?action=connectors&op=callback"
+    },
+    {
+      "source": "/api/connectors/inbound",
+      "destination": "/api/account?action=connectors&op=email-inbound"
+    },
+    {
+      "source": "/api/connectors/push",
+      "destination": "/api/account?action=connectors&op=push"
+    },
+    {
+      "source": "/api/connectors",
+      "destination": "/api/account?action=connectors"
+    },
+    {
       "source": "/api/google-sync/callback",
       "destination": "/api/account?action=google-sync&op=callback"
     },

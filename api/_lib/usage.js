@@ -58,6 +58,11 @@ export async function recordModelCall(
   if (meter) meter.add(model, { inputTokens, outputTokens, cacheReadInputTokens, cacheCreationInputTokens });
   const tenantKey = ctx?.tenantKey;
   if (!tenantKey) return; // nothing to attribute this call to
+  // Monthly total AI allowance (aiAllowance.js): every paid call adds its estimated dollars. Best-effort, never throws.
+  try {
+    const [{ withTenant }, { recordAllowanceSpend }] = await Promise.all([import("./recordsStore.js"), import("./aiAllowance.js")]);
+    await recordAllowanceSpend(withTenant, ctx, estimateModelCostUsd(model, { inputTokens, outputTokens, cacheReadInputTokens, cacheCreationInputTokens }));
+  } catch { /* metering only */ }
 
   try {
     const { rows } = await getAuxPool().query("SELECT resolve_tenant($1, $2) AS id", [

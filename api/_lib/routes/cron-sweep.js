@@ -586,6 +586,17 @@ export default async function handler(req, res) {
     await captureException(err, { route: "/api/cron-sweep", stage: "notifications" });
   }
 
+  // Storage connectors safety net (api/_lib/connectors): same pattern. Does nothing, imports nothing, unless DEEPWELL_CONNECTORS=1.
+  if (process.env.DEEPWELL_CONNECTORS === "1") {
+    try {
+      const { runConnectorSweep } = await import("../connectors/sweep.js");
+      summary.connectors = await runConnectorSweep({ deadlineAt: Math.min(deadlineAt + 60_000, Date.now() + 90_000) });
+    } catch (err) {
+      summary.connectors = { error: err?.message };
+      await captureException(err, { route: "/api/cron-sweep", stage: "connectors" });
+    }
+  }
+
   // Google Drive / Gmail sync safety net (api/_lib/googleSync): the 20-minute Inngest schedule is the main driver; this nightly
   // pass catches anything it missed. Does nothing (and imports nothing) unless DEEPWELL_GOOGLE_SYNC=1.
   if (process.env.DEEPWELL_GOOGLE_SYNC === "1") {

@@ -46,7 +46,7 @@ import { ALL_TOOL_DEFS_V2, ANSWER_TOOL_NAME, VIEW_DOCS, createToolbox } from "./
 import { shapeAgentAnswer } from "./shape.js";
 import { citeAgentData } from "../citations/agent.js";
 import { selectWorkedExamples, formatWorkedExamples } from "../learning/recipes.js";
-import { escalationModel, sonnetAllowed, recordSonnetSpend, isEscalationEnabled, classifyQuestionDifficulty, needsEscalation, MIN_ESCALATION_MS } from "./escalation.js";
+import { escalationModel, sonnetAllowed, recordSonnetSpend, isEscalationEnabled, classifyQuestionDifficulty, needsEscalation, MIN_ESCALATION_MS, logEscalation, QUESTION_SONNET_INPUT_CAP } from "./escalation.js";
 import { VIEW_PAGE_DOCS } from "./viewPage.js";
 import { packForTenant } from "../industry/index.js";
 import { runToolsBounded } from "./loop.js";
@@ -156,7 +156,8 @@ export function isResearchAgentEnabled(env = process.env) {
 
 /** Per-tenant/day cap check, reusing escalation.js's generalized sonnetAllowed with our own bucket. */
 export async function researchAllowed(withTenant, ctxArg, env = process.env) {
-  return sonnetAllowed(withTenant, ctxArg, env, Date.now(), { capUsd: researchDailyCapUsd(env), bucket: RESEARCH_BUCKET });
+  const explicit = env?.DONOVAN_RESEARCH_DAILY_USD;
+  return sonnetAllowed(withTenant, ctxArg, env, Date.now(), { ...(explicit !== undefined && explicit !== "" ? { capUsd: researchDailyCapUsd(env) } : {}), bucket: RESEARCH_BUCKET, planGated: true });
 }
 
 function researchSystemPromptFor(businessNoun) {
@@ -286,7 +287,8 @@ async function runResearchAgentOnce({ withTenant, ctxArg, question, today, overl
 
   const emit = (type, message) => { if (typeof onEvent === "function") { try { onEvent({ type, message }); } catch { /* streaming is best-effort */ } } };
 
-  const gate = await researchAllowed(withTenant, ctxArg, env);
+  const isHaikuRun = /haiku/i.test(String(runModel ?? ""));
+  const gate = isHaikuRun ? { allowed: true } : await researchAllowed(withTenant, ctxArg, env); // only Sonnet runs are gated here; Haiku runs are covered by the monthly total allowance
   if (!gate.allowed) {
     return { handled: false, data: null, reason: `budget:${gate.why}`, model: runModel, modelCalls: 0, inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, costUsd: 0, steps: [], modelCallsMs: [], queries: [], dropped: null, models: [runModel] };
   }
@@ -531,7 +533,7 @@ async function runResearchAgentOnce({ withTenant, ctxArg, question, today, overl
   await Promise.allSettled(records);
   costUsd = Math.round(costUsd * 1_000_000) / 1_000_000;
   const handled = Boolean(shaped?.answered);
-  if (costUsd > 0) await recordSonnetSpend(withTenant, ctxArg, costUsd, Date.now(), RESEARCH_BUCKET);
+  if (costUsd > 0 && !isHaikuRun) await recordSonnetSpend(withTenant, ctxArg, costUsd, Date.now(), RESEARCH_BUCKET);
 
   console.log(
     JSON.stringify({
@@ -592,7 +594,7 @@ async function runResearchAgentOnce({ withTenant, ctxArg, question, today, overl
  * the exact same grounding gates Sonnet's does.
  */
 export const CHEAP_MODEL = process.env.DONOVAN_CHEAP_MODEL || "claude-haiku-4-5";
-export const isCheapTierEnabled = (env = process.env) => env?.DONOVAN_CHEAP_TIER === "1";
+export const isCheapTierEnabled = (env = process.env) => env?.DONOVAN_CHEAP_TIER !== "0"; // tiered policy 2026-10-30: Haiku first by default
 export const CHEAP_TIER_LIMITS = Object.freeze({ maxTurns: 3, maxToolCalls: 6 });
 
 /** Pure: is this question simple enough to try on the cheap model first? */
@@ -634,13 +636,17 @@ function mergeTieredRuns(cheap, full, why) {
  */
 export async function runResearchAgent(params) {
   const env = params?.env ?? process.env;
-  if (!isCheapTierEnabled(env) || params?.model || !isCheapTierCandidate(params?.question)) return runResearchAgentOnce(params);
+  if (!isCheapTierEnabled(env) || params?.model) return runResearchAgentOnce(params);
+  const simple = isCheapTierCandidate(params?.question); // simple lookups keep the tight budget; harder questions get the full budget but still START on Haiku
 
   const deadline = params.deadlineAt ?? Date.now() + DEFAULT_DEADLINE_MS_V2;
-  const cheap = await runResearchAgentOnce({ ...params, model: CHEAP_MODEL, deadlineAt: deadline, limits: { ...CHEAP_TIER_LIMITS, ...(params.limits ?? {}) } });
+  const cheap = await runResearchAgentOnce({ ...params, model: CHEAP_MODEL, deadlineAt: deadline, limits: { ...(simple ? CHEAP_TIER_LIMITS : {}), ...(params.limits ?? {}) } });
   const why = cheapRunNeedsFullModel(cheap);
   if (!why) return cheap;
   if (deadline - Date.now() < MIN_ESCALATION_MS) return cheap; // no time for a second run: the cheap result stands as-is
-  const full = await runResearchAgentOnce({ ...params, model: RESEARCH_MODEL, deadlineAt: deadline });
+  const gate = await researchAllowed(params.withTenant, params.ctxArg, env);
+  if (!gate.allowed || /haiku/i.test(String(RESEARCH_MODEL))) { logEscalation({ path: "research-v2", from: CHEAP_MODEL, to: null, reason: why, skipped: gate.allowed ? "same-model" : gate.why }); return { ...cheap, escalation: { skipped: gate.why ?? "same-model", wanted: why } }; }
+  const full = await runResearchAgentOnce({ ...params, model: RESEARCH_MODEL, deadlineAt: deadline, limits: { ...(params.limits ?? {}), inputTokenCap: Math.min(params.limits?.inputTokenCap ?? QUESTION_SONNET_INPUT_CAP, QUESTION_SONNET_INPUT_CAP) } });
+  logEscalation({ path: "research-v2", from: CHEAP_MODEL, to: RESEARCH_MODEL, reason: why, outcome: full.handled ? "sonnet-answer" : "sonnet-unanswered", sonnetCostUsd: full.costUsd ?? 0 });
   return mergeTieredRuns(cheap, full, why);
 }

@@ -34,6 +34,53 @@ export const SONNET_BUCKET = "sonnet_usd_micro";
 
 export const isEscalationEnabled = (env = process.env) => env?.DONOVAN_ESCALATION !== "0";
 
+/* ------------------------------------------------------------------ TIERED MODEL POLICY (owner directive 2026-10-30)
+ * Haiku is the default for EVERYTHING. Sonnet is a gated escalation reachable ONLY from the designated paths
+ * (agent/loop.js, agent/loopV2.js and, when wired, readDocument's hard-page fallback). Never audits, support, learning or the demo.
+ * Budgets (all env-overridable, all fail closed => the Haiku answer stands or Donovan declines):
+ *   monthly per tenant by plan   DONOVAN_SONNET_MONTHLY_USD_<SOLO|SHOP|CREW|FLEET|TRIAL>  solo 6, shop(Team) 9, crew 14, fleet 35, trial 1 total
+ *   daily per tenant             monthly / 8 (DONOVAN_SONNET_DAILY_USD, if set explicitly, wins)
+ *   platform-wide daily          DONOVAN_SONNET_PLATFORM_DAILY_USD, default $10 (sum of every tenant's Sonnet buckets that UTC day)
+ *   per question                 1 Sonnet attempt, 40k input tokens, 1.5k output tokens => hard stop about $0.095 at $2/$10 per MTok
+ */
+export const HAIKU_MODEL = "claude-haiku-4-5";
+export const SONNET_MONTHLY_USD = Object.freeze({ solo: 6, shop: 9, crew: 14, fleet: 35, trial: 1, demo: 0 });
+export const SONNET_DAILY_DIVISOR = 8;
+export const DEFAULT_PLATFORM_SONNET_DAILY_USD = 10;
+export const QUESTION_SONNET_INPUT_CAP = 40_000;
+export const QUESTION_SONNET_OUTPUT_CAP = 1_500;
+export const QUESTION_SONNET_HARD_STOP_USD = 0.095;
+export const SONNET_BUCKETS = Object.freeze(["sonnet_usd_micro", "research_usd_micro"]);
+const nonNeg = (v) => { const n = Number(v); return v !== undefined && v !== null && v !== "" && Number.isFinite(n) && n >= 0 ? n : null; };
+
+/** Monthly Sonnet cap for a plan (unknown plan => 0, fail closed). Trial billing_status wins over plan. */
+export function sonnetMonthlyCapUsd(plan, billingStatus, env = process.env) {
+  const key = /trial/i.test(String(billingStatus ?? "")) ? "trial" : String(plan ?? "").toLowerCase();
+  if (!Object.prototype.hasOwnProperty.call(SONNET_MONTHLY_USD, key)) return 0;
+  return nonNeg(env?.[`DONOVAN_SONNET_MONTHLY_USD_${key.toUpperCase()}`]) ?? SONNET_MONTHLY_USD[key];
+}
+export const sonnetDailyCapForPlanUsd = (plan, billingStatus, env = process.env) =>
+  nonNeg(env?.DONOVAN_SONNET_DAILY_USD) ?? sonnetMonthlyCapUsd(plan, billingStatus, env) / SONNET_DAILY_DIVISOR;
+export const platformSonnetDailyUsd = (env = process.env) => nonNeg(env?.DONOVAN_SONNET_PLATFORM_DAILY_USD) ?? DEFAULT_PLATFORM_SONNET_DAILY_USD;
+
+/** Pure gate decision. null/undefined spend => deny (fail closed). */
+export function decideSonnet({ plan, billingStatus, spentDayUsd, spentMonthUsd, spentPlatformDayUsd, env = process.env }) {
+  const monthCap = sonnetMonthlyCapUsd(plan, billingStatus, env);
+  if (monthCap <= 0) return { allowed: false, why: "plan-no-sonnet" };
+  const dayCap = sonnetDailyCapForPlanUsd(plan, billingStatus, env);
+  const platCap = platformSonnetDailyUsd(env);
+  for (const v of [spentDayUsd, spentMonthUsd, spentPlatformDayUsd]) if (v === null || v === undefined || !Number.isFinite(v)) return { allowed: false, why: "spend-unreadable" };
+  if (spentMonthUsd >= monthCap) return { allowed: false, why: "monthly-cap", spentUsd: spentMonthUsd, capUsd: monthCap };
+  if (spentDayUsd >= dayCap) return { allowed: false, why: "daily-cap", spentUsd: spentDayUsd, capUsd: dayCap };
+  if (spentPlatformDayUsd >= platCap) return { allowed: false, why: "platform-cap", spentUsd: spentPlatformDayUsd, capUsd: platCap };
+  return { allowed: true, spentUsd: spentDayUsd, capUsd: dayCap, monthCapUsd: monthCap, platformCapUsd: platCap };
+}
+
+/** One structured, question-free line per escalation decision, so the escalation rate (target < 3% of handoffs) can be measured from logs. */
+export function logEscalation(event) {
+  try { console.log(JSON.stringify({ route: "escalation", ts: new Date().toISOString(), ...event })); } catch { /* logging only */ }
+}
+
 export function sonnetDailyCapUsd(env = process.env) {
   const raw = env?.DONOVAN_SONNET_DAILY_USD;
   if (raw === undefined || raw === null || raw === "") return DEFAULT_SONNET_DAILY_USD;
@@ -103,6 +150,8 @@ export function needsEscalation(run) {
   const badQueries = (run.steps ?? []).filter((s) => s.tool === "run_query" && s.error).length;
   if (badQueries >= 2) return "sql-rejected-twice";
   if (run.handled && (run.dropped?.facts ?? 0) > 0) return "grounding-dropped-facts";
+  // Unsure / failed verification on a multi-step (2+ tool calls = cross-record) question.
+  if ((run.steps ?? []).length >= 2 && ((run.dropped?.verify ?? 0) > 0 || (run.dropped?.claims ?? 0) > 0)) return "verification-failed";
   return null;
 }
 
@@ -146,14 +195,36 @@ export async function recordSonnetSpend(withTenant, ctxArg, usd, now = Date.now(
   }
 }
 
-/** True when this tenant may still start a Sonnet run today. `capUsd`/`bucket` let a caller (the research
- *  agent) meter against its own, separately-configured daily cap instead of the escalation one. */
-export async function sonnetAllowed(withTenant, ctxArg, env = process.env, now = Date.now(), { capUsd, bucket = SONNET_BUCKET } = {}) {
+/** True when this tenant may still start a Sonnet run. Plan-gated (monthly + daily + platform) unless a caller passes its own `capUsd`
+ *  (planner/spend.js's Haiku ledgers) and not `planGated`. FAILS CLOSED on any unreadable counter. */
+export async function sonnetAllowed(withTenant, ctxArg, env = process.env, now = Date.now(), { capUsd, bucket = SONNET_BUCKET, planGated } = {}) {
   if (!isEscalationEnabled(env)) return { allowed: false, why: "disabled" };
-  const cap = capUsd ?? sonnetDailyCapUsd(env);
-  if (cap <= 0) return { allowed: false, why: "cap-zero" };
-  const spent = await sonnetSpentTodayUsd(withTenant, ctxArg, now, bucket);
-  if (spent === null) return { allowed: false, why: "spend-unreadable" };
-  if (spent >= cap) return { allowed: false, why: "daily-cap", spentUsd: spent, capUsd: cap };
-  return { allowed: true, spentUsd: spent, capUsd: cap };
+  const gated = planGated ?? capUsd === undefined;
+  if (!gated) {
+    const cap = capUsd ?? sonnetDailyCapUsd(env);
+    if (cap <= 0) return { allowed: false, why: "cap-zero" };
+    const spent = await sonnetSpentTodayUsd(withTenant, ctxArg, now, bucket);
+    if (spent === null) return { allowed: false, why: "spend-unreadable" };
+    if (spent >= cap) return { allowed: false, why: "daily-cap", spentUsd: spent, capUsd: cap };
+    return { allowed: true, spentUsd: spent, capUsd: cap };
+  }
+  try {
+    const day = utcDayStart(now);
+    const monthStart = new Date(Date.UTC(new Date(now).getUTCFullYear(), new Date(now).getUTCMonth(), 1)).toISOString();
+    const t = await withTenant(ctxArg, async (db) => {
+      const p = await db.raw(`SELECT plan, billing_status FROM tenants WHERE id = (current_setting('app.tenant_id', true))::uuid`, []);
+      const d = await db.raw(`SELECT COALESCE(SUM(units),0) AS u FROM rate_limit_windows WHERE tenant_id = (current_setting('app.tenant_id', true))::uuid AND bucket = ANY($1) AND window_start = $2::timestamptz`, [SONNET_BUCKETS, day]);
+      const m = await db.raw(`SELECT COALESCE(SUM(units),0) AS u FROM rate_limit_windows WHERE tenant_id = (current_setting('app.tenant_id', true))::uuid AND bucket = ANY($1) AND window_start >= $2::timestamptz`, [SONNET_BUCKETS, monthStart]);
+      return { plan: p.rows[0]?.plan, billingStatus: p.rows[0]?.billing_status, day: Number(d.rows[0]?.u) / 1e6, month: Number(m.rows[0]?.u) / 1e6 };
+    });
+    let platform = null;
+    try {
+      const { getAuxPool } = await import("../apiKeyAuth.js");
+      const r = await getAuxPool().query(`SELECT COALESCE(SUM(units),0) AS u FROM rate_limit_windows WHERE bucket = ANY($1) AND window_start = $2::timestamptz`, [SONNET_BUCKETS, day]);
+      platform = Number(r.rows[0]?.u) / 1e6;
+    } catch { platform = null; }
+    return decideSonnet({ plan: t.plan, billingStatus: t.billingStatus, spentDayUsd: t.day, spentMonthUsd: t.month, spentPlatformDayUsd: platform, env });
+  } catch {
+    return { allowed: false, why: "spend-unreadable" };
+  }
 }

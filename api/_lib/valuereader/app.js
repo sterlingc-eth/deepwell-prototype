@@ -4,6 +4,7 @@
  * Stricter-only: customer-audience documents only, a collision (same file name + page on two documents) or any error = null. No DB writes, no migration.
  */
 import { buildCorpus, readValue } from "./index.js";
+import { revchainOn, absAuditOn, guardRevision, auditAbsenceAnswer } from "./vr_guard.js";
 
 export const valueReaderOn = () => /^(?:1|true|on|yes)$/i.test(String(process.env.DONOVAN_VALUEREADER ?? "").trim());
 const MAX_PAGES = Number(process.env.DONOVAN_VALUEREADER_MAX_PAGES) > 0 ? Number(process.env.DONOVAN_VALUEREADER_MAX_PAGES) : 20000;
@@ -23,7 +24,8 @@ export function prepare(rows) {
 
 /** Pure: question + prepared library -> answer `data` object (same shape as the docrecord answer) or null (= fall through). */
 export function answerFromPrepared({ corpus, idx }, question) {
-  const r = readValue(corpus, String(question ?? ""), {});
+  let r = readValue(corpus, String(question ?? ""), {});
+  if (revchainOn()) r = guardRevision(corpus, String(question ?? ""), r);   // H328 (DONOVAN_REVCHAIN, default OFF): a stale revision never beats the latest; only ever turns an answer into null
   if (!r || r.ans == null) return null;
   const hit = idx.get(`${r.doc}\u0000${r.page}`);
   const shown = String(r.ans).trim();
@@ -61,4 +63,19 @@ export async function runValueReaderAnswer(ctx, question) {
       return answerFromPrepared(ent, question);
     });
   } catch (err) { console.error("valuereader skipped:", err?.message); return null; }
+}
+
+/** H327 (DONOVAN_ABSAUDIT, default OFF): before a "No X on file" answer goes out, sweep the raw text + filenames of ALL stored documents (read or not) for X.
+ *  Returns replacement answer text (claims no value) or null = leave the answer unchanged. Never throws; no writes. */
+export async function auditAbsence(ctx, question, answerText) {
+  if (!absAuditOn()) return null;
+  try {
+    const { withTenant } = await import("../recordsStore.js");
+    return await withTenant(ctx, async (db) => {
+      const { rows } = await db.raw(
+        `SELECT d.id AS document_id, d.original_filename, dp.page_no, dp.text FROM documents d LEFT JOIN document_pages dp ON dp.document_id = d.id WHERE d.${TENANT} AND d.audience = 'customer' ORDER BY d.id, dp.page_no LIMIT $1`, [MAX_PAGES]);
+      const pages = rows.map((r) => ({ docId: r.document_id, file: String(r.original_filename ?? ""), page_no: r.page_no ?? 1, text: r.text ?? "" }));
+      return auditAbsenceAnswer(pages, question, answerText);
+    });
+  } catch (err) { console.error("absence audit skipped:", err?.message); return null; }
 }

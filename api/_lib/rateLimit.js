@@ -649,6 +649,16 @@ export async function assertModelBudget(ctx) {
   if (status.exceeded) {
     throw new ModelBudgetExceededError(status.message ?? DAILY_MODEL_BUDGET_MESSAGE);
   }
+  // Monthly total AI allowance (aiAllowance.js), fail CLOSED for paid calls: callers already map ModelBudgetExceededError to
+  // "waiting for next allowance" (queue.js) or a plain 429 (no raw error, no dollars). Skipped with no tenant or AI_ALLOWANCE=0.
+  if (ctx?.tenantKey && process.env.AI_ALLOWANCE !== "0") {
+    const [{ withTenant }, a] = await Promise.all([import("./recordsStore.js"), import("./aiAllowance.js")]);
+    const st = await a.allowanceStatus(withTenant, ctx);
+    if (!st.allowed) {
+      const resetAt = a.nextResetUtc();
+      throw new ModelBudgetExceededError(a.allowanceMessage(), Math.max(1, Math.ceil((resetAt.getTime() - Date.now()) / 1000)));
+    }
+  }
   return status;
 }
 
