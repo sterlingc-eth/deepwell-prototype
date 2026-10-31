@@ -3,8 +3,8 @@
  * deterministic valuereader1 and answered with the verbatim value plus a page citation; anything else returns null and the existing chain runs unchanged.
  * Stricter-only: customer-audience documents only, a collision (same file name + page on two documents) or any error = null. No DB writes, no migration.
  */
-import { buildCorpus, readValue } from "./index.js";
-import { revchainOn, absAuditOn, guardRevision, auditAbsenceAnswer } from "./vr_guard.js";
+import { buildCorpus, readValue, analyze } from "./index.js";
+import { revchainOn, absAuditOn, aggFuzzOn, guardRevision, guardAggregate, auditAbsenceAnswer } from "./vr_guard.js";
 
 export const valueReaderOn = () => /^(?:1|true|on|yes)$/i.test(String(process.env.DONOVAN_VALUEREADER ?? "").trim());
 const MAX_PAGES = Number(process.env.DONOVAN_VALUEREADER_MAX_PAGES) > 0 ? Number(process.env.DONOVAN_VALUEREADER_MAX_PAGES) : 20000;
@@ -26,6 +26,7 @@ export function prepare(rows) {
 export function answerFromPrepared({ corpus, idx }, question) {
   let r = readValue(corpus, String(question ?? ""), {});
   if (revchainOn()) r = guardRevision(corpus, String(question ?? ""), r);   // H328 (DONOVAN_REVCHAIN, default OFF): a stale revision never beats the latest; only ever turns an answer into null
+  if (aggFuzzOn()) r = guardAggregate(corpus, String(question ?? ""), r, analyze(String(question ?? ""), corpus).names, 3);   // H340 (DONOVAN_AGGFUZZ, default OFF): a count/sum is withheld when an unattributed scanned page may hold another record of the party; only ever turns an answer into null
   if (!r || r.ans == null) return null;
   const hit = idx.get(`${r.doc}\u0000${r.page}`);
   const shown = String(r.ans).trim();

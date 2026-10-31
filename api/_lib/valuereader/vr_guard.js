@@ -111,3 +111,42 @@ export function auditAbsenceAnswer(pages, question, answerText) {
   if (!claimsDocumentAbsent(answerText, a.keys)) return null;
   return pointerText(a, question);
 }
+
+/**
+ * H340 aggfuzz340 (DONOVAN_AGGFUZZ, default OFF): a count/sum over "all <records> for <party>" is only as complete as the set of pages the reader could attribute to the party.
+ * Scanned/fax pages garble the party name or the record id, so a page of the same record kind can be missed and the count/sum comes out short.
+ * Before releasing a count or sum, sweep the raw text of every page NOT among the counted ones for the party name (exact or OCR-fuzzy, per-token edit distance) together with the record-kind word (fuzzy).
+ * Any such page -> abstain (aggfuzz340). Stricter-only: can only turn an answer into null.
+ */
+export const aggFuzzOn = () => on("DONOVAN_AGGFUZZ");
+const lev = (a, b, cap) => { if (Math.abs(a.length - b.length) > cap) return cap + 1; let p = Array.from({ length: b.length + 1 }, (_, j) => j); for (let i = 1; i <= a.length; i++) { const c = [i]; let mn = i; for (let j = 1; j <= b.length; j++) { const v = Math.min(p[j] + 1, c[j - 1] + 1, p[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); c[j] = v; if (v < mn) mn = v; } if (mn > cap) return cap + 1; p = c; } return p[b.length]; };
+const tokFuzzy = (w, t) => { if (w === t) return true; if (w.length < 4) return false; const cap = w.length >= 8 ? 2 : 1; return lev(w, t, cap) <= cap; };
+const kindFuzzy = (k, t) => { if (t === k) return true; if (k.length < 5) return false; return lev(k, t, 2) <= 2 || (t.length >= 5 && k.length >= 5 && t.startsWith(k.slice(0, 5)) && lev(k, t, 3) <= 3); };
+function nameKind(question) {
+  const q = String(question ?? "");
+  let m = q.match(/\bhow many\s+((?:[a-z-]+\s){0,2}?[a-z-]+?)\s+(?:does|did|has|have|were|are|was|is|do|had|in|for|from)\b/i);
+  if (!m) m = q.match(/\b(?:all|every|each)\s+((?:[a-z-]+\s)?[a-z-]+?)(?:\s+(?:for|from|to|of|issued|received|by|in|made|billed|that)\b|[?.,]|$)/i) || q.match(/\b(?:of|on)\s+(?:all\s+)?([a-z-]+s)\s+(?:for|from|to)\b/i);
+  return m ? toks(m[1]).filter((w) => w.length >= 4).map((w) => w.replace(/s$/, "")) : [];
+}
+/** r = readValue result. names = party name token list. mode 1 = any uncounted page naming the party + kind word; mode 2 = only pages whose party name is NOT an exact match (OCR-garbled). */
+export function guardAggregate(corpus, question, r, names, mode = 1) {
+  if (!r || r.ans == null || !/^(count|sum) of /i.test(String(r.label ?? ""))) return r;
+  const nm = (names ?? []).flatMap((n) => toks(n)).filter(Boolean); const kinds = nameKind(question);
+  if (!nm.length || !kinds.length) return r;
+  const counted = new Set([`${r.doc}\u0000${r.page}`, ...(Array.isArray(r.sources) ? r.sources.map((x) => `${x.doc}\u0000${x.page}`) : [])]);
+  const ids = new Set(); for (const d of corpus.docs) if (counted.has(`${d.file}\u0000${d.page_no}`)) for (const i of d.idset ?? []) ids.add(i);
+  for (const d of corpus.docs) {
+    if (counted.has(`${d.file}\u0000${d.page_no}`)) continue;
+    if (mode >= 3 && !(d.ocr || /\.(png|jpe?g|tiff?|gif|heic|webp|bmp)$/i.test(String(d.file ?? "")))) continue;   // modes 3/4: only pages that came through OCR/photo can hide a party behind garbling
+    const stream = toks(d.text); if (stream.length < 4) continue;
+    let kindHit = false; for (const t of stream.slice(0, 80)) if (kinds.some((k) => kindFuzzy(k, t))) { kindHit = true; break; }
+    if (!kindHit) continue;
+    let exact = false, fuzzy = false;
+    for (let i = 0; i + nm.length <= stream.length && !exact; i++) { let ex = true, fz = true; for (let j = 0; j < nm.length; j++) { const t = stream[i + j]; if (t !== nm[j]) ex = false; if (!tokFuzzy(nm[j], t)) { fz = false; break; } } if (fz && ex) exact = true; else if (fz) fuzzy = true; }
+    if (!exact && !fuzzy) continue;
+    if (exact && (mode === 2 || mode === 4)) continue;
+    if (exact && d.idset && [...d.idset].some((i) => ids.has(i))) continue;   // same record id as a counted page (copy / correction), already reasoned about by the reader
+    return { ans: null, why: "aggfuzz340" };
+  }
+  return r;
+}
